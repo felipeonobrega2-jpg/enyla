@@ -63,8 +63,10 @@ export async function GET() {
       contadorProp:   contadores.find((c) => c.chave === "prop")?.valor ?? 0,
       config:         configRow?.data ?? defaultConfig,
     })
-  } catch (e) {
+  } catch (e: unknown) {
     console.error(e)
-    return NextResponse.json({ error: "DB error" }, { status: 500 })
+    const msg = e instanceof Error ? e.message : String(e)
+    const code = (e as { code?: string }).code
+    return NextResponse.json({ error: "DB error", detail: msg, code }, { status: 500 })
   }
 }
