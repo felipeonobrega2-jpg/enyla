@@ -1,0 +1,242 @@
+"use client"
+
+import { useState } from "react"
+import { KanbanCard, COLUNAS_KANBAN, COL_FECHADO, COL_PERDIDO } from "../types"
+import { brl } from "../utils"
+import { HistItem } from "./HistoricoView"
+import { COL_COLORS } from "./kanban-colors"
+
+export function ClientesView({
+  historico,
+  kanban,
+  onReplicar,
+  onWhatsApp,
+}: {
+  historico: HistItem[]
+  kanban: KanbanCard[]
+  onReplicar: (item: HistItem) => void
+  onWhatsApp: (item: HistItem) => void
+}) {
+  const [busca, setBusca] = useState("")
+  const [expandido, setExpandido] = useState<string | null>(null)
+  const [ordem, setOrdem] = useState<"valor" | "nome" | "orcamentos" | "recente">("valor")
+
+  // Agrupar histórico por cliente (mantendo índice mais recente para sort)
+  const porCliente = historico.reduce((acc, item, idx) => {
+    const nome = item.form.nomeCliente?.trim() || "Sem nome"
+    if (!acc[nome]) acc[nome] = { itens: [], firstIdx: idx }
+    acc[nome].itens.push(item)
+    return acc
+  }, {} as Record<string, { itens: HistItem[]; firstIdx: number }>)
+
+  // Para cada cliente, buscar status no kanban por numero
+  const clientes = Object.entries(porCliente).map(([nome, { itens, firstIdx }]) => {
+    const precoIdeal = (item: HistItem) => {
+      const ideal = item.calculo.tabela.find(l => l.quantidade === item.calculo.sweetSpotIdealQtd) ?? item.calculo.tabela[0]
+      return item.form.comFaca ? (ideal?.precoComFaca ?? 0) : (ideal?.precoSemFaca ?? 0)
+    }
+    const cardsCliente = kanban.filter(c =>
+      itens.some(i => i.numero && i.numero === c.numero)
+    )
+    const fechados = cardsCliente.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO).length
+    const perdidos = cardsCliente.filter(c => c.coluna === COL_PERDIDO).length
+    const decididos = fechados + perdidos
+    const totalValor = itens.reduce((s, i) => s + precoIdeal(i), 0)
+    const valorFechado = cardsCliente
+      .filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO)
+      .reduce((s, c) => s + c.preco, 0)
+    const ultimaData = itens[0]?.data ?? ""
+    return { nome, itens, firstIdx, fechados, perdidos, decididos, totalValor, valorFechado, ultimaData }
+  })
+
+  const filtrados = clientes
+    .filter(c => !busca.trim() || c.nome.toLowerCase().includes(busca.toLowerCase()))
+    .sort((a, b) => {
+      if (ordem === "valor")     return b.totalValor - a.totalValor
+      if (ordem === "orcamentos") return b.itens.length - a.itens.length
+      if (ordem === "nome")      return a.nome.localeCompare(b.nome, "pt-BR")
+      if (ordem === "recente")   return a.firstIdx - b.firstIdx
+      return 0
+    })
+
+  // KPIs globais
+  const totalClientes  = clientes.length
+  const totalOrcamentos = historico.length
+  const totalFaturavel = clientes.reduce((s, c) => s + c.valorFechado, 0)
+  const ticketMedGlobal = totalOrcamentos > 0
+    ? clientes.reduce((s, c) => s + c.totalValor, 0) / totalOrcamentos
+    : 0
+
+  if (!historico.length) return (
+    <div className="flex flex-col items-center justify-center h-full text-slate-400">
+      <p className="text-sm">Nenhum orçamento salvo ainda.</p>
+      <p className="text-xs mt-1">Salve orçamentos para ver o histórico por cliente.</p>
+    </div>
+  )
+
+  return (
+    <div className="max-w-4xl mx-auto px-6 py-6 space-y-5">
+
+      {/* KPIs globais */}
+      <div className="grid grid-cols-4 gap-3">
+        {[
+          ["Clientes",        String(totalClientes),     "com orçamentos"],
+          ["Orçamentos",      String(totalOrcamentos),   "no histórico"],
+          ["Ticket médio",    brl(ticketMedGlobal),      "por orçamento"],
+          ["Receita fechada", brl(totalFaturavel),       "orçamentos fechados"],
+        ].map(([label, val, sub]) => (
+          <div key={label} className="bg-white border border-slate-100 rounded-xl p-4">
+            <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">{label}</p>
+            <p className="text-xl font-black text-slate-800 mt-1 leading-none">{val}</p>
+            <p className="text-[10px] text-slate-400 mt-1">{sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtros */}
+      <div className="flex gap-2 items-center">
+        <div className="relative flex-1">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+          </svg>
+          <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar cliente…"
+            className="w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          {busca && <button onClick={() => setBusca("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 text-lg leading-none">×</button>}
+        </div>
+        <select value={ordem} onChange={e => setOrdem(e.target.value as typeof ordem)}
+          className="border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="valor">Maior valor</option>
+          <option value="orcamentos">Mais orçamentos</option>
+          <option value="nome">Nome A–Z</option>
+          <option value="recente">Mais recentes</option>
+        </select>
+      </div>
+
+      {/* Lista de clientes */}
+      <div className="space-y-2">
+        {filtrados.map(({ nome, itens, fechados, perdidos, decididos, totalValor, valorFechado, ultimaData, firstIdx: _fi }) => {
+          const conversao = decididos > 0 ? Math.round(fechados / decididos * 100) : null
+          const aberto    = expandido === nome
+          const inicial   = nome[0]?.toUpperCase() ?? "#"
+
+          return (
+            <div key={nome} className="bg-white border border-slate-100 rounded-xl overflow-hidden hover:border-slate-200 transition-colors">
+
+              {/* Linha do cliente */}
+              <button
+                onClick={() => setExpandido(aberto ? null : nome)}
+                className="w-full flex items-center gap-4 px-5 py-4 text-left"
+              >
+                {/* Avatar */}
+                <div className="w-10 h-10 rounded-full bg-slate-900 text-white text-sm font-bold flex items-center justify-center shrink-0">
+                  {inicial}
+                </div>
+
+                {/* Nome + última atividade */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-slate-800">{nome}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {itens.length} orçamento{itens.length !== 1 ? "s" : ""} · última atividade {ultimaData}
+                  </p>
+                </div>
+
+                {/* Métricas */}
+                <div className="flex items-center gap-5 shrink-0">
+                  {/* Funil mini */}
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <span className="text-slate-500">{itens.length} realizados</span>
+                    {fechados > 0 && <>
+                      <span className="text-slate-300">→</span>
+                      <span className="text-green-600 font-semibold">{fechados} fechados</span>
+                    </>}
+                    {perdidos > 0 && <>
+                      <span className="text-slate-300">·</span>
+                      <span className="text-rose-500">{perdidos} perdidos</span>
+                    </>}
+                  </div>
+
+                  {/* Conversão */}
+                  {conversao !== null && (
+                    <div className="text-center min-w-[48px]">
+                      <p className={`text-sm font-black leading-none ${
+                        conversao >= 60 ? "text-green-600" : conversao >= 35 ? "text-amber-500" : "text-rose-500"
+                      }`}>{conversao}%</p>
+                      <p className="text-[9px] text-slate-400 mt-0.5">conversão</p>
+                    </div>
+                  )}
+
+                  {/* Valor */}
+                  <div className="text-right min-w-[90px]">
+                    <p className="font-bold text-slate-800">{brl(totalValor)}</p>
+                    {valorFechado > 0 && valorFechado !== totalValor && (
+                      <p className="text-[10px] text-green-600">{brl(valorFechado)} fechado</p>
+                    )}
+                  </div>
+
+                  {/* Chevron */}
+                  <svg className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${aberto ? "rotate-180" : ""}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
+
+              {/* Orçamentos do cliente — expandido */}
+              {aberto && (
+                <div className="border-t border-slate-50 divide-y divide-slate-50">
+                  {itens.map((item, i) => {
+                    const ideal = item.calculo.tabela.find(l => l.quantidade === item.calculo.sweetSpotIdealQtd) ?? item.calculo.tabela[0]
+                    const preco = item.form.comFaca ? (ideal?.precoComFaca ?? 0) : (ideal?.precoSemFaca ?? 0)
+                    const card  = kanban.find(c => item.numero && c.numero === item.numero)
+                    const colIdx = card?.coluna ?? null
+                    const statusLabel = colIdx !== null ? COLUNAS_KANBAN[colIdx] : null
+                    const statusColors = colIdx !== null ? COL_COLORS[colIdx] : null
+
+                    return (
+                      <div key={i} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            {item.numero && (
+                              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full">
+                                {item.numero}
+                              </span>
+                            )}
+                            <span className="text-xs text-slate-500">
+                              {item.form.frente}×{item.form.alturaBox}×{item.form.lateral} cm · {item.form.materialNome}
+                            </span>
+                            {statusLabel && statusColors && (
+                              <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${statusColors.badge}`}>
+                                {statusLabel}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{item.data}</p>
+                          {card?.motivoPerdido && (
+                            <p className="text-[10px] text-rose-500 mt-0.5 italic">"{card.motivoPerdido}"</p>
+                          )}
+                        </div>
+                        <p className="font-bold text-slate-700 shrink-0">{brl(preco)}</p>
+                        <div className="flex gap-1.5 shrink-0">
+                          <button onClick={() => onWhatsApp(item)}
+                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-medium rounded-lg transition-colors">
+                            WhatsApp
+                          </button>
+                          <button onClick={() => onReplicar(item)}
+                            className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-700 text-white text-[10px] font-medium rounded-lg transition-colors">
+                            Replicar
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

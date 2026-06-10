@@ -1,0 +1,598 @@
+"use client"
+
+import { useMemo, useState } from "react"
+import {
+  FormData, Calculo, PropostaCustom, KanbanCard, Cliente,
+  COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO,
+} from "../types"
+import { Configuracoes } from "../config"
+import { brl, num } from "../utils"
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type HistoricoItem = { form: FormData; calculo: Calculo; data: string; numero?: string }
+
+interface Props {
+  historico: HistoricoItem[]
+  kanban: KanbanCard[]
+  propostasCustom: PropostaCustom[]
+  clientes: Cliente[]
+  config: Configuracoes
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function parseDataBr(s: string): Date {
+  try {
+    const [d, m, y] = s.split(",")[0].trim().split("/")
+    return new Date(+y, +m - 1, +d)
+  } catch {
+    return new Date(0)
+  }
+}
+
+function fmtShort(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1).replace(".", ",")}M`
+  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`
+  return num(v, 0)
+}
+
+function niceMax(v: number): number {
+  if (v <= 0) return 1000
+  const mag = Math.pow(10, Math.floor(Math.log10(v)))
+  return Math.ceil(v / mag) * mag
+}
+
+const MESES_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+
+function colColor(col: number): string {
+  if (col === COL_PERDIDO) return "bg-rose-100 text-rose-700"
+  if (col === COL_ENTREGUE) return "bg-emerald-100 text-emerald-700"
+  if (col === COL_FECHADO) return "bg-green-100 text-green-700"
+  return "bg-blue-100 text-blue-700"
+}
+
+function colBg(col: number): string {
+  if (col === COL_PERDIDO) return "#fda4af"
+  if (col === COL_ENTREGUE) return "#6ee7b7"
+  if (col === COL_FECHADO) return "#86efac"
+  const blues = ["#93c5fd", "#7dd3fc", "#67e8f9", "#a5b4fc", "#c4b5fd", "#f9a8d4", "#fca5a5", "#fdba74"]
+  return blues[col % blues.length]
+}
+
+// ─── SVG Monthly Chart ────────────────────────────────────────────────────────
+
+interface MonthlyDatum { label: string; volume: number; receita: number }
+
+function MonthlyChart({ data }: { data: MonthlyDatum[] }) {
+  const W = 560, H = 160
+  const PAD_L = 52, PAD_B = 28, PAD_T = 12, PAD_R = 12
+  const chartW = W - PAD_L - PAD_R
+  const chartH = H - PAD_T - PAD_B
+
+  const maxVal = Math.max(...data.map(d => d.volume), 1)
+  const yMax = niceMax(maxVal)
+  const steps = 4
+
+  const groupW = chartW / data.length
+  const barGap = 2
+  const barW = Math.max(4, (groupW - barGap * 3) / 2)
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+      {/* Y grid lines + labels */}
+      {Array.from({ length: steps + 1 }).map((_, i) => {
+        const val = (yMax / steps) * i
+        const y = PAD_T + chartH - (val / yMax) * chartH
+        return (
+          <g key={i}>
+            <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y}
+              stroke="#f1f5f9" strokeWidth={i === 0 ? 1 : 1} />
+            <text x={PAD_L - 6} y={y + 4} textAnchor="end"
+              fontSize={9} fill="#94a3b8" fontFamily="system-ui">
+              {fmtShort(val)}
+            </text>
+          </g>
+        )
+      })}
+
+      {/* X axis line */}
+      <line x1={PAD_L} y1={PAD_T + chartH} x2={W - PAD_R} y2={PAD_T + chartH}
+        stroke="#e2e8f0" strokeWidth={1} />
+
+      {/* Bars */}
+      {data.map((d, i) => {
+        const gx = PAD_L + i * groupW + barGap
+        const hVol = yMax > 0 ? (d.volume / yMax) * chartH : 0
+        const hRec = yMax > 0 ? (d.receita / yMax) * chartH : 0
+        const yVol = PAD_T + chartH - hVol
+        const yRec = PAD_T + chartH - hRec
+        return (
+          <g key={i}>
+            {/* Volume bar (light blue) */}
+            {hVol > 0 && (
+              <rect x={gx} y={yVol} width={barW} height={hVol}
+                rx={3} fill="#bfdbfe" />
+            )}
+            {/* Receita bar (blue) */}
+            {hRec > 0 && (
+              <rect x={gx + barW + barGap} y={yRec} width={barW} height={hRec}
+                rx={3} fill="#3b82f6" />
+            )}
+            {/* X label */}
+            <text x={gx + barW + barGap / 2} y={PAD_T + chartH + 14}
+              textAnchor="middle" fontSize={8.5} fill="#94a3b8" fontFamily="system-ui">
+              {d.label}
+            </text>
+          </g>
+        )
+      })}
+
+      {/* Legend */}
+      <rect x={PAD_L} y={H - 8} width={9} height={9} rx={2} fill="#bfdbfe" />
+      <text x={PAD_L + 12} y={H - 1} fontSize={9} fill="#64748b" fontFamily="system-ui">Volume orçado</text>
+      <rect x={PAD_L + 90} y={H - 8} width={9} height={9} rx={2} fill="#3b82f6" />
+      <text x={PAD_L + 103} y={H - 1} fontSize={9} fill="#64748b" fontFamily="system-ui">Receita confirmada</text>
+    </svg>
+  )
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+type Periodo = "7d" | "30d" | "90d" | "ano" | "tudo" | "custom"
+
+export default function DashboardView({ historico, kanban, propostasCustom: _propostasCustom, clientes: _clientes, config: _config }: Props) {
+  const [periodo, setPeriodo] = useState<Periodo>("30d")
+  const [dataInicio, setDataInicio] = useState("")
+  const [dataFim, setDataFim]   = useState("")
+
+  // ── Filter ──────────────────────────────────────────────────────────────────
+  const filteredCards = useMemo(() => {
+    const now = new Date()
+    let from: Date | null = null
+    let to: Date | null = null
+
+    if (periodo === "7d")   { from = new Date(now); from.setDate(now.getDate() - 7) }
+    if (periodo === "30d")  { from = new Date(now); from.setDate(now.getDate() - 30) }
+    if (periodo === "90d")  { from = new Date(now); from.setDate(now.getDate() - 90) }
+    if (periodo === "ano")  { from = new Date(now.getFullYear(), 0, 1) }
+    if (periodo === "custom") {
+      if (dataInicio) from = new Date(dataInicio)
+      if (dataFim)   { to = new Date(dataFim); to.setHours(23, 59, 59) }
+    }
+
+    return kanban.filter(c => {
+      const d = parseDataBr(c.data)
+      if (from && d < from) return false
+      if (to   && d > to)   return false
+      return true
+    })
+  }, [kanban, periodo, dataInicio, dataFim])
+
+  // ── KPIs ────────────────────────────────────────────────────────────────────
+  const kpis = useMemo(() => {
+    const total = filteredCards.length
+    const pipeline = filteredCards
+      .filter(c => c.coluna !== COL_PERDIDO && c.coluna !== COL_ENTREGUE)
+      .reduce((s, c) => s + c.preco, 0)
+    const confirmados = filteredCards.filter(c => c.coluna === COL_FECHADO || c.coluna === COL_ENTREGUE)
+    const receita = confirmados.reduce((s, c) => s + c.preco, 0)
+    const conversao = total > 0 ? (confirmados.length / total) * 100 : 0
+    const ticket = confirmados.length > 0 ? receita / confirmados.length : 0
+    return { total, pipeline, receita, conversao, ticket, confirmados: confirmados.length }
+  }, [filteredCards])
+
+  // ── Monthly chart data (last 12 months) ─────────────────────────────────────
+  const monthlyData = useMemo(() => {
+    const now = new Date()
+    const months: MonthlyDatum[] = []
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      months.push({ label: MESES_PT[d.getMonth()], volume: 0, receita: 0 })
+    }
+    kanban.forEach(card => {
+      const cd = parseDataBr(card.data)
+      const diffMonths = (now.getFullYear() - cd.getFullYear()) * 12 + (now.getMonth() - cd.getMonth())
+      if (diffMonths < 0 || diffMonths > 11) return
+      const idx = 11 - diffMonths
+      months[idx].volume += card.preco
+      if (card.coluna === COL_FECHADO || card.coluna === COL_ENTREGUE) {
+        months[idx].receita += card.preco
+      }
+    })
+    return months
+  }, [kanban])
+
+  // ── Funil ───────────────────────────────────────────────────────────────────
+  const funil = useMemo(() => {
+    const map = new Map<number, { count: number; value: number }>()
+    filteredCards.forEach(c => {
+      const cur = map.get(c.coluna) ?? { count: 0, value: 0 }
+      map.set(c.coluna, { count: cur.count + 1, value: cur.value + c.preco })
+    })
+    const arr = Array.from(map.entries())
+      .map(([col, v]) => ({ col, colNome: COLUNAS_KANBAN[col] ?? `Col ${col}`, count: v.count, value: v.value }))
+      .sort((a, b) => a.col - b.col)
+    const maxCount = Math.max(...arr.map(a => a.count), 1)
+    return { stages: arr, maxCount }
+  }, [filteredCards])
+
+  // ── Top clientes ────────────────────────────────────────────────────────────
+  const topClientes = useMemo(() => {
+    const map = new Map<string, { total: number; count: number }>()
+    filteredCards
+      .filter(c => c.coluna === COL_FECHADO || c.coluna === COL_ENTREGUE)
+      .forEach(c => {
+        const k = c.nomeCliente || "Sem nome"
+        const cur = map.get(k) ?? { total: 0, count: 0 }
+        map.set(k, { total: cur.total + c.preco, count: cur.count + 1 })
+      })
+    const arr = Array.from(map.entries())
+      .map(([nome, v]) => ({ nome, total: v.total, count: v.count }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6)
+    const maxTotal = Math.max(...arr.map(a => a.total), 1)
+    return { clientes: arr, maxTotal }
+  }, [filteredCards])
+
+  // ── Materiais ───────────────────────────────────────────────────────────────
+  const materiais = useMemo(() => {
+    const map = new Map<string, { count: number; value: number }>()
+    filteredCards.forEach(card => {
+      let mat = card.materialNome
+      if (!mat) {
+        const h = historico.find(h => h.numero === card.numero)
+        mat = h?.form?.materialNome ?? "Sem material"
+      }
+      if (!mat) mat = "Sem material"
+      const cur = map.get(mat) ?? { count: 0, value: 0 }
+      map.set(mat, { count: cur.count + 1, value: cur.value + card.preco })
+    })
+    const arr = Array.from(map.entries())
+      .map(([nome, v]) => ({ nome, count: v.count, value: v.value }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6)
+    const maxCount = Math.max(...arr.map(a => a.count), 1)
+    const colors = ["#3b82f6", "#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981"]
+    return { materiais: arr.map((m, i) => ({ ...m, color: colors[i % colors.length] })), maxCount }
+  }, [filteredCards, historico])
+
+  // ── Motivos de perda ────────────────────────────────────────────────────────
+  const motivosPerda = useMemo(() => {
+    const map = new Map<string, number>()
+    filteredCards
+      .filter(c => c.coluna === COL_PERDIDO)
+      .forEach(c => {
+        const k = c.motivoPerdido?.trim() || "Sem motivo"
+        map.set(k, (map.get(k) ?? 0) + 1)
+      })
+    const arr = Array.from(map.entries())
+      .map(([motivo, count]) => ({ motivo, count }))
+      .sort((a, b) => b.count - a.count)
+    const maxCount = Math.max(...arr.map(a => a.count), 1)
+    return { motivos: arr, maxCount }
+  }, [filteredCards])
+
+  // ── Últimos negócios ─────────────────────────────────────────────────────────
+  const ultimosNegocios = useMemo(() => {
+    return [...filteredCards]
+      .sort((a, b) => parseDataBr(b.data).getTime() - parseDataBr(a.data).getTime())
+      .slice(0, 10)
+  }, [filteredCards])
+
+  // ── Periodo label ────────────────────────────────────────────────────────────
+  const periodoLabel = (p: Periodo) => ({ "7d": "7d", "30d": "30d", "90d": "90d", "ano": "Ano", "tudo": "Tudo", "custom": "Custom" }[p])
+
+  // ─── Empty state ─────────────────────────────────────────────────────────────
+  if (kanban.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4 text-slate-400">
+        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
+          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+          </svg>
+        </div>
+        <div className="text-center">
+          <p className="text-slate-600 font-semibold text-sm">Nenhum dado ainda</p>
+          <p className="text-slate-400 text-xs mt-1">Salve orçamentos para ver o dashboard</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-[1280px] mx-auto px-6 py-5 space-y-5">
+
+      {/* ── Filter bar ─────────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm py-2 -mx-6 px-6">
+        <div className="flex items-center gap-2 flex-wrap">
+          {(["7d", "30d", "90d", "ano", "tudo"] as Periodo[]).map(p => (
+            <button key={p} onClick={() => setPeriodo(p)}
+              className={`px-3 py-1.5 rounded-full text-[12px] font-medium transition-all ${
+                periodo === p
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+              }`}>
+              {periodoLabel(p)}
+            </button>
+          ))}
+
+          <div className="w-px h-5 bg-slate-200 mx-1" />
+
+          {/* Custom range */}
+          <div className="flex items-center gap-1.5">
+            <input type="date" value={dataInicio}
+              onChange={e => { setDataInicio(e.target.value); setPeriodo("custom") }}
+              className="h-8 border border-slate-200 rounded-lg px-2 text-[11.5px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
+            <span className="text-slate-400 text-xs">→</span>
+            <input type="date" value={dataFim}
+              onChange={e => { setDataFim(e.target.value); setPeriodo("custom") }}
+              className="h-8 border border-slate-200 rounded-lg px-2 text-[11.5px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
+          </div>
+
+          <div className="ml-auto text-[11px] text-slate-500 font-medium tabular-nums bg-white border border-slate-200 rounded-full px-3 py-1.5">
+            {filteredCards.length} orçamento{filteredCards.length !== 1 ? "s" : ""} no período
+          </div>
+        </div>
+      </div>
+
+      {/* ── KPI Cards ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-5 gap-3">
+        {/* Total orçamentos */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-3">Total orçamentos</p>
+          <p className="text-[22px] font-black tabular-nums text-slate-900 leading-none">{num(kpis.total)}</p>
+          <p className="text-[11px] text-slate-400 mt-2">no período selecionado</p>
+        </div>
+
+        {/* Pipeline */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-blue-400 mb-3">Pipeline</p>
+          <p className="text-[22px] font-black tabular-nums text-blue-700 leading-none">{brl(kpis.pipeline)}</p>
+          <p className="text-[11px] text-slate-400 mt-2">em negociação ativa</p>
+        </div>
+
+        {/* Receita confirmada */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-emerald-500 mb-3">Receita confirmada</p>
+          <p className="text-[22px] font-black tabular-nums text-emerald-700 leading-none">{brl(kpis.receita)}</p>
+          <p className="text-[11px] text-slate-400 mt-2">fechados + entregues</p>
+        </div>
+
+        {/* Conversão */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-3">Conversão</p>
+          <p className={`text-[22px] font-black tabular-nums leading-none ${kpis.conversao >= 30 ? "text-emerald-700" : "text-amber-600"}`}>
+            {num(kpis.conversao, 1)}%
+          </p>
+          <p className="text-[11px] text-slate-400 mt-2">{kpis.confirmados} de {kpis.total} fechados</p>
+        </div>
+
+        {/* Ticket médio */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-violet-400 mb-3">Ticket médio</p>
+          <p className="text-[22px] font-black tabular-nums text-violet-700 leading-none">{brl(kpis.ticket)}</p>
+          <p className="text-[11px] text-slate-400 mt-2">por negócio fechado</p>
+        </div>
+      </div>
+
+      {/* ── Charts row ─────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-5 gap-4">
+
+        {/* Receita mensal */}
+        <div className="col-span-3 bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Receita mensal</p>
+            <div className="flex-1 h-px bg-slate-100" />
+            <p className="text-[10px] text-slate-400">últimos 12 meses</p>
+          </div>
+          <MonthlyChart data={monthlyData} />
+        </div>
+
+        {/* Funil de vendas */}
+        <div className="col-span-2 bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Funil de vendas</p>
+            <div className="flex-1 h-px bg-slate-100" />
+          </div>
+          {funil.stages.length === 0 ? (
+            <p className="text-[12px] text-slate-400 text-center py-8">Sem dados no período</p>
+          ) : (
+            <div className="space-y-2.5">
+              {funil.stages.map(s => (
+                <div key={s.col} className="flex items-center gap-2.5">
+                  <div className="w-[110px] shrink-0 text-[11px] text-slate-600 font-medium truncate" title={s.colNome}>
+                    {s.colNome}
+                  </div>
+                  <div className="flex-1 h-5 bg-slate-50 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.max(8, (s.count / funil.maxCount) * 100)}%`,
+                        backgroundColor: colBg(s.col),
+                      }}
+                    />
+                  </div>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums shrink-0 ${colColor(s.col)}`}>
+                    {s.count}
+                  </span>
+                  <span className="text-[10px] text-slate-400 tabular-nums shrink-0 w-[70px] text-right">
+                    {brl(s.value)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Analysis row ───────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-4">
+
+        {/* Top clientes */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Top clientes</p>
+            <div className="flex-1 h-px bg-slate-100" />
+          </div>
+          {topClientes.clientes.length === 0 ? (
+            <p className="text-[12px] text-slate-400 text-center py-6">Sem dados</p>
+          ) : (
+            <div className="space-y-3">
+              {topClientes.clientes.map((c, i) => (
+                <div key={c.nome} className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 ${
+                      ["bg-blue-500","bg-violet-500","bg-emerald-500","bg-amber-500","bg-rose-500","bg-slate-500"][i % 6]
+                    }`}>
+                      {c.nome[0]?.toUpperCase() ?? "?"}
+                    </div>
+                    <p className="text-[12px] font-medium text-slate-700 truncate flex-1">{c.nome}</p>
+                    <p className="text-[11px] font-bold text-slate-900 tabular-nums">{brl(c.total)}</p>
+                    <p className="text-[10px] text-slate-400 tabular-nums shrink-0">{c.count}×</p>
+                  </div>
+                  <div className="ml-8 h-1.5 bg-slate-50 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-400 rounded-full"
+                      style={{ width: `${(c.total / topClientes.maxTotal) * 100}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Materiais mais usados */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Materiais mais usados</p>
+            <div className="flex-1 h-px bg-slate-100" />
+          </div>
+          {materiais.materiais.length === 0 ? (
+            <p className="text-[12px] text-slate-400 text-center py-6">Sem dados</p>
+          ) : (
+            <div className="space-y-3">
+              {materiais.materiais.map(m => (
+                <div key={m.nome} className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
+                    <p className="text-[12px] font-medium text-slate-700 truncate flex-1">{m.nome}</p>
+                    <p className="text-[11px] font-bold text-slate-900 tabular-nums">{num(m.count)}</p>
+                    <p className="text-[10px] text-slate-400 tabular-nums shrink-0">{brl(m.value)}</p>
+                  </div>
+                  <div className="ml-4 h-1.5 bg-slate-50 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full"
+                      style={{ width: `${(m.count / materiais.maxCount) * 100}%`, backgroundColor: m.color }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Motivos de perda */}
+        <div className={`rounded-2xl border p-5 shadow-sm ${motivosPerda.motivos.length === 0 ? "bg-emerald-50 border-emerald-100" : "bg-white border-slate-100"}`}>
+          <div className="flex items-center gap-3 mb-4">
+            <p className={`text-[11px] uppercase tracking-[0.12em] font-bold ${motivosPerda.motivos.length === 0 ? "text-emerald-500" : "text-slate-400"}`}>
+              Motivos de perda
+            </p>
+            <div className={`flex-1 h-px ${motivosPerda.motivos.length === 0 ? "bg-emerald-100" : "bg-slate-100"}`} />
+          </div>
+          {motivosPerda.motivos.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-4 gap-2">
+              <span className="text-3xl">🎯</span>
+              <p className="text-[13px] font-semibold text-emerald-700 text-center">Nenhuma perda registrada</p>
+              <p className="text-[11px] text-emerald-600/70 text-center">Excelente taxa de conversão!</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {motivosPerda.motivos.map(m => (
+                <div key={m.motivo} className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[12px] font-medium text-slate-700 truncate flex-1">{m.motivo}</p>
+                    <p className="text-[11px] font-bold text-rose-600 tabular-nums">{m.count}×</p>
+                  </div>
+                  <div className="h-1.5 bg-slate-50 rounded-full overflow-hidden">
+                    <div className="h-full bg-rose-400 rounded-full"
+                      style={{ width: `${(m.count / motivosPerda.maxCount) * 100}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Últimos negócios ───────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
+          <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Últimos negócios</p>
+          <div className="flex-1 h-px bg-slate-100" />
+          <p className="text-[10px] text-slate-400">10 mais recentes no período</p>
+        </div>
+        {ultimosNegocios.length === 0 ? (
+          <p className="text-[12px] text-slate-400 text-center py-8">Sem negócios no período</p>
+        ) : (
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Nº</th>
+                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Cliente</th>
+                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Material</th>
+                <th className="px-4 py-2.5 text-right text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Valor</th>
+                <th className="px-4 py-2.5 text-right text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Qtd</th>
+                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Estágio</th>
+                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Data</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {ultimosNegocios.map(card => {
+                const dataFmt = card.data.split(",")[0] ?? card.data
+                return (
+                  <tr key={card.id} className="hover:bg-slate-50/80 transition-colors">
+                    {/* Nº */}
+                    <td className="px-4 py-2.5">
+                      <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-1.5 py-0.5 rounded-md tabular-nums whitespace-nowrap">
+                        {card.numero || "—"}
+                      </span>
+                    </td>
+                    {/* Cliente */}
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full bg-blue-500 text-white text-[9px] font-bold flex items-center justify-center shrink-0">
+                          {card.nomeCliente[0]?.toUpperCase() ?? "?"}
+                        </div>
+                        <span className="font-medium text-slate-700 max-w-[120px] truncate">{card.nomeCliente}</span>
+                      </div>
+                    </td>
+                    {/* Material */}
+                    <td className="px-4 py-2.5 text-slate-500 max-w-[120px]">
+                      <span className="truncate block">{card.materialNome || "—"}</span>
+                    </td>
+                    {/* Valor */}
+                    <td className="px-4 py-2.5 text-right font-bold text-slate-900 tabular-nums">
+                      {brl(card.preco)}
+                    </td>
+                    {/* Qtd */}
+                    <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">
+                      {num(card.quantidade)}
+                    </td>
+                    {/* Estágio */}
+                    <td className="px-4 py-2.5">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${colColor(card.coluna)}`}>
+                        {COLUNAS_KANBAN[card.coluna] ?? `Col ${card.coluna}`}
+                      </span>
+                    </td>
+                    {/* Data */}
+                    <td className="px-4 py-2.5 text-slate-400 tabular-nums text-[11px]">
+                      {dataFmt}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
+}

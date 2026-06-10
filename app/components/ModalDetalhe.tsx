@@ -1,0 +1,255 @@
+"use client"
+
+import { FormData, Calculo, PropostaCustom, KanbanCard, COLUNAS_KANBAN } from "../types"
+import { brl, num } from "../utils"
+
+type HistItem = { form: FormData; calculo: Calculo; data: string; numero?: string }
+
+export type DetalheData =
+  | { tipo: "historico"; item: HistItem }
+  | { tipo: "proposta";  proposta: PropostaCustom }
+  | { tipo: "kanban";    card: KanbanCard }
+
+export function ModalDetalhe({ data, parcFator, onClose }: {
+  data: DetalheData
+  parcFator: number
+  onClose: () => void
+}) {
+  const isH = data.tipo === "historico"
+  const isP = data.tipo === "proposta"
+  const isK = data.tipo === "kanban"
+
+  const numero  = isH ? (data.item.numero ?? "")      : isP ? data.proposta.numero    : data.card.numero
+  const nome    = isH ? data.item.form.nomeCliente     : isP ? data.proposta.nomeCliente : data.card.nomeCliente
+  const dataStr = isH ? data.item.data                 : isP ? data.proposta.data      : data.card.data
+  const isCustom = isP
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col overflow-hidden"
+        style={{ maxHeight: "90vh" }}
+      >
+        {/* Header */}
+        <div className="px-6 pt-5 pb-4 border-b border-slate-100 shrink-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-slate-800 text-[15px] leading-snug truncate">
+                {nome || "Sem nome"}
+              </p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                {numero && (
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border tabular-nums shrink-0 ${
+                    isCustom
+                      ? "text-violet-700 bg-violet-50 border-violet-200"
+                      : "text-blue-700 bg-blue-50 border-blue-200"
+                  }`}>{numero}</span>
+                )}
+                <span className="text-[11px] text-slate-400">{dataStr}</span>
+                {isK && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                    {COLUNAS_KANBAN[data.card.coluna]}
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-slate-300 hover:text-slate-500 transition-colors text-xl leading-none mt-0.5 shrink-0"
+            >×</button>
+          </div>
+
+          {/* Pills */}
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {isH && (
+              <>
+                {data.item.form.frente > 0 && (
+                  <Pill>{data.item.form.frente}×{data.item.form.alturaBox}×{data.item.form.lateral} cm</Pill>
+                )}
+                {data.item.form.materialNome && <Pill>{data.item.form.materialNome}</Pill>}
+                <Pill>{data.item.form.comFaca ? "Com faca" : "Sem faca"}</Pill>
+                {data.item.form.incluirVerniz && <Pill blue>Verniz UV</Pill>}
+                {data.item.form.validadeDias > 0 && (
+                  <Pill>Válido {data.item.form.validadeDias} dias</Pill>
+                )}
+              </>
+            )}
+            {isP && (
+              <>
+                {data.proposta.descricao && <Pill>{data.proposta.descricao}</Pill>}
+                {data.proposta.dimensoes  && <Pill>{data.proposta.dimensoes}</Pill>}
+                {data.proposta.material   && <Pill>{data.proposta.material}</Pill>}
+                {data.proposta.incluirVerniz && <Pill blue>Verniz UV</Pill>}
+                {data.proposta.comFaca    && <Pill>Com faca</Pill>}
+                {data.proposta.validadeDias > 0 && (
+                  <Pill>Válido {data.proposta.validadeDias} dias</Pill>
+                )}
+              </>
+            )}
+            {isK && (
+              <>
+                {data.card.dimensoes   && <Pill>{data.card.dimensoes} cm</Pill>}
+                {data.card.materialNome && <Pill>{data.card.materialNome}</Pill>}
+                {data.card.motivoPerdido && (
+                  <Pill red>"{data.card.motivoPerdido}"</Pill>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Tabela */}
+        <div className="overflow-y-auto flex-1">
+          <table className="w-full">
+            <thead className="sticky top-0 bg-white z-10">
+              <tr className="border-b border-slate-100">
+                <th className="py-3 px-5 text-left text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                  Qtd
+                </th>
+                <th className="py-3 px-4 text-right text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                  Unitário
+                </th>
+                <th className="py-3 px-4 text-right text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                  Total
+                </th>
+                {!isK && (
+                  <th className="py-3 px-5 text-right text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                    12×/mês
+                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+
+              {isH && data.item.calculo.tabela.map(l => {
+                const cf       = data.item.form.comFaca
+                const unit     = cf ? l.unitarioComFaca  : l.unitarioSemFaca
+                const total    = cf ? l.precoComFaca     : l.precoSemFaca
+                const parc     = cf ? l.parcela12xComFaca : l.parcela12xSemFaca
+                const isIdeal  = l.quantidade === data.item.calculo.sweetSpotIdealQtd
+                const isMin    = l.quantidade === data.item.calculo.sweetSpotMinimoQtd
+                return (
+                  <tr key={l.quantidade}
+                    className={isIdeal ? "bg-blue-50/50" : isMin ? "bg-amber-50/40" : "hover:bg-slate-50"}>
+                    <td className="py-3 px-5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-[13px] text-slate-800 tabular-nums">{num(l.quantidade)}</span>
+                        {isIdeal && <Badge color="blue">IDEAL</Badge>}
+                        {isMin && !isIdeal && <Badge color="amber">MÍN</Badge>}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-right text-[12.5px] text-slate-600 tabular-nums">{brl(unit)}</td>
+                    <td className="py-3 px-4 text-right font-bold text-[13px] text-blue-700 tabular-nums">{brl(total)}</td>
+                    <td className="py-3 px-5 text-right text-[11.5px] text-slate-400 tabular-nums">{brl(parc)}</td>
+                  </tr>
+                )
+              })}
+
+              {isP && data.proposta.linhas.filter(l => l.ativa && l.quantidade > 0).map((l, i) => {
+                const total = l.unitario * l.quantidade
+                const parc  = (total * parcFator) / 12
+                return (
+                  <tr key={i} className={l.isIdeal ? "bg-blue-50/50" : "hover:bg-slate-50"}>
+                    <td className="py-3 px-5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-[13px] text-slate-800 tabular-nums">{num(l.quantidade)}</span>
+                        {l.isIdeal && <Badge color="blue">IDEAL</Badge>}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-right text-[12.5px] text-slate-600 tabular-nums">{brl(l.unitario)}</td>
+                    <td className="py-3 px-4 text-right font-bold text-[13px] text-violet-700 tabular-nums">{brl(total)}</td>
+                    <td className="py-3 px-5 text-right text-[11.5px] text-slate-400 tabular-nums">{brl(parc)}</td>
+                  </tr>
+                )
+              })}
+
+              {isK && (data.card.opcoes?.length ? data.card.opcoes : null)?.map((op, i) => {
+                const isCurrent = op.quantidade === data.card.quantidade
+                return (
+                  <tr key={i} className={isCurrent ? "bg-green-50/60" : "hover:bg-slate-50"}>
+                    <td className="py-3 px-5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-[13px] text-slate-800 tabular-nums">{num(op.quantidade)}</span>
+                        {isCurrent && <Badge color="green">FECHADO</Badge>}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-right text-[12.5px] text-slate-600 tabular-nums">{brl(op.unitario)}</td>
+                    <td className="py-3 px-4 text-right font-bold text-[13px] text-blue-700 tabular-nums">{brl(op.preco)}</td>
+                  </tr>
+                )
+              })}
+
+              {isK && !data.card.opcoes?.length && (
+                <tr>
+                  <td colSpan={3} className="py-8 text-center">
+                    <p className="font-black text-[22px] text-slate-800 tabular-nums">{brl(data.card.preco)}</p>
+                    <p className="text-[12px] text-slate-400 mt-1">{num(data.card.quantidade)} unidades</p>
+                  </td>
+                </tr>
+              )}
+
+            </tbody>
+          </table>
+        </div>
+
+        {/* Observações */}
+        {isH && (data.item.form.obsCliente || data.item.form.obsInterna) && (
+          <div className="px-5 py-3.5 border-t border-slate-100 shrink-0 space-y-2.5">
+            {data.item.form.obsCliente && (
+              <div>
+                <p className="text-[9.5px] uppercase tracking-[0.08em] text-slate-400 font-semibold">Para o cliente</p>
+                <p className="text-[12px] text-slate-600 mt-0.5 leading-relaxed">{data.item.form.obsCliente}</p>
+              </div>
+            )}
+            {data.item.form.obsInterna && (
+              <div>
+                <p className="text-[9.5px] uppercase tracking-[0.08em] text-slate-400 font-semibold">Interna</p>
+                <p className="text-[12px] text-slate-500 mt-0.5 italic leading-relaxed">{data.item.form.obsInterna}</p>
+              </div>
+            )}
+          </div>
+        )}
+        {isP && data.proposta.obsCliente && (
+          <div className="px-5 py-3.5 border-t border-slate-100 shrink-0">
+            <p className="text-[9.5px] uppercase tracking-[0.08em] text-slate-400 font-semibold">Para o cliente</p>
+            <p className="text-[12px] text-slate-600 mt-0.5 leading-relaxed">{data.proposta.obsCliente}</p>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-slate-100 shrink-0">
+          <button
+            onClick={onClose}
+            className="w-full py-2 text-[12px] font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Pill({ children, blue, red }: { children: React.ReactNode; blue?: boolean; red?: boolean }) {
+  return (
+    <span className={`text-[10.5px] px-2 py-0.5 rounded-full font-medium ${
+      blue ? "bg-blue-50 text-blue-700 border border-blue-100"
+      : red ? "bg-rose-50 text-rose-600 border border-rose-100"
+      : "bg-slate-100 text-slate-600"
+    }`}>{children}</span>
+  )
+}
+
+function Badge({ children, color }: { children: React.ReactNode; color: "blue" | "amber" | "green" }) {
+  const cls = color === "blue"  ? "bg-blue-600 text-white"
+            : color === "amber" ? "bg-amber-500 text-white"
+            :                     "bg-green-600 text-white"
+  return (
+    <span className={`text-[8.5px] px-1.5 py-0.5 rounded-full font-black tracking-wide ${cls}`}>
+      {children}
+    </span>
+  )
+}

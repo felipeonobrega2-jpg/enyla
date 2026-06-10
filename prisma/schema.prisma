@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model HistoricoItem {
+  id        String   @id @default(cuid())
+  numero    String?  @unique
+  form      Json
+  calculo   Json
+  data      String
+  createdAt DateTime @default(now())
+}
+
+model KanbanCard {
+  id            String   @id
+  numero        String?
+  nomeCliente   String   @default("")
+  dimensoes     String   @default("")
+  materialNome  String   @default("")
+  preco         Float    @default(0)
+  quantidade    Int      @default(0)
+  data          String   @default("")
+  coluna        Int      @default(0)
+  motivoPerdido String?
+  opcoes        Json?
+  createdAt     DateTime @default(now())
+}
+
+model Cliente {
+  id        String  @id
+  nome      String
+  telefone  String?
+  email     String?
+  cnpj      String?
+  notas     String?
+  criadoEm  String
+}
+
+model PropostaCustom {
+  id            String   @id
+  numero        String?
+  nomeCliente   String   @default("")
+  descricao     String?
+  material      String?
+  dimensoes     String?
+  incluirVerniz Boolean  @default(false)
+  comFaca       Boolean  @default(false)
+  valorFaca     Float    @default(0)
+  numSKUs       Int      @default(1)
+  validadeDias  Int      @default(7)
+  obsCliente    String?
+  data          String   @default("")
+  linhas        Json     @default("[]")
+  parcFator     Float    @default(1)
+  cardId        String?
+  createdAt     DateTime @default(now())
+}
+
+model Tracking {
+  numero       String  @id
+  nomeCliente  String  @default("")
+  descricao    String?
+  materialNome String?
+  quantidade   Int     @default(0)
+  preco        Float   @default(0)
+  colunaAtual  Int     @default(0)
+  etapas       Json    @default("[]")
+  criadoEm     String  @default("")
+}
+
+model AppConfig {
+  id   Int  @id @default(1)
+  data Json
+}
+
+model Contador {
+  chave String @id
+  valor Int    @default(0)
+}

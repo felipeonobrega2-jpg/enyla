@@ -1,0 +1,206 @@
+"use client"
+
+import React from "react"
+import { brl, num, margemCls } from "../utils"
+import { LinhaTabela, Calculo } from "../types"
+
+export function FormSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="px-5 py-4 border-b border-slate-100">
+      <p className="text-[9px] uppercase tracking-[0.16em] font-bold text-slate-400 mb-3.5">{label}</p>
+      {children}
+    </div>
+  )
+}
+
+export function Label({ children }: { children: React.ReactNode }) {
+  return <p className="text-[10.5px] text-slate-500 font-medium mb-1.5">{children}</p>
+}
+
+const inputCls = "w-full h-10 border border-slate-200 rounded-xl px-3 text-[13px] text-slate-900 placeholder:text-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all duration-150 hover:border-slate-300"
+
+export function TextInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+      className={inputCls} />
+  )
+}
+
+export function NumberInput({ value, onChange, min, max }: { value: number; onChange: (v: number) => void; min?: number; max?: number }) {
+  return (
+    <input type="number" value={value || ""} onChange={e => onChange(Number(e.target.value))}
+      min={min} max={max} placeholder="0"
+      className={`${inputCls} text-center font-semibold tabular-nums`} />
+  )
+}
+
+export function KpiCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
+  return (
+    <div className={`rounded-2xl p-5 border transition-all duration-200 ${
+      accent
+        ? "bg-gradient-to-br from-slate-900 to-[#0c1220] border-slate-800/60 shadow-xl shadow-slate-900/10"
+        : "bg-white border-slate-100 hover:shadow-sm hover:border-slate-200"
+    }`}>
+      <p className={`text-[9px] uppercase tracking-[0.15em] font-bold mb-3 ${accent ? "text-slate-500" : "text-slate-400"}`}>{label}</p>
+      <p className={`text-[28px] font-black leading-none tracking-tight ${accent ? "text-white" : "text-slate-900"}`}>{value}</p>
+      {sub && <p className={`text-[11px] mt-2 leading-snug ${accent ? "text-slate-500" : "text-slate-400"}`}>{sub}</p>}
+    </div>
+  )
+}
+
+export function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <p className="text-[9px] uppercase tracking-[0.15em] font-bold text-slate-400 shrink-0 leading-none">{title}</p>
+        <div className="flex-1 h-px bg-slate-100" />
+      </div>
+      {children}
+    </div>
+  )
+}
+
+export function TH({ children, br, blue }: { children?: React.ReactNode; br?: boolean; blue?: boolean }) {
+  return (
+    <th className={`px-3 py-3 text-left text-[9.5px] uppercase tracking-[0.08em] font-bold whitespace-nowrap
+      ${blue ? "text-blue-500" : "text-slate-400"}
+      ${br ? "border-r border-slate-100" : ""}`}>
+      {children}
+    </th>
+  )
+}
+
+export function TD({ children, bold, muted, blue, green, mono, br }: {
+  children: React.ReactNode; bold?: boolean; muted?: boolean; blue?: boolean; green?: boolean; mono?: boolean; br?: boolean
+}) {
+  return (
+    <td className={`px-3 py-2.5 whitespace-nowrap text-[12.5px]
+      ${bold ? "font-semibold" : ""}
+      ${muted ? "text-slate-400" : blue ? "text-blue-700" : green ? "text-emerald-600" : "text-slate-700"}
+      ${mono ? "tabular-nums" : ""}
+      ${br ? "border-r border-slate-100" : ""}`}>
+      {children}
+    </td>
+  )
+}
+
+export function TabelaRow({ linha, comFaca, incluirVerniz, isMin, isIdeal }: {
+  linha: LinhaTabela; comFaca: boolean; incluirVerniz: boolean; isMin: boolean; isIdeal: boolean
+}) {
+  const rowCls = isIdeal ? "bg-blue-50/60 hover:bg-blue-100/70" : isMin ? "bg-amber-50/60 hover:bg-amber-100/70" : "hover:bg-slate-50/80"
+  const stickyBg = isIdeal ? "bg-blue-50/60" : isMin ? "bg-amber-50/60" : "bg-white"
+  const leftBorder = isIdeal ? "border-l-[3px] border-l-blue-500" : isMin ? "border-l-[3px] border-l-amber-400" : ""
+
+  return (
+    <tr className={`transition-colors ${rowCls}`}>
+      <td className={`sticky left-0 px-4 py-3 font-bold text-slate-800 border-r border-slate-100 whitespace-nowrap ${stickyBg} ${leftBorder}`}>
+        <span className="flex items-center gap-2">
+          {num(linha.quantidade)}
+          {isIdeal && <span className="text-[8.5px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold tracking-wide">IDEAL</span>}
+          {isMin && !isIdeal && <span className="text-[8.5px] bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold tracking-wide">MÍN</span>}
+        </span>
+      </td>
+      <TD muted mono>{num(linha.folhasReais)}</TD>
+      <TD muted mono>{num(linha.folhasComAcrescimo)}</TD>
+      <TD bold mono br>{num(linha.folhasPacote)}</TD>
+      <TD muted mono>{brl(linha.custoPapel)}</TD>
+      <TD muted mono>{brl(linha.custoImpressao)}</TD>
+      <TD muted mono>{brl(linha.custoCorte)}</TD>
+      {incluirVerniz && <TD muted mono>{brl(linha.custoVerniz)}</TD>}
+      <TD muted mono>{brl(linha.custoColagem)}</TD>
+      <TD muted mono br>{brl(linha.custoArte)}</TD>
+      <TD mono>{brl(linha.custoTotalSemFaca)}</TD>
+      <TD blue bold mono>{brl(linha.precoSemFaca)}</TD>
+      {comFaca && <><TD mono>{brl(linha.custoTotalComFaca)}</TD><TD blue bold mono>{brl(linha.precoComFaca)}</TD></>}
+      <TD mono>{brl(linha.unitarioSemFaca)}</TD>
+      {comFaca && <TD mono>{brl(linha.unitarioComFaca)}</TD>}
+      <td className={`px-3 py-2.5 whitespace-nowrap font-mono ${margemCls(linha.margemSemFaca)}`}>{num(linha.margemSemFaca, 1)}%</td>
+      {comFaca && <td className={`px-3 py-2.5 whitespace-nowrap font-mono ${margemCls(linha.margemComFaca)}`}>{num(linha.margemComFaca, 1)}%</td>}
+      <TD muted mono>{brl(linha.parcela12xSemFaca)}</TD>
+      {comFaca && <TD muted mono>{brl(linha.parcela12xComFaca)}</TD>}
+    </tr>
+  )
+}
+
+export function AnaliseEstrategica({ calculo, comFaca, cliente }: { calculo: Calculo; comFaca: boolean; cliente: string }) {
+  const { tabela, sweetSpotMinimoQtd, sweetSpotIdealQtd } = calculo
+  if (!tabela.length) return null
+
+  const melhorMargem = tabela.reduce((b, c) => c.margemSemFaca > b.margemSemFaca ? c : b, tabela[0])
+  const menorUnit    = tabela.reduce((b, c) => c.unitarioSemFaca < b.unitarioSemFaca ? c : b, tabela[0])
+  const sweetMin     = tabela.find(l => l.quantidade === sweetSpotMinimoQtd) ?? tabela[0]
+  const sweetIdeal   = tabela.find(l => l.quantidade === sweetSpotIdealQtd)  ?? tabela[tabela.length - 1]
+
+  const precoKey = comFaca ? "precoComFaca" : "precoSemFaca"
+  const unitKey  = comFaca ? "unitarioComFaca" : "unitarioSemFaca"
+  const margKey  = comFaca ? "margemComFaca" : "margemSemFaca"
+  const lucroKey = comFaca ? "lucroComFaca" : "lucroSemFaca"
+
+  const cards = [
+    { tag: "Para o cliente",       desc: "Menor custo por unidade",      linha: menorUnit,   cor: "border-blue-100 bg-gradient-to-br from-blue-50 to-white",       tagCor: "bg-blue-100 text-blue-700" },
+    { tag: "Maior rentabilidade",  desc: "Melhor margem para a gráfica", linha: melhorMargem, cor: "border-emerald-100 bg-gradient-to-br from-emerald-50 to-white", tagCor: "bg-emerald-100 text-emerald-700" },
+    { tag: "Sweet spot ideal",     desc: "Equilíbrio preço × lucro",     linha: sweetIdeal,  cor: "border-amber-100 bg-gradient-to-br from-amber-50 to-white",     tagCor: "bg-amber-100 text-amber-700" },
+  ]
+
+  return (
+    <Section title="Análise estratégica">
+      <div className="grid grid-cols-3 gap-3 mb-3">
+        {cards.map(c => (
+          <div key={c.tag} className={`rounded-2xl border p-5 ${c.cor}`}>
+            <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full uppercase tracking-[0.1em] ${c.tagCor}`}>{c.tag}</span>
+            <p className="text-slate-500 text-[11px] mt-3 mb-3 leading-snug">{c.desc}</p>
+            <p className="text-[26px] font-black text-slate-900 leading-none tabular-nums">{brl(c.linha[precoKey as keyof LinhaTabela] as number)}</p>
+            <p className="text-[11px] text-slate-500 mt-1.5 tabular-nums">
+              {num(c.linha.quantidade)} un · {brl(c.linha[unitKey as keyof LinhaTabela] as number)}/un
+            </p>
+            <p className={`text-[11.5px] mt-1.5 font-semibold tabular-nums ${margemCls(c.linha[margKey as keyof LinhaTabela] as number)}`}>
+              {num(c.linha[margKey as keyof LinhaTabela] as number, 1)}% · lucro {brl(c.linha[lucroKey as keyof LinhaTabela] as number)}
+            </p>
+          </div>
+        ))}
+      </div>
+      <div className="bg-white border border-slate-100 rounded-2xl p-5">
+        <p className="text-[9px] uppercase tracking-[0.15em] font-bold text-slate-400 mb-3">Recomendação de fechamento</p>
+        <p className="text-slate-600 leading-relaxed text-[13px]">
+          {cliente ? <strong>{cliente}:</strong> : null}{" "}
+          Apresente <strong>{num(sweetIdeal.quantidade)} unidades</strong> como ponto ideal —{" "}
+          {brl(sweetIdeal[precoKey as keyof LinhaTabela] as number)} com margem de{" "}
+          <span className={margemCls(sweetIdeal[margKey as keyof LinhaTabela] as number)}>
+            {num(sweetIdeal[margKey as keyof LinhaTabela] as number, 1)}%
+          </span>.{" "}
+          Se houver resistência, use <strong>{num(sweetMin.quantidade)} un</strong> como mínimo aceitável.
+          {comFaca && " A faca é investimento único — amortizada já na segunda tiragem."}
+        </p>
+      </div>
+    </Section>
+  )
+}
+
+export function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-center px-8 select-none">
+      <div className="relative mb-8">
+        <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-50 via-white to-slate-50 border border-slate-100 flex items-center justify-center shadow-sm">
+          <svg className="w-11 h-11 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+          </svg>
+        </div>
+        <div className="absolute -bottom-2 -right-2 w-7 h-7 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/30">
+          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+        </div>
+      </div>
+      <h2 className="text-slate-800 font-bold text-[17px] mb-2.5 tracking-tight">Comece um orçamento</h2>
+      <p className="text-slate-400 text-[13px] max-w-[220px] leading-relaxed">
+        Preencha as dimensões da caixa na barra lateral para calcular a proposta.
+      </p>
+      <div className="mt-6 px-4 py-2.5 bg-slate-50/80 rounded-xl border border-slate-100 inline-flex items-center gap-1.5">
+        <svg className="w-3 h-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+        <p className="text-[11px] text-slate-400">Largura · Altura · Profundidade</p>
+      </div>
+    </div>
+  )
+}
