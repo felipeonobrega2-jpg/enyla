@@ -27,22 +27,28 @@ const FORM_INICIAL: FormData = {
   obsInterna: "", obsCliente: "", validadeDias: 7, materialId: "cartao300", materialNome: "Cartão 300g",
 }
 
-function NavItem({ active, onClick, icon, label, badge }: {
+function NavItem({ active, onClick, icon, label, badge, accent }: {
   active: boolean
   onClick: () => void
   icon: React.ReactNode
   label: string
   badge?: number
+  accent?: boolean
 }) {
   return (
     <button onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12.5px] font-medium transition-all ${
+      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12.5px] transition-all ${
         active
-          ? "bg-white/10 text-white"
-          : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+          ? "bg-white/10 text-white font-semibold"
+          : accent
+            ? "text-white/70 hover:text-white hover:bg-white/8 font-medium"
+            : "text-slate-400 hover:text-slate-200 hover:bg-white/5 font-medium"
       }`}>
       {icon}
       <span className="flex-1 text-left">{label}</span>
+      {accent && !active && (
+        <span className="w-1.5 h-1.5 rounded-full bg-blue-400/60 shrink-0" />
+      )}
       {badge !== undefined && badge > 0 && (
         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-400 tabular-nums">
           {badge}
@@ -68,6 +74,7 @@ export default function Home() {
   const [propostasCustom, setPropostasCustom] = useState<PropostaCustom[]>([])
   const [contadorProp, setContadorProp] = useState<number>(0)
   const [modalPropostaCustom, setModalPropostaCustom] = useState(false)
+  const [editandoProposta, setEditandoProposta] = useState<PropostaCustom | null>(null)
   const [detalheModal, setDetalheModal] = useState<DetalheData | null>(null)
 
   useEffect(() => {
@@ -467,7 +474,7 @@ export default function Home() {
 
           <div className="h-px bg-white/5 my-2 mx-1" />
 
-          <NavItem active={view === "orcamento"} onClick={() => setView("orcamento")} label="Novo orçamento"
+          <NavItem active={view === "orcamento"} onClick={() => setView("orcamento")} label="Novo orçamento" accent
             icon={<svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>}
           />
 
@@ -796,6 +803,7 @@ export default function Home() {
             <ClientesView
               historico={historico}
               kanban={kanban}
+              propostasCustom={propostasCustom}
               onReplicar={replicar}
               onWhatsApp={(item) => compartilharWhatsApp(item.form, item.calculo, item.numero)}
             />
@@ -1109,6 +1117,7 @@ export default function Home() {
           data={detalheModal}
           parcFator={config.multiplicadores.parcelamento12x}
           onClose={() => setDetalheModal(null)}
+          onEditar={(p) => { setDetalheModal(null); setEditandoProposta(p) }}
         />
       )}
 
@@ -1129,6 +1138,51 @@ export default function Home() {
             numero: "PRÉVIA",
             data: new Date().toLocaleString("pt-BR"),
             cardId: "preview",
+          }))}
+          onWhatsApp={(p) => compartilharWhatsAppCustom(p)}
+        />
+      )}
+
+      {/* ── Modal: editar proposta existente ───────────────────────────────── */}
+      {editandoProposta && (
+        <ModalPropostaCustom
+          clientes={clientes}
+          parcFator={config.multiplicadores.parcelamento12x}
+          initialData={editandoProposta}
+          onClose={() => setEditandoProposta(null)}
+          onSalvar={(draft) => {
+            const atualizada: PropostaCustom = {
+              ...editandoProposta,
+              ...draft,
+            }
+            setPropostasCustom(prev => prev.map(p => p.id === atualizada.id ? atualizada : p))
+            setKanban(prev => prev.map(c => c.id === atualizada.cardId
+              ? { ...c,
+                  nomeCliente: atualizada.nomeCliente,
+                  dimensoes: atualizada.descricao,
+                  materialNome: atualizada.material,
+                }
+              : c
+            ))
+            fetch(`/api/propostas/${atualizada.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(draft),
+            }).catch(() => {})
+            fetch(`/api/kanban/${atualizada.cardId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ nomeCliente: atualizada.nomeCliente, dimensoes: atualizada.descricao, materialNome: atualizada.material }),
+            }).catch(() => {})
+            showToast(`Proposta ${atualizada.numero} atualizada.`)
+            setEditandoProposta(null)
+          }}
+          onPdf={(draft) => abrirPdf(gerarHtmlPropostaCustom({
+            ...draft,
+            id: editandoProposta.id,
+            numero: editandoProposta.numero,
+            data: editandoProposta.data,
+            cardId: editandoProposta.cardId,
           }))}
           onWhatsApp={(p) => compartilharWhatsAppCustom(p)}
         />

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Configuracoes, Material, CONFIG_PADRAO } from "../config"
 
 export function ConfigView({ config, onSave, onExportar, onImportar }: {
@@ -11,6 +11,9 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
 }) {
   const [draft, setDraft] = useState<Configuracoes>(config)
   const importRef = useRef<HTMLInputElement>(null)
+
+  // Sync draft when config loads from API (useState only uses initial value once)
+  useEffect(() => { setDraft(config) }, [config])
 
   function setCusto(k: keyof Configuracoes["custos"], v: number) {
     setDraft(d => ({ ...d, custos: { ...d.custos, [k]: v } }))
@@ -158,6 +161,42 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
   )
 }
 
+// Isolated row so nome uses local state — prevents cursor-jumping on each keystroke
+function MaterialRow({ m, formatoIds, onNomeChange, onPrecoChange, onRemove }: {
+  m: Material
+  formatoIds: string[]
+  onNomeChange: (id: string, nome: string) => void
+  onPrecoChange: (id: string, fmtId: string, v: number) => void
+  onRemove: (id: string) => void
+}) {
+  const [nome, setNome] = useState(m.nome)
+  useEffect(() => { setNome(m.nome) }, [m.nome])
+
+  return (
+    <div className="flex items-center px-4 py-2.5 gap-4">
+      <input
+        value={nome}
+        onChange={e => setNome(e.target.value)}
+        onBlur={e => onNomeChange(m.id, e.target.value)}
+        className="flex-1 border border-transparent hover:border-slate-200 focus:border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+      />
+      {formatoIds.map(fmtId => (
+        <div key={fmtId} className="relative w-28">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">R$</span>
+          <input type="number" min={0} step={1}
+            value={m.precos[fmtId] ?? 0}
+            onChange={e => onPrecoChange(m.id, fmtId, Number(e.target.value))}
+            className="w-full border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-sm text-right text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+        </div>
+      ))}
+      <button onClick={() => onRemove(m.id)}
+        className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors text-lg leading-none shrink-0">
+        ×
+      </button>
+    </div>
+  )
+}
+
 function MaterialConfig({
   materiais, formatoIds, onChange,
 }: {
@@ -203,26 +242,14 @@ function MaterialConfig({
 
       <div className="divide-y divide-slate-50">
         {materiais.map(m => (
-          <div key={m.id} className="flex items-center px-4 py-2.5 gap-4">
-            <input
-              value={m.nome}
-              onChange={e => setNome(m.id, e.target.value)}
-              className="flex-1 border border-transparent hover:border-slate-200 focus:border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-            />
-            {formatoIds.map(fmtId => (
-              <div key={fmtId} className="relative w-28">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">R$</span>
-                <input type="number" min={0} step={1}
-                  value={m.precos[fmtId] ?? 0}
-                  onChange={e => setPreco(m.id, fmtId, Number(e.target.value))}
-                  className="w-full border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-sm text-right text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-              </div>
-            ))}
-            <button onClick={() => remover(m.id)}
-              className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors text-lg leading-none shrink-0">
-              ×
-            </button>
-          </div>
+          <MaterialRow
+            key={m.id}
+            m={m}
+            formatoIds={formatoIds}
+            onNomeChange={setNome}
+            onPrecoChange={setPreco}
+            onRemove={remover}
+          />
         ))}
       </div>
 
