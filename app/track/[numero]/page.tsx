@@ -1,5 +1,5 @@
-import { getTracking } from '../../utils/tracking-store'
-import TrackingClient from './TrackingClient'
+import { supabase } from "@/app/lib/supabase"
+import TrackingClient from "./TrackingClient"
 
 export default async function TrackingPage({
   params,
@@ -7,6 +7,10 @@ export default async function TrackingPage({
   params: Promise<{ numero: string }>
 }) {
   const { numero } = await params
-  const entry = getTracking(decodeURIComponent(numero))
-  return <TrackingClient initialData={entry} numero={decodeURIComponent(numero)} />
+  const { data } = await supabase
+    .from("Tracking")
+    .select("*")
+    .eq("numero", decodeURIComponent(numero))
+    .single()
+  return <TrackingClient initialData={data ?? null} numero={decodeURIComponent(numero)} />
 }

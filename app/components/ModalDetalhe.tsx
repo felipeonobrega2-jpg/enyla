@@ -10,10 +10,11 @@ export type DetalheData =
   | { tipo: "proposta";  proposta: PropostaCustom }
   | { tipo: "kanban";    card: KanbanCard }
 
-export function ModalDetalhe({ data, parcFator, onClose }: {
+export function ModalDetalhe({ data, parcFator, onClose, onEditar }: {
   data: DetalheData
   parcFator: number
   onClose: () => void
+  onEditar?: (p: PropostaCustom) => void
 }) {
   const isH = data.tipo === "historico"
   const isP = data.tipo === "proposta"
@@ -220,10 +221,18 @@ export function ModalDetalhe({ data, parcFator, onClose }: {
         )}
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-slate-100 shrink-0">
+        <div className="px-5 py-3 border-t border-slate-100 shrink-0 flex gap-2">
+          {isP && onEditar && (
+            <button
+              onClick={() => { onEditar(data.proposta); onClose() }}
+              className="flex-1 py-2 text-[12px] font-semibold text-white bg-violet-600 hover:bg-violet-700 rounded-xl transition-colors"
+            >
+              Editar proposta
+            </button>
+          )}
           <button
             onClick={onClose}
-            className="w-full py-2 text-[12px] font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors"
+            className="flex-1 py-2 text-[12px] font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors"
           >
             Fechar
           </button>

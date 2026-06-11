@@ -5,9 +5,16 @@ import { Cliente, PropostaCustom, LinhaPropostaCustom } from "../types"
 import { brl } from "../utils"
 import { ClienteCombobox } from "./ClienteFields"
 
+function dataToInput(dataStr: string): string {
+  // "19/05/2026, 10:15:47" → "2026-05-19"
+  const m = dataStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : new Date().toISOString().slice(0, 10)
+}
+
 export function ModalPropostaCustom({
   clientes,
   parcFator,
+  initialData,
   onClose,
   onSalvar,
   onPdf,
@@ -15,27 +22,32 @@ export function ModalPropostaCustom({
 }: {
   clientes: Cliente[]
   parcFator: number
+  initialData?: PropostaCustom
   onClose: () => void
   onSalvar: (draft: Omit<PropostaCustom, "id" | "numero" | "cardId">) => void
   onPdf: (draft: Omit<PropostaCustom, "id" | "numero" | "cardId">) => void
   onWhatsApp: (p: PropostaCustom) => void
 }) {
-  const [nomeCliente, setNomeCliente]   = useState("")
-  const [descricao, setDescricao]       = useState("")
-  const [material, setMaterial]         = useState("")
-  const [dimensoes, setDimensoes]       = useState("")
-  const [incluirVerniz, setIncluirVerniz] = useState(false)
-  const [comFaca, setComFaca]           = useState(false)
-  const [valorFaca, setValorFaca]       = useState(0)
-  const [numSKUs, setNumSKUs]           = useState(1)
-  const [validadeDias, setValidadeDias] = useState(7)
-  const [obsCliente, setObsCliente]     = useState("")
-  const [dataInput, setDataInput]       = useState(() => new Date().toISOString().slice(0, 10))
-  const [linhas, setLinhas]           = useState<LinhaPropostaCustom[]>([
-    { id: "1", quantidade: 1000,  unitario: 0, ativa: true,  isIdeal: false },
-    { id: "2", quantidade: 5000,  unitario: 0, ativa: true,  isIdeal: true  },
-    { id: "3", quantidade: 10000, unitario: 0, ativa: true,  isIdeal: false },
-  ])
+  const [nomeCliente, setNomeCliente]     = useState(initialData?.nomeCliente ?? "")
+  const [descricao, setDescricao]         = useState(initialData?.descricao ?? "")
+  const [material, setMaterial]           = useState(initialData?.material ?? "")
+  const [dimensoes, setDimensoes]         = useState(initialData?.dimensoes ?? "")
+  const [incluirVerniz, setIncluirVerniz] = useState(initialData?.incluirVerniz ?? false)
+  const [comFaca, setComFaca]             = useState(initialData?.comFaca ?? false)
+  const [valorFaca, setValorFaca]         = useState(initialData?.valorFaca ?? 0)
+  const [numSKUs, setNumSKUs]             = useState(initialData?.numSKUs ?? 1)
+  const [validadeDias, setValidadeDias]   = useState(initialData?.validadeDias ?? 7)
+  const [obsCliente, setObsCliente]       = useState(initialData?.obsCliente ?? "")
+  const [dataInput, setDataInput]         = useState(() =>
+    initialData?.data ? dataToInput(initialData.data) : new Date().toISOString().slice(0, 10)
+  )
+  const [linhas, setLinhas] = useState<LinhaPropostaCustom[]>(
+    initialData?.linhas ?? [
+      { id: "1", quantidade: 1000,  unitario: 0, ativa: true,  isIdeal: false },
+      { id: "2", quantidade: 5000,  unitario: 0, ativa: true,  isIdeal: true  },
+      { id: "3", quantidade: 10000, unitario: 0, ativa: true,  isIdeal: false },
+    ]
+  )
 
   function addLinha() {
     setLinhas(prev => [...prev, {

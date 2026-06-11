@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/app/lib/prisma"
+import { supabase } from "@/app/lib/supabase"
 
 export async function PATCH(
   req: NextRequest,
@@ -8,10 +8,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await req.json()
-    await prisma.historicoItem.updateMany({
-      where: { numero: id },
-      data:  { calculo: body.calculo },
-    })
+    await supabase.from("HistoricoItem").update({ calculo: body.calculo }).eq("numero", id)
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)
@@ -25,7 +22,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    await prisma.historicoItem.deleteMany({ where: { numero: id } })
+    await supabase.from("HistoricoItem").delete().eq("numero", id)
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)

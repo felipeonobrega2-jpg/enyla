@@ -1,26 +1,24 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/app/lib/prisma"
+import { supabase } from "@/app/lib/supabase"
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { form, calculo, data, numero, contador } = body
 
-    await Promise.all([
-      prisma.historicoItem.upsert({
-        where:  { numero: numero ?? "__none__" },
-        update: { form, calculo, data },
-        create: { form, calculo, data, numero },
-      }),
-      contador !== undefined
-        ? prisma.contador.upsert({
-            where:  { chave: "orc" },
-            update: { valor: contador },
-            create: { chave: "orc", valor: contador },
-          })
-        : Promise.resolve(),
-    ])
+    const ops: PromiseLike<unknown>[] = [
+      supabase.from("HistoricoItem")
+        .upsert({ numero, form, calculo, data }, { onConflict: "numero" }),
+    ]
 
+    if (contador !== undefined) {
+      ops.push(
+        supabase.from("Contador")
+          .upsert({ chave: "orc", valor: contador }, { onConflict: "chave" })
+      )
+    }
+
+    await Promise.all(ops)
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)

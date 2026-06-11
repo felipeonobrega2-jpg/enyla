@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { KanbanCard, COLUNAS_KANBAN, COL_FECHADO, COL_PERDIDO } from "../types"
+import { KanbanCard, COLUNAS_KANBAN, COL_FECHADO, COL_PERDIDO, PropostaCustom } from "../types"
 import { brl } from "../utils"
 import { HistItem } from "./HistoricoView"
 import { COL_COLORS } from "./kanban-colors"
@@ -9,11 +9,13 @@ import { COL_COLORS } from "./kanban-colors"
 export function ClientesView({
   historico,
   kanban,
+  propostasCustom,
   onReplicar,
   onWhatsApp,
 }: {
   historico: HistItem[]
   kanban: KanbanCard[]
+  propostasCustom: PropostaCustom[]
   onReplicar: (item: HistItem) => void
   onWhatsApp: (item: HistItem) => void
 }) {
@@ -21,53 +23,68 @@ export function ClientesView({
   const [expandido, setExpandido] = useState<string | null>(null)
   const [ordem, setOrdem] = useState<"valor" | "nome" | "orcamentos" | "recente">("valor")
 
-  // Agrupar histórico por cliente (mantendo índice mais recente para sort)
-  const porCliente = historico.reduce((acc, item, idx) => {
-    const nome = item.form.nomeCliente?.trim() || "Sem nome"
-    if (!acc[nome]) acc[nome] = { itens: [], firstIdx: idx }
-    acc[nome].itens.push(item)
-    return acc
-  }, {} as Record<string, { itens: HistItem[]; firstIdx: number }>)
+  const precoIdeal = (item: HistItem) => {
+    const ideal = item.calculo.tabela.find(l => l.quantidade === item.calculo.sweetSpotIdealQtd) ?? item.calculo.tabela[0]
+    return item.form.comFaca ? (ideal?.precoComFaca ?? 0) : (ideal?.precoSemFaca ?? 0)
+  }
 
-  // Para cada cliente, buscar status no kanban por numero
-  const clientes = Object.entries(porCliente).map(([nome, { itens, firstIdx }]) => {
-    const precoIdeal = (item: HistItem) => {
-      const ideal = item.calculo.tabela.find(l => l.quantidade === item.calculo.sweetSpotIdealQtd) ?? item.calculo.tabela[0]
-      return item.form.comFaca ? (ideal?.precoComFaca ?? 0) : (ideal?.precoSemFaca ?? 0)
-    }
+  const precoPropostaIdeal = (p: PropostaCustom) => {
+    const ativas = p.linhas.filter(l => l.ativa && l.quantidade > 0)
+    const ideal = ativas.find(l => l.isIdeal) ?? ativas[ativas.length - 1]
+    return ideal ? ideal.unitario * ideal.quantidade : 0
+  }
+
+  // Agrupar historico por cliente
+  const porCliente: Record<string, { itens: HistItem[]; propostas: PropostaCustom[]; firstIdx: number }> = {}
+
+  historico.forEach((item, idx) => {
+    const nome = item.form.nomeCliente?.trim() || "Sem nome"
+    if (!porCliente[nome]) porCliente[nome] = { itens: [], propostas: [], firstIdx: idx }
+    porCliente[nome].itens.push(item)
+  })
+
+  // Mesclar propostas no mesmo mapa por cliente
+  propostasCustom.forEach(p => {
+    const nome = p.nomeCliente?.trim() || "Sem nome"
+    if (!porCliente[nome]) porCliente[nome] = { itens: [], propostas: [], firstIdx: historico.length }
+    porCliente[nome].propostas.push(p)
+  })
+
+  const clientes = Object.entries(porCliente).map(([nome, { itens, propostas, firstIdx }]) => {
     const cardsCliente = kanban.filter(c =>
-      itens.some(i => i.numero && i.numero === c.numero)
+      itens.some(i => i.numero && i.numero === c.numero) ||
+      propostas.some(p => p.cardId && p.cardId === c.id)
     )
-    const fechados = cardsCliente.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO).length
-    const perdidos = cardsCliente.filter(c => c.coluna === COL_PERDIDO).length
-    const decididos = fechados + perdidos
-    const totalValor = itens.reduce((s, i) => s + precoIdeal(i), 0)
+    const fechados    = cardsCliente.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO).length
+    const perdidos    = cardsCliente.filter(c => c.coluna === COL_PERDIDO).length
+    const decididos   = fechados + perdidos
+    const totalValor  = itens.reduce((s, i) => s + precoIdeal(i), 0) + propostas.reduce((s, p) => s + precoPropostaIdeal(p), 0)
     const valorFechado = cardsCliente
       .filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO)
       .reduce((s, c) => s + c.preco, 0)
-    const ultimaData = itens[0]?.data ?? ""
-    return { nome, itens, firstIdx, fechados, perdidos, decididos, totalValor, valorFechado, ultimaData }
+    const datas      = [...itens.map(i => i.data), ...propostas.map(p => p.data)].filter(Boolean)
+    const ultimaData = datas[0] ?? ""
+    return { nome, itens, propostas, firstIdx, fechados, perdidos, decididos, totalValor, valorFechado, ultimaData }
   })
 
   const filtrados = clientes
     .filter(c => !busca.trim() || c.nome.toLowerCase().includes(busca.toLowerCase()))
     .sort((a, b) => {
-      if (ordem === "valor")     return b.totalValor - a.totalValor
-      if (ordem === "orcamentos") return b.itens.length - a.itens.length
-      if (ordem === "nome")      return a.nome.localeCompare(b.nome, "pt-BR")
-      if (ordem === "recente")   return a.firstIdx - b.firstIdx
+      if (ordem === "valor")      return b.totalValor - a.totalValor
+      if (ordem === "orcamentos") return (b.itens.length + b.propostas.length) - (a.itens.length + a.propostas.length)
+      if (ordem === "nome")       return a.nome.localeCompare(b.nome, "pt-BR")
+      if (ordem === "recente")    return a.firstIdx - b.firstIdx
       return 0
     })
 
-  // KPIs globais
   const totalClientes  = clientes.length
-  const totalOrcamentos = historico.length
+  const totalRegistros = historico.length + propostasCustom.length
   const totalFaturavel = clientes.reduce((s, c) => s + c.valorFechado, 0)
-  const ticketMedGlobal = totalOrcamentos > 0
-    ? clientes.reduce((s, c) => s + c.totalValor, 0) / totalOrcamentos
+  const ticketMedGlobal = totalRegistros > 0
+    ? clientes.reduce((s, c) => s + c.totalValor, 0) / totalRegistros
     : 0
 
-  if (!historico.length) return (
+  if (!historico.length && !propostasCustom.length) return (
     <div className="flex flex-col items-center justify-center h-full text-slate-400">
       <p className="text-sm">Nenhum orçamento salvo ainda.</p>
       <p className="text-xs mt-1">Salve orçamentos para ver o histórico por cliente.</p>
@@ -80,10 +97,10 @@ export function ClientesView({
       {/* KPIs globais */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          ["Clientes",        String(totalClientes),     "com orçamentos"],
-          ["Orçamentos",      String(totalOrcamentos),   "no histórico"],
-          ["Ticket médio",    brl(ticketMedGlobal),      "por orçamento"],
-          ["Receita fechada", brl(totalFaturavel),       "orçamentos fechados"],
+          ["Clientes",        String(totalClientes),  "com registros"],
+          ["Registros",       String(totalRegistros), "orçamentos + propostas"],
+          ["Ticket médio",    brl(ticketMedGlobal),   "por registro"],
+          ["Receita fechada", brl(totalFaturavel),    "orçamentos fechados"],
         ].map(([label, val, sub]) => (
           <div key={label} className="bg-white border border-slate-100 rounded-xl p-4">
             <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">{label}</p>
@@ -108,7 +125,7 @@ export function ClientesView({
         <select value={ordem} onChange={e => setOrdem(e.target.value as typeof ordem)}
           className="border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="valor">Maior valor</option>
-          <option value="orcamentos">Mais orçamentos</option>
+          <option value="orcamentos">Mais registros</option>
           <option value="nome">Nome A–Z</option>
           <option value="recente">Mais recentes</option>
         </select>
@@ -116,37 +133,33 @@ export function ClientesView({
 
       {/* Lista de clientes */}
       <div className="space-y-2">
-        {filtrados.map(({ nome, itens, fechados, perdidos, decididos, totalValor, valorFechado, ultimaData, firstIdx: _fi }) => {
-          const conversao = decididos > 0 ? Math.round(fechados / decididos * 100) : null
-          const aberto    = expandido === nome
-          const inicial   = nome[0]?.toUpperCase() ?? "#"
+        {filtrados.map(({ nome, itens, propostas, fechados, perdidos, decididos, totalValor, valorFechado, ultimaData }) => {
+          const conversao  = decididos > 0 ? Math.round(fechados / decididos * 100) : null
+          const aberto     = expandido === nome
+          const inicial    = nome[0]?.toUpperCase() ?? "#"
+          const totalItens = itens.length + propostas.length
 
           return (
             <div key={nome} className="bg-white border border-slate-100 rounded-xl overflow-hidden hover:border-slate-200 transition-colors">
 
-              {/* Linha do cliente */}
               <button
                 onClick={() => setExpandido(aberto ? null : nome)}
                 className="w-full flex items-center gap-4 px-5 py-4 text-left"
               >
-                {/* Avatar */}
                 <div className="w-10 h-10 rounded-full bg-slate-900 text-white text-sm font-bold flex items-center justify-center shrink-0">
                   {inicial}
                 </div>
 
-                {/* Nome + última atividade */}
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-slate-800">{nome}</p>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    {itens.length} orçamento{itens.length !== 1 ? "s" : ""} · última atividade {ultimaData}
+                    {totalItens} registro{totalItens !== 1 ? "s" : ""} · última atividade {ultimaData}
                   </p>
                 </div>
 
-                {/* Métricas */}
                 <div className="flex items-center gap-5 shrink-0">
-                  {/* Funil mini */}
                   <div className="flex items-center gap-2 text-[11px]">
-                    <span className="text-slate-500">{itens.length} realizados</span>
+                    <span className="text-slate-500">{totalItens} realizados</span>
                     {fechados > 0 && <>
                       <span className="text-slate-300">→</span>
                       <span className="text-green-600 font-semibold">{fechados} fechados</span>
@@ -157,7 +170,6 @@ export function ClientesView({
                     </>}
                   </div>
 
-                  {/* Conversão */}
                   {conversao !== null && (
                     <div className="text-center min-w-[48px]">
                       <p className={`text-sm font-black leading-none ${
@@ -167,7 +179,6 @@ export function ClientesView({
                     </div>
                   )}
 
-                  {/* Valor */}
                   <div className="text-right min-w-[90px]">
                     <p className="font-bold text-slate-800">{brl(totalValor)}</p>
                     {valorFechado > 0 && valorFechado !== totalValor && (
@@ -175,7 +186,6 @@ export function ClientesView({
                     )}
                   </div>
 
-                  {/* Chevron */}
                   <svg className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${aberto ? "rotate-180" : ""}`}
                     fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -183,7 +193,6 @@ export function ClientesView({
                 </div>
               </button>
 
-              {/* Orçamentos do cliente — expandido */}
               {aberto && (
                 <div className="border-t border-slate-50 divide-y divide-slate-50">
                   {itens.map((item, i) => {
@@ -191,9 +200,8 @@ export function ClientesView({
                     const preco = item.form.comFaca ? (ideal?.precoComFaca ?? 0) : (ideal?.precoSemFaca ?? 0)
                     const card  = kanban.find(c => item.numero && c.numero === item.numero)
                     const colIdx = card?.coluna ?? null
-                    const statusLabel = colIdx !== null ? COLUNAS_KANBAN[colIdx] : null
+                    const statusLabel  = colIdx !== null ? COLUNAS_KANBAN[colIdx] : null
                     const statusColors = colIdx !== null ? COL_COLORS[colIdx] : null
-
                     return (
                       <div key={i} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 transition-colors">
                         <div className="flex-1 min-w-0">
@@ -228,6 +236,39 @@ export function ClientesView({
                             Replicar
                           </button>
                         </div>
+                      </div>
+                    )
+                  })}
+                  {propostas.map(p => {
+                    const ativas = p.linhas.filter(l => l.ativa && l.quantidade > 0)
+                    const ideal  = ativas.find(l => l.isIdeal) ?? ativas[ativas.length - 1]
+                    const preco  = ideal ? ideal.unitario * ideal.quantidade : 0
+                    const card   = p.cardId ? kanban.find(c => c.id === p.cardId) : null
+                    const colIdx = card?.coluna ?? null
+                    const statusLabel  = colIdx !== null ? COLUNAS_KANBAN[colIdx] : null
+                    const statusColors = colIdx !== null ? COL_COLORS[colIdx] : null
+                    return (
+                      <div key={p.id} className="flex items-center gap-4 px-5 py-3 hover:bg-violet-50/30 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full">
+                              {p.numero}
+                            </span>
+                            <span className="text-[9px] font-semibold text-violet-500 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+                              Personalizada
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              {[p.descricao, p.dimensoes, p.material].filter(Boolean).join(" · ") || "—"}
+                            </span>
+                            {statusLabel && statusColors && (
+                              <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${statusColors.badge}`}>
+                                {statusLabel}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{p.data}</p>
+                        </div>
+                        <p className="font-bold text-slate-700 shrink-0">{preco > 0 ? brl(preco) : "—"}</p>
                       </div>
                     )
                   })}

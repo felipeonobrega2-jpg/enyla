@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/app/lib/prisma"
+import { supabase } from "@/app/lib/supabase"
 
 export async function PATCH(
   req: NextRequest,
@@ -8,7 +8,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await req.json()
-    await prisma.cliente.update({ where: { id }, data: body })
+    await supabase.from("Cliente").update(body).eq("id", id)
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)

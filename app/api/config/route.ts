@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/app/lib/prisma"
+import { supabase } from "@/app/lib/supabase"
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    await prisma.appConfig.upsert({
-      where:  { id: 1 },
-      update: { data: body },
-      create: { id: 1, data: body },
-    })
+    await supabase.from("AppConfig").upsert({ id: 1, data: body }, { onConflict: "id" })
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)

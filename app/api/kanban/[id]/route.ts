@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/app/lib/prisma"
+import { supabase } from "@/app/lib/supabase"
 
 export async function PATCH(
   req: NextRequest,
@@ -8,7 +8,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await req.json()
-    await prisma.kanbanCard.update({ where: { id }, data: body })
+    await supabase.from("KanbanCard").update(body).eq("id", id)
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)
@@ -22,7 +22,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    await prisma.kanbanCard.delete({ where: { id } })
+    await supabase.from("KanbanCard").delete().eq("id", id)
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)
