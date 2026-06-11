@@ -189,6 +189,31 @@ export type Parceiro = {
 export type TipoNegocio = "comissao" | "ganho"
 export type StatusNegocio = "pendente" | "pago" | "cancelado"
 
+export type TipoLancamento = "receita" | "despesa"
+export type StatusLancamento = "pendente" | "pago" | "atrasado"
+export type FormaPagamento = "pix" | "boleto" | "cartao_credito" | "cartao_debito" | "dinheiro" | "transferencia" | "outro"
+
+export type CategoriaDesp =
+  | "aluguel" | "fornecedor" | "materiais" | "salarios"
+  | "impostos" | "marketing" | "servicos" | "outros"
+
+export type LancamentoFinanceiro = {
+  id: string
+  tipo: TipoLancamento
+  descricao: string
+  valor: number
+  dataVencimento: string
+  dataPagamento?: string
+  status: StatusLancamento
+  cardId?: string
+  cardNumero?: string
+  nomeCliente?: string
+  categoria?: string
+  formaPagamento?: FormaPagamento
+  obs?: string
+  criadoEm: string
+}
+
 export type NegocioParceiro = {
   id: string
   parceiroId: string

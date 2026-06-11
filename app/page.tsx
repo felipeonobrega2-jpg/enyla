@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect } from "react"
-import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, COL_FECHADO, COLUNAS_KANBAN, Parceiro, NegocioParceiro } from "./types"
+import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, COL_FECHADO, COLUNAS_KANBAN, Parceiro, NegocioParceiro, LancamentoFinanceiro } from "./types"
 import DashboardView from "./components/DashboardView"
 import { QUANTIDADES_PADRAO } from "./dados"
 import { calcular } from "./calculos"
@@ -16,6 +16,7 @@ import { ClientesView } from "./components/ClientesView"
 import { ConfigView } from "./components/ConfigView"
 import { KanbanView } from "./components/KanbanView"
 import { ParceirosView } from "./components/ParceirosView"
+import { FinanceiroView } from "./components/FinanceiroView"
 import { ClienteCombobox, ClienteContactCard } from "./components/ClienteFields"
 import { ModalPersonalizarProposta } from "./components/ModalPersonalizarProposta"
 import { ModalPropostaCustom, BoxPreview3D } from "./components/ModalPropostaCustom"
@@ -65,7 +66,7 @@ export default function Home() {
   const [historico, setHistorico] = useState<Array<{ form: FormData; calculo: Calculo; data: string; numero?: string }>>([])
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
   const [contador, setContador] = useState<number>(0)
-  const [view, setView]       = useState<"orcamento" | "historico" | "clientes" | "kanban" | "forma" | "config" | "dashboard" | "parceiros">("orcamento")
+  const [view, setView]       = useState<"orcamento" | "historico" | "clientes" | "kanban" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro">("orcamento")
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
   const [modalSalvar, setModalSalvar] = useState<{ form: FormData; calculo: Calculo; numero: string; data: string; cardId: string } | null>(null)
   const [clientes, setClientes] = useState<Cliente[]>([])
@@ -76,6 +77,7 @@ export default function Home() {
   const [detalheModal, setDetalheModal] = useState<DetalheData | null>(null)
   const [parceiros, setParceiros] = useState<Parceiro[]>([])
   const [negocios, setNegocios]   = useState<NegocioParceiro[]>([])
+  const [lancamentos, setLancamentos] = useState<LancamentoFinanceiro[]>([])
 
   useEffect(() => {
     fetch("/api/data")
@@ -90,6 +92,7 @@ export default function Home() {
         if (d.config)                 setConfig(d.config)
         if (d.parceiros)              setParceiros(d.parceiros)
         if (d.negocios)               setNegocios(d.negocios)
+        if (d.lancamentos)            setLancamentos(d.lancamentos)
       })
       .catch(() => {})
   }, [])
@@ -514,6 +517,10 @@ export default function Home() {
             icon={<svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z" /></svg>}
           />
 
+          <NavItem active={view === "financeiro"} onClick={() => setView("financeiro")} label="Financeiro"
+            icon={<svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" /></svg>}
+          />
+
           <div className="h-px bg-white/5 my-2 mx-1" />
 
           <NavItem active={view === "forma"} onClick={() => setView("forma")} label="Forma ✦"
@@ -919,6 +926,23 @@ export default function Home() {
                   data: item.data,
                   cardId,
                 })
+              }}
+            />
+          ) : view === "financeiro" ? (
+            <FinanceiroView
+              lancamentos={lancamentos}
+              kanban={kanban}
+              onAdd={l => {
+                setLancamentos(prev => [l, ...prev])
+                fetch("/api/lancamentos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(l) }).catch(() => {})
+              }}
+              onUpdate={(id, updates) => {
+                setLancamentos(prev => prev.map(x => x.id === id ? { ...x, ...updates } : x))
+                fetch(`/api/lancamentos/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updates) }).catch(() => {})
+              }}
+              onDelete={id => {
+                setLancamentos(prev => prev.filter(x => x.id !== id))
+                fetch(`/api/lancamentos/${id}`, { method: "DELETE" }).catch(() => {})
               }}
             />
           ) : view === "parceiros" ? (
