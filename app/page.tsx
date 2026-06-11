@@ -932,6 +932,7 @@ export default function Home() {
             <FinanceiroView
               lancamentos={lancamentos}
               kanban={kanban}
+              negocios={negocios}
               onAdd={l => {
                 setLancamentos(prev => [l, ...prev])
                 fetch("/api/lancamentos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(l) }).catch(() => {})
