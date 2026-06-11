@@ -7,8 +7,8 @@ import { brl, num } from "../utils"
 type HistItem = { form: FormData; calculo: Calculo; data: string; numero?: string }
 
 export type DetalheData =
-  | { tipo: "historico"; item: HistItem }
-  | { tipo: "proposta";  proposta: PropostaCustom }
+  | { tipo: "historico"; item: HistItem;         card?: KanbanCard }
+  | { tipo: "proposta";  proposta: PropostaCustom; card?: KanbanCard }
   | { tipo: "kanban";    card: KanbanCard }
 
 export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDelivery }: {
@@ -22,9 +22,10 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
   const isP = data.tipo === "proposta"
   const isK = data.tipo === "kanban"
 
-  const [deliveryDate, setDeliveryDate] = useState(
-    isK ? (data.card.dataEntregaPrevista ?? "") : ""
-  )
+  // card is always present for kanban type, and optionally passed for historico/proposta
+  const card = isK ? data.card : data.card
+
+  const [deliveryDate, setDeliveryDate] = useState(card?.dataEntregaPrevista ?? "")
   const [savingDelivery, setSavingDelivery] = useState(false)
 
   const numero  = isH ? (data.item.numero ?? "")      : isP ? data.proposta.numero    : data.card.numero
@@ -227,8 +228,8 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
           </div>
         )}
 
-        {/* Data de entrega prevista (apenas cards kanban) */}
-        {isK && onSaveDelivery && (
+        {/* Data de entrega prevista — aparece sempre que o modal tem um card kanban associado */}
+        {card && onSaveDelivery && (
           <div className="px-5 py-3.5 border-t border-slate-100 shrink-0">
             <p className="text-[9.5px] uppercase tracking-[0.1em] text-slate-400 font-semibold mb-2">
               Data prevista de entrega
@@ -251,7 +252,7 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
                 disabled={savingDelivery}
                 onClick={async () => {
                   setSavingDelivery(true)
-                  await onSaveDelivery(data.card.id, deliveryDate || null)
+                  await onSaveDelivery(card.id, deliveryDate || null)
                   setSavingDelivery(false)
                 }}
                 className="px-3 h-8 text-[12px] font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-lg transition-colors disabled:opacity-50 shrink-0"

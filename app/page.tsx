@@ -866,9 +866,9 @@ export default function Home() {
               }}
               onDetalhes={(card) => {
                 const histItem = historico.find(h => h.numero === card.numero)
-                if (histItem) { setDetalheModal({ tipo: "historico", item: histItem }); return }
+                if (histItem) { setDetalheModal({ tipo: "historico", item: histItem, card }); return }
                 const proposta = propostasCustom.find(p => p.cardId === card.id)
-                if (proposta) { setDetalheModal({ tipo: "proposta", proposta }); return }
+                if (proposta) { setDetalheModal({ tipo: "proposta", proposta, card }); return }
                 setDetalheModal({ tipo: "kanban", card })
               }}
             />
@@ -1130,7 +1130,7 @@ export default function Home() {
           parcFator={config.multiplicadores.parcelamento12x}
           onClose={() => setDetalheModal(null)}
           onEditar={(p) => { setDetalheModal(null); setEditandoProposta(p) }}
-          onSaveDelivery={detalheModal.tipo === "kanban" ? salvarDataEntrega : undefined}
+          onSaveDelivery={"card" in detalheModal && detalheModal.card ? salvarDataEntrega : undefined}
         />
       )}
 
