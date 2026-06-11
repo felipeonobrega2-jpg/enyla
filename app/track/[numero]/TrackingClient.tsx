@@ -1,20 +1,66 @@
 "use client"
 
-import { useState, useEffect } from 'react'
-import { TrackingEntry } from '../../utils/tracking-store'
+import React, { useState, useEffect } from 'react'
+import type { TrackingEntry, TrackingEtapa } from '../../utils/tracking-store'
 
-// Customer-visible stages (mapped from internal kanban columns)
 const ETAPAS = [
-  { coluna: 1, label: "Pedido confirmado",     desc: "Seu pedido foi aprovado e está em nossa agenda.",   cor: "emerald" },
-  { coluna: 2, label: "Arte sendo preparada",  desc: "Nossa equipe prepara seu projeto gráfico.",         cor: "blue"    },
-  { coluna: 3, label: "Em aprovação",          desc: "Projeto aguardando aprovação final.",               cor: "blue"    },
-  { coluna: 4, label: "Na fila de produção",   desc: "Aguardando início da impressão.",                   cor: "blue"    },
-  { coluna: 5, label: "Em impressão",          desc: "Suas embalagens estão sendo impressas.",            cor: "blue"    },
-  { coluna: 6, label: "Acabamento UV",         desc: "Aplicando verniz UV nas embalagens.",               cor: "blue"    },
-  { coluna: 7, label: "Acabamento final",      desc: "Corte, dobra e colagem das embalagens.",            cor: "blue"    },
-  { coluna: 8, label: "Saiu para entrega",     desc: "Seu pedido está a caminho!",                        cor: "blue"    },
-  { coluna: 9, label: "Entregue! 🎉",          desc: "Pedido entregue com sucesso. Obrigado!",            cor: "emerald" },
+  { coluna: 1, label: "Pedido confirmado",    desc: "Seu pedido foi aprovado e entrou em nossa agenda.",    icon: "confirmed"  },
+  { coluna: 2, label: "Arte em preparação",   desc: "Nossa equipe está criando o projeto gráfico da sua embalagem.", icon: "design" },
+  { coluna: 3, label: "Arte para aprovação",  desc: "O arquivo será enviado para sua revisão e aprovação.", icon: "review"    },
+  { coluna: 4, label: "Fila de produção",     desc: "Arte aprovada! Aguardando início da impressão.",       icon: "queue"     },
+  { coluna: 5, label: "Em impressão",         desc: "Suas embalagens estão sendo impressas agora.",         icon: "print"     },
+  { coluna: 6, label: "Acabamento UV",        desc: "Aplicando verniz UV para maior durabilidade e brilho.", icon: "uv"       },
+  { coluna: 7, label: "Corte e colagem",      desc: "Corte, dobra e colagem das embalagens.",               icon: "cut"       },
+  { coluna: 8, label: "Saiu para entrega",    desc: "Seu pedido está a caminho!",                           icon: "truck"     },
+  { coluna: 9, label: "Entregue!",            desc: "Pedido entregue com sucesso. Obrigado pela confiança!", icon: "delivered" },
 ]
+
+// Parse "dd/mm/yyyy, hh:mm:ss" → Date
+function parseBRDate(s: string): Date | null {
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
+  if (!m) return null
+  return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]))
+}
+
+function formatDateLong(d: Date) {
+  return d.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })
+}
+
+function calcDelivery(etapas: TrackingEtapa[], colunaAtual: number) {
+  // Delivered: show real delivery date
+  const entregueEtapa = etapas.find(e => e.coluna === 9)
+  if (entregueEtapa) {
+    const d = parseBRDate(entregueEtapa.dataHora)
+    if (d) return { text: formatDateLong(d), isEstimate: false, delivered: true }
+  }
+  // Art approved: production queue entry (col 4)
+  const producaoEtapa = etapas.find(e => e.coluna === 4)
+  if (producaoEtapa) {
+    const d = parseBRDate(producaoEtapa.dataHora)
+    if (d) {
+      d.setDate(d.getDate() + 15)
+      return { text: formatDateLong(d), isEstimate: true, delivered: false }
+    }
+  }
+  return null
+}
+
+function StepIcon({ icon, large, active }: { icon: string; large?: boolean; active?: boolean }) {
+  const sz = large ? "w-7 h-7" : "w-4 h-4"
+  const col = active ? "text-white" : "text-current"
+  const icons: Record<string, React.ReactElement> = {
+    confirmed: <svg className={`${sz} ${col}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>,
+    design:    <svg className={`${sz} ${col}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z"/></svg>,
+    review:    <svg className={`${sz} ${col}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>,
+    queue:     <svg className={`${sz} ${col}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z"/></svg>,
+    print:     <svg className={`${sz} ${col}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.056 48.056 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z"/></svg>,
+    uv:        <svg className={`${sz} ${col}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/></svg>,
+    cut:       <svg className={`${sz} ${col}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m7.848 8.25 1.536.887M7.848 8.25a3 3 0 1 1-5.196-3 3 3 0 0 1 5.196 3Zm1.536.887a2.165 2.165 0 0 1 1.083 1.839c.005.351.054.695.14 1.024M9.384 9.137l2.077 1.199M7.848 15.75l1.536-.887m-1.536.887a3 3 0 1 1-5.196 3 3 3 0 0 1 5.196-3Zm1.536-.887a2.165 2.165 0 0 0 1.083-1.838c.005-.352.054-.695.14-1.025m-1.223 2.863 2.077-1.199m0-3.328a4.323 4.323 0 0 1 2.068-1.379l5.325-1.628a4.5 4.5 0 0 1 2.363-.257L19.5 7.5"/></svg>,
+    truck:     <svg className={`${sz} ${col}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12"/></svg>,
+    delivered: <svg className={`${sz} ${col}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/></svg>,
+  }
+  return <>{icons[icon] ?? icons.confirmed}</>
+}
 
 interface Props {
   initialData: TrackingEntry | null
@@ -22,8 +68,8 @@ interface Props {
 }
 
 export default function TrackingClient({ initialData, numero }: Props) {
-  const [data, setData] = useState<TrackingEntry | null>(initialData)
-  const [lastUpdate, setLastUpdate] = useState(0) // seconds ago
+  const [data, setData]           = useState<TrackingEntry | null>(initialData)
+  const [lastUpdate, setLastUpdate] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
 
   async function fetchData() {
@@ -32,68 +78,55 @@ export default function TrackingClient({ initialData, numero }: Props) {
       const res = await fetch(`/api/track/${encodeURIComponent(numero)}`, { cache: 'no-store' })
       if (res.ok) setData(await res.json())
       setLastUpdate(0)
-    } catch {
-      // silent
-    } finally {
-      setRefreshing(false)
-    }
+    } catch { /* silent */ } finally { setRefreshing(false) }
   }
 
-  // Auto-refresh every 15 seconds
   useEffect(() => {
     const interval = setInterval(fetchData, 15000)
     const counter  = setInterval(() => setLastUpdate(s => s + 1), 1000)
     return () => { clearInterval(interval); clearInterval(counter) }
   }, [numero])
 
-  // Not found page
-  if (!data) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4">
-        <div className="w-full max-w-sm text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto">
-            <svg className="w-8 h-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-            </svg>
-          </div>
-          <div>
-            <p className="font-bold text-slate-800 text-lg">Pedido não encontrado</p>
-            <p className="text-slate-400 text-sm mt-1">Verifique o link enviado pela gráfica.</p>
-          </div>
-          <p className="text-xs text-slate-300 font-mono">{numero}</p>
+  if (!data) return (
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center px-4">
+      <div className="w-full max-w-sm text-center space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-white border border-slate-100 flex items-center justify-center mx-auto shadow-sm">
+          <svg className="w-8 h-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
         </div>
+        <p className="font-bold text-slate-800 text-lg">Pedido não encontrado</p>
+        <p className="text-slate-400 text-sm">Verifique o link enviado pela gráfica.</p>
+        <p className="text-xs text-slate-300 font-mono bg-slate-100 px-3 py-1.5 rounded-lg inline-block">{numero}</p>
       </div>
-    )
-  }
+    </div>
+  )
 
-  // Determine current visible stage
-  const currentEtapa = ETAPAS.findIndex(e => e.coluna === data.colunaAtual)
-  const isCancelled = data.colunaAtual === 10
-  const isPending   = data.colunaAtual < 1  // still in "orçamento realizado"
+  const currentIndex  = ETAPAS.findIndex(e => e.coluna === data.colunaAtual)
+  const isCancelled   = data.colunaAtual === 10
+  const isPending     = data.colunaAtual < 1
+  const isDelivered   = data.colunaAtual === 9
+  const totalSteps    = ETAPAS.length
+  const completedSteps = data.etapas.length
+  const progressPct   = Math.round((completedSteps / totalSteps) * 100)
 
-  void currentEtapa // used implicitly via isCurrent
+  const delivery = calcDelivery(data.etapas, data.colunaAtual)
+  const artApproved = data.etapas.some(e => e.coluna >= 4)
 
-  // Find completed timestamp for a stage
-  function getTimestamp(coluna: number): string | null {
-    return data!.etapas.find(e => e.coluna === coluna)?.dataHora?.split(",")[0] ?? null
-  }
-
-  function isCompleted(etapaColuna: number): boolean {
-    return data!.etapas.some(e => e.coluna === etapaColuna)
-  }
-
-  function isCurrent(index: number): boolean {
-    return ETAPAS[index].coluna === data!.colunaAtual && !isCancelled
-  }
+  const currentEtapa = currentIndex >= 0 ? ETAPAS[currentIndex] : null
 
   const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
   const num = (v: number) => v.toLocaleString("pt-BR")
 
+  function isCompleted(col: number) { return data!.etapas.some(e => e.coluna === col) }
+  function getTS(col: number) { return data!.etapas.find(e => e.coluna === col)?.dataHora?.split(",")[0] ?? null }
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
+    <div className="min-h-screen bg-[#f8fafc]">
+
+      {/* ── Sticky header ──────────────────────────────────────────────── */}
       <div className="bg-white border-b border-slate-100 sticky top-0 z-10">
-        <div className="max-w-md mx-auto px-5 py-3.5 flex items-center gap-3">
+        <div className="max-w-md mx-auto px-5 h-14 flex items-center gap-3">
           <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
             <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
@@ -104,174 +137,294 @@ export default function TrackingClient({ initialData, numero }: Props) {
             <p className="text-slate-400 text-[10px] mt-0.5">Comunicação Visual</p>
           </div>
           <div className="ml-auto">
-            <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded-full font-mono">{numero}</span>
+            <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full font-mono">{numero}</span>
           </div>
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-5 py-6 space-y-5">
+      <div className="max-w-md mx-auto px-4 py-5 pb-10 space-y-4">
 
-        {/* Greeting */}
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Acompanhamento de pedido</p>
-          <p className="text-xl font-bold text-slate-900 mt-1">Olá, {data.nomeCliente.split(" ")[0]}! 👋</p>
-          <p className="text-sm text-slate-500 mt-1">Veja abaixo o andamento do seu pedido.</p>
+        {/* ── Greeting ───────────────────────────────────────────────── */}
+        <div className="pt-1">
+          <p className="text-[22px] font-bold text-slate-900 leading-snug">
+            Olá, {data.nomeCliente.split(" ")[0]}!
+          </p>
+          <p className="text-sm text-slate-500 mt-0.5">Acompanhe o andamento do seu pedido abaixo.</p>
         </div>
 
-        {/* Order summary card */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-4 space-y-3 shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        {/* ── Order summary card ─────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="px-4 py-3.5 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+              <svg className="w-4.5 h-4.5 text-slate-400 w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
               </svg>
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-slate-800 text-sm truncate">{data.descricao || "Embalagem personalizada"}</p>
-              <p className="text-slate-400 text-xs mt-0.5">{data.materialNome}</p>
+              <p className="text-slate-400 text-xs mt-0.5">{data.materialNome || "Material não especificado"}</p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-50">
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Quantidade</p>
+          <div className="grid grid-cols-2 border-t border-slate-50 divide-x divide-slate-50">
+            <div className="px-4 py-2.5">
+              <p className="text-[9.5px] uppercase tracking-wider text-slate-400 font-semibold">Quantidade</p>
               <p className="text-sm font-bold text-slate-800 tabular-nums mt-0.5">{num(data.quantidade)} un</p>
             </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Valor</p>
+            <div className="px-4 py-2.5">
+              <p className="text-[9.5px] uppercase tracking-wider text-slate-400 font-semibold">Valor</p>
               <p className="text-sm font-bold text-slate-800 tabular-nums mt-0.5">{brl(data.preco)}</p>
             </div>
           </div>
         </div>
 
-        {/* Cancelled state */}
+        {/* ── Cancelled ──────────────────────────────────────────────── */}
         {isCancelled && (
-          <div className="bg-slate-50 rounded-2xl border border-slate-100 p-5 text-center space-y-2">
-            <p className="text-2xl">📋</p>
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 text-center space-y-2 shadow-sm">
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto">
+              <svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </div>
             <p className="font-bold text-slate-700">Pedido encerrado</p>
             <p className="text-sm text-slate-400">Entre em contato com a gráfica para mais informações.</p>
           </div>
         )}
 
-        {/* Pending state (col 0) */}
+        {/* ── Pending (col 0) ─────────────────────────────────────────── */}
         {isPending && !isCancelled && (
           <div className="bg-amber-50 rounded-2xl border border-amber-100 p-5 text-center space-y-2">
-            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
+            <div className="w-11 h-11 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
               <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
               </svg>
             </div>
-            <p className="font-bold text-amber-800 text-sm">Aguardando confirmação</p>
-            <p className="text-xs text-amber-600">Seu orçamento foi recebido e está sendo analisado.</p>
+            <p className="font-bold text-amber-800">Aguardando confirmação</p>
+            <p className="text-sm text-amber-600 leading-relaxed">Seu orçamento foi recebido e está sendo analisado pela gráfica.</p>
           </div>
         )}
 
-        {/* Timeline */}
-        {!isCancelled && !isPending && (
-          <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-            <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-5">Progresso do pedido</p>
-            <div className="space-y-0">
-              {ETAPAS.map((etapa, i) => {
-                const completed = isCompleted(etapa.coluna)
-                const current   = isCurrent(i)
-                const ts        = getTimestamp(etapa.coluna)
-                const isLast    = i === ETAPAS.length - 1
-                const nextCompleted = i < ETAPAS.length - 1 && isCompleted(ETAPAS[i + 1].coluna)
+        {/* ── Active / Delivered ─────────────────────────────────────── */}
+        {!isCancelled && !isPending && currentEtapa && (
+          <>
+            {/* Status hero card */}
+            <div className={`rounded-2xl overflow-hidden shadow-sm ${
+              isDelivered
+                ? "bg-gradient-to-br from-emerald-500 to-emerald-600"
+                : "bg-gradient-to-br from-blue-600 to-blue-700"
+            }`}>
 
-                return (
-                  <div key={etapa.coluna} className="flex gap-4">
-                    {/* Left: circle + line */}
-                    <div className="flex flex-col items-center">
-                      {/* Circle */}
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 ${
-                        completed
-                          ? "bg-emerald-500 shadow-sm shadow-emerald-200"
-                          : current
-                          ? "bg-blue-600 shadow-sm shadow-blue-200 ring-4 ring-blue-100"
-                          : "bg-white border-2 border-slate-200"
-                      }`}>
-                        {completed ? (
-                          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                          </svg>
-                        ) : current ? (
-                          <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
-                        ) : (
-                          <div className="w-2 h-2 rounded-full bg-slate-300" />
-                        )}
-                      </div>
-                      {/* Connecting line */}
-                      {!isLast && (
-                        <div className={`w-0.5 flex-1 my-1 min-h-[20px] ${
-                          completed && nextCompleted ? "bg-emerald-300" :
-                          completed ? "bg-gradient-to-b from-emerald-300 to-slate-200" :
-                          "bg-slate-100"
-                        }`} />
+              {/* Progress bar + label */}
+              <div className="px-5 pt-4 pb-2">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/70">
+                    {isDelivered ? "Concluído" : "Em andamento"}
+                  </p>
+                  <p className="text-[11px] font-bold text-white/80 tabular-nums">
+                    {completedSteps}/{totalSteps} etapas
+                  </p>
+                </div>
+                <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-white rounded-full transition-all duration-700"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Current step */}
+              <div className="px-5 py-5 flex items-center gap-4">
+                {/* Icon with animated ring */}
+                <div className="relative shrink-0">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                    isDelivered ? "bg-white/20" : "bg-white/15"
+                  }`}>
+                    <StepIcon icon={currentEtapa.icon} large active />
+                  </div>
+                  {!isDelivered && (
+                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-white/30 animate-ping" />
+                  )}
+                  {!isDelivered && (
+                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-white/70" />
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-white text-[17px] leading-snug">{currentEtapa.label}</p>
+                  <p className="text-white/75 text-[12.5px] mt-1 leading-relaxed">{currentEtapa.desc}</p>
+                </div>
+              </div>
+
+              {/* Delivery date */}
+              <div className={`mx-4 mb-4 rounded-xl px-4 py-3 ${
+                isDelivered ? "bg-white/20" : "bg-white/10"
+              }`}>
+                {delivery ? (
+                  <div className="flex items-start gap-2.5">
+                    <svg className="w-4 h-4 text-white/80 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                    </svg>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">
+                        {delivery.delivered ? "Data de entrega" : "Previsão de entrega"}
+                      </p>
+                      <p className="text-white font-semibold text-[13.5px] mt-0.5 capitalize">{delivery.text}</p>
+                      {delivery.isEstimate && (
+                        <p className="text-white/50 text-[10px] mt-0.5">Estimativa · pode variar conforme produção</p>
                       )}
                     </div>
-
-                    {/* Right: content */}
-                    <div className={`flex-1 pb-5 ${isLast ? "pb-0" : ""}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-[13.5px] font-semibold leading-tight ${
-                            completed ? "text-emerald-700" :
-                            current   ? "text-slate-900" :
-                                        "text-slate-400"
-                          }`}>
-                            {etapa.label}
-                          </p>
-                          {current && (
-                            <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{etapa.desc}</p>
-                          )}
-                        </div>
-                        <div className="shrink-0 text-right">
-                          {completed && ts ? (
-                            <span className="text-[10.5px] text-slate-400 tabular-nums">{ts}</span>
-                          ) : current ? (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 animate-pulse">
-                              Em andamento
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-2.5">
+                    <svg className="w-4 h-4 text-white/50 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Previsão de entrega</p>
+                      <p className="text-white/70 text-[12.5px] mt-0.5 leading-relaxed">
+                        {artApproved
+                          ? "Calculando prazo…"
+                          : "Após a aprovação da arte, a data prevista será calculada automaticamente."
+                        }
+                      </p>
                     </div>
                   </div>
-                )
-              })}
+                )}
+              </div>
             </div>
-          </div>
+
+            {/* ── Timeline ───────────────────────────────────────────── */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-slate-50">
+                <p className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-slate-400">
+                  Detalhes do progresso
+                </p>
+              </div>
+              <div className="px-5 py-4">
+                <div className="space-y-0">
+                  {ETAPAS.map((etapa, i) => {
+                    const completed = isCompleted(etapa.coluna)
+                    const current   = etapa.coluna === data.colunaAtual && !isCancelled
+                    const ts        = getTS(etapa.coluna)
+                    const isLast    = i === ETAPAS.length - 1
+                    const isFuture  = !completed && !current
+                    const isNext    = isFuture && currentIndex >= 0 && i === currentIndex + 1
+                    const isNextNext = isFuture && currentIndex >= 0 && i === currentIndex + 2
+
+                    return (
+                      <div key={etapa.coluna} className="flex gap-3.5">
+                        {/* Left: dot + connector */}
+                        <div className="flex flex-col items-center">
+                          {/* Dot */}
+                          <div className={`relative flex items-center justify-center shrink-0 ${
+                            current ? "w-8 h-8 -mx-1" : "w-6 h-6"
+                          }`}>
+                            {completed ? (
+                              <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm shadow-emerald-100">
+                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
+                              </div>
+                            ) : current ? (
+                              <div className="relative w-8 h-8">
+                                {/* Outer pulse ring */}
+                                <div className={`absolute inset-0 rounded-full animate-ping ${
+                                  isDelivered ? "bg-emerald-400/30" : "bg-blue-400/30"
+                                }`} />
+                                <div className={`relative w-8 h-8 rounded-full flex items-center justify-center shadow-md ${
+                                  isDelivered
+                                    ? "bg-emerald-500 shadow-emerald-200"
+                                    : "bg-blue-600 shadow-blue-200"
+                                }`}>
+                                  <StepIcon icon={etapa.icon} active />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                                isNext ? "border-slate-300 bg-slate-50" : "border-slate-150 bg-white"
+                              }`}
+                              style={{ borderColor: isNext ? undefined : "#e9ecf0" }}>
+                                <div className={`w-2 h-2 rounded-full ${
+                                  isNext ? "bg-slate-300" : "bg-slate-200"
+                                }`} />
+                              </div>
+                            )}
+                          </div>
+                          {/* Connector line */}
+                          {!isLast && (
+                            <div className={`w-0.5 flex-1 my-1 min-h-[16px] transition-colors ${
+                              completed
+                                ? "bg-emerald-300"
+                                : current
+                                ? "bg-gradient-to-b from-blue-300 to-slate-200"
+                                : "bg-slate-100"
+                            }`} />
+                          )}
+                        </div>
+
+                        {/* Right: text */}
+                        <div className={`flex-1 min-w-0 ${isLast ? "pb-0" : "pb-3.5"} ${
+                          current ? "pt-1" : ""
+                        }`}>
+                          <div className="flex items-center justify-between gap-2 min-h-[24px]">
+                            <p className={`text-[13px] font-semibold leading-tight ${
+                              completed
+                                ? "text-emerald-700"
+                                : current
+                                ? isDelivered ? "text-emerald-700" : "text-slate-900"
+                                : isNext
+                                ? "text-slate-500"
+                                : "text-slate-300"
+                            }`}>
+                              {etapa.label}
+                            </p>
+                            {ts && (
+                              <span className="text-[10px] text-slate-400 tabular-nums shrink-0">{ts}</span>
+                            )}
+                            {current && !ts && (
+                              <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                                isDelivered
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-blue-100 text-blue-700"
+                              }`}>
+                                {isDelivered ? "Concluído" : "Agora"}
+                              </span>
+                            )}
+                          </div>
+                          {/* Next step preview */}
+                          {isNext && (
+                            <p className="text-[11px] text-slate-400 mt-0.5">Próxima etapa</p>
+                          )}
+                          {isNextNext && (
+                            <p className="text-[11px] text-slate-300 mt-0.5">Em seguida</p>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </>
         )}
 
-        {/* Refresh bar */}
-        <div className="flex items-center justify-between px-1">
+        {/* ── Refresh bar ─────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between px-1 pt-1">
           <p className="text-[11px] text-slate-400">
-            {refreshing ? "Atualizando..." : `Atualizado há ${lastUpdate}s`}
+            {refreshing ? "Atualizando…" : `Atualizado há ${lastUpdate}s`}
           </p>
-          <button onClick={fetchData}
-            className="text-[11px] text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 transition-colors">
-            <svg className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <button
+            onClick={fetchData}
+            className="text-[11px] text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1.5 transition-colors"
+          >
+            <svg className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
             </svg>
             Atualizar agora
           </button>
         </div>
 
-        {/* Contact */}
-        <div className="pb-6">
-          <a
-            href="https://wa.me/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-2.5 py-3.5 bg-[#25D366] hover:bg-[#20bd5a] text-white font-semibold text-sm rounded-2xl transition-colors shadow-sm shadow-green-900/10"
-          >
-            <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-              <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.526 5.847L0 24l6.335-1.502A11.944 11.944 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.006-1.373l-.36-.214-3.724.882.897-3.63-.235-.374A9.817 9.817 0 0 1 2.182 12c0-5.42 4.398-9.818 9.818-9.818 5.42 0 9.818 4.398 9.818 9.818 0 5.42-4.398 9.818-9.818 9.818z"/>
-            </svg>
-            Falar com a gráfica
-          </a>
-          <p className="text-center text-[10px] text-slate-300 mt-3">ENYLA Comunicação Visual · {numero}</p>
-        </div>
+        <p className="text-center text-[10px] text-slate-300 pb-2">ENYLA Comunicação Visual · {numero}</p>
+
       </div>
     </div>
   )
