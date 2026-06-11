@@ -41,14 +41,11 @@ function NavItem({ active, onClick, icon, label, badge, accent }: {
         active
           ? "bg-white/10 text-white font-semibold"
           : accent
-            ? "text-white/70 hover:text-white hover:bg-white/8 font-medium"
+            ? "text-white font-semibold bg-white/7 hover:bg-white/12 ring-1 ring-inset ring-white/10"
             : "text-slate-400 hover:text-slate-200 hover:bg-white/5 font-medium"
       }`}>
       {icon}
       <span className="flex-1 text-left">{label}</span>
-      {accent && !active && (
-        <span className="w-1.5 h-1.5 rounded-full bg-blue-400/60 shrink-0" />
-      )}
       {badge !== undefined && badge > 0 && (
         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-400 tabular-nums">
           {badge}
@@ -1125,6 +1122,7 @@ export default function Home() {
       {modalPropostaCustom && (
         <ModalPropostaCustom
           clientes={clientes}
+          materiais={config.materiais}
           parcFator={config.multiplicadores.parcelamento12x}
           onClose={() => setModalPropostaCustom(false)}
           onSalvar={(draft) => {
@@ -1147,6 +1145,7 @@ export default function Home() {
       {editandoProposta && (
         <ModalPropostaCustom
           clientes={clientes}
+          materiais={config.materiais}
           parcFator={config.multiplicadores.parcelamento12x}
           initialData={editandoProposta}
           onClose={() => setEditandoProposta(null)}

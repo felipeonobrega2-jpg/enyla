@@ -221,7 +221,7 @@ export function HistoricoView({
       {/* Propostas personalizadas */}
       {filtradoPropostas.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <SectionLabel violet>Propostas personalizadas · {filtradoPropostas.length}</SectionLabel>
+          <SectionLabel>Propostas personalizadas · {filtradoPropostas.length}</SectionLabel>
 
           {filtradoPropostas.map(p => {
             const linhasAtivas = p.linhas.filter(l => l.ativa && l.quantidade > 0)
@@ -231,13 +231,13 @@ export function HistoricoView({
             return (
               <div
                 key={p.id}
-                className="group relative bg-white border border-violet-100 rounded-2xl overflow-hidden hover:border-violet-200 hover:shadow-[0_2px_12px_rgba(109,40,217,0.06)] transition-all duration-200"
+                className="group relative bg-white border border-slate-100 rounded-2xl overflow-hidden hover:border-slate-200 hover:shadow-[0_2px_12px_rgba(0,0,0,0.05)] transition-all duration-200"
               >
                 <div className="flex items-center gap-4 px-5 py-4">
                   {/* Avatar */}
                   <button
                     onClick={() => onDetalhes?.(p)}
-                    className="w-10 h-10 rounded-full bg-violet-600 text-white text-[13px] font-bold flex items-center justify-center shrink-0 hover:bg-violet-500 transition-colors"
+                    className="w-10 h-10 rounded-full bg-slate-700 text-white text-[13px] font-bold flex items-center justify-center shrink-0 hover:bg-slate-600 transition-colors"
                     tabIndex={-1}
                   >
                     {initial}
@@ -254,9 +254,6 @@ export function HistoricoView({
                       </span>
                       <span className="shrink-0 text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full tabular-nums">
                         {p.numero}
-                      </span>
-                      <span className="shrink-0 text-[9px] font-semibold text-violet-500 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
-                        Personalizada
                       </span>
                     </div>
                     <p className="text-[11.5px] text-slate-400 mt-0.5">

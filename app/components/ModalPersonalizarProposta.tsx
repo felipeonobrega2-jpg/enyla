@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import type React from "react"
 import { FormData, Calculo, LinhaTabela, KanbanOpcao } from "../types"
 import { Configuracoes } from "../config"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente } from "../pdf"
@@ -91,18 +92,32 @@ export function ModalPersonalizarProposta({
         {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b border-slate-100 shrink-0">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[9.5px] uppercase tracking-[0.1em] font-bold text-slate-400 mb-1">Personalizar proposta para o cliente</p>
-              <p className="font-bold text-slate-800 text-[15px] leading-snug">{form.nomeCliente || "Sem nome"}</p>
-              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full inline-block mt-1 tabular-nums">
-                {numero}
-              </span>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-slate-800 text-[15px] leading-snug truncate">
+                {form.nomeCliente || "Sem nome"}
+              </p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full tabular-nums shrink-0">
+                  {numero}
+                </span>
+                <span className="text-[11px] text-slate-400">{data}</span>
+              </div>
             </div>
             <button onClick={handleClose}
               className="text-slate-300 hover:text-slate-500 transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
           </div>
+          {/* Specs pills */}
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {form.frente > 0 && (
+              <SpecPill>{form.frente}×{form.alturaBox}×{form.lateral} cm</SpecPill>
+            )}
+            {form.materialNome && <SpecPill>{form.materialNome}</SpecPill>}
+            <SpecPill>{form.comFaca ? "Com faca" : "Sem faca"}</SpecPill>
+            {form.incluirVerniz && <SpecPill blue>Verniz UV</SpecPill>}
+            {form.validadeDias > 0 && <SpecPill>Válido {form.validadeDias} dias</SpecPill>}
+          </div>
           <p className="text-[11px] text-slate-400 mt-2.5 leading-relaxed">
-            Marque os tiers que aparecerão no PDF. Edite o valor unitário para ajustar o total — útil para negociações.
+            Selecione os tiers e ajuste os preços antes de enviar ao cliente.
           </p>
         </div>
 
@@ -237,27 +252,13 @@ export function ModalPersonalizarProposta({
         </div>
 
         {/* Footer actions */}
-        <div className="px-4 pb-4 pt-3 border-t border-slate-100 shrink-0">
+        <div className="px-4 pb-4 pt-3 border-t border-slate-100 shrink-0 space-y-2">
           {nenhum && (
-            <p className="text-[11px] text-rose-500 text-center mb-2">Selecione ao menos um tier para gerar o PDF.</p>
-          )}
-          {onSalvar && (
-            <button
-              disabled={nenhum}
-              onClick={() => {
-                const custom = buildCustomCalculo()
-                const opcoes = buildOpcoes()
-                onSyncOpcoes(cardId, opcoes)
-                onSalvar(custom, opcoes)
-                onClose()
-              }}
-              className="w-full mb-2 py-2.5 text-[12px] font-bold bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
-              Salvar alterações
-            </button>
+            <p className="text-[11px] text-rose-500 text-center">Selecione ao menos um tier para gerar o PDF.</p>
           )}
           <div className="flex gap-2">
             <button onClick={handleClose}
-              className="px-3 py-2.5 text-[11.5px] text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors">
+              className="px-3 py-2.5 text-[11.5px] text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors shrink-0">
               Fechar
             </button>
             <button
@@ -265,6 +266,20 @@ export function ModalPersonalizarProposta({
               className="flex-1 py-2.5 text-[11.5px] font-medium border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-600 rounded-xl transition-colors">
               PDF Gráfica
             </button>
+            {onSalvar && (
+              <button
+                disabled={nenhum}
+                onClick={() => {
+                  const custom = buildCustomCalculo()
+                  const opcoes = buildOpcoes()
+                  onSyncOpcoes(cardId, opcoes)
+                  onSalvar(custom, opcoes)
+                  onClose()
+                }}
+                className="flex-1 py-2.5 text-[11.5px] font-semibold bg-slate-800 hover:bg-slate-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
+                Salvar
+              </button>
+            )}
             <button
               disabled={nenhum}
               onClick={() => { onSyncOpcoes(cardId, buildOpcoes()); onWhatsApp(form, buildCustomCalculo(), numero) }}
@@ -282,5 +297,13 @@ export function ModalPersonalizarProposta({
         </div>
       </div>
     </div>
+  )
+}
+
+function SpecPill({ children, blue }: { children: React.ReactNode; blue?: boolean }) {
+  return (
+    <span className={`text-[10.5px] px-2 py-0.5 rounded-full font-medium ${
+      blue ? "bg-blue-50 text-blue-700 border border-blue-100" : "bg-slate-100 text-slate-600"
+    }`}>{children}</span>
   )
 }

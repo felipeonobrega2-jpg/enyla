@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Cliente, PropostaCustom, LinhaPropostaCustom } from "../types"
+import { Material } from "../config"
 import { brl } from "../utils"
 import { ClienteCombobox } from "./ClienteFields"
 
@@ -13,6 +14,7 @@ function dataToInput(dataStr: string): string {
 
 export function ModalPropostaCustom({
   clientes,
+  materiais,
   parcFator,
   initialData,
   onClose,
@@ -21,6 +23,7 @@ export function ModalPropostaCustom({
   onWhatsApp,
 }: {
   clientes: Cliente[]
+  materiais?: Material[]
   parcFator: number
   initialData?: PropostaCustom
   onClose: () => void
@@ -135,13 +138,26 @@ export function ModalPropostaCustom({
                 placeholder="Dimensões (ex: 8×10×4 cm)"
                 className="border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
               />
-              <input
-                type="text"
-                value={material}
-                onChange={e => setMaterial(e.target.value)}
-                placeholder="Material (ex: Cartão 300g)"
-                className="border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
-              />
+              {materiais && materiais.length > 0 ? (
+                <select
+                  value={material}
+                  onChange={e => setMaterial(e.target.value)}
+                  className="border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400 bg-white"
+                >
+                  <option value="">— Material —</option>
+                  {materiais.map(m => (
+                    <option key={m.id} value={m.nome}>{m.nome}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={material}
+                  onChange={e => setMaterial(e.target.value)}
+                  placeholder="Material (ex: Cartão 300g)"
+                  className="border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
+                />
+              )}
             </div>
             {/* Acabamentos */}
             <div className="flex flex-wrap gap-3 pt-1">
