@@ -28,7 +28,7 @@ export async function POST(
     const { numero } = await params
     const body = await req.json()
     const key = decodeURIComponent(numero)
-    await supabase.from("Tracking").upsert({
+    const payload: Record<string, unknown> = {
       numero:       key,
       nomeCliente:  body.nomeCliente  ?? "",
       descricao:    body.descricao,
@@ -38,7 +38,11 @@ export async function POST(
       colunaAtual:  body.colunaAtual  ?? 0,
       etapas:       body.etapas       ?? [],
       criadoEm:     body.criadoEm     ?? "",
-    }, { onConflict: "numero" })
+    }
+    if (body.dataEntregaPrevista !== undefined) {
+      payload.dataEntregaPrevista = body.dataEntregaPrevista || null
+    }
+    await supabase.from("Tracking").upsert(payload, { onConflict: "numero" })
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)

@@ -26,12 +26,25 @@ function formatDateLong(d: Date) {
   return d.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })
 }
 
-function calcDelivery(etapas: TrackingEtapa[], colunaAtual: number) {
+function calcDelivery(etapas: TrackingEtapa[], colunaAtual: number, override?: string | null) {
+  // Manual override from internal system (YYYY-MM-DD)
+  if (override) {
+    const d = new Date(override + "T12:00:00")
+    if (!isNaN(d.getTime())) {
+      const isDeliveredNow = colunaAtual === 9
+      return {
+        text: formatDateLong(d),
+        isEstimate: !isDeliveredNow,
+        delivered: isDeliveredNow,
+        isOverride: true,
+      }
+    }
+  }
   // Delivered: show real delivery date
   const entregueEtapa = etapas.find(e => e.coluna === 9)
   if (entregueEtapa) {
     const d = parseBRDate(entregueEtapa.dataHora)
-    if (d) return { text: formatDateLong(d), isEstimate: false, delivered: true }
+    if (d) return { text: formatDateLong(d), isEstimate: false, delivered: true, isOverride: false }
   }
   // Art approved: production queue entry (col 4)
   const producaoEtapa = etapas.find(e => e.coluna === 4)
@@ -39,7 +52,7 @@ function calcDelivery(etapas: TrackingEtapa[], colunaAtual: number) {
     const d = parseBRDate(producaoEtapa.dataHora)
     if (d) {
       d.setDate(d.getDate() + 15)
-      return { text: formatDateLong(d), isEstimate: true, delivered: false }
+      return { text: formatDateLong(d), isEstimate: true, delivered: false, isOverride: false }
     }
   }
   return null
@@ -113,7 +126,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
   const completedSteps = activeEtapas.length
   const progressPct   = Math.round((completedSteps / totalSteps) * 100)
 
-  const delivery = calcDelivery(activeEtapas, data.colunaAtual)
+  const delivery = calcDelivery(activeEtapas, data.colunaAtual, (data as TrackingEntry & { dataEntregaPrevista?: string }).dataEntregaPrevista)
   const artApproved = activeEtapas.some(e => e.coluna >= 4)
 
   const currentEtapa = currentIndex >= 0 ? ETAPAS[currentIndex] : null

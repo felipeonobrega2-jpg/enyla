@@ -260,54 +260,51 @@ export function KanbanView({
 
       {/* ── Modal de fechamento ───────────────────────────────────────────── */}
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
           onClick={e => { if (e.target === e.currentTarget) setModal(null) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
 
             {/* Header */}
-            <div className="bg-slate-900 px-5 pt-5 pb-4">
-              <p className="text-[9.5px] uppercase tracking-[0.14em] text-slate-500 font-bold mb-2">Confirmar fechamento</p>
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-bold text-white text-base leading-snug">{modal.card.nomeCliente}</p>
-                {modal.card.numero && (
-                  <span className="text-[10px] font-bold text-blue-300 bg-blue-900/60 border border-blue-700/40 px-2 py-0.5 rounded-full shrink-0 font-mono">
-                    {modal.card.numero}
-                  </span>
-                )}
+            <div className="px-6 pt-5 pb-4 border-b border-slate-100">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase tracking-[0.12em] text-slate-400 font-semibold mb-1">Fechar pedido</p>
+                  <p className="font-bold text-slate-800 text-[15px] leading-snug truncate">{modal.card.nomeCliente}</p>
+                  {modal.card.numero && (
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full mt-1.5 inline-block tabular-nums">
+                      {modal.card.numero}
+                    </span>
+                  )}
+                </div>
+                <button onClick={() => setModal(null)}
+                  className="text-slate-300 hover:text-slate-500 transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
               </div>
-              <p className="text-[11.5px] text-slate-400 mt-2 leading-snug">
-                Selecione a quantidade que foi fechada com o cliente.
-              </p>
+              <p className="text-[12px] text-slate-400 mt-2.5">Qual quantidade foi fechada?</p>
             </div>
 
             {/* Opções */}
-            <div className="px-4 py-3 space-y-2 max-h-72 overflow-y-auto">
+            <div className="px-4 py-3 space-y-1.5 max-h-72 overflow-y-auto">
               {modal.card.opcoes!.map((op, i) => {
                 const selected = i === modal.opcaoIdx
                 return (
                   <button key={i} onClick={() => setModal(m => m ? { ...m, opcaoIdx: i } : m)}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${
                       selected
-                        ? "border-slate-800 bg-slate-900"
+                        ? "border-blue-400 bg-blue-50/60"
                         : "border-slate-100 hover:border-slate-200 hover:bg-slate-50"
                     }`}>
-                    {/* Radio dot */}
                     <div className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${
-                      selected ? "border-white bg-white" : "border-slate-300"
+                      selected ? "border-blue-500" : "border-slate-300"
                     }`}>
-                      {selected && <div className="w-1.5 h-1.5 rounded-full bg-slate-900" />}
+                      {selected && <div className="w-2 h-2 rounded-full bg-blue-500" />}
                     </div>
-
                     <div className="flex-1 min-w-0">
-                      <p className={`font-bold text-sm leading-none ${selected ? "text-white" : "text-slate-800"}`}>
+                      <p className={`font-bold text-sm leading-none ${selected ? "text-blue-900" : "text-slate-800"}`}>
                         {num(op.quantidade)} unidades
                       </p>
-                      <p className={`text-[11px] mt-0.5 ${selected ? "text-slate-400" : "text-slate-400"}`}>
-                        {brl(op.unitario)}/un
-                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">{brl(op.unitario)}/un</p>
                     </div>
-
-                    <p className={`font-black text-base tabular-nums shrink-0 ${selected ? "text-white" : "text-slate-700"}`}>
+                    <p className={`font-black text-[15px] tabular-nums shrink-0 ${selected ? "text-blue-700" : "text-slate-700"}`}>
                       {brl(op.preco)}
                     </p>
                   </button>
@@ -316,14 +313,14 @@ export function KanbanView({
             </div>
 
             {/* Ações */}
-            <div className="flex gap-2 px-4 pb-4 pt-3 border-t border-slate-100">
+            <div className="flex gap-2 px-4 pb-4 pt-2 border-t border-slate-50">
               <button onClick={() => setModal(null)}
                 className="flex-1 py-2.5 text-[13px] text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors font-medium">
                 Cancelar
               </button>
               <button onClick={confirmarFechamento}
-                className="flex-1 py-2.5 text-[13px] font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-colors">
-                Fechar pedido
+                className="flex-1 py-2.5 text-[13px] font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-xl transition-colors">
+                Confirmar →
               </button>
             </div>
           </div>

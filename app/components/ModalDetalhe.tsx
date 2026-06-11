@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { FormData, Calculo, PropostaCustom, KanbanCard, COLUNAS_KANBAN } from "../types"
 import { brl, num } from "../utils"
 
@@ -10,15 +11,21 @@ export type DetalheData =
   | { tipo: "proposta";  proposta: PropostaCustom }
   | { tipo: "kanban";    card: KanbanCard }
 
-export function ModalDetalhe({ data, parcFator, onClose, onEditar }: {
+export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDelivery }: {
   data: DetalheData
   parcFator: number
   onClose: () => void
   onEditar?: (p: PropostaCustom) => void
+  onSaveDelivery?: (cardId: string, date: string | null) => void
 }) {
   const isH = data.tipo === "historico"
   const isP = data.tipo === "proposta"
   const isK = data.tipo === "kanban"
+
+  const [deliveryDate, setDeliveryDate] = useState(
+    isK ? (data.card.dataEntregaPrevista ?? "") : ""
+  )
+  const [savingDelivery, setSavingDelivery] = useState(false)
 
   const numero  = isH ? (data.item.numero ?? "")      : isP ? data.proposta.numero    : data.card.numero
   const nome    = isH ? data.item.form.nomeCliente     : isP ? data.proposta.nomeCliente : data.card.nomeCliente
@@ -217,6 +224,47 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar }: {
           <div className="px-5 py-3.5 border-t border-slate-100 shrink-0">
             <p className="text-[9.5px] uppercase tracking-[0.08em] text-slate-400 font-semibold">Para o cliente</p>
             <p className="text-[12px] text-slate-600 mt-0.5 leading-relaxed">{data.proposta.obsCliente}</p>
+          </div>
+        )}
+
+        {/* Data de entrega prevista (apenas cards kanban) */}
+        {isK && onSaveDelivery && (
+          <div className="px-5 py-3.5 border-t border-slate-100 shrink-0">
+            <p className="text-[9.5px] uppercase tracking-[0.1em] text-slate-400 font-semibold mb-2">
+              Data prevista de entrega
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={deliveryDate}
+                onChange={e => setDeliveryDate(e.target.value)}
+                className="flex-1 h-8 border border-slate-200 rounded-lg px-2.5 text-[12.5px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+              />
+              {deliveryDate && (
+                <button
+                  onClick={() => setDeliveryDate("")}
+                  className="text-slate-400 hover:text-slate-600 transition-colors text-sm px-1"
+                  title="Limpar data"
+                >×</button>
+              )}
+              <button
+                disabled={savingDelivery}
+                onClick={async () => {
+                  setSavingDelivery(true)
+                  await onSaveDelivery(data.card.id, deliveryDate || null)
+                  setSavingDelivery(false)
+                }}
+                className="px-3 h-8 text-[12px] font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-lg transition-colors disabled:opacity-50 shrink-0"
+              >
+                {savingDelivery ? "…" : "Salvar"}
+              </button>
+            </div>
+            {deliveryDate && (
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                {new Date(deliveryDate + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+              </p>
+            )}
+            <p className="text-[10.5px] text-slate-300 mt-1">Sobrescreve o cálculo automático de 15 dias.</p>
           </div>
         )}
 

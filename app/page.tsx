@@ -145,6 +145,28 @@ export default function Home() {
     } catch { /* silently fail */ }
   }
 
+  async function salvarDataEntrega(cardId: string, date: string | null) {
+    setKanban(prev => prev.map(c => c.id === cardId ? { ...c, dataEntregaPrevista: date ?? undefined } : c))
+    const card = kanban.find(c => c.id === cardId)
+    if (!card) return
+    await fetch(`/api/kanban/${cardId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataEntregaPrevista: date ?? null }),
+    }).catch(() => {})
+    if (card.numero) {
+      const res = await fetch(`/api/track/${encodeURIComponent(card.numero)}`).catch(() => null)
+      if (res?.ok) {
+        const entry = await res.json()
+        await fetch(`/api/track/${encodeURIComponent(card.numero)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...entry, dataEntregaPrevista: date ?? null }),
+        }).catch(() => {})
+      }
+    }
+  }
+
   async function atualizarTracking(numero: string, novaColuna: number, preco?: number, quantidade?: number) {
     try {
       const res = await fetch(`/api/track/${encodeURIComponent(numero)}`)
@@ -1108,6 +1130,7 @@ export default function Home() {
           parcFator={config.multiplicadores.parcelamento12x}
           onClose={() => setDetalheModal(null)}
           onEditar={(p) => { setDetalheModal(null); setEditandoProposta(p) }}
+          onSaveDelivery={detalheModal.tipo === "kanban" ? salvarDataEntrega : undefined}
         />
       )}
 

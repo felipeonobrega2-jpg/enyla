@@ -156,6 +156,7 @@ export type KanbanCard = {
   coluna: number
   motivoPerdido?: string
   opcoes?: KanbanOpcao[]
+  dataEntregaPrevista?: string
 }
 
 export const COLUNAS_KANBAN = [

@@ -17,6 +17,7 @@ export type TrackingEntry = {
   colunaAtual: number
   etapas: TrackingEtapa[]
   criadoEm: string
+  dataEntregaPrevista?: string
 }
 
 const STORE_PATH = path.join(process.cwd(), '.tracking-store.json')

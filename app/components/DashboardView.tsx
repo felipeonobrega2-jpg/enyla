@@ -139,10 +139,18 @@ function MonthlyChart({ data }: { data: MonthlyDatum[] }) {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
-type Periodo = "7d" | "30d" | "90d" | "ano" | "tudo" | "custom"
+type Periodo = "mes" | "trimestre" | "semestre" | "ano" | "tudo" | "custom"
+
+const PERIODOS: { id: Periodo; label: string }[] = [
+  { id: "mes",       label: "Este mês"      },
+  { id: "trimestre", label: "Este trimestre" },
+  { id: "semestre",  label: "Este semestre"  },
+  { id: "ano",       label: "Este ano"       },
+  { id: "tudo",      label: "Tudo"           },
+]
 
 export default function DashboardView({ historico, kanban, propostasCustom: _propostasCustom, clientes: _clientes, config: _config }: Props) {
-  const [periodo, setPeriodo] = useState<Periodo>("30d")
+  const [periodo, setPeriodo] = useState<Periodo>("mes")
   const [dataInicio, setDataInicio] = useState("")
   const [dataFim, setDataFim]   = useState("")
 
@@ -152,10 +160,20 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
     let from: Date | null = null
     let to: Date | null = null
 
-    if (periodo === "7d")   { from = new Date(now); from.setDate(now.getDate() - 7) }
-    if (periodo === "30d")  { from = new Date(now); from.setDate(now.getDate() - 30) }
-    if (periodo === "90d")  { from = new Date(now); from.setDate(now.getDate() - 90) }
-    if (periodo === "ano")  { from = new Date(now.getFullYear(), 0, 1) }
+    if (periodo === "mes") {
+      from = new Date(now.getFullYear(), now.getMonth(), 1)
+    }
+    if (periodo === "trimestre") {
+      const q = Math.floor(now.getMonth() / 3)
+      from = new Date(now.getFullYear(), q * 3, 1)
+    }
+    if (periodo === "semestre") {
+      const s = now.getMonth() < 6 ? 0 : 6
+      from = new Date(now.getFullYear(), s, 1)
+    }
+    if (periodo === "ano") {
+      from = new Date(now.getFullYear(), 0, 1)
+    }
     if (periodo === "custom") {
       if (dataInicio) from = new Date(dataInicio)
       if (dataFim)   { to = new Date(dataFim); to.setHours(23, 59, 59) }
@@ -221,7 +239,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
   const topClientes = useMemo(() => {
     const map = new Map<string, { total: number; count: number }>()
     filteredCards
-      .filter(c => c.coluna === COL_FECHADO || c.coluna === COL_ENTREGUE)
+      .filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO)
       .forEach(c => {
         const k = c.nomeCliente || "Sem nome"
         const cur = map.get(k) ?? { total: 0, count: 0 }
@@ -281,7 +299,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
   }, [filteredCards])
 
   // ── Periodo label ────────────────────────────────────────────────────────────
-  const periodoLabel = (p: Periodo) => ({ "7d": "7d", "30d": "30d", "90d": "90d", "ano": "Ano", "tudo": "Tudo", "custom": "Custom" }[p])
+  const periodoLabel = (p: Periodo) => PERIODOS.find(x => x.id === p)?.label ?? p
 
   // ─── Empty state ─────────────────────────────────────────────────────────────
   if (kanban.length === 0) {
@@ -306,14 +324,14 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       {/* ── Filter bar ─────────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm py-2 -mx-6 px-6">
         <div className="flex items-center gap-2 flex-wrap">
-          {(["7d", "30d", "90d", "ano", "tudo"] as Periodo[]).map(p => (
-            <button key={p} onClick={() => setPeriodo(p)}
+          {PERIODOS.map(({ id, label }) => (
+            <button key={id} onClick={() => setPeriodo(id)}
               className={`px-3 py-1.5 rounded-full text-[12px] font-medium transition-all ${
-                periodo === p
+                periodo === id
                   ? "bg-slate-900 text-white shadow-sm"
                   : "bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
               }`}>
-              {periodoLabel(p)}
+              {label}
             </button>
           ))}
 
