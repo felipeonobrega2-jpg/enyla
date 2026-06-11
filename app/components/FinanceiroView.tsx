@@ -356,10 +356,12 @@ export function FinanceiroView({
     return (n.dataOrcamento || n.criadoEm) >= from.toISOString().split("T")[0]
   }
 
-  // Todos os negocios pagos no período (qualquer tipo → receita)
-  const negociosPagos    = negocios.filter(n => n.status === "pago"    && negociosInPeriodo(n))
-  // Todos os pendentes (qualquer tipo → a receber)
-  const negociosPendentes = negocios.filter(n => n.status === "pendente")
+  // Negócios pagos no período selecionado (para KPIs e DRE)
+  const negociosPagos     = negocios.filter(n => n.status === "pago" && negociosInPeriodo(n))
+  // Todos os pagos (sem filtro de período — para mostrar no painel de parcerias)
+  const negociosPagosTodos = negocios.filter(n => n.status === "pago")
+  // Pendentes (qualquer tipo → a receber)
+  const negociosPendentes  = negocios.filter(n => n.status === "pendente")
 
   // KPIs (período selecionado)
   const kpis = useMemo(() => {
@@ -480,6 +482,34 @@ export function FinanceiroView({
                   bold accent={kpis.resultado >= 0 ? "green" : "rose"} separator />
               </div>
             </div>
+
+            {/* Parcerias recentes pagas — sempre visíveis independente do período */}
+            {negociosPagosTodos.length > 0 && (
+              <div className="bg-white border border-violet-100 rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-violet-100 flex items-center justify-between">
+                  <p className="font-bold text-slate-800 text-[13px]">Receitas de parcerias</p>
+                  <p className="font-black text-violet-700 text-[13px] tabular-nums">
+                    {brl(negociosPagosTodos.reduce((s, n) => s + n.comissaoValor, 0))} total
+                  </p>
+                </div>
+                <div className="divide-y divide-slate-50">
+                  {negociosPagosTodos.slice(0, 5).map(n => (
+                    <div key={n.id} className="px-5 py-3 flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-[12.5px] font-semibold text-slate-700 truncate">{n.descricao}</p>
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 shrink-0">
+                            {n.tipo === "comissao" ? "COMISSÃO" : "GANHO"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{n.parceiroNome} · {fmtDate(n.dataOrcamento)}</p>
+                      </div>
+                      <p className="font-bold text-violet-700 text-[13px] tabular-nums shrink-0">{brl(n.comissaoValor)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Próximos recebimentos — lançamentos pendentes + parcerias pendentes */}
             {(lancamentos.filter(l => l.tipo === "receita" && statusEfetivo(l) !== "pago").length > 0 || negociosPendentes.length > 0) && (
@@ -664,8 +694,8 @@ export function FinanceiroView({
               </select>
             </div>
 
-            {/* Negócios de parcerias no período (read-only) */}
-            {negocios.filter(n => negociosInPeriodo(n) && n.status !== "cancelado" && (!filtroTipo || filtroTipo === "receita") && (!filtroStatus || filtroStatus === (n.status === "pago" ? "pago" : "pendente"))).map(n => (
+            {/* Negócios de parcerias — sempre visíveis (sem filtro de período) */}
+            {negocios.filter(n => n.status !== "cancelado" && (!filtroTipo || filtroTipo === "receita") && (!filtroStatus || filtroStatus === (n.status === "pago" ? "pago" : "pendente"))).map(n => (
               <div key={`neg-${n.id}`}
                 className="bg-white border border-violet-100 rounded-2xl px-5 py-4 flex items-center gap-3 hover:border-violet-200 transition-colors">
                 <div className="w-1.5 h-10 rounded-full shrink-0 bg-violet-400" />
@@ -689,7 +719,7 @@ export function FinanceiroView({
               </div>
             ))}
 
-            {lancFiltrados.length === 0 && negocios.filter(n => negociosInPeriodo(n) && n.status !== "cancelado").length === 0 ? (
+            {lancFiltrados.length === 0 && negocios.filter(n => n.status !== "cancelado").length === 0 ? (
               <Empty msg="Nenhum lançamento no período selecionado." />
             ) : lancFiltrados.length > 0 ? (
               <div className="space-y-2">
