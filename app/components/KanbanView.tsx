@@ -260,63 +260,70 @@ export function KanbanView({
 
       {/* ── Modal de fechamento ───────────────────────────────────────────── */}
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
           onClick={e => { if (e.target === e.currentTarget) setModal(null) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
 
             {/* Header */}
-            <div className="px-6 pt-5 pb-4 border-b border-slate-100">
-              <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold mb-1">Fechamento de orçamento</p>
-              <p className="font-bold text-slate-800 text-base leading-snug">{modal.card.nomeCliente}</p>
-              {modal.card.numero && (
-                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full mt-1 inline-block">
-                  {modal.card.numero}
-                </span>
-              )}
-              <p className="text-xs text-slate-400 mt-2">Qual quantidade foi fechada com o cliente?</p>
+            <div className="bg-slate-900 px-5 pt-5 pb-4">
+              <p className="text-[9.5px] uppercase tracking-[0.14em] text-slate-500 font-bold mb-2">Confirmar fechamento</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-bold text-white text-base leading-snug">{modal.card.nomeCliente}</p>
+                {modal.card.numero && (
+                  <span className="text-[10px] font-bold text-blue-300 bg-blue-900/60 border border-blue-700/40 px-2 py-0.5 rounded-full shrink-0 font-mono">
+                    {modal.card.numero}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11.5px] text-slate-400 mt-2 leading-snug">
+                Selecione a quantidade que foi fechada com o cliente.
+              </p>
             </div>
 
             {/* Opções */}
-            <div className="px-4 py-3 space-y-1.5 max-h-72 overflow-y-auto">
+            <div className="px-4 py-3 space-y-2 max-h-72 overflow-y-auto">
               {modal.card.opcoes!.map((op, i) => {
                 const selected = i === modal.opcaoIdx
                 return (
                   <button key={i} onClick={() => setModal(m => m ? { ...m, opcaoIdx: i } : m)}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${
                       selected
-                        ? "border-green-500 bg-green-50"
+                        ? "border-slate-800 bg-slate-900"
                         : "border-slate-100 hover:border-slate-200 hover:bg-slate-50"
                     }`}>
-                    <div>
-                      <p className={`font-bold text-sm ${selected ? "text-green-800" : "text-slate-800"}`}>
+                    {/* Radio dot */}
+                    <div className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${
+                      selected ? "border-white bg-white" : "border-slate-300"
+                    }`}>
+                      {selected && <div className="w-1.5 h-1.5 rounded-full bg-slate-900" />}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-bold text-sm leading-none ${selected ? "text-white" : "text-slate-800"}`}>
                         {num(op.quantidade)} unidades
                       </p>
-                      <p className={`text-[11px] mt-0.5 ${selected ? "text-green-600" : "text-slate-400"}`}>
+                      <p className={`text-[11px] mt-0.5 ${selected ? "text-slate-400" : "text-slate-400"}`}>
                         {brl(op.unitario)}/un
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className={`font-black text-lg leading-none ${selected ? "text-green-700" : "text-blue-700"}`}>
-                        {brl(op.preco)}
-                      </p>
-                      {selected && (
-                        <p className="text-[10px] text-green-600 font-semibold mt-0.5">selecionado ✓</p>
-                      )}
-                    </div>
+
+                    <p className={`font-black text-base tabular-nums shrink-0 ${selected ? "text-white" : "text-slate-700"}`}>
+                      {brl(op.preco)}
+                    </p>
                   </button>
                 )
               })}
             </div>
 
             {/* Ações */}
-            <div className="flex gap-2 px-4 pb-4 pt-2 border-t border-slate-50">
+            <div className="flex gap-2 px-4 pb-4 pt-3 border-t border-slate-100">
               <button onClick={() => setModal(null)}
-                className="flex-1 py-2.5 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors">
+                className="flex-1 py-2.5 text-[13px] text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors font-medium">
                 Cancelar
               </button>
               <button onClick={confirmarFechamento}
-                className="flex-1 py-2.5 text-sm font-bold text-white bg-green-600 hover:bg-green-700 rounded-xl transition-colors">
-                Confirmar fechamento →
+                className="flex-1 py-2.5 text-[13px] font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-colors">
+                Fechar pedido
               </button>
             </div>
           </div>

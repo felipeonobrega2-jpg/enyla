@@ -449,16 +449,9 @@ export default function Home() {
 
         {/* Brand */}
         <div className="px-4 py-[18px] border-b border-white/5 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm shrink-0">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
-              </svg>
-            </div>
-            <div className="leading-none min-w-0">
-              <p className="text-white font-bold tracking-tight text-sm">ENYLA</p>
-              <p className="text-slate-500 text-[10px] mt-0.5">Orçamentista</p>
-            </div>
+          <div className="flex items-center gap-0 leading-none min-w-0">
+            <p className="text-white font-black tracking-tight text-[15px]">ENYLA</p>
+            <p className="text-slate-500 text-[10px] mt-auto mb-0.5 ml-2">Orçamentista</p>
           </div>
         </div>
 

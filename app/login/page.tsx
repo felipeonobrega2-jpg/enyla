@@ -30,13 +30,8 @@ export default function LoginPage() {
 
         {/* Brand */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/40 mb-4">
-            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
-            </svg>
-          </div>
-          <h1 className="text-white font-bold text-xl tracking-tight">ENYLA</h1>
-          <p className="text-slate-500 text-sm mt-1">Orçamentista</p>
+          <h1 className="text-white font-black text-3xl tracking-tight mb-1">ENYLA</h1>
+          <p className="text-slate-500 text-sm">Orçamentista</p>
         </div>
 
         {/* Form */}
