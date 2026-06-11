@@ -176,3 +176,31 @@ export const COLUNAS_KANBAN = [
 export const COL_FECHADO  = 1
 export const COL_ENTREGUE = 9
 export const COL_PERDIDO  = 10
+
+export type Parceiro = {
+  id: string
+  nome: string
+  categoria: string
+  contato?: string
+  comissaoDefault: number
+  criadoEm: string
+}
+
+export type TipoNegocio = "comissao" | "ganho"
+export type StatusNegocio = "pendente" | "pago" | "cancelado"
+
+export type NegocioParceiro = {
+  id: string
+  parceiroId: string
+  parceiroNome: string
+  descricao: string
+  tipo: TipoNegocio
+  valorVenda: number
+  valorCusto?: number
+  comissaoPerc: number
+  comissaoValor: number
+  dataOrcamento: string
+  status: StatusNegocio
+  obs?: string
+  criadoEm: string
+}

@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect } from "react"
-import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, COL_FECHADO, COLUNAS_KANBAN } from "./types"
+import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, COL_FECHADO, COLUNAS_KANBAN, Parceiro, NegocioParceiro } from "./types"
 import DashboardView from "./components/DashboardView"
 import { QUANTIDADES_PADRAO } from "./dados"
 import { calcular } from "./calculos"
@@ -15,6 +15,7 @@ import { HistoricoView } from "./components/HistoricoView"
 import { ClientesView } from "./components/ClientesView"
 import { ConfigView } from "./components/ConfigView"
 import { KanbanView } from "./components/KanbanView"
+import { ParceirosView } from "./components/ParceirosView"
 import { ClienteCombobox, ClienteContactCard } from "./components/ClienteFields"
 import { ModalPersonalizarProposta } from "./components/ModalPersonalizarProposta"
 import { ModalPropostaCustom, BoxPreview3D } from "./components/ModalPropostaCustom"
@@ -64,7 +65,7 @@ export default function Home() {
   const [historico, setHistorico] = useState<Array<{ form: FormData; calculo: Calculo; data: string; numero?: string }>>([])
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
   const [contador, setContador] = useState<number>(0)
-  const [view, setView]       = useState<"orcamento" | "historico" | "clientes" | "kanban" | "forma" | "config" | "dashboard">("orcamento")
+  const [view, setView]       = useState<"orcamento" | "historico" | "clientes" | "kanban" | "forma" | "config" | "dashboard" | "parceiros">("orcamento")
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
   const [modalSalvar, setModalSalvar] = useState<{ form: FormData; calculo: Calculo; numero: string; data: string; cardId: string } | null>(null)
   const [clientes, setClientes] = useState<Cliente[]>([])
@@ -73,6 +74,8 @@ export default function Home() {
   const [modalPropostaCustom, setModalPropostaCustom] = useState(false)
   const [editandoProposta, setEditandoProposta] = useState<PropostaCustom | null>(null)
   const [detalheModal, setDetalheModal] = useState<DetalheData | null>(null)
+  const [parceiros, setParceiros] = useState<Parceiro[]>([])
+  const [negocios, setNegocios]   = useState<NegocioParceiro[]>([])
 
   useEffect(() => {
     fetch("/api/data")
@@ -85,6 +88,8 @@ export default function Home() {
         if (d.contadorProp !== undefined) setContadorProp(d.contadorProp)
         if (d.kanban)                 setKanban(d.kanban)
         if (d.config)                 setConfig(d.config)
+        if (d.parceiros)              setParceiros(d.parceiros)
+        if (d.negocios)               setNegocios(d.negocios)
       })
       .catch(() => {})
   }, [])
@@ -504,6 +509,11 @@ export default function Home() {
             icon={<svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 4.5v15m6-15v15M3 8.25h3m0 0V6a.75.75 0 0 1 .75-.75H8.25m-5.25 3V18a.75.75 0 0 0 .75.75h2.25A.75.75 0 0 0 7 18V8.25m0 0H3m6.75-3.75H9m7.5 3.75h2.25m0 0V6a.75.75 0 0 0-.75-.75h-1.5A.75.75 0 0 0 15 6v2.25m3 0H15m0 9.75V8.25m0 9.75a.75.75 0 0 0 .75.75h1.5a.75.75 0 0 0 .75-.75V8.25m-3 9.75H15" /></svg>}
           />
 
+          <NavItem active={view === "parceiros"} onClick={() => setView("parceiros")} label="Parceiros"
+            badge={parceiros.length || undefined}
+            icon={<svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z" /></svg>}
+          />
+
           <div className="h-px bg-white/5 my-2 mx-1" />
 
           <NavItem active={view === "forma"} onClick={() => setView("forma")} label="Forma ✦"
@@ -909,6 +919,35 @@ export default function Home() {
                   data: item.data,
                   cardId,
                 })
+              }}
+            />
+          ) : view === "parceiros" ? (
+            <ParceirosView
+              parceiros={parceiros}
+              negocios={negocios}
+              onAddParceiro={p => {
+                setParceiros(prev => [...prev, p])
+                fetch("/api/parceiros", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) }).catch(() => {})
+              }}
+              onUpdateParceiro={p => {
+                setParceiros(prev => prev.map(x => x.id === p.id ? p : x))
+                fetch(`/api/parceiros/${p.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) }).catch(() => {})
+              }}
+              onDeleteParceiro={id => {
+                setParceiros(prev => prev.filter(x => x.id !== id))
+                fetch(`/api/parceiros/${id}`, { method: "DELETE" }).catch(() => {})
+              }}
+              onAddNegocio={n => {
+                setNegocios(prev => [n, ...prev])
+                fetch("/api/negocios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(n) }).catch(() => {})
+              }}
+              onUpdateNegocio={n => {
+                setNegocios(prev => prev.map(x => x.id === n.id ? n : x))
+                fetch(`/api/negocios/${n.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(n) }).catch(() => {})
+              }}
+              onDeleteNegocio={id => {
+                setNegocios(prev => prev.filter(x => x.id !== id))
+                fetch(`/api/negocios/${id}`, { method: "DELETE" }).catch(() => {})
               }}
             />
           ) : !r ? (

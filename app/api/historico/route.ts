@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
 
     const ops: PromiseLike<unknown>[] = [
       supabase.from("HistoricoItem")
-        .upsert({ numero, form, calculo, data }, { onConflict: "numero" }),
+        .upsert({ id: crypto.randomUUID(), numero, form, calculo, data }, { onConflict: "numero" }),
     ]
 
     if (contador !== undefined) {
