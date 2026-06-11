@@ -481,13 +481,33 @@ export function FinanceiroView({
               </div>
             </div>
 
-            {/* Lançamentos pendentes / atrasados */}
-            {lancamentos.filter(l => l.tipo === "receita" && statusEfetivo(l) !== "pago").length > 0 && (
+            {/* Próximos recebimentos — lançamentos pendentes + parcerias pendentes */}
+            {(lancamentos.filter(l => l.tipo === "receita" && statusEfetivo(l) !== "pago").length > 0 || negociosPendentes.length > 0) && (
               <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100">
                   <p className="font-bold text-slate-800 text-[13px]">Próximos recebimentos</p>
                 </div>
                 <div className="divide-y divide-slate-50">
+                  {/* Parcerias pendentes */}
+                  {negociosPendentes.map(n => (
+                    <div key={`neg-${n.id}`} className="px-5 py-3.5 flex items-center gap-3 hover:bg-slate-50">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[12.5px] font-semibold text-slate-700 truncate">{n.descricao}</p>
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 shrink-0">PARCERIA</span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          {n.parceiroNome} · {fmtDate(n.dataOrcamento)}
+                          {n.tipo === "comissao" ? " · Comissão" : " · Ganho"}
+                        </p>
+                      </div>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700">
+                        Pendente
+                      </span>
+                      <p className="font-bold text-slate-800 text-[13px] tabular-nums">{brl(n.comissaoValor)}</p>
+                    </div>
+                  ))}
+                  {/* Lançamentos pendentes */}
                   {lancamentos
                     .filter(l => l.tipo === "receita" && statusEfetivo(l) !== "pago")
                     .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))
@@ -644,9 +664,34 @@ export function FinanceiroView({
               </select>
             </div>
 
-            {lancFiltrados.length === 0 ? (
+            {/* Negócios de parcerias no período (read-only) */}
+            {negocios.filter(n => negociosInPeriodo(n) && n.status !== "cancelado" && (!filtroTipo || filtroTipo === "receita") && (!filtroStatus || filtroStatus === (n.status === "pago" ? "pago" : "pendente"))).map(n => (
+              <div key={`neg-${n.id}`}
+                className="bg-white border border-violet-100 rounded-2xl px-5 py-4 flex items-center gap-3 hover:border-violet-200 transition-colors">
+                <div className="w-1.5 h-10 rounded-full shrink-0 bg-violet-400" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-slate-800 text-[13px]">{n.descricao}</span>
+                    <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600">PARCERIA</span>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${n.status === "pago" ? STATUS_CLS.pago : STATUS_CLS.pendente}`}>
+                      {n.status === "pago" ? "Pago" : "Pendente"}
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium">
+                      {n.tipo === "comissao" ? "Comissão" : "Ganho"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-[11px] text-slate-400">{n.parceiroNome}</span>
+                    <span className="text-[11px] text-slate-400">{fmtDate(n.dataOrcamento)}</span>
+                  </div>
+                </div>
+                <p className="font-black text-[14px] tabular-nums shrink-0 text-violet-700">{brl(n.comissaoValor)}</p>
+              </div>
+            ))}
+
+            {lancFiltrados.length === 0 && negocios.filter(n => negociosInPeriodo(n) && n.status !== "cancelado").length === 0 ? (
               <Empty msg="Nenhum lançamento no período selecionado." />
-            ) : (
+            ) : lancFiltrados.length > 0 ? (
               <div className="space-y-2">
                 {lancFiltrados.map(l => {
                   const st = statusEfetivo(l)
@@ -715,7 +760,7 @@ export function FinanceiroView({
                   )
                 })}
               </div>
-            )}
+            ) : null}
           </>
         )}
       </div>
