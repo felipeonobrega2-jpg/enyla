@@ -107,19 +107,22 @@ export default function TrackingClient({ initialData, numero }: Props) {
   const isPending     = data.colunaAtual < 1
   const isDelivered   = data.colunaAtual === 9
   const totalSteps    = ETAPAS.length
-  const completedSteps = data.etapas.length
+
+  // Filter out etapas that were recorded after a backward move in the kanban
+  const activeEtapas  = data.etapas.filter(e => e.coluna <= data.colunaAtual)
+  const completedSteps = activeEtapas.length
   const progressPct   = Math.round((completedSteps / totalSteps) * 100)
 
-  const delivery = calcDelivery(data.etapas, data.colunaAtual)
-  const artApproved = data.etapas.some(e => e.coluna >= 4)
+  const delivery = calcDelivery(activeEtapas, data.colunaAtual)
+  const artApproved = activeEtapas.some(e => e.coluna >= 4)
 
   const currentEtapa = currentIndex >= 0 ? ETAPAS[currentIndex] : null
 
   const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
   const num = (v: number) => v.toLocaleString("pt-BR")
 
-  function isCompleted(col: number) { return data!.etapas.some(e => e.coluna === col) }
-  function getTS(col: number) { return data!.etapas.find(e => e.coluna === col)?.dataHora?.split(",")[0] ?? null }
+  function isCompleted(col: number) { return activeEtapas.some(e => e.coluna === col) }
+  function getTS(col: number) { return activeEtapas.find(e => e.coluna === col)?.dataHora?.split(",")[0] ?? null }
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
@@ -127,14 +130,9 @@ export default function TrackingClient({ initialData, numero }: Props) {
       {/* ── Sticky header ──────────────────────────────────────────────── */}
       <div className="bg-white border-b border-slate-100 sticky top-0 z-10">
         <div className="max-w-md mx-auto px-5 h-14 flex items-center gap-3">
-          <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
-            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
-            </svg>
-          </div>
           <div>
-            <p className="font-bold text-slate-800 text-sm leading-none">ENYLA</p>
-            <p className="text-slate-400 text-[10px] mt-0.5">Comunicação Visual</p>
+            <p className="font-bold text-slate-900 text-base tracking-tight leading-none">ENYLA</p>
+            <p className="text-slate-400 text-[10px] mt-0.5 tracking-wide">Comunicação Visual</p>
           </div>
           <div className="ml-auto">
             <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full font-mono">{numero}</span>
@@ -155,11 +153,6 @@ export default function TrackingClient({ initialData, numero }: Props) {
         {/* ── Order summary card ─────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="px-4 py-3.5 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-              <svg className="w-4.5 h-4.5 text-slate-400 w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
-              </svg>
-            </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-slate-800 text-sm truncate">{data.descricao || "Embalagem personalizada"}</p>
               <p className="text-slate-400 text-xs mt-0.5">{data.materialNome || "Material não especificado"}</p>
@@ -190,16 +183,48 @@ export default function TrackingClient({ initialData, numero }: Props) {
           </div>
         )}
 
-        {/* ── Pending (col 0) ─────────────────────────────────────────── */}
+        {/* ── Pending (col 0) — Orçamento realizado ──────────────────── */}
         {isPending && !isCancelled && (
-          <div className="bg-amber-50 rounded-2xl border border-amber-100 p-5 text-center space-y-2">
-            <div className="w-11 h-11 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
-              <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-              </svg>
+          <div className="rounded-2xl overflow-hidden shadow-sm bg-gradient-to-br from-violet-600 to-violet-700">
+            {/* Top bar */}
+            <div className="px-5 pt-4 pb-2">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/70">Orçamento recebido</p>
+                <p className="text-[11px] font-bold text-white/60 tabular-nums">0/{ETAPAS.length} etapas</p>
+              </div>
+              <div className="w-full h-1.5 bg-white/20 rounded-full" />
             </div>
-            <p className="font-bold text-amber-800">Aguardando confirmação</p>
-            <p className="text-sm text-amber-600 leading-relaxed">Seu orçamento foi recebido e está sendo analisado pela gráfica.</p>
+
+            {/* Content */}
+            <div className="px-5 py-5 flex items-center gap-4">
+              <div className="relative shrink-0">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white/15">
+                  <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                  </svg>
+                </div>
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-white/30 animate-ping" />
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-white/70" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-white text-[17px] leading-snug">Aguardando confirmação</p>
+                <p className="text-white/75 text-[12.5px] mt-1 leading-relaxed">
+                  Seu orçamento foi recebido! A gráfica irá confirmar e iniciar a produção em breve.
+                </p>
+              </div>
+            </div>
+
+            {/* Info bar */}
+            <div className="mx-4 mb-4 rounded-xl px-4 py-3 bg-white/10">
+              <div className="flex items-start gap-2.5">
+                <svg className="w-4 h-4 text-white/60 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+                <p className="text-white/70 text-[12.5px] leading-relaxed">
+                  Após a aprovação da arte, a data prevista de entrega será calculada automaticamente.
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
