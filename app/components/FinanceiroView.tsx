@@ -350,15 +350,16 @@ export function FinanceiroView({
     [lancamentos, periodo, filtroTipo, filtroStatus]
   )
 
-  // Parceiros: ganhos (tipo=ganho pago → receita) e comissões pagas (tipo=comissao pago → despesa)
+  // Parcerias — comissão e ganho são AMBOS receita do usuário
   const negociosInPeriodo = (n: NegocioParceiro) => {
     if (!from) return true
     return (n.dataOrcamento || n.criadoEm) >= from.toISOString().split("T")[0]
   }
 
-  const ganhosParceiros   = negocios.filter(n => n.tipo === "ganho"    && n.status === "pago" && negociosInPeriodo(n))
-  const comissoesPagas    = negocios.filter(n => n.tipo === "comissao" && n.status === "pago" && negociosInPeriodo(n))
-  const ganhosPendentes   = negocios.filter(n => n.tipo === "ganho"    && n.status === "pendente")
+  // Todos os negocios pagos no período (qualquer tipo → receita)
+  const negociosPagos    = negocios.filter(n => n.status === "pago"    && negociosInPeriodo(n))
+  // Todos os pendentes (qualquer tipo → a receber)
+  const negociosPendentes = negocios.filter(n => n.status === "pendente")
 
   // KPIs (período selecionado)
   const kpis = useMemo(() => {
@@ -368,15 +369,14 @@ export function FinanceiroView({
     const pendentes = lancamentos.filter(l => l.tipo === "receita" && l.status !== "pago")
     const atrasados = pendentes.filter(l => l.dataVencimento < hoje())
 
-    const totalGanhosParceiros = ganhosParceiros.reduce((s, n) => s + n.comissaoValor, 0)
-    const totalComissoesPagas  = comissoesPagas.reduce((s, n) => s + n.comissaoValor, 0)
-    const totalRecebido        = recebidas.reduce((s, l) => s + l.valor, 0) + totalGanhosParceiros
-    const totalDespesas        = despesas.reduce((s, l) => s + l.valor, 0) + totalComissoesPagas
+    const totalParceiros = negociosPagos.reduce((s, n) => s + n.comissaoValor, 0)
+    const totalRecebido  = recebidas.reduce((s, l) => s + l.valor, 0) + totalParceiros
+    const totalDespesas  = despesas.reduce((s, l) => s + l.valor, 0)
 
     return {
       recebido:   totalRecebido,
       despesasPg: totalDespesas,
-      aReceber:   pendentes.reduce((s, l) => s + l.valor, 0) + ganhosPendentes.reduce((s, n) => s + n.comissaoValor, 0),
+      aReceber:   pendentes.reduce((s, l) => s + l.valor, 0) + negociosPendentes.reduce((s, n) => s + n.comissaoValor, 0),
       emAtraso:   atrasados.reduce((s, l) => s + l.valor, 0),
       resultado:  totalRecebido - totalDespesas,
       naoRegistrados: pedidosElegiveis.filter(c => !lancPorCard[c.id]).length,
@@ -467,16 +467,13 @@ export function FinanceiroView({
               </div>
               <div className="divide-y divide-slate-50">
                 <DreRow label="Receitas de pedidos" value={lancamentos.filter(l => l.tipo === "receita" && l.status === "pago" && inPeriodo(l)).reduce((s, l) => s + l.valor, 0)} bold accent="green" />
-                {ganhosParceiros.length > 0 && (
-                  <DreRow label="Ganhos via parcerias" value={ganhosParceiros.reduce((s, n) => s + n.comissaoValor, 0)} accent="green" />
+                {negociosPagos.length > 0 && (
+                  <DreRow label="Receitas de parcerias" value={negociosPagos.reduce((s, n) => s + n.comissaoValor, 0)} accent="green" />
                 )}
                 {dreDesp.map(([cat, val]) => (
                   <DreRow key={cat} label={`Despesas — ${capitalize(cat)}`} value={-val} />
                 ))}
-                {comissoesPagas.length > 0 && (
-                  <DreRow label="Comissões pagas (parceiros)" value={-comissoesPagas.reduce((s, n) => s + n.comissaoValor, 0)} />
-                )}
-                {dreDesp.length === 0 && comissoesPagas.length === 0 && (
+                {dreDesp.length === 0 && (
                   <DreRow label="Despesas" value={0} />
                 )}
                 <DreRow label="Resultado líquido" value={kpis.resultado}
@@ -530,11 +527,11 @@ export function FinanceiroView({
               Pedidos fechados ou em produção, e ganhos de parcerias pendentes.
             </p>
 
-            {/* Ganhos de parcerias pendentes */}
-            {ganhosPendentes.length > 0 && (
+            {/* Parcerias pendentes (comissão ou ganho — ambos são receita) */}
+            {negociosPendentes.length > 0 && (
               <div className="mb-4">
-                <p className="text-[10.5px] uppercase tracking-wider text-slate-400 font-semibold mb-2">Ganhos de parcerias</p>
-                {ganhosPendentes.map(n => (
+                <p className="text-[10.5px] uppercase tracking-wider text-slate-400 font-semibold mb-2">Receitas de parcerias</p>
+                {negociosPendentes.map(n => (
                   <div key={n.id} className="bg-white border border-violet-100 rounded-2xl px-5 py-4 flex items-center gap-4 mb-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -542,11 +539,14 @@ export function FinanceiroView({
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200">
                           {n.parceiroNome}
                         </span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-500 border border-slate-200">
+                          {n.tipo === "comissao" ? "Comissão" : "Ganho"}
+                        </span>
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700">
                           Pendente
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-1">{n.dataOrcamento}</p>
+                      <p className="text-[11px] text-slate-400 mt-1">{fmtDate(n.dataOrcamento)}</p>
                     </div>
                     <p className="font-black text-violet-700 text-[15px] tabular-nums shrink-0">{brl(n.comissaoValor)}</p>
                   </div>
@@ -554,7 +554,7 @@ export function FinanceiroView({
               </div>
             )}
 
-            {ganhosPendentes.length > 0 && pedidosElegiveis.length > 0 && (
+            {negociosPendentes.length > 0 && pedidosElegiveis.length > 0 && (
               <p className="text-[10.5px] uppercase tracking-wider text-slate-400 font-semibold mb-2">Pedidos</p>
             )}
             {pedidosElegiveis.length === 0 ? (
