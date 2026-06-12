@@ -795,7 +795,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
               <div className="h-full bg-white rounded-full transition-all duration-700" style={{ width: `${overallPct}%` }} />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-0 mx-4 mb-4 mt-3 bg-white/10 rounded-xl overflow-hidden divide-x divide-white/10">
+          <div className="grid grid-cols-3 gap-0 mx-4 mt-3 bg-white/10 rounded-xl overflow-hidden divide-x divide-white/10" style={{ marginBottom: hasPagamentos ? 12 : 16 }}>
             <div className="px-3 py-3 text-center">
               <p className="text-[9px] font-bold uppercase tracking-widest text-white/60 mb-1">Produtos</p>
               <p className="text-xl font-black text-white tabular-nums">{activeCards.length + parceiros.length}</p>
@@ -809,6 +809,28 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
               <p className="text-[14px] font-black text-white tabular-nums leading-tight mt-0.5">{brl(totalValor)}</p>
             </div>
           </div>
+
+          {/* Payment progress — only when there are lancamentos */}
+          {hasPagamentos && (
+            <div className="mx-4 mb-4 bg-white/10 rounded-xl px-4 py-3">
+              <div className="flex items-baseline justify-between mb-2">
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-white/50 mb-0.5">Pago</p>
+                  <p className="text-[16px] font-black text-emerald-300 tabular-nums leading-none">{brl(totalPago)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-white/50 mb-0.5">Restante</p>
+                  <p className={`text-[16px] font-black tabular-nums leading-none ${saldo <= 0 ? "text-emerald-300" : "text-white/80"}`}>{brl(Math.max(saldo, 0))}</p>
+                </div>
+              </div>
+              <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-400 rounded-full transition-all duration-700" style={{ width: `${pagoPct}%` }} />
+              </div>
+              <p className="text-[9px] text-white/40 mt-1.5 text-center">
+                {saldo <= 0 ? "Pagamento completo ✓" : `${Math.round(pagoPct)}% quitado`}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* All products — internal and partner merged, no distinction shown */}
