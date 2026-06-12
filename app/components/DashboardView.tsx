@@ -202,16 +202,46 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
 
   // ── KPIs ────────────────────────────────────────────────────────────────────
   const kpis = useMemo(() => {
-    const total    = filteredCards.length
-    const pipeline = filteredCards
-      .filter(c => c.coluna !== COL_PERDIDO && c.coluna !== COL_ENTREGUE)
+    const total = filteredCards.length
+
+    // Revenue/closings by CLOSE date (cross-period, e.g. May quote closed in June)
+    const receita    = confirmedByCloseDate.reduce((s, c) => s + c.preco, 0)
+    const fechamentos = confirmedByCloseDate.length
+    const entregues  = confirmedByCloseDate.filter(c => c.coluna === COL_ENTREGUE).length
+    const ticket     = fechamentos > 0 ? receita / fechamentos : 0
+
+    // Conversion: how many of THIS PERIOD's quotes are now closed — always ≤ 100%
+    const confirmedInPeriod = filteredCards.filter(
+      c => c.coluna === COL_FECHADO || c.coluna === COL_ENTREGUE
+    ).length
+    const conversao = total > 0 ? (confirmedInPeriod / total) * 100 : 0
+
+    // Loss rate among resolved deals in this period
+    const perdidos   = filteredCards.filter(c => c.coluna === COL_PERDIDO).length
+    const resolvidos = filteredCards.filter(
+      c => c.coluna === COL_PERDIDO || c.coluna === COL_FECHADO || c.coluna === COL_ENTREGUE
+    ).length
+    const taxaPerda  = resolvidos > 0 ? (perdidos / resolvidos) * 100 : 0
+
+    // Unique clients in period
+    const clientesUnicos = new Set(filteredCards.map(c => c.nomeCliente)).size
+
+    // Pipeline: ALL open deals in the system right now (global snapshot, not period-filtered)
+    const pipelineGlobal = kanban
+      .filter(c => c.coluna !== COL_PERDIDO && c.coluna !== COL_ENTREGUE && c.coluna !== COL_FECHADO)
       .reduce((s, c) => s + c.preco, 0)
-    const receita   = confirmedByCloseDate.reduce((s, c) => s + c.preco, 0)
-    const confirmados = confirmedByCloseDate.length
-    const conversao = total > 0 ? (confirmados / total) * 100 : 0
-    const ticket    = confirmados > 0 ? receita / confirmados : 0
-    return { total, pipeline, receita, conversao, ticket, confirmados }
-  }, [filteredCards, confirmedByCloseDate])
+
+    // Em produção: cards in production stages 2–8 (global)
+    const prodCards      = kanban.filter(c => c.coluna >= 2 && c.coluna <= 8)
+    const emProducaoCount = prodCards.length
+    const emProducaoValor = prodCards.reduce((s, c) => s + c.preco, 0)
+
+    return {
+      total, receita, fechamentos, entregues, ticket,
+      conversao, taxaPerda, clientesUnicos,
+      pipelineGlobal, emProducaoCount, emProducaoValor,
+    }
+  }, [filteredCards, confirmedByCloseDate, kanban])
 
   // ── Monthly chart data (last 12 months) ─────────────────────────────────────
   const monthlyData = useMemo(() => {
@@ -373,43 +403,83 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
         </div>
       </div>
 
-      {/* ── KPI Cards ──────────────────────────────────────────────────────── */}
+      {/* ── KPI Row 1 – Financial metrics ──────────────────────────────────── */}
       <div className="grid grid-cols-5 gap-3">
-        {/* Total orçamentos */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-3">Total orçamentos</p>
-          <p className="text-[22px] font-black tabular-nums text-slate-900 leading-none">{num(kpis.total)}</p>
-          <p className="text-[11px] text-slate-400 mt-2">no período selecionado</p>
+        {/* Receita do período */}
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-5 shadow-sm text-white">
+          <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-emerald-100 mb-3">Receita do período</p>
+          <p className="text-[22px] font-black tabular-nums leading-none">{brl(kpis.receita)}</p>
+          <p className="text-[10px] text-emerald-200 mt-2">por data de fechamento</p>
         </div>
 
-        {/* Pipeline */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-blue-400 mb-3">Pipeline</p>
-          <p className="text-[22px] font-black tabular-nums text-blue-700 leading-none">{brl(kpis.pipeline)}</p>
-          <p className="text-[11px] text-slate-400 mt-2">em negociação ativa</p>
+        {/* Pipeline global */}
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 shadow-sm text-white">
+          <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-blue-100 mb-3">Pipeline</p>
+          <p className="text-[22px] font-black tabular-nums leading-none">{brl(kpis.pipelineGlobal)}</p>
+          <p className="text-[10px] text-blue-200 mt-2">orçamentos em aberto (global)</p>
         </div>
 
-        {/* Receita confirmada */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-emerald-500 mb-3">Receita confirmada</p>
-          <p className="text-[22px] font-black tabular-nums text-emerald-700 leading-none">{brl(kpis.receita)}</p>
-          <p className="text-[11px] text-slate-400 mt-2">fechados + entregues</p>
+        {/* Em produção */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-amber-500 mb-3">Em produção</p>
+          <p className="text-[22px] font-black tabular-nums text-amber-600 leading-none">{num(kpis.emProducaoCount)}</p>
+          <p className="text-[10px] text-slate-400 mt-2">{brl(kpis.emProducaoValor)} em fabricação</p>
         </div>
 
-        {/* Conversão */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-3">Conversão</p>
-          <p className={`text-[22px] font-black tabular-nums leading-none ${kpis.conversao >= 30 ? "text-emerald-700" : "text-amber-600"}`}>
-            {num(kpis.conversao, 1)}%
-          </p>
-          <p className="text-[11px] text-slate-400 mt-2">{kpis.confirmados} de {kpis.total} fechados</p>
+        {/* Fechamentos */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-green-500 mb-3">Fechamentos</p>
+          <p className="text-[22px] font-black tabular-nums text-green-700 leading-none">{num(kpis.fechamentos)}</p>
+          <p className="text-[10px] text-slate-400 mt-2">{kpis.entregues} entregues no período</p>
         </div>
 
         {/* Ticket médio */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-violet-400 mb-3">Ticket médio</p>
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-violet-400 mb-3">Ticket médio</p>
           <p className="text-[22px] font-black tabular-nums text-violet-700 leading-none">{brl(kpis.ticket)}</p>
-          <p className="text-[11px] text-slate-400 mt-2">por negócio fechado</p>
+          <p className="text-[10px] text-slate-400 mt-2">por negócio fechado</p>
+        </div>
+      </div>
+
+      {/* ── KPI Row 2 – Operational metrics ────────────────────────────────── */}
+      <div className="grid grid-cols-5 gap-3">
+        {/* Orçamentos */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-2">Orçamentos</p>
+          <p className="text-[20px] font-black tabular-nums text-slate-900 leading-none">{num(kpis.total)}</p>
+          <p className="text-[10px] text-slate-400 mt-1.5">realizados no período</p>
+        </div>
+
+        {/* Conversão — always ≤ 100% (denominator = period's own quotes) */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-2">Conversão</p>
+          <p className={`text-[20px] font-black tabular-nums leading-none ${kpis.conversao >= 30 ? "text-emerald-600" : "text-amber-600"}`}>
+            {num(kpis.conversao, 1)}%
+          </p>
+          <p className="text-[10px] text-slate-400 mt-1.5">dos orçamentos do período</p>
+        </div>
+
+        {/* Taxa de perda */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-2">Taxa de perda</p>
+          <p className={`text-[20px] font-black tabular-nums leading-none ${kpis.taxaPerda > 30 ? "text-rose-600" : "text-slate-700"}`}>
+            {kpis.taxaPerda > 0 ? `${num(kpis.taxaPerda, 1)}%` : "—"}
+          </p>
+          <p className="text-[10px] text-slate-400 mt-1.5">dos negócios resolvidos</p>
+        </div>
+
+        {/* Clientes únicos */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-2">Clientes únicos</p>
+          <p className="text-[20px] font-black tabular-nums text-slate-900 leading-none">{num(kpis.clientesUnicos)}</p>
+          <p className="text-[10px] text-slate-400 mt-1.5">atendidos no período</p>
+        </div>
+
+        {/* Entregas */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-2">Entregas</p>
+          <p className="text-[20px] font-black tabular-nums text-emerald-600 leading-none">{num(kpis.entregues)}</p>
+          <p className="text-[10px] text-slate-400 mt-1.5">pedidos entregues no período</p>
         </div>
       </div>
 
