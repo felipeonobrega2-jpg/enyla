@@ -48,9 +48,18 @@ type Lote = {
   criadoEm: string
 }
 
+type PartnerItem = {
+  id: string
+  parceiroNome: string
+  descricao: string
+  statusLote?: "aguardando" | "em_producao" | "pronto" | "entregue"
+  valorVenda?: number
+}
+
 interface Props {
   initialLote: Lote | null
   initialCards: LoteCard[]
+  initialParceiros?: PartnerItem[]
   loteNumero: string
 }
 
@@ -163,6 +172,57 @@ function ExpandedTimeline({ numero }: { numero: string }) {
   )
 }
 
+const PARTNER_STEPS: { id: PartnerItem["statusLote"]; label: string }[] = [
+  { id: "aguardando",  label: "Aguardando parceiro" },
+  { id: "em_producao", label: "Em produção" },
+  { id: "pronto",      label: "Pronto" },
+  { id: "entregue",    label: "Entregue" },
+]
+
+function PartnerCard({ item }: { item: PartnerItem }) {
+  const currentIdx = PARTNER_STEPS.findIndex(s => s.id === (item.statusLote ?? "aguardando"))
+  const isEntregue = item.statusLote === "entregue"
+
+  return (
+    <div className={`bg-white rounded-2xl border overflow-hidden shadow-sm ${isEntregue ? "border-emerald-100" : "border-slate-100"}`}>
+      {/* Header */}
+      <div className="px-4 py-3.5">
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-semibold text-slate-800 text-sm leading-tight truncate">{item.descricao}</p>
+              <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide shrink-0">
+                Parceiro
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">via {item.parceiroNome}</p>
+          </div>
+          <span className={`text-[9.5px] font-bold px-2 py-1 rounded-full shrink-0 ${
+            isEntregue ? "bg-emerald-100 text-emerald-700" : "bg-amber-50 text-amber-600"
+          }`}>
+            {PARTNER_STEPS[currentIdx]?.label ?? "Aguardando"}
+          </span>
+        </div>
+
+        {/* 4-step progress */}
+        <div className="mt-3 space-y-1.5">
+          <div className="flex items-center gap-1">
+            {PARTNER_STEPS.map((step, i) => (
+              <div key={step.id} className="flex-1 flex flex-col items-center gap-0.5">
+                <div className={`h-1 w-full rounded-full ${i <= currentIdx ? (isEntregue ? "bg-emerald-400" : "bg-amber-400") : "bg-slate-100"}`} />
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between">
+            <p className="text-[8.5px] text-slate-300">Aguardando</p>
+            <p className="text-[8.5px] text-slate-300">Entregue</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ProductCard({ card }: { card: LoteCard }) {
   const [expanded, setExpanded] = useState(false)
   const isPerdido = card.coluna === 10
@@ -240,9 +300,10 @@ function ProductCard({ card }: { card: LoteCard }) {
   )
 }
 
-export default function LoteTrackingClient({ initialLote, initialCards, loteNumero }: Props) {
+export default function LoteTrackingClient({ initialLote, initialCards, initialParceiros = [], loteNumero }: Props) {
   const [lote, setLote] = useState<Lote | null>(initialLote)
   const [cards, setCards] = useState<LoteCard[]>(initialCards)
+  const [parceiros, setParceiros] = useState<PartnerItem[]>(initialParceiros)
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdate, setLastUpdate] = useState(0)
 
@@ -254,6 +315,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, loteNume
         const d = await res.json()
         if (d.lote) setLote(d.lote)
         if (d.cards) setCards(d.cards)
+        if (d.parceiros) setParceiros(d.parceiros)
       }
       setLastUpdate(0)
     } catch { /* silent */ } finally {
@@ -357,18 +419,31 @@ export default function LoteTrackingClient({ initialLote, initialCards, loteNume
           </div>
         </div>
 
-        {/* Products */}
-        <div className="space-y-3">
-          <p className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-slate-400 px-1">
-            Toque em cada produto para ver o progresso detalhado
-          </p>
-          {cards.map(card => <ProductCard key={card.id} card={card} />)}
-          {cards.length === 0 && (
-            <div className="text-center py-8 text-slate-400 text-sm">
-              Nenhum produto encontrado neste lote.
-            </div>
-          )}
-        </div>
+        {/* Internal products */}
+        {cards.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-slate-400 px-1">
+              Toque em cada produto para ver o progresso detalhado
+            </p>
+            {cards.map(card => <ProductCard key={card.id} card={card} />)}
+          </div>
+        )}
+
+        {/* Partner products */}
+        {parceiros.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-amber-400 px-1">
+              Produtos via parceiros
+            </p>
+            {parceiros.map(p => <PartnerCard key={p.id} item={p} />)}
+          </div>
+        )}
+
+        {cards.length === 0 && parceiros.length === 0 && (
+          <div className="text-center py-8 text-slate-400 text-sm">
+            Nenhum produto encontrado neste lote.
+          </div>
+        )}
 
         {/* Refresh */}
         <div className="flex items-center justify-between px-1 pt-1">

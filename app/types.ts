@@ -227,6 +227,8 @@ export type LancamentoFinanceiro = {
   criadoEm: string
 }
 
+export type StatusLoteParceiro = "aguardando" | "em_producao" | "pronto" | "entregue"
+
 export type NegocioParceiro = {
   id: string
   parceiroId: string
@@ -241,4 +243,7 @@ export type NegocioParceiro = {
   status: StatusNegocio
   obs?: string
   criadoEm: string
+  loteId?: string
+  loteNumero?: string
+  statusLote?: StatusLoteParceiro
 }

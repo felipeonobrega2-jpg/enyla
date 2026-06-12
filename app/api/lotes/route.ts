@@ -1,14 +1,27 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 
+function clientCode(nome: string): string {
+  return nome.replace(/\s+/g, "").slice(0, 3).toUpperCase() || "GEN"
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { data: contData } = await supabase.from("Contador").select("valor").eq("chave", "lote").single()
-    const novoContador = (contData?.valor ?? 0) + 1
-    const ano = new Date().getFullYear()
-    const numero = `LOTE-${ano}-${String(novoContador).padStart(3, "0")}`
-    await supabase.from("Contador").upsert({ chave: "lote", valor: novoContador }, { onConflict: "chave" })
+    const code = clientCode(body.nomeCliente ?? "")
+
+    // Find the highest sequential number for this client code
+    const { data: existing } = await supabase
+      .from("Lote")
+      .select("numero")
+      .like("numero", `${code}-%`)
+
+    const nums = (existing ?? [])
+      .map((l: { numero: string }) => parseInt(l.numero.split("-").pop() ?? "0"))
+      .filter((n: number) => !isNaN(n) && n > 0)
+    const next = nums.length > 0 ? Math.max(...nums) + 1 : 1
+    const numero = `${code}-${String(next).padStart(3, "0")}`
+
     const lote = {
       id: crypto.randomUUID(),
       numero,

@@ -15,14 +15,18 @@ export default async function LoteTrackingPage({
     .eq("numero", loteNumero)
     .single()
 
-  const { data: cards } = lote
-    ? await supabase.from("KanbanCard").select("*").eq("loteId", lote.id)
-    : { data: null }
+  const [{ data: cards }, { data: parceiros }] = lote
+    ? await Promise.all([
+        supabase.from("KanbanCard").select("*").eq("loteId", lote.id),
+        supabase.from("NegocioParceiro").select("*").eq("loteId", lote.id),
+      ])
+    : [{ data: null }, { data: null }]
 
   return (
     <LoteTrackingClient
       initialLote={lote ?? null}
       initialCards={cards ?? []}
+      initialParceiros={parceiros ?? []}
       loteNumero={loteNumero}
     />
   )

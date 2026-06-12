@@ -231,6 +231,21 @@ export default function Home() {
     }).catch(() => {})
   }
 
+  async function mergeLote(sourceLoteId: string, targetLoteId: string, targetLoteNumero: string) {
+    await fetch(`/api/lotes/${sourceLoteId}/merge`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetLoteId, targetLoteNumero }),
+    }).catch(() => {})
+    setKanban(prev => prev.map(c =>
+      c.loteId === sourceLoteId ? { ...c, loteId: targetLoteId, loteNumero: targetLoteNumero } : c
+    ))
+    setNegocios(prev => prev.map(n =>
+      n.loteId === sourceLoteId ? { ...n, loteId: targetLoteId, loteNumero: targetLoteNumero } : n
+    ))
+    setLotes(prev => prev.filter(l => l.id !== sourceLoteId))
+  }
+
   async function salvarDataEntrega(cardId: string, date: string | null) {
     setKanban(prev => prev.map(c => c.id === cardId ? { ...c, dataEntregaPrevista: date ?? undefined } : c))
     const card = kanban.find(c => c.id === cardId)
@@ -314,6 +329,8 @@ export default function Home() {
       body: JSON.stringify(card),
     }).catch(() => {})
     criarTracking(card)
+    // Auto-assign lote
+    criarLote(card.nomeCliente).then(lote => assignLote(card.id, lote.id, lote.numero)).catch(() => {})
     // Auto-create client silently if it's a new name
     const nomeClean = form.nomeCliente.trim()
     if (nomeClean && !clientes.some(c => c.nome.toLowerCase() === nomeClean.toLowerCase())) {
@@ -488,6 +505,8 @@ export default function Home() {
       body: JSON.stringify(card),
     }).catch(() => {})
     criarTracking(card)
+    // Auto-assign lote
+    criarLote(draft.nomeCliente).then(lote => assignLote(card.id, lote.id, lote.numero)).catch(() => {})
 
     const nomeClean = draft.nomeCliente.trim()
     if (nomeClean && !clientes.some(c => c.nome.toLowerCase() === nomeClean.toLowerCase())) {
@@ -1004,6 +1023,7 @@ export default function Home() {
               onLoteCreate={criarLote}
               onLoteAssign={assignLote}
               onLoteRemove={removeLote}
+              onLoteMerge={mergeLote}
             />
           ) : view === "historico" ? (
             <HistoricoView

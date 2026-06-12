@@ -18,6 +18,7 @@ export function KanbanView({
   onLoteCreate,
   onLoteAssign,
   onLoteRemove,
+  onLoteMerge,
 }: {
   cards: KanbanCard[]
   onMove: (id: string, coluna: number) => void
@@ -29,6 +30,7 @@ export function KanbanView({
   onLoteCreate?: (nomeCliente: string) => Promise<{ id: string; numero: string }>
   onLoteAssign?: (cardId: string, loteId: string, loteNumero: string) => void
   onLoteRemove?: (cardId: string) => void
+  onLoteMerge?: (sourceLoteId: string, targetLoteId: string, targetLoteNumero: string) => Promise<void>
 }) {
   const [dragId, setDragId]       = useState<string | null>(null)
   const [overCol, setOverCol]     = useState<number | null>(null)
@@ -261,6 +263,7 @@ export function KanbanView({
                       onLoteCreate={onLoteCreate}
                       onLoteAssign={onLoteAssign}
                       onLoteRemove={onLoteRemove}
+                      onLoteMerge={onLoteMerge}
                     />
                   ))}
                 </div>
@@ -344,7 +347,7 @@ export function KanbanView({
 
 function KanbanCardItem({
   card, colIdx, isDragging, colors, onDragStart, onDragEnd, onDelete, onMove, onSetMotivo, onDetalhes, totalCols,
-  lotes, onLoteCreate, onLoteAssign, onLoteRemove,
+  lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge,
 }: {
   card: KanbanCard
   colIdx: number
@@ -361,6 +364,7 @@ function KanbanCardItem({
   onLoteCreate?: (nomeCliente: string) => Promise<{ id: string; numero: string }>
   onLoteAssign?: (cardId: string, loteId: string, loteNumero: string) => void
   onLoteRemove?: (cardId: string) => void
+  onLoteMerge?: (sourceLoteId: string, targetLoteId: string, targetLoteNumero: string) => Promise<void>
 }) {
   const isPerdido = colIdx === COL_PERDIDO
   const [confirmando, setConfirmando] = useState(false)
@@ -369,6 +373,7 @@ function KanbanCardItem({
   const [showLotePanel, setShowLotePanel] = useState(false)
   const [copiedLote, setCopiedLote] = useState(false)
   const [criandoLote, setCriandoLote] = useState(false)
+  const [merging, setMerging] = useState(false)
   const motivoRef = useRef<HTMLInputElement>(null)
 
   const clientLotes = (lotes ?? []).filter(l =>
@@ -395,6 +400,17 @@ function KanbanCardItem({
   function handleRemoveLote() {
     onLoteRemove?.(card.id)
     setShowLotePanel(false)
+  }
+
+  async function handleMerge(targetLoteId: string, targetLoteNumero: string) {
+    if (!card.loteId || !onLoteMerge) return
+    setMerging(true)
+    try {
+      await onLoteMerge(card.loteId, targetLoteId, targetLoteNumero)
+      setShowLotePanel(false)
+    } finally {
+      setMerging(false)
+    }
   }
 
   function copyLoteLink() {
@@ -556,23 +572,49 @@ function KanbanCardItem({
           <div className="mt-2 pt-2 border-t border-violet-100/80 space-y-1.5" onClick={e => e.stopPropagation()}>
             {card.loteNumero ? (
               <>
-                <p className="text-[9.5px] text-violet-600 font-bold uppercase tracking-wide">{card.loteNumero}</p>
-                <div className="flex gap-1">
+                {/* Header: lote number */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9.5px] font-black text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full font-mono">
+                    {card.loteNumero}
+                  </span>
                   <button onClick={copyLoteLink}
-                    className="flex-1 py-1.5 text-[10px] font-semibold text-violet-600 bg-violet-50 hover:bg-violet-100 rounded-md transition-colors">
-                    {copiedLote ? "Copiado ✓" : "Copiar link"}
+                    className={`text-[9.5px] font-semibold px-2 py-0.5 rounded-full transition-colors ${copiedLote ? "text-emerald-600 bg-emerald-50" : "text-violet-600 bg-violet-50 hover:bg-violet-100"}`}>
+                    {copiedLote ? "Copiado ✓" : "🔗 Copiar link"}
                   </button>
                   <button onClick={handleRemoveLote}
-                    className="flex-1 py-1.5 text-[10px] text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors">
+                    className="ml-auto text-[9.5px] text-slate-300 hover:text-rose-400 transition-colors">
                     Remover
                   </button>
                 </div>
+
+                {/* Merge section */}
+                {clientLotes.length > 0 && (
+                  <div className="pt-1">
+                    <p className="text-[9px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-1">Mesclar pedidos</p>
+                    <div className="space-y-0.5">
+                      {clientLotes.map(l => (
+                        <button key={l.id} onClick={() => handleMerge(l.id, l.numero)}
+                          disabled={merging}
+                          className="w-full flex items-center gap-1.5 py-1.5 px-2 text-[10px] text-violet-700 bg-violet-50 hover:bg-violet-100 disabled:opacity-50 rounded-md transition-colors text-left">
+                          <svg className="w-3 h-3 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                          </svg>
+                          <span className="font-bold">{l.numero}</span>
+                          <span className="text-violet-300">·</span>
+                          <span className="text-violet-500 truncate">{l.nomeCliente}</span>
+                          {merging && <span className="ml-auto text-[9px] text-violet-400">…</span>}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[9px] text-slate-300 mt-1">Todos os pedidos do lote selecionado serão reunidos aqui.</p>
+                  </div>
+                )}
               </>
             ) : (
               <>
                 <p className="text-[10px] text-slate-500 font-semibold">Agrupar em lote</p>
                 {clientLotes.length > 0 && (
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {clientLotes.map(l => (
                       <button key={l.id} onClick={() => handleAssignLote(l.id, l.numero)}
                         className="w-full flex items-center gap-1.5 py-1.5 px-2 text-[10px] text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-md transition-colors text-left">
