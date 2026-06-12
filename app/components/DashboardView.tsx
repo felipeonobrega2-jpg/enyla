@@ -24,6 +24,8 @@ interface Props {
 
 function parseDataBr(s: string): Date {
   try {
+    // ISO date YYYY-MM-DD (dataFechamento)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + "T00:00:00")
     const [d, m, y] = s.split(",")[0].trim().split("/")
     return new Date(+y, +m - 1, +d)
   } catch {
@@ -154,51 +156,62 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
   const [dataInicio, setDataInicio] = useState("")
   const [dataFim, setDataFim]   = useState("")
 
-  // ── Filter ──────────────────────────────────────────────────────────────────
-  const filteredCards = useMemo(() => {
+  // ── Period bounds (shared by both filters) ─────────────────────────────────
+  const periodBounds = useMemo(() => {
     const now = new Date()
     let from: Date | null = null
     let to: Date | null = null
-
     if (periodo === "mes") {
       from = new Date(now.getFullYear(), now.getMonth(), 1)
-    }
-    if (periodo === "trimestre") {
-      const q = Math.floor(now.getMonth() / 3)
-      from = new Date(now.getFullYear(), q * 3, 1)
-    }
-    if (periodo === "semestre") {
-      const s = now.getMonth() < 6 ? 0 : 6
-      from = new Date(now.getFullYear(), s, 1)
-    }
-    if (periodo === "ano") {
+    } else if (periodo === "trimestre") {
+      from = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
+    } else if (periodo === "semestre") {
+      from = new Date(now.getFullYear(), now.getMonth() < 6 ? 0 : 6, 1)
+    } else if (periodo === "ano") {
       from = new Date(now.getFullYear(), 0, 1)
-    }
-    if (periodo === "custom") {
+    } else if (periodo === "custom") {
       if (dataInicio) from = new Date(dataInicio)
       if (dataFim)   { to = new Date(dataFim); to.setHours(23, 59, 59) }
     }
+    return { from, to }
+  }, [periodo, dataInicio, dataFim])
 
+  // ── Filter by QUOTE date — for orçamentos, pipeline, funil ─────────────────
+  const filteredCards = useMemo(() => {
+    const { from, to } = periodBounds
     return kanban.filter(c => {
       const d = parseDataBr(c.data)
       if (from && d < from) return false
       if (to   && d > to)   return false
       return true
     })
-  }, [kanban, periodo, dataInicio, dataFim])
+  }, [kanban, periodBounds])
+
+  // ── Filter confirmed cards by CLOSE date — for receita, ticket médio ───────
+  // Uses dataFechamento when available; falls back to data for existing cards.
+  const confirmedByCloseDate = useMemo(() => {
+    const { from, to } = periodBounds
+    return kanban.filter(c => {
+      if (c.coluna !== COL_FECHADO && c.coluna !== COL_ENTREGUE) return false
+      const d = parseDataBr(c.dataFechamento ?? c.data)
+      if (from && d < from) return false
+      if (to   && d > to)   return false
+      return true
+    })
+  }, [kanban, periodBounds])
 
   // ── KPIs ────────────────────────────────────────────────────────────────────
   const kpis = useMemo(() => {
-    const total = filteredCards.length
+    const total    = filteredCards.length
     const pipeline = filteredCards
       .filter(c => c.coluna !== COL_PERDIDO && c.coluna !== COL_ENTREGUE)
       .reduce((s, c) => s + c.preco, 0)
-    const confirmados = filteredCards.filter(c => c.coluna === COL_FECHADO || c.coluna === COL_ENTREGUE)
-    const receita = confirmados.reduce((s, c) => s + c.preco, 0)
-    const conversao = total > 0 ? (confirmados.length / total) * 100 : 0
-    const ticket = confirmados.length > 0 ? receita / confirmados.length : 0
-    return { total, pipeline, receita, conversao, ticket, confirmados: confirmados.length }
-  }, [filteredCards])
+    const receita   = confirmedByCloseDate.reduce((s, c) => s + c.preco, 0)
+    const confirmados = confirmedByCloseDate.length
+    const conversao = total > 0 ? (confirmados / total) * 100 : 0
+    const ticket    = confirmados > 0 ? receita / confirmados : 0
+    return { total, pipeline, receita, conversao, ticket, confirmados }
+  }, [filteredCards, confirmedByCloseDate])
 
   // ── Monthly chart data (last 12 months) ─────────────────────────────────────
   const monthlyData = useMemo(() => {
@@ -209,13 +222,19 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       months.push({ label: MESES_PT[d.getMonth()], volume: 0, receita: 0 })
     }
     kanban.forEach(card => {
+      // Volume bar: by quote date
       const cd = parseDataBr(card.data)
       const diffMonths = (now.getFullYear() - cd.getFullYear()) * 12 + (now.getMonth() - cd.getMonth())
-      if (diffMonths < 0 || diffMonths > 11) return
-      const idx = 11 - diffMonths
-      months[idx].volume += card.preco
+      if (diffMonths >= 0 && diffMonths <= 11) {
+        months[11 - diffMonths].volume += card.preco
+      }
+      // Revenue bar: by close date (dataFechamento when available)
       if (card.coluna === COL_FECHADO || card.coluna === COL_ENTREGUE) {
-        months[idx].receita += card.preco
+        const closeDate = parseDataBr(card.dataFechamento ?? card.data)
+        const closeDiff = (now.getFullYear() - closeDate.getFullYear()) * 12 + (now.getMonth() - closeDate.getMonth())
+        if (closeDiff >= 0 && closeDiff <= 11) {
+          months[11 - closeDiff].receita += card.preco
+        }
       }
     })
     return months

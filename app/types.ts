@@ -157,6 +157,7 @@ export type KanbanCard = {
   motivoPerdido?: string
   opcoes?: KanbanOpcao[]
   dataEntregaPrevista?: string
+  dataFechamento?: string  // ISO YYYY-MM-DD — set when card first reaches COL_FECHADO
   loteId?: string
   loteNumero?: string
 }

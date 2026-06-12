@@ -892,11 +892,15 @@ export default function Home() {
               cards={kanban}
               onMove={(id, coluna) => {
                 const card = kanban.find(c => c.id === id)
-                setKanban(prev => prev.map(c => c.id === id ? { ...c, coluna } : c))
+                const hoje = new Date().toISOString().slice(0, 10)
+                // Set dataFechamento the first time a card reaches COL_FECHADO
+                const dataFechamento = (coluna === COL_FECHADO && !card?.dataFechamento) ? hoje : undefined
+                const update: Partial<KanbanCard> = { coluna, ...(dataFechamento ? { dataFechamento } : {}) }
+                setKanban(prev => prev.map(c => c.id === id ? { ...c, ...update } : c))
                 fetch(`/api/kanban/${id}`, {
                   method: "PATCH",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ coluna }),
+                  body: JSON.stringify(update),
                 }).catch(() => {})
                 if (card?.numero) atualizarTracking(card.numero, coluna)
               }}
@@ -922,13 +926,14 @@ export default function Home() {
               }}
               onFechamento={(id, opcao) => {
                 const card = kanban.find(c => c.id === id)
-                setKanban(prev => prev.map(c =>
-                  c.id === id ? { ...c, coluna: COL_FECHADO, preco: opcao.preco, quantidade: opcao.quantidade } : c
-                ))
+                const hoje = new Date().toISOString().slice(0, 10)
+                const dataFechamento = card?.dataFechamento ?? hoje
+                const update = { coluna: COL_FECHADO, preco: opcao.preco, quantidade: opcao.quantidade, dataFechamento }
+                setKanban(prev => prev.map(c => c.id === id ? { ...c, ...update } : c))
                 fetch(`/api/kanban/${id}`, {
                   method: "PATCH",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ coluna: COL_FECHADO, preco: opcao.preco, quantidade: opcao.quantidade }),
+                  body: JSON.stringify(update),
                 }).catch(() => {})
                 if (card?.numero) atualizarTracking(card.numero, COL_FECHADO, opcao.preco, opcao.quantidade)
               }}
