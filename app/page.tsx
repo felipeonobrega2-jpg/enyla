@@ -347,8 +347,6 @@ export default function Home() {
       body: JSON.stringify(card),
     }).catch(() => {})
     criarTracking(card)
-    // Auto-assign lote
-    criarLote(card.nomeCliente).then(lote => assignLote(card.id, lote.id, lote.numero)).catch(() => {})
     // Auto-create client silently if it's a new name
     const nomeClean = form.nomeCliente.trim()
     if (nomeClean && !clientes.some(c => c.nome.toLowerCase() === nomeClean.toLowerCase())) {
@@ -523,8 +521,6 @@ export default function Home() {
       body: JSON.stringify(card),
     }).catch(() => {})
     criarTracking(card)
-    // Auto-assign lote
-    criarLote(draft.nomeCliente).then(lote => assignLote(card.id, lote.id, lote.numero)).catch(() => {})
 
     const nomeClean = draft.nomeCliente.trim()
     if (nomeClean && !clientes.some(c => c.nome.toLowerCase() === nomeClean.toLowerCase())) {
@@ -977,7 +973,6 @@ export default function Home() {
                 const hoje = new Date().toISOString().slice(0, 10)
                 const dataFechamento = (coluna === COL_FECHADO && !card?.dataFechamento) ? hoje : undefined
                 setKanban(prev => prev.map(c => c.id === id ? { ...c, coluna, ...(dataFechamento ? { dataFechamento } : {}) } : c))
-                // Send coluna always; dataFechamento in separate call so column-missing can't block the move
                 fetch(`/api/kanban/${id}`, {
                   method: "PATCH",
                   headers: { "Content-Type": "application/json" },
@@ -991,6 +986,10 @@ export default function Home() {
                   }).catch(() => {})
                 }
                 if (card?.numero) atualizarTracking(card.numero, coluna)
+                // Auto-assign lote ao fechar
+                if (coluna === COL_FECHADO && card && !card.loteId) {
+                  criarLote(card.nomeCliente).then(lote => assignLote(id, lote.id, lote.numero)).catch(() => {})
+                }
               }}
               onDelete={id => {
                 const card = kanban.find(c => c.id === id)
@@ -1017,7 +1016,6 @@ export default function Home() {
                 const hoje = new Date().toISOString().slice(0, 10)
                 const dataFechamento = card?.dataFechamento ?? hoje
                 setKanban(prev => prev.map(c => c.id === id ? { ...c, coluna: COL_FECHADO, preco: opcao.preco, quantidade: opcao.quantidade, dataFechamento } : c))
-                // Send core fields and dataFechamento separately to keep the move robust
                 fetch(`/api/kanban/${id}`, {
                   method: "PATCH",
                   headers: { "Content-Type": "application/json" },
@@ -1029,6 +1027,10 @@ export default function Home() {
                   body: JSON.stringify({ dataFechamento }),
                 }).catch(() => {})
                 if (card?.numero) atualizarTracking(card.numero, COL_FECHADO, opcao.preco, opcao.quantidade)
+                // Auto-assign lote ao fechar via modal
+                if (card && !card.loteId) {
+                  criarLote(card.nomeCliente).then(lote => assignLote(id, lote.id, lote.numero)).catch(() => {})
+                }
               }}
               onDetalhes={(card) => {
                 const histItem = historico.find(h => h.numero === card.numero)
