@@ -486,6 +486,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
 
   const activeCards  = cards.filter(c => c.coluna !== 10)
   const totalValor   = activeCards.reduce((s, c) => s + c.preco, 0)
+                     + parceiros.reduce((s, p) => s + (p.valorVenda ?? 0), 0)
   const totalQtd     = activeCards.reduce((s, c) => s + c.quantidade, 0)
   const allEntregue  = activeCards.length > 0 && activeCards.every(c => c.coluna === 9)
   const minColuna    = activeCards.length > 0 ? Math.min(...activeCards.map(c => c.coluna)) : 0
