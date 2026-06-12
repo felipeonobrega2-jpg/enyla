@@ -246,6 +246,24 @@ export default function Home() {
     setLotes(prev => prev.filter(l => l.id !== sourceLoteId))
   }
 
+  async function renameLote(loteId: string, newNumero: string): Promise<{ ok: boolean; error?: string }> {
+    const res = await fetch(`/api/lotes/${loteId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ numero: newNumero }),
+    }).catch(() => null)
+    if (!res) return { ok: false, error: "network" }
+    const data = await res.json()
+    if (res.ok) {
+      const n = data.numero as string
+      setKanban(prev => prev.map(c => c.loteId === loteId ? { ...c, loteNumero: n } : c))
+      setNegocios(prev => prev.map(x => x.loteId === loteId ? { ...x, loteNumero: n } : x))
+      setLotes(prev => prev.map(l => l.id === loteId ? { ...l, numero: n } : l))
+      return { ok: true }
+    }
+    return { ok: false, error: data.error }
+  }
+
   async function salvarDataEntrega(cardId: string, date: string | null) {
     setKanban(prev => prev.map(c => c.id === cardId ? { ...c, dataEntregaPrevista: date ?? undefined } : c))
     const card = kanban.find(c => c.id === cardId)
@@ -1024,6 +1042,16 @@ export default function Home() {
               onLoteAssign={assignLote}
               onLoteRemove={removeLote}
               onLoteMerge={mergeLote}
+              onLoteRename={renameLote}
+              negocios={negocios}
+              onUpdateNegocio={n => {
+                setNegocios(prev => prev.map(x => x.id === n.id ? n : x))
+                fetch(`/api/negocios/${n.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ ...n, loteId: n.loteId ?? null, loteNumero: n.loteNumero ?? null, statusLote: n.statusLote ?? null }),
+                }).catch(() => {})
+              }}
             />
           ) : view === "historico" ? (
             <HistoricoView
@@ -1087,6 +1115,7 @@ export default function Home() {
             <ParceirosView
               parceiros={parceiros}
               negocios={negocios}
+              lotes={lotes}
               onAddParceiro={p => {
                 setParceiros(prev => [...prev, p])
                 fetch("/api/parceiros", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) }).catch(() => {})

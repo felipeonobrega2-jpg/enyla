@@ -1,9 +1,16 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { KanbanCard, KanbanOpcao, Lote, COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO } from "../types"
+import { KanbanCard, KanbanOpcao, Lote, NegocioParceiro, StatusLoteParceiro, COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO } from "../types"
 import { brl, num } from "../utils"
 import { COL_COLORS } from "./kanban-colors"
+
+const PARTNER_STEPS_K: { id: StatusLoteParceiro; short: string }[] = [
+  { id: "aguardando",  short: "Aguard." },
+  { id: "em_producao", short: "Prod." },
+  { id: "pronto",      short: "Pronto" },
+  { id: "entregue",    short: "Entregue" },
+]
 
 type ModalFechamento = { card: KanbanCard; opcaoIdx: number }
 
@@ -19,6 +26,9 @@ export function KanbanView({
   onLoteAssign,
   onLoteRemove,
   onLoteMerge,
+  onLoteRename,
+  negocios,
+  onUpdateNegocio,
 }: {
   cards: KanbanCard[]
   onMove: (id: string, coluna: number) => void
@@ -31,6 +41,9 @@ export function KanbanView({
   onLoteAssign?: (cardId: string, loteId: string, loteNumero: string) => void
   onLoteRemove?: (cardId: string) => void
   onLoteMerge?: (sourceLoteId: string, targetLoteId: string, targetLoteNumero: string) => Promise<void>
+  onLoteRename?: (loteId: string, newNumero: string) => Promise<{ ok: boolean; error?: string }>
+  negocios?: NegocioParceiro[]
+  onUpdateNegocio?: (n: NegocioParceiro) => void
 }) {
   const [dragId, setDragId]       = useState<string | null>(null)
   const [overCol, setOverCol]     = useState<number | null>(null)
@@ -264,6 +277,9 @@ export function KanbanView({
                       onLoteAssign={onLoteAssign}
                       onLoteRemove={onLoteRemove}
                       onLoteMerge={onLoteMerge}
+                      onLoteRename={onLoteRename}
+                      negocios={negocios}
+                      onUpdateNegocio={onUpdateNegocio}
                     />
                   ))}
                 </div>
@@ -347,7 +363,7 @@ export function KanbanView({
 
 function KanbanCardItem({
   card, colIdx, isDragging, colors, onDragStart, onDragEnd, onDelete, onMove, onSetMotivo, onDetalhes, totalCols,
-  lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge,
+  lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge, onLoteRename, negocios, onUpdateNegocio,
 }: {
   card: KanbanCard
   colIdx: number
@@ -365,6 +381,9 @@ function KanbanCardItem({
   onLoteAssign?: (cardId: string, loteId: string, loteNumero: string) => void
   onLoteRemove?: (cardId: string) => void
   onLoteMerge?: (sourceLoteId: string, targetLoteId: string, targetLoteNumero: string) => Promise<void>
+  onLoteRename?: (loteId: string, newNumero: string) => Promise<{ ok: boolean; error?: string }>
+  negocios?: NegocioParceiro[]
+  onUpdateNegocio?: (n: NegocioParceiro) => void
 }) {
   const isPerdido = colIdx === COL_PERDIDO
   const [confirmando, setConfirmando] = useState(false)
@@ -374,6 +393,11 @@ function KanbanCardItem({
   const [copiedLote, setCopiedLote] = useState(false)
   const [criandoLote, setCriandoLote] = useState(false)
   const [merging, setMerging] = useState(false)
+  const [editingLote, setEditingLote] = useState(false)
+  const [loteNumeroEdit, setLoteNumeroEdit] = useState("")
+  const [loteRenameError, setLoteRenameError] = useState("")
+  const [savingRename, setSavingRename] = useState(false)
+  const [showAddNegocio, setShowAddNegocio] = useState(false)
   const motivoRef = useRef<HTMLInputElement>(null)
 
   const clientLotes = (lotes ?? []).filter(l =>
@@ -410,6 +434,19 @@ function KanbanCardItem({
       setShowLotePanel(false)
     } finally {
       setMerging(false)
+    }
+  }
+
+  async function handleRenomear() {
+    if (!card.loteId || !onLoteRename || !loteNumeroEdit.trim()) return
+    setSavingRename(true)
+    setLoteRenameError("")
+    try {
+      const res = await onLoteRename(card.loteId, loteNumeroEdit.trim().toUpperCase())
+      if (res.error === "duplicado") setLoteRenameError("Este número já existe")
+      else if (res.ok) setEditingLote(false)
+    } finally {
+      setSavingRename(false)
     }
   }
 
@@ -572,23 +609,47 @@ function KanbanCardItem({
           <div className="mt-2 pt-2 border-t border-violet-100/80 space-y-1.5" onClick={e => e.stopPropagation()}>
             {card.loteNumero ? (
               <>
-                {/* Header: lote number */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[9.5px] font-black text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full font-mono">
-                    {card.loteNumero}
-                  </span>
-                  <button onClick={copyLoteLink}
-                    className={`text-[9.5px] font-semibold px-2 py-0.5 rounded-full transition-colors ${copiedLote ? "text-emerald-600 bg-emerald-50" : "text-violet-600 bg-violet-50 hover:bg-violet-100"}`}>
-                    {copiedLote ? "Copiado ✓" : "🔗 Copiar link"}
-                  </button>
-                  <button onClick={handleRemoveLote}
-                    className="ml-auto text-[9.5px] text-slate-300 hover:text-rose-400 transition-colors">
-                    Remover
-                  </button>
-                </div>
+                {/* Header: lote number with inline rename */}
+                {editingLote ? (
+                  <div className="space-y-1">
+                    <div className="flex gap-1">
+                      <input
+                        autoFocus
+                        value={loteNumeroEdit}
+                        onChange={e => { setLoteNumeroEdit(e.target.value.toUpperCase()); setLoteRenameError("") }}
+                        onKeyDown={e => { if (e.key === "Enter") handleRenomear(); if (e.key === "Escape") { setEditingLote(false); setLoteRenameError("") } }}
+                        className="flex-1 text-[9.5px] font-bold text-violet-700 bg-white border border-violet-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-violet-400 min-w-0"
+                      />
+                      <button onClick={handleRenomear} disabled={savingRename}
+                        className="text-[9.5px] font-bold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 px-2 py-0.5 rounded transition-colors shrink-0">
+                        {savingRename ? "…" : "OK"}
+                      </button>
+                      <button onClick={() => { setEditingLote(false); setLoteRenameError("") }}
+                        className="text-[9.5px] text-slate-400 hover:text-slate-600 px-1 transition-colors shrink-0">✕</button>
+                    </div>
+                    {loteRenameError && <p className="text-[9px] text-rose-500">{loteRenameError}</p>}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9.5px] font-black text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full font-mono">
+                      {card.loteNumero}
+                    </span>
+                    <button onClick={() => { setLoteNumeroEdit(card.loteNumero ?? ""); setLoteRenameError(""); setEditingLote(true) }}
+                      title="Renomear lote"
+                      className="text-[9px] text-violet-300 hover:text-violet-600 transition-colors px-0.5">✏</button>
+                    <button onClick={copyLoteLink}
+                      className={`text-[9.5px] font-semibold px-2 py-0.5 rounded-full transition-colors ${copiedLote ? "text-emerald-600 bg-emerald-50" : "text-violet-600 bg-violet-50 hover:bg-violet-100"}`}>
+                      {copiedLote ? "Copiado ✓" : "🔗 Copiar link"}
+                    </button>
+                    <button onClick={handleRemoveLote}
+                      className="ml-auto text-[9.5px] text-slate-300 hover:text-rose-400 transition-colors">
+                      Remover
+                    </button>
+                  </div>
+                )}
 
                 {/* Merge section */}
-                {clientLotes.length > 0 && (
+                {clientLotes.length > 0 && !editingLote && (
                   <div className="pt-1">
                     <p className="text-[9px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-1">Mesclar pedidos</p>
                     <div className="space-y-0.5">
@@ -609,6 +670,70 @@ function KanbanCardItem({
                     <p className="text-[9px] text-slate-300 mt-1">Todos os pedidos do lote selecionado serão reunidos aqui.</p>
                   </div>
                 )}
+
+                {/* Partner products section */}
+                {!editingLote && (() => {
+                  const vinculados = (negocios ?? []).filter(n => n.loteId === card.loteId)
+                  const disponiveis = (negocios ?? []).filter(n => !n.loteId)
+                  return (
+                    <div className="pt-1 border-t border-amber-100/60">
+                      <p className="text-[9px] uppercase tracking-[0.12em] font-bold text-amber-500 mb-1">Produtos via parceiros</p>
+                      {vinculados.length > 0 && (
+                        <div className="space-y-1 mb-1.5">
+                          {vinculados.map(n => {
+                            const curIdx = PARTNER_STEPS_K.findIndex(s => s.id === (n.statusLote ?? "aguardando"))
+                            return (
+                              <div key={n.id} className="bg-amber-50 rounded-md px-2 py-1.5">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[9px] font-bold text-amber-800 truncate flex-1">{n.descricao}</span>
+                                  <span className="text-[8px] text-amber-500 shrink-0">{n.parceiroNome}</span>
+                                  <button onClick={() => onUpdateNegocio?.({ ...n, loteId: undefined, loteNumero: undefined, statusLote: undefined })}
+                                    className="text-amber-200 hover:text-rose-400 text-[10px] ml-1 transition-colors shrink-0">×</button>
+                                </div>
+                                <div className="flex gap-0.5 mt-1">
+                                  {PARTNER_STEPS_K.map((step, i) => (
+                                    <button key={step.id}
+                                      onClick={() => onUpdateNegocio?.({ ...n, statusLote: step.id })}
+                                      className={`flex-1 h-4 rounded text-[7px] font-bold transition-colors ${
+                                        i <= curIdx ? "bg-amber-400 text-white" : "bg-amber-100 text-amber-400 hover:bg-amber-200"
+                                      }`}>
+                                      {step.short}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                      {showAddNegocio ? (
+                        <div>
+                          {disponiveis.length > 0 ? (
+                            <div className="space-y-0.5 max-h-24 overflow-y-auto mb-1">
+                              {disponiveis.map(n => (
+                                <button key={n.id}
+                                  onClick={() => { onUpdateNegocio?.({ ...n, loteId: card.loteId, loteNumero: card.loteNumero, statusLote: "aguardando" }); setShowAddNegocio(false) }}
+                                  className="w-full flex items-center gap-1.5 py-1 px-2 text-[9.5px] text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-md transition-colors text-left">
+                                  <span className="font-semibold truncate flex-1">{n.descricao}</span>
+                                  <span className="text-amber-400 text-[8.5px] shrink-0">{n.parceiroNome}</span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[9px] text-slate-400 py-1">Nenhum produto disponível.</p>
+                          )}
+                          <button onClick={() => setShowAddNegocio(false)}
+                            className="w-full py-1 text-[9px] text-slate-300 hover:text-slate-500 transition-colors">Cancelar</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setShowAddNegocio(true)}
+                          className="w-full py-1 text-[9.5px] font-semibold text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-md transition-colors">
+                          + Produto de parceiro
+                        </button>
+                      )}
+                    </div>
+                  )
+                })()}
               </>
             ) : (
               <>
