@@ -123,8 +123,8 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
                 onClick={() => setTheme(opt.value)}
                 className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 text-xs font-semibold transition-all ${
                   theme === opt.value
-                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400"
+                    : "border-slate-200 dark:border-[#30363d] text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-[#484f58] hover:bg-slate-50 dark:hover:bg-[#1e2535]"
                 }`}
               >
                 {opt.icon}

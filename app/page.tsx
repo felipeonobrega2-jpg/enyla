@@ -504,7 +504,7 @@ export default function Home() {
   const clienteAtual = clientes.find(c => c.nome.toLowerCase() === form.nomeCliente.trim().toLowerCase())
 
   return (
-    <div className="h-screen flex bg-slate-50 overflow-hidden text-[13px]">
+    <div className="h-screen flex bg-slate-50 dark:bg-[#0d1117] overflow-hidden text-[13px]">
 
       {/* ── Left Navigation Sidebar ─────────────────────────────────────── */}
       <nav className="w-[220px] shrink-0 flex flex-col border-r border-white/5 print:hidden z-20"
@@ -609,7 +609,7 @@ export default function Home() {
 
         {/* ──── SIDEBAR ──────────────────────────────────────────────────────── */}
         {view === "orcamento" && (
-        <aside className="w-72 shrink-0 bg-white border-r border-slate-100/80 flex flex-col overflow-y-auto print:hidden">
+        <aside className="w-72 shrink-0 bg-white dark:bg-[#0d1117] border-r border-slate-100/80 dark:border-[#21262d] flex flex-col overflow-y-auto print:hidden">
 
           {/* Seção: Cliente */}
           <FormSection label="Cliente">

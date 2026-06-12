@@ -1,12 +1,13 @@
 @import "tailwindcss";
 
-:root {
-  color-scheme: light;
-}
-html.dark {
-  color-scheme: dark;
-}
+/* Enable class-based dark: prefix (dark:bg-*, dark:text-*, etc.) */
+@custom-variant dark (&:is(.dark *));
 
+/* ─── Theme tokens ──────────────────────────────────────────────────────────── */
+:root  { color-scheme: light; }
+html.dark { color-scheme: dark; }
+
+/* ─── Base ──────────────────────────────────────────────────────────────────── */
 body {
   background: #f8fafc;
   color: #0f172a;
@@ -15,85 +16,109 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Dark Mode Global Overrides ───────────────────────────────────────────── */
-/* Higher specificity (html.dark .class) wins over Tailwind utilities (.class) */
+/* ─── Dark Mode ─────────────────────────────────────────────────────────────── */
+/*
+  Unlayered CSS beats @layer utilities in the CSS cascade,
+  so these overrides win without !important.
+  Palette: GitHub Dark (3-level elevation: page → card → raised)
+  Page   #0d1117   Card   #161b22   Raised  #1e2535
+  Text   #e6edf3   Muted  #768390   Border  #30363d
+*/
 
-html.dark body { background: #0f172a; color: #e2e8f0; }
+html.dark body { background: #0d1117; color: #e6edf3; }
 
-/* Backgrounds */
-html.dark .bg-white               { background-color: #1e293b; }
-html.dark .bg-slate-50            { background-color: #0f172a; }
-html.dark .bg-slate-100           { background-color: #1e293b; }
-html.dark .bg-slate-200           { background-color: #334155; }
-html.dark .bg-\[\#f8fafc\]        { background-color: #0f172a; }
+/* ── Backgrounds ─────────────── */
+html.dark .bg-white                { background-color: #161b22; }
+html.dark .bg-slate-50             { background-color: #0d1117; }
+html.dark .bg-slate-100            { background-color: #1e2535; }
+html.dark .bg-slate-200            { background-color: #2a3548; }
+html.dark .bg-\[\#f8fafc\]         { background-color: #0d1117; }
+html.dark .bg-\[#f8fafc\]          { background-color: #0d1117; }
 
-/* Hover backgrounds */
-html.dark .hover\:bg-white:hover        { background-color: #253346; }
-html.dark .hover\:bg-slate-50:hover     { background-color: #1e293b; }
-html.dark .hover\:bg-slate-100:hover    { background-color: #253346; }
-html.dark .hover\:bg-slate-200:hover    { background-color: #475569; }
+/* ── Hover backgrounds ───────── */
+html.dark .hover\:bg-white:hover          { background-color: #1e2535; }
+html.dark .hover\:bg-slate-50:hover       { background-color: #161b22; }
+html.dark .hover\:bg-slate-50\/80:hover   { background-color: rgba(22 27 34 / 0.8); }
+html.dark .hover\:bg-slate-100:hover      { background-color: #1e2535; }
+html.dark .hover\:bg-slate-200:hover      { background-color: #2a3548; }
 
-/* Borders */
-html.dark .border-slate-50        { border-color: #1e293b; }
-html.dark .border-slate-100       { border-color: #1e293b; }
-html.dark .border-slate-200       { border-color: #334155; }
-html.dark .border-slate-300       { border-color: #475569; }
-html.dark .hover\:border-slate-200:hover { border-color: #334155; }
-html.dark .hover\:border-slate-300:hover { border-color: #475569; }
+/* ── Borders ─────────────────── */
+html.dark .border-slate-50         { border-color: #161b22; }
+html.dark .border-slate-100        { border-color: #21262d; }
+html.dark .border-slate-200        { border-color: #30363d; }
+html.dark .border-slate-300        { border-color: #484f58; }
+html.dark .hover\:border-slate-200:hover  { border-color: #30363d; }
+html.dark .hover\:border-slate-300:hover  { border-color: #484f58; }
 
-/* Divide lines */
-html.dark .divide-slate-50  > :not([hidden]) ~ :not([hidden]) { border-color: #1e293b; }
-html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #1e293b; }
-html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: #334155; }
+/* ── Divide lines ────────────── */
+html.dark .divide-slate-50  > :not([hidden]) ~ :not([hidden]) { border-color: #161b22; }
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #21262d; }
+html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: #30363d; }
 
-/* Text */
-html.dark .text-slate-900 { color: #f1f5f9; }
-html.dark .text-slate-800 { color: #e2e8f0; }
-html.dark .text-slate-700 { color: #cbd5e1; }
-html.dark .text-slate-600 { color: #94a3b8; }
-html.dark .hover\:text-slate-900:hover { color: #f1f5f9; }
-html.dark .hover\:text-slate-800:hover { color: #e2e8f0; }
+/* ── Text ────────────────────── */
+html.dark .text-slate-900           { color: #e6edf3; }
+html.dark .text-slate-800           { color: #cdd9e5; }
+html.dark .text-slate-700           { color: #adbac7; }
+html.dark .text-slate-600           { color: #768390; }
+html.dark .hover\:text-slate-900:hover { color: #e6edf3; }
+html.dark .hover\:text-slate-600:hover { color: #adbac7; }
 
-/* All form inputs in dark mode */
-html.dark input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+/* ── Form inputs ─────────────── */
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
 html.dark textarea,
 html.dark select {
-  background-color: #1e293b;
-  border-color: #334155;
-  color: #e2e8f0;
+  background-color: #0d1117;
+  border-color: #30363d;
+  color: #e6edf3;
 }
 html.dark input::placeholder,
-html.dark textarea::placeholder { color: #475569; }
+html.dark textarea::placeholder { color: #545d68; }
 html.dark input:focus,
 html.dark textarea:focus,
-html.dark select:focus { border-color: #3b82f6; }
+html.dark select:focus { border-color: #388bfd; }
 
-/* Sticky table cells */
-html.dark td.sticky { background-color: #1e293b; }
+/* ── Table highlights ────────── */
+html.dark .bg-blue-50\/60            { background-color: rgba(56, 139, 253, 0.08); }
+html.dark .bg-amber-50\/60           { background-color: rgba(187, 128, 9, 0.10); }
+html.dark .hover\:bg-blue-100\/70:hover  { background-color: rgba(56, 139, 253, 0.14); }
+html.dark .hover\:bg-amber-100\/70:hover { background-color: rgba(187, 128, 9, 0.16); }
+html.dark .hover\:bg-slate-50\/80:hover  { background-color: rgba(22, 27, 34, 0.8); }
 
-/* Highlighted table rows */
-html.dark .bg-blue-50\/60           { background-color: rgb(30 64 175 / 0.15); }
-html.dark .bg-amber-50\/60          { background-color: rgb(180 83 9 / 0.15); }
-html.dark .hover\:bg-blue-100\/70:hover  { background-color: rgb(30 64 175 / 0.22); }
-html.dark .hover\:bg-amber-100\/70:hover { background-color: rgb(180 83 9 / 0.22); }
-html.dark .hover\:bg-slate-50\/80:hover  { background-color: rgb(30 41 59 / 0.8); }
+/* ── Opacity bg variants (different class names, need explicit) ─ */
+html.dark .bg-slate-50\/80   { background-color: rgba(22, 27, 34, 0.9); }
+html.dark .bg-slate-50\/50   { background-color: rgba(22, 27, 34, 0.5); }
+html.dark .bg-slate-50\/60   { background-color: rgba(22, 27, 34, 0.6); }
+html.dark .bg-slate-100\/40  { background-color: rgba(13, 17, 23, 0.6); }
+html.dark .bg-slate-100\/80  { background-color: rgba(22, 27, 34, 0.85); }
+html.dark .bg-rose-50\/40    { background-color: rgba(190, 18, 60, 0.08); }
 
-/* Scrollbar */
+/* ── Opacity border variants ─── */
+html.dark .border-slate-50\/80  { border-color: rgba(33, 38, 45, 0.8); }
+html.dark .border-slate-100\/80 { border-color: rgba(33, 38, 45, 0.8); }
+html.dark .border-slate-200\/50 { border-color: rgba(48, 54, 61, 0.5); }
+html.dark .border-slate-200\/60 { border-color: rgba(48, 54, 61, 0.6); }
+html.dark .border-slate-200\/70 { border-color: rgba(48, 54, 61, 0.7); }
+html.dark .border-rose-200\/70  { border-color: rgba(190, 18, 60, 0.2); }
+
+/* ── hover slate/50 with opacity ── */
+html.dark .hover\:bg-slate-50\/50:hover { background-color: rgba(22, 27, 34, 0.6); }
+
+/* ── Sticky table cells ──────── */
+html.dark td.sticky { background-color: #161b22; }
+
+/* ── Scrollbar ───────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
-html.dark ::-webkit-scrollbar-thumb       { background: #334155; }
-html.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+html.dark ::-webkit-scrollbar-thumb       { background: #30363d; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #484f58; }
 
-/* Selection */
+/* ── Selection ───────────────── */
 ::selection { background: #dbeafe; color: #1e3a8a; }
-html.dark ::selection { background: #1e3a8a; color: #bfdbfe; }
+html.dark ::selection { background: rgba(56, 139, 253, 0.3); color: #e6edf3; }
 
-/* Hide number spinners */
+/* ─── Input helpers ─────────────────────────────────────────────────────────── */
 input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; }

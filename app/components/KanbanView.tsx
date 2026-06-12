@@ -95,7 +95,7 @@ export function KanbanView({
     <div className="flex flex-col h-full overflow-hidden">
 
       {/* ── Dashboard ── */}
-      <div className="shrink-0 border-b border-slate-100 bg-white px-5 pt-4 pb-4 space-y-3">
+      <div className="shrink-0 border-b border-slate-100 dark:border-[#21262d] bg-white dark:bg-[#0d1117] px-5 pt-4 pb-4 space-y-3">
         <p className="text-[10px] uppercase tracking-[0.08em] font-semibold text-slate-400">Visão geral</p>
         <div className="grid grid-cols-4 gap-3">
 
@@ -126,7 +126,7 @@ export function KanbanView({
             }}>
               {decididos === 0 ? "—" : `${num(conversao, 1)}%`}
             </p>
-            <div className="w-full h-1 bg-slate-200 rounded-full overflow-hidden mt-2">
+            <div className="w-full h-1 bg-slate-200 dark:bg-[#2a3548] rounded-full overflow-hidden mt-2">
               <div className="h-full rounded-full transition-all duration-500" style={{
                 width: `${Math.min(conversao, 100)}%`,
                 background: conversao >= 60 ? "#16a34a" : conversao >= 35 ? "#d97706" : "#dc2626"
@@ -204,7 +204,7 @@ export function KanbanView({
       </div>
 
       {/* Board */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden bg-slate-100/40">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden bg-slate-100/40 dark:bg-[#0d1117]">
         <div className="flex gap-3 h-full px-5 py-4" style={{ minWidth: `${COLUNAS_KANBAN.length * 252}px` }}>
           {COLUNAS_KANBAN.map((colNome, colIdx) => {
             const colCards = cards.filter(c => c.coluna === colIdx)
@@ -217,18 +217,18 @@ export function KanbanView({
                 className={`flex flex-col w-60 shrink-0 rounded-2xl transition-all ${
                   isOver
                     ? `border-2 ${colors.border} ${colors.bg}`
-                    : "border border-slate-200/70 bg-slate-50/80"
+                    : "border border-slate-200/70 bg-slate-50/80 dark:bg-[#161b22] dark:border-[#30363d]"
                 }`}
                 onDragOver={e => handleDragOver(e, colIdx)}
                 onDrop={e => handleDrop(e, colIdx)}
                 onDragLeave={() => setOverCol(null)}
               >
                 {/* Cabeçalho da coluna */}
-                <div className="flex items-center gap-2 px-3 pt-3 pb-2.5 border-b border-slate-200/50 shrink-0">
+                <div className="flex items-center gap-2 px-3 pt-3 pb-2.5 border-b border-slate-200/50 dark:border-[#21262d] shrink-0">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${colors.dot}`} />
-                  <p className="text-[11px] font-bold text-slate-700 flex-1 leading-tight">{colNome}</p>
+                  <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex-1 leading-tight">{colNome}</p>
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${
-                    colCards.length > 0 ? colors.badge : "bg-slate-100 text-slate-300"
+                    colCards.length > 0 ? colors.badge : "bg-slate-100 text-slate-300 dark:bg-[#1e2535] dark:text-slate-500"
                   }`}>
                     {colCards.length}
                   </span>
@@ -238,9 +238,9 @@ export function KanbanView({
                 <div className="flex-1 overflow-y-auto px-2 pb-3 pt-2 space-y-2 min-h-[60px]">
                   {colCards.length === 0 && (
                     <div className={`border-2 border-dashed rounded-lg h-12 flex items-center justify-center transition-colors ${
-                      isOver ? colors.border : "border-slate-200/60"
+                      isOver ? colors.border : "border-slate-200/60 dark:border-[#30363d]/60"
                     }`}>
-                      <p className="text-[10px] text-slate-300 select-none">Arraste aqui</p>
+                      <p className="text-[10px] text-slate-300 dark:text-slate-600 select-none">Arraste aqui</p>
                     </div>
                   )}
                   {colCards.map(card => (
@@ -426,7 +426,7 @@ function KanbanCardItem({
       onDragEnd={onDragEnd}
       onClick={() => onDetalhes?.(card)}
       className={`flex rounded-xl border overflow-hidden transition-all duration-150 select-none ${
-        isPerdido ? "bg-rose-50/40 border-rose-200/70" : "bg-white border-slate-200/60"
+        isPerdido ? "bg-rose-50/40 border-rose-200/70 dark:bg-rose-950/20 dark:border-rose-900/40" : "bg-white border-slate-200/60 dark:bg-[#1c2333] dark:border-[#30363d]"
       } ${isDragging ? "opacity-40 scale-95 shadow-none" : "shadow-sm hover:shadow-md hover:-translate-y-px cursor-grab active:cursor-grabbing"}`}
     >
       {/* Accent bar */}
@@ -490,7 +490,7 @@ function KanbanCardItem({
 
         {/* Action bar */}
         {!isPerdido && !confirmando && (
-          <div className="flex items-center gap-0.5 mt-2 pt-1.5 border-t border-slate-100/80" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-0.5 mt-2 pt-1.5 border-t border-slate-100/80 dark:border-[#21262d]" onClick={e => e.stopPropagation()}>
 
             {/* Back */}
             <button
