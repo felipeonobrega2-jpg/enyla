@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { KanbanCard, KanbanOpcao, COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO } from "../types"
+import { KanbanCard, KanbanOpcao, Lote, COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO } from "../types"
 import { brl, num } from "../utils"
 import { COL_COLORS } from "./kanban-colors"
 
@@ -14,6 +14,10 @@ export function KanbanView({
   onSetMotivo,
   onFechamento,
   onDetalhes,
+  lotes,
+  onLoteCreate,
+  onLoteAssign,
+  onLoteRemove,
 }: {
   cards: KanbanCard[]
   onMove: (id: string, coluna: number) => void
@@ -21,6 +25,10 @@ export function KanbanView({
   onSetMotivo: (id: string, motivo: string) => void
   onFechamento: (id: string, opcao: KanbanOpcao) => void
   onDetalhes?: (card: KanbanCard) => void
+  lotes?: Lote[]
+  onLoteCreate?: (nomeCliente: string) => Promise<{ id: string; numero: string }>
+  onLoteAssign?: (cardId: string, loteId: string, loteNumero: string) => void
+  onLoteRemove?: (cardId: string) => void
 }) {
   const [dragId, setDragId]       = useState<string | null>(null)
   const [overCol, setOverCol]     = useState<number | null>(null)
@@ -249,6 +257,10 @@ export function KanbanView({
                       onSetMotivo={onSetMotivo}
                       onDetalhes={onDetalhes}
                       totalCols={COLUNAS_KANBAN.length}
+                      lotes={lotes}
+                      onLoteCreate={onLoteCreate}
+                      onLoteAssign={onLoteAssign}
+                      onLoteRemove={onLoteRemove}
                     />
                   ))}
                 </div>
@@ -332,6 +344,7 @@ export function KanbanView({
 
 function KanbanCardItem({
   card, colIdx, isDragging, colors, onDragStart, onDragEnd, onDelete, onMove, onSetMotivo, onDetalhes, totalCols,
+  lotes, onLoteCreate, onLoteAssign, onLoteRemove,
 }: {
   card: KanbanCard
   colIdx: number
@@ -344,12 +357,53 @@ function KanbanCardItem({
   onSetMotivo: (id: string, motivo: string) => void
   onDetalhes?: (card: KanbanCard) => void
   totalCols: number
+  lotes?: Lote[]
+  onLoteCreate?: (nomeCliente: string) => Promise<{ id: string; numero: string }>
+  onLoteAssign?: (cardId: string, loteId: string, loteNumero: string) => void
+  onLoteRemove?: (cardId: string) => void
 }) {
   const isPerdido = colIdx === COL_PERDIDO
   const [confirmando, setConfirmando] = useState(false)
   const [motivoRascunho, setMotivoRascunho] = useState("")
   const [copiedId, setCopiedId] = useState(false)
+  const [showLotePanel, setShowLotePanel] = useState(false)
+  const [copiedLote, setCopiedLote] = useState(false)
+  const [criandoLote, setCriandoLote] = useState(false)
   const motivoRef = useRef<HTMLInputElement>(null)
+
+  const clientLotes = (lotes ?? []).filter(l =>
+    l.nomeCliente.toLowerCase() === card.nomeCliente.toLowerCase() && l.id !== card.loteId
+  )
+
+  async function handleCriarLote() {
+    if (!onLoteCreate || !onLoteAssign) return
+    setCriandoLote(true)
+    try {
+      const lote = await onLoteCreate(card.nomeCliente)
+      onLoteAssign(card.id, lote.id, lote.numero)
+      setShowLotePanel(false)
+    } finally {
+      setCriandoLote(false)
+    }
+  }
+
+  function handleAssignLote(loteId: string, loteNumero: string) {
+    onLoteAssign?.(card.id, loteId, loteNumero)
+    setShowLotePanel(false)
+  }
+
+  function handleRemoveLote() {
+    onLoteRemove?.(card.id)
+    setShowLotePanel(false)
+  }
+
+  function copyLoteLink() {
+    const url = `${window.location.origin}/track/lote/${encodeURIComponent(card.loteNumero ?? "")}`
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedLote(true)
+      setTimeout(() => setCopiedLote(false), 2000)
+    })
+  }
 
   void totalCols
 
@@ -390,11 +444,18 @@ function KanbanCardItem({
             <p className={`font-semibold text-[11.5px] leading-snug truncate ${
               isPerdido ? "line-through text-rose-700/70" : "text-slate-800"
             }`}>{card.nomeCliente}</p>
-            {card.numero && (
-              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-tight border inline-block mt-0.5 tabular-nums ${
-                isPerdido ? "text-rose-500 bg-rose-50 border-rose-200" : "text-blue-600 bg-blue-50 border-blue-200"
-              }`}>{card.numero}</span>
-            )}
+            <div className="flex items-center gap-1 flex-wrap mt-0.5">
+              {card.numero && (
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-tight border tabular-nums ${
+                  isPerdido ? "text-rose-500 bg-rose-50 border-rose-200" : "text-blue-600 bg-blue-50 border-blue-200"
+                }`}>{card.numero}</span>
+              )}
+              {card.loteNumero && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-tight border text-violet-600 bg-violet-50 border-violet-200 tabular-nums">
+                  {card.loteNumero}
+                </span>
+              )}
+            </div>
           </div>
           <button
             onClick={e => { e.stopPropagation(); if (confirm(`Remover "${card.nomeCliente}" do kanban?`)) onDelete(card.id) }}
@@ -457,6 +518,21 @@ function KanbanCardItem({
                 </>
               )}
             </button>
+            {/* Lote button */}
+            <button
+              onClick={e => { e.stopPropagation(); setShowLotePanel(v => !v) }}
+              title={card.loteNumero ? `Lote: ${card.loteNumero}` : "Agrupar em lote"}
+              className={`flex items-center gap-1 text-[10px] transition-colors px-1.5 py-1 rounded-md ${
+                card.loteNumero
+                  ? "text-violet-600 bg-violet-50 hover:bg-violet-100 font-semibold"
+                  : "text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+              }`}
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z" />
+              </svg>
+              <span>{card.loteNumero ?? "Lote"}</span>
+            </button>
             <div className="flex-1" />
             {colIdx < COL_ENTREGUE && (
               <button
@@ -470,6 +546,63 @@ function KanbanCardItem({
                 onClick={() => onMove(card.id, colIdx + 1)}
                 className="h-7 px-3 text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-lg transition-all duration-100"
               >→</button>
+            )}
+          </div>
+        )}
+
+        {/* Lote panel */}
+        {showLotePanel && !isPerdido && (
+          <div className="mt-2 pt-2 border-t border-violet-100 space-y-1.5" onClick={e => e.stopPropagation()}>
+            {card.loteNumero ? (
+              <>
+                <p className="text-[10px] text-violet-700 font-semibold">{card.loteNumero}</p>
+                <div className="flex gap-1">
+                  <button
+                    onClick={copyLoteLink}
+                    className="flex-1 py-1.5 text-[10px] font-medium text-violet-600 bg-violet-50 hover:bg-violet-100 rounded-md transition-colors"
+                  >
+                    {copiedLote ? "Copiado ✓" : "Copiar link"}
+                  </button>
+                  <button
+                    onClick={handleRemoveLote}
+                    className="flex-1 py-1.5 text-[10px] text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors"
+                  >
+                    Remover
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-[10px] text-slate-600 font-semibold">Agrupar em lote</p>
+                {clientLotes.length > 0 && (
+                  <div className="space-y-1">
+                    {clientLotes.map(l => (
+                      <button
+                        key={l.id}
+                        onClick={() => handleAssignLote(l.id, l.numero)}
+                        className="w-full flex items-center gap-2 py-1.5 px-2 text-[10px] text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-md transition-colors text-left"
+                      >
+                        <span className="font-bold">{l.numero}</span>
+                        <span className="text-violet-300">·</span>
+                        <span className="text-violet-500 truncate">{l.nomeCliente}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={handleCriarLote}
+                  disabled={criandoLote}
+                  className="w-full py-1.5 text-[10px] font-semibold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-md transition-colors"
+                >
+                  {criandoLote ? "Criando…" : "+ Criar novo lote"}
+                </button>
+                <button
+                  onClick={() => setShowLotePanel(false)}
+                  className="w-full py-1 text-[10px] text-slate-300 hover:text-slate-500 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </>
             )}
           </div>
         )}

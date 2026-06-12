@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect } from "react"
-import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, COL_FECHADO, COLUNAS_KANBAN, Parceiro, NegocioParceiro, LancamentoFinanceiro } from "./types"
+import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, COL_FECHADO, COLUNAS_KANBAN, Parceiro, NegocioParceiro, LancamentoFinanceiro, Lote } from "./types"
 import DashboardView from "./components/DashboardView"
 import { QUANTIDADES_PADRAO } from "./dados"
 import { calcular } from "./calculos"
@@ -78,6 +78,7 @@ export default function Home() {
   const [parceiros, setParceiros] = useState<Parceiro[]>([])
   const [negocios, setNegocios]   = useState<NegocioParceiro[]>([])
   const [lancamentos, setLancamentos] = useState<LancamentoFinanceiro[]>([])
+  const [lotes, setLotes]         = useState<Lote[]>([])
 
   useEffect(() => {
     fetch("/api/data")
@@ -93,6 +94,7 @@ export default function Home() {
         if (d.parceiros)              setParceiros(d.parceiros)
         if (d.negocios)               setNegocios(d.negocios)
         if (d.lancamentos)            setLancamentos(d.lancamentos)
+        if (d.lotes)                  setLotes(d.lotes)
       })
       .catch(() => {})
   }, [])
@@ -151,6 +153,35 @@ export default function Home() {
         }),
       })
     } catch { /* silently fail */ }
+  }
+
+  async function criarLote(nomeCliente: string): Promise<{ id: string; numero: string }> {
+    const res = await fetch("/api/lotes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nomeCliente }),
+    })
+    const lote = await res.json()
+    setLotes(prev => [lote, ...prev])
+    return lote
+  }
+
+  function assignLote(cardId: string, loteId: string, loteNumero: string) {
+    setKanban(prev => prev.map(c => c.id === cardId ? { ...c, loteId, loteNumero } : c))
+    fetch(`/api/kanban/${cardId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ loteId, loteNumero }),
+    }).catch(() => {})
+  }
+
+  function removeLote(cardId: string) {
+    setKanban(prev => prev.map(c => c.id === cardId ? { ...c, loteId: undefined, loteNumero: undefined } : c))
+    fetch(`/api/kanban/${cardId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ loteId: null, loteNumero: null }),
+    }).catch(() => {})
   }
 
   async function salvarDataEntrega(cardId: string, date: string | null) {
@@ -888,6 +919,10 @@ export default function Home() {
                 if (proposta) { setDetalheModal({ tipo: "proposta", proposta, card }); return }
                 setDetalheModal({ tipo: "kanban", card })
               }}
+              lotes={lotes}
+              onLoteCreate={criarLote}
+              onLoteAssign={assignLote}
+              onLoteRemove={removeLote}
             />
           ) : view === "historico" ? (
             <HistoricoView

@@ -157,6 +157,16 @@ export type KanbanCard = {
   motivoPerdido?: string
   opcoes?: KanbanOpcao[]
   dataEntregaPrevista?: string
+  loteId?: string
+  loteNumero?: string
+}
+
+export type Lote = {
+  id: string
+  numero: string
+  nomeCliente: string
+  descricao?: string
+  criadoEm: string
 }
 
 export const COLUNAS_KANBAN = [
