@@ -5,11 +5,11 @@ import { KanbanCard, KanbanOpcao, Lote, NegocioParceiro, StatusLoteParceiro, COL
 import { brl, num } from "../utils"
 import { COL_COLORS } from "./kanban-colors"
 
-const PARTNER_STEPS_K: { id: StatusLoteParceiro; short: string }[] = [
-  { id: "aguardando",  short: "Aguard." },
-  { id: "em_producao", short: "Prod." },
-  { id: "pronto",      short: "Pronto" },
-  { id: "entregue",    short: "Entregue" },
+const PARTNER_STEPS_K: { id: StatusLoteParceiro; label: string }[] = [
+  { id: "aguardando",  label: "Aguardando" },
+  { id: "em_producao", label: "Em produção" },
+  { id: "pronto",      label: "Pronto" },
+  { id: "entregue",    label: "Entregue" },
 ]
 
 type ModalFechamento = { card: KanbanCard; opcaoIdx: number }
@@ -478,295 +478,325 @@ function KanbanCardItem({
       onDragStart={e => !confirmando && onDragStart(e, card.id)}
       onDragEnd={onDragEnd}
       onClick={() => onDetalhes?.(card)}
-      className={`flex rounded-xl border overflow-hidden transition-all duration-150 select-none ${
-        isPerdido ? "bg-rose-50/40 border-rose-200/70 dark:bg-rose-950/20 dark:border-rose-900/40" : "bg-white border-slate-200/60 dark:bg-[#1c2333] dark:border-[#30363d]"
-      } ${isDragging ? "opacity-40 scale-95 shadow-none" : "shadow-sm hover:shadow-md hover:-translate-y-px cursor-grab active:cursor-grabbing"}`}
+      className={`flex rounded-2xl border overflow-hidden transition-all duration-150 select-none ${
+        isPerdido
+          ? "bg-rose-50/30 border-rose-200/60 dark:bg-rose-950/20 dark:border-rose-900/40"
+          : "bg-white border-slate-200/70 dark:bg-[#1c2333] dark:border-[#30363d]"
+      } ${isDragging ? "opacity-30 scale-95 shadow-none" : "shadow-sm hover:shadow-lg hover:-translate-y-0.5 cursor-grab active:cursor-grabbing"}`}
     >
       {/* Accent bar */}
-      <div className={`w-0.5 shrink-0 ${isPerdido ? "bg-rose-400" : colors.dot}`} />
+      <div className={`w-[3px] shrink-0 ${isPerdido ? "bg-rose-300" : colors.dot}`} />
 
-      <div className="flex-1 px-2.5 py-2.5 min-w-0">
+      <div className="flex-1 min-w-0">
 
-        {/* Name + close */}
-        <div className="flex items-center gap-1.5">
-          <p className={`flex-1 font-bold text-[12px] leading-snug truncate ${
-            isPerdido ? "line-through text-rose-600/70" : "text-slate-800"
-          }`}>{card.nomeCliente}</p>
-          <button
-            onClick={e => { e.stopPropagation(); if (confirm(`Remover "${card.nomeCliente}" do kanban?`)) onDelete(card.id) }}
-            className="w-4 h-4 flex items-center justify-center text-slate-200 hover:text-rose-400 hover:bg-rose-50 rounded transition-colors text-sm leading-none shrink-0"
-          >×</button>
+        {/* ── Card body ── */}
+        <div className="px-3 pt-3 pb-2.5">
+
+          {/* Name + close */}
+          <div className="flex items-start gap-1.5 mb-1">
+            <p className={`flex-1 font-bold text-[12.5px] leading-snug ${
+              isPerdido ? "line-through text-rose-500/60" : "text-slate-800 dark:text-slate-100"
+            }`}>{card.nomeCliente}</p>
+            <button
+              onClick={e => { e.stopPropagation(); if (confirm(`Remover "${card.nomeCliente}" do kanban?`)) onDelete(card.id) }}
+              className="w-5 h-5 flex items-center justify-center text-slate-200 hover:text-rose-400 hover:bg-rose-50 rounded-lg transition-colors text-[13px] leading-none shrink-0 mt-px"
+            >×</button>
+          </div>
+
+          {/* Identifiers — order number and lote, subtle */}
+          {(card.numero || card.loteNumero) && (
+            <div className="flex items-center gap-1 mb-2">
+              {card.numero && (
+                <span className={`text-[8px] font-semibold px-1.5 py-[2px] rounded-md tabular-nums ${
+                  isPerdido
+                    ? "text-rose-400/70 bg-rose-50 border border-rose-100"
+                    : "text-slate-400 bg-slate-50 border border-slate-150"
+                }`}>{card.numero}</span>
+              )}
+              {card.loteNumero && (
+                <span className="text-[8px] font-semibold px-1.5 py-[2px] rounded-md border text-violet-500 bg-violet-50/80 border-violet-100 tabular-nums">
+                  {card.loteNumero}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Description */}
+          <p className="text-[10.5px] text-slate-400 leading-snug truncate mb-3">
+            {card.dimensoes} cm · {card.materialNome}
+          </p>
+
+          {/* Loss motivo */}
+          {isPerdido && (
+            <div className="mb-2.5" onClick={e => e.stopPropagation()}>
+              <input
+                type="text"
+                value={card.motivoPerdido ?? ""}
+                onChange={e => onSetMotivo(card.id, e.target.value)}
+                placeholder="Motivo da perda…"
+                className="w-full text-[10px] text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-2.5 py-1.5 placeholder:text-rose-300/70 focus:outline-none focus:ring-2 focus:ring-rose-300/50"
+              />
+            </div>
+          )}
+
+          {/* Price row */}
+          <div className="flex items-baseline gap-2">
+            <span className={`font-black text-[16px] leading-none tabular-nums tracking-tight ${
+              isPerdido ? "text-rose-400/70 line-through" : "text-slate-900 dark:text-white"
+            }`}>{brl(card.preco)}</span>
+            <span className="text-[10px] text-slate-400 tabular-nums">{num(card.quantidade)} un</span>
+            <span className="text-[9px] text-slate-300 ml-auto tabular-nums">{card.data.split(",")[0]}</span>
+          </div>
         </div>
 
-        {/* Badges */}
-        {(card.numero || card.loteNumero) && (
-          <div className="flex items-center gap-1 mt-1 flex-wrap">
-            {card.numero && (
-              <span className={`text-[8.5px] font-bold px-1.5 py-0.5 rounded-full border tabular-nums leading-tight ${
-                isPerdido ? "text-rose-400 bg-rose-50 border-rose-200" : "text-blue-600 bg-blue-50 border-blue-200"
-              }`}>{card.numero}</span>
-            )}
-            {card.loteNumero && (
-              <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded-full border text-violet-600 bg-violet-50 border-violet-200 tabular-nums leading-tight">
-                {card.loteNumero}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Specs */}
-        <p className="text-[10px] text-slate-400 mt-1.5 leading-tight truncate">
-          {card.dimensoes} cm · {card.materialNome}
-        </p>
-
-        {/* Loss motivo */}
-        {isPerdido && (
-          <div className="mt-2" onClick={e => e.stopPropagation()}>
-            <input
-              type="text"
-              value={card.motivoPerdido ?? ""}
-              onChange={e => onSetMotivo(card.id, e.target.value)}
-              placeholder="Motivo da perda…"
-              className="w-full text-[10px] text-rose-700 bg-rose-100/70 border border-rose-200 rounded-lg px-2 py-1 placeholder:text-rose-300/80 focus:outline-none focus:ring-1 focus:ring-rose-400"
-            />
-          </div>
-        )}
-
-        {/* Price row */}
-        <div className="flex items-baseline gap-2 mt-2.5">
-          <span className={`font-black text-[15px] leading-none tabular-nums ${
-            isPerdido ? "text-rose-400 line-through" : "text-slate-900"
-          }`}>{brl(card.preco)}</span>
-          <span className="text-[10px] text-slate-400 tabular-nums">{num(card.quantidade)} un</span>
-          <span className="text-[9px] text-slate-300 ml-auto tabular-nums">{card.data.split(",")[0]}</span>
-        </div>
-
-        {/* Action bar */}
+        {/* ── Action bar ── */}
         {!isPerdido && !confirmando && (
-          <div className="flex items-center gap-0.5 mt-2 pt-1.5 border-t border-slate-100/80 dark:border-[#21262d]" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-0.5 px-2.5 pb-2.5 pt-0" onClick={e => e.stopPropagation()}>
 
-            {/* Back */}
-            <button
-              disabled={colIdx === 0}
-              onClick={() => onMove(card.id, colIdx - 1)}
-              className="w-6 h-6 flex items-center justify-center text-[11px] text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-md disabled:opacity-0 transition-all"
-            >←</button>
+            <button disabled={colIdx === 0} onClick={() => onMove(card.id, colIdx - 1)}
+              className="w-7 h-7 flex items-center justify-center text-[11px] text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-0 transition-all">
+              ←
+            </button>
 
-            {/* Copy link */}
-            <button
+            <button title="Copiar link de rastreamento"
               onClick={e => {
                 e.stopPropagation()
                 navigator.clipboard.writeText(`${window.location.origin}/track/${encodeURIComponent(card.numero)}`).then(() => {
                   setCopiedId(true); setTimeout(() => setCopiedId(false), 2000)
                 })
               }}
-              title="Copiar link de rastreamento"
-              className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors ${
+              className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${
                 copiedId ? "text-emerald-500 bg-emerald-50" : "text-slate-300 hover:text-blue-500 hover:bg-blue-50"
-              }`}
-            >
+              }`}>
               {copiedId
-                ? <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                : <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+                ? <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                : <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
               }
             </button>
 
-            {/* Lote */}
-            <button
+            <button title={card.loteNumero ? `Lote ${card.loteNumero}` : "Agrupar em lote"}
               onClick={e => { e.stopPropagation(); setShowLotePanel(v => !v) }}
-              title={card.loteNumero ? `Lote: ${card.loteNumero}` : "Agrupar em lote"}
-              className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors ${
-                card.loteNumero ? "text-violet-500 bg-violet-50/80 hover:bg-violet-100" : "text-slate-300 hover:text-violet-500 hover:bg-violet-50"
-              }`}
-            >
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${
+                showLotePanel
+                  ? "text-violet-700 bg-violet-100"
+                  : card.loteNumero
+                    ? "text-violet-500 bg-violet-50 hover:bg-violet-100"
+                    : "text-slate-300 hover:text-violet-500 hover:bg-violet-50"
+              }`}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z" />
               </svg>
             </button>
 
             <div className="flex-1" />
 
-            {/* Mark lost */}
             {colIdx < COL_ENTREGUE && (
               <button onClick={iniciarPerda} title="Marcar como perdido"
-                className="w-6 h-6 flex items-center justify-center text-[10px] text-slate-200 hover:text-rose-400 hover:bg-rose-50 rounded-md transition-all">
+                className="w-7 h-7 flex items-center justify-center text-[11px] text-slate-200 hover:text-rose-400 hover:bg-rose-50 rounded-lg transition-all">
                 ✕
               </button>
             )}
-
-            {/* Advance */}
             {colIdx < COL_ENTREGUE && (
               <button onClick={() => onMove(card.id, colIdx + 1)}
-                className="h-6 px-2 text-[10px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-md transition-all ml-0.5">
+                className="h-7 px-3 text-[10px] font-bold text-slate-600 bg-slate-100/80 hover:bg-slate-200 active:scale-95 rounded-lg transition-all ml-0.5">
                 →
               </button>
             )}
           </div>
         )}
 
-        {/* Lote panel */}
+        {/* ── Lote panel ── */}
         {showLotePanel && !isPerdido && (
-          <div className="mt-2 pt-2 border-t border-violet-100/80 space-y-1.5" onClick={e => e.stopPropagation()}>
+          <div className="border-t border-slate-100/80 dark:border-[#21262d]" onClick={e => e.stopPropagation()}>
             {card.loteNumero ? (
-              <>
-                {/* Header: lote number with inline rename */}
-                {editingLote ? (
-                  <div className="space-y-1">
-                    <div className="flex gap-1">
+
+              /* ─ Has lote ─ */
+              <div className="bg-slate-50/60 dark:bg-[#161b22] rounded-b-2xl px-3 py-3 space-y-3">
+
+                {/* Lote number — click to rename */}
+                <div className="flex items-center justify-between gap-2">
+                  {editingLote ? (
+                    <div className="flex-1 flex items-center gap-1.5">
                       <input
                         autoFocus
                         value={loteNumeroEdit}
                         onChange={e => { setLoteNumeroEdit(e.target.value.toUpperCase()); setLoteRenameError("") }}
                         onKeyDown={e => { if (e.key === "Enter") handleRenomear(); if (e.key === "Escape") { setEditingLote(false); setLoteRenameError("") } }}
-                        className="flex-1 text-[9.5px] font-bold text-violet-700 bg-white border border-violet-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-violet-400 min-w-0"
+                        className="flex-1 font-black text-[15px] text-violet-700 bg-white border-2 border-violet-300 rounded-xl px-2.5 py-1 focus:outline-none focus:border-violet-500 min-w-0 tracking-wide"
                       />
                       <button onClick={handleRenomear} disabled={savingRename}
-                        className="text-[9.5px] font-bold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 px-2 py-0.5 rounded transition-colors shrink-0">
-                        {savingRename ? "…" : "OK"}
+                        className="w-8 h-8 flex items-center justify-center text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-xl transition-colors shrink-0">
+                        {savingRename
+                          ? <span className="text-[10px]">…</span>
+                          : <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                        }
                       </button>
                       <button onClick={() => { setEditingLote(false); setLoteRenameError("") }}
-                        className="text-[9.5px] text-slate-400 hover:text-slate-600 px-1 transition-colors shrink-0">✕</button>
+                        className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors shrink-0 text-[14px]">
+                        ✕
+                      </button>
                     </div>
-                    {loteRenameError && <p className="text-[9px] text-rose-500">{loteRenameError}</p>}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[9.5px] font-black text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full font-mono">
+                  ) : (
+                    <button
+                      onClick={() => { setLoteNumeroEdit(card.loteNumero ?? ""); setLoteRenameError(""); setEditingLote(true) }}
+                      title="Clique para renomear"
+                      className="font-black text-[17px] text-violet-700 tracking-wide hover:text-violet-900 transition-colors cursor-text -mx-0.5 px-0.5 rounded-lg"
+                    >
                       {card.loteNumero}
-                    </span>
-                    <button onClick={() => { setLoteNumeroEdit(card.loteNumero ?? ""); setLoteRenameError(""); setEditingLote(true) }}
-                      title="Renomear lote"
-                      className="text-[9px] text-violet-300 hover:text-violet-600 transition-colors px-0.5">✏</button>
-                    <button onClick={copyLoteLink}
-                      className={`text-[9.5px] font-semibold px-2 py-0.5 rounded-full transition-colors ${copiedLote ? "text-emerald-600 bg-emerald-50" : "text-violet-600 bg-violet-50 hover:bg-violet-100"}`}>
-                      {copiedLote ? "Copiado ✓" : "🔗 Copiar link"}
                     </button>
-                    <button onClick={handleRemoveLote}
-                      className="ml-auto text-[9.5px] text-slate-300 hover:text-rose-400 transition-colors">
-                      Remover
-                    </button>
-                  </div>
-                )}
+                  )}
 
-                {/* Merge section */}
-                {clientLotes.length > 0 && !editingLote && (
-                  <div className="pt-1">
-                    <p className="text-[9px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-1">Mesclar pedidos</p>
-                    <div className="space-y-0.5">
-                      {clientLotes.map(l => (
-                        <button key={l.id} onClick={() => handleMerge(l.id, l.numero)}
-                          disabled={merging}
-                          className="w-full flex items-center gap-1.5 py-1.5 px-2 text-[10px] text-violet-700 bg-violet-50 hover:bg-violet-100 disabled:opacity-50 rounded-md transition-colors text-left">
-                          <svg className="w-3 h-3 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                          </svg>
-                          <span className="font-bold">{l.numero}</span>
-                          <span className="text-violet-300">·</span>
-                          <span className="text-violet-500 truncate">{l.nomeCliente}</span>
-                          {merging && <span className="ml-auto text-[9px] text-violet-400">…</span>}
-                        </button>
-                      ))}
+                  {!editingLote && (
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button onClick={copyLoteLink} title={copiedLote ? "Copiado!" : "Copiar link público"}
+                        className={`w-8 h-8 flex items-center justify-center rounded-xl transition-colors ${
+                          copiedLote ? "text-emerald-600 bg-emerald-50" : "text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+                        }`}>
+                        {copiedLote
+                          ? <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                          : <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+                        }
+                      </button>
+                      <button onClick={handleRemoveLote} title="Desvincular lote"
+                        className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-rose-400 hover:bg-rose-50 rounded-xl transition-colors">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
+                      </button>
                     </div>
-                    <p className="text-[9px] text-slate-300 mt-1">Todos os pedidos do lote selecionado serão reunidos aqui.</p>
-                  </div>
-                )}
+                  )}
+                </div>
+                {loteRenameError && <p className="text-[9px] text-rose-500 -mt-2">{loteRenameError}</p>}
 
-                {/* Partner products section */}
+                {/* Partner products */}
                 {!editingLote && (() => {
                   const vinculados = (negocios ?? []).filter(n => n.loteId === card.loteId)
                   const disponiveis = (negocios ?? []).filter(n => !n.loteId)
                   return (
-                    <div className="pt-1 border-t border-amber-100/60">
-                      <p className="text-[9px] uppercase tracking-[0.12em] font-bold text-amber-500 mb-1">Produtos via parceiros</p>
-                      {vinculados.length > 0 && (
-                        <div className="space-y-1 mb-1.5">
-                          {vinculados.map(n => {
-                            const curIdx = PARTNER_STEPS_K.findIndex(s => s.id === (n.statusLote ?? "aguardando"))
-                            return (
-                              <div key={n.id} className="bg-amber-50 rounded-md px-2 py-1.5">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[9px] font-bold text-amber-800 truncate flex-1">{n.descricao}</span>
-                                  <span className="text-[8px] text-amber-500 shrink-0">{n.parceiroNome}</span>
-                                  <button onClick={() => onUpdateNegocio?.({ ...n, loteId: undefined, loteNumero: undefined, statusLote: undefined })}
-                                    className="text-amber-200 hover:text-rose-400 text-[10px] ml-1 transition-colors shrink-0">×</button>
-                                </div>
-                                <div className="flex gap-0.5 mt-1">
-                                  {PARTNER_STEPS_K.map((step, i) => (
-                                    <button key={step.id}
-                                      onClick={() => onUpdateNegocio?.({ ...n, statusLote: step.id })}
-                                      className={`flex-1 h-4 rounded text-[7px] font-bold transition-colors ${
-                                        i <= curIdx ? "bg-amber-400 text-white" : "bg-amber-100 text-amber-400 hover:bg-amber-200"
-                                      }`}>
-                                      {step.short}
-                                    </button>
-                                  ))}
-                                </div>
+                    <div className="space-y-2">
+                      {vinculados.map(n => {
+                        const curIdx = PARTNER_STEPS_K.findIndex(s => s.id === (n.statusLote ?? "aguardando"))
+                        return (
+                          <div key={n.id} className="bg-white rounded-xl border border-amber-100 px-3 py-2.5 shadow-sm">
+                            <div className="flex items-start justify-between gap-1.5 mb-2">
+                              <div className="min-w-0">
+                                <p className="text-[11px] font-semibold text-slate-800 leading-snug truncate">{n.descricao}</p>
+                                <p className="text-[9px] text-slate-400 mt-0.5">via {n.parceiroNome}</p>
                               </div>
-                            )
-                          })}
-                        </div>
-                      )}
+                              <button onClick={() => onUpdateNegocio?.({ ...n, loteId: undefined, loteNumero: undefined, statusLote: undefined })}
+                                className="w-5 h-5 flex items-center justify-center rounded-lg text-slate-200 hover:text-rose-400 hover:bg-rose-50 transition-colors shrink-0 text-[12px] mt-0.5">
+                                ×
+                              </button>
+                            </div>
+                            {/* Thin progress bar — each segment clickable */}
+                            <div className="flex gap-0.5">
+                              {PARTNER_STEPS_K.map((step, i) => (
+                                <button key={step.id} title={step.label}
+                                  onClick={() => onUpdateNegocio?.({ ...n, statusLote: step.id })}
+                                  className={`flex-1 h-1.5 rounded-full transition-all hover:opacity-80 ${
+                                    i <= curIdx ? "bg-amber-400" : "bg-slate-100 hover:bg-amber-100"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <p className="text-[8.5px] font-medium text-amber-600 mt-1.5">
+                              {PARTNER_STEPS_K[curIdx]?.label ?? "Aguardando"}
+                            </p>
+                          </div>
+                        )
+                      })}
+
                       {showAddNegocio ? (
-                        <div>
+                        <div className="space-y-1">
                           {disponiveis.length > 0 ? (
-                            <div className="space-y-0.5 max-h-24 overflow-y-auto mb-1">
+                            <div className="space-y-0.5 max-h-28 overflow-y-auto">
                               {disponiveis.map(n => (
                                 <button key={n.id}
                                   onClick={() => { onUpdateNegocio?.({ ...n, loteId: card.loteId, loteNumero: card.loteNumero, statusLote: "aguardando" }); setShowAddNegocio(false) }}
-                                  className="w-full flex items-center gap-1.5 py-1 px-2 text-[9.5px] text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-md transition-colors text-left">
-                                  <span className="font-semibold truncate flex-1">{n.descricao}</span>
-                                  <span className="text-amber-400 text-[8.5px] shrink-0">{n.parceiroNome}</span>
+                                  className="w-full flex items-center gap-2 py-2 px-2.5 rounded-xl bg-white hover:bg-amber-50 border border-transparent hover:border-amber-100 transition-all text-left">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[10.5px] font-semibold text-slate-700 truncate">{n.descricao}</p>
+                                    <p className="text-[9px] text-slate-400">via {n.parceiroNome}</p>
+                                  </div>
+                                  <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                                 </button>
                               ))}
                             </div>
                           ) : (
-                            <p className="text-[9px] text-slate-400 py-1">Nenhum produto disponível.</p>
+                            <p className="text-[10px] text-slate-400 text-center py-2.5">Nenhum produto disponível</p>
                           )}
                           <button onClick={() => setShowAddNegocio(false)}
-                            className="w-full py-1 text-[9px] text-slate-300 hover:text-slate-500 transition-colors">Cancelar</button>
+                            className="w-full py-1.5 text-[10px] text-slate-400 hover:text-slate-600 transition-colors">
+                            Cancelar
+                          </button>
                         </div>
                       ) : (
                         <button onClick={() => setShowAddNegocio(true)}
-                          className="w-full py-1 text-[9.5px] font-semibold text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-md transition-colors">
-                          + Produto de parceiro
+                          className="w-full py-2 text-[10.5px] font-semibold text-amber-600 border border-amber-200/70 rounded-xl hover:bg-amber-50 transition-colors flex items-center justify-center gap-1.5">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                          Produto de parceiro
                         </button>
                       )}
                     </div>
                   )
                 })()}
-              </>
+
+                {/* Merge section */}
+                {clientLotes.length > 0 && !editingLote && (
+                  <div>
+                    <p className="text-[8.5px] uppercase tracking-widest text-slate-300 font-semibold mb-1.5">Mesclar com</p>
+                    <div className="space-y-0.5">
+                      {clientLotes.map(l => (
+                        <button key={l.id} onClick={() => handleMerge(l.id, l.numero)} disabled={merging}
+                          className="w-full flex items-center gap-2 py-2 px-2.5 rounded-xl bg-white hover:bg-violet-50 border border-transparent hover:border-violet-100 disabled:opacity-50 transition-all text-left">
+                          <span className="font-bold text-[10px] text-violet-600">{l.numero}</span>
+                          <span className="text-[9.5px] text-slate-400 flex-1 truncate">{l.nomeCliente}</span>
+                          {merging
+                            ? <span className="text-[9px] text-slate-300">…</span>
+                            : <svg className="w-3 h-3 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" /></svg>
+                          }
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
             ) : (
-              <>
-                <p className="text-[10px] text-slate-500 font-semibold">Agrupar em lote</p>
+
+              /* ─ No lote — create/assign ─ */
+              <div className="bg-slate-50/60 rounded-b-2xl px-3 pt-3 pb-3 space-y-1.5">
+                <p className="text-[10px] font-semibold text-slate-500 mb-2">Agrupar em lote</p>
                 {clientLotes.length > 0 && (
                   <div className="space-y-0.5">
                     {clientLotes.map(l => (
                       <button key={l.id} onClick={() => handleAssignLote(l.id, l.numero)}
-                        className="w-full flex items-center gap-1.5 py-1.5 px-2 text-[10px] text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-md transition-colors text-left">
-                        <span className="font-bold">{l.numero}</span>
-                        <span className="text-violet-300">·</span>
-                        <span className="text-violet-500 truncate">{l.nomeCliente}</span>
+                        className="w-full flex items-center gap-2 py-2 px-2.5 rounded-xl bg-white hover:bg-violet-50 border border-transparent hover:border-violet-100 transition-all text-left">
+                        <span className="font-bold text-[10px] text-violet-600">{l.numero}</span>
+                        <span className="text-[9.5px] text-slate-400 flex-1 truncate">{l.nomeCliente}</span>
+                        <svg className="w-3 h-3 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                       </button>
                     ))}
                   </div>
                 )}
                 <button onClick={handleCriarLote} disabled={criandoLote}
-                  className="w-full py-1.5 text-[10px] font-semibold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-md transition-colors">
-                  {criandoLote ? "Criando…" : "+ Criar novo lote"}
+                  className="w-full py-2 text-[10.5px] font-semibold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-xl transition-colors flex items-center justify-center gap-1.5">
+                  {criandoLote
+                    ? <><span className="text-[9px]">●</span> Criando…</>
+                    : <><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> Criar novo lote</>
+                  }
                 </button>
                 <button onClick={() => setShowLotePanel(false)}
-                  className="w-full py-1 text-[10px] text-slate-300 hover:text-slate-500 transition-colors">
+                  className="w-full py-1.5 text-[10px] text-slate-400 hover:text-slate-600 transition-colors">
                   Cancelar
                 </button>
-              </>
+              </div>
             )}
           </div>
         )}
 
-        {/* Loss confirmation */}
+        {/* ── Loss confirmation ── */}
         {confirmando && (
-          <div className="mt-2 pt-2 border-t border-rose-100 space-y-1.5" onClick={e => e.stopPropagation()}>
-            <p className="text-[10px] text-rose-600 font-semibold">Confirmar perda?</p>
+          <div className="border-t border-rose-100 px-3 pb-3 pt-2.5 space-y-2" onClick={e => e.stopPropagation()}>
+            <p className="text-[10.5px] font-semibold text-rose-600">Confirmar perda?</p>
             <input
               ref={motivoRef}
               type="text"
@@ -774,26 +804,26 @@ function KanbanCardItem({
               onChange={e => setMotivoRascunho(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") confirmarPerda(); if (e.key === "Escape") setConfirmando(false) }}
               placeholder="Motivo (opcional)…"
-              className="w-full text-[10px] text-slate-700 bg-white border border-rose-200 rounded-lg px-2 py-1.5 placeholder:text-slate-300 focus:outline-none focus:ring-1 focus:ring-rose-400 cursor-text select-text"
+              className="w-full text-[10px] text-slate-700 bg-white border border-rose-200 rounded-xl px-2.5 py-1.5 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-300/50 cursor-text select-text"
             />
-            <div className="flex gap-1">
+            <div className="flex gap-1.5">
               <button onClick={() => setConfirmando(false)}
-                className="flex-1 py-1.5 text-[10px] text-slate-400 hover:bg-slate-50 rounded-md transition-colors">
+                className="flex-1 py-2 text-[10px] font-medium text-slate-500 hover:bg-slate-50 rounded-xl transition-colors">
                 Cancelar
               </button>
               <button onClick={confirmarPerda}
-                className="flex-1 py-1.5 text-[10px] font-semibold text-white bg-rose-500 hover:bg-rose-600 rounded-md transition-colors">
+                className="flex-1 py-2 text-[10px] font-bold text-white bg-rose-500 hover:bg-rose-600 rounded-xl transition-colors">
                 Confirmar
               </button>
             </div>
           </div>
         )}
 
-        {/* Reopen lost */}
+        {/* ── Reopen lost ── */}
         {isPerdido && (
-          <div className="mt-2 pt-2 border-t border-rose-100" onClick={e => e.stopPropagation()}>
+          <div className="border-t border-rose-100/60 px-2.5 pb-2.5 pt-0" onClick={e => e.stopPropagation()}>
             <button onClick={() => onMove(card.id, 0)}
-              className="w-full py-1.5 text-[10px] font-medium text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-md transition-colors">
+              className="w-full py-2 text-[10px] font-medium text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors">
               ↺ Reabrir orçamento
             </button>
           </div>
