@@ -893,15 +893,21 @@ export default function Home() {
               onMove={(id, coluna) => {
                 const card = kanban.find(c => c.id === id)
                 const hoje = new Date().toISOString().slice(0, 10)
-                // Set dataFechamento the first time a card reaches COL_FECHADO
                 const dataFechamento = (coluna === COL_FECHADO && !card?.dataFechamento) ? hoje : undefined
-                const update: Partial<KanbanCard> = { coluna, ...(dataFechamento ? { dataFechamento } : {}) }
-                setKanban(prev => prev.map(c => c.id === id ? { ...c, ...update } : c))
+                setKanban(prev => prev.map(c => c.id === id ? { ...c, coluna, ...(dataFechamento ? { dataFechamento } : {}) } : c))
+                // Send coluna always; dataFechamento in separate call so column-missing can't block the move
                 fetch(`/api/kanban/${id}`, {
                   method: "PATCH",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(update),
+                  body: JSON.stringify({ coluna }),
                 }).catch(() => {})
+                if (dataFechamento) {
+                  fetch(`/api/kanban/${id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ dataFechamento }),
+                  }).catch(() => {})
+                }
                 if (card?.numero) atualizarTracking(card.numero, coluna)
               }}
               onDelete={id => {
@@ -928,12 +934,17 @@ export default function Home() {
                 const card = kanban.find(c => c.id === id)
                 const hoje = new Date().toISOString().slice(0, 10)
                 const dataFechamento = card?.dataFechamento ?? hoje
-                const update = { coluna: COL_FECHADO, preco: opcao.preco, quantidade: opcao.quantidade, dataFechamento }
-                setKanban(prev => prev.map(c => c.id === id ? { ...c, ...update } : c))
+                setKanban(prev => prev.map(c => c.id === id ? { ...c, coluna: COL_FECHADO, preco: opcao.preco, quantidade: opcao.quantidade, dataFechamento } : c))
+                // Send core fields and dataFechamento separately to keep the move robust
                 fetch(`/api/kanban/${id}`, {
                   method: "PATCH",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(update),
+                  body: JSON.stringify({ coluna: COL_FECHADO, preco: opcao.preco, quantidade: opcao.quantidade }),
+                }).catch(() => {})
+                fetch(`/api/kanban/${id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ dataFechamento }),
                 }).catch(() => {})
                 if (card?.numero) atualizarTracking(card.numero, COL_FECHADO, opcao.preco, opcao.quantidade)
               }}
