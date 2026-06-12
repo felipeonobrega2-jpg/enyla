@@ -1,8 +1,8 @@
 "use client"
 
-import React, { useState, useCallback, useEffect } from "react"
+import React, { useState, useCallback, useEffect, useRef } from "react"
 import { useTheme } from "./components/ThemeProvider"
-import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, COL_FECHADO, COLUNAS_KANBAN, Parceiro, NegocioParceiro, LancamentoFinanceiro, Lote } from "./types"
+import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, COL_FECHADO, COL_PERDIDO, COLUNAS_KANBAN, Parceiro, NegocioParceiro, LancamentoFinanceiro, Lote } from "./types"
 import DashboardView from "./components/DashboardView"
 import { QUANTIDADES_PADRAO } from "./dados"
 import { calcular } from "./calculos"
@@ -81,6 +81,7 @@ export default function Home() {
   const [lancamentos, setLancamentos] = useState<LancamentoFinanceiro[]>([])
   const [lotes, setLotes]         = useState<Lote[]>([])
   const { isDark, setTheme, theme } = useTheme()
+  const expirySweepDone = useRef(false)
 
   useEffect(() => {
     fetch("/api/data")
@@ -100,6 +101,50 @@ export default function Home() {
       })
       .catch(() => {})
   }, [])
+
+  // ── Auto-expire: move vencidos (col 0) para Perdido silenciosamente ──────────
+  useEffect(() => {
+    if (expirySweepDone.current) return
+    if (kanban.length === 0) return
+    expirySweepDone.current = true
+
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+
+    const vencidos = kanban.filter(card => {
+      if (card.coluna !== 0) return false
+
+      // Busca validadeDias: historico → propostaCustom → default 30 dias
+      let dias = 30
+      const hist = historico.find(h => h.numero === card.numero)
+      if (hist?.form?.validadeDias) dias = hist.form.validadeDias
+      else {
+        const prop = propostasCustom.find(p => p.cardId === card.id)
+        if (prop?.validadeDias) dias = prop.validadeDias
+      }
+
+      // Parseia data do orçamento (formato "dd/mm/yyyy, hh:mm:ss" ou similar)
+      const parts = card.data.split(",")[0].trim().split("/")
+      if (parts.length !== 3) return false
+      const [d, m, y] = parts
+      const quoteDate = new Date(+y, +m - 1, +d)
+      const expiry    = new Date(quoteDate.getTime() + dias * 86_400_000)
+
+      return hoje > expiry
+    })
+
+    vencidos.forEach(card => {
+      fetch(`/api/kanban/${card.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coluna: COL_PERDIDO, motivoPerdido: "Orçamento sem conclusão" }),
+      }).catch(() => {})
+      setKanban(prev => prev.map(c =>
+        c.id === card.id
+          ? { ...c, coluna: COL_PERDIDO, motivoPerdido: "Orçamento sem conclusão" }
+          : c
+      ))
+    })
+  }, [kanban, historico, propostasCustom])
 
   function atualizarCliente(id: string, updates: Partial<Cliente>) {
     setClientes(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c))
