@@ -514,7 +514,6 @@ export default function Home() {
         <div className="px-4 py-[18px] border-b border-white/5 shrink-0">
           <div className="flex items-center leading-none min-w-0">
             <p className="text-white font-black tracking-tight text-[15px]">ENYLA</p>
-            <p className="text-slate-500 text-[10px] mt-auto mb-0.5 ml-2">Orçamentista</p>
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "system" : "dark")}
               title={theme === "system" ? "Tema: sistema" : theme === "dark" ? "Tema: escuro" : "Tema: claro"}
