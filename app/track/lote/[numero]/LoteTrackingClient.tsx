@@ -223,75 +223,77 @@ function PartnerCard({ item }: { item: PartnerItem }) {
   )
 }
 
-function ProductCard({ card }: { card: LoteCard }) {
-  const [expanded, setExpanded] = useState(false)
+function ProductCard({ card, alwaysExpanded = false }: { card: LoteCard; alwaysExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(alwaysExpanded)
   const isPerdido = card.coluna === 10
   const isEntregue = card.coluna === 9
   const pct = progressPct(card.coluna)
+
+  const header = (
+    <div className="flex items-start gap-3">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="font-semibold text-slate-800 text-sm leading-tight truncate">
+            {card.dimensoes} cm
+          </p>
+          {card.numero && (
+            <span className="text-[9.5px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full tabular-nums">
+              {card.numero}
+            </span>
+          )}
+        </div>
+        <p className="text-slate-400 text-xs mt-0.5">{card.materialNome}</p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <span className={`text-[9.5px] font-bold px-2 py-1 rounded-full ${etapaColorCls(card.coluna)}`}>
+          {etapaLabel(card.coluna)}
+        </span>
+        {!alwaysExpanded && (
+          <svg className={`w-4 h-4 text-slate-300 transition-transform ${expanded ? "rotate-180" : ""}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        )}
+      </div>
+    </div>
+  )
+
+  const progressBar = !isPerdido && (
+    <div className="mt-3">
+      <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all duration-700 ${isEntregue ? "bg-emerald-500" : "bg-blue-500"}`}
+          style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
 
   return (
     <div className={`bg-white rounded-2xl border overflow-hidden shadow-sm ${
       isPerdido ? "border-slate-100 opacity-60" : isEntregue ? "border-emerald-100" : "border-slate-100"
     }`}>
-      {/* Card header — clickable */}
-      <button
-        className="w-full text-left px-4 py-3.5 hover:bg-slate-50/50 transition-colors"
-        onClick={() => setExpanded(v => !v)}
-      >
-        <div className="flex items-start gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-semibold text-slate-800 text-sm leading-tight truncate">
-                {card.dimensoes} cm
-              </p>
-              {card.numero && (
-                <span className="text-[9.5px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full tabular-nums">
-                  {card.numero}
-                </span>
-              )}
-            </div>
-            <p className="text-slate-400 text-xs mt-0.5">{card.materialNome}</p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className={`text-[9.5px] font-bold px-2 py-1 rounded-full ${etapaColorCls(card.coluna)}`}>
-              {etapaLabel(card.coluna)}
-            </span>
-            <svg
-              className={`w-4 h-4 text-slate-300 transition-transform ${expanded ? "rotate-180" : ""}`}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        {!isPerdido && (
-          <div className="mt-3">
-            <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-700 ${isEntregue ? "bg-emerald-500" : "bg-blue-500"}`}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-        )}
-      </button>
+      {alwaysExpanded ? (
+        <div className="px-4 py-3.5">{header}{progressBar}</div>
+      ) : (
+        <button className="w-full text-left px-4 py-3.5 hover:bg-slate-50/50 transition-colors"
+          onClick={() => setExpanded(v => !v)}>
+          {header}{progressBar}
+        </button>
+      )}
 
       {/* Price/qty row */}
       <div className="grid grid-cols-2 border-t border-slate-50 divide-x divide-slate-50">
-        <div className="px-4 py-2">
+        <div className="px-4 py-2.5">
           <p className="text-[9.5px] uppercase tracking-wider text-slate-400 font-semibold">Quantidade</p>
           <p className="text-sm font-bold text-slate-800 tabular-nums mt-0.5">{num(card.quantidade)} un</p>
         </div>
-        <div className="px-4 py-2">
+        <div className="px-4 py-2.5">
           <p className="text-[9.5px] uppercase tracking-wider text-slate-400 font-semibold">Valor</p>
           <p className="text-sm font-bold text-slate-800 tabular-nums mt-0.5">{brl(card.preco)}</p>
         </div>
       </div>
 
-      {/* Expanded timeline */}
-      {expanded && (
+      {/* Timeline */}
+      {(expanded || alwaysExpanded) && (
         <div className="border-t border-slate-100">
           <ExpandedTimeline numero={card.numero} />
         </div>
@@ -346,31 +348,77 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
     )
   }
 
-  const activeCards = cards.filter(c => c.coluna !== 10)
-  const totalValor  = activeCards.reduce((s, c) => s + c.preco, 0)
-  const totalQtd    = activeCards.reduce((s, c) => s + c.quantidade, 0)
-  const allEntregue = activeCards.length > 0 && activeCards.every(c => c.coluna === 9)
-  const minColuna   = activeCards.length > 0 ? Math.min(...activeCards.map(c => c.coluna)) : 0
-  const overallPct  = progressPct(minColuna)
+  const activeCards  = cards.filter(c => c.coluna !== 10)
+  const totalValor   = activeCards.reduce((s, c) => s + c.preco, 0)
+  const totalQtd     = activeCards.reduce((s, c) => s + c.quantidade, 0)
+  const allEntregue  = activeCards.length > 0 && activeCards.every(c => c.coluna === 9)
+  const minColuna    = activeCards.length > 0 ? Math.min(...activeCards.map(c => c.coluna)) : 0
+  const overallPct   = progressPct(minColuna)
 
-  return (
-    <div className="min-h-screen bg-[#f8fafc]">
+  // Single-product mode: 1 internal card, no partner products
+  const isSingleMode = cards.length === 1 && parceiros.length === 0
 
-      {/* Header */}
-      <div className="bg-white border-b border-slate-100 sticky top-0 z-10">
-        <div className="max-w-md mx-auto px-5 h-14 flex items-center gap-3">
-          <div>
-            <p className="font-bold text-slate-900 text-base tracking-tight leading-none">ENYLA</p>
-            <p className="text-slate-400 text-[10px] mt-0.5 tracking-wide">Comunicação Visual</p>
-          </div>
-          <div className="ml-auto">
-            <span className="text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-100 px-2.5 py-1 rounded-full font-mono">
-              {loteNumero}
-            </span>
-          </div>
+  const header = (
+    <div className="bg-white border-b border-slate-100 sticky top-0 z-10">
+      <div className="max-w-md mx-auto px-5 h-14 flex items-center gap-3">
+        <div>
+          <p className="font-bold text-slate-900 text-base tracking-tight leading-none">ENYLA</p>
+          <p className="text-slate-400 text-[10px] mt-0.5 tracking-wide">Comunicação Visual</p>
+        </div>
+        <div className="ml-auto">
+          <span className="text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-100 px-2.5 py-1 rounded-full font-mono">
+            {loteNumero}
+          </span>
         </div>
       </div>
+    </div>
+  )
 
+  const refreshBar = (
+    <div className="flex items-center justify-between px-1 pt-1">
+      <p className="text-[11px] text-slate-400">
+        {refreshing ? "Atualizando…" : `Atualizado há ${lastUpdate}s`}
+      </p>
+      <button onClick={fetchData}
+        className="text-[11px] text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1.5 transition-colors">
+        <svg className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+        </svg>
+        Atualizar agora
+      </button>
+    </div>
+  )
+
+  // ── Single-product mode ──────────────────────────────────────────────────
+  if (isSingleMode) {
+    const card = cards[0]
+    const isEntregue = card.coluna === 9
+    return (
+      <div className="min-h-screen bg-[#f8fafc]">
+        {header}
+        <div className="max-w-md mx-auto px-4 py-5 pb-10 space-y-4">
+          <div className="pt-1">
+            <p className="text-[22px] font-bold text-slate-900 leading-snug">
+              Olá, {lote.nomeCliente.split(" ")[0]}!
+            </p>
+            <p className="text-sm text-slate-500 mt-0.5">
+              {isEntregue
+                ? "Seu pedido foi entregue. Obrigado pela confiança!"
+                : "Veja abaixo o andamento do seu pedido em tempo real."}
+            </p>
+          </div>
+          <ProductCard card={card} alwaysExpanded />
+          {refreshBar}
+          <p className="text-center text-[10px] text-slate-300 pb-2">ENYLA Comunicação Visual · {loteNumero}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Multi-product mode ───────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-[#f8fafc]">
+      {header}
       <div className="max-w-md mx-auto px-4 py-5 pb-10 space-y-4">
 
         {/* Greeting */}
@@ -379,11 +427,11 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
             Olá, {lote.nomeCliente.split(" ")[0]}!
           </p>
           <p className="text-sm text-slate-500 mt-0.5">
-            Acompanhe cada produto do seu pedido abaixo. Toque para ver os detalhes.
+            Acompanhe cada produto do seu pedido abaixo.
           </p>
         </div>
 
-        {/* Lote summary hero */}
+        {/* Summary hero */}
         <div className={`rounded-2xl overflow-hidden shadow-sm ${
           allEntregue
             ? "bg-gradient-to-br from-emerald-500 to-emerald-600"
@@ -402,11 +450,10 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
               <div className="h-full bg-white rounded-full transition-all duration-700" style={{ width: `${overallPct}%` }} />
             </div>
           </div>
-
           <div className="grid grid-cols-3 gap-0 mx-4 mb-4 mt-3 bg-white/10 rounded-xl overflow-hidden divide-x divide-white/10">
             <div className="px-3 py-3 text-center">
               <p className="text-[9px] font-bold uppercase tracking-widest text-white/60 mb-1">Produtos</p>
-              <p className="text-xl font-black text-white tabular-nums">{activeCards.length}</p>
+              <p className="text-xl font-black text-white tabular-nums">{activeCards.length + parceiros.length}</p>
             </div>
             <div className="px-3 py-3 text-center">
               <p className="text-[9px] font-bold uppercase tracking-widest text-white/60 mb-1">Unidades</p>
@@ -423,7 +470,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
         {cards.length > 0 && (
           <div className="space-y-3">
             <p className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-slate-400 px-1">
-              Toque em cada produto para ver o progresso detalhado
+              Toque para ver o progresso detalhado
             </p>
             {cards.map(card => <ProductCard key={card.id} card={card} />)}
           </div>
@@ -445,20 +492,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
           </div>
         )}
 
-        {/* Refresh */}
-        <div className="flex items-center justify-between px-1 pt-1">
-          <p className="text-[11px] text-slate-400">
-            {refreshing ? "Atualizando…" : `Atualizado há ${lastUpdate}s`}
-          </p>
-          <button onClick={fetchData}
-            className="text-[11px] text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1.5 transition-colors">
-            <svg className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-            </svg>
-            Atualizar agora
-          </button>
-        </div>
-
+        {refreshBar}
         <p className="text-center text-[10px] text-slate-300 pb-2">ENYLA Comunicação Visual · {loteNumero}</p>
       </div>
     </div>

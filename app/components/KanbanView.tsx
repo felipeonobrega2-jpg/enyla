@@ -561,7 +561,10 @@ function KanbanCardItem({
             <button title="Copiar link de rastreamento"
               onClick={e => {
                 e.stopPropagation()
-                navigator.clipboard.writeText(`${window.location.origin}/track/${encodeURIComponent(card.numero)}`).then(() => {
+                const url = card.loteNumero
+                  ? `${window.location.origin}/track/lote/${encodeURIComponent(card.loteNumero)}`
+                  : `${window.location.origin}/track/${encodeURIComponent(card.numero)}`
+                navigator.clipboard.writeText(url).then(() => {
                   setCopiedId(true); setTimeout(() => setCopiedId(false), 2000)
                 })
               }}
