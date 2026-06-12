@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import type React from "react"
-import { FormData, Calculo, LinhaTabela, KanbanOpcao } from "../types"
+import { FormData, Calculo, LinhaTabela, KanbanOpcao, Lote } from "../types"
 import { Configuracoes } from "../config"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente } from "../pdf"
 import { brl, num } from "../utils"
@@ -15,6 +15,10 @@ export function ModalPersonalizarProposta({
   onWhatsApp,
   onSyncOpcoes,
   onSalvar,
+  lotes,
+  cardLoteNumero,
+  onLoteCreate,
+  onLoteAssign,
 }: {
   data: { form: FormData; calculo: Calculo; numero: string; data: string; cardId: string }
   config: Configuracoes
@@ -23,6 +27,10 @@ export function ModalPersonalizarProposta({
   onWhatsApp: (form: FormData, calculo: Calculo, numero?: string) => void
   onSyncOpcoes: (cardId: string, opcoes: KanbanOpcao[]) => void
   onSalvar?: (customCalculo: Calculo, opcoes: KanbanOpcao[]) => void
+  lotes?: Lote[]
+  cardLoteNumero?: string
+  onLoteCreate?: (nomeCliente: string) => Promise<{ id: string; numero: string }>
+  onLoteAssign?: (cardId: string, loteId: string, loteNumero: string) => void
 }) {
   const { form, calculo, numero, data, cardId } = d
   const comFaca = form.comFaca
@@ -36,6 +44,33 @@ export function ModalPersonalizarProposta({
   // Overridden ideal quantity (null = use calculated default)
   const [idealOvr, setIdealOvr] = useState<number | null>(null)
   const effectiveIdealQtd = idealOvr ?? calculo.sweetSpotIdealQtd
+
+  // Lote
+  const [showLoteSection, setShowLoteSection] = useState(false)
+  const [criandoLote, setCriandoLote] = useState(false)
+  const [loteAtribuido, setLoteAtribuido] = useState(cardLoteNumero ?? "")
+  const clientLotes = (lotes ?? []).filter(l =>
+    l.nomeCliente.toLowerCase() === form.nomeCliente.toLowerCase()
+  )
+
+  async function handleCriarLote() {
+    if (!onLoteCreate) return
+    setCriandoLote(true)
+    try {
+      const lote = await onLoteCreate(form.nomeCliente || "Sem nome")
+      onLoteAssign?.(cardId, lote.id, lote.numero)
+      setLoteAtribuido(lote.numero)
+      setShowLoteSection(false)
+    } finally {
+      setCriandoLote(false)
+    }
+  }
+
+  function handleAssignLote(loteId: string, loteNumero: string) {
+    onLoteAssign?.(cardId, loteId, loteNumero)
+    setLoteAtribuido(loteNumero)
+    setShowLoteSection(false)
+  }
 
   function getUnit(linha: LinhaTabela): number {
     const s = unitOvr[linha.quantidade]
@@ -250,6 +285,54 @@ export function ModalPersonalizarProposta({
             </button>
           )}
         </div>
+
+        {/* Lote section */}
+        {(lotes !== undefined || onLoteCreate) && (
+          <div className="px-4 pt-3 pb-0 border-t border-slate-100 shrink-0">
+            <div className={`rounded-xl p-3 ${loteAtribuido ? "bg-violet-50 border border-violet-200" : "border border-dashed border-slate-200"}`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <svg className={`w-3.5 h-3.5 shrink-0 ${loteAtribuido ? "text-violet-500" : "text-slate-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z" />
+                  </svg>
+                  <p className={`text-[11.5px] font-semibold ${loteAtribuido ? "text-violet-700" : "text-slate-500"}`}>
+                    {loteAtribuido ? loteAtribuido : "Lote"}
+                  </p>
+                </div>
+                {!loteAtribuido && (
+                  <button onClick={() => setShowLoteSection(v => !v)}
+                    className="text-[11px] font-semibold text-violet-600 hover:text-violet-800 transition-colors">
+                    + Agrupar
+                  </button>
+                )}
+                {loteAtribuido && (
+                  <span className="text-[10px] text-violet-500">Associado</span>
+                )}
+              </div>
+              {showLoteSection && !loteAtribuido && (
+                <div className="mt-2.5 space-y-1.5">
+                  {clientLotes.length > 0 && (
+                    <>
+                      <p className="text-[10px] text-slate-400 font-medium">Lotes de {form.nomeCliente}:</p>
+                      {clientLotes.map(l => (
+                        <button key={l.id} onClick={() => handleAssignLote(l.id, l.numero)}
+                          className="w-full flex items-center gap-2 py-1.5 px-2.5 text-[11px] text-violet-700 bg-white hover:bg-violet-50 rounded-lg border border-violet-200 transition-colors text-left">
+                          <span className="font-bold">{l.numero}</span>
+                          <span className="text-violet-300">·</span>
+                          <span className="truncate text-violet-500">{l.nomeCliente}</span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  <button onClick={handleCriarLote} disabled={criandoLote}
+                    className="w-full py-1.5 text-[11px] font-semibold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors">
+                    {criandoLote ? "Criando…" : clientLotes.length > 0 ? "Criar novo lote" : "+ Criar lote para este pedido"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Footer actions */}
         <div className="px-4 pb-4 pt-3 border-t border-slate-100 shrink-0 space-y-2">

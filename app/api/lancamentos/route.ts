@@ -15,6 +15,8 @@ export async function POST(req: NextRequest) {
       cardId:          body.cardId ?? null,
       cardNumero:      body.cardNumero ?? null,
       nomeCliente:     body.nomeCliente ?? null,
+      loteId:          body.loteId ?? null,
+      loteNumero:      body.loteNumero ?? null,
       categoria:       body.categoria ?? null,
       formaPagamento:  body.formaPagamento ?? null,
       obs:             body.obs ?? null,

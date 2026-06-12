@@ -426,162 +426,156 @@ function KanbanCardItem({
       onDragEnd={onDragEnd}
       onClick={() => onDetalhes?.(card)}
       className={`flex rounded-xl border overflow-hidden transition-all duration-150 select-none ${
-        isPerdido ? "bg-rose-50/60 border-rose-200/80" : "bg-white border-slate-200/60"
-      } ${isDragging ? "opacity-40 scale-[0.97] shadow-none" : "shadow-sm hover:shadow-lg hover:-translate-y-0.5 cursor-grab active:cursor-grabbing"}`}
+        isPerdido ? "bg-rose-50/40 border-rose-200/70" : "bg-white border-slate-200/60"
+      } ${isDragging ? "opacity-40 scale-95 shadow-none" : "shadow-sm hover:shadow-md hover:-translate-y-px cursor-grab active:cursor-grabbing"}`}
     >
-      {/* Left accent bar */}
-      <div className={`w-[3px] shrink-0 ${isPerdido ? "bg-rose-400" : colors.dot}`} />
+      {/* Accent bar */}
+      <div className={`w-0.5 shrink-0 ${isPerdido ? "bg-rose-400" : colors.dot}`} />
 
-      <div className="flex-1 px-3 py-3">
-        {/* Header */}
-        <div className="flex items-start gap-2 mb-2">
-          <div className={`w-7 h-7 rounded-lg text-[11px] font-bold flex items-center justify-center shrink-0 ${
-            isPerdido ? "bg-rose-100 text-rose-500" : "bg-slate-100 text-slate-600"
-          }`}>
-            {card.nomeCliente[0]?.toUpperCase() ?? "#"}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className={`font-semibold text-[11.5px] leading-snug truncate ${
-              isPerdido ? "line-through text-rose-700/70" : "text-slate-800"
-            }`}>{card.nomeCliente}</p>
-            <div className="flex items-center gap-1 flex-wrap mt-0.5">
-              {card.numero && (
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-tight border tabular-nums ${
-                  isPerdido ? "text-rose-500 bg-rose-50 border-rose-200" : "text-blue-600 bg-blue-50 border-blue-200"
-                }`}>{card.numero}</span>
-              )}
-              {card.loteNumero && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-tight border text-violet-600 bg-violet-50 border-violet-200 tabular-nums">
-                  {card.loteNumero}
-                </span>
-              )}
-            </div>
-          </div>
+      <div className="flex-1 px-2.5 py-2.5 min-w-0">
+
+        {/* Name + close */}
+        <div className="flex items-center gap-1.5">
+          <p className={`flex-1 font-bold text-[12px] leading-snug truncate ${
+            isPerdido ? "line-through text-rose-600/70" : "text-slate-800"
+          }`}>{card.nomeCliente}</p>
           <button
             onClick={e => { e.stopPropagation(); if (confirm(`Remover "${card.nomeCliente}" do kanban?`)) onDelete(card.id) }}
-            className="w-5 h-5 flex items-center justify-center text-slate-200 hover:text-rose-400 hover:bg-rose-50 rounded transition-colors text-sm leading-none shrink-0"
+            className="w-4 h-4 flex items-center justify-center text-slate-200 hover:text-rose-400 hover:bg-rose-50 rounded transition-colors text-sm leading-none shrink-0"
           >×</button>
         </div>
 
-        <p className="text-[10px] text-slate-400 mb-2.5 leading-tight">{card.dimensoes} cm · {card.materialNome}</p>
+        {/* Badges */}
+        {(card.numero || card.loteNumero) && (
+          <div className="flex items-center gap-1 mt-1 flex-wrap">
+            {card.numero && (
+              <span className={`text-[8.5px] font-bold px-1.5 py-0.5 rounded-full border tabular-nums leading-tight ${
+                isPerdido ? "text-rose-400 bg-rose-50 border-rose-200" : "text-blue-600 bg-blue-50 border-blue-200"
+              }`}>{card.numero}</span>
+            )}
+            {card.loteNumero && (
+              <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded-full border text-violet-600 bg-violet-50 border-violet-200 tabular-nums leading-tight">
+                {card.loteNumero}
+              </span>
+            )}
+          </div>
+        )}
 
-        {/* Motivo da perda */}
+        {/* Specs */}
+        <p className="text-[10px] text-slate-400 mt-1.5 leading-tight truncate">
+          {card.dimensoes} cm · {card.materialNome}
+        </p>
+
+        {/* Loss motivo */}
         {isPerdido && (
-          <div className="mb-2.5" onClick={e => e.stopPropagation()}>
+          <div className="mt-2" onClick={e => e.stopPropagation()}>
             <input
               type="text"
               value={card.motivoPerdido ?? ""}
               onChange={e => onSetMotivo(card.id, e.target.value)}
               placeholder="Motivo da perda…"
-              className="w-full text-[10px] text-rose-700 bg-rose-100 border border-rose-200 rounded-lg px-2 py-1 placeholder:text-rose-300 focus:outline-none focus:ring-1 focus:ring-rose-400"
+              className="w-full text-[10px] text-rose-700 bg-rose-100/70 border border-rose-200 rounded-lg px-2 py-1 placeholder:text-rose-300/80 focus:outline-none focus:ring-1 focus:ring-rose-400"
             />
           </div>
         )}
 
-        {/* Price block */}
-        <div className={`rounded-xl px-3 py-2.5 mb-2 ${isPerdido ? "bg-rose-100/30" : "bg-slate-50/80"}`}>
-          <p className={`font-black text-[17px] leading-none tabular-nums ${isPerdido ? "text-rose-400 line-through" : "text-slate-900"}`}>{brl(card.preco)}</p>
-          <p className="text-[10px] text-slate-400 mt-0.5 tabular-nums">{num(card.quantidade)} unidades</p>
+        {/* Price row */}
+        <div className="flex items-baseline gap-2 mt-2.5">
+          <span className={`font-black text-[15px] leading-none tabular-nums ${
+            isPerdido ? "text-rose-400 line-through" : "text-slate-900"
+          }`}>{brl(card.preco)}</span>
+          <span className="text-[10px] text-slate-400 tabular-nums">{num(card.quantidade)} un</span>
+          <span className="text-[9px] text-slate-300 ml-auto tabular-nums">{card.data.split(",")[0]}</span>
         </div>
 
-        <p className="text-[9px] text-slate-300 tabular-nums">{card.data}</p>
-
-        {/* Navigation */}
+        {/* Action bar */}
         {!isPerdido && !confirmando && (
-          <div className="flex items-center gap-1 mt-2 pt-2 border-t border-slate-100" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-0.5 mt-2 pt-1.5 border-t border-slate-100/80" onClick={e => e.stopPropagation()}>
+
+            {/* Back */}
             <button
               disabled={colIdx === 0}
               onClick={() => onMove(card.id, colIdx - 1)}
-              className="w-7 h-7 flex items-center justify-center text-[12px] text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-100"
+              className="w-6 h-6 flex items-center justify-center text-[11px] text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-md disabled:opacity-0 transition-all"
             >←</button>
-            {/* Copy tracking link */}
+
+            {/* Copy link */}
             <button
               onClick={e => {
                 e.stopPropagation()
-                const url = `${window.location.origin}/track/${encodeURIComponent(card.numero)}`
-                navigator.clipboard.writeText(url).then(() => {
-                  setCopiedId(true)
-                  setTimeout(() => setCopiedId(false), 2000)
+                navigator.clipboard.writeText(`${window.location.origin}/track/${encodeURIComponent(card.numero)}`).then(() => {
+                  setCopiedId(true); setTimeout(() => setCopiedId(false), 2000)
                 })
               }}
               title="Copiar link de rastreamento"
-              className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-blue-600 transition-colors px-1.5 py-1 rounded-md hover:bg-blue-50"
+              className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors ${
+                copiedId ? "text-emerald-500 bg-emerald-50" : "text-slate-300 hover:text-blue-500 hover:bg-blue-50"
+              }`}
             >
-              {copiedId ? (
-                <span className="text-emerald-600 font-medium">Copiado ✓</span>
-              ) : (
-                <>
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
-                  </svg>
-                  <span>Link</span>
-                </>
-              )}
+              {copiedId
+                ? <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                : <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+              }
             </button>
-            {/* Lote button */}
+
+            {/* Lote */}
             <button
               onClick={e => { e.stopPropagation(); setShowLotePanel(v => !v) }}
               title={card.loteNumero ? `Lote: ${card.loteNumero}` : "Agrupar em lote"}
-              className={`flex items-center gap-1 text-[10px] transition-colors px-1.5 py-1 rounded-md ${
-                card.loteNumero
-                  ? "text-violet-600 bg-violet-50 hover:bg-violet-100 font-semibold"
-                  : "text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+              className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors ${
+                card.loteNumero ? "text-violet-500 bg-violet-50/80 hover:bg-violet-100" : "text-slate-300 hover:text-violet-500 hover:bg-violet-50"
               }`}
             >
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z" />
               </svg>
-              <span>{card.loteNumero ?? "Lote"}</span>
             </button>
+
             <div className="flex-1" />
+
+            {/* Mark lost */}
             {colIdx < COL_ENTREGUE && (
-              <button
-                onClick={iniciarPerda}
-                title="Marcar como perdido"
-                className="w-7 h-7 flex items-center justify-center text-[10px] text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all duration-100"
-              >✕</button>
+              <button onClick={iniciarPerda} title="Marcar como perdido"
+                className="w-6 h-6 flex items-center justify-center text-[10px] text-slate-200 hover:text-rose-400 hover:bg-rose-50 rounded-md transition-all">
+                ✕
+              </button>
             )}
+
+            {/* Advance */}
             {colIdx < COL_ENTREGUE && (
-              <button
-                onClick={() => onMove(card.id, colIdx + 1)}
-                className="h-7 px-3 text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-lg transition-all duration-100"
-              >→</button>
+              <button onClick={() => onMove(card.id, colIdx + 1)}
+                className="h-6 px-2 text-[10px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-md transition-all ml-0.5">
+                →
+              </button>
             )}
           </div>
         )}
 
         {/* Lote panel */}
         {showLotePanel && !isPerdido && (
-          <div className="mt-2 pt-2 border-t border-violet-100 space-y-1.5" onClick={e => e.stopPropagation()}>
+          <div className="mt-2 pt-2 border-t border-violet-100/80 space-y-1.5" onClick={e => e.stopPropagation()}>
             {card.loteNumero ? (
               <>
-                <p className="text-[10px] text-violet-700 font-semibold">{card.loteNumero}</p>
+                <p className="text-[9.5px] text-violet-600 font-bold uppercase tracking-wide">{card.loteNumero}</p>
                 <div className="flex gap-1">
-                  <button
-                    onClick={copyLoteLink}
-                    className="flex-1 py-1.5 text-[10px] font-medium text-violet-600 bg-violet-50 hover:bg-violet-100 rounded-md transition-colors"
-                  >
+                  <button onClick={copyLoteLink}
+                    className="flex-1 py-1.5 text-[10px] font-semibold text-violet-600 bg-violet-50 hover:bg-violet-100 rounded-md transition-colors">
                     {copiedLote ? "Copiado ✓" : "Copiar link"}
                   </button>
-                  <button
-                    onClick={handleRemoveLote}
-                    className="flex-1 py-1.5 text-[10px] text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors"
-                  >
+                  <button onClick={handleRemoveLote}
+                    className="flex-1 py-1.5 text-[10px] text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors">
                     Remover
                   </button>
                 </div>
               </>
             ) : (
               <>
-                <p className="text-[10px] text-slate-600 font-semibold">Agrupar em lote</p>
+                <p className="text-[10px] text-slate-500 font-semibold">Agrupar em lote</p>
                 {clientLotes.length > 0 && (
                   <div className="space-y-1">
                     {clientLotes.map(l => (
-                      <button
-                        key={l.id}
-                        onClick={() => handleAssignLote(l.id, l.numero)}
-                        className="w-full flex items-center gap-2 py-1.5 px-2 text-[10px] text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-md transition-colors text-left"
-                      >
+                      <button key={l.id} onClick={() => handleAssignLote(l.id, l.numero)}
+                        className="w-full flex items-center gap-1.5 py-1.5 px-2 text-[10px] text-violet-700 bg-violet-50 hover:bg-violet-100 rounded-md transition-colors text-left">
                         <span className="font-bold">{l.numero}</span>
                         <span className="text-violet-300">·</span>
                         <span className="text-violet-500 truncate">{l.nomeCliente}</span>
@@ -589,17 +583,12 @@ function KanbanCardItem({
                     ))}
                   </div>
                 )}
-                <button
-                  onClick={handleCriarLote}
-                  disabled={criandoLote}
-                  className="w-full py-1.5 text-[10px] font-semibold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-md transition-colors"
-                >
+                <button onClick={handleCriarLote} disabled={criandoLote}
+                  className="w-full py-1.5 text-[10px] font-semibold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-md transition-colors">
                   {criandoLote ? "Criando…" : "+ Criar novo lote"}
                 </button>
-                <button
-                  onClick={() => setShowLotePanel(false)}
-                  className="w-full py-1 text-[10px] text-slate-300 hover:text-slate-500 transition-colors"
-                >
+                <button onClick={() => setShowLotePanel(false)}
+                  className="w-full py-1 text-[10px] text-slate-300 hover:text-slate-500 transition-colors">
                   Cancelar
                 </button>
               </>
@@ -607,10 +596,10 @@ function KanbanCardItem({
           </div>
         )}
 
-        {/* Confirmação de perda — inline, sem popup */}
+        {/* Loss confirmation */}
         {confirmando && (
           <div className="mt-2 pt-2 border-t border-rose-100 space-y-1.5" onClick={e => e.stopPropagation()}>
-            <p className="text-[10px] text-rose-600 font-semibold">Marcar como perdido?</p>
+            <p className="text-[10px] text-rose-600 font-semibold">Confirmar perda?</p>
             <input
               ref={motivoRef}
               type="text"
@@ -633,13 +622,13 @@ function KanbanCardItem({
           </div>
         )}
 
-        {/* Recuperar perdido */}
+        {/* Reopen lost */}
         {isPerdido && (
           <div className="mt-2 pt-2 border-t border-rose-100" onClick={e => e.stopPropagation()}>
-            <button
-              onClick={() => onMove(card.id, 0)}
-              className="w-full py-1.5 text-[10px] text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-md transition-colors"
-            >↺ Reabrir orçamento</button>
+            <button onClick={() => onMove(card.id, 0)}
+              className="w-full py-1.5 text-[10px] font-medium text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-md transition-colors">
+              ↺ Reabrir orçamento
+            </button>
           </div>
         )}
       </div>

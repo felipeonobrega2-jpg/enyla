@@ -968,6 +968,7 @@ export default function Home() {
               lancamentos={lancamentos}
               kanban={kanban}
               negocios={negocios}
+              lotes={lotes}
               onAdd={l => {
                 setLancamentos(prev => [l, ...prev])
                 fetch("/api/lancamentos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(l) }).catch(() => {})
@@ -1190,6 +1191,10 @@ export default function Home() {
           onClose={() => setModalSalvar(null)}
           onAbrirPdf={abrirPdf}
           onWhatsApp={compartilharWhatsApp}
+          lotes={lotes}
+          cardLoteNumero={kanban.find(c => c.id === modalSalvar.cardId)?.loteNumero}
+          onLoteCreate={criarLote}
+          onLoteAssign={assignLote}
           onSyncOpcoes={(cardId, opcoes) => {
             setKanban(prev => prev.map(c => c.id === cardId ? { ...c, opcoes } : c))
             fetch(`/api/kanban/${cardId}`, {

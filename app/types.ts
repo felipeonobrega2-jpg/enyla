@@ -218,6 +218,8 @@ export type LancamentoFinanceiro = {
   cardId?: string
   cardNumero?: string
   nomeCliente?: string
+  loteId?: string
+  loteNumero?: string
   categoria?: string
   formaPagamento?: FormaPagamento
   obs?: string

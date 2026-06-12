@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react"
 import {
   LancamentoFinanceiro, TipoLancamento, StatusLancamento,
-  FormaPagamento, KanbanCard, COL_FECHADO, COL_PERDIDO, NegocioParceiro,
+  FormaPagamento, KanbanCard, COL_FECHADO, COL_PERDIDO, NegocioParceiro, Lote,
 } from "../types"
 import { brl } from "../utils"
 
@@ -70,7 +70,8 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
     const c = kanban.find(x => x.id === id)
     if (c) {
       setValor(String(c.preco))
-      setDescricao(`Pedido ${c.numero} — ${c.nomeCliente}`)
+      const loteTag = c.loteNumero ? ` [${c.loteNumero}]` : ""
+      setDescricao(`Pedido ${c.numero} — ${c.nomeCliente}${loteTag}`)
     }
   }
 
@@ -88,6 +89,8 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
       cardId:         cardId || undefined,
       cardNumero:     cardSel?.numero || inicial?.cardNumero,
       nomeCliente:    cardSel?.nomeCliente || inicial?.nomeCliente,
+      loteId:         cardSel?.loteId || inicial?.loteId,
+      loteNumero:     cardSel?.loteNumero || inicial?.loteNumero,
       categoria:      categoria || undefined,
       formaPagamento: forma || undefined,
       obs:            obs.trim() || undefined,
@@ -300,6 +303,7 @@ export function FinanceiroView({
   lancamentos,
   kanban,
   negocios,
+  lotes,
   onAdd,
   onUpdate,
   onDelete,
@@ -307,6 +311,7 @@ export function FinanceiroView({
   lancamentos: LancamentoFinanceiro[]
   kanban: KanbanCard[]
   negocios: NegocioParceiro[]
+  lotes?: Lote[]
   onAdd: (l: LancamentoFinanceiro) => void
   onUpdate: (id: string, updates: Partial<LancamentoFinanceiro>) => void
   onDelete: (id: string) => void
@@ -324,6 +329,15 @@ export function FinanceiroView({
     kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO),
     [kanban]
   )
+
+  // Map loteId → lançamento (para lotes com pagamento unificado)
+  const lancPorLote = useMemo(() => {
+    const m: Record<string, LancamentoFinanceiro> = {}
+    for (const l of lancamentos) {
+      if (l.tipo === "receita" && l.loteId) m[l.loteId] = l
+    }
+    return m
+  }, [lancamentos])
 
   // Map cardId → lancamento mais recente de receita
   const lancPorCard = useMemo(() => {
@@ -609,69 +623,157 @@ export function FinanceiroView({
             )}
             {pedidosElegiveis.length === 0 ? (
               <Empty msg="Nenhum pedido fechado ainda." />
-            ) : (
-              pedidosElegiveis
-                .sort((a, b) => b.preco - a.preco)
-                .map(card => {
-                  const lanc = lancPorCard[card.id]
-                  const st = lanc ? statusEfetivo(lanc) : null
+            ) : (() => {
+              // Group by lote (cards with same loteId → one row)
+              const loteGroups: Record<string, KanbanCard[]> = {}
+              const solos: KanbanCard[] = []
+              for (const card of pedidosElegiveis) {
+                if (card.loteId) {
+                  if (!loteGroups[card.loteId]) loteGroups[card.loteId] = []
+                  loteGroups[card.loteId].push(card)
+                } else {
+                  solos.push(card)
+                }
+              }
+              const loteEntries = Object.entries(loteGroups)
 
-                  return (
-                    <div key={card.id}
-                      className="bg-white border border-slate-100 rounded-2xl px-5 py-4 flex items-center gap-4 hover:border-slate-200 transition-colors group">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-slate-800 text-[13px]">{card.nomeCliente}</span>
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                            {card.numero}
-                          </span>
-                          {st && (
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_CLS[st]}`}>
-                              {STATUS_LABEL[st]}
+              return (
+                <>
+                  {/* Lote groups */}
+                  {loteEntries.map(([loteId, cards]) => {
+                    const loteNum = cards[0].loteNumero ?? loteId
+                    const loteInfo = (lotes ?? []).find(l => l.id === loteId)
+                    const total = cards.reduce((s, c) => s + c.preco, 0)
+                    const lanc = lancPorLote[loteId]
+                    const st = lanc ? statusEfetivo(lanc) : null
+
+                    return (
+                      <div key={loteId} className="bg-white border border-violet-100 rounded-2xl overflow-hidden mb-2">
+                        {/* Lote header */}
+                        <div className="px-5 py-3 bg-violet-50/50 border-b border-violet-100 flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-slate-800 text-[13px]">{loteInfo?.nomeCliente ?? cards[0].nomeCliente}</span>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200">
+                                {loteNum}
+                              </span>
+                              {st && (
+                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_CLS[st]}`}>
+                                  {STATUS_LABEL[st]}
+                                </span>
+                              )}
+                              {!lanc && (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-400">
+                                  Não registrado
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-0.5">{cards.length} produto{cards.length > 1 ? "s" : ""}{lanc?.dataVencimento ? ` · Vence ${fmtDate(lanc.dataVencimento)}` : ""}</p>
+                          </div>
+                          <p className="font-black text-violet-700 text-[15px] tabular-nums shrink-0">{brl(total)}</p>
+                          <div className="flex gap-1.5 shrink-0">
+                            {!lanc ? (
+                              <button
+                                onClick={() => setModalLanc({
+                                  tipo: "receita",
+                                  descricao: `Lote ${loteNum} — ${cards[0].nomeCliente}`,
+                                  valor: total,
+                                  nomeCliente: cards[0].nomeCliente,
+                                  loteId,
+                                  loteNumero: loteNum,
+                                  dataVencimento: hoje(),
+                                })}
+                                className="px-3 py-1.5 text-[11px] font-semibold text-violet-700 bg-violet-100 hover:bg-violet-200 rounded-lg transition-colors">
+                                Registrar cobrança
+                              </button>
+                            ) : st !== "pago" ? (
+                              <button onClick={() => setModalPag(lanc)}
+                                className="px-3 py-1.5 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors">
+                                Registrar pagamento
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-emerald-600 font-semibold px-2">
+                                ✓ {fmtDate(lanc.dataPagamento ?? "")}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {/* Products in lote */}
+                        <div className="divide-y divide-slate-50">
+                          {cards.map(card => (
+                            <div key={card.id} className="px-5 py-2.5 flex items-center gap-3">
+                              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-full">{card.numero}</span>
+                              <p className="flex-1 text-[12px] text-slate-600 truncate">{card.dimensoes} · {card.materialNome}</p>
+                              <p className="text-[12px] font-semibold text-slate-700 tabular-nums">{brl(card.preco)}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {/* Solo cards */}
+                  {solos.sort((a, b) => b.preco - a.preco).map(card => {
+                    const lanc = lancPorCard[card.id]
+                    const st = lanc ? statusEfetivo(lanc) : null
+                    return (
+                      <div key={card.id}
+                        className="bg-white border border-slate-100 rounded-2xl px-5 py-4 flex items-center gap-4 hover:border-slate-200 transition-colors mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-slate-800 text-[13px]">{card.nomeCliente}</span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                              {card.numero}
                             </span>
-                          )}
-                          {!lanc && (
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-400">
-                              Não registrado
+                            {st && (
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_CLS[st]}`}>
+                                {STATUS_LABEL[st]}
+                              </span>
+                            )}
+                            {!lanc && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-400">
+                                Não registrado
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-1">
+                            {card.dimensoes && `${card.dimensoes} · `}{card.materialNome}
+                            {lanc?.dataVencimento && ` · Vence ${fmtDate(lanc.dataVencimento)}`}
+                          </p>
+                        </div>
+                        <p className="font-black text-slate-800 text-[15px] tabular-nums shrink-0">{brl(card.preco)}</p>
+                        <div className="flex gap-1.5 shrink-0">
+                          {!lanc ? (
+                            <button
+                              onClick={() => setModalLanc({
+                                tipo: "receita",
+                                descricao: `Pedido ${card.numero} — ${card.nomeCliente}`,
+                                valor: card.preco,
+                                cardId: card.id,
+                                cardNumero: card.numero,
+                                nomeCliente: card.nomeCliente,
+                                dataVencimento: hoje(),
+                              })}
+                              className="px-3 py-1.5 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+                              Registrar cobrança
+                            </button>
+                          ) : st !== "pago" ? (
+                            <button onClick={() => setModalPag(lanc)}
+                              className="px-3 py-1.5 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors">
+                              Registrar pagamento
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-emerald-600 font-semibold px-2">
+                              ✓ {fmtDate(lanc.dataPagamento ?? "")}
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-1">
-                          {card.dimensoes && `${card.dimensoes} · `}{card.materialNome}
-                          {lanc?.dataVencimento && ` · Vence ${fmtDate(lanc.dataVencimento)}`}
-                        </p>
                       </div>
-                      <p className="font-black text-slate-800 text-[15px] tabular-nums shrink-0">{brl(card.preco)}</p>
-                      <div className="flex gap-1.5 shrink-0">
-                        {!lanc ? (
-                          <button
-                            onClick={() => setModalLanc({
-                              tipo: "receita",
-                              descricao: `Pedido ${card.numero} — ${card.nomeCliente}`,
-                              valor: card.preco,
-                              cardId: card.id,
-                              cardNumero: card.numero,
-                              nomeCliente: card.nomeCliente,
-                              dataVencimento: hoje(),
-                            })}
-                            className="px-3 py-1.5 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
-                            Registrar cobrança
-                          </button>
-                        ) : st !== "pago" ? (
-                          <button onClick={() => setModalPag(lanc)}
-                            className="px-3 py-1.5 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors">
-                            Registrar pagamento
-                          </button>
-                        ) : (
-                          <span className="text-[11px] text-emerald-600 font-semibold px-2">
-                            ✓ {fmtDate(lanc.dataPagamento ?? "")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })
-            )}
+                    )
+                  })}
+                </>
+              )
+            })()}
           </div>
         )}
 
