@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState, useEffect } from "react"
 import {
   FormData, Calculo, PropostaCustom, KanbanCard, Cliente,
   COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO,
@@ -141,34 +141,121 @@ function MonthlyChart({ data }: { data: MonthlyDatum[] }) {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
-type Periodo = "mes" | "trimestre" | "semestre" | "ano" | "tudo" | "custom"
+type Periodo =
+  | "mes" | "mes_passado"
+  | "trimestre" | "trimestre_passado"
+  | "semestre" | "semestre_passado"
+  | "ano" | "ano_passado"
+  | "ultimos7" | "ultimos14" | "ultimos30" | "ultimos90" | "ultimos12m"
+  | "tudo" | "custom"
 
-const PERIODOS: { id: Periodo; label: string }[] = [
-  { id: "mes",       label: "Este mês"      },
-  { id: "trimestre", label: "Este trimestre" },
-  { id: "semestre",  label: "Este semestre"  },
-  { id: "ano",       label: "Este ano"       },
-  { id: "tudo",      label: "Tudo"           },
+const PERIODO_LABEL: Record<Periodo, string> = {
+  mes:                "Este mês",
+  mes_passado:        "Mês passado",
+  trimestre:          "Este trimestre",
+  trimestre_passado:  "Trimestre passado",
+  semestre:           "Este semestre",
+  semestre_passado:   "Semestre passado",
+  ano:                "Este ano",
+  ano_passado:        "Ano passado",
+  ultimos7:           "Últimos 7 dias",
+  ultimos14:          "Últimos 14 dias",
+  ultimos30:          "Últimos 30 dias",
+  ultimos90:          "Últimos 90 dias",
+  ultimos12m:         "Últimos 12 meses",
+  tudo:               "Tudo",
+  custom:             "Personalizado",
+}
+
+const GRUPOS_PERIODO: { label: string; items: { id: Periodo; label: string }[] }[] = [
+  {
+    label: "Janelas móveis",
+    items: [
+      { id: "ultimos7",   label: "Últimos 7 dias"   },
+      { id: "ultimos14",  label: "Últimos 14 dias"  },
+      { id: "ultimos30",  label: "Últimos 30 dias"  },
+      { id: "ultimos90",  label: "Últimos 90 dias"  },
+      { id: "ultimos12m", label: "Últimos 12 meses" },
+    ],
+  },
+  {
+    label: "Período atual",
+    items: [
+      { id: "mes",       label: "Este mês"      },
+      { id: "trimestre", label: "Este trimestre" },
+      { id: "semestre",  label: "Este semestre"  },
+      { id: "ano",       label: "Este ano"       },
+      { id: "tudo",      label: "Tudo"           },
+    ],
+  },
+  {
+    label: "Período anterior",
+    items: [
+      { id: "mes_passado",       label: "Mês passado"       },
+      { id: "trimestre_passado", label: "Trimestre passado" },
+      { id: "semestre_passado",  label: "Semestre passado"  },
+      { id: "ano_passado",       label: "Ano passado"       },
+    ],
+  },
 ]
 
 export default function DashboardView({ historico, kanban, propostasCustom: _propostasCustom, clientes: _clientes, config: _config }: Props) {
   const [periodo, setPeriodo] = useState<Periodo>("mes")
   const [dataInicio, setDataInicio] = useState("")
   const [dataFim, setDataFim]   = useState("")
+  const [showMenu, setShowMenu] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false)
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [])
 
   // ── Period bounds (shared by both filters) ─────────────────────────────────
   const periodBounds = useMemo(() => {
     const now = new Date()
     let from: Date | null = null
     let to: Date | null = null
+
     if (periodo === "mes") {
       from = new Date(now.getFullYear(), now.getMonth(), 1)
+    } else if (periodo === "mes_passado") {
+      from = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      to   = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59)
     } else if (periodo === "trimestre") {
       from = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
+    } else if (periodo === "trimestre_passado") {
+      const q = Math.floor(now.getMonth() / 3)
+      from = new Date(now.getFullYear(), (q - 1) * 3, 1)
+      to   = new Date(now.getFullYear(), q * 3, 0, 23, 59, 59)
     } else if (periodo === "semestre") {
       from = new Date(now.getFullYear(), now.getMonth() < 6 ? 0 : 6, 1)
+    } else if (periodo === "semestre_passado") {
+      if (now.getMonth() < 6) {
+        from = new Date(now.getFullYear() - 1, 6, 1)
+        to   = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59)
+      } else {
+        from = new Date(now.getFullYear(), 0, 1)
+        to   = new Date(now.getFullYear(), 5, 30, 23, 59, 59)
+      }
     } else if (periodo === "ano") {
       from = new Date(now.getFullYear(), 0, 1)
+    } else if (periodo === "ano_passado") {
+      from = new Date(now.getFullYear() - 1, 0, 1)
+      to   = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59)
+    } else if (periodo === "ultimos7") {
+      from = new Date(now); from.setDate(now.getDate() - 7)
+    } else if (periodo === "ultimos14") {
+      from = new Date(now); from.setDate(now.getDate() - 14)
+    } else if (periodo === "ultimos30") {
+      from = new Date(now); from.setDate(now.getDate() - 30)
+    } else if (periodo === "ultimos90") {
+      from = new Date(now); from.setDate(now.getDate() - 90)
+    } else if (periodo === "ultimos12m") {
+      from = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
     } else if (periodo === "custom") {
       if (dataInicio) from = new Date(dataInicio)
       if (dataFim)   { to = new Date(dataFim); to.setHours(23, 59, 59) }
@@ -348,7 +435,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
   }, [filteredCards])
 
   // ── Periodo label ────────────────────────────────────────────────────────────
-  const periodoLabel = (p: Periodo) => PERIODOS.find(x => x.id === p)?.label ?? p
+  const periodoLabel = (p: Periodo) => PERIODO_LABEL[p] ?? p
 
   // ─── Empty state ─────────────────────────────────────────────────────────────
   if (kanban.length === 0) {
@@ -372,19 +459,55 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
 
       {/* ── Filter bar ─────────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm py-2 -mx-6 px-6">
-        <div className="flex items-center gap-2 flex-wrap">
-          {PERIODOS.map(({ id, label }) => (
-            <button key={id} onClick={() => setPeriodo(id)}
-              className={`px-3 py-1.5 rounded-full text-[12px] font-medium transition-all ${
-                periodo === id
-                  ? "bg-slate-900 text-white shadow-sm"
-                  : "bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-              }`}>
-              {label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
 
-          <div className="w-px h-5 bg-slate-200 mx-1" />
+          {/* Period dropdown */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setShowMenu(m => !m)}
+              className={`flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-medium transition-all ${
+                periodo !== "custom"
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "bg-white border border-slate-200 text-slate-600 hover:border-slate-300"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5 opacity-70 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 9v7.5" />
+              </svg>
+              {periodoLabel(periodo)}
+              <svg className={`w-3 h-3 opacity-60 transition-transform shrink-0 ${showMenu ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+
+            {showMenu && (
+              <div className="absolute top-full left-0 mt-1.5 w-52 bg-white rounded-xl border border-slate-200 shadow-lg py-1.5 z-50">
+                {GRUPOS_PERIODO.map((grupo, gi) => (
+                  <div key={gi}>
+                    {gi > 0 && <div className="h-px bg-slate-100 my-1" />}
+                    <p className="px-3 pt-1.5 pb-0.5 text-[9px] uppercase tracking-[0.15em] font-bold text-slate-400">
+                      {grupo.label}
+                    </p>
+                    {grupo.items.map(({ id, label }) => (
+                      <button key={id}
+                        onClick={() => { setPeriodo(id); setShowMenu(false) }}
+                        className={`w-full text-left px-3 py-1.5 text-[12px] flex items-center gap-2 transition-colors ${
+                          periodo === id
+                            ? "text-blue-600 font-semibold bg-blue-50"
+                            : "text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${periodo === id ? "bg-blue-500" : "bg-transparent"}`} />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
           {/* Custom range */}
           <div className="flex items-center gap-1.5">
