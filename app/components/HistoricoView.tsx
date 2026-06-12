@@ -102,7 +102,7 @@ export function HistoricoView({
             value={busca}
             onChange={e => setBusca(e.target.value)}
             placeholder="Buscar por cliente, número ou data…"
-            className="w-full border border-slate-200 rounded-xl pl-9 pr-9 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            className="w-full border border-slate-200 rounded-xl pl-9 pr-9 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 bg-white transition-all"
           />
           {busca && (
             <button onClick={() => setBusca("")}
@@ -112,7 +112,7 @@ export function HistoricoView({
         <select
           value={ordem}
           onChange={e => setOrdem(e.target.value as OrdemHistorico)}
-          className="border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+          className="border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 cursor-pointer transition-all"
         >
           <option value="recente">Mais recentes</option>
           <option value="antigo">Mais antigos</option>
@@ -148,13 +148,13 @@ export function HistoricoView({
             return (
               <div
                 key={originalIndex}
-                className="group relative bg-white border border-slate-100 rounded-2xl overflow-hidden hover:border-slate-200 hover:shadow-[0_2px_12px_rgba(0,0,0,0.05)] transition-all duration-200"
+                className="group relative bg-white border border-slate-100 rounded-xl overflow-hidden hover:border-slate-200 hover:shadow-[0_4px_16px_rgba(0,0,0,0.07)] hover:-translate-y-px transition-all duration-200"
               >
                 <div className="flex items-center gap-4 px-5 py-4">
                   {/* Avatar */}
                   <button
                     onClick={() => onDetalhes?.(item)}
-                    className="w-10 h-10 rounded-full bg-slate-900 text-white text-[13px] font-bold flex items-center justify-center shrink-0 hover:bg-slate-700 transition-colors"
+                    className="w-10 h-10 rounded-full bg-indigo-600 text-white text-[13px] font-bold flex items-center justify-center shrink-0 hover:bg-indigo-700 transition-colors"
                     tabIndex={-1}
                   >
                     {initial}
@@ -170,7 +170,7 @@ export function HistoricoView({
                         {item.form.nomeCliente || "Sem nome"}
                       </span>
                       {item.numero && (
-                        <span className="shrink-0 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full tabular-nums">
+                        <span className="shrink-0 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded-full tabular-nums">
                           {item.numero}
                         </span>
                       )}
@@ -231,13 +231,13 @@ export function HistoricoView({
             return (
               <div
                 key={p.id}
-                className="group relative bg-white border border-slate-100 rounded-2xl overflow-hidden hover:border-slate-200 hover:shadow-[0_2px_12px_rgba(0,0,0,0.05)] transition-all duration-200"
+                className="group relative bg-white border border-slate-100 rounded-xl overflow-hidden hover:border-slate-200 hover:shadow-[0_4px_16px_rgba(0,0,0,0.07)] hover:-translate-y-px transition-all duration-200"
               >
                 <div className="flex items-center gap-4 px-5 py-4">
                   {/* Avatar */}
                   <button
                     onClick={() => onDetalhes?.(p)}
-                    className="w-10 h-10 rounded-full bg-slate-700 text-white text-[13px] font-bold flex items-center justify-center shrink-0 hover:bg-slate-600 transition-colors"
+                    className="w-10 h-10 rounded-full bg-violet-600 text-white text-[13px] font-bold flex items-center justify-center shrink-0 hover:bg-violet-700 transition-colors"
                     tabIndex={-1}
                   >
                     {initial}
@@ -318,7 +318,7 @@ function IconBtn({
 }) {
   const colors = {
     slate:  "text-slate-500 hover:bg-slate-100 hover:text-slate-700",
-    blue:   "text-blue-500  hover:bg-blue-50   hover:text-blue-700",
+    blue:   "text-indigo-500 hover:bg-indigo-50  hover:text-indigo-700",
     green:  "text-emerald-500 hover:bg-emerald-50 hover:text-emerald-700",
     red:    "text-rose-400  hover:bg-rose-50   hover:text-rose-600",
     violet: "text-violet-500 hover:bg-violet-50 hover:text-violet-700",

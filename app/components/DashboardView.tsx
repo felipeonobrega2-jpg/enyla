@@ -51,14 +51,14 @@ function colColor(col: number): string {
   if (col === COL_PERDIDO) return "bg-rose-100 text-rose-700"
   if (col === COL_ENTREGUE) return "bg-emerald-100 text-emerald-700"
   if (col === COL_FECHADO) return "bg-green-100 text-green-700"
-  return "bg-blue-100 text-blue-700"
+  return "bg-indigo-100 text-indigo-700"
 }
 
 function colBg(col: number): string {
   if (col === COL_PERDIDO) return "#fda4af"
   if (col === COL_ENTREGUE) return "#6ee7b7"
   if (col === COL_FECHADO) return "#86efac"
-  const blues = ["#93c5fd", "#7dd3fc", "#67e8f9", "#a5b4fc", "#c4b5fd", "#f9a8d4", "#fca5a5", "#fdba74"]
+  const blues = ["#a5b4fc","#818cf8","#93c5fd","#c4b5fd","#7dd3fc","#fdba74","#fca5a5","#86efac"]
   return blues[col % blues.length]
 }
 
@@ -114,12 +114,12 @@ function MonthlyChart({ data }: { data: MonthlyDatum[] }) {
             {/* Volume bar (light blue) */}
             {hVol > 0 && (
               <rect x={gx} y={yVol} width={barW} height={hVol}
-                rx={3} fill="#bfdbfe" />
+                rx={3} fill="#c7d2fe" />
             )}
             {/* Receita bar (blue) */}
             {hRec > 0 && (
               <rect x={gx + barW + barGap} y={yRec} width={barW} height={hRec}
-                rx={3} fill="#3b82f6" />
+                rx={3} fill="#6366f1" />
             )}
             {/* X label */}
             <text x={gx + barW + barGap / 2} y={PAD_T + chartH + 14}
@@ -131,9 +131,9 @@ function MonthlyChart({ data }: { data: MonthlyDatum[] }) {
       })}
 
       {/* Legend */}
-      <rect x={PAD_L} y={H - 8} width={9} height={9} rx={2} fill="#bfdbfe" />
+      <rect x={PAD_L} y={H - 8} width={9} height={9} rx={2} fill="#c7d2fe" />
       <text x={PAD_L + 12} y={H - 1} fontSize={9} fill="#64748b" fontFamily="system-ui">Volume orçado</text>
-      <rect x={PAD_L + 90} y={H - 8} width={9} height={9} rx={2} fill="#3b82f6" />
+      <rect x={PAD_L + 90} y={H - 8} width={9} height={9} rx={2} fill="#6366f1" />
       <text x={PAD_L + 103} y={H - 1} fontSize={9} fill="#64748b" fontFamily="system-ui">Receita confirmada</text>
     </svg>
   )
@@ -458,7 +458,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
     <div className="max-w-[1280px] mx-auto px-6 py-5 space-y-5">
 
       {/* ── Filter bar ─────────────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-10 bg-slate-50/90 backdrop-blur-sm py-2 -mx-6 px-6">
+      <div className="sticky top-0 z-10 bg-[#f8f9fb]/95 backdrop-blur-sm py-2 -mx-6 px-6">
         <div className="flex items-center gap-2">
 
           {/* Period dropdown */}
@@ -493,11 +493,11 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                         onClick={() => { setPeriodo(id); setShowMenu(false) }}
                         className={`w-full text-left px-3 py-1.5 text-[12px] flex items-center gap-2 transition-colors ${
                           periodo === id
-                            ? "text-blue-600 font-semibold bg-blue-50"
+                            ? "text-indigo-600 font-semibold bg-indigo-50"
                             : "text-slate-700 hover:bg-slate-50"
                         }`}
                       >
-                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${periodo === id ? "bg-blue-500" : "bg-transparent"}`} />
+                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${periodo === id ? "bg-indigo-500" : "bg-transparent"}`} />
                         {label}
                       </button>
                     ))}
@@ -513,14 +513,14 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
           <div className="flex items-center gap-1.5">
             <input type="date" value={dataInicio}
               onChange={e => { setDataInicio(e.target.value); setPeriodo("custom") }}
-              className="h-8 border border-slate-200 rounded-lg px-2 text-[11.5px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
+              className="h-8 border border-slate-200 rounded-lg px-2 text-[11.5px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400" />
             <span className="text-slate-400 text-xs">→</span>
             <input type="date" value={dataFim}
               onChange={e => { setDataFim(e.target.value); setPeriodo("custom") }}
-              className="h-8 border border-slate-200 rounded-lg px-2 text-[11.5px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
+              className="h-8 border border-slate-200 rounded-lg px-2 text-[11.5px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400" />
           </div>
 
-          <div className="ml-auto text-[11px] text-slate-500 font-medium tabular-nums bg-white border border-slate-200 rounded-full px-3 py-1.5">
+          <div className="ml-auto text-[11px] text-slate-500 font-medium tabular-nums bg-white border border-slate-200 rounded-full px-3 py-1.5 shadow-sm">
             {filteredCards.length} orçamento{filteredCards.length !== 1 ? "s" : ""} no período
           </div>
         </div>
@@ -529,35 +529,35 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       {/* ── KPI Row 1 – Financial metrics ──────────────────────────────────── */}
       <div className="grid grid-cols-5 gap-3">
         {/* Receita do período */}
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-5 shadow-sm text-white">
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-5 shadow-sm text-white">
           <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-emerald-100 mb-3">Receita do período</p>
           <p className="text-[22px] font-black tabular-nums leading-none">{brl(kpis.receita)}</p>
           <p className="text-[10px] text-emerald-200 mt-2">por data de fechamento</p>
         </div>
 
         {/* Pipeline global */}
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 shadow-sm text-white">
-          <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-blue-100 mb-3">Pipeline</p>
+        <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 shadow-sm text-white">
+          <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-indigo-100 mb-3">Pipeline</p>
           <p className="text-[22px] font-black tabular-nums leading-none">{brl(kpis.pipelineGlobal)}</p>
-          <p className="text-[10px] text-blue-200 mt-2">cotações aguardando confirmação</p>
+          <p className="text-[10px] text-indigo-200 mt-2">cotações aguardando confirmação</p>
         </div>
 
         {/* Em produção */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
           <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-amber-500 mb-3">Em produção</p>
           <p className="text-[22px] font-black tabular-nums text-amber-600 leading-none">{num(kpis.emProducaoCount)}</p>
           <p className="text-[10px] text-slate-400 mt-2">{brl(kpis.emProducaoValor)} em fabricação</p>
         </div>
 
         {/* Fechamentos */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
           <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-green-500 mb-3">Fechamentos</p>
           <p className="text-[22px] font-black tabular-nums text-green-700 leading-none">{num(kpis.fechamentos)}</p>
           <p className="text-[10px] text-slate-400 mt-2">{kpis.entregues} entregues no período</p>
         </div>
 
         {/* Ticket médio */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+        <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
           <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-violet-400 mb-3">Ticket médio</p>
           <p className="text-[22px] font-black tabular-nums text-violet-700 leading-none">{brl(kpis.ticket)}</p>
           <p className="text-[10px] text-slate-400 mt-2">por negócio fechado</p>
@@ -567,14 +567,14 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       {/* ── KPI Row 2 – Operational metrics ────────────────────────────────── */}
       <div className="grid grid-cols-5 gap-3">
         {/* Orçamentos */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+        <div className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
           <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-2">Orçamentos</p>
           <p className="text-[20px] font-black tabular-nums text-slate-900 leading-none">{num(kpis.total)}</p>
           <p className="text-[10px] text-slate-400 mt-1.5">realizados no período</p>
         </div>
 
         {/* Conversão — always ≤ 100% (denominator = period's own quotes) */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+        <div className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
           <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-2">Conversão</p>
           <p className={`text-[20px] font-black tabular-nums leading-none ${kpis.conversao >= 30 ? "text-emerald-600" : "text-amber-600"}`}>
             {num(kpis.conversao, 1)}%
@@ -583,7 +583,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
         </div>
 
         {/* Taxa de perda */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+        <div className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
           <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-2">Taxa de perda</p>
           <p className={`text-[20px] font-black tabular-nums leading-none ${kpis.taxaPerda > 30 ? "text-rose-600" : "text-slate-700"}`}>
             {kpis.taxaPerda > 0 ? `${num(kpis.taxaPerda, 1)}%` : "—"}
@@ -592,14 +592,14 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
         </div>
 
         {/* Clientes únicos */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+        <div className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
           <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-2">Clientes únicos</p>
           <p className="text-[20px] font-black tabular-nums text-slate-900 leading-none">{num(kpis.clientesUnicos)}</p>
           <p className="text-[10px] text-slate-400 mt-1.5">atendidos no período</p>
         </div>
 
         {/* Entregas */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+        <div className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
           <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-2">Entregas</p>
           <p className="text-[20px] font-black tabular-nums text-emerald-600 leading-none">{num(kpis.entregues)}</p>
           <p className="text-[10px] text-slate-400 mt-1.5">pedidos entregues no período</p>
@@ -610,7 +610,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       <div className="grid grid-cols-5 gap-4">
 
         {/* Receita mensal */}
-        <div className="col-span-3 bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+        <div className="col-span-3 bg-white rounded-xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex items-center gap-3 mb-4">
             <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Receita mensal</p>
             <div className="flex-1 h-px bg-slate-100" />
@@ -620,7 +620,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
         </div>
 
         {/* Funil de vendas */}
-        <div className="col-span-2 bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+        <div className="col-span-2 bg-white rounded-xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex items-center gap-3 mb-4">
             <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Funil de vendas</p>
             <div className="flex-1 h-px bg-slate-100" />
@@ -660,7 +660,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       <div className="grid grid-cols-3 gap-4">
 
         {/* Top clientes */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+        <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex items-center gap-3 mb-4">
             <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Top clientes</p>
             <div className="flex-1 h-px bg-slate-100" />
@@ -673,7 +673,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                 <div key={c.nome} className="space-y-1">
                   <div className="flex items-center gap-2">
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 ${
-                      ["bg-blue-500","bg-violet-500","bg-emerald-500","bg-amber-500","bg-rose-500","bg-slate-500"][i % 6]
+                      ["bg-indigo-500","bg-violet-500","bg-emerald-500","bg-amber-500","bg-rose-500","bg-slate-500"][i % 6]
                     }`}>
                       {c.nome[0]?.toUpperCase() ?? "?"}
                     </div>
@@ -682,7 +682,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                     <p className="text-[10px] text-slate-400 tabular-nums shrink-0">{c.count}×</p>
                   </div>
                   <div className="ml-8 h-1.5 bg-slate-50 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-400 rounded-full"
+                    <div className="h-full bg-indigo-400 rounded-full"
                       style={{ width: `${(c.total / topClientes.maxTotal) * 100}%` }} />
                   </div>
                 </div>
@@ -692,7 +692,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
         </div>
 
         {/* Materiais mais usados */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+        <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex items-center gap-3 mb-4">
             <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Materiais mais usados</p>
             <div className="flex-1 h-px bg-slate-100" />
@@ -720,7 +720,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
         </div>
 
         {/* Motivos de perda */}
-        <div className={`rounded-2xl border p-5 shadow-sm ${motivosPerda.motivos.length === 0 ? "bg-emerald-50 border-emerald-100" : "bg-white border-slate-100"}`}>
+        <div className={`rounded-xl border p-5 shadow-sm hover:shadow-md transition-all duration-200 ${motivosPerda.motivos.length === 0 ? "bg-emerald-50 border-emerald-100" : "bg-white border-slate-100"}`}>
           <div className="flex items-center gap-3 mb-4">
             <p className={`text-[11px] uppercase tracking-[0.12em] font-bold ${motivosPerda.motivos.length === 0 ? "text-emerald-500" : "text-slate-400"}`}>
               Motivos de perda
@@ -753,7 +753,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       </div>
 
       {/* ── Últimos negócios ───────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
           <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Últimos negócios</p>
           <div className="flex-1 h-px bg-slate-100" />
@@ -788,7 +788,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                     {/* Cliente */}
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-blue-500 text-white text-[9px] font-bold flex items-center justify-center shrink-0">
+                        <div className="w-5 h-5 rounded-full bg-indigo-500 text-white text-[9px] font-bold flex items-center justify-center shrink-0">
                           {card.nomeCliente[0]?.toUpperCase() ?? "?"}
                         </div>
                         <span className="font-medium text-slate-700 max-w-[120px] truncate">{card.nomeCliente}</span>

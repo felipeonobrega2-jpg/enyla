@@ -111,40 +111,44 @@ export function KanbanView({
 
       {/* ── Dashboard ── */}
       <div className="shrink-0 border-b border-slate-100 dark:border-[#21262d] bg-white dark:bg-[#0d1117] px-5 pt-4 pb-4 space-y-3">
-        <p className="text-[10px] uppercase tracking-[0.08em] font-semibold text-slate-400">Visão geral</p>
+        <div className="flex items-center gap-3">
+          <p className="text-[9.5px] uppercase tracking-[0.13em] font-semibold text-slate-400">Visão geral do pipeline</p>
+          <div className="flex-1 h-px bg-slate-100" />
+          <span className="text-[10px] text-slate-400 tabular-nums">{total} orçamento{total !== 1 ? "s" : ""}</span>
+        </div>
         <div className="grid grid-cols-4 gap-3">
 
           {/* Orçamentos */}
-          <div className="bg-slate-50 rounded-2xl p-3.5">
-            <p className="text-[9.5px] uppercase tracking-[0.07em] text-slate-400 font-semibold mb-2.5">Orçamentos</p>
+          <div className="bg-white border border-slate-100 rounded-xl p-3.5 shadow-sm">
+            <p className="text-[9px] uppercase tracking-[0.13em] text-slate-400 font-semibold mb-3">Orçamentos</p>
             <div className="flex gap-3">
               <div>
-                <p className="text-[26px] font-black text-slate-800 leading-none tabular-nums">{total}</p>
+                <p className="text-[24px] font-black text-slate-800 leading-none tabular-nums">{total}</p>
                 <p className="text-[10px] text-slate-400 mt-1">realizados</p>
               </div>
-              <div className="border-l border-slate-200 pl-3">
-                <p className="text-[26px] font-black text-green-600 leading-none tabular-nums">{fechados}</p>
+              <div className="border-l border-slate-100 pl-3">
+                <p className="text-[24px] font-black text-emerald-600 leading-none tabular-nums">{fechados}</p>
                 <p className="text-[10px] text-slate-400 mt-1">fechados</p>
               </div>
-              <div className="border-l border-slate-200 pl-3">
-                <p className="text-[26px] font-black text-rose-500 leading-none tabular-nums">{perdidos}</p>
+              <div className="border-l border-slate-100 pl-3">
+                <p className="text-[24px] font-black text-rose-500 leading-none tabular-nums">{perdidos}</p>
                 <p className="text-[10px] text-slate-400 mt-1">perdidos</p>
               </div>
             </div>
           </div>
 
           {/* Conversão */}
-          <div className="bg-slate-50 rounded-2xl p-3.5">
-            <p className="text-[9.5px] uppercase tracking-[0.07em] text-slate-400 font-semibold mb-2">Taxa de conversão</p>
-            <p className="text-[26px] font-black leading-none tabular-nums" style={{
-              color: conversao >= 60 ? "#16a34a" : conversao >= 35 ? "#d97706" : decididos === 0 ? "#cbd5e1" : "#dc2626"
+          <div className="bg-white border border-slate-100 rounded-xl p-3.5 shadow-sm">
+            <p className="text-[9px] uppercase tracking-[0.13em] text-slate-400 font-semibold mb-2">Taxa de conversão</p>
+            <p className="text-[24px] font-black leading-none tabular-nums" style={{
+              color: conversao >= 60 ? "#059669" : conversao >= 35 ? "#d97706" : decididos === 0 ? "#cbd5e1" : "#e11d48"
             }}>
               {decididos === 0 ? "—" : `${num(conversao, 1)}%`}
             </p>
-            <div className="w-full h-1 bg-slate-200 dark:bg-[#2a3548] rounded-full overflow-hidden mt-2">
+            <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden mt-2.5">
               <div className="h-full rounded-full transition-all duration-500" style={{
                 width: `${Math.min(conversao, 100)}%`,
-                background: conversao >= 60 ? "#16a34a" : conversao >= 35 ? "#d97706" : "#dc2626"
+                background: conversao >= 60 ? "#059669" : conversao >= 35 ? "#d97706" : "#e11d48"
               }} />
             </div>
             <p className="text-[10px] text-slate-400 mt-1.5">
@@ -153,35 +157,35 @@ export function KanbanView({
           </div>
 
           {/* Em andamento */}
-          <div className="bg-slate-50 rounded-2xl p-3.5">
-            <p className="text-[9.5px] uppercase tracking-[0.07em] text-slate-400 font-semibold mb-2.5">Em andamento</p>
+          <div className="bg-white border border-slate-100 rounded-xl p-3.5 shadow-sm">
+            <p className="text-[9px] uppercase tracking-[0.13em] text-slate-400 font-semibold mb-3">Em andamento</p>
             <div className="flex gap-3">
               <div>
-                <p className="text-[26px] font-black text-orange-500 leading-none tabular-nums">{emProd}</p>
+                <p className="text-[24px] font-black text-orange-500 leading-none tabular-nums">{emProd}</p>
                 <p className="text-[10px] text-slate-400 mt-1">produção</p>
               </div>
-              <div className="border-l border-slate-200 pl-3">
-                <p className="text-[26px] font-black text-violet-500 leading-none tabular-nums">{aguardAprov}</p>
+              <div className="border-l border-slate-100 pl-3">
+                <p className="text-[24px] font-black text-violet-500 leading-none tabular-nums">{aguardAprov}</p>
                 <p className="text-[10px] text-slate-400 mt-1">aprovação</p>
               </div>
             </div>
           </div>
 
           {/* Financeiro */}
-          <div className="bg-slate-900 rounded-2xl p-3.5">
-            <p className="text-[9.5px] uppercase tracking-[0.07em] text-slate-400 font-semibold mb-2">Financeiro</p>
+          <div className="rounded-xl p-3.5" style={{ background: "#09090b" }}>
+            <p className="text-[9px] uppercase tracking-[0.13em] text-zinc-600 font-semibold mb-2.5">Financeiro</p>
             <div className="space-y-1.5">
               <div className="flex items-baseline justify-between gap-2">
-                <p className="text-[10px] text-slate-500">Pipeline</p>
+                <p className="text-[10px] text-zinc-600">Pipeline</p>
                 <p className="text-[13px] font-bold text-white tabular-nums">{brl(pipeline)}</p>
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <p className="text-[10px] text-slate-500">Faturado</p>
+                <p className="text-[10px] text-zinc-600">Faturado</p>
                 <p className="text-[13px] font-bold text-emerald-400 tabular-nums">{brl(faturado)}</p>
               </div>
-              <div className="flex items-baseline justify-between gap-2 pt-1.5 border-t border-slate-800">
-                <p className="text-[10px] text-slate-500">Ticket médio</p>
-                <p className="text-[12px] font-semibold text-slate-400 tabular-nums">{brl(ticketMed)}</p>
+              <div className="flex items-baseline justify-between gap-2 pt-1.5" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+                <p className="text-[10px] text-zinc-600">Ticket médio</p>
+                <p className="text-[12px] font-semibold text-zinc-400 tabular-nums">{brl(ticketMed)}</p>
               </div>
             </div>
           </div>
@@ -219,8 +223,8 @@ export function KanbanView({
       </div>
 
       {/* Board */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden bg-slate-100/40 dark:bg-[#0d1117]">
-        <div className="flex gap-3 h-full px-5 py-4" style={{ minWidth: `${COLUNAS_KANBAN.length * 252}px` }}>
+      <div className="flex-1 overflow-x-auto overflow-y-hidden dark:bg-[#0d1117]" style={{ background: "#eef0f4" }}>
+        <div className="flex gap-2.5 h-full px-4 py-3.5" style={{ minWidth: `${COLUNAS_KANBAN.length * 252}px` }}>
           {COLUNAS_KANBAN.map((colNome, colIdx) => {
             const colCards = cards.filter(c => c.coluna === colIdx)
             const isOver   = overCol === colIdx
@@ -229,20 +233,21 @@ export function KanbanView({
             return (
               <div
                 key={colIdx}
-                className={`flex flex-col w-60 shrink-0 rounded-2xl transition-all ${
+                className={`flex flex-col w-60 shrink-0 rounded-xl transition-all ${
                   isOver
-                    ? `border-2 ${colors.border} ${colors.bg}`
-                    : "border border-slate-200/70 bg-slate-50/80 dark:bg-[#161b22] dark:border-[#30363d]"
+                    ? `ring-2 ${colors.border.replace("border-", "ring-")} ${colors.bg} border border-transparent`
+                    : "border border-slate-200/60 bg-white/70 dark:bg-[#161b22] dark:border-[#30363d]"
                 }`}
+                style={isOver ? {} : { backdropFilter: "blur(8px)" }}
                 onDragOver={e => handleDragOver(e, colIdx)}
                 onDrop={e => handleDrop(e, colIdx)}
                 onDragLeave={() => setOverCol(null)}
               >
                 {/* Cabeçalho da coluna */}
-                <div className="flex items-center gap-2 px-3 pt-3 pb-2.5 border-b border-slate-200/50 dark:border-[#21262d] shrink-0">
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${colors.dot}`} />
-                  <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex-1 leading-tight">{colNome}</p>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${
+                <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 border-b border-slate-100/80 dark:border-[#21262d] shrink-0">
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colors.dot}`} />
+                  <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 flex-1 leading-tight tracking-tight">{colNome}</p>
+                  <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center tabular-nums ${
                     colCards.length > 0 ? colors.badge : "bg-slate-100 text-slate-300 dark:bg-[#1e2535] dark:text-slate-500"
                   }`}>
                     {colCards.length}
@@ -250,10 +255,10 @@ export function KanbanView({
                 </div>
 
                 {/* Cards */}
-                <div className="flex-1 overflow-y-auto px-2 pb-3 pt-2 space-y-2 min-h-[60px]">
+                <div className="flex-1 overflow-y-auto px-2 pb-2.5 pt-1.5 space-y-1.5 min-h-[60px]">
                   {colCards.length === 0 && (
-                    <div className={`border-2 border-dashed rounded-lg h-12 flex items-center justify-center transition-colors ${
-                      isOver ? colors.border : "border-slate-200/60 dark:border-[#30363d]/60"
+                    <div className={`border-2 border-dashed rounded-lg h-10 flex items-center justify-center transition-colors ${
+                      isOver ? colors.border : "border-slate-200/50 dark:border-[#30363d]/60"
                     }`}>
                       <p className="text-[10px] text-slate-300 dark:text-slate-600 select-none">Arraste aqui</p>
                     </div>
@@ -302,7 +307,7 @@ export function KanbanView({
                   <p className="text-[10px] uppercase tracking-[0.12em] text-slate-400 font-semibold mb-1">Fechar pedido</p>
                   <p className="font-bold text-slate-800 text-[15px] leading-snug truncate">{modal.card.nomeCliente}</p>
                   {modal.card.numero && (
-                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full mt-1.5 inline-block tabular-nums">
+                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded-full mt-1.5 inline-block tabular-nums">
                       {modal.card.numero}
                     </span>
                   )}
@@ -321,21 +326,21 @@ export function KanbanView({
                   <button key={i} onClick={() => setModal(m => m ? { ...m, opcaoIdx: i } : m)}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${
                       selected
-                        ? "border-blue-400 bg-blue-50/60"
+                        ? "border-indigo-400 bg-indigo-50/60"
                         : "border-slate-100 hover:border-slate-200 hover:bg-slate-50"
                     }`}>
                     <div className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${
-                      selected ? "border-blue-500" : "border-slate-300"
+                      selected ? "border-indigo-500" : "border-slate-300"
                     }`}>
-                      {selected && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                      {selected && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`font-bold text-sm leading-none ${selected ? "text-blue-900" : "text-slate-800"}`}>
+                      <p className={`font-bold text-sm leading-none ${selected ? "text-indigo-900" : "text-slate-800"}`}>
                         {num(op.quantidade)} unidades
                       </p>
                       <p className="text-[11px] text-slate-400 mt-0.5">{brl(op.unitario)}/un</p>
                     </div>
-                    <p className={`font-black text-[15px] tabular-nums shrink-0 ${selected ? "text-blue-700" : "text-slate-700"}`}>
+                    <p className={`font-black text-[15px] tabular-nums shrink-0 ${selected ? "text-indigo-700" : "text-slate-700"}`}>
                       {brl(op.preco)}
                     </p>
                   </button>
@@ -470,11 +475,11 @@ function KanbanCardItem({
       onDragStart={e => !confirmando && onDragStart(e, card.id)}
       onDragEnd={onDragEnd}
       onClick={() => onDetalhes?.(card)}
-      className={`flex rounded-2xl border overflow-hidden transition-all duration-150 select-none ${
+      className={`flex rounded-xl border overflow-hidden transition-all duration-150 select-none ${
         isPerdido
-          ? "bg-rose-50/30 border-rose-200/60 dark:bg-rose-950/20 dark:border-rose-900/40"
-          : "bg-white border-slate-200/70 dark:bg-[#1c2333] dark:border-[#30363d]"
-      } ${isDragging ? "opacity-30 scale-95 shadow-none" : "shadow-sm hover:shadow-lg hover:-translate-y-0.5 cursor-grab active:cursor-grabbing"}`}
+          ? "bg-rose-50/40 border-rose-200/60 dark:bg-rose-950/20 dark:border-rose-900/40"
+          : "bg-white border-slate-200/60 dark:bg-[#1c2333] dark:border-[#30363d]"
+      } ${isDragging ? "opacity-30 scale-95 shadow-none" : "shadow-sm hover:shadow-[0_8px_24px_rgba(0,0,0,0.10)] hover:-translate-y-0.5 cursor-grab active:cursor-grabbing"}`}
     >
       {/* Accent bar */}
       <div className={`w-[3px] shrink-0 ${isPerdido ? "bg-rose-300" : colors.dot}`} />
@@ -561,7 +566,7 @@ function KanbanCardItem({
                 })
               }}
               className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${
-                copiedId ? "text-emerald-500 bg-emerald-50" : "text-slate-300 hover:text-blue-500 hover:bg-blue-50"
+                copiedId ? "text-emerald-500 bg-emerald-50" : "text-slate-300 hover:text-indigo-500 hover:bg-indigo-50"
               }`}>
               {copiedId
                 ? <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
