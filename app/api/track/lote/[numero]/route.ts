@@ -19,12 +19,17 @@ export async function GET(
       return NextResponse.json({ lote: null, cards: [] })
     }
 
-    const [{ data: cards }, { data: parceiros }] = await Promise.all([
+    const [{ data: cards }, { data: parceiros }, { data: pagamentos }] = await Promise.all([
       supabase.from("KanbanCard").select("*").eq("loteId", lote.id).order("createdAt", { ascending: true }),
       supabase.from("NegocioParceiro").select("*").eq("loteId", lote.id),
+      supabase.from("LancamentoFinanceiro")
+        .select("id, valor, status, formaPagamento, dataVencimento, dataPagamento")
+        .eq("loteId", lote.id)
+        .eq("tipo", "receita")
+        .order("dataVencimento", { ascending: true }),
     ])
 
-    return NextResponse.json({ lote, cards: cards ?? [], parceiros: parceiros ?? [] })
+    return NextResponse.json({ lote, cards: cards ?? [], parceiros: parceiros ?? [], pagamentos: pagamentos ?? [] })
   } catch (e) {
     console.error(e)
     return NextResponse.json({ error: "DB error" }, { status: 500 })

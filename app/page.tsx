@@ -40,21 +40,31 @@ function NavItem({ active, onClick, icon, label, badge, accent }: {
 }) {
   return (
     <button onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12.5px] transition-all ${
+      className={`w-full flex items-center gap-2.5 px-3 py-[7px] rounded-lg text-[12.5px] transition-all duration-100 ${
         active
-          ? "bg-white/10 text-white font-semibold"
+          ? "bg-white/[0.08] text-white font-semibold"
           : accent
-            ? "text-white font-semibold bg-white/7 hover:bg-white/12 ring-1 ring-inset ring-white/10"
-            : "text-slate-400 hover:text-slate-200 hover:bg-white/5 font-medium"
+            ? "text-indigo-300 font-semibold bg-indigo-500/[0.12] hover:bg-indigo-500/[0.18] ring-1 ring-inset ring-indigo-500/20"
+            : "text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.05] font-medium"
       }`}>
-      {icon}
-      <span className="flex-1 text-left">{label}</span>
+      <span className={`shrink-0 transition-colors ${active ? "text-white" : accent ? "text-indigo-400" : "text-zinc-600"}`}>
+        {icon}
+      </span>
+      <span className="flex-1 text-left truncate">{label}</span>
       {badge !== undefined && badge > 0 && (
-        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-400 tabular-nums">
+        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/[0.07] text-zinc-500 tabular-nums min-w-[18px] text-center">
           {badge}
         </span>
       )}
     </button>
+  )
+}
+
+function NavGroup({ label }: { label: string }) {
+  return (
+    <p className="text-[8.5px] font-semibold uppercase tracking-[0.14em] text-zinc-700 px-3 pt-4 pb-1.5 select-none">
+      {label}
+    </p>
   )
 }
 
@@ -582,93 +592,92 @@ export default function Home() {
   const clienteAtual = clientes.find(c => c.nome.toLowerCase() === form.nomeCliente.trim().toLowerCase())
 
   return (
-    <div className="h-screen flex bg-slate-50 dark:bg-[#0d1117] overflow-hidden text-[13px]">
+    <div className="h-screen flex bg-[#f8f9fb] dark:bg-[#0d1117] overflow-hidden text-[13px]">
 
       {/* ── Left Navigation Sidebar ─────────────────────────────────────── */}
-      <nav className="w-[220px] shrink-0 flex flex-col border-r border-white/5 print:hidden z-20"
-        style={{ background: "#0f172a" }}>
+      <nav className="w-[220px] shrink-0 flex flex-col print:hidden z-20"
+        style={{ background: "#09090b", borderRight: "1px solid rgba(255,255,255,0.05)" }}>
 
         {/* Brand */}
-        <div className="px-4 py-[18px] border-b border-white/5 shrink-0">
-          <div className="flex items-center leading-none min-w-0">
-            <p className="text-white font-black tracking-tight text-[15px]">ENYLA</p>
+        <div className="px-4 pt-5 pb-4 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg shrink-0 flex items-center justify-center"
+              style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" }}>
+              <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 3.75 9v.878m14.25-3A2.25 2.25 0 0 1 20.25 9v.878M3.75 9.878c.235-.083.487-.128.75-.128h15c.263 0 .515.045.75.128m-16.5 0A2.25 2.25 0 0 0 2.25 12v6a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-6a2.25 2.25 0 0 0-1.5-2.122" />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <p className="text-white font-black tracking-tight text-[14px] leading-none">ENYLA</p>
+              <p className="text-zinc-600 text-[9px] font-medium tracking-widest mt-0.5 uppercase">Gráfica</p>
+            </div>
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "system" : "dark")}
               title={theme === "system" ? "Tema: sistema" : theme === "dark" ? "Tema: escuro" : "Tema: claro"}
-              className="ml-auto w-6 h-6 flex items-center justify-center rounded-lg text-slate-600 hover:text-slate-300 hover:bg-white/8 transition-colors"
+              className="ml-auto w-6 h-6 flex items-center justify-center rounded-lg text-zinc-700 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors shrink-0"
             >
               {theme === "dark" ? (
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
-                </svg>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" /></svg>
               ) : theme === "light" ? (
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-                </svg>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" /></svg>
               ) : (
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0H3" />
-                </svg>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0H3" /></svg>
               )}
             </button>
           </div>
         </div>
 
-        {/* Nav items */}
-        <div className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto scrollbar-none">
+        {/* Nav */}
+        <div className="flex-1 px-2 pb-2 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
 
           <NavItem active={view === "dashboard"} onClick={() => setView("dashboard")} label="Dashboard"
-            icon={<svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" /></svg>}
+            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" /></svg>}
           />
 
-          <div className="h-px bg-white/5 my-2 mx-1" />
+          <NavGroup label="Orçamentos" />
 
           <NavItem active={view === "orcamento"} onClick={() => setView("orcamento")} label="Novo orçamento" accent
-            icon={<svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>}
+            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>}
           />
-
           <NavItem active={view === "historico"} onClick={() => setView("historico")} label="Histórico"
             badge={historico.length + propostasCustom.length || undefined}
-            icon={<svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>}
+            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>}
+          />
+          <NavItem active={view === "forma"} onClick={() => setView("forma")} label="Forma IA"
+            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" /></svg>}
           />
 
-          <NavItem active={view === "clientes"} onClick={() => setView("clientes")} label="Clientes"
-            badge={clientes.length || undefined}
-            icon={<svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>}
-          />
+          <NavGroup label="Gestão" />
 
           <NavItem active={view === "kanban"} onClick={() => setView("kanban")} label="Kanban"
-            icon={<svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 4.5v15m6-15v15M3 8.25h3m0 0V6a.75.75 0 0 1 .75-.75H8.25m-5.25 3V18a.75.75 0 0 0 .75.75h2.25A.75.75 0 0 0 7 18V8.25m0 0H3m6.75-3.75H9m7.5 3.75h2.25m0 0V6a.75.75 0 0 0-.75-.75h-1.5A.75.75 0 0 0 15 6v2.25m3 0H15m0 9.75V8.25m0 9.75a.75.75 0 0 0 .75.75h1.5a.75.75 0 0 0 .75-.75V8.25m-3 9.75H15" /></svg>}
+            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 4.5v15m6-15v15M3 8.25h3m0 0V6a.75.75 0 0 1 .75-.75H8.25m-5.25 3V18a.75.75 0 0 0 .75.75h2.25A.75.75 0 0 0 7 18V8.25m0 0H3m6.75-3.75H9m7.5 3.75h2.25m0 0V6a.75.75 0 0 0-.75-.75h-1.5A.75.75 0 0 0 15 6v2.25m3 0H15m0 9.75V8.25m0 9.75a.75.75 0 0 0 .75.75h1.5a.75.75 0 0 0 .75-.75V8.25m-3 9.75H15" /></svg>}
           />
-
+          <NavItem active={view === "clientes"} onClick={() => setView("clientes")} label="Clientes"
+            badge={clientes.length || undefined}
+            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>}
+          />
           <NavItem active={view === "parceiros"} onClick={() => setView("parceiros")} label="Parceiros"
             badge={parceiros.length || undefined}
-            icon={<svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z" /></svg>}
+            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z" /></svg>}
           />
-
           <NavItem active={view === "financeiro"} onClick={() => setView("financeiro")} label="Financeiro"
-            icon={<svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" /></svg>}
-          />
-
-          <div className="h-px bg-white/5 my-2 mx-1" />
-
-          <NavItem active={view === "forma"} onClick={() => setView("forma")} label="Forma ✦"
-            icon={<svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" /></svg>}
+            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" /></svg>}
           />
         </div>
 
         {/* Bottom: Nova Proposta + Config */}
-        <div className="px-2 py-3 border-t border-white/5 shrink-0 space-y-1">
+        <div className="px-2 py-3 shrink-0 space-y-1" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
           <button
             onClick={() => setModalPropostaCustom(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[12.5px] font-semibold transition-all shadow-sm shadow-blue-900/30 mb-2">
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12.5px] font-semibold transition-all duration-100 text-white mb-1"
+            style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)", boxShadow: "0 2px 12px rgba(99,102,241,0.3)" }}>
             <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
             Nova Proposta
           </button>
           <NavItem active={view === "config"} onClick={() => setView("config")} label="Configurações"
-            icon={<svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>}
+            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>}
           />
         </div>
       </nav>
@@ -733,16 +742,16 @@ export default function Home() {
                   onClick={() => { set("materialId", m.id); set("materialNome", m.nome) }}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border-2 text-left transition-all duration-150 ${
                     form.materialId === m.id
-                      ? "border-blue-500/40 bg-blue-50/50 shadow-sm"
+                      ? "border-indigo-500/40 bg-indigo-50/50 shadow-sm"
                       : "border-slate-100 hover:border-slate-200 hover:bg-slate-50/50"
                   }`}>
                   <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-150 ${
-                    form.materialId === m.id ? "border-blue-600 bg-blue-600" : "border-slate-300"
+                    form.materialId === m.id ? "border-indigo-600 bg-indigo-600" : "border-slate-300"
                   }`}>
                     {form.materialId === m.id && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                   </div>
                   <span className={`text-[12.5px] font-medium transition-colors ${
-                    form.materialId === m.id ? "text-blue-900" : "text-slate-700"
+                    form.materialId === m.id ? "text-indigo-900" : "text-slate-700"
                   }`}>{m.nome}</span>
                 </button>
               ))}
@@ -765,7 +774,7 @@ export default function Home() {
 
             {/* Toggle Verniz */}
             <label className="flex items-center gap-2.5 py-1.5 cursor-pointer select-none group" onClick={() => set("incluirVerniz", !form.incluirVerniz)}>
-              <div className={`w-8 h-4 rounded-full transition-colors relative ${form.incluirVerniz ? "bg-blue-600" : "bg-slate-200"}`}>
+              <div className={`w-8 h-4 rounded-full transition-colors relative ${form.incluirVerniz ? "bg-indigo-600" : "bg-slate-200"}`}>
                 <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${form.incluirVerniz ? "translate-x-4" : "translate-x-0.5"}`} />
               </div>
               <span className="text-[12.5px] text-slate-600 group-hover:text-slate-900 transition-colors duration-150">Verniz UV</span>
@@ -795,7 +804,7 @@ export default function Home() {
                     value={form.valorFaca || ""}
                     onChange={e => set("valorFaca", Number(e.target.value))}
                     placeholder="Valor da faca"
-                    className="w-full h-10 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-slate-300 transition-all duration-150" />
+                    className="w-full h-10 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 hover:border-slate-300 transition-all duration-150" />
                 </div>
               )}
             </div>
@@ -817,9 +826,9 @@ export default function Home() {
                 onChange={e => setNovaQtd(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && addQtd()}
                 placeholder="Adicionar quantidade…"
-                className="flex-1 border border-slate-200 rounded-xl px-3 py-1.5 text-[13px] text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                className="flex-1 border border-slate-200 rounded-xl px-3 py-1.5 text-[13px] text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400" />
               <button onClick={addQtd}
-                className="px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition-colors">+</button>
+                className="px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition-colors">+</button>
             </div>
           </FormSection>
 
@@ -843,7 +852,7 @@ export default function Home() {
                   <input type="number" min={1} max={365}
                     value={form.validadeDias}
                     onChange={e => set("validadeDias", Math.max(1, Number(e.target.value)))}
-                    className="w-20 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-900 text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-20 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-900 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
                     title="Valor personalizado"
                   />
                 </div>
@@ -855,7 +864,7 @@ export default function Home() {
                   onChange={e => set("obsInterna", e.target.value)}
                   placeholder="Notas internas, condições especiais, prazo…"
                   rows={3}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-300 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-300 resize-none focus:outline-none focus:ring-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition"
                 />
               </div>
               <div>
@@ -865,7 +874,7 @@ export default function Home() {
                   onChange={e => set("obsCliente", e.target.value)}
                   placeholder="Aparece na proposta enviada ao cliente…"
                   rows={3}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-300 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-300 resize-none focus:outline-none focus:ring-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition"
                 />
               </div>
             </div>
@@ -874,7 +883,7 @@ export default function Home() {
           {/* Ações */}
           <div className="p-5 mt-auto space-y-2 border-t border-slate-100 bg-white">
             <button onClick={salvar} disabled={!r}
-              className="w-full h-11 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 active:scale-[0.99] disabled:opacity-30 disabled:cursor-not-allowed text-white text-[13px] font-bold rounded-xl transition-all duration-150 shadow-md shadow-blue-600/20 disabled:shadow-none">
+              className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 active:scale-[0.99] disabled:opacity-30 disabled:cursor-not-allowed text-white text-[13px] font-bold rounded-xl transition-all duration-150 shadow-md shadow-indigo-600/20 disabled:shadow-none">
               Salvar orçamento
             </button>
             {r && (
@@ -890,7 +899,7 @@ export default function Home() {
                     PDF Gráfica
                   </button>
                   <button onClick={() => downloadPdfCliente({ form, calculo: r, data: new Date().toLocaleString("pt-BR") })}
-                    className="flex-1 h-9 border border-blue-200 hover:border-blue-300 hover:bg-blue-50/50 text-blue-600 text-[11.5px] font-medium rounded-xl transition-all duration-150">
+                    className="flex-1 h-9 border border-indigo-200 hover:border-indigo-300 hover:bg-indigo-50/50 text-indigo-600 text-[11.5px] font-medium rounded-xl transition-all duration-150">
                     PDF Cliente
                   </button>
                 </div>

@@ -25,42 +25,97 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "#0f172a" }}>
-      <div className="w-full max-w-sm px-6">
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "#09090b" }}>
 
-        {/* Brand */}
-        <div className="flex flex-col items-center mb-8">
-          <h1 className="text-white font-black text-3xl tracking-tight mb-1">ENYLA</h1>
-          <p className="text-slate-500 text-sm">Orçamentista</p>
+      {/* Ambient glow */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+        <div style={{
+          position: "absolute", top: "30%", left: "50%", transform: "translate(-50%, -50%)",
+          width: 600, height: 600,
+          background: "radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)",
+        }} />
+      </div>
+
+      <div className="relative w-full max-w-[360px] px-6">
+
+        {/* Brand mark */}
+        <div className="flex flex-col items-center mb-10">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5 shadow-lg shadow-indigo-900/40"
+            style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" }}>
+            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 3.75 9v.878m14.25-3A2.25 2.25 0 0 1 20.25 9v.878M3.75 9.878c.235-.083.487-.128.75-.128h15c.263 0 .515.045.75.128m-16.5 0A2.25 2.25 0 0 0 2.25 12v6a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-6a2.25 2.25 0 0 0-1.5-2.122" />
+            </svg>
+          </div>
+          <h1 className="text-white font-black text-2xl tracking-tight leading-none">ENYLA</h1>
+          <p className="text-zinc-500 text-xs mt-1.5 tracking-widest uppercase font-medium">Comunicação Visual</p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-slate-400 text-xs font-medium mb-1.5">Senha de acesso</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              autoFocus
-              className="w-full h-11 bg-white/5 border border-white/10 rounded-xl px-4 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-            />
-          </div>
+        {/* Card */}
+        <div style={{
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: 20,
+          padding: "28px 28px 24px",
+        }}>
+          <p className="text-white font-semibold text-[15px] mb-1">Bem-vindo de volta</p>
+          <p className="text-zinc-500 text-[12.5px] mb-6">Acesso restrito — equipe interna</p>
 
-          {error && (
-            <p className="text-rose-400 text-xs text-center">{error}</p>
-          )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-zinc-400 text-[11px] font-semibold uppercase tracking-[0.1em] mb-2">Senha de acesso</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                autoFocus
+                style={{
+                  width: "100%", height: 44,
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 12,
+                  padding: "0 16px",
+                  color: "#fff",
+                  fontSize: 14,
+                  outline: "none",
+                  transition: "border-color 0.15s",
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = "#6366f1" }}
+                onBlur={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)" }}
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={loading || !password}
-            className="w-full h-11 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-blue-900/30"
-          >
-            {loading ? "Entrando…" : "Entrar"}
-          </button>
-        </form>
+            {error && (
+              <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2.5">
+                <svg className="w-3.5 h-3.5 text-rose-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                </svg>
+                <p className="text-rose-400 text-[12px]">{error}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || !password}
+              style={{
+                width: "100%", height: 44,
+                background: loading || !password ? "rgba(99,102,241,0.4)" : "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                border: "none", borderRadius: 12,
+                color: "#fff", fontWeight: 700, fontSize: 14,
+                cursor: loading || !password ? "not-allowed" : "pointer",
+                transition: "opacity 0.15s",
+                boxShadow: loading || !password ? "none" : "0 4px 24px rgba(99,102,241,0.35)",
+              }}
+            >
+              {loading ? "Entrando…" : "Entrar"}
+            </button>
+          </form>
+        </div>
+
+        <p className="text-center text-zinc-700 text-[10.5px] mt-8">
+          ENYLA Comunicação Visual · Sistema interno
+        </p>
       </div>
     </div>
   )

@@ -7,7 +7,7 @@ import { LinhaTabela, Calculo } from "../types"
 export function FormSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="px-5 py-4 border-b border-slate-100">
-      <p className="text-[9px] uppercase tracking-[0.16em] font-bold text-slate-400 mb-3.5">{label}</p>
+      <p className="text-[9.5px] uppercase tracking-[0.13em] font-semibold text-zinc-400 mb-3">{label}</p>
       {children}
     </div>
   )
@@ -17,7 +17,7 @@ export function Label({ children }: { children: React.ReactNode }) {
   return <p className="text-[10.5px] text-slate-500 font-medium mb-1.5">{children}</p>
 }
 
-const inputCls = "w-full h-10 border border-slate-200 rounded-xl px-3 text-[13px] text-slate-900 placeholder:text-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all duration-150 hover:border-slate-300"
+const inputCls = "w-full h-10 border border-slate-200 rounded-xl px-3 text-[13px] text-slate-900 placeholder:text-slate-300 bg-zinc-50/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all duration-150 hover:border-slate-300 dark:bg-transparent"
 
 export function TextInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
@@ -38,11 +38,11 @@ export function KpiCard({ label, value, sub, accent }: { label: string; value: s
   return (
     <div className={`rounded-2xl p-5 border transition-all duration-200 ${
       accent
-        ? "bg-gradient-to-br from-slate-900 to-[#0c1220] border-slate-800/60 shadow-xl shadow-slate-900/10"
-        : "bg-white border-slate-100 hover:shadow-sm hover:border-slate-200"
+        ? "bg-gradient-to-br from-[#09090b] to-[#111827] border-white/[0.06] shadow-xl"
+        : "bg-white border-slate-100/80 hover:shadow-md hover:shadow-slate-100 hover:border-slate-200/80 hover:-translate-y-px"
     }`}>
-      <p className={`text-[9px] uppercase tracking-[0.15em] font-bold mb-3 ${accent ? "text-slate-500" : "text-slate-400"}`}>{label}</p>
-      <p className={`text-[28px] font-black leading-none tracking-tight ${accent ? "text-white" : "text-slate-900"}`}>{value}</p>
+      <p className={`text-[9.5px] uppercase tracking-[0.13em] font-semibold mb-3 ${accent ? "text-zinc-500" : "text-slate-400"}`}>{label}</p>
+      <p className={`text-[26px] font-black leading-none tracking-tight ${accent ? "text-white" : "text-slate-900"}`}>{value}</p>
       {sub && <p className={`text-[11px] mt-2 leading-snug ${accent ? "text-slate-500" : "text-slate-400"}`}>{sub}</p>}
     </div>
   )
@@ -52,7 +52,7 @@ export function Section({ title, children }: { title: string; children: React.Re
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <p className="text-[9px] uppercase tracking-[0.15em] font-bold text-slate-400 shrink-0 leading-none">{title}</p>
+        <p className="text-[9.5px] uppercase tracking-[0.13em] font-semibold text-slate-400 shrink-0 leading-none">{title}</p>
         <div className="flex-1 h-px bg-slate-100" />
       </div>
       {children}
@@ -185,7 +185,7 @@ export function EmptyState() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
           </svg>
         </div>
-        <div className="absolute -bottom-2 -right-2 w-7 h-7 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/30">
+        <div className="absolute -bottom-2 -right-2 w-7 h-7 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30">
           <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
