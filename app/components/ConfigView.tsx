@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import { Configuracoes, Material, CONFIG_PADRAO } from "../config"
+import { useTheme, ThemeChoice } from "./ThemeProvider"
 
 export function ConfigView({ config, onSave, onExportar, onImportar }: {
   config: Configuracoes
@@ -21,6 +22,38 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
   function setMult(k: keyof Configuracoes["multiplicadores"], v: number) {
     setDraft(d => ({ ...d, multiplicadores: { ...d.multiplicadores, [k]: v } }))
   }
+
+  const { theme, setTheme } = useTheme()
+
+  const themeOptions: { value: ThemeChoice; label: string; icon: React.ReactNode }[] = [
+    {
+      value: "system",
+      label: "Sistema",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0H3" />
+        </svg>
+      ),
+    },
+    {
+      value: "light",
+      label: "Claro",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
+        </svg>
+      ),
+    },
+    {
+      value: "dark",
+      label: "Escuro",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
+        </svg>
+      ),
+    },
+  ]
 
   const custosLabels: [keyof Configuracoes["custos"], string, string][] = [
     ["impressaoPorChapa", "Impressão por chapa", "R$/chapa"],
@@ -70,6 +103,35 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
             placeholder="sk-ant-api03-…"
             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 font-mono placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
+        </div>
+      </div>
+
+      {/* Aparência */}
+      <div className="bg-white border border-slate-100 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+          <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
+          </svg>
+          <p className="text-xs font-semibold text-slate-600">Aparência</p>
+        </div>
+        <div className="px-4 py-4">
+          <p className="text-[11px] text-slate-400 mb-3">Tema da interface. "Sistema" acompanha automaticamente a preferência do seu dispositivo.</p>
+          <div className="flex gap-2">
+            {themeOptions.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setTheme(opt.value)}
+                className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 text-xs font-semibold transition-all ${
+                  theme === opt.value
+                    ? "border-blue-500 bg-blue-50 text-blue-700"
+                    : "border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                {opt.icon}
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
