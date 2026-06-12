@@ -1,8 +1,15 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Parceiro, NegocioParceiro, TipoNegocio, StatusNegocio } from "../types"
+import { Parceiro, NegocioParceiro, TipoNegocio, StatusNegocio, StatusLoteParceiro, Lote } from "../types"
 import { brl } from "../utils"
+
+const PARTNER_STEPS: { id: StatusLoteParceiro; label: string }[] = [
+  { id: "aguardando",  label: "Aguardando" },
+  { id: "em_producao", label: "Em produção" },
+  { id: "pronto",      label: "Pronto" },
+  { id: "entregue",    label: "Entregue" },
+]
 
 const CATEGORIAS = [
   "Embalagens", "Vidros", "Essências", "Papéis",
@@ -132,9 +139,10 @@ function ModalParceiro({ inicial, onSave, onClose }: {
 }
 
 // ─── Modal Negócio ───────────────────────────────────────────────────────────
-function ModalNegocio({ inicial, parceiros, onSave, onClose }: {
+function ModalNegocio({ inicial, parceiros, lotes, onSave, onClose }: {
   inicial?: NegocioParceiro
   parceiros: Parceiro[]
+  lotes?: Lote[]
   onSave: (n: NegocioParceiro) => void
   onClose: () => void
 }) {
@@ -147,6 +155,9 @@ function ModalNegocio({ inicial, parceiros, onSave, onClose }: {
   const [dataOrcamento, setDataOrcamento] = useState(inicial?.dataOrcamento ?? hoje())
   const [status, setStatus]           = useState<StatusNegocio>(inicial?.status ?? "pendente")
   const [obs, setObs]                 = useState(inicial?.obs ?? "")
+  const [loteId, setLoteId]           = useState(inicial?.loteId ?? "")
+  const [loteNumero, setLoteNumero]   = useState(inicial?.loteNumero ?? "")
+  const [statusLote, setStatusLote]   = useState<StatusLoteParceiro>(inicial?.statusLote ?? "aguardando")
 
   const parceiro = parceiros.find(p => p.id === parceiroId)
 
@@ -182,6 +193,9 @@ function ModalNegocio({ inicial, parceiros, onSave, onClose }: {
       dataOrcamento,
       status,
       obs:            obs.trim() || undefined,
+      loteId:         loteId || undefined,
+      loteNumero:     loteNumero || undefined,
+      statusLote:     loteId ? statusLote : undefined,
       criadoEm:       inicial?.criadoEm ?? new Date().toLocaleString("pt-BR"),
     })
     onClose()
@@ -318,6 +332,44 @@ function ModalNegocio({ inicial, parceiros, onSave, onClose }: {
               className={`${input()} resize-none`}
             />
           </Field>
+
+          {lotes && lotes.length > 0 && (
+            <Field label="Vincular ao lote (opcional)">
+              <select
+                value={loteId}
+                onChange={e => {
+                  const chosen = lotes.find(l => l.id === e.target.value)
+                  setLoteId(chosen?.id ?? "")
+                  setLoteNumero(chosen?.numero ?? "")
+                }}
+                className={input()}>
+                <option value="">Nenhum</option>
+                {lotes.map(l => (
+                  <option key={l.id} value={l.id}>{l.numero} · {l.nomeCliente}</option>
+                ))}
+              </select>
+            </Field>
+          )}
+
+          {loteId && (
+            <Field label="Status do produto no lote">
+              <div className="flex gap-1.5">
+                {PARTNER_STEPS.map(step => (
+                  <button
+                    key={step.id}
+                    type="button"
+                    onClick={() => setStatusLote(step.id)}
+                    className={`flex-1 py-1.5 text-[10px] font-semibold rounded-lg transition-colors border ${
+                      statusLote === step.id
+                        ? "bg-amber-500 text-white border-amber-500"
+                        : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100"
+                    }`}>
+                    {step.label}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          )}
         </div>
 
         <div className="px-6 pb-5 flex gap-2 shrink-0 border-t border-slate-100 pt-4">
@@ -341,6 +393,7 @@ function ModalNegocio({ inicial, parceiros, onSave, onClose }: {
 export function ParceirosView({
   parceiros,
   negocios,
+  lotes,
   onAddParceiro,
   onUpdateParceiro,
   onDeleteParceiro,
@@ -350,6 +403,7 @@ export function ParceirosView({
 }: {
   parceiros: Parceiro[]
   negocios: NegocioParceiro[]
+  lotes?: Lote[]
   onAddParceiro: (p: Parceiro) => void
   onUpdateParceiro: (p: Parceiro) => void
   onDeleteParceiro: (id: string) => void
@@ -542,11 +596,37 @@ export function ParceirosView({
                           <span className="font-bold text-slate-800 text-[13px]">{n.descricao}</span>
                           {pill(n.tipo === "comissao" ? "Comissão" : "Ganho", "bg-violet-50 text-violet-700 border-violet-200")}
                           {pill(STATUS_LABEL[n.status], STATUS_CLS[n.status])}
+                          {n.loteNumero && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-violet-100 text-violet-700 border-violet-200">
+                              {n.loteNumero}
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-3 mt-1 flex-wrap">
                           <span className="text-[11.5px] font-medium text-slate-500">{n.parceiroNome}</span>
                           <span className="text-[11px] text-slate-400">{formatDate(n.dataOrcamento)}</span>
                         </div>
+                        {n.loteId && (
+                          <div className="flex gap-1 mt-2">
+                            {PARTNER_STEPS.map((step, i) => {
+                              const currentIdx = PARTNER_STEPS.findIndex(s => s.id === (n.statusLote ?? "aguardando"))
+                              const done = i <= currentIdx
+                              return (
+                                <button
+                                  key={step.id}
+                                  onClick={() => onUpdateNegocio({ ...n, statusLote: step.id })}
+                                  title={step.label}
+                                  className={`flex-1 h-5 rounded text-[9px] font-bold transition-colors ${
+                                    done
+                                      ? "bg-amber-400 text-white"
+                                      : "bg-slate-100 text-slate-400 hover:bg-amber-100 hover:text-amber-600"
+                                  }`}>
+                                  {step.label.split(" ")[0]}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
                         {n.obs && (
                           <p className="text-[11px] text-slate-400 italic mt-1">{n.obs}</p>
                         )}
@@ -599,6 +679,7 @@ export function ParceirosView({
         <ModalNegocio
           inicial={modalNegocio === true ? undefined : modalNegocio}
           parceiros={parceiros}
+          lotes={lotes}
           onSave={n => modalNegocio === true ? onAddNegocio(n) : onUpdateNegocio(n)}
           onClose={() => setModalNegocio(null)}
         />

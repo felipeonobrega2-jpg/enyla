@@ -17,6 +17,9 @@ export async function POST(req: NextRequest) {
       dataOrcamento:  body.dataOrcamento,
       status:         body.status,
       obs:            body.obs ?? null,
+      loteId:         body.loteId ?? null,
+      loteNumero:     body.loteNumero ?? null,
+      statusLote:     body.statusLote ?? null,
       criadoEm:       body.criadoEm,
     }, { onConflict: "id" })
     return NextResponse.json({ ok: true })
