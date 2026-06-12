@@ -226,9 +226,9 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
     // Unique clients in period
     const clientesUnicos = new Set(filteredCards.map(c => c.nomeCliente)).size
 
-    // Pipeline: ALL open deals in the system right now (global snapshot, not period-filtered)
+    // Pipeline: only unconfirmed quotes (col 0) — once confirmed it moves to production
     const pipelineGlobal = kanban
-      .filter(c => c.coluna !== COL_PERDIDO && c.coluna !== COL_ENTREGUE && c.coluna !== COL_FECHADO)
+      .filter(c => c.coluna === 0)
       .reduce((s, c) => s + c.preco, 0)
 
     // Em produção: cards in production stages 2–8 (global)
@@ -416,7 +416,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 shadow-sm text-white">
           <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-blue-100 mb-3">Pipeline</p>
           <p className="text-[22px] font-black tabular-nums leading-none">{brl(kpis.pipelineGlobal)}</p>
-          <p className="text-[10px] text-blue-200 mt-2">orçamentos em aberto (global)</p>
+          <p className="text-[10px] text-blue-200 mt-2">cotações aguardando confirmação</p>
         </div>
 
         {/* Em produção */}
