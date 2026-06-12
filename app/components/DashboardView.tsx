@@ -275,11 +275,13 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
   }, [kanban, periodBounds])
 
   // ── Filter confirmed cards by CLOSE date — for receita, ticket médio ───────
-  // Uses dataFechamento when available; falls back to data for existing cards.
+  // "Confirmed" = any card that advanced past col 0 (open quote) and was not lost.
+  // This includes cols 1 (Fechado), 2-8 (in production), 9 (Entregue).
+  // Uses dataFechamento (set when first reaching col 1) or falls back to quote date.
   const confirmedByCloseDate = useMemo(() => {
     const { from, to } = periodBounds
     return kanban.filter(c => {
-      if (c.coluna !== COL_FECHADO && c.coluna !== COL_ENTREGUE) return false
+      if (c.coluna === 0 || c.coluna === COL_PERDIDO) return false
       const d = parseDataBr(c.dataFechamento ?? c.data)
       if (from && d < from) return false
       if (to   && d > to)   return false
@@ -297,17 +299,15 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
     const entregues  = confirmedByCloseDate.filter(c => c.coluna === COL_ENTREGUE).length
     const ticket     = fechamentos > 0 ? receita / fechamentos : 0
 
-    // Conversion: how many of THIS PERIOD's quotes are now closed — always ≤ 100%
+    // Conversion: how many of THIS PERIOD's quotes are now confirmed (cols 1-9) — always ≤ 100%
     const confirmedInPeriod = filteredCards.filter(
-      c => c.coluna === COL_FECHADO || c.coluna === COL_ENTREGUE
+      c => c.coluna !== 0 && c.coluna !== COL_PERDIDO
     ).length
     const conversao = total > 0 ? (confirmedInPeriod / total) * 100 : 0
 
-    // Loss rate among resolved deals in this period
+    // Loss rate: among resolved deals (not still open at col 0) how many were lost
     const perdidos   = filteredCards.filter(c => c.coluna === COL_PERDIDO).length
-    const resolvidos = filteredCards.filter(
-      c => c.coluna === COL_PERDIDO || c.coluna === COL_FECHADO || c.coluna === COL_ENTREGUE
-    ).length
+    const resolvidos = filteredCards.filter(c => c.coluna !== 0).length
     const taxaPerda  = resolvidos > 0 ? (perdidos / resolvidos) * 100 : 0
 
     // Unique clients in period

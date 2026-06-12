@@ -67,7 +67,7 @@ export default function Home() {
   const [historico, setHistorico] = useState<Array<{ form: FormData; calculo: Calculo; data: string; numero?: string }>>([])
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
   const [contador, setContador] = useState<number>(0)
-  const [view, setView]       = useState<"orcamento" | "historico" | "clientes" | "kanban" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro">("orcamento")
+  const [view, setView]       = useState<"orcamento" | "historico" | "clientes" | "kanban" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro">("dashboard")
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
   const [modalSalvar, setModalSalvar] = useState<{ form: FormData; calculo: Calculo; numero: string; data: string; cardId: string } | null>(null)
   const [clientes, setClientes] = useState<Cliente[]>([])
