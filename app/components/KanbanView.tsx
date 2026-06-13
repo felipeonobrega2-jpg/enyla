@@ -112,7 +112,7 @@ export function KanbanView({
       {/* ── Dashboard ── */}
       <div className="shrink-0 border-b border-[rgba(60,60,67,0.12)] bg-white px-5 pt-4 pb-4 space-y-3">
         <div className="flex items-center gap-3">
-          <p className="text-[9.5px] uppercase tracking-[0.13em] font-semibold text-[#8E8E93]">Visão geral do pipeline</p>
+          <p className="text-[9.5px] uppercase tracking-wide font-semibold text-[#8E8E93]">Visão geral do pipeline</p>
           <div className="flex-1 h-px bg-[rgba(60,60,67,0.12)]" />
           <span className="text-[10px] text-[#8E8E93] tabular-nums">{total} orçamento{total !== 1 ? "s" : ""}</span>
         </div>
@@ -120,18 +120,18 @@ export function KanbanView({
 
           {/* Orçamentos */}
           <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]">
-            <p className="text-[9px] uppercase tracking-[0.13em] text-[#8E8E93] font-semibold mb-3">Orçamentos</p>
+            <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-3">Orçamentos</p>
             <div className="flex gap-3">
               <div>
-                <p className="text-[24px] font-black text-[#1C1C1E] leading-none tabular-nums">{total}</p>
+                <p className="text-[24px] font-semibold text-[#1C1C1E] leading-none tabular-nums">{total}</p>
                 <p className="text-[10px] text-[#8E8E93] mt-1">realizados</p>
               </div>
               <div className="border-l border-[rgba(60,60,67,0.12)] pl-3">
-                <p className="text-[24px] font-black leading-none tabular-nums" style={{ color: "#34C759" }}>{fechados}</p>
+                <p className="text-[24px] font-semibold leading-none tabular-nums" style={{ color: "#34C759" }}>{fechados}</p>
                 <p className="text-[10px] text-[#8E8E93] mt-1">fechados</p>
               </div>
               <div className="border-l border-[rgba(60,60,67,0.12)] pl-3">
-                <p className="text-[24px] font-black leading-none tabular-nums" style={{ color: "#FF3B30" }}>{perdidos}</p>
+                <p className="text-[24px] font-semibold leading-none tabular-nums" style={{ color: "#FF3B30" }}>{perdidos}</p>
                 <p className="text-[10px] text-[#8E8E93] mt-1">perdidos</p>
               </div>
             </div>
@@ -139,8 +139,8 @@ export function KanbanView({
 
           {/* Conversão */}
           <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]">
-            <p className="text-[9px] uppercase tracking-[0.13em] text-[#8E8E93] font-semibold mb-2">Taxa de conversão</p>
-            <p className="text-[24px] font-black leading-none tabular-nums" style={{
+            <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-2">Taxa de conversão</p>
+            <p className="text-[24px] font-semibold leading-none tabular-nums" style={{
               color: conversao >= 60 ? "#34C759" : conversao >= 35 ? "#FF9500" : decididos === 0 ? "#8E8E93" : "#FF3B30"
             }}>
               {decididos === 0 ? "—" : `${num(conversao, 1)}%`}
@@ -158,14 +158,14 @@ export function KanbanView({
 
           {/* Em andamento */}
           <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]">
-            <p className="text-[9px] uppercase tracking-[0.13em] text-[#8E8E93] font-semibold mb-3">Em andamento</p>
+            <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-3">Em andamento</p>
             <div className="flex gap-3">
               <div>
-                <p className="text-[24px] font-black leading-none tabular-nums" style={{ color: "#FF9500" }}>{emProd}</p>
+                <p className="text-[24px] font-semibold leading-none tabular-nums" style={{ color: "#FF9500" }}>{emProd}</p>
                 <p className="text-[10px] text-[#8E8E93] mt-1">produção</p>
               </div>
               <div className="border-l border-[rgba(60,60,67,0.12)] pl-3">
-                <p className="text-[24px] font-black leading-none tabular-nums" style={{ color: "#AF52DE" }}>{aguardAprov}</p>
+                <p className="text-[24px] font-semibold leading-none tabular-nums" style={{ color: "#AF52DE" }}>{aguardAprov}</p>
                 <p className="text-[10px] text-[#8E8E93] mt-1">aprovação</p>
               </div>
             </div>
@@ -173,7 +173,7 @@ export function KanbanView({
 
           {/* Financeiro */}
           <div className="rounded-xl p-3.5" style={{ background: "#1C1C1E" }}>
-            <p className="text-[9px] uppercase tracking-[0.13em] font-semibold mb-2.5" style={{ color: "rgba(255,255,255,0.4)" }}>Financeiro</p>
+            <p className="text-[9px] uppercase tracking-wide font-semibold mb-2.5" style={{ color: "rgba(255,255,255,0.4)" }}>Financeiro</p>
             <div className="space-y-1.5">
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>Pipeline</p>
@@ -303,7 +303,7 @@ export function KanbanView({
             <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.12)]">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] uppercase tracking-[0.12em] text-[#8E8E93] font-semibold mb-1">Fechar pedido</p>
+                  <p className="text-[10px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-1">Fechar pedido</p>
                   <p className="font-bold text-[#1C1C1E] text-[15px] leading-snug truncate">{modal.card.nomeCliente}</p>
                   {modal.card.numero && (
                     <span className="text-[10px] font-bold text-[#007AFF] bg-[#007AFF]/10 border border-[#007AFF]/20 px-1.5 py-0.5 rounded-full mt-1.5 inline-block tabular-nums">
@@ -339,7 +339,7 @@ export function KanbanView({
                       </p>
                       <p className="text-[11px] text-[#8E8E93] mt-0.5">{brl(op.unitario)}/un</p>
                     </div>
-                    <p className={`font-black text-[15px] tabular-nums shrink-0 ${selected ? "text-[#007AFF]" : "text-[#1C1C1E]"}`}>
+                    <p className={`font-semibold text-[15px] tabular-nums shrink-0 ${selected ? "text-[#007AFF]" : "text-[#1C1C1E]"}`}>
                       {brl(op.preco)}
                     </p>
                   </button>
@@ -537,7 +537,7 @@ function KanbanCardItem({
 
           {/* Price row */}
           <div className="flex items-baseline gap-2">
-            <span className={`font-black text-[16px] leading-none tabular-nums tracking-tight ${
+            <span className={`font-semibold text-[16px] leading-none tabular-nums tracking-tight ${
               isPerdido ? "text-[#FF3B30]/60 line-through" : "text-[#1C1C1E]"
             }`}>{brl(card.preco)}</span>
             <span className="text-[10px] text-[#8E8E93] tabular-nums">{num(card.quantidade)} un</span>
@@ -622,7 +622,7 @@ function KanbanCardItem({
                         value={loteNumeroEdit}
                         onChange={e => { setLoteNumeroEdit(e.target.value.toUpperCase()); setLoteRenameError("") }}
                         onKeyDown={e => { if (e.key === "Enter") handleRenomear(); if (e.key === "Escape") { setEditingLote(false); setLoteRenameError("") } }}
-                        className="flex-1 font-black text-[15px] text-[#007AFF] bg-white border-2 border-[#007AFF] rounded-xl px-2.5 py-1 focus:outline-none min-w-0 tracking-wide"
+                        className="flex-1 font-semibold text-[15px] text-[#007AFF] bg-white border-2 border-[#007AFF] rounded-xl px-2.5 py-1 focus:outline-none min-w-0 tracking-wide"
                       />
                       <button onClick={handleRenomear} disabled={savingRename}
                         className="w-8 h-8 flex items-center justify-center text-white bg-[#007AFF] hover:bg-[#0062CC] disabled:opacity-50 rounded-xl transition-colors shrink-0">
@@ -640,7 +640,7 @@ function KanbanCardItem({
                     <button
                       onClick={() => { setLoteNumeroEdit(card.loteNumero ?? ""); setLoteRenameError(""); setEditingLote(true) }}
                       title="Clique para renomear"
-                      className="font-black text-[17px] text-[#007AFF] tracking-wide hover:text-[#0062CC] transition-colors cursor-text -mx-0.5 px-0.5 rounded-lg"
+                      className="font-semibold text-[17px] text-[#007AFF] tracking-wide hover:text-[#0062CC] transition-colors cursor-text -mx-0.5 px-0.5 rounded-lg"
                     >
                       {card.loteNumero}
                     </button>
@@ -710,10 +710,10 @@ function KanbanCardItem({
                               ))}
                             </div>
                           ) : (
-                            <p className="text-[10px] text-slate-400 text-center py-2.5">Nenhum produto disponível</p>
+                            <p className="text-[10px] text-[#8E8E93] text-center py-2.5">Nenhum produto disponível</p>
                           )}
                           <button onClick={() => setShowAddNegocio(false)}
-                            className="w-full py-1.5 text-[10px] text-slate-400 hover:text-slate-600 transition-colors">
+                            className="w-full py-1.5 text-[10px] text-[#8E8E93] hover:text-[rgba(60,60,67,0.6)] transition-colors">
                             Cancelar
                           </button>
                         </div>
@@ -740,8 +740,8 @@ function KanbanCardItem({
                           <span className="font-bold text-[10px] text-[#007AFF]">{l.numero}</span>
                           <span className="text-[9.5px] text-[#8E8E93] flex-1 truncate">{l.nomeCliente}</span>
                           {merging
-                            ? <span className="text-[9px] text-slate-300">…</span>
-                            : <svg className="w-3 h-3 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" /></svg>
+                            ? <span className="text-[9px] text-[rgba(60,60,67,0.3)]">…</span>
+                            : <svg className="w-3 h-3 text-[rgba(60,60,67,0.3)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" /></svg>
                           }
                         </button>
                       ))}

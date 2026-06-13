@@ -100,14 +100,14 @@ export function ModalPropostaCustom({
         style={{ maxHeight: "94vh" }}>
 
         {/* Header */}
-        <div className="px-6 pt-5 pb-4 border-b border-slate-100 shrink-0">
+        <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] shrink-0">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[9.5px] uppercase tracking-[0.1em] font-bold text-violet-500 mb-1">Nova Proposta Personalizada</p>
-              <p className="font-bold text-slate-800 text-[15px] leading-snug">Defina as quantidades e preços manualmente</p>
+              <p className="text-[9.5px] uppercase tracking-wide font-bold text-[#AF52DE] mb-1">Nova Proposta Personalizada</p>
+              <p className="font-bold text-[#1C1C1E] text-[15px] leading-snug">Defina as quantidades e preços manualmente</p>
             </div>
             <button onClick={onClose}
-              className="text-slate-300 hover:text-slate-500 transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
+              className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
           </div>
         </div>
 
@@ -116,19 +116,19 @@ export function ModalPropostaCustom({
 
           {/* Cliente */}
           <div className="space-y-2">
-            <p className="text-[9.5px] uppercase tracking-widest font-bold text-slate-400">Cliente</p>
+            <p className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Cliente</p>
             <ClienteCombobox value={nomeCliente} onChange={setNomeCliente} clientes={clientes} />
           </div>
 
           {/* Especificações opcionais */}
           <div className="space-y-2">
-            <p className="text-[9.5px] uppercase tracking-widest font-bold text-slate-400">Especificações <span className="normal-case font-normal text-slate-300">(opcional)</span></p>
+            <p className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Especificações <span className="normal-case font-normal text-[rgba(60,60,67,0.3)]">(opcional)</span></p>
             <input
               type="text"
               value={descricao}
               onChange={e => setDescricao(e.target.value)}
               placeholder="Produto (ex: Caixa perfume)"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
+              className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
             />
             <div className="grid grid-cols-2 gap-2">
               <input
@@ -136,13 +136,13 @@ export function ModalPropostaCustom({
                 value={dimensoes}
                 onChange={e => setDimensoes(e.target.value)}
                 placeholder="Dimensões (ex: 8×10×4 cm)"
-                className="border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
+                className="border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
               />
               {materiais && materiais.length > 0 ? (
                 <select
                   value={material}
                   onChange={e => setMaterial(e.target.value)}
-                  className="border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400 bg-white"
+                  className="border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400 bg-white"
                 >
                   <option value="">— Material —</option>
                   {materiais.map(m => (
@@ -155,7 +155,7 @@ export function ModalPropostaCustom({
                   value={material}
                   onChange={e => setMaterial(e.target.value)}
                   placeholder="Material (ex: Cartão 300g)"
-                  className="border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
+                  className="border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
                 />
               )}
             </div>
@@ -168,7 +168,7 @@ export function ModalPropostaCustom({
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all ${
                   incluirVerniz
                     ? "border-blue-400 bg-blue-50 text-blue-700"
-                    : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                    : "border-[rgba(60,60,67,0.12)] bg-white text-[#8E8E93] hover:border-slate-300"
                 }`}
               >
                 <span className={`w-[14px] h-[14px] rounded-[4px] border-2 flex items-center justify-center shrink-0 transition-all ${
@@ -185,7 +185,7 @@ export function ModalPropostaCustom({
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all ${
                   comFaca
                     ? "border-amber-400 bg-amber-50 text-amber-700"
-                    : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                    : "border-[rgba(60,60,67,0.12)] bg-white text-[#8E8E93] hover:border-slate-300"
                 }`}
               >
                 <span className={`w-[14px] h-[14px] rounded-[4px] border-2 flex items-center justify-center shrink-0 transition-all ${
@@ -200,25 +200,25 @@ export function ModalPropostaCustom({
             <div className="grid grid-cols-2 gap-2">
               {comFaca && (
                 <div className="space-y-1">
-                  <label className="text-[9.5px] uppercase tracking-widest font-bold text-slate-400">Valor da faca (R$)</label>
+                  <label className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Valor da faca (R$)</label>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={valorFaca || ""}
                     onChange={e => setValorFaca(parseFloat(e.target.value) || 0)}
-                    className="w-full border border-amber-200 rounded-lg px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
+                    className="w-full border border-amber-200 rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
                   />
                 </div>
               )}
               <div className="space-y-1">
-                <label className="text-[9.5px] uppercase tracking-widest font-bold text-slate-400">Qtd de SKUs</label>
+                <label className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Qtd de SKUs</label>
                 <input
                   type="number"
                   min="1"
                   value={numSKUs}
                   onChange={e => setNumSKUs(parseInt(e.target.value) || 1)}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
+                  className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
                 />
               </div>
             </div>
@@ -226,16 +226,16 @@ export function ModalPropostaCustom({
 
           {/* Tabela de preços */}
           <div className="space-y-2">
-            <p className="text-[9.5px] uppercase tracking-widest font-bold text-slate-400">Tabela de Preços</p>
-            <div className="border border-slate-100 rounded-xl overflow-hidden">
+            <p className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Tabela de Preços</p>
+            <div className="border border-[rgba(60,60,67,0.08)] rounded-xl overflow-hidden">
               <table className="w-full">
-                <thead className="bg-slate-50">
-                  <tr className="border-b border-slate-100">
+                <thead className="bg-[rgba(116,116,128,0.04)]">
+                  <tr className="border-b border-[rgba(60,60,67,0.08)]">
                     <th className="py-2 px-3 w-9" />
-                    <th className="py-2 px-2 text-left text-[9.5px] uppercase tracking-wider text-slate-400 font-semibold">Quantidade</th>
-                    <th className="py-2 px-2 text-right text-[9.5px] uppercase tracking-wider text-slate-400 font-semibold">Unit. (R$)</th>
-                    <th className="py-2 px-2 text-right text-[9.5px] uppercase tracking-wider text-slate-400 font-semibold">Total</th>
-                    <th className="py-2 px-2 text-center text-[9.5px] uppercase tracking-wider text-slate-400 font-semibold">Ideal</th>
+                    <th className="py-2 px-2 text-left text-[9.5px] uppercase tracking-wider text-[#8E8E93] font-semibold">Quantidade</th>
+                    <th className="py-2 px-2 text-right text-[9.5px] uppercase tracking-wider text-[#8E8E93] font-semibold">Unit. (R$)</th>
+                    <th className="py-2 px-2 text-right text-[9.5px] uppercase tracking-wider text-[#8E8E93] font-semibold">Total</th>
+                    <th className="py-2 px-2 text-center text-[9.5px] uppercase tracking-wider text-[#8E8E93] font-semibold">Ideal</th>
                     <th className="py-2 px-2 w-8" />
                   </tr>
                 </thead>
@@ -249,7 +249,7 @@ export function ModalPropostaCustom({
                           <button
                             onClick={() => updateLinha(l.id, "ativa", !l.ativa)}
                             className={`w-[16px] h-[16px] rounded-[4px] border-2 flex items-center justify-center transition-all ${
-                              l.ativa ? "border-violet-600 bg-violet-600" : "border-slate-300 bg-white"
+                              l.ativa ? "border-violet-600 bg-[#AF52DE]" : "border-slate-300 bg-white"
                             }`}
                           >
                             {l.ativa && (
@@ -266,7 +266,7 @@ export function ModalPropostaCustom({
                             min="1"
                             value={l.quantidade || ""}
                             onChange={e => updateLinha(l.id, "quantidade", parseInt(e.target.value) || 0)}
-                            className="w-full text-[12.5px] font-semibold tabular-nums border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400"
+                            className="w-full text-[12.5px] font-semibold tabular-nums border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400"
                           />
                         </td>
                         {/* Unitário */}
@@ -278,12 +278,12 @@ export function ModalPropostaCustom({
                             value={l.unitario || ""}
                             onChange={e => updateLinha(l.id, "unitario", parseFloat(e.target.value) || 0)}
                             onFocus={e => e.target.select()}
-                            className="w-full text-right text-[12.5px] font-semibold tabular-nums border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400"
+                            className="w-full text-right text-[12.5px] font-semibold tabular-nums border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400"
                           />
                         </td>
                         {/* Total */}
                         <td className="py-2.5 px-2 text-right">
-                          <span className="text-[13px] font-black tabular-nums text-slate-800">
+                          <span className="text-[13px] font-semibold tabular-nums text-[#1C1C1E]">
                             {total > 0 ? brl(total) : "—"}
                           </span>
                         </td>
@@ -310,9 +310,9 @@ export function ModalPropostaCustom({
                   })}
                 </tbody>
               </table>
-              <div className="px-4 py-2.5 border-t border-slate-50 bg-slate-50/50">
+              <div className="px-4 py-2.5 border-t border-[rgba(60,60,67,0.06)] bg-[rgba(116,116,128,0.04)]/50">
                 <button onClick={addLinha}
-                  className="flex items-center gap-1 text-[11.5px] text-violet-600 hover:text-violet-800 font-medium transition-colors">
+                  className="flex items-center gap-1 text-[11.5px] text-[#AF52DE] hover:text-violet-800 font-medium transition-colors">
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                   </svg>
@@ -320,46 +320,46 @@ export function ModalPropostaCustom({
                 </button>
               </div>
             </div>
-            <p className="text-[10px] text-slate-400">Coluna <span className="font-semibold">Ideal</span> marca qual linha é recomendada no PDF.</p>
+            <p className="text-[10px] text-[#8E8E93]">Coluna <span className="font-semibold">Ideal</span> marca qual linha é recomendada no PDF.</p>
           </div>
 
           {/* Validade + Data */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-[9.5px] uppercase tracking-widest font-bold text-slate-400">Validade (dias)</label>
+              <label className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Validade (dias)</label>
               <input
                 type="number"
                 min="1"
                 value={validadeDias}
                 onChange={e => setValidadeDias(parseInt(e.target.value) || 7)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
+                className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[9.5px] uppercase tracking-widest font-bold text-slate-400">Data da proposta</label>
+              <label className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Data da proposta</label>
               <input
                 type="date"
                 value={dataInput}
                 onChange={e => setDataInput(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
+                className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
               />
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-[9.5px] uppercase tracking-widest font-bold text-slate-400">Observações para o cliente <span className="normal-case font-normal text-slate-300">(opcional)</span></label>
+            <label className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Observações para o cliente <span className="normal-case font-normal text-[rgba(60,60,67,0.3)]">(opcional)</span></label>
             <textarea
               value={obsCliente}
               onChange={e => setObsCliente(e.target.value)}
               rows={3}
               placeholder="Detalhes adicionais, condições especiais…"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400 resize-none"
+              className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400 resize-none"
             />
           </div>
 
         </div>
 
         {/* Footer */}
-        <div className="px-5 pb-5 pt-3 border-t border-slate-100 shrink-0 space-y-2">
+        <div className="px-5 pb-5 pt-3 border-t border-[rgba(60,60,67,0.08)] shrink-0 space-y-2">
           {!nomeCliente.trim() && (
             <p className="text-[11px] text-rose-500 text-center">Informe o nome do cliente para continuar.</p>
           )}
@@ -368,13 +368,13 @@ export function ModalPropostaCustom({
           )}
           <div className="flex gap-2">
             <button onClick={onClose}
-              className="px-3 py-2.5 text-[11.5px] text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors">
+              className="px-3 py-2.5 text-[11.5px] text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors">
               Cancelar
             </button>
             <button
               disabled={!podeSalvar}
               onClick={() => onPdf(buildDraft())}
-              className="flex-1 py-2.5 text-[11.5px] font-medium border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-600 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              className="flex-1 py-2.5 text-[11.5px] font-medium border border-[rgba(60,60,67,0.12)] hover:border-slate-300 hover:bg-[rgba(116,116,128,0.04)] text-[rgba(60,60,67,0.6)] rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               Pré-visualizar PDF
             </button>
             <button
@@ -397,7 +397,7 @@ export function ModalPropostaCustom({
             <button
               disabled={!podeSalvar}
               onClick={() => onSalvar(buildDraft())}
-              className="flex-1 py-2.5 text-[11.5px] font-bold bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
+              className="flex-1 py-2.5 text-[11.5px] font-bold bg-[#AF52DE] hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
               Salvar Proposta
             </button>
           </div>
@@ -524,16 +524,16 @@ export function BoxPreview3D({
       {/* Dimension chips */}
       <div className="flex items-center gap-1.5">
         {([ ["L", largura], ["A", altura], ["P", profundidade] ] as [string, number][]).map(([label, val]) => (
-          <span key={label} className="bg-slate-100 rounded-md px-2 py-0.5 text-[11px] font-semibold text-slate-700 tabular-nums">
-            <span className="text-slate-400 text-[9px] font-normal">{label} </span>{val}
+          <span key={label} className="bg-[rgba(116,116,128,0.08)] rounded-md px-2 py-0.5 text-[11px] font-semibold text-[rgba(60,60,67,0.75)] tabular-nums">
+            <span className="text-[#8E8E93] text-[9px] font-normal">{label} </span>{val}
           </span>
         ))}
-        <span className="text-slate-400 text-[11px]">cm</span>
-        {materialNome && <span className="text-slate-300 text-[10px] ml-1">{materialNome}</span>}
+        <span className="text-[#8E8E93] text-[11px]">cm</span>
+        {materialNome && <span className="text-[rgba(60,60,67,0.3)] text-[10px] ml-1">{materialNome}</span>}
         {incluirVerniz && <span className="text-blue-500 text-[9px] font-bold bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full ml-1">UV</span>}
       </div>
 
-      <p className="text-[9px] text-slate-300 tracking-widest uppercase">arraste para girar</p>
+      <p className="text-[9px] text-[rgba(60,60,67,0.3)] tracking-widest uppercase">arraste para girar</p>
     </div>
   )
 }

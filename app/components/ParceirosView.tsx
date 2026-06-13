@@ -69,9 +69,9 @@ function ModalParceiro({ inicial, onSave, onClose }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
-        <div className="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between">
-          <p className="font-bold text-slate-800 text-[15px]">{inicial ? "Editar parceiro" : "Novo parceiro"}</p>
-          <button onClick={onClose} className="text-slate-300 hover:text-slate-500 text-xl leading-none">×</button>
+        <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between">
+          <p className="font-bold text-[#1C1C1E] text-[15px]">{inicial ? "Editar parceiro" : "Novo parceiro"}</p>
+          <button onClick={onClose} className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] text-xl leading-none">×</button>
         </div>
         <div className="px-6 py-5 space-y-4">
           <Field label="Nome *">
@@ -123,13 +123,13 @@ function ModalParceiro({ inicial, onSave, onClose }: {
         </div>
         <div className="px-6 pb-5 flex gap-2">
           <button onClick={onClose}
-            className="flex-1 py-2.5 text-[12.5px] font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors">
+            className="flex-1 py-2.5 text-[12.5px] font-medium text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors">
             Cancelar
           </button>
           <button
             disabled={!nome.trim() || !catFinal.trim()}
             onClick={salvar}
-            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-xl transition-colors disabled:opacity-40">
+            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#2C2C2E] hover:bg-[#1C1C1E] rounded-xl transition-colors disabled:opacity-40">
             {inicial ? "Salvar" : "Cadastrar"}
           </button>
         </div>
@@ -205,9 +205,9 @@ function ModalNegocio({ inicial, parceiros, lotes, onSave, onClose }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col overflow-hidden" style={{ maxHeight: "92vh" }}>
-        <div className="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-          <p className="font-bold text-slate-800 text-[15px]">{inicial ? "Editar negócio" : "Registrar negócio"}</p>
-          <button onClick={onClose} className="text-slate-300 hover:text-slate-500 text-xl leading-none">×</button>
+        <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between shrink-0">
+          <p className="font-bold text-[#1C1C1E] text-[15px]">{inicial ? "Editar negócio" : "Registrar negócio"}</p>
+          <button onClick={onClose} className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] text-xl leading-none">×</button>
         </div>
 
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
@@ -237,7 +237,7 @@ function ModalNegocio({ inicial, parceiros, lotes, onSave, onClose }: {
               className={input()}
             />
             {dataOrcamento && (
-              <p className="text-[10.5px] text-slate-400 mt-1">
+              <p className="text-[10.5px] text-[#8E8E93] mt-1">
                 {new Date(dataOrcamento + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
               </p>
             )}
@@ -253,14 +253,14 @@ function ModalNegocio({ inicial, parceiros, lotes, onSave, onClose }: {
                   className={`flex-1 py-2 rounded-lg border text-[12px] font-semibold transition-all ${
                     tipo === t
                       ? "border-blue-400 bg-blue-50/60 text-blue-700"
-                      : "border-slate-200 text-slate-400 hover:border-slate-300"
+                      : "border-[rgba(60,60,67,0.12)] text-[#8E8E93] hover:border-slate-300"
                   }`}
                 >
                   {t === "comissao" ? "Comissão" : "Ganho em cima"}
                 </button>
               ))}
             </div>
-            <p className="text-[10.5px] text-slate-400 mt-1.5">
+            <p className="text-[10.5px] text-[#8E8E93] mt-1.5">
               {tipo === "comissao"
                 ? "Parceiro indicou o cliente. Você paga uma comissão sobre a venda."
                 : "Você comprou via parceiro e marcou preço acima. O ganho é o spread."}
@@ -277,10 +277,10 @@ function ModalNegocio({ inicial, parceiros, lotes, onSave, onClose }: {
                 <div className="flex items-center gap-2">
                   <input type="number" min="0" max="100" step="0.5" value={comissaoPerc}
                     onChange={e => setComissaoPerc(e.target.value)} placeholder="0" className={`${input()} flex-1`} />
-                  <span className="text-slate-400 text-[12px] shrink-0">%</span>
+                  <span className="text-[#8E8E93] text-[12px] shrink-0">%</span>
                 </div>
                 {vv > 0 && cp > 0 && (
-                  <p className="text-[11px] text-slate-500 mt-1">
+                  <p className="text-[11px] text-[#8E8E93] mt-1">
                     = <span className="font-bold text-blue-700">{brl(comissaoCalculada)}</span> a pagar ao parceiro
                   </p>
                 )}
@@ -315,7 +315,7 @@ function ModalNegocio({ inicial, parceiros, lotes, onSave, onClose }: {
                   className={`flex-1 py-1.5 rounded-lg border text-[11px] font-semibold transition-all capitalize ${
                     status === s
                       ? STATUS_CLS[s]
-                      : "border-slate-200 text-slate-400 hover:border-slate-300"
+                      : "border-[rgba(60,60,67,0.12)] text-[#8E8E93] hover:border-slate-300"
                   }`}>
                   {STATUS_LABEL[s]}
                 </button>
@@ -362,7 +362,7 @@ function ModalNegocio({ inicial, parceiros, lotes, onSave, onClose }: {
                     className={`flex-1 py-1.5 text-[10px] font-semibold rounded-lg transition-colors border ${
                       statusLote === step.id
                         ? "bg-amber-500 text-white border-amber-500"
-                        : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100"
+                        : "bg-[rgba(116,116,128,0.04)] text-[#8E8E93] border-[rgba(60,60,67,0.12)] hover:bg-[rgba(116,116,128,0.08)]"
                     }`}>
                     {step.label}
                   </button>
@@ -372,15 +372,15 @@ function ModalNegocio({ inicial, parceiros, lotes, onSave, onClose }: {
           )}
         </div>
 
-        <div className="px-6 pb-5 flex gap-2 shrink-0 border-t border-slate-100 pt-4">
+        <div className="px-6 pb-5 flex gap-2 shrink-0 border-t border-[rgba(60,60,67,0.08)] pt-4">
           <button onClick={onClose}
-            className="flex-1 py-2.5 text-[12.5px] font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors">
+            className="flex-1 py-2.5 text-[12.5px] font-medium text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors">
             Cancelar
           </button>
           <button
             disabled={!parceiroId || !descricao.trim() || vv <= 0}
             onClick={salvar}
-            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-xl transition-colors disabled:opacity-40">
+            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#2C2C2E] hover:bg-[#1C1C1E] rounded-xl transition-colors disabled:opacity-40">
             {inicial ? "Salvar" : "Registrar"}
           </button>
         </div>
@@ -450,12 +450,12 @@ export function ParceirosView({
       <div className="px-8 pt-6 pb-0 shrink-0">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-[18px] font-black text-slate-800">Parceiros comerciais</h1>
-            <p className="text-[12px] text-slate-400 mt-0.5">Gestão de parceiros e negócios gerados</p>
+            <h1 className="text-[18px] font-semibold text-[#1C1C1E]">Parceiros comerciais</h1>
+            <p className="text-[12px] text-[#8E8E93] mt-0.5">Gestão de parceiros e negócios gerados</p>
           </div>
           <button
             onClick={() => tab === "parceiros" ? setModalParceiro(true) : setModalNegocio(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-[12.5px] font-semibold rounded-xl transition-colors">
+            className="flex items-center gap-2 px-4 py-2 bg-[#2C2C2E] hover:bg-[#1C1C1E] text-white text-[12.5px] font-semibold rounded-xl transition-colors">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
@@ -471,13 +471,13 @@ export function ParceirosView({
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 border-b border-slate-100">
+        <div className="flex gap-1 border-b border-[rgba(60,60,67,0.08)]">
           {(["parceiros", "negocios"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2.5 text-[12.5px] font-semibold border-b-2 transition-colors -mb-px ${
                 tab === t
-                  ? "border-slate-800 text-slate-800"
-                  : "border-transparent text-slate-400 hover:text-slate-600"
+                  ? "border-slate-800 text-[#1C1C1E]"
+                  : "border-transparent text-[#8E8E93] hover:text-[rgba(60,60,67,0.6)]"
               }`}>
               {t === "parceiros" ? `Parceiros (${parceiros.length})` : `Negócios (${negocios.length})`}
             </button>
@@ -493,13 +493,13 @@ export function ParceirosView({
           <>
             {parceiros.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
-                  <svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <div className="w-12 h-12 rounded-2xl bg-[rgba(116,116,128,0.08)] flex items-center justify-center mb-3">
+                  <svg className="w-6 h-6 text-[#8E8E93]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
                   </svg>
                 </div>
-                <p className="text-[13px] font-semibold text-slate-500">Nenhum parceiro cadastrado</p>
-                <p className="text-[12px] text-slate-400 mt-1">Clique em "Novo parceiro" para começar.</p>
+                <p className="text-[13px] font-semibold text-[#8E8E93]">Nenhum parceiro cadastrado</p>
+                <p className="text-[12px] text-[#8E8E93] mt-1">Clique em "Novo parceiro" para começar.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-3">
@@ -507,43 +507,43 @@ export function ParceirosView({
                   const st = statsParc[p.id]
                   return (
                     <div key={p.id}
-                      className="bg-white border border-slate-100 rounded-2xl px-5 py-4 flex items-center gap-4 hover:border-slate-200 transition-colors group">
-                      <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-slate-600 font-black text-[15px]">
+                      className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-5 py-4 flex items-center gap-4 hover:border-[rgba(60,60,67,0.12)] transition-colors group">
+                      <div className="w-9 h-9 rounded-xl bg-[rgba(116,116,128,0.08)] flex items-center justify-center shrink-0 text-[rgba(60,60,67,0.6)] font-semibold text-[15px]">
                         {p.nome[0].toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-slate-800 text-[13.5px]">{p.nome}</span>
+                          <span className="font-bold text-[#1C1C1E] text-[13.5px]">{p.nome}</span>
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
                             {p.categoria}
                           </span>
                         </div>
                         <div className="flex items-center gap-3 mt-1 flex-wrap">
                           {p.contato && (
-                            <span className="text-[11.5px] text-slate-400">{p.contato}</span>
+                            <span className="text-[11.5px] text-[#8E8E93]">{p.contato}</span>
                           )}
                           {p.comissaoDefault > 0 && (
-                            <span className="text-[11.5px] text-slate-400">Comissão padrão: {p.comissaoDefault}%</span>
+                            <span className="text-[11.5px] text-[#8E8E93]">Comissão padrão: {p.comissaoDefault}%</span>
                           )}
                         </div>
                       </div>
                       {/* Stats */}
                       <div className="text-right shrink-0 hidden sm:block">
-                        <p className="font-bold text-slate-800 text-[13px]">{brl(st?.total ?? 0)}</p>
-                        <p className="text-[10.5px] text-slate-400">{st?.deals ?? 0} negócio{(st?.deals ?? 0) !== 1 ? "s" : ""}</p>
+                        <p className="font-bold text-[#1C1C1E] text-[13px]">{brl(st?.total ?? 0)}</p>
+                        <p className="text-[10.5px] text-[#8E8E93]">{st?.deals ?? 0} negócio{(st?.deals ?? 0) !== 1 ? "s" : ""}</p>
                       </div>
                       {/* Actions */}
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => setModalParceiro(p)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                          className="p-1.5 rounded-lg text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.08)] transition-colors">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
                           </svg>
                         </button>
                         <button
                           onClick={() => setConfirmarExcluir({ tipo: "parceiro", id: p.id })}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors">
+                          className="p-1.5 rounded-lg text-[#8E8E93] hover:text-rose-500 hover:bg-rose-50 transition-colors">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                           </svg>
@@ -565,14 +565,14 @@ export function ParceirosView({
               <select
                 value={filtroParceiro}
                 onChange={e => setFiltroParceiro(e.target.value)}
-                className="h-8 border border-slate-200 rounded-lg px-3 text-[12px] text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
+                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[rgba(60,60,67,0.6)] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
                 <option value="">Todos os parceiros</option>
                 {parceiros.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
               </select>
               <select
                 value={filtroStatus}
                 onChange={e => setFiltroStatus(e.target.value as StatusNegocio | "")}
-                className="h-8 border border-slate-200 rounded-lg px-3 text-[12px] text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
+                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[rgba(60,60,67,0.6)] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
                 <option value="">Todos os status</option>
                 <option value="pendente">Pendente</option>
                 <option value="pago">Pago</option>
@@ -582,29 +582,29 @@ export function ParceirosView({
 
             {negociosFiltrados.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
-                <p className="text-[13px] font-semibold text-slate-500">Nenhum negócio registrado</p>
-                <p className="text-[12px] text-slate-400 mt-1">Registre vendas feitas através de parceiros.</p>
+                <p className="text-[13px] font-semibold text-[#8E8E93]">Nenhum negócio registrado</p>
+                <p className="text-[12px] text-[#8E8E93] mt-1">Registre vendas feitas através de parceiros.</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {negociosFiltrados.map(n => (
                   <div key={n.id}
-                    className="bg-white border border-slate-100 rounded-2xl px-5 py-4 hover:border-slate-200 transition-colors group">
+                    className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-5 py-4 hover:border-[rgba(60,60,67,0.12)] transition-colors group">
                     <div className="flex items-start gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-slate-800 text-[13px]">{n.descricao}</span>
-                          {pill(n.tipo === "comissao" ? "Comissão" : "Ganho", "bg-violet-50 text-violet-700 border-violet-200")}
+                          <span className="font-bold text-[#1C1C1E] text-[13px]">{n.descricao}</span>
+                          {pill(n.tipo === "comissao" ? "Comissão" : "Ganho", "bg-violet-50 text-[#AF52DE] border-violet-200")}
                           {pill(STATUS_LABEL[n.status], STATUS_CLS[n.status])}
                           {n.loteNumero && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-violet-100 text-violet-700 border-violet-200">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-[#AF52DE]/10 text-[#AF52DE] border-violet-200">
                               {n.loteNumero}
                             </span>
                           )}
                         </div>
                         <div className="flex items-center gap-3 mt-1 flex-wrap">
-                          <span className="text-[11.5px] font-medium text-slate-500">{n.parceiroNome}</span>
-                          <span className="text-[11px] text-slate-400">{formatDate(n.dataOrcamento)}</span>
+                          <span className="text-[11.5px] font-medium text-[#8E8E93]">{n.parceiroNome}</span>
+                          <span className="text-[11px] text-[#8E8E93]">{formatDate(n.dataOrcamento)}</span>
                         </div>
                         {n.loteId && (
                           <div className="flex gap-1 mt-2">
@@ -619,7 +619,7 @@ export function ParceirosView({
                                   className={`flex-1 h-5 rounded text-[9px] font-bold transition-colors ${
                                     done
                                       ? "bg-amber-400 text-white"
-                                      : "bg-slate-100 text-slate-400 hover:bg-amber-100 hover:text-amber-600"
+                                      : "bg-[rgba(116,116,128,0.08)] text-[#8E8E93] hover:bg-amber-100 hover:text-amber-600"
                                   }`}>
                                   {step.label.split(" ")[0]}
                                 </button>
@@ -628,14 +628,14 @@ export function ParceirosView({
                           </div>
                         )}
                         {n.obs && (
-                          <p className="text-[11px] text-slate-400 italic mt-1">{n.obs}</p>
+                          <p className="text-[11px] text-[#8E8E93] italic mt-1">{n.obs}</p>
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-black text-slate-800 text-[14px] tabular-nums">
+                        <p className="font-semibold text-[#1C1C1E] text-[14px] tabular-nums">
                           {brl(n.comissaoValor)}
                         </p>
-                        <p className="text-[10.5px] text-slate-400 tabular-nums">
+                        <p className="text-[10.5px] text-[#8E8E93] tabular-nums">
                           {n.tipo === "comissao"
                             ? `${n.comissaoPerc.toFixed(1)}% de ${brl(n.valorVenda)}`
                             : `${brl(n.valorVenda)} venda`}
@@ -644,14 +644,14 @@ export function ParceirosView({
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => setModalNegocio(n)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                          className="p-1.5 rounded-lg text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.08)] transition-colors">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
                           </svg>
                         </button>
                         <button
                           onClick={() => setConfirmarExcluir({ tipo: "negocio", id: n.id })}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors">
+                          className="p-1.5 rounded-lg text-[#8E8E93] hover:text-rose-500 hover:bg-rose-50 transition-colors">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                           </svg>
@@ -689,11 +689,11 @@ export function ParceirosView({
       {confirmarExcluir && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mx-4 p-6 text-center">
-            <p className="font-bold text-slate-800 text-[14px] mb-1">Confirmar exclusão</p>
-            <p className="text-[12px] text-slate-400 mb-5">Esta ação não pode ser desfeita.</p>
+            <p className="font-bold text-[#1C1C1E] text-[14px] mb-1">Confirmar exclusão</p>
+            <p className="text-[12px] text-[#8E8E93] mb-5">Esta ação não pode ser desfeita.</p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmarExcluir(null)}
-                className="flex-1 py-2.5 text-[12.5px] font-medium text-slate-500 hover:bg-slate-50 rounded-xl transition-colors">
+                className="flex-1 py-2.5 text-[12.5px] font-medium text-[#8E8E93] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors">
                 Cancelar
               </button>
               <button
@@ -721,10 +721,10 @@ function KpiParceiro({ label, value, sub, color }: {
                : color === "green" ? "text-emerald-700"
                : "text-amber-600"
   return (
-    <div className="bg-white border border-slate-100 rounded-2xl px-4 py-3">
-      <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{label}</p>
-      <p className={`font-black text-[17px] tabular-nums mt-0.5 ${accent}`}>{value}</p>
-      <p className="text-[10.5px] text-slate-400 mt-0.5">{sub}</p>
+    <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-4 py-3">
+      <p className="text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">{label}</p>
+      <p className={`font-semibold text-[17px] tabular-nums mt-0.5 ${accent}`}>{value}</p>
+      <p className="text-[10.5px] text-[#8E8E93] mt-0.5">{sub}</p>
     </div>
   )
 }
@@ -732,7 +732,7 @@ function KpiParceiro({ label, value, sub, color }: {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-[10.5px] uppercase tracking-[0.08em] text-slate-400 font-semibold mb-1.5">
+      <label className="block text-[10.5px] uppercase  text-[#8E8E93] font-semibold mb-1.5">
         {label}
       </label>
       {children}
@@ -741,7 +741,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function input() {
-  return "w-full h-9 border border-slate-200 rounded-lg px-3 text-[12.5px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+  return "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
 }
 
 function formatDate(iso: string) {

@@ -248,7 +248,7 @@ function SingleTimeline({ card }: { card: LoteCard }) {
   return (
     <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] overflow-hidden">
       <div className="px-5 py-3.5 border-b border-[rgba(60,60,67,0.06)]">
-        <p className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-[#8E8E93]">Detalhes do progresso</p>
+        <p className="text-[10.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Detalhes do progresso</p>
       </div>
       <div className="px-5 py-4">
         {loading ? (
@@ -544,22 +544,22 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
   const pagamentosCard = hasPagamentos && (
     <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] overflow-hidden">
       <div className="px-5 py-3.5 border-b border-[rgba(60,60,67,0.06)]">
-        <p className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-[#8E8E93]">Financeiro</p>
+        <p className="text-[10.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Financeiro</p>
       </div>
 
       {/* Summary row */}
       <div className="grid grid-cols-3 divide-x divide-[rgba(60,60,67,0.06)] border-b border-[rgba(60,60,67,0.06)]">
         <div className="px-4 py-3">
           <p className="text-[9px] uppercase tracking-wider text-[#8E8E93] font-semibold mb-1">Total</p>
-          <p className="text-[13px] font-black text-[#1C1C1E] tabular-nums">{brl(totalFaturado)}</p>
+          <p className="text-[13px] font-semibold text-[#1C1C1E] tabular-nums">{brl(totalFaturado)}</p>
         </div>
         <div className="px-4 py-3">
           <p className="text-[9px] uppercase tracking-wider text-[#8E8E93] font-semibold mb-1">Pago</p>
-          <p className="text-[13px] font-black tabular-nums" style={{ color: "#34C759" }}>{brl(totalPago)}</p>
+          <p className="text-[13px] font-semibold tabular-nums" style={{ color: "#34C759" }}>{brl(totalPago)}</p>
         </div>
         <div className="px-4 py-3">
           <p className="text-[9px] uppercase tracking-wider text-[#8E8E93] font-semibold mb-1">Restante</p>
-          <p className="text-[13px] font-black tabular-nums" style={{ color: saldo > 0 ? "#FF9500" : "#34C759" }}>{brl(saldo)}</p>
+          <p className="text-[13px] font-semibold tabular-nums" style={{ color: saldo > 0 ? "#FF9500" : "#34C759" }}>{brl(saldo)}</p>
         </div>
       </div>
 
@@ -675,7 +675,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
             <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: "#007AFF" }}>
               <div className="px-5 pt-4 pb-2">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/70">Orçamento recebido</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">Orçamento recebido</p>
                   <p className="text-[11px] font-bold text-white/60 tabular-nums">0/{totalSteps} etapas</p>
                 </div>
                 <div className="w-full h-1.5 bg-white/20 rounded-full" />
@@ -711,7 +711,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
                   {/* Progress bar */}
                   <div className="px-5 pt-4 pb-2">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/70">{isEntregue ? "Concluído" : "Em andamento"}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">{isEntregue ? "Concluído" : "Em andamento"}</p>
                       <p className="text-[11px] font-bold text-white/80 tabular-nums">{completedSteps}/{totalSteps} etapas</p>
                     </div>
                     <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
@@ -782,7 +782,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
         <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: allEntregue ? "#34C759" : "#007AFF" }}>
           <div className="px-5 pt-4 pb-2">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/70">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">
                 {allEntregue ? "Todos entregues" : "Em andamento"}
               </p>
               <p className="text-[11px] font-bold text-white/80 tabular-nums">
@@ -796,15 +796,15 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
           <div className="grid grid-cols-3 gap-0 mx-4 mt-3 bg-white/10 rounded-xl overflow-hidden divide-x divide-white/10" style={{ marginBottom: hasPagamentos ? 12 : 16 }}>
             <div className="px-3 py-3 text-center">
               <p className="text-[9px] font-bold uppercase tracking-widest text-white/60 mb-1">Produtos</p>
-              <p className="text-xl font-black text-white tabular-nums">{activeCards.length + parceiros.length}</p>
+              <p className="text-xl font-semibold text-white tabular-nums">{activeCards.length + parceiros.length}</p>
             </div>
             <div className="px-3 py-3 text-center">
               <p className="text-[9px] font-bold uppercase tracking-widest text-white/60 mb-1">Unidades</p>
-              <p className="text-xl font-black text-white tabular-nums">{num(totalQtd)}</p>
+              <p className="text-xl font-semibold text-white tabular-nums">{num(totalQtd)}</p>
             </div>
             <div className="px-3 py-3 text-center">
               <p className="text-[9px] font-bold uppercase tracking-widest text-white/60 mb-1">Total</p>
-              <p className="text-[14px] font-black text-white tabular-nums leading-tight mt-0.5">{brl(totalValor)}</p>
+              <p className="text-[14px] font-semibold text-white tabular-nums leading-tight mt-0.5">{brl(totalValor)}</p>
             </div>
           </div>
 
@@ -814,11 +814,11 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
               <div className="flex items-baseline justify-between mb-2">
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-widest text-white/50 mb-0.5">Pago</p>
-                  <p className="text-[16px] font-black text-emerald-300 tabular-nums leading-none">{brl(totalPago)}</p>
+                  <p className="text-[16px] font-semibold text-emerald-300 tabular-nums leading-none">{brl(totalPago)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[9px] font-bold uppercase tracking-widest text-white/50 mb-0.5">Restante</p>
-                  <p className={`text-[16px] font-black tabular-nums leading-none ${saldo <= 0 ? "text-emerald-300" : "text-white/80"}`}>{brl(Math.max(saldo, 0))}</p>
+                  <p className={`text-[16px] font-semibold tabular-nums leading-none ${saldo <= 0 ? "text-emerald-300" : "text-white/80"}`}>{brl(Math.max(saldo, 0))}</p>
                 </div>
               </div>
               <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
@@ -834,7 +834,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
         {/* All products — internal and partner merged, no distinction shown */}
         {(cards.length > 0 || parceiros.length > 0) && (
           <div className="space-y-3">
-            <p className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-[#8E8E93] px-1">
+            <p className="text-[10.5px] uppercase tracking-wide font-bold text-[#8E8E93] px-1">
               Toque para ver o progresso detalhado
             </p>
             {cards.map(card => <ProductCard key={card.id} card={card} />)}

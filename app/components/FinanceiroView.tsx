@@ -105,11 +105,11 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col overflow-hidden" style={{ maxHeight: "92vh" }}>
-        <div className="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-          <p className="font-bold text-slate-800 text-[15px]">
+        <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between shrink-0">
+          <p className="font-bold text-[#1C1C1E] text-[15px]">
             {inicial?.id ? "Editar lançamento" : "Novo lançamento"}
           </p>
-          <button onClick={onClose} className="text-slate-300 hover:text-slate-500 text-xl leading-none">×</button>
+          <button onClick={onClose} className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] text-xl leading-none">×</button>
         </div>
 
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
@@ -123,7 +123,7 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
                       ? t === "receita"
                         ? "border-emerald-400 bg-emerald-50 text-emerald-700"
                         : "border-rose-300 bg-rose-50 text-rose-600"
-                      : "border-slate-200 text-slate-400 hover:border-slate-300"
+                      : "border-[rgba(60,60,67,0.12)] text-[#8E8E93] hover:border-slate-300"
                   }`}>
                   {t === "receita" ? "Receita" : "Despesa"}
                 </button>
@@ -174,7 +174,7 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
               {(["pendente", "pago"] as const).map(s => (
                 <button key={s} onClick={() => setStatus(s)}
                   className={`flex-1 py-2 rounded-lg border text-[12px] font-semibold transition-all ${
-                    status === s ? STATUS_CLS[s] : "border-slate-200 text-slate-400 hover:border-slate-300"
+                    status === s ? STATUS_CLS[s] : "border-[rgba(60,60,67,0.12)] text-[#8E8E93] hover:border-slate-300"
                   }`}>
                   {s === "pago" ? "Pago" : "Pendente"}
                 </button>
@@ -202,13 +202,13 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
           </Field>
         </div>
 
-        <div className="px-6 pb-5 flex gap-2 shrink-0 border-t border-slate-100 pt-4">
+        <div className="px-6 pb-5 flex gap-2 shrink-0 border-t border-[rgba(60,60,67,0.08)] pt-4">
           <button onClick={onClose}
-            className="flex-1 py-2.5 text-[12.5px] font-medium text-slate-500 hover:bg-slate-50 rounded-xl transition-colors">
+            className="flex-1 py-2.5 text-[12.5px] font-medium text-[#8E8E93] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors">
             Cancelar
           </button>
           <button disabled={!descricao.trim() || !parseFloat(valor) || !dataVenc} onClick={salvar}
-            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-xl transition-colors disabled:opacity-40">
+            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#2C2C2E] hover:bg-[#1C1C1E] rounded-xl transition-colors disabled:opacity-40">
             {inicial?.id ? "Salvar" : "Lançar"}
           </button>
         </div>
@@ -232,17 +232,17 @@ function ModalPagamento({ lancamento, onSave, onClose }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
-        <div className="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between">
           <div>
-            <p className="font-bold text-slate-800 text-[14px]">Registrar pagamento</p>
-            <p className="text-[11px] text-slate-400 mt-0.5 truncate">{lancamento.descricao}</p>
+            <p className="font-bold text-[#1C1C1E] text-[14px]">Registrar pagamento</p>
+            <p className="text-[11px] text-[#8E8E93] mt-0.5 truncate">{lancamento.descricao}</p>
           </div>
-          <button onClick={onClose} className="text-slate-300 hover:text-slate-500 text-xl leading-none ml-3">×</button>
+          <button onClick={onClose} className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] text-xl leading-none ml-3">×</button>
         </div>
         <div className="px-6 py-5 space-y-4">
           <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 text-center">
             <p className="text-[11px] text-emerald-600 font-medium">Valor recebido</p>
-            <p className="font-black text-[22px] text-emerald-700 tabular-nums">{brl(lancamento.valor)}</p>
+            <p className="font-semibold text-[22px] text-emerald-700 tabular-nums">{brl(lancamento.valor)}</p>
           </div>
           <Field label="Data do recebimento">
             <input type="date" value={dataPag} onChange={e => setDataPag(e.target.value)} className={inp()} />
@@ -259,7 +259,7 @@ function ModalPagamento({ lancamento, onSave, onClose }: {
         </div>
         <div className="px-6 pb-5 flex gap-2">
           <button onClick={onClose}
-            className="flex-1 py-2.5 text-[12.5px] font-medium text-slate-500 hover:bg-slate-50 rounded-xl transition-colors">
+            className="flex-1 py-2.5 text-[12.5px] font-medium text-[#8E8E93] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors">
             Cancelar
           </button>
           <button onClick={() => { onSave({ status: "pago", dataPagamento: dataPag, formaPagamento: forma || undefined, obs: obs || undefined }); onClose() }}
@@ -418,18 +418,18 @@ export function FinanceiroView({
       <div className="px-8 pt-6 pb-0 shrink-0">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-[18px] font-black text-slate-800">Financeiro</h1>
-            <p className="text-[12px] text-slate-400 mt-0.5">Receitas, despesas e fluxo de caixa</p>
+            <h1 className="text-[18px] font-semibold text-[#1C1C1E]">Financeiro</h1>
+            <p className="text-[12px] text-[#8E8E93] mt-0.5">Receitas, despesas e fluxo de caixa</p>
           </div>
           <div className="flex items-center gap-2">
             <select value={periodo} onChange={e => setPeriodo(e.target.value as Periodo)}
-              className="h-8 border border-slate-200 rounded-lg px-3 text-[12px] text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
+              className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[rgba(60,60,67,0.6)] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
               {(Object.entries(PERIODO_LABEL) as [Periodo, string][]).map(([v, l]) => (
                 <option key={v} value={v}>{l}</option>
               ))}
             </select>
             <button onClick={() => setModalLanc(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-[12.5px] font-semibold rounded-xl transition-colors">
+              className="flex items-center gap-2 px-4 py-2 bg-[#2C2C2E] hover:bg-[#1C1C1E] text-white text-[12.5px] font-semibold rounded-xl transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
               </svg>
@@ -439,7 +439,7 @@ export function FinanceiroView({
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 border-b border-slate-100">
+        <div className="flex gap-1 border-b border-[rgba(60,60,67,0.08)]">
           {([
             ["dash",       "Visão geral"],
             ["receber",    `A receber${kpis.naoRegistrados > 0 ? ` (${kpis.naoRegistrados})` : ""}`],
@@ -447,7 +447,7 @@ export function FinanceiroView({
           ] as const).map(([t, l]) => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2.5 text-[12.5px] font-semibold border-b-2 transition-colors -mb-px ${
-                tab === t ? "border-slate-800 text-slate-800" : "border-transparent text-slate-400 hover:text-slate-600"
+                tab === t ? "border-slate-800 text-[#1C1C1E]" : "border-transparent text-[#8E8E93] hover:text-[rgba(60,60,67,0.6)]"
               }`}>
               {l}
             </button>
@@ -477,9 +477,9 @@ export function FinanceiroView({
             </div>
 
             {/* DRE simples */}
-            <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100">
-                <p className="font-bold text-slate-800 text-[13px]">DRE — {PERIODO_LABEL[periodo]}</p>
+            <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-[rgba(60,60,67,0.08)]">
+                <p className="font-bold text-[#1C1C1E] text-[13px]">DRE — {PERIODO_LABEL[periodo]}</p>
               </div>
               <div className="divide-y divide-slate-50">
                 <DreRow label="Receitas de pedidos" value={lancamentos.filter(l => l.tipo === "receita" && l.status === "pago" && inPeriodo(l)).reduce((s, l) => s + l.valor, 0)} bold accent="green" />
@@ -501,8 +501,8 @@ export function FinanceiroView({
             {negociosPagosTodos.length > 0 && (
               <div className="bg-white border border-violet-100 rounded-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-violet-100 flex items-center justify-between">
-                  <p className="font-bold text-slate-800 text-[13px]">Receitas de parcerias</p>
-                  <p className="font-black text-violet-700 text-[13px] tabular-nums">
+                  <p className="font-bold text-[#1C1C1E] text-[13px]">Receitas de parcerias</p>
+                  <p className="font-semibold text-[#AF52DE] text-[13px] tabular-nums">
                     {brl(negociosPagosTodos.reduce((s, n) => s + n.comissaoValor, 0))} total
                   </p>
                 </div>
@@ -511,14 +511,14 @@ export function FinanceiroView({
                     <div key={n.id} className="px-5 py-3 flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-[12.5px] font-semibold text-slate-700 truncate">{n.descricao}</p>
-                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 shrink-0">
+                          <p className="text-[12.5px] font-semibold text-[rgba(60,60,67,0.75)] truncate">{n.descricao}</p>
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-[#AF52DE]/10 text-[#AF52DE] shrink-0">
                             {n.tipo === "comissao" ? "COMISSÃO" : "GANHO"}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5">{n.parceiroNome} · {fmtDate(n.dataOrcamento)}</p>
+                        <p className="text-[11px] text-[#8E8E93] mt-0.5">{n.parceiroNome} · {fmtDate(n.dataOrcamento)}</p>
                       </div>
-                      <p className="font-bold text-violet-700 text-[13px] tabular-nums shrink-0">{brl(n.comissaoValor)}</p>
+                      <p className="font-bold text-[#AF52DE] text-[13px] tabular-nums shrink-0">{brl(n.comissaoValor)}</p>
                     </div>
                   ))}
                 </div>
@@ -527,20 +527,20 @@ export function FinanceiroView({
 
             {/* Próximos recebimentos — lançamentos pendentes + parcerias pendentes */}
             {(lancamentos.filter(l => l.tipo === "receita" && statusEfetivo(l) !== "pago").length > 0 || negociosPendentes.length > 0) && (
-              <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100">
-                  <p className="font-bold text-slate-800 text-[13px]">Próximos recebimentos</p>
+              <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-[rgba(60,60,67,0.08)]">
+                  <p className="font-bold text-[#1C1C1E] text-[13px]">Próximos recebimentos</p>
                 </div>
                 <div className="divide-y divide-slate-50">
                   {/* Parcerias pendentes */}
                   {negociosPendentes.map(n => (
-                    <div key={`neg-${n.id}`} className="px-5 py-3.5 flex items-center gap-3 hover:bg-slate-50">
+                    <div key={`neg-${n.id}`} className="px-5 py-3.5 flex items-center gap-3 hover:bg-[rgba(116,116,128,0.04)]">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <p className="text-[12.5px] font-semibold text-slate-700 truncate">{n.descricao}</p>
-                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 shrink-0">PARCERIA</span>
+                          <p className="text-[12.5px] font-semibold text-[rgba(60,60,67,0.75)] truncate">{n.descricao}</p>
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-[#AF52DE]/10 text-[#AF52DE] shrink-0">PARCERIA</span>
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
+                        <p className="text-[11px] text-[#8E8E93] mt-0.5">
                           {n.parceiroNome} · {fmtDate(n.dataOrcamento)}
                           {n.tipo === "comissao" ? " · Comissão" : " · Ganho"}
                         </p>
@@ -548,7 +548,7 @@ export function FinanceiroView({
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700">
                         Pendente
                       </span>
-                      <p className="font-bold text-slate-800 text-[13px] tabular-nums">{brl(n.comissaoValor)}</p>
+                      <p className="font-bold text-[#1C1C1E] text-[13px] tabular-nums">{brl(n.comissaoValor)}</p>
                     </div>
                   ))}
                   {/* Lançamentos pendentes */}
@@ -559,10 +559,10 @@ export function FinanceiroView({
                     .map(l => {
                       const st = statusEfetivo(l)
                       return (
-                        <div key={l.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-slate-50 group">
+                        <div key={l.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-[rgba(116,116,128,0.04)] group">
                           <div className="flex-1 min-w-0">
-                            <p className="text-[12.5px] font-semibold text-slate-700 truncate">{l.descricao}</p>
-                            <p className="text-[11px] text-slate-400 mt-0.5">
+                            <p className="text-[12.5px] font-semibold text-[rgba(60,60,67,0.75)] truncate">{l.descricao}</p>
+                            <p className="text-[11px] text-[#8E8E93] mt-0.5">
                               Vence {fmtDate(l.dataVencimento)}
                               {l.nomeCliente && ` · ${l.nomeCliente}`}
                             </p>
@@ -570,7 +570,7 @@ export function FinanceiroView({
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_CLS[st]}`}>
                             {STATUS_LABEL[st]}
                           </span>
-                          <p className="font-bold text-slate-800 text-[13px] tabular-nums">{brl(l.valor)}</p>
+                          <p className="font-bold text-[#1C1C1E] text-[13px] tabular-nums">{brl(l.valor)}</p>
                           <button onClick={() => setModalPag(l)}
                             className="opacity-0 group-hover:opacity-100 px-2.5 py-1 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-all">
                             Pago
@@ -587,39 +587,39 @@ export function FinanceiroView({
         {/* ── A RECEBER ── */}
         {tab === "receber" && (
           <div className="space-y-2">
-            <p className="text-[11.5px] text-slate-400 mb-4">
+            <p className="text-[11.5px] text-[#8E8E93] mb-4">
               Pedidos fechados ou em produção, e ganhos de parcerias pendentes.
             </p>
 
             {/* Parcerias pendentes (comissão ou ganho — ambos são receita) */}
             {negociosPendentes.length > 0 && (
               <div className="mb-4">
-                <p className="text-[10.5px] uppercase tracking-wider text-slate-400 font-semibold mb-2">Receitas de parcerias</p>
+                <p className="text-[10.5px] uppercase tracking-wider text-[#8E8E93] font-semibold mb-2">Receitas de parcerias</p>
                 {negociosPendentes.map(n => (
                   <div key={n.id} className="bg-white border border-violet-100 rounded-2xl px-5 py-4 flex items-center gap-4 mb-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-slate-800 text-[13px]">{n.descricao}</span>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200">
+                        <span className="font-bold text-[#1C1C1E] text-[13px]">{n.descricao}</span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-[#AF52DE] border border-violet-200">
                           {n.parceiroNome}
                         </span>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-500 border border-slate-200">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(116,116,128,0.04)] text-[#8E8E93] border border-[rgba(60,60,67,0.12)]">
                           {n.tipo === "comissao" ? "Comissão" : "Ganho"}
                         </span>
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700">
                           Pendente
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-1">{fmtDate(n.dataOrcamento)}</p>
+                      <p className="text-[11px] text-[#8E8E93] mt-1">{fmtDate(n.dataOrcamento)}</p>
                     </div>
-                    <p className="font-black text-violet-700 text-[15px] tabular-nums shrink-0">{brl(n.comissaoValor)}</p>
+                    <p className="font-semibold text-[#AF52DE] text-[15px] tabular-nums shrink-0">{brl(n.comissaoValor)}</p>
                   </div>
                 ))}
               </div>
             )}
 
             {negociosPendentes.length > 0 && pedidosElegiveis.length > 0 && (
-              <p className="text-[10.5px] uppercase tracking-wider text-slate-400 font-semibold mb-2">Pedidos</p>
+              <p className="text-[10.5px] uppercase tracking-wider text-[#8E8E93] font-semibold mb-2">Pedidos</p>
             )}
             {pedidosElegiveis.length === 0 ? (
               <Empty msg="Nenhum pedido fechado ainda." />
@@ -653,8 +653,8 @@ export function FinanceiroView({
                         <div className="px-5 py-3 bg-violet-50/50 border-b border-violet-100 flex items-center gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-slate-800 text-[13px]">{loteInfo?.nomeCliente ?? cards[0].nomeCliente}</span>
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200">
+                              <span className="font-bold text-[#1C1C1E] text-[13px]">{loteInfo?.nomeCliente ?? cards[0].nomeCliente}</span>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#AF52DE]/10 text-[#AF52DE] border border-violet-200">
                                 {loteNum}
                               </span>
                               {st && (
@@ -663,14 +663,14 @@ export function FinanceiroView({
                                 </span>
                               )}
                               {!lanc && (
-                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-400">
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-[rgba(60,60,67,0.12)] bg-[rgba(116,116,128,0.04)] text-[#8E8E93]">
                                   Não registrado
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] text-slate-400 mt-0.5">{cards.length} produto{cards.length > 1 ? "s" : ""}{lanc?.dataVencimento ? ` · Vence ${fmtDate(lanc.dataVencimento)}` : ""}</p>
+                            <p className="text-[11px] text-[#8E8E93] mt-0.5">{cards.length} produto{cards.length > 1 ? "s" : ""}{lanc?.dataVencimento ? ` · Vence ${fmtDate(lanc.dataVencimento)}` : ""}</p>
                           </div>
-                          <p className="font-black text-violet-700 text-[15px] tabular-nums shrink-0">{brl(total)}</p>
+                          <p className="font-semibold text-[#AF52DE] text-[15px] tabular-nums shrink-0">{brl(total)}</p>
                           <div className="flex gap-1.5 shrink-0">
                             {!lanc ? (
                               <button
@@ -683,7 +683,7 @@ export function FinanceiroView({
                                   loteNumero: loteNum,
                                   dataVencimento: hoje(),
                                 })}
-                                className="px-3 py-1.5 text-[11px] font-semibold text-violet-700 bg-violet-100 hover:bg-violet-200 rounded-lg transition-colors">
+                                className="px-3 py-1.5 text-[11px] font-semibold text-[#AF52DE] bg-[#AF52DE]/10 hover:bg-violet-200 rounded-lg transition-colors">
                                 Registrar cobrança
                               </button>
                             ) : st !== "pago" ? (
@@ -703,8 +703,8 @@ export function FinanceiroView({
                           {cards.map(card => (
                             <div key={card.id} className="px-5 py-2.5 flex items-center gap-3">
                               <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-full">{card.numero}</span>
-                              <p className="flex-1 text-[12px] text-slate-600 truncate">{card.dimensoes} · {card.materialNome}</p>
-                              <p className="text-[12px] font-semibold text-slate-700 tabular-nums">{brl(card.preco)}</p>
+                              <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.6)] truncate">{card.dimensoes} · {card.materialNome}</p>
+                              <p className="text-[12px] font-semibold text-[rgba(60,60,67,0.75)] tabular-nums">{brl(card.preco)}</p>
                             </div>
                           ))}
                         </div>
@@ -718,10 +718,10 @@ export function FinanceiroView({
                     const st = lanc ? statusEfetivo(lanc) : null
                     return (
                       <div key={card.id}
-                        className="bg-white border border-slate-100 rounded-2xl px-5 py-4 flex items-center gap-4 hover:border-slate-200 transition-colors mb-2">
+                        className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-5 py-4 flex items-center gap-4 hover:border-[rgba(60,60,67,0.12)] transition-colors mb-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-slate-800 text-[13px]">{card.nomeCliente}</span>
+                            <span className="font-bold text-[#1C1C1E] text-[13px]">{card.nomeCliente}</span>
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
                               {card.numero}
                             </span>
@@ -731,17 +731,17 @@ export function FinanceiroView({
                               </span>
                             )}
                             {!lanc && (
-                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-400">
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-[rgba(60,60,67,0.12)] bg-[rgba(116,116,128,0.04)] text-[#8E8E93]">
                                 Não registrado
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-400 mt-1">
+                          <p className="text-[11px] text-[#8E8E93] mt-1">
                             {card.dimensoes && `${card.dimensoes} · `}{card.materialNome}
                             {lanc?.dataVencimento && ` · Vence ${fmtDate(lanc.dataVencimento)}`}
                           </p>
                         </div>
-                        <p className="font-black text-slate-800 text-[15px] tabular-nums shrink-0">{brl(card.preco)}</p>
+                        <p className="font-semibold text-[#1C1C1E] text-[15px] tabular-nums shrink-0">{brl(card.preco)}</p>
                         <div className="flex gap-1.5 shrink-0">
                           {!lanc ? (
                             <button
@@ -754,7 +754,7 @@ export function FinanceiroView({
                                 nomeCliente: card.nomeCliente,
                                 dataVencimento: hoje(),
                               })}
-                              className="px-3 py-1.5 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+                              className="px-3 py-1.5 text-[11px] font-semibold text-[rgba(60,60,67,0.6)] bg-[rgba(116,116,128,0.08)] hover:bg-slate-200 rounded-lg transition-colors">
                               Registrar cobrança
                             </button>
                           ) : st !== "pago" ? (
@@ -782,13 +782,13 @@ export function FinanceiroView({
           <>
             <div className="flex gap-2 mb-4 flex-wrap">
               <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoLancamento | "")}
-                className="h-8 border border-slate-200 rounded-lg px-3 text-[12px] text-slate-600 bg-white focus:outline-none">
+                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[rgba(60,60,67,0.6)] bg-white focus:outline-none">
                 <option value="">Todos os tipos</option>
                 <option value="receita">Receitas</option>
                 <option value="despesa">Despesas</option>
               </select>
               <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value as StatusLancamento | "")}
-                className="h-8 border border-slate-200 rounded-lg px-3 text-[12px] text-slate-600 bg-white focus:outline-none">
+                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[rgba(60,60,67,0.6)] bg-white focus:outline-none">
                 <option value="">Todos os status</option>
                 <option value="pago">Pago</option>
                 <option value="pendente">Pendente</option>
@@ -803,21 +803,21 @@ export function FinanceiroView({
                 <div className="w-1.5 h-10 rounded-full shrink-0 bg-violet-400" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-slate-800 text-[13px]">{n.descricao}</span>
-                    <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600">PARCERIA</span>
+                    <span className="font-bold text-[#1C1C1E] text-[13px]">{n.descricao}</span>
+                    <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-[#AF52DE]/10 text-[#AF52DE]">PARCERIA</span>
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${n.status === "pago" ? STATUS_CLS.pago : STATUS_CLS.pendente}`}>
                       {n.status === "pago" ? "Pago" : "Pendente"}
                     </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[rgba(116,116,128,0.08)] text-[#8E8E93] font-medium">
                       {n.tipo === "comissao" ? "Comissão" : "Ganho"}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-1">
-                    <span className="text-[11px] text-slate-400">{n.parceiroNome}</span>
-                    <span className="text-[11px] text-slate-400">{fmtDate(n.dataOrcamento)}</span>
+                    <span className="text-[11px] text-[#8E8E93]">{n.parceiroNome}</span>
+                    <span className="text-[11px] text-[#8E8E93]">{fmtDate(n.dataOrcamento)}</span>
                   </div>
                 </div>
-                <p className="font-black text-[14px] tabular-nums shrink-0 text-violet-700">{brl(n.comissaoValor)}</p>
+                <p className="font-semibold text-[14px] tabular-nums shrink-0 text-[#AF52DE]">{brl(n.comissaoValor)}</p>
               </div>
             ))}
 
@@ -829,38 +829,38 @@ export function FinanceiroView({
                   const st = statusEfetivo(l)
                   return (
                     <div key={l.id}
-                      className="bg-white border border-slate-100 rounded-2xl px-5 py-4 flex items-center gap-3 hover:border-slate-200 transition-colors group">
+                      className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-5 py-4 flex items-center gap-3 hover:border-[rgba(60,60,67,0.12)] transition-colors group">
                       {/* Tipo indicator */}
                       <div className={`w-1.5 h-10 rounded-full shrink-0 ${l.tipo === "receita" ? "bg-emerald-400" : "bg-rose-400"}`} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-slate-800 text-[13px]">{l.descricao}</span>
+                          <span className="font-bold text-[#1C1C1E] text-[13px]">{l.descricao}</span>
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_CLS[st]}`}>
                             {STATUS_LABEL[st]}
                           </span>
                           {l.categoria && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[rgba(116,116,128,0.08)] text-[#8E8E93] font-medium">
                               {capitalize(l.categoria)}
                             </span>
                           )}
                         </div>
                         <div className="flex items-center gap-3 mt-1 flex-wrap">
-                          <span className="text-[11px] text-slate-400">
+                          <span className="text-[11px] text-[#8E8E93]">
                             {l.status === "pago" && l.dataPagamento
                               ? `Pago em ${fmtDate(l.dataPagamento)}`
                               : `Vence ${fmtDate(l.dataVencimento)}`}
                           </span>
                           {l.formaPagamento && (
-                            <span className="text-[11px] text-slate-400">
+                            <span className="text-[11px] text-[#8E8E93]">
                               {FORMAS.find(f => f.value === l.formaPagamento)?.label}
                             </span>
                           )}
                           {l.nomeCliente && (
-                            <span className="text-[11px] text-slate-400">{l.nomeCliente}</span>
+                            <span className="text-[11px] text-[#8E8E93]">{l.nomeCliente}</span>
                           )}
                         </div>
                       </div>
-                      <p className={`font-black text-[14px] tabular-nums shrink-0 ${
+                      <p className={`font-semibold text-[14px] tabular-nums shrink-0 ${
                         l.tipo === "receita" ? "text-emerald-700" : "text-rose-600"
                       }`}>
                         {l.tipo === "despesa" ? "−" : ""}{brl(l.valor)}
@@ -876,13 +876,13 @@ export function FinanceiroView({
                           </button>
                         )}
                         <button onClick={() => setModalLanc(l)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                          className="p-1.5 rounded-lg text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.08)] transition-colors">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
                           </svg>
                         </button>
                         <button onClick={() => setConfirmarDel(l.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors">
+                          className="p-1.5 rounded-lg text-[#8E8E93] hover:text-rose-500 hover:bg-rose-50 transition-colors">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                           </svg>
@@ -921,11 +921,11 @@ export function FinanceiroView({
       {confirmarDel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mx-4 p-6 text-center">
-            <p className="font-bold text-slate-800 text-[14px] mb-1">Excluir lançamento?</p>
-            <p className="text-[12px] text-slate-400 mb-5">Esta ação não pode ser desfeita.</p>
+            <p className="font-bold text-[#1C1C1E] text-[14px] mb-1">Excluir lançamento?</p>
+            <p className="text-[12px] text-[#8E8E93] mb-5">Esta ação não pode ser desfeita.</p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmarDel(null)}
-                className="flex-1 py-2.5 text-[12.5px] font-medium text-slate-500 hover:bg-slate-50 rounded-xl">
+                className="flex-1 py-2.5 text-[12.5px] font-medium text-[#8E8E93] hover:bg-[rgba(116,116,128,0.04)] rounded-xl">
                 Cancelar
               </button>
               <button onClick={() => { onDelete(confirmarDel); setConfirmarDel(null) }}
@@ -951,10 +951,10 @@ function KpiCard({ label, value, sub, color }: {
             : color === "amber"  ? "text-amber-600"
             :                      "text-blue-700"
   return (
-    <div className="bg-white border border-slate-100 rounded-2xl px-4 py-3">
-      <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{label}</p>
-      <p className={`font-black text-[17px] tabular-nums mt-0.5 ${cls}`}>{value}</p>
-      <p className="text-[10.5px] text-slate-400 mt-0.5">{sub}</p>
+    <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-4 py-3">
+      <p className="text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">{label}</p>
+      <p className={`font-semibold text-[17px] tabular-nums mt-0.5 ${cls}`}>{value}</p>
+      <p className="text-[10.5px] text-[#8E8E93] mt-0.5">{sub}</p>
     </div>
   )
 }
@@ -966,11 +966,11 @@ function DreRow({ label, value, bold, accent, separator }: {
   const valCls = accent === "green" ? "text-emerald-700"
                : accent === "rose"  ? "text-rose-600"
                : value < 0          ? "text-rose-600"
-               :                      "text-slate-700"
+               :                      "text-[rgba(60,60,67,0.75)]"
   return (
-    <div className={`px-5 py-3 flex items-center justify-between ${separator ? "border-t border-slate-200 bg-slate-50/50" : ""}`}>
-      <span className={`text-[12.5px] ${bold ? "font-bold text-slate-800" : "text-slate-600"}`}>{label}</span>
-      <span className={`text-[13px] tabular-nums ${bold ? "font-black" : "font-semibold"} ${valCls}`}>
+    <div className={`px-5 py-3 flex items-center justify-between ${separator ? "border-t border-[rgba(60,60,67,0.12)] bg-[rgba(116,116,128,0.04)]/50" : ""}`}>
+      <span className={`text-[12.5px] ${bold ? "font-bold text-[#1C1C1E]" : "text-[rgba(60,60,67,0.6)]"}`}>{label}</span>
+      <span className={`text-[13px] tabular-nums ${bold ? "font-semibold" : "font-semibold"} ${valCls}`}>
         {value < 0 ? `−${brl(Math.abs(value))}` : brl(value)}
       </span>
     </div>
@@ -980,7 +980,7 @@ function DreRow({ label, value, bold, accent, separator }: {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-[10.5px] uppercase tracking-[0.08em] text-slate-400 font-semibold mb-1.5">{label}</label>
+      <label className="block text-[10.5px] uppercase  text-[#8E8E93] font-semibold mb-1.5">{label}</label>
       {children}
     </div>
   )
@@ -989,13 +989,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Empty({ msg }: { msg: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
-      <p className="text-[13px] font-semibold text-slate-500">{msg}</p>
+      <p className="text-[13px] font-semibold text-[#8E8E93]">{msg}</p>
     </div>
   )
 }
 
 function inp() {
-  return "w-full h-9 border border-slate-200 rounded-lg px-3 text-[12.5px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+  return "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
 }
 
 function capitalize(s: string) {

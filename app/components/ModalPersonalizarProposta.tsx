@@ -125,21 +125,21 @@ export function ModalPersonalizarProposta({
         style={{ maxHeight: "92vh" }}>
 
         {/* Header */}
-        <div className="px-6 pt-5 pb-4 border-b border-slate-100 shrink-0">
+        <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] shrink-0">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-slate-800 text-[15px] leading-snug truncate">
+              <p className="font-bold text-[#1C1C1E] text-[15px] leading-snug truncate">
                 {form.nomeCliente || "Sem nome"}
               </p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full tabular-nums shrink-0">
                   {numero}
                 </span>
-                <span className="text-[11px] text-slate-400">{data}</span>
+                <span className="text-[11px] text-[#8E8E93]">{data}</span>
               </div>
             </div>
             <button onClick={handleClose}
-              className="text-slate-300 hover:text-slate-500 transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
+              className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
           </div>
           {/* Specs pills */}
           <div className="flex flex-wrap gap-1.5 mt-3">
@@ -151,7 +151,7 @@ export function ModalPersonalizarProposta({
             {form.incluirVerniz && <SpecPill blue>Verniz UV</SpecPill>}
             {form.validadeDias > 0 && <SpecPill>Válido {form.validadeDias} dias</SpecPill>}
           </div>
-          <p className="text-[11px] text-slate-400 mt-2.5 leading-relaxed">
+          <p className="text-[11px] text-[#8E8E93] mt-2.5 leading-relaxed">
             Selecione os tiers e ajuste os preços antes de enviar ao cliente.
           </p>
         </div>
@@ -160,12 +160,12 @@ export function ModalPersonalizarProposta({
         <div className="overflow-y-auto flex-1 px-2">
           <table className="w-full">
             <thead className="sticky top-0 bg-white z-10">
-              <tr className="border-b border-slate-100">
+              <tr className="border-b border-[rgba(60,60,67,0.08)]">
                 <th className="py-3 px-3 w-10" />
-                <th className="py-3 px-2 text-left text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Qtd</th>
-                <th className="py-3 px-2 text-right text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Unitário</th>
-                <th className="py-3 px-2 text-right text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Total</th>
-                <th className="py-3 px-2 text-right text-[10px] uppercase tracking-wider text-slate-400 font-semibold">12×/mês</th>
+                <th className="py-3 px-2 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Qtd</th>
+                <th className="py-3 px-2 text-right text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Unitário</th>
+                <th className="py-3 px-2 text-right text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Total</th>
+                <th className="py-3 px-2 text-right text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">12×/mês</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -220,16 +220,16 @@ export function ModalPersonalizarProposta({
                             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                           </svg>
                         </button>
-                        <span className="font-bold text-[13px] text-slate-800 tabular-nums">{num(linha.quantidade)}</span>
-                        {isIdeal && <span className="text-[8.5px] bg-blue-600 text-white px-1.5 py-0.5 rounded-full font-black tracking-wide">IDEAL</span>}
-                        {isMin && !isIdeal && <span className="text-[8.5px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-black tracking-wide">MÍN</span>}
+                        <span className="font-bold text-[13px] text-[#1C1C1E] tabular-nums">{num(linha.quantidade)}</span>
+                        {isIdeal && <span className="text-[8.5px] bg-blue-600 text-white px-1.5 py-0.5 rounded-full font-semibold tracking-wide">IDEAL</span>}
+                        {isMin && !isIdeal && <span className="text-[8.5px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-semibold tracking-wide">MÍN</span>}
                       </div>
                     </td>
 
                     {/* Unitário (editável) */}
                     <td className="py-3 px-2">
                       <div className="flex items-center justify-end gap-1">
-                        <span className="text-slate-400 text-[10px]">R$</span>
+                        <span className="text-[#8E8E93] text-[10px]">R$</span>
                         <input
                           type="number"
                           step="0.01"
@@ -241,7 +241,7 @@ export function ModalPersonalizarProposta({
                           className={`w-[72px] text-right text-[12.5px] font-semibold tabular-nums border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                             modified
                               ? "border-amber-400 bg-amber-50 text-amber-900 focus:ring-amber-300/50 focus:border-amber-400"
-                              : "border-slate-200 text-slate-800 focus:ring-blue-400/30 focus:border-blue-400"
+                              : "border-[rgba(60,60,67,0.12)] text-[#1C1C1E] focus:ring-blue-400/30 focus:border-blue-400"
                           }`}
                         />
                       </div>
@@ -249,13 +249,13 @@ export function ModalPersonalizarProposta({
 
                     {/* Total */}
                     <td className="py-3 px-2 text-right">
-                      <span className={`font-black text-[13.5px] tabular-nums ${
-                        ativo ? (modified ? "text-amber-700" : "text-blue-700") : "text-slate-400"
+                      <span className={`font-semibold text-[13.5px] tabular-nums ${
+                        ativo ? (modified ? "text-amber-700" : "text-blue-700") : "text-[#8E8E93]"
                       }`}>
                         {brl(total)}
                       </span>
                       {modified && ativo && (
-                        <p className="text-[9px] text-slate-400 line-through tabular-nums">
+                        <p className="text-[9px] text-[#8E8E93] line-through tabular-nums">
                           {brl((comFaca ? linha.unitarioComFaca : linha.unitarioSemFaca) * linha.quantidade)}
                         </p>
                       )}
@@ -263,7 +263,7 @@ export function ModalPersonalizarProposta({
 
                     {/* Parcela */}
                     <td className="py-3 px-2 text-right">
-                      <span className="text-[11.5px] text-slate-400 tabular-nums">{brl(parcela)}</span>
+                      <span className="text-[11.5px] text-[#8E8E93] tabular-nums">{brl(parcela)}</span>
                     </td>
                   </tr>
                 )
@@ -273,8 +273,8 @@ export function ModalPersonalizarProposta({
         </div>
 
         {/* Resumo + reset */}
-        <div className="px-5 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between shrink-0">
-          <p className="text-[11px] text-slate-500">
+        <div className="px-5 py-2.5 bg-[rgba(116,116,128,0.04)] border-t border-[rgba(60,60,67,0.08)] flex items-center justify-between shrink-0">
+          <p className="text-[11px] text-[#8E8E93]">
             <span className="font-semibold tabular-nums">{ativos.size}</span> de{" "}
             <span className="tabular-nums">{calculo.tabela.length}</span> tiers selecionados
           </p>
@@ -288,44 +288,44 @@ export function ModalPersonalizarProposta({
 
         {/* Lote section */}
         {(lotes !== undefined || onLoteCreate) && (
-          <div className="px-4 pt-3 pb-0 border-t border-slate-100 shrink-0">
-            <div className={`rounded-xl p-3 ${loteAtribuido ? "bg-violet-50 border border-violet-200" : "border border-dashed border-slate-200"}`}>
+          <div className="px-4 pt-3 pb-0 border-t border-[rgba(60,60,67,0.08)] shrink-0">
+            <div className={`rounded-xl p-3 ${loteAtribuido ? "bg-violet-50 border border-violet-200" : "border border-dashed border-[rgba(60,60,67,0.12)]"}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <svg className={`w-3.5 h-3.5 shrink-0 ${loteAtribuido ? "text-violet-500" : "text-slate-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className={`w-3.5 h-3.5 shrink-0 ${loteAtribuido ? "text-[#AF52DE]" : "text-[#8E8E93]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z" />
                   </svg>
-                  <p className={`text-[11.5px] font-semibold ${loteAtribuido ? "text-violet-700" : "text-slate-500"}`}>
+                  <p className={`text-[11.5px] font-semibold ${loteAtribuido ? "text-[#AF52DE]" : "text-[#8E8E93]"}`}>
                     {loteAtribuido ? loteAtribuido : "Lote"}
                   </p>
                 </div>
                 {!loteAtribuido && (
                   <button onClick={() => setShowLoteSection(v => !v)}
-                    className="text-[11px] font-semibold text-violet-600 hover:text-violet-800 transition-colors">
+                    className="text-[11px] font-semibold text-[#AF52DE] hover:text-violet-800 transition-colors">
                     + Agrupar
                   </button>
                 )}
                 {loteAtribuido && (
-                  <span className="text-[10px] text-violet-500">Associado</span>
+                  <span className="text-[10px] text-[#AF52DE]">Associado</span>
                 )}
               </div>
               {showLoteSection && !loteAtribuido && (
                 <div className="mt-2.5 space-y-1.5">
                   {clientLotes.length > 0 && (
                     <>
-                      <p className="text-[10px] text-slate-400 font-medium">Lotes de {form.nomeCliente}:</p>
+                      <p className="text-[10px] text-[#8E8E93] font-medium">Lotes de {form.nomeCliente}:</p>
                       {clientLotes.map(l => (
                         <button key={l.id} onClick={() => handleAssignLote(l.id, l.numero)}
-                          className="w-full flex items-center gap-2 py-1.5 px-2.5 text-[11px] text-violet-700 bg-white hover:bg-violet-50 rounded-lg border border-violet-200 transition-colors text-left">
+                          className="w-full flex items-center gap-2 py-1.5 px-2.5 text-[11px] text-[#AF52DE] bg-white hover:bg-violet-50 rounded-lg border border-violet-200 transition-colors text-left">
                           <span className="font-bold">{l.numero}</span>
                           <span className="text-violet-300">·</span>
-                          <span className="truncate text-violet-500">{l.nomeCliente}</span>
+                          <span className="truncate text-[#AF52DE]">{l.nomeCliente}</span>
                         </button>
                       ))}
                     </>
                   )}
                   <button onClick={handleCriarLote} disabled={criandoLote}
-                    className="w-full py-1.5 text-[11px] font-semibold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors">
+                    className="w-full py-1.5 text-[11px] font-semibold text-white bg-[#AF52DE] hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors">
                     {criandoLote ? "Criando…" : clientLotes.length > 0 ? "Criar novo lote" : "+ Criar lote para este pedido"}
                   </button>
                 </div>
@@ -335,18 +335,18 @@ export function ModalPersonalizarProposta({
         )}
 
         {/* Footer actions */}
-        <div className="px-4 pb-4 pt-3 border-t border-slate-100 shrink-0 space-y-2">
+        <div className="px-4 pb-4 pt-3 border-t border-[rgba(60,60,67,0.08)] shrink-0 space-y-2">
           {nenhum && (
             <p className="text-[11px] text-rose-500 text-center">Selecione ao menos um tier para gerar o PDF.</p>
           )}
           <div className="flex gap-2">
             <button onClick={handleClose}
-              className="px-3 py-2.5 text-[11.5px] text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors shrink-0">
+              className="px-3 py-2.5 text-[11.5px] text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors shrink-0">
               Fechar
             </button>
             <button
               onClick={() => onAbrirPdf(gerarHtmlOrcamento({ form, calculo, data, numero }))}
-              className="flex-1 py-2.5 text-[11.5px] font-medium border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-600 rounded-xl transition-colors">
+              className="flex-1 py-2.5 text-[11.5px] font-medium border border-[rgba(60,60,67,0.12)] hover:border-slate-300 hover:bg-[rgba(116,116,128,0.04)] text-[rgba(60,60,67,0.6)] rounded-xl transition-colors">
               PDF Gráfica
             </button>
             {onSalvar && (
@@ -359,7 +359,7 @@ export function ModalPersonalizarProposta({
                   onSalvar(custom, opcoes)
                   onClose()
                 }}
-                className="flex-1 py-2.5 text-[11.5px] font-semibold bg-slate-800 hover:bg-slate-900 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
+                className="flex-1 py-2.5 text-[11.5px] font-semibold bg-[#2C2C2E] hover:bg-[#1C1C1E] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
                 Salvar
               </button>
             )}
@@ -386,7 +386,7 @@ export function ModalPersonalizarProposta({
 function SpecPill({ children, blue }: { children: React.ReactNode; blue?: boolean }) {
   return (
     <span className={`text-[10.5px] px-2 py-0.5 rounded-full font-medium ${
-      blue ? "bg-blue-50 text-blue-700 border border-blue-100" : "bg-slate-100 text-slate-600"
+      blue ? "bg-blue-50 text-blue-700 border border-blue-100" : "bg-[rgba(116,116,128,0.08)] text-[rgba(60,60,67,0.6)]"
     }`}>{children}</span>
   )
 }

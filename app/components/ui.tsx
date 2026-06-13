@@ -7,7 +7,7 @@ import { LinhaTabela, Calculo } from "../types"
 export function FormSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(60,60,67,0.12)" }}>
-      <p className="text-[9.5px] uppercase tracking-[0.13em] font-semibold text-[rgba(60,60,67,0.4)] mb-3">{label}</p>
+      <p className="text-[9.5px] uppercase tracking-wide font-semibold text-[rgba(60,60,67,0.4)] mb-3">{label}</p>
       {children}
     </div>
   )
@@ -43,8 +43,8 @@ export function KpiCard({ label, value, sub, accent }: { label: string; value: s
         : "bg-white hover:shadow-md hover:-translate-y-px"
     }`}
     style={{ borderColor: accent ? "rgba(255,255,255,0.08)" : "rgba(60,60,67,0.08)" }}>
-      <p className={`text-[9.5px] uppercase tracking-[0.13em] font-semibold mb-3 ${accent ? "text-[rgba(255,255,255,0.4)]" : "text-[rgba(60,60,67,0.4)]"}`}>{label}</p>
-      <p className={`text-[26px] font-black leading-none tracking-tight ${accent ? "text-white" : "text-[#1C1C1E]"}`}>{value}</p>
+      <p className={`text-[9.5px] uppercase tracking-wide font-semibold mb-3 ${accent ? "text-[rgba(255,255,255,0.4)]" : "text-[rgba(60,60,67,0.4)]"}`}>{label}</p>
+      <p className={`text-[26px] font-semibold leading-none tracking-tight ${accent ? "text-white" : "text-[#1C1C1E]"}`}>{value}</p>
       {sub && <p className={`text-[11px] mt-2 leading-snug ${accent ? "text-[rgba(255,255,255,0.35)]" : "text-[rgba(60,60,67,0.45)]"}`}>{sub}</p>}
     </div>
   )
@@ -54,7 +54,7 @@ export function Section({ title, children }: { title: string; children: React.Re
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <p className="text-[9.5px] uppercase tracking-[0.13em] font-semibold text-[rgba(60,60,67,0.4)] shrink-0 leading-none">{title}</p>
+        <p className="text-[9.5px] uppercase tracking-wide font-semibold text-[rgba(60,60,67,0.4)] shrink-0 leading-none">{title}</p>
         <div className="flex-1 h-px" style={{ background: "rgba(60,60,67,0.1)" }} />
       </div>
       {children}
@@ -64,7 +64,7 @@ export function Section({ title, children }: { title: string; children: React.Re
 
 export function TH({ children, br, blue }: { children?: React.ReactNode; br?: boolean; blue?: boolean }) {
   return (
-    <th className={`px-3 py-3 text-left text-[9.5px] uppercase tracking-[0.08em] font-bold whitespace-nowrap
+    <th className={`px-3 py-3 text-left text-[9.5px] uppercase font-semibold whitespace-nowrap
       ${blue ? "text-[#007AFF]" : "text-[rgba(60,60,67,0.4)]"}
       ${br ? "border-r border-[rgba(60,60,67,0.08)]" : ""}`}>
       {children}
@@ -150,9 +150,9 @@ export function AnaliseEstrategica({ calculo, comFaca, cliente }: { calculo: Cal
       <div className="grid grid-cols-3 gap-3 mb-3">
         {cards.map(c => (
           <div key={c.tag} className={`rounded-xl border p-5 bg-white ${c.cor}`}>
-            <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full uppercase tracking-[0.1em] ${c.tagCor}`}>{c.tag}</span>
+            <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide ${c.tagCor}`}>{c.tag}</span>
             <p className="text-[rgba(60,60,67,0.55)] text-[11px] mt-3 mb-3 leading-snug">{c.desc}</p>
-            <p className="text-[26px] font-black text-[#1C1C1E] leading-none tabular-nums">{brl(c.linha[precoKey as keyof LinhaTabela] as number)}</p>
+            <p className="text-[26px] font-semibold text-[#1C1C1E] leading-none tabular-nums">{brl(c.linha[precoKey as keyof LinhaTabela] as number)}</p>
             <p className="text-[11px] text-[rgba(60,60,67,0.5)] mt-1.5 tabular-nums">
               {num(c.linha.quantidade)} un · {brl(c.linha[unitKey as keyof LinhaTabela] as number)}/un
             </p>
@@ -163,7 +163,7 @@ export function AnaliseEstrategica({ calculo, comFaca, cliente }: { calculo: Cal
         ))}
       </div>
       <div className="bg-white rounded-xl p-5" style={{ border: "1px solid rgba(60,60,67,0.08)" }}>
-        <p className="text-[9px] uppercase tracking-[0.15em] font-bold text-[rgba(60,60,67,0.4)] mb-3">Recomendação de fechamento</p>
+        <p className="text-[9px] uppercase tracking-wide font-bold text-[rgba(60,60,67,0.4)] mb-3">Recomendação de fechamento</p>
         <p className="text-[rgba(60,60,67,0.7)] leading-relaxed text-[13px]">
           {cliente ? <strong className="text-[#1C1C1E]">{cliente}:</strong> : null}{" "}
           Apresente <strong className="text-[#1C1C1E]">{num(sweetIdeal.quantidade)} unidades</strong> como ponto ideal —{" "}

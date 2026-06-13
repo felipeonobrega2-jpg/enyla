@@ -195,12 +195,12 @@ export default function TrackingClient({ initialData, numero }: Props) {
             </div>
             <div className="grid grid-cols-2 border-t border-[rgba(60,60,67,0.06)] divide-x divide-[rgba(60,60,67,0.06)]">
               <div className="px-4 py-3">
-                <p className="text-[9px] uppercase tracking-[0.12em] text-[#8E8E93] font-semibold">Quantidade</p>
-                <p className="text-[15px] font-black text-[#1C1C1E] tabular-nums mt-1">{num(data.quantidade)} un</p>
+                <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold">Quantidade</p>
+                <p className="text-[15px] font-semibold text-[#1C1C1E] tabular-nums mt-1">{num(data.quantidade)} un</p>
               </div>
               <div className="px-4 py-3">
-                <p className="text-[9px] uppercase tracking-[0.12em] text-[#8E8E93] font-semibold">Valor</p>
-                <p className="text-[15px] font-black text-[#1C1C1E] tabular-nums mt-1">{brl(data.preco)}</p>
+                <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold">Valor</p>
+                <p className="text-[15px] font-semibold text-[#1C1C1E] tabular-nums mt-1">{brl(data.preco)}</p>
               </div>
             </div>
           </div>
@@ -225,7 +225,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
             {/* Top bar */}
             <div className="px-5 pt-4 pb-2">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/70">Orçamento recebido</p>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">Orçamento recebido</p>
                 <p className="text-[11px] font-bold text-white/60 tabular-nums">0/{ETAPAS.length} etapas</p>
               </div>
               <div className="w-full h-1.5 bg-white/20 rounded-full" />
@@ -274,7 +274,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
               {/* Progress bar + label */}
               <div className="px-5 pt-4 pb-2">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/70">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">
                     {isDelivered ? "Concluído" : "Em andamento"}
                   </p>
                   <p className="text-[11px] font-bold text-white/80 tabular-nums">
@@ -352,11 +352,11 @@ export default function TrackingClient({ initialData, numero }: Props) {
                   <div className="flex items-baseline justify-between mb-2">
                     <div>
                       <p className="text-[9px] font-bold uppercase tracking-widest text-white/50 mb-0.5">Pago</p>
-                      <p className="text-[16px] font-black text-emerald-300 tabular-nums leading-none">{brl(totalPago)}</p>
+                      <p className="text-[16px] font-semibold text-emerald-300 tabular-nums leading-none">{brl(totalPago)}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-[9px] font-bold uppercase tracking-widest text-white/50 mb-0.5">Restante</p>
-                      <p className={`text-[16px] font-black tabular-nums leading-none ${saldo <= 0 ? "text-emerald-300" : "text-white/80"}`}>{brl(saldo)}</p>
+                      <p className={`text-[16px] font-semibold tabular-nums leading-none ${saldo <= 0 ? "text-emerald-300" : "text-white/80"}`}>{brl(saldo)}</p>
                     </div>
                   </div>
                   <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
@@ -372,7 +372,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
             {/* ── Timeline ───────────────────────────────────────────── */}
             <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] overflow-hidden">
               <div className="px-5 py-3.5 border-b border-[rgba(60,60,67,0.06)]">
-                <p className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-[#8E8E93]">
+                <p className="text-[10.5px] uppercase tracking-wide font-bold text-[#8E8E93]">
                   Detalhes do progresso
                 </p>
               </div>

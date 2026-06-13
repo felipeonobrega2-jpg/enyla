@@ -43,23 +43,23 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
         style={{ maxHeight: "90vh" }}
       >
         {/* Header */}
-        <div className="px-6 pt-5 pb-4 border-b border-slate-100 shrink-0">
+        <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] shrink-0">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-slate-800 text-[15px] leading-snug truncate">
+              <p className="font-bold text-[#1C1C1E] text-[15px] leading-snug truncate">
                 {nome || "Sem nome"}
               </p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 {numero && (
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border tabular-nums shrink-0 ${
                     isCustom
-                      ? "text-violet-700 bg-violet-50 border-violet-200"
+                      ? "text-[#AF52DE] bg-violet-50 border-violet-200"
                       : "text-blue-700 bg-blue-50 border-blue-200"
                   }`}>{numero}</span>
                 )}
-                <span className="text-[11px] text-slate-400">{dataStr}</span>
+                <span className="text-[11px] text-[#8E8E93]">{dataStr}</span>
                 {isK && (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(116,116,128,0.08)] text-[rgba(60,60,67,0.6)]">
                     {COLUNAS_KANBAN[data.card.coluna]}
                   </span>
                 )}
@@ -67,7 +67,7 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
             </div>
             <button
               onClick={onClose}
-              className="text-slate-300 hover:text-slate-500 transition-colors text-xl leading-none mt-0.5 shrink-0"
+              className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] transition-colors text-xl leading-none mt-0.5 shrink-0"
             >×</button>
           </div>
 
@@ -114,18 +114,18 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
         <div className="overflow-y-auto flex-1">
           <table className="w-full">
             <thead className="sticky top-0 bg-white z-10">
-              <tr className="border-b border-slate-100">
-                <th className="py-3 px-5 text-left text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+              <tr className="border-b border-[rgba(60,60,67,0.08)]">
+                <th className="py-3 px-5 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">
                   Qtd
                 </th>
-                <th className="py-3 px-4 text-right text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                <th className="py-3 px-4 text-right text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">
                   Unitário
                 </th>
-                <th className="py-3 px-4 text-right text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                <th className="py-3 px-4 text-right text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">
                   Total
                 </th>
                 {!isK && (
-                  <th className="py-3 px-5 text-right text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                  <th className="py-3 px-5 text-right text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">
                     12×/mês
                   </th>
                 )}
@@ -142,17 +142,17 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
                 const isMin    = l.quantidade === data.item.calculo.sweetSpotMinimoQtd
                 return (
                   <tr key={l.quantidade}
-                    className={isIdeal ? "bg-blue-50/50" : isMin ? "bg-amber-50/40" : "hover:bg-slate-50"}>
+                    className={isIdeal ? "bg-blue-50/50" : isMin ? "bg-amber-50/40" : "hover:bg-[rgba(116,116,128,0.04)]"}>
                     <td className="py-3 px-5">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-[13px] text-slate-800 tabular-nums">{num(l.quantidade)}</span>
+                        <span className="font-bold text-[13px] text-[#1C1C1E] tabular-nums">{num(l.quantidade)}</span>
                         {isIdeal && <Badge color="blue">IDEAL</Badge>}
                         {isMin && !isIdeal && <Badge color="amber">MÍN</Badge>}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-right text-[12.5px] text-slate-600 tabular-nums">{brl(unit)}</td>
+                    <td className="py-3 px-4 text-right text-[12.5px] text-[rgba(60,60,67,0.6)] tabular-nums">{brl(unit)}</td>
                     <td className="py-3 px-4 text-right font-bold text-[13px] text-blue-700 tabular-nums">{brl(total)}</td>
-                    <td className="py-3 px-5 text-right text-[11.5px] text-slate-400 tabular-nums">{brl(parc)}</td>
+                    <td className="py-3 px-5 text-right text-[11.5px] text-[#8E8E93] tabular-nums">{brl(parc)}</td>
                   </tr>
                 )
               })}
@@ -161,16 +161,16 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
                 const total = l.unitario * l.quantidade
                 const parc  = (total * parcFator) / 12
                 return (
-                  <tr key={i} className={l.isIdeal ? "bg-blue-50/50" : "hover:bg-slate-50"}>
+                  <tr key={i} className={l.isIdeal ? "bg-blue-50/50" : "hover:bg-[rgba(116,116,128,0.04)]"}>
                     <td className="py-3 px-5">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-[13px] text-slate-800 tabular-nums">{num(l.quantidade)}</span>
+                        <span className="font-bold text-[13px] text-[#1C1C1E] tabular-nums">{num(l.quantidade)}</span>
                         {l.isIdeal && <Badge color="blue">IDEAL</Badge>}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-right text-[12.5px] text-slate-600 tabular-nums">{brl(l.unitario)}</td>
-                    <td className="py-3 px-4 text-right font-bold text-[13px] text-violet-700 tabular-nums">{brl(total)}</td>
-                    <td className="py-3 px-5 text-right text-[11.5px] text-slate-400 tabular-nums">{brl(parc)}</td>
+                    <td className="py-3 px-4 text-right text-[12.5px] text-[rgba(60,60,67,0.6)] tabular-nums">{brl(l.unitario)}</td>
+                    <td className="py-3 px-4 text-right font-bold text-[13px] text-[#AF52DE] tabular-nums">{brl(total)}</td>
+                    <td className="py-3 px-5 text-right text-[11.5px] text-[#8E8E93] tabular-nums">{brl(parc)}</td>
                   </tr>
                 )
               })}
@@ -178,14 +178,14 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
               {isK && (data.card.opcoes?.length ? data.card.opcoes : null)?.map((op, i) => {
                 const isCurrent = op.quantidade === data.card.quantidade
                 return (
-                  <tr key={i} className={isCurrent ? "bg-green-50/60" : "hover:bg-slate-50"}>
+                  <tr key={i} className={isCurrent ? "bg-green-50/60" : "hover:bg-[rgba(116,116,128,0.04)]"}>
                     <td className="py-3 px-5">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-[13px] text-slate-800 tabular-nums">{num(op.quantidade)}</span>
+                        <span className="font-bold text-[13px] text-[#1C1C1E] tabular-nums">{num(op.quantidade)}</span>
                         {isCurrent && <Badge color="green">FECHADO</Badge>}
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-right text-[12.5px] text-slate-600 tabular-nums">{brl(op.unitario)}</td>
+                    <td className="py-3 px-4 text-right text-[12.5px] text-[rgba(60,60,67,0.6)] tabular-nums">{brl(op.unitario)}</td>
                     <td className="py-3 px-4 text-right font-bold text-[13px] text-blue-700 tabular-nums">{brl(op.preco)}</td>
                   </tr>
                 )
@@ -194,8 +194,8 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
               {isK && !data.card.opcoes?.length && (
                 <tr>
                   <td colSpan={3} className="py-8 text-center">
-                    <p className="font-black text-[22px] text-slate-800 tabular-nums">{brl(data.card.preco)}</p>
-                    <p className="text-[12px] text-slate-400 mt-1">{num(data.card.quantidade)} unidades</p>
+                    <p className="font-semibold text-[22px] text-[#1C1C1E] tabular-nums">{brl(data.card.preco)}</p>
+                    <p className="text-[12px] text-[#8E8E93] mt-1">{num(data.card.quantidade)} unidades</p>
                   </td>
                 </tr>
               )}
@@ -206,32 +206,32 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
 
         {/* Observações */}
         {isH && (data.item.form.obsCliente || data.item.form.obsInterna) && (
-          <div className="px-5 py-3.5 border-t border-slate-100 shrink-0 space-y-2.5">
+          <div className="px-5 py-3.5 border-t border-[rgba(60,60,67,0.08)] shrink-0 space-y-2.5">
             {data.item.form.obsCliente && (
               <div>
-                <p className="text-[9.5px] uppercase tracking-[0.08em] text-slate-400 font-semibold">Para o cliente</p>
-                <p className="text-[12px] text-slate-600 mt-0.5 leading-relaxed">{data.item.form.obsCliente}</p>
+                <p className="text-[9.5px] uppercase  text-[#8E8E93] font-semibold">Para o cliente</p>
+                <p className="text-[12px] text-[rgba(60,60,67,0.6)] mt-0.5 leading-relaxed">{data.item.form.obsCliente}</p>
               </div>
             )}
             {data.item.form.obsInterna && (
               <div>
-                <p className="text-[9.5px] uppercase tracking-[0.08em] text-slate-400 font-semibold">Interna</p>
-                <p className="text-[12px] text-slate-500 mt-0.5 italic leading-relaxed">{data.item.form.obsInterna}</p>
+                <p className="text-[9.5px] uppercase  text-[#8E8E93] font-semibold">Interna</p>
+                <p className="text-[12px] text-[#8E8E93] mt-0.5 italic leading-relaxed">{data.item.form.obsInterna}</p>
               </div>
             )}
           </div>
         )}
         {isP && data.proposta.obsCliente && (
-          <div className="px-5 py-3.5 border-t border-slate-100 shrink-0">
-            <p className="text-[9.5px] uppercase tracking-[0.08em] text-slate-400 font-semibold">Para o cliente</p>
-            <p className="text-[12px] text-slate-600 mt-0.5 leading-relaxed">{data.proposta.obsCliente}</p>
+          <div className="px-5 py-3.5 border-t border-[rgba(60,60,67,0.08)] shrink-0">
+            <p className="text-[9.5px] uppercase  text-[#8E8E93] font-semibold">Para o cliente</p>
+            <p className="text-[12px] text-[rgba(60,60,67,0.6)] mt-0.5 leading-relaxed">{data.proposta.obsCliente}</p>
           </div>
         )}
 
         {/* Data de entrega prevista — aparece sempre que o modal tem um card kanban associado */}
         {card && onSaveDelivery && (
-          <div className="px-5 py-3.5 border-t border-slate-100 shrink-0">
-            <p className="text-[9.5px] uppercase tracking-[0.1em] text-slate-400 font-semibold mb-2">
+          <div className="px-5 py-3.5 border-t border-[rgba(60,60,67,0.08)] shrink-0">
+            <p className="text-[9.5px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-2">
               Data prevista de entrega
             </p>
             <div className="flex items-center gap-2">
@@ -239,12 +239,12 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
                 type="date"
                 value={deliveryDate}
                 onChange={e => setDeliveryDate(e.target.value)}
-                className="flex-1 h-8 border border-slate-200 rounded-lg px-2.5 text-[12.5px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                className="flex-1 h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-2.5 text-[12.5px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
               />
               {deliveryDate && (
                 <button
                   onClick={() => setDeliveryDate("")}
-                  className="text-slate-400 hover:text-slate-600 transition-colors text-sm px-1"
+                  className="text-[#8E8E93] hover:text-[rgba(60,60,67,0.6)] transition-colors text-sm px-1"
                   title="Limpar data"
                 >×</button>
               )}
@@ -255,33 +255,33 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
                   await onSaveDelivery(card.id, deliveryDate || null)
                   setSavingDelivery(false)
                 }}
-                className="px-3 h-8 text-[12px] font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                className="px-3 h-8 text-[12px] font-semibold text-white bg-[#2C2C2E] hover:bg-[#1C1C1E] rounded-lg transition-colors disabled:opacity-50 shrink-0"
               >
                 {savingDelivery ? "…" : "Salvar"}
               </button>
             </div>
             {deliveryDate && (
-              <p className="text-[11px] text-slate-400 mt-1.5">
+              <p className="text-[11px] text-[#8E8E93] mt-1.5">
                 {new Date(deliveryDate + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
               </p>
             )}
-            <p className="text-[10.5px] text-slate-300 mt-1">Sobrescreve o cálculo automático de 15 dias.</p>
+            <p className="text-[10.5px] text-[rgba(60,60,67,0.3)] mt-1">Sobrescreve o cálculo automático de 15 dias.</p>
           </div>
         )}
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t border-slate-100 shrink-0 flex gap-2">
+        <div className="px-5 py-3 border-t border-[rgba(60,60,67,0.08)] shrink-0 flex gap-2">
           {isP && onEditar && (
             <button
               onClick={() => { onEditar(data.proposta); onClose() }}
-              className="flex-1 py-2 text-[12px] font-semibold text-white bg-violet-600 hover:bg-violet-700 rounded-xl transition-colors"
+              className="flex-1 py-2 text-[12px] font-semibold text-white bg-[#AF52DE] hover:bg-violet-700 rounded-xl transition-colors"
             >
               Editar proposta
             </button>
           )}
           <button
             onClick={onClose}
-            className="flex-1 py-2 text-[12px] font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors"
+            className="flex-1 py-2 text-[12px] font-medium text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors"
           >
             Fechar
           </button>
@@ -296,7 +296,7 @@ function Pill({ children, blue, red }: { children: React.ReactNode; blue?: boole
     <span className={`text-[10.5px] px-2 py-0.5 rounded-full font-medium ${
       blue ? "bg-blue-50 text-blue-700 border border-blue-100"
       : red ? "bg-rose-50 text-rose-600 border border-rose-100"
-      : "bg-slate-100 text-slate-600"
+      : "bg-[rgba(116,116,128,0.08)] text-[rgba(60,60,67,0.6)]"
     }`}>{children}</span>
   )
 }
@@ -306,7 +306,7 @@ function Badge({ children, color }: { children: React.ReactNode; color: "blue" |
             : color === "amber" ? "bg-amber-500 text-white"
             :                     "bg-green-600 text-white"
   return (
-    <span className={`text-[8.5px] px-1.5 py-0.5 rounded-full font-black tracking-wide ${cls}`}>
+    <span className={`text-[8.5px] px-1.5 py-0.5 rounded-full font-semibold tracking-wide ${cls}`}>
       {children}
     </span>
   )

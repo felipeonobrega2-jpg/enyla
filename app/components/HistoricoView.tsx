@@ -136,7 +136,7 @@ export function HistoricoView({
             <SectionLabel>Orçamentos calculados · {filtrado.length}</SectionLabel>
           )}
           {historico.length > 0 && propostasCustom.length === 0 && (
-            <p className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[#8E8E93] mb-1">
+            <p className="text-[10px] uppercase tracking-wide font-semibold text-[#8E8E93] mb-1">
               {filtrado.length} de {historico.length} orçamento{historico.length !== 1 ? "s" : ""}
             </p>
           )}
@@ -304,7 +304,7 @@ export function HistoricoView({
 
 function SectionLabel({ children }: { children: React.ReactNode; violet?: boolean }) {
   return (
-    <p className="text-[10px] uppercase tracking-[0.12em] font-bold mb-1 text-[#8E8E93]">
+    <p className="text-[10px] uppercase tracking-wide font-bold mb-1 text-[#8E8E93]">
       {children}
     </p>
   )
