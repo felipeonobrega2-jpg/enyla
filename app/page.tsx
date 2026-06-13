@@ -40,19 +40,19 @@ function NavItem({ active, onClick, icon, label, badge, accent }: {
 }) {
   return (
     <button onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-3 py-[7px] rounded-lg text-[12.5px] transition-all duration-100 ${
+      className={`w-full flex items-center gap-2.5 px-3 py-[7px] rounded-lg text-[12.5px] transition-all duration-150 ${
         active
-          ? "bg-[#007AFF]/10 text-[#007AFF] font-semibold"
+          ? "bg-white/[0.09] text-white font-semibold"
           : accent
-            ? "text-[#007AFF] font-semibold bg-[#007AFF]/[0.08] hover:bg-[#007AFF]/[0.13]"
-            : "text-[rgba(60,60,67,0.6)] hover:text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)] font-medium"
+            ? "text-[#007AFF] font-semibold bg-[#007AFF]/[0.12] hover:bg-[#007AFF]/[0.18]"
+            : "text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.05] font-medium"
       }`}>
-      <span className={`shrink-0 transition-colors ${active ? "text-[#007AFF]" : accent ? "text-[#007AFF]" : "text-[rgba(60,60,67,0.45)]"}`}>
+      <span className={`shrink-0 transition-colors ${active ? "text-white" : accent ? "text-[#007AFF]" : "text-zinc-600"}`}>
         {icon}
       </span>
       <span className="flex-1 text-left truncate">{label}</span>
       {badge !== undefined && badge > 0 && (
-        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[rgba(0,0,0,0.06)] text-[rgba(60,60,67,0.5)] tabular-nums min-w-[18px] text-center">
+        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-white/[0.07] text-zinc-500 tabular-nums min-w-[18px] text-center">
           {badge}
         </span>
       )}
@@ -62,7 +62,7 @@ function NavItem({ active, onClick, icon, label, badge, accent }: {
 
 function NavGroup({ label }: { label: string }) {
   return (
-    <p className="text-[8.5px] font-semibold uppercase tracking-[0.14em] text-[rgba(60,60,67,0.36)] px-3 pt-4 pb-1.5 select-none">
+    <p className="text-[8.5px] font-semibold uppercase tracking-[0.14em] text-zinc-700 px-3 pt-4 pb-1.5 select-none">
       {label}
     </p>
   )
@@ -630,7 +630,7 @@ export default function Home() {
 
       {/* ── Left Navigation Sidebar ─────────────────────────────────────── */}
       <nav className="w-[220px] shrink-0 flex flex-col print:hidden z-20"
-        style={{ background: "#F2F2F7", borderRight: "1px solid rgba(60,60,67,0.12)" }}>
+        style={{ background: "#09090b", borderRight: "1px solid rgba(255,255,255,0.05)" }}>
 
         {/* Brand */}
         <div className="px-4 pt-5 pb-4 shrink-0">
@@ -641,13 +641,13 @@ export default function Home() {
               </svg>
             </div>
             <div className="min-w-0">
-              <p className="text-[#1C1C1E] font-black tracking-tight text-[14px] leading-none">ENYLA</p>
-              <p className="text-[rgba(60,60,67,0.4)] text-[9px] font-medium tracking-widest mt-0.5 uppercase">Gráfica</p>
+              <p className="text-white font-black tracking-tight text-[14px] leading-none">ENYLA</p>
+              <p className="text-zinc-600 text-[9px] font-medium tracking-widest mt-0.5 uppercase">Gráfica</p>
             </div>
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "system" : "dark")}
               title={theme === "system" ? "Tema: sistema" : theme === "dark" ? "Tema: escuro" : "Tema: claro"}
-              className="ml-auto w-6 h-6 flex items-center justify-center rounded-lg text-[rgba(60,60,67,0.4)] hover:text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.06)] transition-colors shrink-0"
+              className="ml-auto w-6 h-6 flex items-center justify-center rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors shrink-0"
             >
               {theme === "dark" ? (
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" /></svg>
@@ -699,7 +699,7 @@ export default function Home() {
         </div>
 
         {/* Bottom: Nova Proposta + Config */}
-        <div className="px-2 py-3 shrink-0 space-y-1" style={{ borderTop: "1px solid rgba(60,60,67,0.12)" }}>
+        <div className="px-2 py-3 shrink-0 space-y-1" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
           <button
             onClick={() => setModalPropostaCustom(true)}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12.5px] font-semibold transition-all duration-100 text-white mb-1 bg-[#007AFF] hover:bg-[#0062CC] active:bg-[#004EA8]">
@@ -1542,9 +1542,9 @@ function ModalSinalEntrada({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 backdrop-blur-[6px] px-4 apple-backdrop-enter"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden apple-modal-enter">
 
         {step === "ask" ? (
           <>
