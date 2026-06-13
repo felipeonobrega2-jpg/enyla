@@ -48,6 +48,7 @@ export function KanbanView({
   const [dragId, setDragId]       = useState<string | null>(null)
   const [overCol, setOverCol]     = useState<number | null>(null)
   const [modal, setModal]         = useState<ModalFechamento | null>(null)
+  const [colapsarVazias, setColapsarVazias] = useState(false)
 
   function tentarMover(id: string, destCol: number) {
     const card = cards.find(c => c.id === id)
@@ -114,6 +115,23 @@ export function KanbanView({
         <div className="flex items-center gap-3">
           <p className="text-[9.5px] uppercase tracking-wide font-semibold text-[#8E8E93]">Visão geral do pipeline</p>
           <div className="flex-1 h-px bg-[rgba(60,60,67,0.12)]" />
+          <button
+            onClick={() => setColapsarVazias(v => !v)}
+            title={colapsarVazias ? "Expandir colunas vazias" : "Colapsar colunas vazias"}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-semibold transition-colors border ${
+              colapsarVazias
+                ? "bg-[#007AFF]/[0.08] text-[#007AFF] border-[#007AFF]/20"
+                : "bg-[rgba(116,116,128,0.06)] text-[#8E8E93] border-[rgba(60,60,67,0.1)] hover:text-[#1C1C1E] hover:border-[rgba(60,60,67,0.2)]"
+            }`}
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+              {colapsarVazias
+                ? <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                : <path strokeLinecap="round" strokeLinejoin="round" d="M9 4H5a1 1 0 00-1 1v4m0 0h16M4 9v10a1 1 0 001 1h4M20 9v10a1 1 0 01-1 1h-4M9 4h6M9 4v16m6-16v16" />
+              }
+            </svg>
+            {colapsarVazias ? "Expandir vazias" : "Ocultar vazias"}
+          </button>
           <span className="text-[10px] text-[#8E8E93] tabular-nums">{total} orçamento{total !== 1 ? "s" : ""}</span>
         </div>
         <div className="grid grid-cols-4 gap-3">
@@ -224,11 +242,42 @@ export function KanbanView({
 
       {/* Board */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden" style={{ background: "#F2F2F7" }}>
-        <div className="flex gap-2.5 h-full px-4 py-3.5" style={{ minWidth: `${COLUNAS_KANBAN.length * 252}px` }}>
+        <div className="flex gap-2.5 h-full px-4 py-3.5" style={{ minWidth: `${COLUNAS_KANBAN.length * 48}px` }}>
           {COLUNAS_KANBAN.map((colNome, colIdx) => {
             const colCards = cards.filter(c => c.coluna === colIdx)
             const isOver   = overCol === colIdx
             const colors   = COL_COLORS[colIdx]
+            const vazia    = colCards.length === 0
+            const colapsada = colapsarVazias && vazia
+
+            if (colapsada) {
+              return (
+                <div
+                  key={colIdx}
+                  className={`flex flex-col shrink-0 rounded-xl transition-all cursor-default ${
+                    isOver
+                      ? `ring-2 ${colors.border.replace("border-", "ring-")} ${colors.bg}`
+                      : "border border-[rgba(0,0,0,0.06)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+                  }`}
+                  style={{ width: 36 }}
+                  onDragOver={e => handleDragOver(e, colIdx)}
+                  onDrop={e => handleDrop(e, colIdx)}
+                  onDragLeave={() => setOverCol(null)}
+                >
+                  <div className="flex-1 flex items-center justify-center py-3 overflow-hidden">
+                    <span
+                      className="text-[9.5px] font-semibold text-[#8E8E93] select-none whitespace-nowrap"
+                      style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", letterSpacing: "0.04em" }}
+                    >
+                      {colNome}
+                    </span>
+                  </div>
+                  {isOver && (
+                    <div className={`mx-1 mb-1 border-2 border-dashed rounded-lg h-8 flex items-center justify-center ${colors.border}`} />
+                  )}
+                </div>
+              )
+            }
 
             return (
               <div
