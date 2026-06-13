@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { FormData, Calculo, PropostaCustom, KanbanCard, COLUNAS_KANBAN, COL_FECHADO, COL_PERDIDO } from "../types"
+import { FormData, Calculo, PropostaCustom, KanbanCard, COLUNAS_KANBAN, COL_FECHADO, COL_EXPEDICAO, COL_PERDIDO } from "../types"
 import { brl, num } from "../utils"
 
 type HistItem = { form: FormData; calculo: Calculo; data: string; numero?: string }
@@ -306,7 +306,7 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
         )}
 
         {/* Sobras */}
-        {card && onRegistrarSobra && card.coluna >= COL_FECHADO && card.coluna !== COL_PERDIDO && (
+        {card && onRegistrarSobra && card.coluna >= COL_EXPEDICAO && card.coluna !== COL_PERDIDO && (
           <div className="px-5 py-3.5 border-t border-[rgba(60,60,67,0.08)] shrink-0">
             <div className="flex items-center justify-between">
               <div>

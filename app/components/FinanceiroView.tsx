@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react"
 import {
   LancamentoFinanceiro, TipoLancamento, StatusLancamento,
-  FormaPagamento, KanbanCard, COL_FECHADO, COL_PERDIDO, NegocioParceiro, Lote,
+  FormaPagamento, KanbanCard, COL_FECHADO, COL_EXPEDICAO, COL_PERDIDO, NegocioParceiro, Lote,
 } from "../types"
 import { brl } from "../utils"
 
@@ -675,6 +675,7 @@ export function FinanceiroView({
                     const total = totalPedidos + totalSobras
                     const lanc = lancPorLote[loteId]
                     const st = lanc ? statusEfetivo(lanc) : null
+                    const podeSobra = cards.some(c => c.coluna >= COL_EXPEDICAO && c.coluna !== COL_PERDIDO)
 
                     return (
                       <div key={loteId} className="bg-white border border-violet-100 rounded-2xl overflow-hidden mb-2">
@@ -706,7 +707,7 @@ export function FinanceiroView({
                           </div>
                           <p className="font-semibold text-[#AF52DE] text-[15px] tabular-nums shrink-0">{brl(total)}</p>
                           <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
-                            {onRegistrarSobra && (
+                            {onRegistrarSobra && podeSobra && (
                               <button
                                 onClick={() => onRegistrarSobra(cards[0])}
                                 className="px-3 py-1.5 text-[11px] font-semibold text-[#FF9500] bg-[#FF9500]/[0.08] hover:bg-[#FF9500]/[0.14] rounded-lg transition-colors">
@@ -798,7 +799,7 @@ export function FinanceiroView({
                           </div>
                           <p className="font-semibold text-[#1C1C1E] text-[15px] tabular-nums shrink-0">{brl(card.preco + totalSobrasCard)}</p>
                           <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
-                            {onRegistrarSobra && (
+                            {onRegistrarSobra && card.coluna >= COL_EXPEDICAO && card.coluna !== COL_PERDIDO && (
                               <button
                                 onClick={() => onRegistrarSobra(card)}
                                 className="px-3 py-1.5 text-[11px] font-semibold text-[#FF9500] bg-[#FF9500]/[0.08] hover:bg-[#FF9500]/[0.14] rounded-lg transition-colors">

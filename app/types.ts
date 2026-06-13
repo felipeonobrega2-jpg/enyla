@@ -184,9 +184,10 @@ export const COLUNAS_KANBAN = [
   "Perdido",
 ] as const
 
-export const COL_FECHADO  = 1
-export const COL_ENTREGUE = 9
-export const COL_PERDIDO  = 10
+export const COL_FECHADO   = 1
+export const COL_EXPEDICAO = 8
+export const COL_ENTREGUE  = 9
+export const COL_PERDIDO   = 10
 
 export type Parceiro = {
   id: string
