@@ -42,17 +42,17 @@ function NavItem({ active, onClick, icon, label, badge, accent }: {
     <button onClick={onClick}
       className={`w-full flex items-center gap-2.5 px-3 py-[7px] rounded-lg text-[12.5px] transition-all duration-100 ${
         active
-          ? "bg-white/[0.08] text-white font-semibold"
+          ? "bg-[#007AFF]/10 text-[#007AFF] font-semibold"
           : accent
-            ? "text-indigo-300 font-semibold bg-indigo-500/[0.12] hover:bg-indigo-500/[0.18] ring-1 ring-inset ring-indigo-500/20"
-            : "text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.05] font-medium"
+            ? "text-[#007AFF] font-semibold bg-[#007AFF]/[0.08] hover:bg-[#007AFF]/[0.13]"
+            : "text-[rgba(60,60,67,0.6)] hover:text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)] font-medium"
       }`}>
-      <span className={`shrink-0 transition-colors ${active ? "text-white" : accent ? "text-indigo-400" : "text-zinc-600"}`}>
+      <span className={`shrink-0 transition-colors ${active ? "text-[#007AFF]" : accent ? "text-[#007AFF]" : "text-[rgba(60,60,67,0.45)]"}`}>
         {icon}
       </span>
       <span className="flex-1 text-left truncate">{label}</span>
       {badge !== undefined && badge > 0 && (
-        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/[0.07] text-zinc-500 tabular-nums min-w-[18px] text-center">
+        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[rgba(0,0,0,0.06)] text-[rgba(60,60,67,0.5)] tabular-nums min-w-[18px] text-center">
           {badge}
         </span>
       )}
@@ -62,7 +62,7 @@ function NavItem({ active, onClick, icon, label, badge, accent }: {
 
 function NavGroup({ label }: { label: string }) {
   return (
-    <p className="text-[8.5px] font-semibold uppercase tracking-[0.14em] text-zinc-700 px-3 pt-4 pb-1.5 select-none">
+    <p className="text-[8.5px] font-semibold uppercase tracking-[0.14em] text-[rgba(60,60,67,0.36)] px-3 pt-4 pb-1.5 select-none">
       {label}
     </p>
   )
@@ -626,29 +626,28 @@ export default function Home() {
   const clienteAtual = clientes.find(c => c.nome.toLowerCase() === form.nomeCliente.trim().toLowerCase())
 
   return (
-    <div className="h-screen flex bg-[#f8f9fb] dark:bg-[#0d1117] overflow-hidden text-[13px]">
+    <div className="h-screen flex bg-[#F2F2F7] overflow-hidden text-[13px]">
 
       {/* ── Left Navigation Sidebar ─────────────────────────────────────── */}
       <nav className="w-[220px] shrink-0 flex flex-col print:hidden z-20"
-        style={{ background: "#09090b", borderRight: "1px solid rgba(255,255,255,0.05)" }}>
+        style={{ background: "#F2F2F7", borderRight: "1px solid rgba(60,60,67,0.12)" }}>
 
         {/* Brand */}
         <div className="px-4 pt-5 pb-4 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg shrink-0 flex items-center justify-center"
-              style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" }}>
+            <div className="w-7 h-7 rounded-lg shrink-0 flex items-center justify-center bg-[#007AFF]">
               <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 3.75 9v.878m14.25-3A2.25 2.25 0 0 1 20.25 9v.878M3.75 9.878c.235-.083.487-.128.75-.128h15c.263 0 .515.045.75.128m-16.5 0A2.25 2.25 0 0 0 2.25 12v6a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-6a2.25 2.25 0 0 0-1.5-2.122" />
               </svg>
             </div>
             <div className="min-w-0">
-              <p className="text-white font-black tracking-tight text-[14px] leading-none">ENYLA</p>
-              <p className="text-zinc-600 text-[9px] font-medium tracking-widest mt-0.5 uppercase">Gráfica</p>
+              <p className="text-[#1C1C1E] font-black tracking-tight text-[14px] leading-none">ENYLA</p>
+              <p className="text-[rgba(60,60,67,0.4)] text-[9px] font-medium tracking-widest mt-0.5 uppercase">Gráfica</p>
             </div>
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "system" : "dark")}
               title={theme === "system" ? "Tema: sistema" : theme === "dark" ? "Tema: escuro" : "Tema: claro"}
-              className="ml-auto w-6 h-6 flex items-center justify-center rounded-lg text-zinc-700 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors shrink-0"
+              className="ml-auto w-6 h-6 flex items-center justify-center rounded-lg text-[rgba(60,60,67,0.4)] hover:text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.06)] transition-colors shrink-0"
             >
               {theme === "dark" ? (
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" /></svg>
@@ -700,11 +699,10 @@ export default function Home() {
         </div>
 
         {/* Bottom: Nova Proposta + Config */}
-        <div className="px-2 py-3 shrink-0 space-y-1" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+        <div className="px-2 py-3 shrink-0 space-y-1" style={{ borderTop: "1px solid rgba(60,60,67,0.12)" }}>
           <button
             onClick={() => setModalPropostaCustom(true)}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12.5px] font-semibold transition-all duration-100 text-white mb-1"
-            style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)", boxShadow: "0 2px 12px rgba(99,102,241,0.3)" }}>
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12.5px] font-semibold transition-all duration-100 text-white mb-1 bg-[#007AFF] hover:bg-[#0062CC] active:bg-[#004EA8]">
             <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
@@ -718,8 +716,8 @@ export default function Home() {
 
       {/* ── Toast ───────────────────────────────────────────────────────────── */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-slate-900 text-white text-[12.5px] font-medium px-4 py-3 rounded-xl shadow-2xl border border-white/10">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-[#1C1C1E] text-white text-[12.5px] font-medium px-4 py-3 rounded-xl shadow-lg border border-white/[0.08]">
+          <span className="w-2 h-2 rounded-full bg-[#34C759] shrink-0" />
           {toast}
         </div>
       )}
@@ -729,7 +727,7 @@ export default function Home() {
 
         {/* ──── SIDEBAR ──────────────────────────────────────────────────────── */}
         {view === "orcamento" && (
-        <aside className="w-72 shrink-0 bg-white dark:bg-[#0d1117] border-r border-slate-100/80 dark:border-[#21262d] flex flex-col overflow-y-auto print:hidden">
+        <aside className="w-72 shrink-0 bg-white border-r flex flex-col overflow-y-auto print:hidden" style={{ borderColor: "rgba(60,60,67,0.12)" }}>
 
           {/* Seção: Cliente */}
           <FormSection label="Cliente">
@@ -776,16 +774,16 @@ export default function Home() {
                   onClick={() => { set("materialId", m.id); set("materialNome", m.nome) }}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border-2 text-left transition-all duration-150 ${
                     form.materialId === m.id
-                      ? "border-indigo-500/40 bg-indigo-50/50 shadow-sm"
+                      ? "border-[#007AFF]/30 bg-[#007AFF]/[0.04] shadow-sm"
                       : "border-slate-100 hover:border-slate-200 hover:bg-slate-50/50"
                   }`}>
                   <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-150 ${
-                    form.materialId === m.id ? "border-indigo-600 bg-indigo-600" : "border-slate-300"
+                    form.materialId === m.id ? "border-[#007AFF] bg-[#007AFF]" : "border-slate-300"
                   }`}>
                     {form.materialId === m.id && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                   </div>
                   <span className={`text-[12.5px] font-medium transition-colors ${
-                    form.materialId === m.id ? "text-indigo-900" : "text-slate-700"
+                    form.materialId === m.id ? "text-[#007AFF]" : "text-slate-700"
                   }`}>{m.nome}</span>
                 </button>
               ))}
@@ -808,7 +806,7 @@ export default function Home() {
 
             {/* Toggle Verniz */}
             <label className="flex items-center gap-2.5 py-1.5 cursor-pointer select-none group" onClick={() => set("incluirVerniz", !form.incluirVerniz)}>
-              <div className={`w-8 h-4 rounded-full transition-colors relative ${form.incluirVerniz ? "bg-indigo-600" : "bg-slate-200"}`}>
+              <div className={`w-8 h-4 rounded-full transition-colors relative ${form.incluirVerniz ? "bg-[#007AFF]" : "bg-slate-200"}`}>
                 <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${form.incluirVerniz ? "translate-x-4" : "translate-x-0.5"}`} />
               </div>
               <span className="text-[12.5px] text-slate-600 group-hover:text-slate-900 transition-colors duration-150">Verniz UV</span>
@@ -838,7 +836,7 @@ export default function Home() {
                     value={form.valorFaca || ""}
                     onChange={e => set("valorFaca", Number(e.target.value))}
                     placeholder="Valor da faca"
-                    className="w-full h-10 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 hover:border-slate-300 transition-all duration-150" />
+                    className="w-full h-10 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] hover:border-slate-300 transition-all duration-150" />
                 </div>
               )}
             </div>
@@ -860,9 +858,9 @@ export default function Home() {
                 onChange={e => setNovaQtd(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && addQtd()}
                 placeholder="Adicionar quantidade…"
-                className="flex-1 border border-slate-200 rounded-xl px-3 py-1.5 text-[13px] text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400" />
+                className="flex-1 border border-slate-200 rounded-xl px-3 py-1.5 text-[13px] text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF]" />
               <button onClick={addQtd}
-                className="px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition-colors">+</button>
+                className="px-3 bg-[#007AFF] hover:bg-[#0062CC] text-white rounded-lg text-sm font-bold transition-colors">+</button>
             </div>
           </FormSection>
 
@@ -886,7 +884,7 @@ export default function Home() {
                   <input type="number" min={1} max={365}
                     value={form.validadeDias}
                     onChange={e => set("validadeDias", Math.max(1, Number(e.target.value)))}
-                    className="w-20 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-900 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+                    className="w-20 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-900 text-center focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF]"
                     title="Valor personalizado"
                   />
                 </div>
@@ -898,7 +896,7 @@ export default function Home() {
                   onChange={e => set("obsInterna", e.target.value)}
                   placeholder="Notas internas, condições especiais, prazo…"
                   rows={3}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-300 resize-none focus:outline-none focus:ring-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-300 resize-none focus:outline-none focus:ring-2 focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] transition"
                 />
               </div>
               <div>
@@ -908,7 +906,7 @@ export default function Home() {
                   onChange={e => set("obsCliente", e.target.value)}
                   placeholder="Aparece na proposta enviada ao cliente…"
                   rows={3}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-300 resize-none focus:outline-none focus:ring-2 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-300 resize-none focus:outline-none focus:ring-2 focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] transition"
                 />
               </div>
             </div>
@@ -917,7 +915,7 @@ export default function Home() {
           {/* Ações */}
           <div className="p-5 mt-auto space-y-2 border-t border-slate-100 bg-white">
             <button onClick={salvar} disabled={!r}
-              className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 active:scale-[0.99] disabled:opacity-30 disabled:cursor-not-allowed text-white text-[13px] font-bold rounded-xl transition-all duration-150 shadow-md shadow-indigo-600/20 disabled:shadow-none">
+              className="w-full h-11 bg-[#007AFF] hover:bg-[#0062CC] active:bg-[#004EA8] active:scale-[0.99] disabled:opacity-30 disabled:cursor-not-allowed text-white text-[13px] font-bold rounded-xl transition-all duration-150 shadow-sm shadow-[#007AFF]/15 disabled:shadow-none">
               Salvar orçamento
             </button>
             {r && (
@@ -933,7 +931,7 @@ export default function Home() {
                     PDF Gráfica
                   </button>
                   <button onClick={() => downloadPdfCliente({ form, calculo: r, data: new Date().toLocaleString("pt-BR") })}
-                    className="flex-1 h-9 border border-indigo-200 hover:border-indigo-300 hover:bg-indigo-50/50 text-indigo-600 text-[11.5px] font-medium rounded-xl transition-all duration-150">
+                    className="flex-1 h-9 border border-[#007AFF]/25 hover:border-[#007AFF]/40 hover:bg-[#007AFF]/[0.04] text-[#007AFF] text-[11.5px] font-medium rounded-xl transition-all duration-150">
                     PDF Cliente
                   </button>
                 </div>
@@ -1214,7 +1212,7 @@ export default function Home() {
               {/* Header do orçamento */}
               {form.nomeCliente && (
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-[#007AFF] text-white text-xs font-bold flex items-center justify-center">
                     {form.nomeCliente[0].toUpperCase()}
                   </div>
                   <div>
@@ -1552,8 +1550,8 @@ function ModalSinalEntrada({
           <>
             {/* Header */}
             <div className="px-6 pt-6 pb-4">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center mb-4">
-                <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <div className="w-10 h-10 rounded-xl bg-[#007AFF]/10 flex items-center justify-center mb-4">
+                <svg className="w-5 h-5 text-[#007AFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                 </svg>
               </div>
@@ -1569,7 +1567,7 @@ function ModalSinalEntrada({
               </button>
               <button onClick={() => setStep("form")}
                 className="flex-1 py-2.5 text-[13px] font-bold text-white rounded-xl transition-colors"
-                style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" }}>
+                style={{ background: "#007AFF" }}>
                 Sim, registrar
               </button>
             </div>
@@ -1598,7 +1596,7 @@ function ModalSinalEntrada({
                     onKeyDown={e => e.key === "Enter" && confirmar()}
                     placeholder="0,00"
                     autoFocus
-                    className="w-full h-11 border border-slate-200 rounded-xl pl-9 pr-3 text-[14px] font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
+                    className="w-full h-11 border border-slate-200 rounded-xl pl-9 pr-3 text-[14px] font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] transition-all"
                   />
                 </div>
               </div>
@@ -1611,7 +1609,7 @@ function ModalSinalEntrada({
                     <button key={f} onClick={() => setForma(f)}
                       className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-all capitalize ${
                         forma === f
-                          ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                          ? "bg-[#007AFF] text-white border-[#007AFF] shadow-sm"
                           : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                       }`}>
                       {f}
@@ -1628,7 +1626,7 @@ function ModalSinalEntrada({
               </button>
               <button onClick={confirmar} disabled={valorNum <= 0}
                 className="flex-1 py-2.5 text-[13px] font-bold text-white rounded-xl transition-all disabled:opacity-40"
-                style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" }}>
+                style={{ background: "#007AFF" }}>
                 Confirmar sinal
               </button>
             </div>
