@@ -90,6 +90,10 @@ export default function Home() {
   const [negocios, setNegocios]   = useState<NegocioParceiro[]>([])
   const [lancamentos, setLancamentos] = useState<LancamentoFinanceiro[]>([])
   const [lotes, setLotes]         = useState<Lote[]>([])
+  const [modalSinal, setModalSinal] = useState<{
+    cardId: string; nomeCliente: string; cardNumero?: string
+    loteId?: string; loteNumero?: string; preco: number
+  } | null>(null)
   const { isDark, setTheme, theme } = useTheme()
   const expirySweepDone = useRef(false)
 
@@ -272,6 +276,36 @@ export default function Home() {
       return { ok: true }
     }
     return { ok: false, error: data.error }
+  }
+
+  function criarLancamentoSinal(
+    cardId: string, nomeCliente: string, cardNumero: string | undefined,
+    loteId: string | undefined, loteNumero: string | undefined,
+    valor: number, formaPagamento: string
+  ) {
+    const hoje = new Date().toISOString().slice(0, 10)
+    const lancamento: LancamentoFinanceiro = {
+      id: crypto.randomUUID(),
+      tipo: "receita",
+      descricao: `Sinal de entrada — ${nomeCliente}`,
+      valor,
+      dataVencimento: hoje,
+      dataPagamento: hoje,
+      status: "pago",
+      cardId: cardId ?? null,
+      cardNumero: cardNumero ?? null,
+      nomeCliente,
+      loteId: loteId ?? null,
+      loteNumero: loteNumero ?? null,
+      formaPagamento,
+      criadoEm: new Date().toISOString(),
+    } as unknown as LancamentoFinanceiro
+    setLancamentos(prev => [lancamento, ...prev])
+    fetch("/api/lancamentos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(lancamento),
+    }).catch(() => {})
   }
 
   async function salvarDataEntrega(cardId: string, date: string | null) {
@@ -995,9 +1029,22 @@ export default function Home() {
                   }).catch(() => {})
                 }
                 if (card?.numero) atualizarTracking(card.numero, coluna)
-                // Auto-assign lote ao fechar
-                if (coluna === COL_FECHADO && card && !card.loteId) {
-                  criarLote(card.nomeCliente).then(lote => assignLote(id, lote.id, lote.numero)).catch(() => {})
+                // Voltar para col 0 → remover lote
+                if (coluna === 0 && card?.loteId) {
+                  removeLote(id)
+                }
+                // Fechar → criar lote se necessário e mostrar modal de sinal
+                if (coluna === COL_FECHADO && card) {
+                  if (!card.loteId) {
+                    criarLote(card.nomeCliente).then(lote => {
+                      assignLote(id, lote.id, lote.numero)
+                      setModalSinal({ cardId: id, nomeCliente: card.nomeCliente, cardNumero: card.numero, loteId: lote.id, loteNumero: lote.numero, preco: card.preco })
+                    }).catch(() => {
+                      setModalSinal({ cardId: id, nomeCliente: card.nomeCliente, cardNumero: card.numero, preco: card.preco })
+                    })
+                  } else {
+                    setModalSinal({ cardId: id, nomeCliente: card.nomeCliente, cardNumero: card.numero, loteId: card.loteId, loteNumero: card.loteNumero, preco: card.preco })
+                  }
                 }
               }}
               onDelete={id => {
@@ -1036,9 +1083,16 @@ export default function Home() {
                   body: JSON.stringify({ dataFechamento }),
                 }).catch(() => {})
                 if (card?.numero) atualizarTracking(card.numero, COL_FECHADO, opcao.preco, opcao.quantidade)
-                // Auto-assign lote ao fechar via modal
+                // Auto-assign lote + mostrar modal sinal
                 if (card && !card.loteId) {
-                  criarLote(card.nomeCliente).then(lote => assignLote(id, lote.id, lote.numero)).catch(() => {})
+                  criarLote(card.nomeCliente).then(lote => {
+                    assignLote(id, lote.id, lote.numero)
+                    setModalSinal({ cardId: id, nomeCliente: card.nomeCliente, cardNumero: card.numero, loteId: lote.id, loteNumero: lote.numero, preco: opcao.preco })
+                  }).catch(() => {
+                    setModalSinal({ cardId: id, nomeCliente: card.nomeCliente, cardNumero: card.numero, preco: opcao.preco })
+                  })
+                } else if (card) {
+                  setModalSinal({ cardId: id, nomeCliente: card.nomeCliente, cardNumero: card.numero, loteId: card.loteId, loteNumero: card.loteNumero, preco: opcao.preco })
                 }
               }}
               onDetalhes={(card) => {
@@ -1447,6 +1501,140 @@ export default function Home() {
           onWhatsApp={(p) => compartilharWhatsAppCustom(p)}
         />
       )}
+
+      {/* ── Modal: sinal de entrada ─────────────────────────────────────────── */}
+      {modalSinal && (
+        <ModalSinalEntrada
+          nomeCliente={modalSinal.nomeCliente}
+          preco={modalSinal.preco}
+          onClose={() => setModalSinal(null)}
+          onConfirm={(valor, forma) => {
+            criarLancamentoSinal(modalSinal.cardId, modalSinal.nomeCliente, modalSinal.cardNumero, modalSinal.loteId, modalSinal.loteNumero, valor, forma)
+            showToast(`Sinal de R$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} registrado.`)
+            setModalSinal(null)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Modal Sinal de Entrada ────────────────────────────────────────────────────
+
+const FORMAS = ["pix", "dinheiro", "cartão de crédito", "cartão de débito", "boleto", "transferência"]
+
+function ModalSinalEntrada({
+  nomeCliente, preco, onClose, onConfirm,
+}: {
+  nomeCliente: string
+  preco: number
+  onClose: () => void
+  onConfirm: (valor: number, forma: string) => void
+}) {
+  const [step, setStep]   = useState<"ask" | "form">("ask")
+  const [valor, setValor] = useState("")
+  const [forma, setForma] = useState("pix")
+
+  const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+  const valorNum = parseFloat(valor.replace(",", ".")) || 0
+
+  function confirmar() {
+    if (valorNum <= 0) return
+    onConfirm(valorNum, forma)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+
+        {step === "ask" ? (
+          <>
+            {/* Header */}
+            <div className="px-6 pt-6 pb-4">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center mb-4">
+                <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+              </div>
+              <p className="font-bold text-slate-800 text-[15px] leading-snug">Sinal de entrada?</p>
+              <p className="text-slate-500 text-[12.5px] mt-1">
+                O cliente <span className="font-semibold text-slate-700">{nomeCliente}</span> deixou algum valor de entrada ao fechar o pedido de <span className="font-semibold text-slate-700">{brl(preco)}</span>?
+              </p>
+            </div>
+            <div className="flex gap-2 px-6 pb-5">
+              <button onClick={onClose}
+                className="flex-1 py-2.5 text-[13px] text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-colors font-medium border border-slate-200">
+                Não, pular
+              </button>
+              <button onClick={() => setStep("form")}
+                className="flex-1 py-2.5 text-[13px] font-bold text-white rounded-xl transition-colors"
+                style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" }}>
+                Sim, registrar
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Form */}
+            <div className="px-6 pt-5 pb-2 border-b border-slate-100">
+              <div className="flex items-center justify-between">
+                <p className="font-bold text-slate-800 text-[15px]">Registrar sinal</p>
+                <button onClick={onClose} className="text-slate-300 hover:text-slate-500 text-xl leading-none">×</button>
+              </div>
+              <p className="text-slate-400 text-[12px] mt-0.5">{nomeCliente} · pedido de {brl(preco)}</p>
+            </div>
+
+            <div className="px-6 py-4 space-y-3">
+              {/* Valor */}
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.12em] font-semibold text-slate-400 mb-1.5">Valor recebido</p>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">R$</span>
+                  <input
+                    type="number" min={0} step="0.01"
+                    value={valor}
+                    onChange={e => setValor(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && confirmar()}
+                    placeholder="0,00"
+                    autoFocus
+                    className="w-full h-11 border border-slate-200 rounded-xl pl-9 pr-3 text-[14px] font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Forma de pagamento */}
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.12em] font-semibold text-slate-400 mb-1.5">Forma de pagamento</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {FORMAS.map(f => (
+                    <button key={f} onClick={() => setForma(f)}
+                      className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-all capitalize ${
+                        forma === f
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                          : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                      }`}>
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 px-6 pb-5">
+              <button onClick={() => setStep("ask")}
+                className="flex-1 py-2.5 text-[13px] text-slate-500 hover:bg-slate-50 rounded-xl transition-colors font-medium">
+                Voltar
+              </button>
+              <button onClick={confirmar} disabled={valorNum <= 0}
+                className="flex-1 py-2.5 text-[13px] font-bold text-white rounded-xl transition-all disabled:opacity-40"
+                style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" }}>
+                Confirmar sinal
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
