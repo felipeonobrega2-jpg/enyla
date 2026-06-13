@@ -48,7 +48,7 @@ export function ModalSobra({
     }))
   )
 
-  const [data, setData]     = useState(hoje())
+  const [data, setData]     = useState(card.dataFechamento || card.data?.slice(0, 10) || hoje())
   const [status, setStatus] = useState<"pago" | "pendente">("pendente")
   const [saving, setSaving] = useState(false)
 
