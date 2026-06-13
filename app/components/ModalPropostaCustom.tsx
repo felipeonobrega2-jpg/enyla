@@ -249,7 +249,7 @@ export function ModalPropostaCustom({
                           <button
                             onClick={() => updateLinha(l.id, "ativa", !l.ativa)}
                             className={`w-[16px] h-[16px] rounded-[4px] border-2 flex items-center justify-center transition-all ${
-                              l.ativa ? "border-violet-600 bg-[#AF52DE]" : "border-slate-300 bg-white"
+                              l.ativa ? "border-[#AF52DE] bg-[#AF52DE]" : "border-[rgba(60,60,67,0.2)] bg-white"
                             }`}
                           >
                             {l.ativa && (
@@ -266,7 +266,7 @@ export function ModalPropostaCustom({
                             min="1"
                             value={l.quantidade || ""}
                             onChange={e => updateLinha(l.id, "quantidade", parseInt(e.target.value) || 0)}
-                            className="w-full text-[12.5px] font-semibold tabular-nums border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400"
+                            className="w-full text-[12.5px] font-semibold tabular-nums border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#AF52DE]/20 focus:border-[#AF52DE]"
                           />
                         </td>
                         {/* Unitário */}
@@ -278,7 +278,7 @@ export function ModalPropostaCustom({
                             value={l.unitario || ""}
                             onChange={e => updateLinha(l.id, "unitario", parseFloat(e.target.value) || 0)}
                             onFocus={e => e.target.select()}
-                            className="w-full text-right text-[12.5px] font-semibold tabular-nums border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400"
+                            className="w-full text-right text-[12.5px] font-semibold tabular-nums border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#AF52DE]/20 focus:border-[#AF52DE]"
                           />
                         </td>
                         {/* Total */}
@@ -292,7 +292,7 @@ export function ModalPropostaCustom({
                           <button
                             onClick={() => updateLinha(l.id, "isIdeal", true)}
                             className={`w-[16px] h-[16px] rounded-full border-2 flex items-center justify-center mx-auto transition-all ${
-                              l.isIdeal ? "border-blue-600 bg-blue-600" : "border-slate-300 bg-white hover:border-blue-400"
+                              l.isIdeal ? "border-[#007AFF] bg-[#007AFF]" : "border-[rgba(60,60,67,0.2)] bg-white hover:border-[#007AFF]/60"
                             }`}
                           >
                             {l.isIdeal && <span className="w-1.5 h-1.5 rounded-full bg-white block" />}
@@ -302,7 +302,7 @@ export function ModalPropostaCustom({
                         <td className="py-2.5 px-2">
                           {linhas.length > 1 && (
                             <button onClick={() => removeLinha(l.id)}
-                              className="text-slate-200 hover:text-rose-400 transition-colors text-lg leading-none">×</button>
+                              className="text-[rgba(60,60,67,0.2)] hover:text-[#FF3B30] transition-colors text-lg leading-none">×</button>
                           )}
                         </td>
                       </tr>

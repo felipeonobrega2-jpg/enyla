@@ -1462,12 +1462,19 @@ export default function Home() {
               ...editandoProposta,
               ...draft,
             }
+            // Compute new ideal price from updated lines
+            const ativas = atualizada.linhas.filter(l => l.ativa && l.quantidade > 0)
+            const idealLinha = ativas.find(l => l.isIdeal) ?? ativas[ativas.length - 1]
+            const novoPreco = idealLinha ? idealLinha.unitario * idealLinha.quantidade : 0
+            const novaQtd   = idealLinha?.quantidade ?? 0
             setPropostasCustom(prev => prev.map(p => p.id === atualizada.id ? atualizada : p))
             setKanban(prev => prev.map(c => c.id === atualizada.cardId
               ? { ...c,
                   nomeCliente: atualizada.nomeCliente,
                   dimensoes: atualizada.descricao,
                   materialNome: atualizada.material,
+                  preco: novoPreco,
+                  quantidade: novaQtd,
                 }
               : c
             ))
@@ -1479,7 +1486,7 @@ export default function Home() {
             fetch(`/api/kanban/${atualizada.cardId}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ nomeCliente: atualizada.nomeCliente, dimensoes: atualizada.descricao, materialNome: atualizada.material }),
+              body: JSON.stringify({ nomeCliente: atualizada.nomeCliente, dimensoes: atualizada.descricao, materialNome: atualizada.material, preco: novoPreco, quantidade: novaQtd }),
             }).catch(() => {})
             showToast(`Proposta ${atualizada.numero} atualizada.`)
             setEditandoProposta(null)

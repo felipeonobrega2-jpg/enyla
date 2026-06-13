@@ -84,7 +84,7 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
       descricao:      descricao.trim(),
       valor:          v,
       dataVencimento: dataVenc,
-      dataPagamento:  status === "pago" ? (dataPag || hoje()) : undefined,
+      dataPagamento:  status === "pago" ? (dataPag || dataVenc) : undefined,
       status:         status === "pago" ? "pago" : "pendente",
       cardId:         cardId || undefined,
       cardNumero:     cardSel?.numero || inicial?.cardNumero,
@@ -183,8 +183,8 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
           </Field>
 
           {status === "pago" && (
-            <Field label="Data do pagamento">
-              <input type="date" value={dataPag || hoje()}
+            <Field label="Data do recebimento">
+              <input type="date" value={dataPag || dataVenc}
                 onChange={e => setDataPag(e.target.value)} className={inp()} />
             </Field>
           )}
