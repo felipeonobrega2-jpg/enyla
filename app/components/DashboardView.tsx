@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useEffect } from "react"
 import {
   FormData, Calculo, PropostaCustom, KanbanCard, Cliente,
-  COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO,
+  COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO, LancamentoFinanceiro,
 } from "../types"
 import { Configuracoes } from "../config"
 import { brl, num } from "../utils"
@@ -18,6 +18,7 @@ interface Props {
   propostasCustom: PropostaCustom[]
   clientes: Cliente[]
   config: Configuracoes
+  lancamentos?: LancamentoFinanceiro[]
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -199,7 +200,7 @@ const GRUPOS_PERIODO: { label: string; items: { id: Periodo; label: string }[] }
   },
 ]
 
-export default function DashboardView({ historico, kanban, propostasCustom: _propostasCustom, clientes: _clientes, config: _config }: Props) {
+export default function DashboardView({ historico, kanban, propostasCustom: _propostasCustom, clientes: _clientes, config: _config, lancamentos = [] }: Props) {
   const [periodo, setPeriodo] = useState<Periodo>("mes")
   const [dataInicio, setDataInicio] = useState("")
   const [dataFim, setDataFim]   = useState("")
@@ -293,8 +294,22 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
   const kpis = useMemo(() => {
     const total = filteredCards.length
 
+    // Sobras no período (lancamentos categoria="sobra" tipo="receita")
+    const { from, to } = periodBounds
+    const sobrasReceita = lancamentos
+      .filter(l => l.categoria === "sobra" && l.tipo === "receita")
+      .filter(l => {
+        const ref = l.dataPagamento || l.dataVencimento
+        if (!ref) return false
+        const d = new Date(ref + "T12:00:00")
+        if (from && d < from) return false
+        if (to   && d > to)   return false
+        return true
+      })
+      .reduce((s, l) => s + l.valor, 0)
+
     // Revenue/closings by CLOSE date (cross-period, e.g. May quote closed in June)
-    const receita    = confirmedByCloseDate.reduce((s, c) => s + c.preco, 0)
+    const receita    = confirmedByCloseDate.reduce((s, c) => s + c.preco, 0) + sobrasReceita
     const fechamentos = confirmedByCloseDate.length
     const entregues  = confirmedByCloseDate.filter(c => c.coluna === COL_ENTREGUE).length
     const ticket     = fechamentos > 0 ? receita / fechamentos : 0
@@ -346,7 +361,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
         months[11 - diffMonths].volume += card.preco
       }
       // Revenue bar: by close date (dataFechamento when available)
-      if (card.coluna === COL_FECHADO || card.coluna === COL_ENTREGUE) {
+      if (card.coluna !== 0 && card.coluna !== COL_PERDIDO) {
         const closeDate = parseDataBr(card.dataFechamento ?? card.data)
         const closeDiff = (now.getFullYear() - closeDate.getFullYear()) * 12 + (now.getMonth() - closeDate.getMonth())
         if (closeDiff >= 0 && closeDiff <= 11) {
@@ -354,8 +369,18 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
         }
       }
     })
+    // Add sobras to monthly revenue
+    lancamentos
+      .filter(l => l.categoria === "sobra" && l.tipo === "receita")
+      .forEach(l => {
+        const ref = l.dataPagamento || l.dataVencimento
+        if (!ref) return
+        const d = new Date(ref + "T12:00:00")
+        const diff = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth())
+        if (diff >= 0 && diff <= 11) months[11 - diff].receita += l.valor
+      })
     return months
-  }, [kanban])
+  }, [kanban, lancamentos])
 
   // ── Funil ───────────────────────────────────────────────────────────────────
   const funil = useMemo(() => {

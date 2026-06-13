@@ -990,6 +990,7 @@ export default function Home() {
               propostasCustom={propostasCustom}
               clientes={clientes}
               config={config}
+              lancamentos={lancamentos}
             />
           ) : view === "config" ? (
             <ConfigView
@@ -1033,6 +1034,7 @@ export default function Home() {
               historico={historico}
               kanban={kanban}
               propostasCustom={propostasCustom}
+              lancamentos={lancamentos}
               onReplicar={replicar}
               onWhatsApp={(item) => compartilharWhatsApp(item.form, item.calculo, item.numero)}
             />
