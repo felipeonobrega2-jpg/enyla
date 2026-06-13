@@ -48,17 +48,17 @@ function niceMax(v: number): number {
 const MESES_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
 
 function colColor(col: number): string {
-  if (col === COL_PERDIDO) return "bg-rose-100 text-rose-700"
-  if (col === COL_ENTREGUE) return "bg-emerald-100 text-emerald-700"
-  if (col === COL_FECHADO) return "bg-green-100 text-green-700"
-  return "bg-indigo-100 text-indigo-700"
+  if (col === COL_PERDIDO) return "bg-[#FF3B30]/10 text-[#FF3B30]"
+  if (col === COL_ENTREGUE) return "bg-[#34C759]/10 text-[#34C759]"
+  if (col === COL_FECHADO) return "bg-[#34C759]/10 text-[#34C759]"
+  return "bg-[#007AFF]/10 text-[#007AFF]"
 }
 
 function colBg(col: number): string {
-  if (col === COL_PERDIDO) return "#fda4af"
-  if (col === COL_ENTREGUE) return "#6ee7b7"
-  if (col === COL_FECHADO) return "#86efac"
-  const blues = ["#a5b4fc","#818cf8","#93c5fd","#c4b5fd","#7dd3fc","#fdba74","#fca5a5","#86efac"]
+  if (col === COL_PERDIDO) return "#FF3B30"
+  if (col === COL_ENTREGUE) return "#34C759"
+  if (col === COL_FECHADO) return "#34C759"
+  const blues = ["#93C5FD","#6EE7B7","#FCA5A5","#C4B5FD","#FDBA74","#A5F3FC","#FDE68A","#BBF7D0"]
   return blues[col % blues.length]
 }
 
@@ -114,12 +114,12 @@ function MonthlyChart({ data }: { data: MonthlyDatum[] }) {
             {/* Volume bar (light blue) */}
             {hVol > 0 && (
               <rect x={gx} y={yVol} width={barW} height={hVol}
-                rx={3} fill="#c7d2fe" />
+                rx={3} fill="#93C5FD" />
             )}
             {/* Receita bar (blue) */}
             {hRec > 0 && (
               <rect x={gx + barW + barGap} y={yRec} width={barW} height={hRec}
-                rx={3} fill="#6366f1" />
+                rx={3} fill="#007AFF" />
             )}
             {/* X label */}
             <text x={gx + barW + barGap / 2} y={PAD_T + chartH + 14}
@@ -131,10 +131,10 @@ function MonthlyChart({ data }: { data: MonthlyDatum[] }) {
       })}
 
       {/* Legend */}
-      <rect x={PAD_L} y={H - 8} width={9} height={9} rx={2} fill="#c7d2fe" />
-      <text x={PAD_L + 12} y={H - 1} fontSize={9} fill="#64748b" fontFamily="system-ui">Volume orçado</text>
-      <rect x={PAD_L + 90} y={H - 8} width={9} height={9} rx={2} fill="#6366f1" />
-      <text x={PAD_L + 103} y={H - 1} fontSize={9} fill="#64748b" fontFamily="system-ui">Receita confirmada</text>
+      <rect x={PAD_L} y={H - 8} width={9} height={9} rx={2} fill="#93C5FD" />
+      <text x={PAD_L + 12} y={H - 1} fontSize={9} fill="#8E8E93" fontFamily="system-ui">Volume orçado</text>
+      <rect x={PAD_L + 90} y={H - 8} width={9} height={9} rx={2} fill="#007AFF" />
+      <text x={PAD_L + 103} y={H - 1} fontSize={9} fill="#8E8E93" fontFamily="system-ui">Receita confirmada</text>
     </svg>
   )
 }
@@ -407,7 +407,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       .sort((a, b) => b.count - a.count)
       .slice(0, 6)
     const maxCount = Math.max(...arr.map(a => a.count), 1)
-    const colors = ["#3b82f6", "#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981"]
+    const colors = ["#007AFF", "#34C759", "#FF3B30", "#AF52DE", "#FF9500", "#5AC8FA"]
     return { materiais: arr.map((m, i) => ({ ...m, color: colors[i % colors.length] })), maxCount }
   }, [filteredCards, historico])
 
@@ -440,15 +440,15 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
   // ─── Empty state ─────────────────────────────────────────────────────────────
   if (kanban.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4 text-slate-400">
-        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
+      <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4 text-[#8E8E93]">
+        <div className="w-16 h-16 rounded-2xl bg-[rgba(116,116,128,0.08)] flex items-center justify-center">
           <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
           </svg>
         </div>
         <div className="text-center">
-          <p className="text-slate-600 font-semibold text-sm">Nenhum dado ainda</p>
-          <p className="text-slate-400 text-xs mt-1">Salve orçamentos para ver o dashboard</p>
+          <p className="text-[#1C1C1E] font-semibold text-sm">Nenhum dado ainda</p>
+          <p className="text-[#8E8E93] text-xs mt-1">Salve orçamentos para ver o dashboard</p>
         </div>
       </div>
     )
@@ -458,7 +458,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
     <div className="max-w-[1280px] mx-auto px-6 py-5 space-y-5">
 
       {/* ── Filter bar ─────────────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-10 bg-[#f8f9fb]/95 backdrop-blur-sm py-2 -mx-6 px-6">
+      <div className="sticky top-0 z-10 bg-[#F2F2F7]/95 backdrop-blur-sm py-2 -mx-6 px-6">
         <div className="flex items-center gap-2">
 
           {/* Period dropdown */}
@@ -467,8 +467,8 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
               onClick={() => setShowMenu(m => !m)}
               className={`flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-medium transition-all ${
                 periodo !== "custom"
-                  ? "bg-slate-900 text-white shadow-sm"
-                  : "bg-white border border-slate-200 text-slate-600 hover:border-slate-300"
+                  ? "bg-[#007AFF] text-white shadow-sm"
+                  : "bg-white border border-[rgba(0,0,0,0.12)] text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)]"
               }`}
             >
               <svg className="w-3.5 h-3.5 opacity-70 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -481,11 +481,11 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
             </button>
 
             {showMenu && (
-              <div className="absolute top-full left-0 mt-1.5 w-52 bg-white rounded-xl border border-slate-200 shadow-lg py-1.5 z-50">
+              <div className="absolute top-full left-0 mt-1.5 w-52 bg-white rounded-xl border border-[rgba(0,0,0,0.12)] shadow-[0_4px_16px_rgba(0,0,0,0.08)] py-1.5 z-50">
                 {GRUPOS_PERIODO.map((grupo, gi) => (
                   <div key={gi}>
-                    {gi > 0 && <div className="h-px bg-slate-100 my-1" />}
-                    <p className="px-3 pt-1.5 pb-0.5 text-[9px] uppercase tracking-[0.15em] font-bold text-slate-400">
+                    {gi > 0 && <div className="h-px bg-[rgba(60,60,67,0.12)] my-1" />}
+                    <p className="px-3 pt-1.5 pb-0.5 text-[9px] uppercase tracking-[0.15em] font-bold text-[#8E8E93]">
                       {grupo.label}
                     </p>
                     {grupo.items.map(({ id, label }) => (
@@ -493,11 +493,11 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                         onClick={() => { setPeriodo(id); setShowMenu(false) }}
                         className={`w-full text-left px-3 py-1.5 text-[12px] flex items-center gap-2 transition-colors ${
                           periodo === id
-                            ? "text-indigo-600 font-semibold bg-indigo-50"
-                            : "text-slate-700 hover:bg-slate-50"
+                            ? "text-[#007AFF] font-semibold bg-[#007AFF]/5"
+                            : "text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)]"
                         }`}
                       >
-                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${periodo === id ? "bg-indigo-500" : "bg-transparent"}`} />
+                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${periodo === id ? "bg-[#007AFF]" : "bg-transparent"}`} />
                         {label}
                       </button>
                     ))}
@@ -507,20 +507,20 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
             )}
           </div>
 
-          <div className="w-px h-5 bg-slate-200 mx-0.5" />
+          <div className="w-px h-5 bg-[rgba(60,60,67,0.12)] mx-0.5" />
 
           {/* Custom range */}
           <div className="flex items-center gap-1.5">
             <input type="date" value={dataInicio}
               onChange={e => { setDataInicio(e.target.value); setPeriodo("custom") }}
-              className="h-8 border border-slate-200 rounded-lg px-2 text-[11.5px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400" />
-            <span className="text-slate-400 text-xs">→</span>
+              className="h-8 border border-[rgba(0,0,0,0.12)] rounded-lg px-2 text-[11.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25 focus:border-[#007AFF]" />
+            <span className="text-[#8E8E93] text-xs">→</span>
             <input type="date" value={dataFim}
               onChange={e => { setDataFim(e.target.value); setPeriodo("custom") }}
-              className="h-8 border border-slate-200 rounded-lg px-2 text-[11.5px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400" />
+              className="h-8 border border-[rgba(0,0,0,0.12)] rounded-lg px-2 text-[11.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25 focus:border-[#007AFF]" />
           </div>
 
-          <div className="ml-auto text-[11px] text-slate-500 font-medium tabular-nums bg-white border border-slate-200 rounded-full px-3 py-1.5 shadow-sm">
+          <div className="ml-auto text-[11px] text-[#8E8E93] font-medium tabular-nums bg-white border border-[rgba(0,0,0,0.12)] rounded-full px-3 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
             {filteredCards.length} orçamento{filteredCards.length !== 1 ? "s" : ""} no período
           </div>
         </div>
@@ -529,80 +529,80 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       {/* ── KPI Row 1 – Financial metrics ──────────────────────────────────── */}
       <div className="grid grid-cols-5 gap-3">
         {/* Receita do período */}
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-5 shadow-sm text-white">
-          <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-emerald-100 mb-3">Receita do período</p>
-          <p className="text-[22px] font-black tabular-nums leading-none">{brl(kpis.receita)}</p>
-          <p className="text-[10px] text-emerald-200 mt-2">por data de fechamento</p>
+        <div className="rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] text-white" style={{ background: "#34C759" }}>
+          <p className="text-[10px] uppercase tracking-[0.15em] font-bold mb-3" style={{ color: "rgba(255,255,255,0.7)" }}>Receita do período</p>
+          <p className="text-[22px] font-black tabular-nums leading-none tracking-[-0.01em]">{brl(kpis.receita)}</p>
+          <p className="text-[10px] mt-2" style={{ color: "rgba(255,255,255,0.7)" }}>por data de fechamento</p>
         </div>
 
         {/* Pipeline global */}
-        <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 shadow-sm text-white">
-          <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-indigo-100 mb-3">Pipeline</p>
-          <p className="text-[22px] font-black tabular-nums leading-none">{brl(kpis.pipelineGlobal)}</p>
-          <p className="text-[10px] text-indigo-200 mt-2">cotações aguardando confirmação</p>
+        <div className="rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] text-white" style={{ background: "#007AFF" }}>
+          <p className="text-[10px] uppercase tracking-[0.15em] font-bold mb-3" style={{ color: "rgba(255,255,255,0.7)" }}>Pipeline</p>
+          <p className="text-[22px] font-black tabular-nums leading-none tracking-[-0.01em]">{brl(kpis.pipelineGlobal)}</p>
+          <p className="text-[10px] mt-2" style={{ color: "rgba(255,255,255,0.7)" }}>cotações aguardando confirmação</p>
         </div>
 
         {/* Em produção */}
-        <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
-          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-amber-500 mb-3">Em produção</p>
-          <p className="text-[22px] font-black tabular-nums text-amber-600 leading-none">{num(kpis.emProducaoCount)}</p>
-          <p className="text-[10px] text-slate-400 mt-2">{brl(kpis.emProducaoValor)} em fabricação</p>
+        <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-px transition-all duration-200">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold mb-3" style={{ color: "#FF9500" }}>Em produção</p>
+          <p className="text-[22px] font-black tabular-nums leading-none tracking-[-0.01em]" style={{ color: "#FF9500" }}>{num(kpis.emProducaoCount)}</p>
+          <p className="text-[10px] text-[#8E8E93] mt-2">{brl(kpis.emProducaoValor)} em fabricação</p>
         </div>
 
         {/* Fechamentos */}
-        <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
-          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-green-500 mb-3">Fechamentos</p>
-          <p className="text-[22px] font-black tabular-nums text-green-700 leading-none">{num(kpis.fechamentos)}</p>
-          <p className="text-[10px] text-slate-400 mt-2">{kpis.entregues} entregues no período</p>
+        <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-px transition-all duration-200">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold mb-3" style={{ color: "#34C759" }}>Fechamentos</p>
+          <p className="text-[22px] font-black tabular-nums leading-none tracking-[-0.01em]" style={{ color: "#34C759" }}>{num(kpis.fechamentos)}</p>
+          <p className="text-[10px] text-[#8E8E93] mt-2">{kpis.entregues} entregues no período</p>
         </div>
 
         {/* Ticket médio */}
-        <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
-          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-violet-400 mb-3">Ticket médio</p>
-          <p className="text-[22px] font-black tabular-nums text-violet-700 leading-none">{brl(kpis.ticket)}</p>
-          <p className="text-[10px] text-slate-400 mt-2">por negócio fechado</p>
+        <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-px transition-all duration-200">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold mb-3" style={{ color: "#AF52DE" }}>Ticket médio</p>
+          <p className="text-[22px] font-black tabular-nums leading-none tracking-[-0.01em]" style={{ color: "#AF52DE" }}>{brl(kpis.ticket)}</p>
+          <p className="text-[10px] text-[#8E8E93] mt-2">por negócio fechado</p>
         </div>
       </div>
 
       {/* ── KPI Row 2 – Operational metrics ────────────────────────────────── */}
       <div className="grid grid-cols-5 gap-3">
         {/* Orçamentos */}
-        <div className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
-          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-2">Orçamentos</p>
-          <p className="text-[20px] font-black tabular-nums text-slate-900 leading-none">{num(kpis.total)}</p>
-          <p className="text-[10px] text-slate-400 mt-1.5">realizados no período</p>
+        <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-px transition-all duration-200">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-[#8E8E93] mb-2">Orçamentos</p>
+          <p className="text-[20px] font-black tabular-nums text-[#1C1C1E] leading-none">{num(kpis.total)}</p>
+          <p className="text-[10px] text-[#8E8E93] mt-1.5">realizados no período</p>
         </div>
 
         {/* Conversão — always ≤ 100% (denominator = period's own quotes) */}
-        <div className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
-          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-2">Conversão</p>
-          <p className={`text-[20px] font-black tabular-nums leading-none ${kpis.conversao >= 30 ? "text-emerald-600" : "text-amber-600"}`}>
+        <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-px transition-all duration-200">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-[#8E8E93] mb-2">Conversão</p>
+          <p className="text-[20px] font-black tabular-nums leading-none" style={{ color: kpis.conversao >= 30 ? "#34C759" : "#FF9500" }}>
             {num(kpis.conversao, 1)}%
           </p>
-          <p className="text-[10px] text-slate-400 mt-1.5">dos orçamentos do período</p>
+          <p className="text-[10px] text-[#8E8E93] mt-1.5">dos orçamentos do período</p>
         </div>
 
         {/* Taxa de perda */}
-        <div className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
-          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-2">Taxa de perda</p>
-          <p className={`text-[20px] font-black tabular-nums leading-none ${kpis.taxaPerda > 30 ? "text-rose-600" : "text-slate-700"}`}>
+        <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-px transition-all duration-200">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-[#8E8E93] mb-2">Taxa de perda</p>
+          <p className="text-[20px] font-black tabular-nums leading-none" style={{ color: kpis.taxaPerda > 30 ? "#FF3B30" : "#1C1C1E" }}>
             {kpis.taxaPerda > 0 ? `${num(kpis.taxaPerda, 1)}%` : "—"}
           </p>
-          <p className="text-[10px] text-slate-400 mt-1.5">dos negócios resolvidos</p>
+          <p className="text-[10px] text-[#8E8E93] mt-1.5">dos negócios resolvidos</p>
         </div>
 
         {/* Clientes únicos */}
-        <div className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
-          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-2">Clientes únicos</p>
-          <p className="text-[20px] font-black tabular-nums text-slate-900 leading-none">{num(kpis.clientesUnicos)}</p>
-          <p className="text-[10px] text-slate-400 mt-1.5">atendidos no período</p>
+        <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-px transition-all duration-200">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-[#8E8E93] mb-2">Clientes únicos</p>
+          <p className="text-[20px] font-black tabular-nums text-[#1C1C1E] leading-none">{num(kpis.clientesUnicos)}</p>
+          <p className="text-[10px] text-[#8E8E93] mt-1.5">atendidos no período</p>
         </div>
 
         {/* Entregas */}
-        <div className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200">
-          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-400 mb-2">Entregas</p>
-          <p className="text-[20px] font-black tabular-nums text-emerald-600 leading-none">{num(kpis.entregues)}</p>
-          <p className="text-[10px] text-slate-400 mt-1.5">pedidos entregues no período</p>
+        <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-px transition-all duration-200">
+          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-[#8E8E93] mb-2">Entregas</p>
+          <p className="text-[20px] font-black tabular-nums leading-none" style={{ color: "#34C759" }}>{num(kpis.entregues)}</p>
+          <p className="text-[10px] text-[#8E8E93] mt-1.5">pedidos entregues no período</p>
         </div>
       </div>
 
@@ -610,43 +610,44 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       <div className="grid grid-cols-5 gap-4">
 
         {/* Receita mensal */}
-        <div className="col-span-3 bg-white rounded-xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-all duration-200">
+        <div className="col-span-3 bg-white rounded-xl border border-[rgba(0,0,0,0.06)] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-all duration-200">
           <div className="flex items-center gap-3 mb-4">
-            <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Receita mensal</p>
-            <div className="flex-1 h-px bg-slate-100" />
-            <p className="text-[10px] text-slate-400">últimos 12 meses</p>
+            <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-[#8E8E93]">Receita mensal</p>
+            <div className="flex-1 h-px bg-[rgba(60,60,67,0.12)]" />
+            <p className="text-[10px] text-[#8E8E93]">últimos 12 meses</p>
           </div>
           <MonthlyChart data={monthlyData} />
         </div>
 
         {/* Funil de vendas */}
-        <div className="col-span-2 bg-white rounded-xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-all duration-200">
+        <div className="col-span-2 bg-white rounded-xl border border-[rgba(0,0,0,0.06)] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-all duration-200">
           <div className="flex items-center gap-3 mb-4">
-            <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Funil de vendas</p>
-            <div className="flex-1 h-px bg-slate-100" />
+            <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-[#8E8E93]">Funil de vendas</p>
+            <div className="flex-1 h-px bg-[rgba(60,60,67,0.12)]" />
           </div>
           {funil.stages.length === 0 ? (
-            <p className="text-[12px] text-slate-400 text-center py-8">Sem dados no período</p>
+            <p className="text-[12px] text-[#8E8E93] text-center py-8">Sem dados no período</p>
           ) : (
             <div className="space-y-2.5">
               {funil.stages.map(s => (
                 <div key={s.col} className="flex items-center gap-2.5">
-                  <div className="w-[110px] shrink-0 text-[11px] text-slate-600 font-medium truncate" title={s.colNome}>
+                  <div className="w-[110px] shrink-0 text-[11px] text-[#1C1C1E] font-medium truncate" title={s.colNome}>
                     {s.colNome}
                   </div>
-                  <div className="flex-1 h-5 bg-slate-50 rounded-full overflow-hidden">
+                  <div className="flex-1 h-5 bg-[rgba(116,116,128,0.08)] rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{
                         width: `${Math.max(8, (s.count / funil.maxCount) * 100)}%`,
                         backgroundColor: colBg(s.col),
+                        opacity: 0.75,
                       }}
                     />
                   </div>
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums shrink-0 ${colColor(s.col)}`}>
                     {s.count}
                   </span>
-                  <span className="text-[10px] text-slate-400 tabular-nums shrink-0 w-[70px] text-right">
+                  <span className="text-[10px] text-[#8E8E93] tabular-nums shrink-0 w-[70px] text-right">
                     {brl(s.value)}
                   </span>
                 </div>
@@ -660,30 +661,29 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       <div className="grid grid-cols-3 gap-4">
 
         {/* Top clientes */}
-        <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-all duration-200">
+        <div className="bg-white rounded-xl border border-[rgba(0,0,0,0.06)] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-all duration-200">
           <div className="flex items-center gap-3 mb-4">
-            <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Top clientes</p>
-            <div className="flex-1 h-px bg-slate-100" />
+            <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-[#8E8E93]">Top clientes</p>
+            <div className="flex-1 h-px bg-[rgba(60,60,67,0.12)]" />
           </div>
           {topClientes.clientes.length === 0 ? (
-            <p className="text-[12px] text-slate-400 text-center py-6">Sem dados</p>
+            <p className="text-[12px] text-[#8E8E93] text-center py-6">Sem dados</p>
           ) : (
             <div className="space-y-3">
               {topClientes.clientes.map((c, i) => (
                 <div key={c.nome} className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 ${
-                      ["bg-indigo-500","bg-violet-500","bg-emerald-500","bg-amber-500","bg-rose-500","bg-slate-500"][i % 6]
-                    }`}>
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                      style={{ background: "#007AFF" }}>
                       {c.nome[0]?.toUpperCase() ?? "?"}
                     </div>
-                    <p className="text-[12px] font-medium text-slate-700 truncate flex-1">{c.nome}</p>
-                    <p className="text-[11px] font-bold text-slate-900 tabular-nums">{brl(c.total)}</p>
-                    <p className="text-[10px] text-slate-400 tabular-nums shrink-0">{c.count}×</p>
+                    <p className="text-[12px] font-medium text-[#1C1C1E] truncate flex-1">{c.nome}</p>
+                    <p className="text-[11px] font-bold text-[#1C1C1E] tabular-nums">{brl(c.total)}</p>
+                    <p className="text-[10px] text-[#8E8E93] tabular-nums shrink-0">{c.count}×</p>
                   </div>
-                  <div className="ml-8 h-1.5 bg-slate-50 rounded-full overflow-hidden">
-                    <div className="h-full bg-indigo-400 rounded-full"
-                      style={{ width: `${(c.total / topClientes.maxTotal) * 100}%` }} />
+                  <div className="ml-8 h-1.5 bg-[rgba(116,116,128,0.08)] rounded-full overflow-hidden">
+                    <div className="h-full rounded-full"
+                      style={{ width: `${(c.total / topClientes.maxTotal) * 100}%`, background: "#007AFF" }} />
                   </div>
                 </div>
               ))}
@@ -692,24 +692,24 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
         </div>
 
         {/* Materiais mais usados */}
-        <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-all duration-200">
+        <div className="bg-white rounded-xl border border-[rgba(0,0,0,0.06)] p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-all duration-200">
           <div className="flex items-center gap-3 mb-4">
-            <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Materiais mais usados</p>
-            <div className="flex-1 h-px bg-slate-100" />
+            <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-[#8E8E93]">Materiais mais usados</p>
+            <div className="flex-1 h-px bg-[rgba(60,60,67,0.12)]" />
           </div>
           {materiais.materiais.length === 0 ? (
-            <p className="text-[12px] text-slate-400 text-center py-6">Sem dados</p>
+            <p className="text-[12px] text-[#8E8E93] text-center py-6">Sem dados</p>
           ) : (
             <div className="space-y-3">
               {materiais.materiais.map(m => (
                 <div key={m.nome} className="space-y-1">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
-                    <p className="text-[12px] font-medium text-slate-700 truncate flex-1">{m.nome}</p>
-                    <p className="text-[11px] font-bold text-slate-900 tabular-nums">{num(m.count)}</p>
-                    <p className="text-[10px] text-slate-400 tabular-nums shrink-0">{brl(m.value)}</p>
+                    <p className="text-[12px] font-medium text-[#1C1C1E] truncate flex-1">{m.nome}</p>
+                    <p className="text-[11px] font-bold text-[#1C1C1E] tabular-nums">{num(m.count)}</p>
+                    <p className="text-[10px] text-[#8E8E93] tabular-nums shrink-0">{brl(m.value)}</p>
                   </div>
-                  <div className="ml-4 h-1.5 bg-slate-50 rounded-full overflow-hidden">
+                  <div className="ml-4 h-1.5 bg-[rgba(116,116,128,0.08)] rounded-full overflow-hidden">
                     <div className="h-full rounded-full"
                       style={{ width: `${(m.count / materiais.maxCount) * 100}%`, backgroundColor: m.color }} />
                   </div>
@@ -720,30 +720,30 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
         </div>
 
         {/* Motivos de perda */}
-        <div className={`rounded-xl border p-5 shadow-sm hover:shadow-md transition-all duration-200 ${motivosPerda.motivos.length === 0 ? "bg-emerald-50 border-emerald-100" : "bg-white border-slate-100"}`}>
+        <div className={`rounded-xl border p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-all duration-200 ${motivosPerda.motivos.length === 0 ? "bg-[#34C759]/5 border-[#34C759]/20" : "bg-white border-[rgba(0,0,0,0.06)]"}`}>
           <div className="flex items-center gap-3 mb-4">
-            <p className={`text-[11px] uppercase tracking-[0.12em] font-bold ${motivosPerda.motivos.length === 0 ? "text-emerald-500" : "text-slate-400"}`}>
+            <p className={`text-[11px] uppercase tracking-[0.12em] font-bold ${motivosPerda.motivos.length === 0 ? "text-[#34C759]" : "text-[#8E8E93]"}`}>
               Motivos de perda
             </p>
-            <div className={`flex-1 h-px ${motivosPerda.motivos.length === 0 ? "bg-emerald-100" : "bg-slate-100"}`} />
+            <div className={`flex-1 h-px ${motivosPerda.motivos.length === 0 ? "bg-[#34C759]/20" : "bg-[rgba(60,60,67,0.12)]"}`} />
           </div>
           {motivosPerda.motivos.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-4 gap-2">
               <span className="text-3xl">🎯</span>
-              <p className="text-[13px] font-semibold text-emerald-700 text-center">Nenhuma perda registrada</p>
-              <p className="text-[11px] text-emerald-600/70 text-center">Excelente taxa de conversão!</p>
+              <p className="text-[13px] font-semibold text-center" style={{ color: "#34C759" }}>Nenhuma perda registrada</p>
+              <p className="text-[11px] text-center" style={{ color: "rgba(52,199,89,0.7)" }}>Excelente taxa de conversão!</p>
             </div>
           ) : (
             <div className="space-y-3">
               {motivosPerda.motivos.map(m => (
                 <div key={m.motivo} className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <p className="text-[12px] font-medium text-slate-700 truncate flex-1">{m.motivo}</p>
-                    <p className="text-[11px] font-bold text-rose-600 tabular-nums">{m.count}×</p>
+                    <p className="text-[12px] font-medium text-[#1C1C1E] truncate flex-1">{m.motivo}</p>
+                    <p className="text-[11px] font-bold tabular-nums" style={{ color: "#FF3B30" }}>{m.count}×</p>
                   </div>
-                  <div className="h-1.5 bg-slate-50 rounded-full overflow-hidden">
-                    <div className="h-full bg-rose-400 rounded-full"
-                      style={{ width: `${(m.count / motivosPerda.maxCount) * 100}%` }} />
+                  <div className="h-1.5 bg-[rgba(116,116,128,0.08)] rounded-full overflow-hidden">
+                    <div className="h-full rounded-full"
+                      style={{ width: `${(m.count / motivosPerda.maxCount) * 100}%`, background: "#FF3B30" }} />
                   </div>
                 </div>
               ))}
@@ -753,57 +753,58 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       </div>
 
       {/* ── Últimos negócios ───────────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
-          <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-slate-400">Últimos negócios</p>
-          <div className="flex-1 h-px bg-slate-100" />
-          <p className="text-[10px] text-slate-400">10 mais recentes no período</p>
+      <div className="bg-white rounded-xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-[rgba(60,60,67,0.12)]">
+          <p className="text-[11px] uppercase tracking-[0.12em] font-bold text-[#8E8E93]">Últimos negócios</p>
+          <div className="flex-1 h-px bg-[rgba(60,60,67,0.12)]" />
+          <p className="text-[10px] text-[#8E8E93]">10 mais recentes no período</p>
         </div>
         {ultimosNegocios.length === 0 ? (
-          <p className="text-[12px] text-slate-400 text-center py-8">Sem negócios no período</p>
+          <p className="text-[12px] text-[#8E8E93] text-center py-8">Sem negócios no período</p>
         ) : (
           <table className="w-full text-[12px]">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Nº</th>
-                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Cliente</th>
-                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Material</th>
-                <th className="px-4 py-2.5 text-right text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Valor</th>
-                <th className="px-4 py-2.5 text-right text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Qtd</th>
-                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Estágio</th>
-                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Data</th>
+              <tr className="bg-[rgba(116,116,128,0.04)] border-b border-[rgba(60,60,67,0.12)]">
+                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Nº</th>
+                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Cliente</th>
+                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Material</th>
+                <th className="px-4 py-2.5 text-right text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Valor</th>
+                <th className="px-4 py-2.5 text-right text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Qtd</th>
+                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Estágio</th>
+                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Data</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-[rgba(60,60,67,0.06)]">
               {ultimosNegocios.map(card => {
                 const dataFmt = card.data.split(",")[0] ?? card.data
                 return (
-                  <tr key={card.id} className="hover:bg-slate-50/80 transition-colors">
+                  <tr key={card.id} className="hover:bg-[rgba(0,0,0,0.02)] transition-colors">
                     {/* Nº */}
                     <td className="px-4 py-2.5">
-                      <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-1.5 py-0.5 rounded-md tabular-nums whitespace-nowrap">
+                      <span className="bg-[rgba(116,116,128,0.08)] text-[#8E8E93] text-[10px] font-bold px-1.5 py-0.5 rounded-md tabular-nums whitespace-nowrap">
                         {card.numero || "—"}
                       </span>
                     </td>
                     {/* Cliente */}
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-indigo-500 text-white text-[9px] font-bold flex items-center justify-center shrink-0">
+                        <div className="w-5 h-5 rounded-full text-white text-[9px] font-bold flex items-center justify-center shrink-0"
+                          style={{ background: "#007AFF" }}>
                           {card.nomeCliente[0]?.toUpperCase() ?? "?"}
                         </div>
-                        <span className="font-medium text-slate-700 max-w-[120px] truncate">{card.nomeCliente}</span>
+                        <span className="font-medium text-[#1C1C1E] max-w-[120px] truncate">{card.nomeCliente}</span>
                       </div>
                     </td>
                     {/* Material */}
-                    <td className="px-4 py-2.5 text-slate-500 max-w-[120px]">
+                    <td className="px-4 py-2.5 text-[#8E8E93] max-w-[120px]">
                       <span className="truncate block">{card.materialNome || "—"}</span>
                     </td>
                     {/* Valor */}
-                    <td className="px-4 py-2.5 text-right font-bold text-slate-900 tabular-nums">
+                    <td className="px-4 py-2.5 text-right font-bold text-[#1C1C1E] tabular-nums">
                       {brl(card.preco)}
                     </td>
                     {/* Qtd */}
-                    <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">
+                    <td className="px-4 py-2.5 text-right text-[#8E8E93] tabular-nums">
                       {num(card.quantidade)}
                     </td>
                     {/* Estágio */}
@@ -813,7 +814,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                       </span>
                     </td>
                     {/* Data */}
-                    <td className="px-4 py-2.5 text-slate-400 tabular-nums text-[11px]">
+                    <td className="px-4 py-2.5 text-[#8E8E93] tabular-nums text-[11px]">
                       {dataFmt}
                     </td>
                   </tr>

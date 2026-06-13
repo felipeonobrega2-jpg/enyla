@@ -76,13 +76,13 @@ export function HistoricoView({
 
   if (!historico.length && !propostasCustom.length) return (
     <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-6">
-      <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-1">
-        <svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <div className="w-12 h-12 rounded-2xl bg-[rgba(116,116,128,0.08)] flex items-center justify-center mb-1">
+        <svg className="w-6 h-6 text-[#8E8E93]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
         </svg>
       </div>
-      <p className="text-[14px] font-semibold text-slate-700">Nenhum registro ainda</p>
-      <p className="text-[12px] text-slate-400 max-w-[260px] leading-relaxed">
+      <p className="text-[14px] font-semibold text-[#1C1C1E]">Nenhum registro ainda</p>
+      <p className="text-[12px] text-[#8E8E93] max-w-[260px] leading-relaxed">
         Orçamentos calculados e propostas personalizadas aparecerão aqui.
       </p>
     </div>
@@ -94,7 +94,7 @@ export function HistoricoView({
       {/* Barra de busca + ordenação */}
       <div className="flex gap-2 items-center">
         <div className="relative flex-1">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8E8E93]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
           </svg>
           <input
@@ -102,17 +102,17 @@ export function HistoricoView({
             value={busca}
             onChange={e => setBusca(e.target.value)}
             placeholder="Buscar por cliente, número ou data…"
-            className="w-full border border-slate-200 rounded-xl pl-9 pr-9 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 bg-white transition-all"
+            className="w-full border border-[rgba(0,0,0,0.12)] rounded-xl pl-9 pr-9 py-2.5 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.36)] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25 focus:border-[#007AFF] bg-white transition-all"
           />
           {busca && (
             <button onClick={() => setBusca("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 text-lg leading-none transition-colors">×</button>
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[rgba(60,60,67,0.36)] hover:text-[#1C1C1E] text-lg leading-none transition-colors">×</button>
           )}
         </div>
         <select
           value={ordem}
           onChange={e => setOrdem(e.target.value as OrdemHistorico)}
-          className="border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 cursor-pointer transition-all"
+          className="border border-[rgba(0,0,0,0.12)] rounded-xl px-3 py-2.5 text-[13px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25 focus:border-[#007AFF] cursor-pointer transition-all"
         >
           <option value="recente">Mais recentes</option>
           <option value="antigo">Mais antigos</option>
@@ -125,7 +125,7 @@ export function HistoricoView({
       {/* Sem resultados */}
       {!temResultados && busca && (
         <div className="text-center py-16">
-          <p className="text-[13px] text-slate-400">Nenhum resultado para <span className="font-medium text-slate-600">"{busca}"</span>.</p>
+          <p className="text-[13px] text-[#8E8E93]">Nenhum resultado para <span className="font-medium text-[#1C1C1E]">"{busca}"</span>.</p>
         </div>
       )}
 
@@ -136,7 +136,7 @@ export function HistoricoView({
             <SectionLabel>Orçamentos calculados · {filtrado.length}</SectionLabel>
           )}
           {historico.length > 0 && propostasCustom.length === 0 && (
-            <p className="text-[10px] uppercase tracking-[0.12em] font-semibold text-slate-400 mb-1">
+            <p className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[#8E8E93] mb-1">
               {filtrado.length} de {historico.length} orçamento{historico.length !== 1 ? "s" : ""}
             </p>
           )}
@@ -148,13 +148,14 @@ export function HistoricoView({
             return (
               <div
                 key={originalIndex}
-                className="group relative bg-white border border-slate-100 rounded-xl overflow-hidden hover:border-slate-200 hover:shadow-[0_4px_16px_rgba(0,0,0,0.07)] hover:-translate-y-px transition-all duration-200"
+                className="group relative bg-white border border-[rgba(0,0,0,0.06)] rounded-xl overflow-hidden hover:border-[rgba(0,0,0,0.10)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-px transition-all duration-200"
               >
                 <div className="flex items-center gap-4 px-5 py-4">
                   {/* Avatar */}
                   <button
                     onClick={() => onDetalhes?.(item)}
-                    className="w-10 h-10 rounded-full bg-indigo-600 text-white text-[13px] font-bold flex items-center justify-center shrink-0 hover:bg-indigo-700 transition-colors"
+                    className="w-10 h-10 rounded-full text-white text-[13px] font-bold flex items-center justify-center shrink-0 transition-colors"
+                    style={{ background: "#007AFF" }}
                     tabIndex={-1}
                   >
                     {initial}
@@ -166,16 +167,16 @@ export function HistoricoView({
                     className="flex-1 min-w-0 text-left"
                   >
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-[14px] text-slate-800 leading-snug">
+                      <span className="font-semibold text-[14px] text-[#1C1C1E] leading-snug">
                         {item.form.nomeCliente || "Sem nome"}
                       </span>
                       {item.numero && (
-                        <span className="shrink-0 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded-full tabular-nums">
+                        <span className="shrink-0 text-[10px] font-bold text-[#007AFF] bg-[#007AFF]/10 border border-[#007AFF]/20 px-1.5 py-0.5 rounded-full tabular-nums">
                           {item.numero}
                         </span>
                       )}
                     </div>
-                    <p className="text-[11.5px] text-slate-400 mt-0.5">
+                    <p className="text-[11.5px] text-[#8E8E93] mt-0.5">
                       {item.form.frente}×{item.form.alturaBox}×{item.form.lateral} cm
                       {item.form.materialNome && ` · ${item.form.materialNome}`}
                       {` · ${item.data}`}
@@ -185,8 +186,8 @@ export function HistoricoView({
                   {/* Right: price fades → actions appear on hover */}
                   <div className="relative shrink-0 flex items-center justify-end" style={{ minWidth: 196 }}>
                     <div className="text-right transition-opacity duration-150 group-hover:opacity-0 group-hover:pointer-events-none">
-                      <p className="font-bold text-[15px] text-slate-800 tabular-nums">{brl(preco)}</p>
-                      <p className="text-[11px] text-slate-400 tabular-nums">{num(ideal?.quantidade ?? 0)} un</p>
+                      <p className="font-bold text-[15px] text-[#1C1C1E] tabular-nums">{brl(preco)}</p>
+                      <p className="text-[11px] text-[#8E8E93] tabular-nums">{num(ideal?.quantidade ?? 0)} un</p>
                     </div>
                     <div className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                       <IconBtn title="Replicar" onClick={() => onReplicar(item)}>
@@ -231,13 +232,14 @@ export function HistoricoView({
             return (
               <div
                 key={p.id}
-                className="group relative bg-white border border-slate-100 rounded-xl overflow-hidden hover:border-slate-200 hover:shadow-[0_4px_16px_rgba(0,0,0,0.07)] hover:-translate-y-px transition-all duration-200"
+                className="group relative bg-white border border-[rgba(0,0,0,0.06)] rounded-xl overflow-hidden hover:border-[rgba(0,0,0,0.10)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-px transition-all duration-200"
               >
                 <div className="flex items-center gap-4 px-5 py-4">
                   {/* Avatar */}
                   <button
                     onClick={() => onDetalhes?.(p)}
-                    className="w-10 h-10 rounded-full bg-violet-600 text-white text-[13px] font-bold flex items-center justify-center shrink-0 hover:bg-violet-700 transition-colors"
+                    className="w-10 h-10 rounded-full text-white text-[13px] font-bold flex items-center justify-center shrink-0 transition-colors"
+                    style={{ background: "#007AFF" }}
                     tabIndex={-1}
                   >
                     {initial}
@@ -249,14 +251,14 @@ export function HistoricoView({
                     className="flex-1 min-w-0 text-left"
                   >
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-[14px] text-slate-800 leading-snug">
+                      <span className="font-semibold text-[14px] text-[#1C1C1E] leading-snug">
                         {p.nomeCliente || "Sem nome"}
                       </span>
-                      <span className="shrink-0 text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full tabular-nums">
+                      <span className="shrink-0 text-[10px] font-bold text-[#007AFF] bg-[#007AFF]/10 border border-[#007AFF]/20 px-1.5 py-0.5 rounded-full tabular-nums">
                         {p.numero}
                       </span>
                     </div>
-                    <p className="text-[11.5px] text-slate-400 mt-0.5">
+                    <p className="text-[11.5px] text-[#8E8E93] mt-0.5">
                       {[p.descricao, p.dimensoes, p.material].filter(Boolean).join(" · ") || "—"}
                       {` · ${p.data}`}
                     </p>
@@ -267,10 +269,10 @@ export function HistoricoView({
                     <div className="text-right transition-opacity duration-150 group-hover:opacity-0 group-hover:pointer-events-none">
                       {preco != null
                         ? <>
-                            <p className="font-bold text-[15px] text-slate-800 tabular-nums">{brl(preco)}</p>
-                            <p className="text-[11px] text-slate-400 tabular-nums">{num(ideal!.quantidade)} un</p>
+                            <p className="font-bold text-[15px] text-[#1C1C1E] tabular-nums">{brl(preco)}</p>
+                            <p className="text-[11px] text-[#8E8E93] tabular-nums">{num(ideal!.quantidade)} un</p>
                           </>
-                        : <p className="text-[13px] text-slate-300 font-medium">—</p>
+                        : <p className="text-[13px] text-[rgba(60,60,67,0.36)] font-medium">—</p>
                       }
                     </div>
                     <div className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
@@ -300,9 +302,9 @@ export function HistoricoView({
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function SectionLabel({ children, violet }: { children: React.ReactNode; violet?: boolean }) {
+function SectionLabel({ children }: { children: React.ReactNode; violet?: boolean }) {
   return (
-    <p className={`text-[10px] uppercase tracking-[0.12em] font-bold mb-1 ${violet ? "text-violet-400" : "text-slate-400"}`}>
+    <p className="text-[10px] uppercase tracking-[0.12em] font-bold mb-1 text-[#8E8E93]">
       {children}
     </p>
   )
@@ -317,11 +319,11 @@ function IconBtn({
   color?: "slate" | "blue" | "green" | "red" | "violet"
 }) {
   const colors = {
-    slate:  "text-slate-500 hover:bg-slate-100 hover:text-slate-700",
-    blue:   "text-indigo-500 hover:bg-indigo-50  hover:text-indigo-700",
-    green:  "text-emerald-500 hover:bg-emerald-50 hover:text-emerald-700",
-    red:    "text-rose-400  hover:bg-rose-50   hover:text-rose-600",
-    violet: "text-violet-500 hover:bg-violet-50 hover:text-violet-700",
+    slate:  "text-[#8E8E93] hover:bg-[rgba(0,0,0,0.04)] hover:text-[#1C1C1E]",
+    blue:   "text-[#007AFF] hover:bg-[#007AFF]/5 hover:text-[#0062CC]",
+    green:  "text-[#34C759] hover:bg-[#34C759]/5 hover:text-[#248A3D]",
+    red:    "text-[#FF3B30] hover:bg-[#FF3B30]/5 hover:text-[#D70015]",
+    violet: "text-[#007AFF] hover:bg-[#007AFF]/5 hover:text-[#0062CC]",
   }
   return (
     <button

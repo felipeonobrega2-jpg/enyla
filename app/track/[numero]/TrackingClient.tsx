@@ -115,16 +115,16 @@ export default function TrackingClient({ initialData, numero }: Props) {
   }, [numero])
 
   if (!data) return (
-    <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4" style={{ background: "#F2F2F7" }}>
       <div className="w-full max-w-sm text-center space-y-4">
-        <div className="w-16 h-16 rounded-2xl bg-white border border-slate-100 flex items-center justify-center mx-auto shadow-sm">
-          <svg className="w-8 h-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div className="w-16 h-16 rounded-2xl bg-white border border-[rgba(0,0,0,0.06)] flex items-center justify-center mx-auto shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <svg className="w-8 h-8 text-[rgba(60,60,67,0.36)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
           </svg>
         </div>
-        <p className="font-bold text-slate-800 text-lg">Pedido não encontrado</p>
-        <p className="text-slate-400 text-sm">Verifique o link enviado pela gráfica.</p>
-        <p className="text-xs text-slate-300 font-mono bg-slate-100 px-3 py-1.5 rounded-lg inline-block">{numero}</p>
+        <p className="font-bold text-[#1C1C1E] text-lg">Pedido não encontrado</p>
+        <p className="text-[#8E8E93] text-sm">Verifique o link enviado pela gráfica.</p>
+        <p className="text-xs text-[rgba(60,60,67,0.36)] font-mono bg-[rgba(116,116,128,0.08)] px-3 py-1.5 rounded-lg inline-block">{numero}</p>
       </div>
     </div>
   )
@@ -159,17 +159,17 @@ export default function TrackingClient({ initialData, numero }: Props) {
   function getTS(col: number) { return activeEtapas.find(e => e.coluna === col)?.dataHora?.split(",")[0] ?? null }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc]">
+    <div className="min-h-screen" style={{ background: "#F2F2F7" }}>
 
       {/* ── Sticky header ──────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-slate-100 sticky top-0 z-10">
+      <div className="bg-white border-b border-[rgba(60,60,67,0.12)] sticky top-0 z-10">
         <div className="max-w-md mx-auto px-5 h-14 flex items-center gap-3">
           <div>
-            <p className="font-bold text-slate-900 text-base tracking-tight leading-none">ENYLA</p>
-            <p className="text-slate-400 text-[10px] mt-0.5 tracking-wide">Comunicação Visual</p>
+            <p className="font-bold text-[#1C1C1E] text-base tracking-tight leading-none">ENYLA</p>
+            <p className="text-[#8E8E93] text-[10px] mt-0.5 tracking-wide">Comunicação Visual</p>
           </div>
           <div className="ml-auto">
-            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-full font-mono">{numero}</span>
+            <span className="text-[10px] font-bold text-[#007AFF] bg-[#007AFF]/10 border border-[#007AFF]/20 px-2.5 py-1 rounded-full font-mono">{numero}</span>
           </div>
         </div>
       </div>
@@ -178,29 +178,29 @@ export default function TrackingClient({ initialData, numero }: Props) {
 
         {/* ── Greeting ───────────────────────────────────────────────── */}
         <div className="pt-1">
-          <p className="text-[22px] font-bold text-slate-900 leading-snug">
+          <p className="text-[22px] font-bold text-[#1C1C1E] leading-snug tracking-[-0.01em]">
             Olá, {data.nomeCliente.split(" ")[0]}!
           </p>
-          <p className="text-sm text-slate-500 mt-0.5">Acompanhe o andamento do seu pedido abaixo.</p>
+          <p className="text-sm text-[#8E8E93] mt-0.5">Acompanhe o andamento do seu pedido abaixo.</p>
         </div>
 
         {/* ── Order summary card ─────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex">
+        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] overflow-hidden flex">
           {/* Accent bar */}
-          <div className="w-1 shrink-0 bg-indigo-500" />
+          <div className="w-1 shrink-0" style={{ background: "#007AFF" }} />
           <div className="flex-1 min-w-0">
             <div className="px-4 pt-4 pb-3">
-              <p className="font-bold text-slate-800 text-[15px] leading-snug">{data.descricao || "Embalagem personalizada"}</p>
-              <p className="text-slate-400 text-[12px] mt-0.5">{data.materialNome || "Material não especificado"}</p>
+              <p className="font-bold text-[#1C1C1E] text-[15px] leading-snug">{data.descricao || "Embalagem personalizada"}</p>
+              <p className="text-[#8E8E93] text-[12px] mt-0.5">{data.materialNome || "Material não especificado"}</p>
             </div>
-            <div className="grid grid-cols-2 border-t border-slate-50 divide-x divide-slate-50">
+            <div className="grid grid-cols-2 border-t border-[rgba(60,60,67,0.06)] divide-x divide-[rgba(60,60,67,0.06)]">
               <div className="px-4 py-3">
-                <p className="text-[9px] uppercase tracking-[0.12em] text-slate-400 font-semibold">Quantidade</p>
-                <p className="text-[15px] font-black text-slate-800 tabular-nums mt-1">{num(data.quantidade)} un</p>
+                <p className="text-[9px] uppercase tracking-[0.12em] text-[#8E8E93] font-semibold">Quantidade</p>
+                <p className="text-[15px] font-black text-[#1C1C1E] tabular-nums mt-1">{num(data.quantidade)} un</p>
               </div>
               <div className="px-4 py-3">
-                <p className="text-[9px] uppercase tracking-[0.12em] text-slate-400 font-semibold">Valor</p>
-                <p className="text-[15px] font-black text-slate-800 tabular-nums mt-1">{brl(data.preco)}</p>
+                <p className="text-[9px] uppercase tracking-[0.12em] text-[#8E8E93] font-semibold">Valor</p>
+                <p className="text-[15px] font-black text-[#1C1C1E] tabular-nums mt-1">{brl(data.preco)}</p>
               </div>
             </div>
           </div>
@@ -208,20 +208,20 @@ export default function TrackingClient({ initialData, numero }: Props) {
 
         {/* ── Cancelled ──────────────────────────────────────────────── */}
         {isCancelled && (
-          <div className="bg-white rounded-2xl border border-slate-100 p-5 text-center space-y-2 shadow-sm">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto">
-              <svg className="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] p-5 text-center space-y-2 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+            <div className="w-12 h-12 rounded-2xl bg-[rgba(116,116,128,0.08)] flex items-center justify-center mx-auto">
+              <svg className="w-6 h-6 text-[#8E8E93]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
               </svg>
             </div>
-            <p className="font-bold text-slate-700">Pedido encerrado</p>
-            <p className="text-sm text-slate-400">Entre em contato com a gráfica para mais informações.</p>
+            <p className="font-bold text-[#1C1C1E]">Pedido encerrado</p>
+            <p className="text-sm text-[#8E8E93]">Entre em contato com a gráfica para mais informações.</p>
           </div>
         )}
 
         {/* ── Pending (col 0) — Orçamento realizado ──────────────────── */}
         {isPending && !isCancelled && (
-          <div className="rounded-2xl overflow-hidden shadow-sm bg-gradient-to-br from-violet-600 to-violet-700">
+          <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: "#007AFF" }}>
             {/* Top bar */}
             <div className="px-5 pt-4 pb-2">
               <div className="flex items-center justify-between mb-2">
@@ -268,11 +268,8 @@ export default function TrackingClient({ initialData, numero }: Props) {
         {!isCancelled && !isPending && currentEtapa && (
           <>
             {/* Status hero card */}
-            <div className={`rounded-2xl overflow-hidden shadow-sm ${
-              isDelivered
-                ? "bg-gradient-to-br from-emerald-500 to-emerald-600"
-                : "bg-gradient-to-br from-blue-600 to-blue-700"
-            }`}>
+            <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+              style={{ background: isDelivered ? "#34C759" : "#007AFF" }}>
 
               {/* Progress bar + label */}
               <div className="px-5 pt-4 pb-2">
@@ -296,9 +293,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
               <div className="px-5 py-5 flex items-center gap-4">
                 {/* Icon with animated ring */}
                 <div className="relative shrink-0">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
-                    isDelivered ? "bg-white/20" : "bg-white/15"
-                  }`}>
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white/20">
                     <StepIcon icon={currentEtapa.icon} large active />
                   </div>
                   {!isDelivered && (
@@ -365,7 +360,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
                     </div>
                   </div>
                   <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-400 rounded-full transition-all duration-700" style={{ width: `${pagoPct}%` }} />
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pagoPct}%`, background: "#34C759" }} />
                   </div>
                   <p className="text-[9px] text-white/40 mt-1.5 text-center">
                     {saldo <= 0 ? "Pagamento completo ✓" : `${Math.round(pagoPct)}% quitado`}
@@ -375,9 +370,9 @@ export default function TrackingClient({ initialData, numero }: Props) {
             </div>
 
             {/* ── Timeline ───────────────────────────────────────────── */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-slate-50">
-                <p className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-slate-400">
+            <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-[rgba(60,60,67,0.06)]">
+                <p className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-[#8E8E93]">
                   Detalhes do progresso
                 </p>
               </div>
@@ -401,7 +396,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
                             current ? "w-8 h-8 -mx-1" : "w-6 h-6"
                           }`}>
                             {completed ? (
-                              <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm shadow-emerald-100">
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center shadow-sm" style={{ background: "#34C759" }}>
                                 <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                                 </svg>
@@ -409,37 +404,22 @@ export default function TrackingClient({ initialData, numero }: Props) {
                             ) : current ? (
                               <div className="relative w-8 h-8">
                                 {/* Outer pulse ring */}
-                                <div className={`absolute inset-0 rounded-full animate-ping ${
-                                  isDelivered ? "bg-emerald-400/30" : "bg-blue-400/30"
-                                }`} />
-                                <div className={`relative w-8 h-8 rounded-full flex items-center justify-center shadow-md ${
-                                  isDelivered
-                                    ? "bg-emerald-500 shadow-emerald-200"
-                                    : "bg-blue-600 shadow-blue-200"
-                                }`}>
+                                <div className="absolute inset-0 rounded-full animate-ping" style={{ background: isDelivered ? "rgba(52,199,89,0.3)" : "rgba(0,122,255,0.3)" }} />
+                                <div className="relative w-8 h-8 rounded-full flex items-center justify-center shadow-md" style={{ background: isDelivered ? "#34C759" : "#007AFF" }}>
                                   <StepIcon icon={etapa.icon} active />
                                 </div>
                               </div>
                             ) : (
-                              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                                isNext ? "border-slate-300 bg-slate-50" : "border-slate-150 bg-white"
-                              }`}
-                              style={{ borderColor: isNext ? undefined : "#e9ecf0" }}>
-                                <div className={`w-2 h-2 rounded-full ${
-                                  isNext ? "bg-slate-300" : "bg-slate-200"
-                                }`} />
+                              <div className="w-6 h-6 rounded-full border-2 flex items-center justify-center"
+                              style={{ borderColor: isNext ? "rgba(60,60,67,0.36)" : "rgba(0,0,0,0.08)", background: "white" }}>
+                                <div className="w-2 h-2 rounded-full" style={{ background: isNext ? "rgba(60,60,67,0.36)" : "rgba(0,0,0,0.08)" }} />
                               </div>
                             )}
                           </div>
                           {/* Connector line */}
                           {!isLast && (
-                            <div className={`w-0.5 flex-1 my-1 min-h-[16px] transition-colors ${
-                              completed
-                                ? "bg-emerald-300"
-                                : current
-                                ? "bg-gradient-to-b from-blue-300 to-slate-200"
-                                : "bg-slate-100"
-                            }`} />
+                            <div className="w-0.5 flex-1 my-1 min-h-[16px] transition-colors rounded-full"
+                              style={{ background: completed ? "rgba(52,199,89,0.5)" : current ? "rgba(0,122,255,0.2)" : "rgba(0,0,0,0.08)" }} />
                           )}
                         </div>
 
@@ -448,36 +428,27 @@ export default function TrackingClient({ initialData, numero }: Props) {
                           current ? "pt-1" : ""
                         }`}>
                           <div className="flex items-center justify-between gap-2 min-h-[24px]">
-                            <p className={`text-[13px] font-semibold leading-tight ${
-                              completed
-                                ? "text-emerald-700"
-                                : current
-                                ? isDelivered ? "text-emerald-700" : "text-slate-900"
-                                : isNext
-                                ? "text-slate-500"
-                                : "text-slate-300"
-                            }`}>
+                            <p className="text-[13px] font-semibold leading-tight" style={{
+                              color: completed ? "#34C759" : current ? (isDelivered ? "#34C759" : "#1C1C1E") : isNext ? "#8E8E93" : "rgba(60,60,67,0.36)"
+                            }}>
                               {etapa.label}
                             </p>
                             {ts && (
-                              <span className="text-[10px] text-slate-400 tabular-nums shrink-0">{ts}</span>
+                              <span className="text-[10px] text-[#8E8E93] tabular-nums shrink-0">{ts}</span>
                             )}
                             {current && !ts && (
-                              <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                                isDelivered
-                                  ? "bg-emerald-100 text-emerald-700"
-                                  : "bg-blue-100 text-blue-700"
-                              }`}>
+                              <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                                style={{ background: isDelivered ? "rgba(52,199,89,0.12)" : "rgba(0,122,255,0.12)", color: isDelivered ? "#34C759" : "#007AFF" }}>
                                 {isDelivered ? "Concluído" : "Agora"}
                               </span>
                             )}
                           </div>
                           {/* Next step preview */}
                           {isNext && (
-                            <p className="text-[11px] text-slate-400 mt-0.5">Próxima etapa</p>
+                            <p className="text-[11px] text-[#8E8E93] mt-0.5">Próxima etapa</p>
                           )}
                           {isNextNext && (
-                            <p className="text-[11px] text-slate-300 mt-0.5">Em seguida</p>
+                            <p className="text-[11px] mt-0.5" style={{ color: "rgba(60,60,67,0.36)" }}>Em seguida</p>
                           )}
                         </div>
                       </div>
@@ -491,12 +462,13 @@ export default function TrackingClient({ initialData, numero }: Props) {
 
         {/* ── Refresh bar ─────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-1 pt-1">
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-[#8E8E93]">
             {refreshing ? "Atualizando…" : `Atualizado há ${lastUpdate}s`}
           </p>
           <button
             onClick={fetchData}
-            className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1.5 transition-colors"
+            className="text-[11px] font-medium flex items-center gap-1.5 transition-colors hover:opacity-80"
+            style={{ color: "#007AFF" }}
           >
             <svg className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
@@ -505,7 +477,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
           </button>
         </div>
 
-        <p className="text-center text-[10px] text-slate-300 pb-2">ENYLA Comunicação Visual · {numero}</p>
+        <p className="text-center text-[10px] pb-2" style={{ color: "rgba(60,60,67,0.36)" }}>ENYLA Comunicação Visual · {numero}</p>
 
       </div>
     </div>
