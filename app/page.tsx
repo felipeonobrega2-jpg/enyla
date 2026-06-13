@@ -315,6 +315,7 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ dataFechamento: date }),
     }).catch(() => {})
+    showToast("Data de fechamento atualizada.")
   }
 
   async function salvarDataEntrega(cardId: string, date: string | null) {
@@ -337,6 +338,7 @@ export default function Home() {
         }).catch(() => {})
       }
     }
+    showToast(date ? "Data de entrega atualizada." : "Data de entrega removida.")
   }
 
   async function atualizarTracking(numero: string, novaColuna: number, preco?: number, quantidade?: number) {
