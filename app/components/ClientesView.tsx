@@ -118,12 +118,12 @@ export function ClientesView({
           </svg>
           <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar cliente…"
-            className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg pl-8 pr-3 py-2 text-[13px] text-slate-900 placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg pl-8 pr-3 py-2 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25 focus:border-[#007AFF]" />
           {busca && <button onClick={() => setBusca("")}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] text-lg leading-none">×</button>}
         </div>
         <select value={ordem} onChange={e => setOrdem(e.target.value as typeof ordem)}
-          className="border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+          className="border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25 focus:border-[#007AFF]">
           <option value="valor">Maior valor</option>
           <option value="orcamentos">Mais registros</option>
           <option value="nome">Nome A–Z</option>
@@ -162,18 +162,18 @@ export function ClientesView({
                     <span className="text-[#8E8E93]">{totalItens} realizados</span>
                     {fechados > 0 && <>
                       <span className="text-[rgba(60,60,67,0.3)]">→</span>
-                      <span className="text-green-600 font-semibold">{fechados} fechados</span>
+                      <span className="text-[#34C759] font-semibold">{fechados} fechados</span>
                     </>}
                     {perdidos > 0 && <>
                       <span className="text-[rgba(60,60,67,0.3)]">·</span>
-                      <span className="text-rose-500">{perdidos} perdidos</span>
+                      <span className="text-[#FF3B30]">{perdidos} perdidos</span>
                     </>}
                   </div>
 
                   {conversao !== null && (
                     <div className="text-center min-w-[48px]">
                       <p className={`text-sm font-semibold leading-none ${
-                        conversao >= 60 ? "text-green-600" : conversao >= 35 ? "text-amber-500" : "text-rose-500"
+                        conversao >= 60 ? "text-[#34C759]" : conversao >= 35 ? "text-[#FF9500]" : "text-[#FF3B30]"
                       }`}>{conversao}%</p>
                       <p className="text-[9px] text-[#8E8E93] mt-0.5">conversão</p>
                     </div>
@@ -182,7 +182,7 @@ export function ClientesView({
                   <div className="text-right min-w-[90px]">
                     <p className="font-bold text-[#1C1C1E]">{brl(totalValor)}</p>
                     {valorFechado > 0 && valorFechado !== totalValor && (
-                      <p className="text-[10px] text-green-600">{brl(valorFechado)} fechado</p>
+                      <p className="text-[10px] text-[#34C759]">{brl(valorFechado)} fechado</p>
                     )}
                   </div>
 
@@ -194,7 +194,7 @@ export function ClientesView({
               </button>
 
               {aberto && (
-                <div className="border-t border-[rgba(60,60,67,0.06)] divide-y divide-slate-50">
+                <div className="border-t border-[rgba(60,60,67,0.06)] divide-y divide-[rgba(0,0,0,0.03)]">
                   {itens.map((item, i) => {
                     const ideal = item.calculo.tabela.find(l => l.quantidade === item.calculo.sweetSpotIdealQtd) ?? item.calculo.tabela[0]
                     const preco = item.form.comFaca ? (ideal?.precoComFaca ?? 0) : (ideal?.precoSemFaca ?? 0)
@@ -207,7 +207,7 @@ export function ClientesView({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             {item.numero && (
-                              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full">
+                              <span className="text-[10px] font-bold text-[#007AFF] bg-[#007AFF]/[0.08] border border-[#007AFF]/20 px-1.5 py-0.5 rounded-full">
                                 {item.numero}
                               </span>
                             )}
@@ -228,11 +228,11 @@ export function ClientesView({
                         <p className="font-bold text-[rgba(60,60,67,0.75)] shrink-0">{brl(preco)}</p>
                         <div className="flex gap-1.5 shrink-0">
                           <button onClick={() => onWhatsApp(item)}
-                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-medium rounded-lg transition-colors">
+                            className="px-2.5 py-1.5 bg-[#34C759] hover:bg-[#2DB74F] text-white text-[10px] font-medium rounded-lg transition-colors">
                             WhatsApp
                           </button>
                           <button onClick={() => onReplicar(item)}
-                            className="px-2.5 py-1.5 bg-[#1C1C1E] hover:bg-slate-700 text-white text-[10px] font-medium rounded-lg transition-colors">
+                            className="px-2.5 py-1.5 bg-[#1C1C1E] hover:bg-[#2C2C2E] text-white text-[10px] font-medium rounded-lg transition-colors">
                             Replicar
                           </button>
                         </div>
@@ -248,13 +248,13 @@ export function ClientesView({
                     const statusLabel  = colIdx !== null ? COLUNAS_KANBAN[colIdx] : null
                     const statusColors = colIdx !== null ? COL_COLORS[colIdx] : null
                     return (
-                      <div key={p.id} className="flex items-center gap-4 px-5 py-3 hover:bg-violet-50/30 transition-colors">
+                      <div key={p.id} className="flex items-center gap-4 px-5 py-3 hover:bg-[rgba(0,0,0,0.02)] transition-colors">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-[#AF52DE] bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full">
+                            <span className="text-[10px] font-bold text-[#AF52DE] bg-[#AF52DE]/[0.08] border border-[#AF52DE]/20 px-1.5 py-0.5 rounded-full">
                               {p.numero}
                             </span>
-                            <span className="text-[9px] font-semibold text-[#AF52DE] bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+                            <span className="text-[9px] font-semibold text-[#AF52DE] bg-[#AF52DE]/[0.06] border border-[#AF52DE]/15 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
                               Personalizada
                             </span>
                             <span className="text-xs text-[#8E8E93]">

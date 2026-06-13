@@ -132,7 +132,7 @@ export function ModalPersonalizarProposta({
                 {form.nomeCliente || "Sem nome"}
               </p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full tabular-nums shrink-0">
+                <span className="text-[10px] font-bold text-[#007AFF] bg-[#007AFF]/[0.08] border border-[#007AFF]/20 px-1.5 py-0.5 rounded-full tabular-nums shrink-0">
                   {numero}
                 </span>
                 <span className="text-[11px] text-[#8E8E93]">{data}</span>
@@ -168,7 +168,7 @@ export function ModalPersonalizarProposta({
                 <th className="py-3 px-2 text-right text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">12×/mês</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-[rgba(0,0,0,0.04)]">
               {calculo.tabela.map(linha => {
                 const ativo    = ativos.has(linha.quantidade)
                 const isIdeal  = linha.quantidade === effectiveIdealQtd
@@ -182,7 +182,7 @@ export function ModalPersonalizarProposta({
                   <tr key={linha.quantidade}
                     className={`transition-all ${
                       !ativo ? "opacity-35" :
-                      isIdeal ? "bg-blue-50/50" : ""
+                      isIdeal ? "bg-[#007AFF]/[0.03]" : ""
                     }`}
                   >
                     {/* Checkbox */}
@@ -196,8 +196,8 @@ export function ModalPersonalizarProposta({
                         }}
                         className={`w-[18px] h-[18px] rounded-[5px] border-2 flex items-center justify-center transition-all shrink-0 ${
                           ativo
-                            ? "border-blue-600 bg-blue-600"
-                            : "border-slate-300 bg-white hover:border-slate-400"
+                            ? "border-[#007AFF] bg-[#007AFF]"
+                            : "border-[rgba(60,60,67,0.2)] bg-white hover:border-[rgba(60,60,67,0.35)]"
                         }`}
                       >
                         {ativo && (
@@ -214,15 +214,15 @@ export function ModalPersonalizarProposta({
                         <button
                           title={isIdeal ? "Ideal atual" : "Definir como ideal"}
                           onClick={() => setIdealOvr(isIdeal ? null : linha.quantidade)}
-                          className={`transition-colors shrink-0 ${isIdeal ? "text-blue-600" : "text-slate-200 hover:text-blue-400"}`}
+                          className={`transition-colors shrink-0 ${isIdeal ? "text-[#007AFF]" : "text-[rgba(60,60,67,0.15)] hover:text-[#007AFF]/60"}`}
                         >
                           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                           </svg>
                         </button>
                         <span className="font-bold text-[13px] text-[#1C1C1E] tabular-nums">{num(linha.quantidade)}</span>
-                        {isIdeal && <span className="text-[8.5px] bg-blue-600 text-white px-1.5 py-0.5 rounded-full font-semibold tracking-wide">IDEAL</span>}
-                        {isMin && !isIdeal && <span className="text-[8.5px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-semibold tracking-wide">MÍN</span>}
+                        {isIdeal && <span className="text-[8.5px] bg-[#007AFF] text-white px-1.5 py-0.5 rounded-full font-semibold tracking-wide">IDEAL</span>}
+                        {isMin && !isIdeal && <span className="text-[8.5px] bg-[#FF9500] text-white px-1.5 py-0.5 rounded-full font-semibold tracking-wide">MÍN</span>}
                       </div>
                     </td>
 
@@ -240,8 +240,8 @@ export function ModalPersonalizarProposta({
                           onFocus={e => e.target.select()}
                           className={`w-[72px] text-right text-[12.5px] font-semibold tabular-nums border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                             modified
-                              ? "border-amber-400 bg-amber-50 text-amber-900 focus:ring-amber-300/50 focus:border-amber-400"
-                              : "border-[rgba(60,60,67,0.12)] text-[#1C1C1E] focus:ring-blue-400/30 focus:border-blue-400"
+                              ? "border-[#FF9500]/50 bg-[#FF9500]/[0.06] text-[#1C1C1E] focus:ring-[#FF9500]/20 focus:border-[#FF9500]"
+                              : "border-[rgba(60,60,67,0.12)] text-[#1C1C1E] focus:ring-[#007AFF]/20 focus:border-[#007AFF]"
                           }`}
                         />
                       </div>
@@ -250,7 +250,7 @@ export function ModalPersonalizarProposta({
                     {/* Total */}
                     <td className="py-3 px-2 text-right">
                       <span className={`font-semibold text-[13.5px] tabular-nums ${
-                        ativo ? (modified ? "text-amber-700" : "text-blue-700") : "text-[#8E8E93]"
+                        ativo ? (modified ? "text-[#FF9500]" : "text-[#007AFF]") : "text-[#8E8E93]"
                       }`}>
                         {brl(total)}
                       </span>
@@ -280,7 +280,7 @@ export function ModalPersonalizarProposta({
           </p>
           {Object.keys(unitOvr).length > 0 && (
             <button onClick={() => setUnitOvr({})}
-              className="text-[10.5px] text-amber-600 hover:text-amber-800 font-medium transition-colors">
+              className="text-[10.5px] text-[#FF9500] hover:text-[#E08500] font-medium transition-colors">
               ↺ Restaurar preços
             </button>
           )}
@@ -337,7 +337,7 @@ export function ModalPersonalizarProposta({
         {/* Footer actions */}
         <div className="px-4 pb-4 pt-3 border-t border-[rgba(60,60,67,0.08)] shrink-0 space-y-2">
           {nenhum && (
-            <p className="text-[11px] text-rose-500 text-center">Selecione ao menos um tier para gerar o PDF.</p>
+            <p className="text-[11px] text-[#FF3B30] text-center">Selecione ao menos um tier para gerar o PDF.</p>
           )}
           <div className="flex gap-2">
             <button onClick={handleClose}
@@ -346,7 +346,7 @@ export function ModalPersonalizarProposta({
             </button>
             <button
               onClick={() => onAbrirPdf(gerarHtmlOrcamento({ form, calculo, data, numero }))}
-              className="flex-1 py-2.5 text-[11.5px] font-medium border border-[rgba(60,60,67,0.12)] hover:border-slate-300 hover:bg-[rgba(116,116,128,0.04)] text-[rgba(60,60,67,0.6)] rounded-xl transition-colors">
+              className="flex-1 py-2.5 text-[11.5px] font-medium border border-[rgba(60,60,67,0.12)] hover:border-[rgba(60,60,67,0.25)] hover:bg-[rgba(116,116,128,0.04)] text-[rgba(60,60,67,0.6)] rounded-xl transition-colors">
               PDF Gráfica
             </button>
             {onSalvar && (
@@ -373,7 +373,7 @@ export function ModalPersonalizarProposta({
             <button
               disabled={nenhum}
               onClick={() => { onSyncOpcoes(cardId, buildOpcoes()); onAbrirPdf(gerarHtmlOrcamentoCliente({ form, calculo: buildCustomCalculo(), data, numero })) }}
-              className="flex-1 py-2.5 text-[11.5px] font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
+              className="flex-1 py-2.5 text-[11.5px] font-semibold bg-[#007AFF] hover:bg-[#0066D6] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
               PDF Cliente ↓
             </button>
           </div>
@@ -386,7 +386,7 @@ export function ModalPersonalizarProposta({
 function SpecPill({ children, blue }: { children: React.ReactNode; blue?: boolean }) {
   return (
     <span className={`text-[10.5px] px-2 py-0.5 rounded-full font-medium ${
-      blue ? "bg-blue-50 text-blue-700 border border-blue-100" : "bg-[rgba(116,116,128,0.08)] text-[rgba(60,60,67,0.6)]"
+      blue ? "bg-[#007AFF]/[0.08] text-[#007AFF] border border-[#007AFF]/15" : "bg-[rgba(116,116,128,0.08)] text-[rgba(60,60,67,0.6)]"
     }`}>{children}</span>
   )
 }

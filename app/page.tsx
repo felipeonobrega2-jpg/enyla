@@ -1268,19 +1268,19 @@ export default function Home() {
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-slate-50">
+                    <tbody className="bg-white divide-y divide-[rgba(0,0,0,0.04)]">
                       {r.formatos.map((f, i) => {
                         const best = f.formatoId === r.melhorFormato.formatoId && f.orientacao === r.melhorFormato.orientacao
                         return (
-                          <tr key={i} className={best ? "bg-emerald-50" : "hover:bg-[rgba(116,116,128,0.04)]"}>
+                          <tr key={i} className={best ? "bg-[#34C759]/[0.05]" : "hover:bg-[rgba(116,116,128,0.04)]"}>
                             <td className="px-3 py-2 font-medium text-[rgba(60,60,67,0.75)]">
                               {f.formatoNome}
-                              {best && <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-semibold">✓ selecionado</span>}
+                              {best && <span className="ml-2 text-[10px] bg-[#34C759]/[0.1] text-[#34C759] px-1.5 py-0.5 rounded-full font-semibold">✓ selecionado</span>}
                             </td>
                             <td className="px-3 py-2 text-[#8E8E93] capitalize">{f.orientacao}</td>
                             <td className="px-3 py-2 text-[rgba(60,60,67,0.6)]">{f.colunas}</td>
                             <td className="px-3 py-2 text-[rgba(60,60,67,0.6)]">{f.linhas}</td>
-                            <td className={`px-3 py-2 font-bold ${best ? "text-emerald-700" : "text-[rgba(60,60,67,0.75)]"}`}>{f.pecasPorFolha}</td>
+                            <td className={`px-3 py-2 font-bold ${best ? "text-[#34C759]" : "text-[rgba(60,60,67,0.75)]"}`}>{f.pecasPorFolha}</td>
                             <td className="px-3 py-2 text-[#8E8E93]">{num(f.aproveitamentoPct, 1)}%</td>
                             <td className="px-3 py-2 text-[#8E8E93]">{brl(f.precoPor100)}</td>
                           </tr>
@@ -1303,7 +1303,7 @@ export default function Home() {
                   />
                   <div className="flex gap-5 mt-3 pt-3 border-t border-[rgba(60,60,67,0.06)] text-xs text-[#8E8E93]">
                     <span className="flex items-center gap-1.5">
-                      <span className="w-5 h-px bg-blue-700 block" /> linha de corte
+                      <span className="w-5 h-px bg-[#007AFF] block" /> linha de corte
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="w-5 border-t border-dashed border-red-500 block" /> vinco de dobra
@@ -1326,7 +1326,7 @@ export default function Home() {
                             <th className="sticky left-0 bg-[rgba(116,116,128,0.04)] px-4 py-3 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold border-r border-[rgba(60,60,67,0.08)]">Qtd</th>
                             <th colSpan={3} className="px-3 py-2 text-center text-[10px] uppercase tracking-wider text-[rgba(60,60,67,0.3)] font-semibold border-r border-[rgba(60,60,67,0.06)]">Produção</th>
                             <th colSpan={form.incluirVerniz ? 6 : 5} className="px-3 py-2 text-center text-[10px] uppercase tracking-wider text-[rgba(60,60,67,0.3)] font-semibold border-r border-[rgba(60,60,67,0.06)]">Custos</th>
-                            <th colSpan={form.comFaca ? 4 : 2} className="px-3 py-2 text-center text-[10px] uppercase tracking-wider text-blue-400 font-semibold">Preços</th>
+                            <th colSpan={form.comFaca ? 4 : 2} className="px-3 py-2 text-center text-[10px] uppercase tracking-wider text-[#007AFF]/70 font-semibold">Preços</th>
                           </tr>
                           <tr className="bg-[rgba(116,116,128,0.04)] border-b border-[rgba(60,60,67,0.08)]">
                             <th className="sticky left-0 bg-[rgba(116,116,128,0.04)] px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold border-r border-[rgba(60,60,67,0.08)]" />

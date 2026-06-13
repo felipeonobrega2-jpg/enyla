@@ -25,9 +25,9 @@ const STATUS_LABEL: Record<StatusNegocio, string> = {
 }
 
 const STATUS_CLS: Record<StatusNegocio, string> = {
-  pendente:  "bg-amber-50 text-amber-700 border-amber-200",
-  pago:      "bg-emerald-50 text-emerald-700 border-emerald-200",
-  cancelado: "bg-rose-50 text-rose-600 border-rose-200",
+  pendente:  "bg-[#FF9500]/[0.08] text-[#FF9500] border-[#FF9500]/20",
+  pago:      "bg-[#34C759]/[0.08] text-[#34C759] border-[#34C759]/20",
+  cancelado: "bg-[#FF3B30]/[0.08] text-[#FF3B30] border-[#FF3B30]/20",
 }
 
 function pill(text: string, cls: string) {
