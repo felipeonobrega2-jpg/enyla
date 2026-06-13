@@ -1034,7 +1034,6 @@ export default function Home() {
               historico={historico}
               kanban={kanban}
               propostasCustom={propostasCustom}
-              lancamentos={lancamentos}
               onReplicar={replicar}
               onWhatsApp={(item) => compartilharWhatsApp(item.form, item.calculo, item.numero)}
             />

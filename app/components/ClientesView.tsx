@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { KanbanCard, COLUNAS_KANBAN, COL_FECHADO, COL_PERDIDO, PropostaCustom, LancamentoFinanceiro } from "../types"
+import { KanbanCard, COLUNAS_KANBAN, COL_FECHADO, COL_PERDIDO, PropostaCustom } from "../types"
 import { brl } from "../utils"
 import { HistItem } from "./HistoricoView"
 import { COL_COLORS } from "./kanban-colors"
@@ -10,14 +10,12 @@ export function ClientesView({
   historico,
   kanban,
   propostasCustom,
-  lancamentos = [],
   onReplicar,
   onWhatsApp,
 }: {
   historico: HistItem[]
   kanban: KanbanCard[]
   propostasCustom: PropostaCustom[]
-  lancamentos?: LancamentoFinanceiro[]
   onReplicar: (item: HistItem) => void
   onWhatsApp: (item: HistItem) => void
 }) {
@@ -62,14 +60,7 @@ export function ClientesView({
     const decididos   = fechados + perdidos
     const totalValor  = itens.reduce((s, i) => s + precoIdeal(i), 0) + propostas.reduce((s, p) => s + precoPropostaIdeal(p), 0)
     const cardsAtivos = cardsCliente.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO)
-    const cardIds = new Set(cardsAtivos.map(c => c.id))
-    const loteIds = new Set(cardsAtivos.map(c => c.loteId).filter(Boolean) as string[])
-    const sobrasCliente = lancamentos
-      .filter(l => l.categoria === "sobra" && l.tipo === "receita" && (
-        (l.cardId && cardIds.has(l.cardId)) || (l.loteId && loteIds.has(l.loteId))
-      ))
-      .reduce((s, l) => s + l.valor, 0)
-    const valorFechado = cardsAtivos.reduce((s, c) => s + c.preco, 0) + sobrasCliente
+    const valorFechado = cardsAtivos.reduce((s, c) => s + c.preco, 0)
     const datas      = [...itens.map(i => i.data), ...propostas.map(p => p.data)].filter(Boolean)
     const ultimaData = datas[0] ?? ""
     return { nome, itens, propostas, firstIdx, fechados, perdidos, decididos, totalValor, valorFechado, ultimaData }
