@@ -27,7 +27,7 @@ export async function GET(
         .from("LancamentoFinanceiro")
         .select("id, valor, status, formaPagamento, dataVencimento, dataPagamento")
         .eq("tipo", "receita")
-        .neq("categoria", "sobra")
+        .or("categoria.is.null,categoria.neq.sobra")
         .order("dataVencimento", { ascending: true })
 
       const { data: pags } = card.loteId
