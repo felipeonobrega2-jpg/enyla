@@ -148,11 +148,10 @@ export default function TrackingClient({ initialData, numero }: Props) {
   const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
   const num = (v: number) => v.toLocaleString("pt-BR")
 
-  // Financial
+  // Financial — use actual order price as reference total
   const totalPago     = pagamentos.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
-  const totalFaturado = pagamentos.reduce((s, p) => s + p.valor, 0)
-  const saldo         = Math.max(totalFaturado - totalPago, 0)
-  const pagoPct       = totalFaturado > 0 ? Math.min((totalPago / totalFaturado) * 100, 100) : 0
+  const saldo         = Math.max(data.preco - totalPago, 0)
+  const pagoPct       = data.preco > 0 ? Math.min((totalPago / data.preco) * 100, 100) : 0
   const hasPagamentos = pagamentos.length > 0
 
   function isCompleted(col: number) { return activeEtapas.some(e => e.coluna === col) }

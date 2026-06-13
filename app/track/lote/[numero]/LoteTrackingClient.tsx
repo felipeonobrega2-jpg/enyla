@@ -493,11 +493,10 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
   const allEntregue  = activeCards.length > 0 && activeCards.every(c => c.coluna === 9)
   const minColuna    = activeCards.length > 0 ? Math.min(...activeCards.map(c => c.coluna)) : 0
 
-  // Financial
-  const totalFaturado = pagamentos.reduce((s, p) => s + p.valor, 0)
+  // Financial — use the actual order total (card prices) as the reference
   const totalPago     = pagamentos.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
-  const saldo         = totalFaturado - totalPago
-  const pagoPct       = totalFaturado > 0 ? Math.min((totalPago / totalFaturado) * 100, 100) : 0
+  const saldo         = Math.max(totalValor - totalPago, 0)
+  const pagoPct       = totalValor > 0 ? Math.min((totalPago / totalValor) * 100, 100) : 0
   const hasPagamentos = pagamentos.length > 0
   const overallPct   = progressPct(minColuna)
 
@@ -551,7 +550,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
       <div className="grid grid-cols-3 divide-x divide-[rgba(60,60,67,0.06)] border-b border-[rgba(60,60,67,0.06)]">
         <div className="px-4 py-3">
           <p className="text-[9px] uppercase tracking-wider text-[#8E8E93] font-semibold mb-1">Total</p>
-          <p className="text-[13px] font-semibold text-[#1C1C1E] tabular-nums">{brl(totalFaturado)}</p>
+          <p className="text-[13px] font-semibold text-[#1C1C1E] tabular-nums">{brl(totalValor)}</p>
         </div>
         <div className="px-4 py-3">
           <p className="text-[9px] uppercase tracking-wider text-[#8E8E93] font-semibold mb-1">Pago</p>
