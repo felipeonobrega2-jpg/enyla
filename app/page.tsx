@@ -308,6 +308,15 @@ export default function Home() {
     }).catch(() => {})
   }
 
+  async function salvarDataFechamento(cardId: string, date: string) {
+    setKanban(prev => prev.map(c => c.id === cardId ? { ...c, dataFechamento: date } : c))
+    await fetch(`/api/kanban/${cardId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataFechamento: date }),
+    }).catch(() => {})
+  }
+
   async function salvarDataEntrega(cardId: string, date: string | null) {
     setKanban(prev => prev.map(c => c.id === cardId ? { ...c, dataEntregaPrevista: date ?? undefined } : c))
     const card = kanban.find(c => c.id === cardId)
@@ -1423,6 +1432,7 @@ export default function Home() {
           onClose={() => setDetalheModal(null)}
           onEditar={(p) => { setDetalheModal(null); setEditandoProposta(p) }}
           onSaveDelivery={"card" in detalheModal && detalheModal.card ? salvarDataEntrega : undefined}
+          onSaveCloseDate={"card" in detalheModal && detalheModal.card ? salvarDataFechamento : undefined}
         />
       )}
 

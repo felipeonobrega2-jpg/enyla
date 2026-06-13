@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { FormData, Calculo, PropostaCustom, KanbanCard, COLUNAS_KANBAN } from "../types"
+import { FormData, Calculo, PropostaCustom, KanbanCard, COLUNAS_KANBAN, COL_FECHADO, COL_PERDIDO } from "../types"
 import { brl, num } from "../utils"
 
 type HistItem = { form: FormData; calculo: Calculo; data: string; numero?: string }
@@ -11,12 +11,13 @@ export type DetalheData =
   | { tipo: "proposta";  proposta: PropostaCustom; card?: KanbanCard }
   | { tipo: "kanban";    card: KanbanCard }
 
-export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDelivery }: {
+export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDelivery, onSaveCloseDate }: {
   data: DetalheData
   parcFator: number
   onClose: () => void
   onEditar?: (p: PropostaCustom) => void
   onSaveDelivery?: (cardId: string, date: string | null) => void
+  onSaveCloseDate?: (cardId: string, date: string) => void
 }) {
   const isH = data.tipo === "historico"
   const isP = data.tipo === "proposta"
@@ -27,6 +28,8 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
 
   const [deliveryDate, setDeliveryDate] = useState(card?.dataEntregaPrevista ?? "")
   const [savingDelivery, setSavingDelivery] = useState(false)
+  const [closeDate, setCloseDate] = useState(card?.dataFechamento ?? "")
+  const [savingClose, setSavingClose] = useState(false)
 
   const numero  = isH ? (data.item.numero ?? "")      : isP ? data.proposta.numero    : data.card.numero
   const nome    = isH ? data.item.form.nomeCliente     : isP ? data.proposta.nomeCliente : data.card.nomeCliente
@@ -53,8 +56,8 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
                 {numero && (
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border tabular-nums shrink-0 ${
                     isCustom
-                      ? "text-[#AF52DE] bg-violet-50 border-violet-200"
-                      : "text-blue-700 bg-blue-50 border-blue-200"
+                      ? "text-[#AF52DE] bg-[#AF52DE]/[0.08] border-[#AF52DE]/20"
+                      : "text-[#007AFF] bg-[#007AFF]/[0.08] border-[#007AFF]/20"
                   }`}>{numero}</span>
                 )}
                 <span className="text-[11px] text-[#8E8E93]">{dataStr}</span>
@@ -228,6 +231,38 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
           </div>
         )}
 
+        {/* Data de fechamento — editável para corrigir entradas históricas */}
+        {card && onSaveCloseDate && card.coluna >= COL_FECHADO && card.coluna !== COL_PERDIDO && (
+          <div className="px-5 py-3.5 border-t border-[rgba(60,60,67,0.08)] shrink-0">
+            <p className="text-[9.5px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-1.5">
+              Data de fechamento
+            </p>
+            <p className="text-[10.5px] text-[rgba(60,60,67,0.4)] mb-2">
+              Afeta a receita exibida no Dashboard por período.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={closeDate}
+                onChange={e => setCloseDate(e.target.value)}
+                className="flex-1 h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-2.5 text-[12.5px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF]"
+              />
+              <button
+                disabled={savingClose || !closeDate}
+                onClick={async () => {
+                  if (!closeDate) return
+                  setSavingClose(true)
+                  await onSaveCloseDate(card.id, closeDate)
+                  setSavingClose(false)
+                }}
+                className="px-3 h-8 text-[12px] font-semibold text-white bg-[#2C2C2E] hover:bg-[#1C1C1E] rounded-lg transition-colors disabled:opacity-40 shrink-0"
+              >
+                {savingClose ? "…" : "Salvar"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Data de entrega prevista — aparece sempre que o modal tem um card kanban associado */}
         {card && onSaveDelivery && (
           <div className="px-5 py-3.5 border-t border-[rgba(60,60,67,0.08)] shrink-0">
@@ -294,8 +329,8 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
 function Pill({ children, blue, red }: { children: React.ReactNode; blue?: boolean; red?: boolean }) {
   return (
     <span className={`text-[10.5px] px-2 py-0.5 rounded-full font-medium ${
-      blue ? "bg-blue-50 text-blue-700 border border-blue-100"
-      : red ? "bg-rose-50 text-rose-600 border border-rose-100"
+      blue ? "bg-[#007AFF]/[0.08] text-[#007AFF] border border-[#007AFF]/15"
+      : red ? "bg-[#FF3B30]/[0.08] text-[#FF3B30] border border-[#FF3B30]/15"
       : "bg-[rgba(116,116,128,0.08)] text-[rgba(60,60,67,0.6)]"
     }`}>{children}</span>
   )
