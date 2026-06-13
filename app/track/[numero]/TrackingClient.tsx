@@ -11,7 +11,7 @@ const ETAPAS = [
   { coluna: 5, label: "Em impressão",         desc: "Suas embalagens estão sendo impressas agora.",         icon: "print"     },
   { coluna: 6, label: "Acabamento UV",        desc: "Aplicando verniz UV para maior durabilidade e brilho.", icon: "uv"       },
   { coluna: 7, label: "Corte e colagem",      desc: "Corte, dobra e colagem das embalagens.",               icon: "cut"       },
-  { coluna: 8, label: "Saiu para entrega",    desc: "Seu pedido está a caminho!",                           icon: "truck"     },
+  { coluna: 8, label: "Pedido pronto",         desc: "Seu pedido está pronto e aguardando retirada ou envio.", icon: "truck"     },
   { coluna: 9, label: "Entregue!",            desc: "Pedido entregue com sucesso. Obrigado pela confiança!", icon: "delivered" },
 ]
 
