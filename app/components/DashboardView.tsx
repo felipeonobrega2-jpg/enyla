@@ -68,75 +68,162 @@ function colBg(col: number): string {
 interface MonthlyDatum { label: string; volume: number; receita: number }
 
 function MonthlyChart({ data }: { data: MonthlyDatum[] }) {
-  const W = 560, H = 160
-  const PAD_L = 52, PAD_B = 28, PAD_T = 12, PAD_R = 12
+  const [hovered, setHovered] = useState<number | null>(null)
+
+  const W = 560, H = 148
+  const PAD_L = 48, PAD_B = 22, PAD_T = 8, PAD_R = 8
   const chartW = W - PAD_L - PAD_R
   const chartH = H - PAD_T - PAD_B
 
-  const maxVal = Math.max(...data.map(d => d.volume), 1)
+  const maxVal = Math.max(...data.map(d => Math.max(d.volume, d.receita)), 1)
   const yMax = niceMax(maxVal)
   const steps = 4
 
   const groupW = chartW / data.length
-  const barGap = 2
-  const barW = Math.max(4, (groupW - barGap * 3) / 2)
+  const barGap = 3
+  const barW = Math.max(5, (groupW - barGap * 3) / 2)
+
+  // Summary stats
+  const totalReceita  = data.reduce((s, d) => s + d.receita, 0)
+  const avgMensal     = totalReceita / 12
+  const bestIdx       = data.reduce((bi, d, i) => d.receita > data[bi].receita ? i : bi, 0)
+  const bestMes       = data[bestIdx]
+
+  const hov = hovered !== null ? data[hovered] : null
 
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
-      {/* Y grid lines + labels */}
-      {Array.from({ length: steps + 1 }).map((_, i) => {
-        const val = (yMax / steps) * i
-        const y = PAD_T + chartH - (val / yMax) * chartH
-        return (
-          <g key={i}>
-            <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y}
-              stroke="rgba(0,0,0,0.06)" strokeWidth={1} />
-            <text x={PAD_L - 6} y={y + 4} textAnchor="end"
-              fontSize={9} fill="#8E8E93" fontFamily="system-ui">
-              {fmtShort(val)}
-            </text>
-          </g>
-        )
-      })}
-
-      {/* X axis line */}
-      <line x1={PAD_L} y1={PAD_T + chartH} x2={W - PAD_R} y2={PAD_T + chartH}
-        stroke="rgba(0,0,0,0.1)" strokeWidth={1} />
-
-      {/* Bars */}
-      {data.map((d, i) => {
-        const gx = PAD_L + i * groupW + barGap
-        const hVol = yMax > 0 ? (d.volume / yMax) * chartH : 0
-        const hRec = yMax > 0 ? (d.receita / yMax) * chartH : 0
-        const yVol = PAD_T + chartH - hVol
-        const yRec = PAD_T + chartH - hRec
-        return (
-          <g key={i}>
-            {/* Volume bar (light blue) */}
-            {hVol > 0 && (
-              <rect x={gx} y={yVol} width={barW} height={hVol}
-                rx={3} fill="#93C5FD" />
+    <div>
+      {/* Summary mini-KPIs */}
+      <div className="flex gap-5 mb-4 pb-4 border-b border-[rgba(60,60,67,0.06)]">
+        <div>
+          <p className="text-[9px] uppercase tracking-wide font-semibold text-[#8E8E93] mb-0.5">Acumulado 12m</p>
+          <p className="text-[16px] font-semibold text-[#1C1C1E] tabular-nums leading-none">{brl(totalReceita)}</p>
+        </div>
+        <div className="border-l border-[rgba(60,60,67,0.08)] pl-5">
+          <p className="text-[9px] uppercase tracking-wide font-semibold text-[#8E8E93] mb-0.5">Média mensal</p>
+          <p className="text-[16px] font-semibold text-[#1C1C1E] tabular-nums leading-none">{brl(avgMensal)}</p>
+        </div>
+        {bestMes.receita > 0 && (
+          <div className="border-l border-[rgba(60,60,67,0.08)] pl-5">
+            <p className="text-[9px] uppercase tracking-wide font-semibold text-[#8E8E93] mb-0.5">Melhor mês</p>
+            <p className="text-[16px] font-semibold tabular-nums leading-none" style={{ color: "#34C759" }}>
+              {bestMes.label} · {brl(bestMes.receita)}
+            </p>
+          </div>
+        )}
+        {/* Tooltip inline — aparece no canto direito quando hover */}
+        {hov && (
+          <div className="ml-auto text-right">
+            <p className="text-[11px] font-semibold text-[#1C1C1E] mb-1">{hov.label}</p>
+            <p className="text-[10px] text-[#8E8E93]">
+              <span className="inline-block w-2 h-2 rounded-full bg-[#BFD7FF] mr-1 align-middle" />
+              Volume {brl(hov.volume)}
+            </p>
+            <p className="text-[10px] text-[#007AFF] font-semibold">
+              <span className="inline-block w-2 h-2 rounded-full bg-[#007AFF] mr-1 align-middle" />
+              Receita {brl(hov.receita)}
+            </p>
+            {hov.receita > 0 && hov.volume > 0 && (
+              <p className="text-[9.5px] text-[#8E8E93] mt-0.5">
+                {num((hov.receita / hov.volume) * 100, 0)}% convertido
+              </p>
             )}
-            {/* Receita bar (blue) */}
-            {hRec > 0 && (
-              <rect x={gx + barW + barGap} y={yRec} width={barW} height={hRec}
-                rx={3} fill="#007AFF" />
-            )}
-            {/* X label */}
-            <text x={gx + barW + barGap / 2} y={PAD_T + chartH + 14}
-              textAnchor="middle" fontSize={8.5} fill="#8E8E93" fontFamily="system-ui">
-              {d.label}
-            </text>
-          </g>
-        )
-      })}
+          </div>
+        )}
+      </div>
+
+      {/* Chart */}
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+        {/* Y grid lines + labels */}
+        {Array.from({ length: steps + 1 }).map((_, i) => {
+          const val = (yMax / steps) * i
+          const y = PAD_T + chartH - (val / yMax) * chartH
+          return (
+            <g key={i}>
+              <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y}
+                stroke="rgba(0,0,0,0.06)" strokeWidth={1} />
+              <text x={PAD_L - 5} y={y + 3.5} textAnchor="end"
+                fontSize={8.5} fill="#8E8E93" fontFamily="system-ui">
+                {fmtShort(val)}
+              </text>
+            </g>
+          )
+        })}
+
+        {/* X axis */}
+        <line x1={PAD_L} y1={PAD_T + chartH} x2={W - PAD_R} y2={PAD_T + chartH}
+          stroke="rgba(0,0,0,0.08)" strokeWidth={1} />
+
+        {/* Bars */}
+        {data.map((d, i) => {
+          const gx    = PAD_L + i * groupW + barGap
+          const cx    = gx + barW + barGap / 2
+          const hVol  = yMax > 0 ? (d.volume / yMax) * chartH : 0
+          const hRec  = yMax > 0 ? (d.receita / yMax) * chartH : 0
+          const yVol  = PAD_T + chartH - hVol
+          const yRec  = PAD_T + chartH - hRec
+          const isHov = hovered === i
+          const isBest = i === bestIdx && bestMes.receita > 0
+
+          return (
+            <g key={i}
+              onMouseEnter={() => setHovered(i)}
+              onMouseLeave={() => setHovered(null)}
+              style={{ cursor: "default" }}
+            >
+              {/* Hover background */}
+              {isHov && (
+                <rect
+                  x={gx - 2} y={PAD_T - 2}
+                  width={barW * 2 + barGap + 4} height={chartH + 4}
+                  rx={4} fill="rgba(0,122,255,0.05)"
+                />
+              )}
+              {/* Volume bar */}
+              {hVol > 0.5 && (
+                <rect x={gx} y={yVol} width={barW} height={hVol}
+                  rx={2.5}
+                  fill={isHov ? "#93C5FD" : "rgba(147,197,253,0.55)"}
+                />
+              )}
+              {/* Receita bar */}
+              {hRec > 0.5 && (
+                <rect x={gx + barW + barGap} y={yRec} width={barW} height={hRec}
+                  rx={2.5}
+                  fill={isBest ? "#34C759" : isHov ? "#007AFF" : "rgba(0,122,255,0.7)"}
+                />
+              )}
+              {/* X label */}
+              <text x={cx} y={PAD_T + chartH + 14}
+                textAnchor="middle" fontSize={8.5}
+                fill={isHov ? "#1C1C1E" : "#8E8E93"}
+                fontWeight={isHov ? "600" : "400"}
+                fontFamily="system-ui">
+                {d.label}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
 
       {/* Legend */}
-      <rect x={PAD_L} y={H - 8} width={9} height={9} rx={2} fill="#93C5FD" />
-      <text x={PAD_L + 12} y={H - 1} fontSize={9} fill="#8E8E93" fontFamily="system-ui">Volume orçado</text>
-      <rect x={PAD_L + 90} y={H - 8} width={9} height={9} rx={2} fill="#007AFF" />
-      <text x={PAD_L + 103} y={H - 1} fontSize={9} fill="#8E8E93" fontFamily="system-ui">Receita confirmada</text>
-    </svg>
+      <div className="flex gap-4 mt-2">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-sm" style={{ background: "rgba(147,197,253,0.7)" }} />
+          <span className="text-[10px] text-[#8E8E93]">Volume orçado</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-sm bg-[#007AFF]" />
+          <span className="text-[10px] text-[#8E8E93]">Receita confirmada</span>
+        </div>
+        {bestMes.receita > 0 && (
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm bg-[#34C759]" />
+            <span className="text-[10px] text-[#8E8E93]">Melhor mês</span>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
