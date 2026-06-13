@@ -75,13 +75,23 @@ function StepIcon({ icon, large, active }: { icon: string; large?: boolean; acti
   return <>{icons[icon] ?? icons.confirmed}</>
 }
 
+type Pagamento = {
+  id: string
+  valor: number
+  status: "pendente" | "pago" | "atrasado"
+  formaPagamento?: string
+  dataVencimento: string
+  dataPagamento?: string
+}
+
 interface Props {
   initialData: TrackingEntry | null
   numero: string
 }
 
 export default function TrackingClient({ initialData, numero }: Props) {
-  const [data, setData]           = useState<TrackingEntry | null>(initialData)
+  const [data, setData]             = useState<TrackingEntry | null>(initialData)
+  const [pagamentos, setPagamentos] = useState<Pagamento[]>((initialData as (TrackingEntry & { pagamentos?: Pagamento[] }) | null)?.pagamentos ?? [])
   const [lastUpdate, setLastUpdate] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -89,7 +99,11 @@ export default function TrackingClient({ initialData, numero }: Props) {
     try {
       setRefreshing(true)
       const res = await fetch(`/api/track/${encodeURIComponent(numero)}`, { cache: 'no-store' })
-      if (res.ok) setData(await res.json())
+      if (res.ok) {
+        const json = await res.json()
+        setData(json)
+        setPagamentos(json.pagamentos ?? [])
+      }
       setLastUpdate(0)
     } catch { /* silent */ } finally { setRefreshing(false) }
   }
@@ -134,6 +148,13 @@ export default function TrackingClient({ initialData, numero }: Props) {
   const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
   const num = (v: number) => v.toLocaleString("pt-BR")
 
+  // Financial
+  const totalPago     = pagamentos.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+  const totalFaturado = pagamentos.reduce((s, p) => s + p.valor, 0)
+  const saldo         = Math.max(totalFaturado - totalPago, 0)
+  const pagoPct       = totalFaturado > 0 ? Math.min((totalPago / totalFaturado) * 100, 100) : 0
+  const hasPagamentos = pagamentos.length > 0
+
   function isCompleted(col: number) { return activeEtapas.some(e => e.coluna === col) }
   function getTS(col: number) { return activeEtapas.find(e => e.coluna === col)?.dataHora?.split(",")[0] ?? null }
 
@@ -148,7 +169,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
             <p className="text-slate-400 text-[10px] mt-0.5 tracking-wide">Comunicação Visual</p>
           </div>
           <div className="ml-auto">
-            <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full font-mono">{numero}</span>
+            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-full font-mono">{numero}</span>
           </div>
         </div>
       </div>
@@ -164,21 +185,23 @@ export default function TrackingClient({ initialData, numero }: Props) {
         </div>
 
         {/* ── Order summary card ─────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="px-4 py-3.5 flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-slate-800 text-sm truncate">{data.descricao || "Embalagem personalizada"}</p>
-              <p className="text-slate-400 text-xs mt-0.5">{data.materialNome || "Material não especificado"}</p>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex">
+          {/* Accent bar */}
+          <div className="w-1 shrink-0 bg-indigo-500" />
+          <div className="flex-1 min-w-0">
+            <div className="px-4 pt-4 pb-3">
+              <p className="font-bold text-slate-800 text-[15px] leading-snug">{data.descricao || "Embalagem personalizada"}</p>
+              <p className="text-slate-400 text-[12px] mt-0.5">{data.materialNome || "Material não especificado"}</p>
             </div>
-          </div>
-          <div className="grid grid-cols-2 border-t border-slate-50 divide-x divide-slate-50">
-            <div className="px-4 py-2.5">
-              <p className="text-[9.5px] uppercase tracking-wider text-slate-400 font-semibold">Quantidade</p>
-              <p className="text-sm font-bold text-slate-800 tabular-nums mt-0.5">{num(data.quantidade)} un</p>
-            </div>
-            <div className="px-4 py-2.5">
-              <p className="text-[9.5px] uppercase tracking-wider text-slate-400 font-semibold">Valor</p>
-              <p className="text-sm font-bold text-slate-800 tabular-nums mt-0.5">{brl(data.preco)}</p>
+            <div className="grid grid-cols-2 border-t border-slate-50 divide-x divide-slate-50">
+              <div className="px-4 py-3">
+                <p className="text-[9px] uppercase tracking-[0.12em] text-slate-400 font-semibold">Quantidade</p>
+                <p className="text-[15px] font-black text-slate-800 tabular-nums mt-1">{num(data.quantidade)} un</p>
+              </div>
+              <div className="px-4 py-3">
+                <p className="text-[9px] uppercase tracking-[0.12em] text-slate-400 font-semibold">Valor</p>
+                <p className="text-[15px] font-black text-slate-800 tabular-nums mt-1">{brl(data.preco)}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -293,9 +316,8 @@ export default function TrackingClient({ initialData, numero }: Props) {
               </div>
 
               {/* Delivery date */}
-              <div className={`mx-4 mb-4 rounded-xl px-4 py-3 ${
-                isDelivered ? "bg-white/20" : "bg-white/10"
-              }`}>
+              <div className={`mx-4 rounded-xl px-4 py-3 ${isDelivered ? "bg-white/20" : "bg-white/10"}`}
+                style={{ marginBottom: hasPagamentos ? 10 : 16 }}>
                 {delivery ? (
                   <div className="flex items-start gap-2.5">
                     <svg className="w-4 h-4 text-white/80 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -328,6 +350,28 @@ export default function TrackingClient({ initialData, numero }: Props) {
                   </div>
                 )}
               </div>
+
+              {/* Payment progress */}
+              {hasPagamentos && (
+                <div className="mx-4 mb-4 bg-white/10 rounded-xl px-4 py-3">
+                  <div className="flex items-baseline justify-between mb-2">
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-white/50 mb-0.5">Pago</p>
+                      <p className="text-[16px] font-black text-emerald-300 tabular-nums leading-none">{brl(totalPago)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-white/50 mb-0.5">Restante</p>
+                      <p className={`text-[16px] font-black tabular-nums leading-none ${saldo <= 0 ? "text-emerald-300" : "text-white/80"}`}>{brl(saldo)}</p>
+                    </div>
+                  </div>
+                  <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-400 rounded-full transition-all duration-700" style={{ width: `${pagoPct}%` }} />
+                  </div>
+                  <p className="text-[9px] text-white/40 mt-1.5 text-center">
+                    {saldo <= 0 ? "Pagamento completo ✓" : `${Math.round(pagoPct)}% quitado`}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* ── Timeline ───────────────────────────────────────────── */}
@@ -452,7 +496,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
           </p>
           <button
             onClick={fetchData}
-            className="text-[11px] text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1.5 transition-colors"
+            className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1.5 transition-colors"
           >
             <svg className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />

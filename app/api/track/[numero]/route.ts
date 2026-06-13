@@ -13,7 +13,26 @@ export async function GET(
       .eq("numero", decodeURIComponent(numero))
       .single()
     if (error || !data) return NextResponse.json({ error: "Não encontrado" }, { status: 404 })
-    return NextResponse.json(data)
+
+    // Fetch financial data via KanbanCard loteId
+    const { data: card } = await supabase
+      .from("KanbanCard")
+      .select("loteId")
+      .eq("numero", decodeURIComponent(numero))
+      .maybeSingle()
+
+    let pagamentos: unknown[] = []
+    if (card?.loteId) {
+      const { data: pags } = await supabase
+        .from("LancamentoFinanceiro")
+        .select("id, valor, status, formaPagamento, dataVencimento, dataPagamento")
+        .eq("loteId", card.loteId)
+        .eq("tipo", "receita")
+        .order("dataVencimento", { ascending: true })
+      pagamentos = pags ?? []
+    }
+
+    return NextResponse.json({ ...data, pagamentos })
   } catch (e) {
     console.error(e)
     return NextResponse.json({ error: "DB error" }, { status: 500 })
