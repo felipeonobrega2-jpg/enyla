@@ -732,7 +732,7 @@ function KanbanCardItem({
                 {/* Merge section */}
                 {clientLotes.length > 0 && !editingLote && (
                   <div>
-                    <p className="text-[8.5px] uppercase tracking-widest text-[rgba(60,60,67,0.36)] font-semibold mb-1.5">Mesclar com</p>
+                    <p className="text-[8.5px] uppercase tracking-wide text-[rgba(60,60,67,0.36)] font-semibold mb-1.5">Mesclar com</p>
                     <div className="space-y-0.5">
                       {clientLotes.map(l => (
                         <button key={l.id} onClick={() => handleMerge(l.id, l.numero)} disabled={merging}

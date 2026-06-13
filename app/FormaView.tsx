@@ -66,7 +66,7 @@ function LayoutCard({ layout, onUsar }: LayoutCardProps) {
 
   return (
     <div className="bg-blue-50 border border-blue-200 rounded-2xl rounded-tl-sm p-4 space-y-3 max-w-[75vw]">
-      <p className="text-[10px] uppercase tracking-widest font-bold text-blue-500">Layout sugerido — faca aberta</p>
+      <p className="text-[10px] uppercase tracking-wide font-bold text-blue-500">Layout sugerido — faca aberta</p>
 
       {/* Dieline SVG */}
       <div className="bg-white rounded-xl border border-blue-100 overflow-auto p-2">

@@ -319,7 +319,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
                     </svg>
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-white/60">
                         {delivery.delivered ? "Data de entrega" : "Previsão de entrega"}
                       </p>
                       <p className="text-white font-semibold text-[13.5px] mt-0.5 capitalize">{delivery.text}</p>
@@ -334,7 +334,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                     </svg>
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Previsão de entrega</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-white/50">Previsão de entrega</p>
                       <p className="text-white/70 text-[12.5px] mt-0.5 leading-relaxed">
                         {artApproved
                           ? "Calculando prazo…"
@@ -351,11 +351,11 @@ export default function TrackingClient({ initialData, numero }: Props) {
                 <div className="mx-4 mb-4 bg-white/10 rounded-xl px-4 py-3">
                   <div className="flex items-baseline justify-between mb-2">
                     <div>
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-white/50 mb-0.5">Pago</p>
+                      <p className="text-[9px] font-bold uppercase tracking-wide text-white/50 mb-0.5">Pago</p>
                       <p className="text-[16px] font-semibold text-emerald-300 tabular-nums leading-none">{brl(totalPago)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-white/50 mb-0.5">Restante</p>
+                      <p className="text-[9px] font-bold uppercase tracking-wide text-white/50 mb-0.5">Restante</p>
                       <p className={`text-[16px] font-semibold tabular-nums leading-none ${saldo <= 0 ? "text-emerald-300" : "text-white/80"}`}>{brl(saldo)}</p>
                     </div>
                   </div>

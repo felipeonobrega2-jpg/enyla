@@ -73,7 +73,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
   return (
     <div className="max-w-2xl mx-auto px-6 py-6 space-y-6">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] uppercase tracking-widest font-semibold text-slate-400">Configurações de custos</p>
+        <p className="text-[10px] uppercase tracking-wide font-semibold text-slate-400">Configurações de custos</p>
         <div className="flex gap-2">
           <button onClick={() => setDraft(CONFIG_PADRAO)}
             className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-500 text-xs rounded-lg transition-colors">

@@ -739,7 +739,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
                     <div className="flex items-start gap-2.5">
                       <svg className="w-4 h-4 text-white/70 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Previsão de entrega</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-white/50">Previsão de entrega</p>
                         <p className="text-white/70 text-[12.5px] mt-0.5 leading-relaxed">
                           {artApproved ? "Calculando prazo…" : "Após a aprovação da arte, a data prevista será calculada automaticamente."}
                         </p>
@@ -795,15 +795,15 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
           </div>
           <div className="grid grid-cols-3 gap-0 mx-4 mt-3 bg-white/10 rounded-xl overflow-hidden divide-x divide-white/10" style={{ marginBottom: hasPagamentos ? 12 : 16 }}>
             <div className="px-3 py-3 text-center">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-white/60 mb-1">Produtos</p>
+              <p className="text-[9px] font-bold uppercase tracking-wide text-white/60 mb-1">Produtos</p>
               <p className="text-xl font-semibold text-white tabular-nums">{activeCards.length + parceiros.length}</p>
             </div>
             <div className="px-3 py-3 text-center">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-white/60 mb-1">Unidades</p>
+              <p className="text-[9px] font-bold uppercase tracking-wide text-white/60 mb-1">Unidades</p>
               <p className="text-xl font-semibold text-white tabular-nums">{num(totalQtd)}</p>
             </div>
             <div className="px-3 py-3 text-center">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-white/60 mb-1">Total</p>
+              <p className="text-[9px] font-bold uppercase tracking-wide text-white/60 mb-1">Total</p>
               <p className="text-[14px] font-semibold text-white tabular-nums leading-tight mt-0.5">{brl(totalValor)}</p>
             </div>
           </div>
@@ -813,11 +813,11 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
             <div className="mx-4 mb-4 bg-white/10 rounded-xl px-4 py-3">
               <div className="flex items-baseline justify-between mb-2">
                 <div>
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-white/50 mb-0.5">Pago</p>
+                  <p className="text-[9px] font-bold uppercase tracking-wide text-white/50 mb-0.5">Pago</p>
                   <p className="text-[16px] font-semibold text-emerald-300 tabular-nums leading-none">{brl(totalPago)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-white/50 mb-0.5">Restante</p>
+                  <p className="text-[9px] font-bold uppercase tracking-wide text-white/50 mb-0.5">Restante</p>
                   <p className={`text-[16px] font-semibold tabular-nums leading-none ${saldo <= 0 ? "text-emerald-300" : "text-white/80"}`}>{brl(Math.max(saldo, 0))}</p>
                 </div>
               </div>

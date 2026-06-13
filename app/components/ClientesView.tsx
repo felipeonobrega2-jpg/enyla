@@ -103,7 +103,7 @@ export function ClientesView({
           ["Receita fechada", brl(totalFaturavel),    "orçamentos fechados"],
         ].map(([label, val, sub]) => (
           <div key={label} className="bg-white border border-[rgba(60,60,67,0.08)] rounded-xl p-4">
-            <p className="text-[10px] uppercase tracking-widest text-[#8E8E93] font-semibold">{label}</p>
+            <p className="text-[10px] uppercase tracking-wide text-[#8E8E93] font-semibold">{label}</p>
             <p className="text-xl font-semibold text-[#1C1C1E] mt-1 leading-none">{val}</p>
             <p className="text-[10px] text-[#8E8E93] mt-1">{sub}</p>
           </div>

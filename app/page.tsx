@@ -634,20 +634,15 @@ export default function Home() {
 
         {/* Brand */}
         <div className="px-4 pt-5 pb-4 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg shrink-0 flex items-center justify-center bg-[#007AFF]">
-              <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 3.75 9v.878m14.25-3A2.25 2.25 0 0 1 20.25 9v.878M3.75 9.878c.235-.083.487-.128.75-.128h15c.263 0 .515.045.75.128m-16.5 0A2.25 2.25 0 0 0 2.25 12v6a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-6a2.25 2.25 0 0 0-1.5-2.122" />
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <p className="text-white font-bold tracking-tight text-[14px] leading-none">ENYLA</p>
-              <p className="text-zinc-600 text-[9px] font-medium tracking-widest mt-0.5 uppercase">Gráfica</p>
+          <div className="flex items-center">
+            <div className="min-w-0 flex-1">
+              <p className="text-white font-semibold text-[16px] leading-none tracking-[-0.02em]">Enyla</p>
+              <p className="text-zinc-600 text-[10px] font-medium mt-1">Gestão Gráfica</p>
             </div>
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "system" : "dark")}
               title={theme === "system" ? "Tema: sistema" : theme === "dark" ? "Tema: escuro" : "Tema: claro"}
-              className="ml-auto w-6 h-6 flex items-center justify-center rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors shrink-0"
+              className="w-6 h-6 flex items-center justify-center rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition-colors shrink-0"
             >
               {theme === "dark" ? (
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" /></svg>
@@ -1254,7 +1249,7 @@ export default function Home() {
                     ["Aba inferior",   `${(r.dieline.abaInferior / 10).toFixed(1)} cm`, "fundo"],
                   ].map(([l, v, s]) => (
                     <div key={l} className="bg-[rgba(116,116,128,0.04)] border border-[rgba(60,60,67,0.08)] rounded-2xl px-4 py-2.5 min-w-[120px]">
-                      <p className="text-[10px] uppercase tracking-widest text-[#8E8E93] font-semibold">{l}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-[#8E8E93] font-semibold">{l}</p>
                       <p className="text-[#1C1C1E] font-bold text-lg leading-tight">{v}</p>
                       {s && <p className="text-[10px] text-[#8E8E93] mt-0.5">{s}</p>}
                     </div>

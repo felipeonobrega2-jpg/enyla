@@ -47,7 +47,7 @@ export default function LoginPage() {
             </svg>
           </div>
           <h1 className="text-white font-black text-2xl tracking-tight leading-none">ENYLA</h1>
-          <p className="text-zinc-500 text-xs mt-1.5 tracking-widest uppercase font-medium">Comunicação Visual</p>
+          <p className="text-zinc-500 text-xs mt-1.5 tracking-wide uppercase font-medium">Comunicação Visual</p>
         </div>
 
         {/* Card */}

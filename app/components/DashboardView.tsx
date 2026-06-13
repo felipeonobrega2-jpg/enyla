@@ -55,11 +55,11 @@ function colColor(col: number): string {
 }
 
 function colBg(col: number): string {
-  if (col === COL_PERDIDO) return "#FF3B30"
-  if (col === COL_ENTREGUE) return "#34C759"
-  if (col === COL_FECHADO) return "#34C759"
-  const blues = ["#93C5FD","#6EE7B7","#FCA5A5","#C4B5FD","#FDBA74","#A5F3FC","#FDE68A","#BBF7D0"]
-  return blues[col % blues.length]
+  if (col === COL_PERDIDO)  return "#FF3B30"
+  if (col === COL_ENTREGUE) return "#007AFF"
+  if (col === COL_FECHADO)  return "#34C759"
+  if (col === 0)            return "#C7C7CC"
+  return "#FF9500" // cols 2-8: em produção
 }
 
 // ─── SVG Monthly Chart ────────────────────────────────────────────────────────

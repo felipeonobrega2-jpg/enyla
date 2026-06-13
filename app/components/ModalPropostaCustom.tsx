@@ -116,13 +116,13 @@ export function ModalPropostaCustom({
 
           {/* Cliente */}
           <div className="space-y-2">
-            <p className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Cliente</p>
+            <p className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Cliente</p>
             <ClienteCombobox value={nomeCliente} onChange={setNomeCliente} clientes={clientes} />
           </div>
 
           {/* Especificações opcionais */}
           <div className="space-y-2">
-            <p className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Especificações <span className="normal-case font-normal text-[rgba(60,60,67,0.3)]">(opcional)</span></p>
+            <p className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Especificações <span className="normal-case font-normal text-[rgba(60,60,67,0.3)]">(opcional)</span></p>
             <input
               type="text"
               value={descricao}
@@ -200,7 +200,7 @@ export function ModalPropostaCustom({
             <div className="grid grid-cols-2 gap-2">
               {comFaca && (
                 <div className="space-y-1">
-                  <label className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Valor da faca (R$)</label>
+                  <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Valor da faca (R$)</label>
                   <input
                     type="number"
                     min="0"
@@ -212,7 +212,7 @@ export function ModalPropostaCustom({
                 </div>
               )}
               <div className="space-y-1">
-                <label className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Qtd de SKUs</label>
+                <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Qtd de SKUs</label>
                 <input
                   type="number"
                   min="1"
@@ -226,7 +226,7 @@ export function ModalPropostaCustom({
 
           {/* Tabela de preços */}
           <div className="space-y-2">
-            <p className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Tabela de Preços</p>
+            <p className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Tabela de Preços</p>
             <div className="border border-[rgba(60,60,67,0.08)] rounded-xl overflow-hidden">
               <table className="w-full">
                 <thead className="bg-[rgba(116,116,128,0.04)]">
@@ -326,7 +326,7 @@ export function ModalPropostaCustom({
           {/* Validade + Data */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Validade (dias)</label>
+              <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Validade (dias)</label>
               <input
                 type="number"
                 min="1"
@@ -336,7 +336,7 @@ export function ModalPropostaCustom({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Data da proposta</label>
+              <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Data da proposta</label>
               <input
                 type="date"
                 value={dataInput}
@@ -346,7 +346,7 @@ export function ModalPropostaCustom({
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-[9.5px] uppercase tracking-widest font-bold text-[#8E8E93]">Observações para o cliente <span className="normal-case font-normal text-[rgba(60,60,67,0.3)]">(opcional)</span></label>
+            <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Observações para o cliente <span className="normal-case font-normal text-[rgba(60,60,67,0.3)]">(opcional)</span></label>
             <textarea
               value={obsCliente}
               onChange={e => setObsCliente(e.target.value)}
@@ -533,7 +533,7 @@ export function BoxPreview3D({
         {incluirVerniz && <span className="text-blue-500 text-[9px] font-bold bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full ml-1">UV</span>}
       </div>
 
-      <p className="text-[9px] text-[rgba(60,60,67,0.3)] tracking-widest uppercase">arraste para girar</p>
+      <p className="text-[9px] text-[rgba(60,60,67,0.3)] tracking-wide uppercase">arraste para girar</p>
     </div>
   )
 }
