@@ -332,23 +332,42 @@ export function FinanceiroView({
     [kanban]
   )
 
-  // Map loteId → lançamento principal (exclui sobras)
-  const lancPorLote = useMemo(() => {
-    const m: Record<string, LancamentoFinanceiro> = {}
+  // Todos os pagamentos por loteId (exclui sobras) — suporta múltiplos parciais
+  const pagamentosPorLote = useMemo(() => {
+    const m: Record<string, LancamentoFinanceiro[]> = {}
     for (const l of lancamentos) {
-      if (l.tipo === "receita" && l.loteId && l.categoria !== "sobra") m[l.loteId] = l
+      if (l.tipo === "receita" && l.loteId && l.categoria !== "sobra") {
+        if (!m[l.loteId]) m[l.loteId] = []
+        m[l.loteId].push(l)
+      }
     }
     return m
   }, [lancamentos])
 
-  // Map cardId → lancamento principal de receita (exclui sobras)
-  const lancPorCard = useMemo(() => {
-    const m: Record<string, LancamentoFinanceiro> = {}
+  // Todos os pagamentos por cardId (exclui sobras)
+  const pagamentosPorCard = useMemo(() => {
+    const m: Record<string, LancamentoFinanceiro[]> = {}
     for (const l of lancamentos) {
-      if (l.tipo === "receita" && l.cardId && l.categoria !== "sobra") m[l.cardId] = l
+      if (l.tipo === "receita" && l.cardId && l.categoria !== "sobra") {
+        if (!m[l.cardId]) m[l.cardId] = []
+        m[l.cardId].push(l)
+      }
     }
     return m
   }, [lancamentos])
+
+  // Backward-compat: single entry maps (used in kpis / pending list)
+  const lancPorLote = useMemo(() => {
+    const m: Record<string, LancamentoFinanceiro> = {}
+    for (const [lid, arr] of Object.entries(pagamentosPorLote)) m[lid] = arr[arr.length - 1]
+    return m
+  }, [pagamentosPorLote])
+
+  const lancPorCard = useMemo(() => {
+    const m: Record<string, LancamentoFinanceiro> = {}
+    for (const [cid, arr] of Object.entries(pagamentosPorCard)) m[cid] = arr[arr.length - 1]
+    return m
+  }, [pagamentosPorCard])
 
   // Sobras por loteId (soma dos valores)
   const sobrasPorLote = useMemo(() => {
@@ -421,7 +440,11 @@ export function FinanceiroView({
       aReceber:   pendentes.reduce((s, l) => s + l.valor, 0) + negociosPendentes.reduce((s, n) => s + n.comissaoValor, 0),
       emAtraso:   atrasados.reduce((s, l) => s + l.valor, 0),
       resultado:  totalRecebido - totalDespesas,
-      naoRegistrados: pedidosElegiveis.filter(c => !lancPorCard[c.id]).length,
+      naoRegistrados: pedidosElegiveis.filter(c =>
+        c.loteId
+          ? !(pagamentosPorLote[c.loteId]?.length)
+          : !(pagamentosPorCard[c.id]?.length)
+      ).length,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lancamentos, negocios, periodo, pedidosElegiveis, lancPorCard])
@@ -673,8 +696,11 @@ export function FinanceiroView({
                     const sobrasLote = sobrasPorLote[loteId] ?? []
                     const totalSobras = sobrasLote.reduce((s, l) => s + l.valor, 0)
                     const total = totalPedidos + totalSobras
-                    const lanc = lancPorLote[loteId]
-                    const st = lanc ? statusEfetivo(lanc) : null
+                    const pagamentosLote = pagamentosPorLote[loteId] ?? []
+                    const totalPago = pagamentosLote.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+                    const pagoPct = total > 0 ? Math.min(100, Math.round((totalPago / total) * 100)) : 0
+                    const completo = totalPago >= total && total > 0
+                    const restante = Math.max(0, total - totalPago)
                     const podeSobra = cards.some(c => c.coluna >= COL_EXPEDICAO && c.coluna !== COL_PERDIDO)
 
                     return (
@@ -687,15 +713,12 @@ export function FinanceiroView({
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#AF52DE]/10 text-[#AF52DE] border border-violet-200">
                                 {loteNum}
                               </span>
-                              {st && (
-                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_CLS[st]}`}>
-                                  {STATUS_LABEL[st]}
-                                </span>
-                              )}
-                              {!lanc && (
-                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-[rgba(60,60,67,0.12)] bg-[rgba(116,116,128,0.04)] text-[#8E8E93]">
-                                  Não registrado
-                                </span>
+                              {completo ? (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Pago ✓</span>
+                              ) : pagamentosLote.length > 0 ? (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">{pagoPct}% pago</span>
+                              ) : (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-[rgba(60,60,67,0.12)] bg-[rgba(116,116,128,0.04)] text-[#8E8E93]">Não registrado</span>
                               )}
                               {sobrasLote.length > 0 && (
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#FF9500]/[0.08] text-[#FF9500] border border-[#FF9500]/20">
@@ -703,7 +726,10 @@ export function FinanceiroView({
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] text-[#8E8E93] mt-0.5">{cards.length} produto{cards.length > 1 ? "s" : ""}{lanc?.dataVencimento ? ` · Vence ${fmtDate(lanc.dataVencimento)}` : ""}</p>
+                            <p className="text-[11px] text-[#8E8E93] mt-0.5">
+                              {cards.length} produto{cards.length > 1 ? "s" : ""}
+                              {pagamentosLote.length > 0 && ` · ${brl(totalPago)} de ${brl(total)} pago`}
+                            </p>
                           </div>
                           <p className="font-semibold text-[#AF52DE] text-[15px] tabular-nums shrink-0">{brl(total)}</p>
                           <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
@@ -714,31 +740,29 @@ export function FinanceiroView({
                                 Sobras
                               </button>
                             )}
-                            {!lanc ? (
+                            {!completo && (
                               <button
                                 onClick={() => setModalLanc({
                                   tipo: "receita",
                                   descricao: `Lote ${loteNum} — ${cards[0].nomeCliente}`,
-                                  valor: totalPedidos,
+                                  valor: restante,
                                   nomeCliente: cards[0].nomeCliente,
                                   loteId,
                                   loteNumero: loteNum,
                                   dataVencimento: hoje(),
                                 })}
-                                className="px-3 py-1.5 text-[11px] font-semibold text-[#AF52DE] bg-[#AF52DE]/10 hover:bg-violet-200 rounded-lg transition-colors">
-                                Registrar cobrança
-                              </button>
-                            ) : st !== "pago" ? (
-                              <button onClick={() => setModalPag(lanc)}
                                 className="px-3 py-1.5 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors">
                                 Registrar pagamento
                               </button>
-                            ) : (
-                              <span className="text-[11px] text-emerald-600 font-semibold px-2">
-                                ✓ {fmtDate(lanc.dataPagamento ?? "")}
-                              </span>
                             )}
                           </div>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="h-1 bg-[rgba(60,60,67,0.06)] w-full">
+                          <div
+                            className="h-1 transition-all bg-[#34C759]"
+                            style={{ width: `${pagoPct}%`, opacity: completo ? 1 : 0.65 }}
+                          />
                         </div>
                         {/* Products in lote */}
                         <div className="divide-y divide-slate-50">
@@ -756,6 +780,22 @@ export function FinanceiroView({
                               <p className="text-[12px] font-semibold text-[#FF9500] tabular-nums">{brl(s.valor)}</p>
                             </div>
                           ))}
+                          {pagamentosLote.map(p => (
+                            <div key={p.id} className="px-5 py-2 flex items-center gap-3 bg-emerald-50/40">
+                              <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-full shrink-0 border ${
+                                p.status === "pago"
+                                  ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                  : "text-amber-700 bg-amber-50 border-amber-200"
+                              }`}>
+                                {p.status === "pago" ? "Pago" : "Pendente"}
+                              </span>
+                              <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.55)] truncate">
+                                {p.dataPagamento ? fmtDate(p.dataPagamento) : fmtDate(p.dataVencimento)}
+                                {p.formaPagamento ? ` · ${p.formaPagamento}` : ""}
+                              </p>
+                              <p className={`text-[12px] font-semibold tabular-nums ${p.status === "pago" ? "text-emerald-700" : "text-amber-700"}`}>{brl(p.valor)}</p>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )
@@ -763,10 +803,14 @@ export function FinanceiroView({
 
                   {/* Solo cards */}
                   {solos.sort((a, b) => b.preco - a.preco).map(card => {
-                    const lanc = lancPorCard[card.id]
-                    const st = lanc ? statusEfetivo(lanc) : null
+                    const pagamentosCard = pagamentosPorCard[card.id] ?? []
                     const sobrasCard = sobrasPorCard[card.id] ?? []
                     const totalSobrasCard = sobrasCard.reduce((s, l) => s + l.valor, 0)
+                    const totalCard = card.preco + totalSobrasCard
+                    const totalPagoCard = pagamentosCard.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+                    const pagoPctCard = totalCard > 0 ? Math.min(100, Math.round((totalPagoCard / totalCard) * 100)) : 0
+                    const completoCard = totalPagoCard >= totalCard && totalCard > 0
+                    const restanteCard = Math.max(0, totalCard - totalPagoCard)
                     return (
                       <div key={card.id} className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl overflow-hidden hover:border-[rgba(60,60,67,0.12)] transition-colors mb-2">
                         <div className="px-5 py-4 flex items-center gap-4">
@@ -776,15 +820,12 @@ export function FinanceiroView({
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
                                 {card.numero}
                               </span>
-                              {st && (
-                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_CLS[st]}`}>
-                                  {STATUS_LABEL[st]}
-                                </span>
-                              )}
-                              {!lanc && (
-                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-[rgba(60,60,67,0.12)] bg-[rgba(116,116,128,0.04)] text-[#8E8E93]">
-                                  Não registrado
-                                </span>
+                              {completoCard ? (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Pago ✓</span>
+                              ) : pagamentosCard.length > 0 ? (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">{pagoPctCard}% pago</span>
+                              ) : (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-[rgba(60,60,67,0.12)] bg-[rgba(116,116,128,0.04)] text-[#8E8E93]">Não registrado</span>
                               )}
                               {sobrasCard.length > 0 && (
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#FF9500]/[0.08] text-[#FF9500] border border-[#FF9500]/20">
@@ -794,10 +835,10 @@ export function FinanceiroView({
                             </div>
                             <p className="text-[11px] text-[#8E8E93] mt-1">
                               {card.dimensoes && `${card.dimensoes} · `}{card.materialNome}
-                              {lanc?.dataVencimento && ` · Vence ${fmtDate(lanc.dataVencimento)}`}
+                              {pagamentosCard.length > 0 && ` · ${brl(totalPagoCard)} de ${brl(totalCard)} pago`}
                             </p>
                           </div>
-                          <p className="font-semibold text-[#1C1C1E] text-[15px] tabular-nums shrink-0">{brl(card.preco + totalSobrasCard)}</p>
+                          <p className="font-semibold text-[#1C1C1E] text-[15px] tabular-nums shrink-0">{brl(totalCard)}</p>
                           <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
                             {onRegistrarSobra && card.coluna >= COL_EXPEDICAO && card.coluna !== COL_PERDIDO && (
                               <button
@@ -806,39 +847,53 @@ export function FinanceiroView({
                                 Sobras
                               </button>
                             )}
-                            {!lanc ? (
+                            {!completoCard && (
                               <button
                                 onClick={() => setModalLanc({
                                   tipo: "receita",
                                   descricao: `Pedido ${card.numero} — ${card.nomeCliente}`,
-                                  valor: card.preco,
+                                  valor: restanteCard,
                                   cardId: card.id,
                                   cardNumero: card.numero,
                                   nomeCliente: card.nomeCliente,
                                   dataVencimento: hoje(),
                                 })}
-                                className="px-3 py-1.5 text-[11px] font-semibold text-[rgba(60,60,67,0.6)] bg-[rgba(116,116,128,0.08)] hover:bg-slate-200 rounded-lg transition-colors">
-                                Registrar cobrança
-                              </button>
-                            ) : st !== "pago" ? (
-                              <button onClick={() => setModalPag(lanc)}
                                 className="px-3 py-1.5 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors">
                                 Registrar pagamento
                               </button>
-                            ) : (
-                              <span className="text-[11px] text-emerald-600 font-semibold px-2">
-                                ✓ {fmtDate(lanc.dataPagamento ?? "")}
-                              </span>
                             )}
                           </div>
                         </div>
-                        {sobrasCard.length > 0 && (
+                        {/* Progress bar */}
+                        <div className="h-1 bg-[rgba(60,60,67,0.06)] w-full">
+                          <div
+                            className="h-1 transition-all bg-[#34C759]"
+                            style={{ width: `${pagoPctCard}%`, opacity: completoCard ? 1 : 0.65 }}
+                          />
+                        </div>
+                        {(sobrasCard.length > 0 || pagamentosCard.length > 0) && (
                           <div className="border-t border-[rgba(60,60,67,0.05)] divide-y divide-[rgba(60,60,67,0.03)]">
                             {sobrasCard.map(s => (
                               <div key={s.id} className="px-5 py-2 flex items-center gap-3 bg-[#FF9500]/[0.02]">
                                 <span className="text-[9.5px] font-bold text-[#FF9500] bg-[#FF9500]/[0.08] border border-[#FF9500]/20 px-1.5 py-0.5 rounded-full shrink-0">Sobra</span>
                                 <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.55)] truncate">{s.descricao}</p>
                                 <p className="text-[12px] font-semibold text-[#FF9500] tabular-nums">{brl(s.valor)}</p>
+                              </div>
+                            ))}
+                            {pagamentosCard.map(p => (
+                              <div key={p.id} className="px-5 py-2 flex items-center gap-3 bg-emerald-50/30">
+                                <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-full shrink-0 border ${
+                                  p.status === "pago"
+                                    ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                    : "text-amber-700 bg-amber-50 border-amber-200"
+                                }`}>
+                                  {p.status === "pago" ? "Pago" : "Pendente"}
+                                </span>
+                                <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.55)] truncate">
+                                  {p.dataPagamento ? fmtDate(p.dataPagamento) : fmtDate(p.dataVencimento)}
+                                  {p.formaPagamento ? ` · ${p.formaPagamento}` : ""}
+                                </p>
+                                <p className={`text-[12px] font-semibold tabular-nums ${p.status === "pago" ? "text-emerald-700" : "text-amber-700"}`}>{brl(p.valor)}</p>
                               </div>
                             ))}
                           </div>

@@ -14,21 +14,26 @@ export async function GET(
       .single()
     if (error || !data) return NextResponse.json({ error: "Não encontrado" }, { status: 404 })
 
-    // Fetch financial data via KanbanCard loteId
+    // Fetch financial data via KanbanCard
     const { data: card } = await supabase
       .from("KanbanCard")
-      .select("loteId")
+      .select("id, loteId")
       .eq("numero", decodeURIComponent(numero))
       .maybeSingle()
 
     let pagamentos: unknown[] = []
-    if (card?.loteId) {
-      const { data: pags } = await supabase
+    if (card) {
+      const query = supabase
         .from("LancamentoFinanceiro")
         .select("id, valor, status, formaPagamento, dataVencimento, dataPagamento")
-        .eq("loteId", card.loteId)
         .eq("tipo", "receita")
+        .neq("categoria", "sobra")
         .order("dataVencimento", { ascending: true })
+
+      const { data: pags } = card.loteId
+        ? await query.eq("loteId", card.loteId)
+        : await query.eq("cardId", card.id)
+
       pagamentos = pags ?? []
     }
 

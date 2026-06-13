@@ -26,6 +26,7 @@ export async function GET(
         .select("id, valor, status, formaPagamento, dataVencimento, dataPagamento")
         .eq("loteId", lote.id)
         .eq("tipo", "receita")
+        .neq("categoria", "sobra")
         .order("dataVencimento", { ascending: true }),
     ])
 
