@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Cliente, PropostaCustom, LinhaPropostaCustom } from "../types"
 import { Material } from "../config"
 import { brl } from "../utils"
-import { ClienteCombobox } from "./ClienteFields"
+import { ClienteCombobox, ClienteContactCard } from "./ClienteFields"
 
 function dataToInput(dataStr: string): string {
   // "19/05/2026, 10:15:47" → "2026-05-19"
@@ -21,6 +21,7 @@ export function ModalPropostaCustom({
   onSalvar,
   onPdf,
   onWhatsApp,
+  onUpsertCliente,
 }: {
   clientes: Cliente[]
   materiais?: Material[]
@@ -30,6 +31,7 @@ export function ModalPropostaCustom({
   onSalvar: (draft: Omit<PropostaCustom, "id" | "numero" | "cardId">) => void
   onPdf: (draft: Omit<PropostaCustom, "id" | "numero" | "cardId">) => void
   onWhatsApp: (p: PropostaCustom) => void
+  onUpsertCliente?: (nome: string, updates: Partial<Cliente>) => void
 }) {
   const [nomeCliente, setNomeCliente]     = useState(initialData?.nomeCliente ?? "")
   const [descricao, setDescricao]         = useState(initialData?.descricao ?? "")
@@ -90,6 +92,9 @@ export function ModalPropostaCustom({
 
   const linhasAtivas = linhas.filter(l => l.ativa && l.quantidade > 0 && l.unitario >= 0)
   const podeSalvar = linhasAtivas.length > 0 && nomeCliente.trim().length > 0
+  const clienteAtual = nomeCliente.trim()
+    ? (clientes.find(c => c.nome.toLowerCase() === nomeCliente.trim().toLowerCase()) ?? null)
+    : null
 
   return (
     <div
@@ -118,6 +123,14 @@ export function ModalPropostaCustom({
           <div className="space-y-2">
             <p className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Cliente</p>
             <ClienteCombobox value={nomeCliente} onChange={setNomeCliente} clientes={clientes} />
+            {nomeCliente.trim() && onUpsertCliente ? (
+              <ClienteContactCard
+                key={clienteAtual?.id ?? `draft-${nomeCliente}`}
+                cliente={clienteAtual}
+                nome={nomeCliente.trim()}
+                onUpdate={updates => onUpsertCliente(nomeCliente.trim(), updates)}
+              />
+            ) : null}
           </div>
 
           {/* Especificações opcionais */}

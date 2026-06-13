@@ -1458,6 +1458,10 @@ export default function Home() {
             cardId: "preview",
           }))}
           onWhatsApp={(p) => compartilharWhatsAppCustom(p)}
+          onUpsertCliente={(nome, updates) => {
+            const existing = clientes.find(c => c.nome.toLowerCase() === nome.toLowerCase())
+            existing ? atualizarCliente(existing.id, updates) : criarClienteComDados(nome, updates)
+          }}
         />
       )}
 
@@ -1511,6 +1515,10 @@ export default function Home() {
             cardId: editandoProposta.cardId,
           }))}
           onWhatsApp={(p) => compartilharWhatsAppCustom(p)}
+          onUpsertCliente={(nome, updates) => {
+            const existing = clientes.find(c => c.nome.toLowerCase() === nome.toLowerCase())
+            existing ? atualizarCliente(existing.id, updates) : criarClienteComDados(nome, updates)
+          }}
         />
       )}
 

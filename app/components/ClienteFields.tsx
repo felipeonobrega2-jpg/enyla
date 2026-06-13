@@ -17,9 +17,9 @@ export function ClienteCombobox({
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef     = useRef<HTMLInputElement>(null)
 
-  const matches = value.trim().length > 0
+  const matches = value.trim().length >= 2
     ? clientes.filter(c => c.nome.toLowerCase().includes(value.toLowerCase())).slice(0, 6)
-    : clientes.slice(-6).reverse() // most recent on empty focus
+    : []
 
   useEffect(() => {
     function onDown(e: MouseEvent) {
@@ -52,18 +52,13 @@ export function ClienteCombobox({
         value={value}
         placeholder="Nome do cliente"
         className={inputCls}
-        onChange={e => { onChange(e.target.value); setOpen(true); setHighlighted(0) }}
-        onFocus={() => { setOpen(true); setHighlighted(0) }}
+        onChange={e => { onChange(e.target.value); setHighlighted(0); setOpen(e.target.value.trim().length >= 2) }}
+        onFocus={() => { setOpen(value.trim().length >= 2); setHighlighted(0) }}
         onKeyDown={onKeyDown}
       />
 
       {showDropdown && (
         <div className="absolute top-full left-0 right-0 z-50 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
-          {value.trim().length === 0 && (
-            <p className="px-3 pt-2.5 pb-1 text-[9.5px] uppercase tracking-[0.1em] font-bold text-slate-400">
-              Recentes
-            </p>
-          )}
           {matches.map((c, i) => (
             <button
               key={c.id}
