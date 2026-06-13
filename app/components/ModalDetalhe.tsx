@@ -11,13 +11,14 @@ export type DetalheData =
   | { tipo: "proposta";  proposta: PropostaCustom; card?: KanbanCard }
   | { tipo: "kanban";    card: KanbanCard }
 
-export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDelivery, onSaveCloseDate }: {
+export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDelivery, onSaveCloseDate, onRegistrarSobra }: {
   data: DetalheData
   parcFator: number
   onClose: () => void
   onEditar?: (p: PropostaCustom) => void
   onSaveDelivery?: (cardId: string, date: string | null) => void
   onSaveCloseDate?: (cardId: string, date: string) => void
+  onRegistrarSobra?: (card: KanbanCard) => void
 }) {
   const isH = data.tipo === "historico"
   const isP = data.tipo === "proposta"
@@ -301,6 +302,24 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
               </p>
             )}
             <p className="text-[10.5px] text-[rgba(60,60,67,0.3)] mt-1">Sobrescreve o cálculo automático de 15 dias.</p>
+          </div>
+        )}
+
+        {/* Sobras */}
+        {card && onRegistrarSobra && card.coluna >= COL_FECHADO && card.coluna !== COL_PERDIDO && (
+          <div className="px-5 py-3.5 border-t border-[rgba(60,60,67,0.08)] shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-semibold text-[#1C1C1E]">Sobras de produção</p>
+                <p className="text-[10.5px] text-[rgba(60,60,67,0.4)] mt-0.5">Registre as sobras negociadas com o cliente.</p>
+              </div>
+              <button
+                onClick={() => { onRegistrarSobra(card); onClose() }}
+                className="px-3 h-8 text-[12px] font-semibold text-[#FF9500] bg-[#FF9500]/[0.08] hover:bg-[#FF9500]/[0.14] rounded-lg transition-colors shrink-0"
+              >
+                Registrar
+              </button>
+            </div>
           </div>
         )}
 

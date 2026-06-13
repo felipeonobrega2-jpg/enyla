@@ -22,6 +22,7 @@ import { ClienteCombobox, ClienteContactCard } from "./components/ClienteFields"
 import { ModalPersonalizarProposta } from "./components/ModalPersonalizarProposta"
 import { ModalPropostaCustom, BoxPreview3D } from "./components/ModalPropostaCustom"
 import { ModalDetalhe, DetalheData } from "./components/ModalDetalhe"
+import { ModalSobra } from "./components/ModalSobra"
 
 const FORM_INICIAL: FormData = {
   nomeCliente: "", frente: 0, lateral: 0, alturaBox: 0, abaColagem: 1,
@@ -94,6 +95,7 @@ export default function Home() {
     cardId: string; nomeCliente: string; cardNumero?: string
     loteId?: string; loteNumero?: string; preco: number
   } | null>(null)
+  const [modalSobra, setModalSobra] = useState<{ card: KanbanCard; loteCards: KanbanCard[] } | null>(null)
   const { isDark, setTheme, theme } = useTheme()
   const expirySweepDone = useRef(false)
 
@@ -339,6 +341,28 @@ export default function Home() {
       }
     }
     showToast(date ? "Data de entrega atualizada." : "Data de entrega removida.")
+  }
+
+  function abrirSobra(card: KanbanCard) {
+    const loteCards = card.loteId ? kanban.filter(c => c.loteId === card.loteId) : []
+    setModalSobra({ card, loteCards })
+  }
+
+  async function salvarSobras(lancamentos_: Omit<LancamentoFinanceiro, "id" | "criadoEm">[]) {
+    const novos = lancamentos_.map(l => ({
+      ...l,
+      id: Date.now().toString() + Math.random().toString(36).slice(2),
+      criadoEm: new Date().toLocaleString("pt-BR"),
+    } as LancamentoFinanceiro))
+    setLancamentos(prev => [...novos, ...prev])
+    await Promise.all(novos.map(l =>
+      fetch("/api/lancamentos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(l),
+      }).catch(() => {})
+    ))
+    showToast(novos.length === 1 ? "Sobra registrada." : `${novos.length} sobras registradas.`)
   }
 
   async function atualizarTracking(numero: string, novaColuna: number, preco?: number, quantidade?: number) {
@@ -1179,6 +1203,7 @@ export default function Home() {
                 setLancamentos(prev => prev.filter(x => x.id !== id))
                 fetch(`/api/lancamentos/${id}`, { method: "DELETE" }).catch(() => {})
               }}
+              onRegistrarSobra={abrirSobra}
             />
           ) : view === "parceiros" ? (
             <ParceirosView
@@ -1435,6 +1460,17 @@ export default function Home() {
           onEditar={(p) => { setDetalheModal(null); setEditandoProposta(p) }}
           onSaveDelivery={"card" in detalheModal && detalheModal.card ? salvarDataEntrega : undefined}
           onSaveCloseDate={"card" in detalheModal && detalheModal.card ? salvarDataFechamento : undefined}
+          onRegistrarSobra={"card" in detalheModal && detalheModal.card ? abrirSobra : undefined}
+        />
+      )}
+
+      {/* ── Modal: sobras ───────────────────────────────────────────────────── */}
+      {modalSobra && (
+        <ModalSobra
+          card={modalSobra.card}
+          loteCards={modalSobra.loteCards}
+          onClose={() => setModalSobra(null)}
+          onSave={salvarSobras}
         />
       )}
 
