@@ -326,7 +326,7 @@ export function FinanceiroView({
   const [filtroTipo, setFiltroTipo]       = useState<TipoLancamento | "">("")
   const [filtroStatus, setFiltroStatus]   = useState<StatusLancamento | "">("")
   const [buscaReceber, setBuscaReceber]   = useState("")
-  const [filtroReceber, setFiltroReceber] = useState<"todos" | "pendente" | "parcial">("todos")
+  const [filtroReceber, setFiltroReceber] = useState<"aberto" | "pendente" | "parcial" | "todos">("aberto")
   const [confirmarDel, setConfirmarDel]   = useState<string | null>(null)
 
   // Restore on mount — write effects would corrupt sessionStorage during SSR hydration
@@ -722,8 +722,8 @@ export function FinanceiroView({
                   <button onClick={() => setBuscaReceber("")} className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] text-base leading-none">×</button>
                 )}
               </div>
-              <div className="flex gap-1.5">
-                {(["todos", "pendente", "parcial"] as const).map(f => (
+              <div className="flex gap-1.5 flex-wrap">
+                {(["aberto", "pendente", "parcial", "todos"] as const).map(f => (
                   <button key={f}
                     onClick={() => setFiltroReceber(f)}
                     className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-colors ${
@@ -731,7 +731,7 @@ export function FinanceiroView({
                         ? "bg-[#1C1C1E] text-white"
                         : "bg-[rgba(116,116,128,0.08)] text-[#8E8E93] hover:bg-[rgba(116,116,128,0.14)]"
                     }`}>
-                    {f === "todos" ? "Todos" : f === "pendente" ? "Sem registro" : "Em aberto"}
+                    {f === "aberto" ? "Pendentes" : f === "pendente" ? "Sem registro" : f === "parcial" ? "Em aberto" : "Todos"}
                   </button>
                 ))}
               </div>
@@ -826,27 +826,29 @@ export function FinanceiroView({
                 }
               }
 
-              // Apply status filter ("todos" shows everything including fully paid)
+              // Apply status filter
+              const isComplete = (pags: LancamentoFinanceiro[], total: number) => {
+                const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+                return total > 0 && totalPago >= total
+              }
               const loteEntries = Object.entries(loteGroups).filter(([loteId, cards]) => {
                 if (filtroReceber === "todos") return true
                 const pags = pagamentosPorLote[loteId] ?? []
-                if (filtroReceber === "pendente") return pags.length === 0
-                // "parcial" = tem registro mas não está completo
-                if (pags.length === 0) return false
-                const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
                 const sobrasLote = sobrasPorLote[loteId] ?? []
                 const total = cards.reduce((s, c) => s + c.preco, 0) + sobrasLote.reduce((s, l) => s + l.valor, 0)
-                return totalPago < total
+                if (filtroReceber === "aberto") return !isComplete(pags, total)
+                if (filtroReceber === "pendente") return pags.length === 0
+                // "parcial" = tem registro mas não está completo
+                return pags.length > 0 && !isComplete(pags, total)
               })
               const solosFiltrados = solos.filter(card => {
                 if (filtroReceber === "todos") return true
                 const pags = pagamentosPorCard[card.id] ?? []
-                if (filtroReceber === "pendente") return pags.length === 0
-                if (pags.length === 0) return false
-                const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
                 const sobrasCard = sobrasPorCard[card.id] ?? []
                 const total = card.preco + sobrasCard.reduce((s, l) => s + l.valor, 0)
-                return totalPago < total
+                if (filtroReceber === "aberto") return !isComplete(pags, total)
+                if (filtroReceber === "pendente") return pags.length === 0
+                return pags.length > 0 && !isComplete(pags, total)
               })
 
               if (loteEntries.length === 0 && solosFiltrados.length === 0) {
@@ -854,7 +856,9 @@ export function FinanceiroView({
                   ? `Nenhum resultado para "${buscaReceber}".`
                   : filtroReceber === "pendente"
                     ? "Todos os pedidos já têm pagamento registrado."
-                    : "Nenhum pedido em aberto."
+                    : filtroReceber === "aberto"
+                      ? "Todos os pedidos estão quitados."
+                      : "Nenhum pedido em aberto."
                 return <Empty msg={msg} />
               }
 
