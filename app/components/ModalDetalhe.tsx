@@ -38,6 +38,7 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
   const [fornecedor, setFornecedor] = useState(card?.fornecedor ?? "")
   const [custoTerceiro, setCustoTerceiro] = useState(card?.custoTerceiro?.toString() ?? "")
   const [savingFornecedor, setSavingFornecedor] = useState(false)
+  const [pixCopied, setPixCopied] = useState(false)
 
   const numero  = isH ? (data.item.numero ?? "")      : isP ? data.proposta.numero    : data.card.numero
   const nome    = isH ? data.item.form.nomeCliente     : isP ? data.proposta.nomeCliente : data.card.nomeCliente
@@ -421,6 +422,35 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
               Editar proposta
             </button>
           )}
+          {(isK || isP) && (() => {
+            const pixPreco = card?.preco ?? 0
+            const pixNumero = numero
+            const pixCliente = nome
+            if (pixPreco <= 0) return null
+            return (
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}/pix/${encodeURIComponent(pixNumero)}?v=${pixPreco.toFixed(2)}&c=${encodeURIComponent(pixCliente)}`
+                  navigator.clipboard.writeText(url).then(() => {
+                    setPixCopied(true)
+                    setTimeout(() => setPixCopied(false), 2000)
+                  })
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold rounded-xl transition-all"
+                style={{
+                  background: pixCopied ? "#34C759" : "rgba(52,199,89,0.10)",
+                  color: pixCopied ? "white" : "#34C759",
+                }}
+              >
+                {pixCopied ? (
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+                )}
+                {pixCopied ? "Copiado!" : "Link PIX"}
+              </button>
+            )
+          })()}
           <button
             onClick={onClose}
             className="flex-1 py-2 text-[12px] font-medium text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors"
