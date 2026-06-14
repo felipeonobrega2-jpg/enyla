@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Cliente, Lote, PropostaCustom, LinhaPropostaCustom, ItemTerceirizado } from "../types"
+import { Cliente, Lote, Parceiro, PropostaCustom, LinhaPropostaCustom, ItemTerceirizado } from "../types"
 import { Material } from "../config"
 import { brl } from "../utils"
 import { ClienteCombobox, ClienteContactCard } from "./ClienteFields"
@@ -15,6 +15,7 @@ function dataToInput(dataStr: string): string {
 export function ModalPropostaCustom({
   clientes,
   lotes,
+  parceiros,
   materiais,
   parcFator,
   initialData,
@@ -26,6 +27,7 @@ export function ModalPropostaCustom({
 }: {
   clientes: Cliente[]
   lotes?: Lote[]
+  parceiros?: Parceiro[]
   materiais?: Material[]
   parcFator: number
   initialData?: PropostaCustom
@@ -209,9 +211,19 @@ export function ModalPropostaCustom({
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Fornecedor</label>
-                    <input type="text" value={t.fornecedor} onChange={e => updateTerceirizado(t.id, "fornecedor", e.target.value)}
-                      placeholder="ex: Marcelino"
-                      className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
+                    {parceiros && parceiros.length > 0 ? (
+                      <select value={t.fornecedor} onChange={e => updateTerceirizado(t.id, "fornecedor", e.target.value)}
+                        className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]">
+                        <option value="">— Selecionar —</option>
+                        {parceiros.map(p => (
+                          <option key={p.id} value={p.nome}>{p.nome}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input type="text" value={t.fornecedor} onChange={e => updateTerceirizado(t.id, "fornecedor", e.target.value)}
+                        placeholder="ex: Marcelino"
+                        className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Quantidade</label>

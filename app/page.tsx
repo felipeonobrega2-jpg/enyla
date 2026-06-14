@@ -1547,6 +1547,7 @@ export default function Home() {
         <ModalPropostaCustom
           clientes={clientes}
           lotes={lotes}
+          parceiros={parceiros}
           materiais={config.materiais}
           parcFator={config.multiplicadores.parcelamento12x}
           onClose={() => setModalPropostaCustom(false)}
