@@ -460,7 +460,7 @@ export function FinanceiroView({
     const grupos: Record<string, {
       key: string; loteId?: string; cardId?: string
       nomeCliente: string; loteNumero?: string; cardNumero?: string
-      total: number; diasAtraso: number
+      total: number; diasAtraso: number; lancamentos: LancamentoFinanceiro[]
     }> = {}
     for (const l of atrasados) {
       const key = l.loteId ? `lote:${l.loteId}` : `card:${l.cardId}`
@@ -470,10 +470,11 @@ export function FinanceiroView({
           key, loteId: l.loteId, cardId: l.cardId,
           nomeCliente: l.nomeCliente || "",
           loteNumero: l.loteNumero, cardNumero: l.cardNumero,
-          total: 0, diasAtraso: dias,
+          total: 0, diasAtraso: dias, lancamentos: [],
         }
       }
       grupos[key].total += l.valor
+      grupos[key].lancamentos.push(l)
     }
     return Object.values(grupos).sort((a, b) => b.total - a.total)
   }, [lancamentos])
@@ -732,6 +733,11 @@ export function FinanceiroView({
                       </div>
                       <span className="text-[10.5px] text-[#FF3B30]/70 shrink-0">{v.diasAtraso}d em atraso</span>
                       <span className="text-[12px] font-semibold text-[#FF3B30] tabular-nums">{brl(v.total)}</span>
+                      <button
+                        onClick={() => setModalPag(v.lancamentos[0])}
+                        className="h-6 px-2.5 text-[10.5px] font-semibold text-white bg-[#34C759] hover:bg-[#2DB84D] rounded-lg transition-colors shrink-0">
+                        Recebido
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -923,6 +929,13 @@ export function FinanceiroView({
                                 {p.formaPagamento ? ` · ${p.formaPagamento}` : ""}
                               </p>
                               <p className={`text-[12px] font-semibold tabular-nums ${p.status === "pago" ? "text-[#34C759]" : "text-amber-600"}`}>{brl(p.valor)}</p>
+                              {p.status !== "pago" && (
+                                <button
+                                  onClick={() => setModalPag(p)}
+                                  className="h-6 px-2.5 text-[10.5px] font-semibold text-white bg-[#34C759] hover:bg-[#2DB84D] rounded-lg transition-colors shrink-0">
+                                  Recebido
+                                </button>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -1017,6 +1030,13 @@ export function FinanceiroView({
                                   {p.formaPagamento ? ` · ${p.formaPagamento}` : ""}
                                 </p>
                                 <p className={`text-[12px] font-semibold tabular-nums ${p.status === "pago" ? "text-[#34C759]" : "text-amber-600"}`}>{brl(p.valor)}</p>
+                                {p.status !== "pago" && (
+                                  <button
+                                    onClick={() => setModalPag(p)}
+                                    className="h-6 px-2.5 text-[10.5px] font-semibold text-white bg-[#34C759] hover:bg-[#2DB84D] rounded-lg transition-colors shrink-0">
+                                    Recebido
+                                  </button>
+                                )}
                               </div>
                             ))}
                           </div>
