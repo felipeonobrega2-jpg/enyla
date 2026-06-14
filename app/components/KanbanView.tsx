@@ -275,7 +275,7 @@ export function KanbanView({
       <div className="flex-1 overflow-x-auto overflow-y-hidden" style={{ background: "#F2F2F7" }}>
         <div className="flex gap-2.5 h-full px-4 py-3.5" style={{ minWidth: `${COLUNAS_KANBAN.length * 48}px` }}>
           {COLUNAS_KANBAN.map((colNome, colIdx) => {
-            const colCards = cards.filter(c => c.coluna === colIdx)
+            const colCards = cards.filter(c => c.coluna === colIdx && !c.isTerceirizado)
             const isOver   = overCol === colIdx
             const colors   = COL_COLORS[colIdx]
             const vazia    = colCards.length === 0

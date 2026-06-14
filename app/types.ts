@@ -116,6 +116,8 @@ export type ItemTerceirizado = {
   quantidade: number
   custoTotal: number   // custo total pago ao fornecedor
   precoTotal: number   // preço total cobrado ao cliente
+  loteId?: string
+  loteNumero?: string
 }
 
 export type PropostaCustom = {
@@ -171,6 +173,7 @@ export type KanbanCard = {
   dataFechamento?: string  // ISO YYYY-MM-DD — set when card first reaches COL_FECHADO
   fornecedor?: string          // nome do fornecedor externo (item terceirizado)
   custoTerceiro?: number       // custo pago ao fornecedor (informativo)
+  isTerceirizado?: boolean     // oculto no kanban; vinculado a lote desde criação
   loteId?: string
   loteNumero?: string
 }

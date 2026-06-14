@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Cliente, PropostaCustom, LinhaPropostaCustom, ItemTerceirizado } from "../types"
+import { Cliente, Lote, PropostaCustom, LinhaPropostaCustom, ItemTerceirizado } from "../types"
 import { Material } from "../config"
 import { brl } from "../utils"
 import { ClienteCombobox, ClienteContactCard } from "./ClienteFields"
@@ -14,6 +14,7 @@ function dataToInput(dataStr: string): string {
 
 export function ModalPropostaCustom({
   clientes,
+  lotes,
   materiais,
   parcFator,
   initialData,
@@ -24,6 +25,7 @@ export function ModalPropostaCustom({
   onUpsertCliente,
 }: {
   clientes: Cliente[]
+  lotes?: Lote[]
   materiais?: Material[]
   parcFator: number
   initialData?: PropostaCustom
@@ -53,9 +55,12 @@ export function ModalPropostaCustom({
       { id: "3", quantidade: 10000, unitario: 0, ativa: true,  isIdeal: false },
     ]
   )
-  const [abaModal, setAbaModal] = useState<"nossa" | "terceirizado">("nossa")
+  const [abaModal, setAbaModal] = useState<"producao" | "terceirizado">("producao")
   const [terceirizados, setTerceirizados] = useState<ItemTerceirizado[]>(
     initialData?.terceirizados ?? []
+  )
+  const [loteIdTerceirizado, setLoteIdTerceirizado] = useState(
+    initialData?.terceirizados?.[0]?.loteId ?? ""
   )
 
   function addLinha() {
@@ -104,11 +109,22 @@ export function ModalPropostaCustom({
   function buildDraft(): Omit<PropostaCustom, "id" | "numero" | "cardId"> {
     const [y, m, d] = dataInput.split("-")
     const dataFormatada = `${d}/${m}/${y}, ${new Date().toLocaleTimeString("pt-BR")}`
-    return { nomeCliente, descricao, material, dimensoes, incluirVerniz, comFaca, valorFaca, numSKUs, validadeDias, obsCliente, linhas, parcFator, data: dataFormatada, terceirizados: terceirizados.filter(t => t.nome.trim()) }
+    const loteSel = lotes?.find(l => l.id === loteIdTerceirizado)
+    return {
+      nomeCliente, descricao, material, dimensoes, incluirVerniz, comFaca, valorFaca,
+      numSKUs, validadeDias, obsCliente, linhas, parcFator, data: dataFormatada,
+      terceirizados: terceirizados.filter(t => t.nome.trim()).map(t => ({
+        ...t,
+        loteId: loteSel?.id,
+        loteNumero: loteSel?.numero,
+      })),
+    }
   }
 
   const linhasAtivas = linhas.filter(l => l.ativa && l.quantidade > 0 && l.unitario >= 0)
-  const podeSalvar = linhasAtivas.length > 0 && nomeCliente.trim().length > 0
+  const terceirizadosValidos = terceirizados.filter(t => t.nome.trim())
+  const terceirizadosPrecisaLote = terceirizadosValidos.length > 0 && !loteIdTerceirizado
+  const podeSalvar = linhasAtivas.length > 0 && nomeCliente.trim().length > 0 && !terceirizadosPrecisaLote
   const clienteAtual = nomeCliente.trim()
     ? (clientes.find(c => c.nome.toLowerCase() === nomeCliente.trim().toLowerCase()) ?? null)
     : null
@@ -132,12 +148,12 @@ export function ModalPropostaCustom({
               className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
           </div>
           <div className="flex gap-1 bg-[rgba(116,116,128,0.08)] p-0.5 rounded-xl w-fit">
-            {(["nossa", "terceirizado"] as const).map(aba => (
+            {(["producao", "terceirizado"] as const).map(aba => (
               <button key={aba} onClick={() => setAbaModal(aba)}
                 className={`px-4 py-1.5 rounded-[10px] text-[11.5px] font-semibold transition-all ${
                   abaModal === aba ? "bg-white text-[#1C1C1E] shadow-sm" : "text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)]"
                 }`}>
-                {aba === "nossa" ? "Nossa" : `Terceirizado${terceirizados.filter(t => t.nome.trim()).length > 0 ? ` (${terceirizados.filter(t => t.nome.trim()).length})` : ""}`}
+                {aba === "producao" ? "Produção" : `Terceirizado${terceirizados.filter(t => t.nome.trim()).length > 0 ? ` (${terceirizados.filter(t => t.nome.trim()).length})` : ""}`}
               </button>
             ))}
           </div>
@@ -148,7 +164,36 @@ export function ModalPropostaCustom({
 
         {abaModal === "terceirizado" && (
           <div className="space-y-4">
-            <p className="text-[11px] text-[#8E8E93]">Itens que você compra de terceiros e revende ao cliente no mesmo lote.</p>
+            <p className="text-[11px] text-[#8E8E93]">Itens comprados de terceiros e revendidos ao cliente. Vinculados a um lote existente e ocultos do fluxo de produção.</p>
+
+            {/* Seletor de lote */}
+            <div className="space-y-1.5">
+              <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Lote de destino <span className="text-[#FF3B30]">*</span></label>
+              {(() => {
+                const lotesCliente = (lotes ?? []).filter(l =>
+                  l.nomeCliente.toLowerCase() === nomeCliente.trim().toLowerCase()
+                )
+                if (!nomeCliente.trim()) return (
+                  <p className="text-[11.5px] text-[rgba(60,60,67,0.4)] bg-[rgba(116,116,128,0.04)] rounded-xl px-3 py-2.5">
+                    Preencha o cliente na aba Produção primeiro.
+                  </p>
+                )
+                if (lotesCliente.length === 0) return (
+                  <p className="text-[11.5px] text-[rgba(60,60,67,0.4)] bg-[rgba(116,116,128,0.04)] rounded-xl px-3 py-2.5">
+                    Nenhum lote encontrado para "{nomeCliente}". Crie o lote no kanban primeiro.
+                  </p>
+                )
+                return (
+                  <select value={loteIdTerceirizado} onChange={e => setLoteIdTerceirizado(e.target.value)}
+                    className="w-full border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-2.5 text-[13px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]">
+                    <option value="">— Selecionar lote —</option>
+                    {lotesCliente.map(l => (
+                      <option key={l.id} value={l.id}>{l.numero}</option>
+                    ))}
+                  </select>
+                )
+              })()}
+            </div>
             {terceirizados.length === 0 && (
               <div className="text-center py-8 text-[12px] text-[rgba(60,60,67,0.3)]">Nenhum item terceirizado ainda.</div>
             )}
@@ -203,7 +248,7 @@ export function ModalPropostaCustom({
           </div>
         )}
 
-        {abaModal === "nossa" && <>
+        {abaModal === "producao" && <>
 
           {/* Cliente */}
           <div className="space-y-2">
@@ -462,6 +507,9 @@ export function ModalPropostaCustom({
         <div className="px-5 pb-5 pt-3 border-t border-[rgba(60,60,67,0.08)] shrink-0 space-y-2">
           {!nomeCliente.trim() && (
             <p className="text-[11px] text-rose-500 text-center">Informe o nome do cliente para continuar.</p>
+          )}
+          {terceirizadosPrecisaLote && (
+            <p className="text-[11px] text-[#FF9500] text-center">Selecione um lote para os itens terceirizados.</p>
           )}
           {linhasAtivas.length === 0 && nomeCliente.trim() && (
             <p className="text-[11px] text-rose-500 text-center">Adicione ao menos uma linha com quantidade e preço.</p>

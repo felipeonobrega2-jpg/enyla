@@ -649,9 +649,13 @@ export default function Home() {
         preco: t.precoTotal,
         quantidade: t.quantidade,
         data,
-        coluna: 0,
+        coluna: COL_FECHADO,
+        loteId: t.loteId || undefined,
+        loteNumero: t.loteNumero || undefined,
         fornecedor: t.fornecedor || undefined,
         custoTerceiro: t.custoTotal || undefined,
+        isTerceirizado: true,
+        dataFechamento: new Date().toISOString().slice(0, 10),
       }
       setKanban(prev => [...prev, tCard])
       fetch("/api/kanban", {
@@ -1542,6 +1546,7 @@ export default function Home() {
       {modalPropostaCustom && (
         <ModalPropostaCustom
           clientes={clientes}
+          lotes={lotes}
           materiais={config.materiais}
           parcFator={config.multiplicadores.parcelamento12x}
           onClose={() => setModalPropostaCustom(false)}
