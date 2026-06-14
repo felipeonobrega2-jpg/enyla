@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
   LancamentoFinanceiro, TipoLancamento, StatusLancamento,
   FormaPagamento, KanbanCard, COL_FECHADO, COL_EXPEDICAO, COL_PERDIDO, NegocioParceiro, Lote,
@@ -319,8 +319,16 @@ export function FinanceiroView({
   onDelete: (id: string) => void
   onRegistrarSobra?: (card: KanbanCard) => void
 }) {
-  const [tab, setTab]                     = useState<"dash" | "receber" | "lancamentos" | "analytics">("dash")
-  const [periodo, setPeriodo]             = useState<Periodo>("mes")
+  const [tab, setTab] = useState<"dash" | "receber" | "lancamentos" | "analytics">(() => {
+    if (typeof window === "undefined") return "dash"
+    const v = sessionStorage.getItem("fin:tab")
+    return (["dash", "receber", "lancamentos", "analytics"].includes(v ?? "") ? v : "dash") as "dash" | "receber" | "lancamentos" | "analytics"
+  })
+  const [periodo, setPeriodo] = useState<Periodo>(() => {
+    if (typeof window === "undefined") return "mes"
+    const v = sessionStorage.getItem("fin:periodo")
+    return (["mes", "trimestre", "semestre", "ano", "tudo"].includes(v ?? "") ? v : "mes") as Periodo
+  })
   const [modalLanc, setModalLanc]         = useState<Partial<LancamentoFinanceiro> | true | null>(null)
   const [modalPag, setModalPag]           = useState<LancamentoFinanceiro | null>(null)
   const [filtroTipo, setFiltroTipo]       = useState<TipoLancamento | "">("")
@@ -328,6 +336,9 @@ export function FinanceiroView({
   const [buscaReceber, setBuscaReceber]   = useState("")
   const [filtroReceber, setFiltroReceber] = useState<"todos" | "pendente" | "parcial">("todos")
   const [confirmarDel, setConfirmarDel]   = useState<string | null>(null)
+
+  useEffect(() => { sessionStorage.setItem("fin:tab", tab) }, [tab])
+  useEffect(() => { sessionStorage.setItem("fin:periodo", periodo) }, [periodo])
 
   // Pedidos elegíveis (fechado, em produção, entregue — exceto perdido)
   const pedidosElegiveis = useMemo(() =>
