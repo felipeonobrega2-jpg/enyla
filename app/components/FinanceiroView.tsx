@@ -665,7 +665,7 @@ export function FinanceiroView({
             )}
 
             {/* Próximos recebimentos — lançamentos pendentes + parcerias pendentes */}
-            {(lancamentos.filter(l => l.tipo === "receita" && statusEfetivo(l) !== "pago").length > 0 || negociosPendentes.length > 0) && (
+            {(lancamentos.filter(l => l.tipo === "receita" && statusEfetivo(l) !== "pago" && l.categoria !== "sobra").length > 0 || negociosPendentes.length > 0) && (
               <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-[rgba(60,60,67,0.08)]">
                   <p className="font-bold text-[#1C1C1E] text-[13px]">Próximos recebimentos</p>
@@ -692,7 +692,7 @@ export function FinanceiroView({
                   ))}
                   {/* Lançamentos pendentes */}
                   {lancamentos
-                    .filter(l => l.tipo === "receita" && statusEfetivo(l) !== "pago")
+                    .filter(l => l.tipo === "receita" && statusEfetivo(l) !== "pago" && l.categoria !== "sobra")
                     .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))
                     .slice(0, 8)
                     .map(l => {
