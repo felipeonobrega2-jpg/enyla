@@ -453,14 +453,32 @@ export function FinanceiroView({
       aReceber:   pendentes.reduce((s, l) => s + l.valor, 0) + negociosPendentes.reduce((s, n) => s + n.comissaoValor, 0),
       emAtraso:   atrasados.reduce((s, l) => s + l.valor, 0),
       resultado:  totalRecebido - totalDespesas,
-      naoRegistrados: pedidosElegiveis.filter(c =>
-        c.loteId
-          ? !(pagamentosPorLote[c.loteId]?.length)
-          : !(pagamentosPorCard[c.id]?.length)
-      ).length,
+      naoRegistrados: (() => {
+        const lotesSeen = new Set<string>()
+        let count = 0
+        for (const c of pedidosElegiveis) {
+          if (c.loteId) {
+            if (lotesSeen.has(c.loteId)) continue
+            lotesSeen.add(c.loteId)
+            const pags = pagamentosPorLote[c.loteId] ?? []
+            const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+            const loteCards = pedidosElegiveis.filter(cc => cc.loteId === c.loteId)
+            const sobrasLote = sobrasPorLote[c.loteId] ?? []
+            const total = loteCards.reduce((s, cc) => s + cc.preco, 0) + sobrasLote.reduce((s, l) => s + l.valor, 0)
+            if (total === 0 || totalPago < total) count++
+          } else {
+            const pags = pagamentosPorCard[c.id] ?? []
+            const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+            const sobrasCard = sobrasPorCard[c.id] ?? []
+            const total = c.preco + sobrasCard.reduce((s, l) => s + l.valor, 0)
+            if (total === 0 || totalPago < total) count++
+          }
+        }
+        return count
+      })(),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lancamentos, negocios, periodo, pedidosElegiveis, lancPorCard])
+  }, [lancamentos, negocios, periodo, pedidosElegiveis, lancPorCard, pagamentosPorLote, pagamentosPorCard, sobrasPorLote, sobrasPorCard])
 
   // Pagamentos vencidos — pendentes com dataVencimento no passado, agrupados por lote/card
   const vencidos = useMemo(() => {
@@ -808,27 +826,26 @@ export function FinanceiroView({
                 }
               }
 
-              // Apply status filter
+              // Apply status filter — always exclude 100% paid
               const loteEntries = Object.entries(loteGroups).filter(([loteId, cards]) => {
-                if (filtroReceber === "todos") return true
                 const pags = pagamentosPorLote[loteId] ?? []
-                if (filtroReceber === "pendente") return pags.length === 0
-                // "parcial" = tem registro mas não está completo
-                if (pags.length === 0) return false
                 const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
                 const sobrasLote = sobrasPorLote[loteId] ?? []
                 const total = cards.reduce((s, c) => s + c.preco, 0) + sobrasLote.reduce((s, l) => s + l.valor, 0)
-                return totalPago < total
+                if (total > 0 && totalPago >= total) return false
+                if (filtroReceber === "todos") return true
+                if (filtroReceber === "pendente") return pags.length === 0
+                return pags.length > 0
               })
               const solosFiltrados = solos.filter(card => {
-                if (filtroReceber === "todos") return true
                 const pags = pagamentosPorCard[card.id] ?? []
-                if (filtroReceber === "pendente") return pags.length === 0
-                if (pags.length === 0) return false
                 const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
                 const sobrasCard = sobrasPorCard[card.id] ?? []
                 const total = card.preco + sobrasCard.reduce((s, l) => s + l.valor, 0)
-                return totalPago < total
+                if (total > 0 && totalPago >= total) return false
+                if (filtroReceber === "todos") return true
+                if (filtroReceber === "pendente") return pags.length === 0
+                return pags.length > 0
               })
 
               if (loteEntries.length === 0 && solosFiltrados.length === 0) {
