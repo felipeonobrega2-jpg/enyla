@@ -159,6 +159,8 @@ export type KanbanCard = {
   dataEntregaPrevista?: string
   dataEntregaReal?: string     // ISO YYYY-MM-DD — actual delivery date recorded manually
   dataFechamento?: string  // ISO YYYY-MM-DD — set when card first reaches COL_FECHADO
+  fornecedor?: string          // nome do fornecedor externo (item terceirizado)
+  custoTerceiro?: number       // custo pago ao fornecedor (informativo)
   loteId?: string
   loteNumero?: string
 }

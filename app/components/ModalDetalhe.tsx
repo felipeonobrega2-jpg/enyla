@@ -11,7 +11,7 @@ export type DetalheData =
   | { tipo: "proposta";  proposta: PropostaCustom; card?: KanbanCard }
   | { tipo: "kanban";    card: KanbanCard }
 
-export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDelivery, onSaveDeliveryReal, onSaveCloseDate, onRegistrarSobra }: {
+export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDelivery, onSaveDeliveryReal, onSaveCloseDate, onRegistrarSobra, onSaveFornecedor }: {
   data: DetalheData
   parcFator: number
   onClose: () => void
@@ -20,6 +20,7 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
   onSaveDeliveryReal?: (cardId: string, date: string | null) => void
   onSaveCloseDate?: (cardId: string, date: string) => void
   onRegistrarSobra?: (card: KanbanCard) => void
+  onSaveFornecedor?: (cardId: string, fornecedor: string | null, custoTerceiro: number | null) => void
 }) {
   const isH = data.tipo === "historico"
   const isP = data.tipo === "proposta"
@@ -34,6 +35,9 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
   const [savingDeliveryReal, setSavingDeliveryReal] = useState(false)
   const [closeDate, setCloseDate] = useState(card?.dataFechamento ?? "")
   const [savingClose, setSavingClose] = useState(false)
+  const [fornecedor, setFornecedor] = useState(card?.fornecedor ?? "")
+  const [custoTerceiro, setCustoTerceiro] = useState(card?.custoTerceiro?.toString() ?? "")
+  const [savingFornecedor, setSavingFornecedor] = useState(false)
 
   const numero  = isH ? (data.item.numero ?? "")      : isP ? data.proposta.numero    : data.card.numero
   const nome    = isH ? data.item.form.nomeCliente     : isP ? data.proposta.nomeCliente : data.card.nomeCliente
@@ -339,6 +343,51 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
             {deliveryRealDate && (
               <p className="text-[11px] text-[#34C759] mt-1.5">
                 {new Date(deliveryRealDate + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Fornecedor externo */}
+        {card && onSaveFornecedor && (
+          <div className="px-5 py-3.5 border-t border-[rgba(60,60,67,0.08)] shrink-0">
+            <p className="text-[9.5px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-2">
+              Terceirizado
+            </p>
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="text"
+                value={fornecedor}
+                onChange={e => setFornecedor(e.target.value)}
+                placeholder="Fornecedor (ex: Marcelino)"
+                className="flex-1 h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-2.5 text-[12.5px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-[#FF9500]/20 focus:border-[#FF9500]/60 placeholder:text-[rgba(60,60,67,0.25)]"
+              />
+              <input
+                type="number"
+                value={custoTerceiro}
+                onChange={e => setCustoTerceiro(e.target.value)}
+                placeholder="Custo R$"
+                min={0}
+                className="w-24 h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-2.5 text-[12.5px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-[#FF9500]/20 focus:border-[#FF9500]/60 placeholder:text-[rgba(60,60,67,0.25)]"
+              />
+              <button
+                disabled={savingFornecedor}
+                onClick={async () => {
+                  setSavingFornecedor(true)
+                  await onSaveFornecedor(
+                    card.id,
+                    fornecedor.trim() || null,
+                    custoTerceiro ? parseFloat(custoTerceiro) : null,
+                  )
+                  setSavingFornecedor(false)
+                }}
+                className="px-3 h-8 text-[12px] font-semibold text-white bg-[#FF9500] hover:bg-[#E68600] rounded-lg transition-colors disabled:opacity-50 shrink-0">
+                {savingFornecedor ? "…" : "Salvar"}
+              </button>
+            </div>
+            {fornecedor && (
+              <p className="text-[10.5px] text-[#FF9500]">
+                {fornecedor}{custoTerceiro ? ` · custo R$ ${parseFloat(custoTerceiro).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : ""}
               </p>
             )}
           </div>

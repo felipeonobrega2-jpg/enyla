@@ -365,6 +365,16 @@ export default function Home() {
     showToast(date ? "Entrega registrada." : "Data de entrega removida.")
   }
 
+  async function salvarFornecedor(cardId: string, fornecedor: string | null, custoTerceiro: number | null) {
+    setKanban(prev => prev.map(c => c.id === cardId ? { ...c, fornecedor: fornecedor ?? undefined, custoTerceiro: custoTerceiro ?? undefined } : c))
+    await fetch(`/api/kanban/${cardId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fornecedor: fornecedor ?? null, custoTerceiro: custoTerceiro ?? null }),
+    }).catch(() => {})
+    showToast(fornecedor ? "Fornecedor salvo." : "Fornecedor removido.")
+  }
+
   function abrirSobra(card: KanbanCard) {
     const loteCards = card.loteId ? kanban.filter(c => c.loteId === card.loteId) : []
     setModalSobra({ card, loteCards })
@@ -1485,6 +1495,7 @@ export default function Home() {
           onSaveDeliveryReal={"card" in detalheModal && detalheModal.card ? salvarDataEntregaReal : undefined}
           onSaveCloseDate={"card" in detalheModal && detalheModal.card ? salvarDataFechamento : undefined}
           onRegistrarSobra={"card" in detalheModal && detalheModal.card ? abrirSobra : undefined}
+          onSaveFornecedor={"card" in detalheModal && detalheModal.card ? salvarFornecedor : undefined}
         />
       )}
 

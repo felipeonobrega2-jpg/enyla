@@ -624,6 +624,13 @@ function KanbanCardItem({
             <span className="text-[9px] text-[rgba(60,60,67,0.36)] ml-auto tabular-nums">{card.data.split(",")[0]}</span>
           </div>
 
+          {/* Fornecedor externo */}
+          {card.fornecedor && (
+            <p className="mt-1 text-[9px] text-[#FF9500] font-medium truncate">
+              ↗ {card.fornecedor}{card.custoTerceiro ? ` · R$ ${card.custoTerceiro.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : ""}
+            </p>
+          )}
+
           {/* Delivery date / overdue badge */}
           {card.dataEntregaPrevista && !isPerdido && colIdx < COL_ENTREGUE && (() => {
             const hj = new Date().toISOString().slice(0, 10)
