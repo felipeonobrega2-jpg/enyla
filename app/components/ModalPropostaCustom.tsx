@@ -126,7 +126,10 @@ export function ModalPropostaCustom({
   const linhasAtivas = linhas.filter(l => l.ativa && l.quantidade > 0 && l.unitario >= 0)
   const terceirizadosValidos = terceirizados.filter(t => t.nome.trim())
   const terceirizadosPrecisaLote = terceirizadosValidos.length > 0 && !loteIdTerceirizado
-  const podeSalvar = linhasAtivas.length > 0 && nomeCliente.trim().length > 0 && !terceirizadosPrecisaLote
+  const podeSalvar =
+    nomeCliente.trim().length > 0 &&
+    !terceirizadosPrecisaLote &&
+    (linhasAtivas.length > 0 || terceirizadosValidos.length > 0)
   const clienteAtual = nomeCliente.trim()
     ? (clientes.find(c => c.nome.toLowerCase() === nomeCliente.trim().toLowerCase()) ?? null)
     : null
@@ -164,6 +167,20 @@ export function ModalPropostaCustom({
         {/* Body */}
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
 
+          {/* Cliente — comum a ambas as abas */}
+          <div className="space-y-2">
+            <p className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Cliente</p>
+            <ClienteCombobox value={nomeCliente} onChange={setNomeCliente} clientes={clientes} />
+            {nomeCliente.trim() && onUpsertCliente ? (
+              <ClienteContactCard
+                key={clienteAtual?.id ?? `draft-${nomeCliente}`}
+                cliente={clienteAtual}
+                nome={nomeCliente.trim()}
+                onUpdate={updates => onUpsertCliente(nomeCliente.trim(), updates)}
+              />
+            ) : null}
+          </div>
+
         {abaModal === "terceirizado" && (
           <div className="space-y-4">
             <p className="text-[11px] text-[#8E8E93]">Itens comprados de terceiros e revendidos ao cliente. Vinculados a um lote existente e ocultos do fluxo de produção.</p>
@@ -177,7 +194,7 @@ export function ModalPropostaCustom({
                 )
                 if (!nomeCliente.trim()) return (
                   <p className="text-[11.5px] text-[rgba(60,60,67,0.4)] bg-[rgba(116,116,128,0.04)] rounded-xl px-3 py-2.5">
-                    Preencha o cliente na aba Produção primeiro.
+                    Selecione um cliente acima para ver os lotes disponíveis.
                   </p>
                 )
                 if (lotesCliente.length === 0) return (
@@ -264,20 +281,6 @@ export function ModalPropostaCustom({
         )}
 
         {abaModal === "producao" && <>
-
-          {/* Cliente */}
-          <div className="space-y-2">
-            <p className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Cliente</p>
-            <ClienteCombobox value={nomeCliente} onChange={setNomeCliente} clientes={clientes} />
-            {nomeCliente.trim() && onUpsertCliente ? (
-              <ClienteContactCard
-                key={clienteAtual?.id ?? `draft-${nomeCliente}`}
-                cliente={clienteAtual}
-                nome={nomeCliente.trim()}
-                onUpdate={updates => onUpsertCliente(nomeCliente.trim(), updates)}
-              />
-            ) : null}
-          </div>
 
           {/* Especificações opcionais */}
           <div className="space-y-2">
@@ -526,8 +529,8 @@ export function ModalPropostaCustom({
           {terceirizadosPrecisaLote && (
             <p className="text-[11px] text-[#FF9500] text-center">Selecione um lote para os itens terceirizados.</p>
           )}
-          {linhasAtivas.length === 0 && nomeCliente.trim() && (
-            <p className="text-[11px] text-rose-500 text-center">Adicione ao menos uma linha com quantidade e preço.</p>
+          {linhasAtivas.length === 0 && terceirizadosValidos.length === 0 && nomeCliente.trim() && (
+            <p className="text-[11px] text-rose-500 text-center">Adicione ao menos uma linha de produção ou item terceirizado.</p>
           )}
           <div className="flex gap-2">
             <button onClick={onClose}
