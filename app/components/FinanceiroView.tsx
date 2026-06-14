@@ -704,45 +704,35 @@ export function FinanceiroView({
                     const podeSobra = cards.some(c => c.coluna >= COL_EXPEDICAO && c.coluna !== COL_PERDIDO)
 
                     return (
-                      <div key={loteId} className="bg-white border border-violet-100 rounded-2xl overflow-hidden mb-2">
-                        {/* Lote header */}
-                        <div className="px-5 py-3 bg-violet-50/50 border-b border-violet-100 flex items-center gap-3">
+                      <div key={loteId} className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl overflow-hidden mb-2">
+                        {/* Header */}
+                        <div className="px-5 pt-4 pb-3 flex items-start gap-3">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-[#1C1C1E] text-[13px]">{loteInfo?.nomeCliente ?? cards[0].nomeCliente}</span>
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#AF52DE]/10 text-[#AF52DE] border border-violet-200">
-                                {loteNum}
-                              </span>
-                              {completo ? (
-                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Pago ✓</span>
-                              ) : pagamentosLote.length > 0 ? (
-                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">{pagoPct}% pago</span>
-                              ) : (
-                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-[rgba(60,60,67,0.12)] bg-[rgba(116,116,128,0.04)] text-[#8E8E93]">Não registrado</span>
-                              )}
-                              {sobrasLote.length > 0 && (
-                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#FF9500]/[0.08] text-[#FF9500] border border-[#FF9500]/20">
-                                  + Sobras {brl(totalSobras)}
-                                </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-[#1C1C1E] text-[14px] leading-tight">{loteInfo?.nomeCliente ?? cards[0].nomeCliente}</span>
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#AF52DE]/10 text-[#AF52DE] shrink-0">{loteNum}</span>
+                              {completo && (
+                                <svg className="w-3.5 h-3.5 text-[#34C759] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
                               )}
                             </div>
                             <p className="text-[11px] text-[#8E8E93] mt-0.5">
                               {cards.length} produto{cards.length > 1 ? "s" : ""}
-                              {pagamentosLote.length > 0 && ` · ${brl(totalPago)} de ${brl(total)} pago`}
+                              {pagamentosLote.length > 0 && !completo && ` · ${brl(totalPago)} recebido`}
+                              {sobrasLote.length > 0 && ` · +${brl(totalSobras)} sobras`}
                             </p>
                           </div>
-                          <p className="font-semibold text-[#AF52DE] text-[15px] tabular-nums shrink-0">{brl(total)}</p>
-                          <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="font-semibold text-[#1C1C1E] text-[15px] tabular-nums">{brl(total)}</span>
                             {onRegistrarSobra && podeSobra && (
-                              <button
-                                onClick={() => onRegistrarSobra(cards[0])}
-                                className="px-3 py-1.5 text-[11px] font-semibold text-[#FF9500] bg-[#FF9500]/[0.08] hover:bg-[#FF9500]/[0.14] rounded-lg transition-colors">
+                              <button onClick={() => onRegistrarSobra(cards[0])}
+                                className="h-7 px-2.5 text-[11px] font-medium text-[#FF9500] bg-[#FF9500]/[0.08] hover:bg-[#FF9500]/[0.14] rounded-lg transition-colors shrink-0">
                                 Sobras
                               </button>
                             )}
                             {!completo && (
-                              <button
-                                onClick={() => setModalLanc({
+                              <button onClick={() => setModalLanc({
                                   tipo: "receita",
                                   descricao: `Lote ${loteNum} — ${cards[0].nomeCliente}`,
                                   valor: restante,
@@ -751,49 +741,51 @@ export function FinanceiroView({
                                   loteNumero: loteNum,
                                   dataVencimento: hoje(),
                                 })}
-                                className="px-3 py-1.5 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors">
-                                Registrar pagamento
+                                className="h-7 px-3 text-[11px] font-semibold text-white bg-[#34C759] hover:bg-[#2DB84D] rounded-lg transition-colors shrink-0">
+                                Receber
                               </button>
                             )}
                           </div>
                         </div>
-                        {/* Progress bar */}
-                        <div className="h-1 bg-[rgba(60,60,67,0.06)] w-full">
-                          <div
-                            className="h-1 transition-all bg-[#34C759]"
-                            style={{ width: `${pagoPct}%`, opacity: completo ? 1 : 0.65 }}
-                          />
-                        </div>
-                        {/* Products in lote */}
-                        <div className="divide-y divide-slate-50">
+                        {/* Progress bar — only when payments exist */}
+                        {pagamentosLote.length > 0 && (
+                          <div className="h-0.5 bg-[rgba(60,60,67,0.06)] mx-5 rounded-full overflow-hidden mb-1">
+                            <div className="h-full rounded-full bg-[#34C759] transition-all"
+                              style={{ width: `${pagoPct}%` }} />
+                          </div>
+                        )}
+                        {/* Rows */}
+                        <div className="border-t border-[rgba(60,60,67,0.05)] divide-y divide-[rgba(60,60,67,0.04)]">
                           {cards.map(card => (
                             <div key={card.id} className="px-5 py-2.5 flex items-center gap-3">
-                              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-full">{card.numero}</span>
-                              <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.6)] truncate">{card.dimensoes} · {card.materialNome}</p>
-                              <p className="text-[12px] font-semibold text-[rgba(60,60,67,0.75)] tabular-nums">{brl(card.preco)}</p>
+                              <span className="text-[9.5px] font-bold text-[#007AFF] bg-[#007AFF]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">{card.numero}</span>
+                              <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.55)] truncate">{card.dimensoes}{card.materialNome ? ` · ${card.materialNome}` : ""}</p>
+                              <p className="text-[12px] font-medium text-[rgba(60,60,67,0.75)] tabular-nums">{brl(card.preco)}</p>
                             </div>
                           ))}
                           {sobrasLote.map(s => (
-                            <div key={s.id} className="px-5 py-2 flex items-center gap-3 bg-[#FF9500]/[0.03]">
-                              <span className="text-[9.5px] font-bold text-[#FF9500] bg-[#FF9500]/[0.08] border border-[#FF9500]/20 px-1.5 py-0.5 rounded-full shrink-0">Sobra</span>
-                              <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.55)] truncate">{s.descricao}</p>
-                              <p className="text-[12px] font-semibold text-[#FF9500] tabular-nums">{brl(s.valor)}</p>
+                            <div key={s.id} className="px-5 py-2.5 flex items-center gap-3">
+                              <div className="w-1.5 h-1.5 rounded-full bg-[#FF9500] shrink-0 ml-0.5" />
+                              <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.5)] truncate">{s.descricao}</p>
+                              <p className="text-[12px] font-medium text-[#FF9500] tabular-nums">+{brl(s.valor)}</p>
                             </div>
                           ))}
                           {pagamentosLote.map(p => (
-                            <div key={p.id} className="px-5 py-2 flex items-center gap-3 bg-emerald-50/40">
-                              <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-full shrink-0 border ${
-                                p.status === "pago"
-                                  ? "text-emerald-700 bg-emerald-50 border-emerald-200"
-                                  : "text-amber-700 bg-amber-50 border-amber-200"
-                              }`}>
-                                {p.status === "pago" ? "Pago" : "Pendente"}
-                              </span>
-                              <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.55)] truncate">
-                                {p.dataPagamento ? fmtDate(p.dataPagamento) : fmtDate(p.dataVencimento)}
+                            <div key={p.id} className="px-5 py-2.5 flex items-center gap-3">
+                              {p.status === "pago" ? (
+                                <svg className="w-3.5 h-3.5 text-[#34C759] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
+                              ) : (
+                                <svg className="w-3.5 h-3.5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                </svg>
+                              )}
+                              <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.5)] truncate">
+                                {p.dataPagamento ? fmtDate(p.dataPagamento) : `vence ${fmtDate(p.dataVencimento)}`}
                                 {p.formaPagamento ? ` · ${p.formaPagamento}` : ""}
                               </p>
-                              <p className={`text-[12px] font-semibold tabular-nums ${p.status === "pago" ? "text-emerald-700" : "text-amber-700"}`}>{brl(p.valor)}</p>
+                              <p className={`text-[12px] font-semibold tabular-nums ${p.status === "pago" ? "text-[#34C759]" : "text-amber-600"}`}>{brl(p.valor)}</p>
                             </div>
                           ))}
                         </div>
@@ -812,44 +804,35 @@ export function FinanceiroView({
                     const completoCard = totalPagoCard >= totalCard && totalCard > 0
                     const restanteCard = Math.max(0, totalCard - totalPagoCard)
                     return (
-                      <div key={card.id} className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl overflow-hidden hover:border-[rgba(60,60,67,0.12)] transition-colors mb-2">
-                        <div className="px-5 py-4 flex items-center gap-4">
+                      <div key={card.id} className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl overflow-hidden mb-2">
+                        {/* Header */}
+                        <div className="px-5 pt-4 pb-3 flex items-start gap-3">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-[#1C1C1E] text-[13px]">{card.nomeCliente}</span>
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                                {card.numero}
-                              </span>
-                              {completoCard ? (
-                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Pago ✓</span>
-                              ) : pagamentosCard.length > 0 ? (
-                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">{pagoPctCard}% pago</span>
-                              ) : (
-                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-[rgba(60,60,67,0.12)] bg-[rgba(116,116,128,0.04)] text-[#8E8E93]">Não registrado</span>
-                              )}
-                              {sobrasCard.length > 0 && (
-                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#FF9500]/[0.08] text-[#FF9500] border border-[#FF9500]/20">
-                                  + Sobras {brl(totalSobrasCard)}
-                                </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-[#1C1C1E] text-[14px] leading-tight">{card.nomeCliente}</span>
+                              <span className="text-[9.5px] font-bold text-[#007AFF] bg-[#007AFF]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">{card.numero}</span>
+                              {completoCard && (
+                                <svg className="w-3.5 h-3.5 text-[#34C759] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
                               )}
                             </div>
-                            <p className="text-[11px] text-[#8E8E93] mt-1">
-                              {card.dimensoes && `${card.dimensoes} · `}{card.materialNome}
-                              {pagamentosCard.length > 0 && ` · ${brl(totalPagoCard)} de ${brl(totalCard)} pago`}
+                            <p className="text-[11px] text-[#8E8E93] mt-0.5">
+                              {[card.dimensoes, card.materialNome].filter(Boolean).join(" · ")}
+                              {pagamentosCard.length > 0 && !completoCard && ` · ${brl(totalPagoCard)} recebido`}
+                              {sobrasCard.length > 0 && ` · +${brl(totalSobrasCard)} sobras`}
                             </p>
                           </div>
-                          <p className="font-semibold text-[#1C1C1E] text-[15px] tabular-nums shrink-0">{brl(totalCard)}</p>
-                          <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="font-semibold text-[#1C1C1E] text-[15px] tabular-nums">{brl(totalCard)}</span>
                             {onRegistrarSobra && card.coluna >= COL_EXPEDICAO && card.coluna !== COL_PERDIDO && (
-                              <button
-                                onClick={() => onRegistrarSobra(card)}
-                                className="px-3 py-1.5 text-[11px] font-semibold text-[#FF9500] bg-[#FF9500]/[0.08] hover:bg-[#FF9500]/[0.14] rounded-lg transition-colors">
+                              <button onClick={() => onRegistrarSobra(card)}
+                                className="h-7 px-2.5 text-[11px] font-medium text-[#FF9500] bg-[#FF9500]/[0.08] hover:bg-[#FF9500]/[0.14] rounded-lg transition-colors shrink-0">
                                 Sobras
                               </button>
                             )}
                             {!completoCard && (
-                              <button
-                                onClick={() => setModalLanc({
+                              <button onClick={() => setModalLanc({
                                   tipo: "receita",
                                   descricao: `Pedido ${card.numero} — ${card.nomeCliente}`,
                                   valor: restanteCard,
@@ -858,42 +841,45 @@ export function FinanceiroView({
                                   nomeCliente: card.nomeCliente,
                                   dataVencimento: hoje(),
                                 })}
-                                className="px-3 py-1.5 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors">
-                                Registrar pagamento
+                                className="h-7 px-3 text-[11px] font-semibold text-white bg-[#34C759] hover:bg-[#2DB84D] rounded-lg transition-colors shrink-0">
+                                Receber
                               </button>
                             )}
                           </div>
                         </div>
-                        {/* Progress bar */}
-                        <div className="h-1 bg-[rgba(60,60,67,0.06)] w-full">
-                          <div
-                            className="h-1 transition-all bg-[#34C759]"
-                            style={{ width: `${pagoPctCard}%`, opacity: completoCard ? 1 : 0.65 }}
-                          />
-                        </div>
+                        {/* Progress bar — only when payments exist */}
+                        {pagamentosCard.length > 0 && (
+                          <div className="h-0.5 bg-[rgba(60,60,67,0.06)] mx-5 rounded-full overflow-hidden mb-1">
+                            <div className="h-full rounded-full bg-[#34C759] transition-all"
+                              style={{ width: `${pagoPctCard}%` }} />
+                          </div>
+                        )}
+                        {/* Rows */}
                         {(sobrasCard.length > 0 || pagamentosCard.length > 0) && (
-                          <div className="border-t border-[rgba(60,60,67,0.05)] divide-y divide-[rgba(60,60,67,0.03)]">
+                          <div className="border-t border-[rgba(60,60,67,0.05)] divide-y divide-[rgba(60,60,67,0.04)]">
                             {sobrasCard.map(s => (
-                              <div key={s.id} className="px-5 py-2 flex items-center gap-3 bg-[#FF9500]/[0.02]">
-                                <span className="text-[9.5px] font-bold text-[#FF9500] bg-[#FF9500]/[0.08] border border-[#FF9500]/20 px-1.5 py-0.5 rounded-full shrink-0">Sobra</span>
-                                <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.55)] truncate">{s.descricao}</p>
-                                <p className="text-[12px] font-semibold text-[#FF9500] tabular-nums">{brl(s.valor)}</p>
+                              <div key={s.id} className="px-5 py-2.5 flex items-center gap-3">
+                                <div className="w-1.5 h-1.5 rounded-full bg-[#FF9500] shrink-0 ml-0.5" />
+                                <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.5)] truncate">{s.descricao}</p>
+                                <p className="text-[12px] font-medium text-[#FF9500] tabular-nums">+{brl(s.valor)}</p>
                               </div>
                             ))}
                             {pagamentosCard.map(p => (
-                              <div key={p.id} className="px-5 py-2 flex items-center gap-3 bg-emerald-50/30">
-                                <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-full shrink-0 border ${
-                                  p.status === "pago"
-                                    ? "text-emerald-700 bg-emerald-50 border-emerald-200"
-                                    : "text-amber-700 bg-amber-50 border-amber-200"
-                                }`}>
-                                  {p.status === "pago" ? "Pago" : "Pendente"}
-                                </span>
-                                <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.55)] truncate">
-                                  {p.dataPagamento ? fmtDate(p.dataPagamento) : fmtDate(p.dataVencimento)}
+                              <div key={p.id} className="px-5 py-2.5 flex items-center gap-3">
+                                {p.status === "pago" ? (
+                                  <svg className="w-3.5 h-3.5 text-[#34C759] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                  </svg>
+                                ) : (
+                                  <svg className="w-3.5 h-3.5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                  </svg>
+                                )}
+                                <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.5)] truncate">
+                                  {p.dataPagamento ? fmtDate(p.dataPagamento) : `vence ${fmtDate(p.dataVencimento)}`}
                                   {p.formaPagamento ? ` · ${p.formaPagamento}` : ""}
                                 </p>
-                                <p className={`text-[12px] font-semibold tabular-nums ${p.status === "pago" ? "text-emerald-700" : "text-amber-700"}`}>{brl(p.valor)}</p>
+                                <p className={`text-[12px] font-semibold tabular-nums ${p.status === "pago" ? "text-[#34C759]" : "text-amber-600"}`}>{brl(p.valor)}</p>
                               </div>
                             ))}
                           </div>
