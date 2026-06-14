@@ -598,7 +598,7 @@ export default function Home() {
     setContadorProp(novoContador)
 
     const cardId = `prop-${Date.now()}`
-    const linhasAtivas = draft.linhas.filter(l => l.ativa && l.quantidade > 0)
+    const linhasAtivas = draft.linhas.filter(l => l.ativa && l.quantidade > 0 && l.unitario > 0)
     const idealLinha = linhasAtivas.find(l => l.isIdeal) ?? linhasAtivas[linhasAtivas.length - 1]
 
     const novaProposta: PropostaCustom = { ...draft, id: cardId, numero, data, cardId }
@@ -609,29 +609,31 @@ export default function Home() {
       body: JSON.stringify({ ...novaProposta, contadorProp: novoContador }),
     }).catch(() => {})
 
-    const card: KanbanCard = {
-      id: cardId,
-      numero,
-      nomeCliente: draft.nomeCliente || "Sem nome",
-      dimensoes: draft.dimensoes || draft.descricao || "Proposta personalizada",
-      materialNome: draft.material,
-      preco: idealLinha ? idealLinha.unitario * idealLinha.quantidade : 0,
-      quantidade: idealLinha?.quantidade ?? 0,
-      data,
-      coluna: 0,
-      opcoes: linhasAtivas.map(l => ({
-        quantidade: l.quantidade,
-        preco: l.unitario * l.quantidade,
-        unitario: l.unitario,
-      })),
+    if (idealLinha) {
+      const card: KanbanCard = {
+        id: cardId,
+        numero,
+        nomeCliente: draft.nomeCliente || "Sem nome",
+        dimensoes: draft.dimensoes || draft.descricao || "Proposta personalizada",
+        materialNome: draft.material,
+        preco: idealLinha.unitario * idealLinha.quantidade,
+        quantidade: idealLinha.quantidade,
+        data,
+        coluna: 0,
+        opcoes: linhasAtivas.map(l => ({
+          quantidade: l.quantidade,
+          preco: l.unitario * l.quantidade,
+          unitario: l.unitario,
+        })),
+      }
+      setKanban(prev => [card, ...prev])
+      fetch("/api/kanban", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(card),
+      }).catch(() => {})
+      criarTracking(card)
     }
-    setKanban(prev => [card, ...prev])
-    fetch("/api/kanban", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(card),
-    }).catch(() => {})
-    criarTracking(card)
 
     // Criar cards para itens terceirizados
     const terceirs = (draft.terceirizados ?? []).filter(t => t.nome.trim())

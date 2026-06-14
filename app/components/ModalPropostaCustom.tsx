@@ -123,7 +123,7 @@ export function ModalPropostaCustom({
     }
   }
 
-  const linhasAtivas = linhas.filter(l => l.ativa && l.quantidade > 0 && l.unitario >= 0)
+  const linhasAtivas = linhas.filter(l => l.ativa && l.quantidade > 0 && l.unitario > 0)
   const terceirizadosValidos = terceirizados.filter(t => t.nome.trim())
   const terceirizadosPrecisaLote = terceirizadosValidos.length > 0 && !loteIdTerceirizado
   const podeSalvar =
@@ -530,7 +530,7 @@ export function ModalPropostaCustom({
             <p className="text-[11px] text-[#FF9500] text-center">Selecione um lote para os itens terceirizados.</p>
           )}
           {linhasAtivas.length === 0 && terceirizadosValidos.length === 0 && nomeCliente.trim() && (
-            <p className="text-[11px] text-rose-500 text-center">Adicione ao menos uma linha de produção ou item terceirizado.</p>
+            <p className="text-[11px] text-rose-500 text-center">Preencha ao menos uma linha de produção com preço, ou adicione um item terceirizado.</p>
           )}
           <div className="flex gap-2">
             <button onClick={onClose}
