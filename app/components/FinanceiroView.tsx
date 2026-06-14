@@ -447,10 +447,35 @@ export function FinanceiroView({
     const totalRecebido  = recebidas.reduce((s, l) => s + l.valor, 0) + totalParceiros
     const totalDespesas  = despesas.reduce((s, l) => s + l.valor, 0)
 
+    // Soma o que falta receber de cada lote/card incompleto (total − já pago)
+    const aReceberPedidos = (() => {
+      const lotesSeen = new Set<string>()
+      let sum = 0
+      for (const c of pedidosElegiveis) {
+        if (c.loteId) {
+          if (lotesSeen.has(c.loteId)) continue
+          lotesSeen.add(c.loteId)
+          const pags = pagamentosPorLote[c.loteId] ?? []
+          const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+          const loteCards = pedidosElegiveis.filter(cc => cc.loteId === c.loteId)
+          const sobrasLote = sobrasPorLote[c.loteId] ?? []
+          const total = loteCards.reduce((s, cc) => s + cc.preco, 0) + sobrasLote.reduce((s, l) => s + l.valor, 0)
+          if (totalPago < total) sum += total - totalPago
+        } else {
+          const pags = pagamentosPorCard[c.id] ?? []
+          const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+          const sobrasCard = sobrasPorCard[c.id] ?? []
+          const total = c.preco + sobrasCard.reduce((s, l) => s + l.valor, 0)
+          if (totalPago < total) sum += total - totalPago
+        }
+      }
+      return sum
+    })()
+
     return {
       recebido:   totalRecebido,
       despesasPg: totalDespesas,
-      aReceber:   pendentes.reduce((s, l) => s + l.valor, 0) + negociosPendentes.reduce((s, n) => s + n.comissaoValor, 0),
+      aReceber:   aReceberPedidos + negociosPendentes.reduce((s, n) => s + n.comissaoValor, 0),
       emAtraso:   atrasados.reduce((s, l) => s + l.valor, 0),
       resultado:  totalRecebido - totalDespesas,
       naoRegistrados: (() => {
@@ -585,7 +610,7 @@ export function FinanceiroView({
                 color={kpis.resultado >= 0 ? "blue" : "rose"}
                 sub="receitas − despesas" />
               <KpiCard label="A receber" value={brl(kpis.aReceber)} color="amber"
-                sub={`${lancamentos.filter(l => l.tipo === "receita" && l.status !== "pago").length} pendentes`} />
+                sub={`${kpis.naoRegistrados} pedido${kpis.naoRegistrados !== 1 ? "s" : ""} incompleto${kpis.naoRegistrados !== 1 ? "s" : ""}`} />
               <KpiCard label="Em atraso" value={brl(kpis.emAtraso)} color="rose"
                 sub={`${lancamentos.filter(l => l.tipo === "receita" && statusEfetivo(l) === "atrasado").length} títulos`} />
             </div>
