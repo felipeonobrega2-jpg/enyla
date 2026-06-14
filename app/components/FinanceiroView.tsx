@@ -430,7 +430,7 @@ export function FinanceiroView({
     const all = lancamentos.filter(inPeriodo)
     const recebidas = all.filter(l => l.tipo === "receita" && l.status === "pago")
     const despesas  = all.filter(l => l.tipo === "despesa" && l.status === "pago")
-    const pendentes = lancamentos.filter(l => l.tipo === "receita" && l.status !== "pago")
+    const pendentes = lancamentos.filter(l => l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra")
     const atrasados = pendentes.filter(l => l.dataVencimento < hoje())
 
     const totalParceiros = negociosPagos.reduce((s, n) => s + n.comissaoValor, 0)
@@ -456,7 +456,7 @@ export function FinanceiroView({
   const vencidos = useMemo(() => {
     const hj = hoje()
     const atrasados = lancamentos.filter(l =>
-      l.tipo === "receita" && l.status === "pendente" && l.dataVencimento < hj
+      l.tipo === "receita" && l.status === "pendente" && l.dataVencimento < hj && l.categoria !== "sobra"
     )
     const grupos: Record<string, {
       key: string; loteId?: string; cardId?: string
