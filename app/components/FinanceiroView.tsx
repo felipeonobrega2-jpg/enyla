@@ -6,6 +6,7 @@ import {
   FormaPagamento, KanbanCard, COL_FECHADO, COL_EXPEDICAO, COL_PERDIDO, NegocioParceiro, Lote,
 } from "../types"
 import { brl } from "../utils"
+import { AnalyticsView } from "./AnalyticsView"
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -318,7 +319,7 @@ export function FinanceiroView({
   onDelete: (id: string) => void
   onRegistrarSobra?: (card: KanbanCard) => void
 }) {
-  const [tab, setTab]                     = useState<"dash" | "receber" | "lancamentos">("dash")
+  const [tab, setTab]                     = useState<"dash" | "receber" | "lancamentos" | "analytics">("dash")
   const [periodo, setPeriodo]             = useState<Periodo>("mes")
   const [modalLanc, setModalLanc]         = useState<Partial<LancamentoFinanceiro> | true | null>(null)
   const [modalPag, setModalPag]           = useState<LancamentoFinanceiro | null>(null)
@@ -519,12 +520,12 @@ export function FinanceiroView({
 
         {/* Tabs */}
         <div className="flex gap-1 border-b border-[rgba(60,60,67,0.08)]">
-          {(["dash", "receber", "lancamentos"] as const).map(t => (
+          {(["dash", "receber", "lancamentos", "analytics"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2.5 text-[12.5px] font-semibold border-b-2 transition-colors -mb-px flex items-center gap-1.5 ${
                 tab === t ? "border-slate-800 text-[#1C1C1E]" : "border-transparent text-[#8E8E93] hover:text-[rgba(60,60,67,0.6)]"
               }`}>
-              {t === "dash" ? "Visão geral" : t === "lancamentos" ? "Lançamentos" : (
+              {t === "dash" ? "Visão geral" : t === "lancamentos" ? "Lançamentos" : t === "analytics" ? "Analytics" : (
                 <>
                   A receber
                   {kpis.naoRegistrados > 0 && (
@@ -1167,6 +1168,10 @@ export function FinanceiroView({
               </div>
             ) : null}
           </>
+        )}
+        {/* ── ANALYTICS ── */}
+        {tab === "analytics" && (
+          <AnalyticsView lancamentos={lancamentos} kanban={kanban} negocios={negocios} />
         )}
       </div>
 
