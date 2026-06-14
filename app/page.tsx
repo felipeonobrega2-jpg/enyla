@@ -343,6 +343,16 @@ export default function Home() {
     showToast(date ? "Data de entrega atualizada." : "Data de entrega removida.")
   }
 
+  async function salvarDataEntregaReal(cardId: string, date: string | null) {
+    setKanban(prev => prev.map(c => c.id === cardId ? { ...c, dataEntregaReal: date ?? undefined } : c))
+    await fetch(`/api/kanban/${cardId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataEntregaReal: date ?? null }),
+    }).catch(() => {})
+    showToast(date ? "Entrega registrada." : "Data de entrega removida.")
+  }
+
   function abrirSobra(card: KanbanCard) {
     const loteCards = card.loteId ? kanban.filter(c => c.loteId === card.loteId) : []
     setModalSobra({ card, loteCards })
@@ -1460,6 +1470,7 @@ export default function Home() {
           onClose={() => setDetalheModal(null)}
           onEditar={(p) => { setDetalheModal(null); setEditandoProposta(p) }}
           onSaveDelivery={"card" in detalheModal && detalheModal.card ? salvarDataEntrega : undefined}
+          onSaveDeliveryReal={"card" in detalheModal && detalheModal.card ? salvarDataEntregaReal : undefined}
           onSaveCloseDate={"card" in detalheModal && detalheModal.card ? salvarDataFechamento : undefined}
           onRegistrarSobra={"card" in detalheModal && detalheModal.card ? abrirSobra : undefined}
         />

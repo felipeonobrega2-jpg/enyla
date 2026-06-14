@@ -11,12 +11,13 @@ export type DetalheData =
   | { tipo: "proposta";  proposta: PropostaCustom; card?: KanbanCard }
   | { tipo: "kanban";    card: KanbanCard }
 
-export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDelivery, onSaveCloseDate, onRegistrarSobra }: {
+export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDelivery, onSaveDeliveryReal, onSaveCloseDate, onRegistrarSobra }: {
   data: DetalheData
   parcFator: number
   onClose: () => void
   onEditar?: (p: PropostaCustom) => void
   onSaveDelivery?: (cardId: string, date: string | null) => void
+  onSaveDeliveryReal?: (cardId: string, date: string | null) => void
   onSaveCloseDate?: (cardId: string, date: string) => void
   onRegistrarSobra?: (card: KanbanCard) => void
 }) {
@@ -29,6 +30,8 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
 
   const [deliveryDate, setDeliveryDate] = useState(card?.dataEntregaPrevista ?? "")
   const [savingDelivery, setSavingDelivery] = useState(false)
+  const [deliveryRealDate, setDeliveryRealDate] = useState(card?.dataEntregaReal ?? "")
+  const [savingDeliveryReal, setSavingDeliveryReal] = useState(false)
   const [closeDate, setCloseDate] = useState(card?.dataFechamento ?? "")
   const [savingClose, setSavingClose] = useState(false)
 
@@ -302,6 +305,42 @@ export function ModalDetalhe({ data, parcFator, onClose, onEditar, onSaveDeliver
               </p>
             )}
             <p className="text-[10.5px] text-[rgba(60,60,67,0.3)] mt-1">Sobrescreve o cálculo automático de 15 dias.</p>
+          </div>
+        )}
+
+        {/* Data de entrega real */}
+        {card && onSaveDeliveryReal && (
+          <div className="px-5 py-3.5 border-t border-[rgba(60,60,67,0.08)] shrink-0">
+            <p className="text-[9.5px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-2">
+              Data de entrega real
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={deliveryRealDate}
+                onChange={e => setDeliveryRealDate(e.target.value)}
+                className="flex-1 h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-2.5 text-[12.5px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-[#34C759]/20 focus:border-[#34C759]/60"
+              />
+              {deliveryRealDate && (
+                <button onClick={() => setDeliveryRealDate("")}
+                  className="text-[#8E8E93] hover:text-[rgba(60,60,67,0.6)] transition-colors text-sm px-1">×</button>
+              )}
+              <button
+                disabled={savingDeliveryReal}
+                onClick={async () => {
+                  setSavingDeliveryReal(true)
+                  await onSaveDeliveryReal(card.id, deliveryRealDate || null)
+                  setSavingDeliveryReal(false)
+                }}
+                className="px-3 h-8 text-[12px] font-semibold text-white bg-[#34C759] hover:bg-[#2DB84D] rounded-lg transition-colors disabled:opacity-50 shrink-0">
+                {savingDeliveryReal ? "…" : "Salvar"}
+              </button>
+            </div>
+            {deliveryRealDate && (
+              <p className="text-[11px] text-[#34C759] mt-1.5">
+                {new Date(deliveryRealDate + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+              </p>
+            )}
           </div>
         )}
 

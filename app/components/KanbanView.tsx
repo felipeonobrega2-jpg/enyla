@@ -240,6 +240,37 @@ export function KanbanView({
         )}
       </div>
 
+      {/* Entregas atrasadas */}
+      {(() => {
+        const hj = new Date().toISOString().slice(0, 10)
+        const atrasados = cards.filter(c =>
+          c.dataEntregaPrevista && c.dataEntregaPrevista < hj &&
+          c.coluna < COL_ENTREGUE && c.coluna !== COL_PERDIDO
+        )
+        if (atrasados.length === 0) return null
+        return (
+          <div className="shrink-0 px-5 py-2.5 bg-[#FF3B30]/[0.04] border-b border-[#FF3B30]/10 flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FF3B30]" />
+              <span className="text-[10.5px] font-semibold text-[#FF3B30] uppercase tracking-wide">
+                {atrasados.length} entrega{atrasados.length > 1 ? "s" : ""} atrasada{atrasados.length > 1 ? "s" : ""}
+              </span>
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              {atrasados.map(c => {
+                const dias = Math.floor((Date.now() - new Date(c.dataEntregaPrevista! + "T12:00:00").getTime()) / 86_400_000)
+                return (
+                  <button key={c.id} onClick={() => onDetalhes?.(c)}
+                    className="text-[10px] font-medium text-[#FF3B30] bg-white border border-[#FF3B30]/20 rounded-lg px-2 py-1 hover:bg-[#FF3B30]/[0.04] transition-colors">
+                    {c.nomeCliente} · {dias}d
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Board */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden" style={{ background: "#F2F2F7" }}>
         <div className="flex gap-2.5 h-full px-4 py-3.5" style={{ minWidth: `${COLUNAS_KANBAN.length * 48}px` }}>
@@ -592,6 +623,22 @@ function KanbanCardItem({
             <span className="text-[10px] text-[#8E8E93] tabular-nums">{num(card.quantidade)} un</span>
             <span className="text-[9px] text-[rgba(60,60,67,0.36)] ml-auto tabular-nums">{card.data.split(",")[0]}</span>
           </div>
+
+          {/* Delivery date / overdue badge */}
+          {card.dataEntregaPrevista && !isPerdido && colIdx < COL_ENTREGUE && (() => {
+            const hj = new Date().toISOString().slice(0, 10)
+            const dias = Math.floor((Date.now() - new Date(card.dataEntregaPrevista + "T12:00:00").getTime()) / 86_400_000)
+            if (dias > 0) return (
+              <span className="mt-1.5 inline-flex items-center gap-1 text-[9px] font-semibold text-[#FF3B30] bg-[#FF3B30]/[0.08] border border-[#FF3B30]/20 px-1.5 py-0.5 rounded-md">
+                <span className="w-1 h-1 rounded-full bg-[#FF3B30] inline-block" />{dias}d atrasado
+              </span>
+            )
+            return (
+              <p className="mt-1 text-[9px] text-[#8E8E93]">
+                Entrega: {new Date(card.dataEntregaPrevista + "T12:00:00").toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}
+              </p>
+            )
+          })()}
         </div>
 
         {/* ── Action bar ── */}
