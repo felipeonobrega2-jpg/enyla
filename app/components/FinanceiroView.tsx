@@ -324,6 +324,8 @@ export function FinanceiroView({
   const [modalPag, setModalPag]           = useState<LancamentoFinanceiro | null>(null)
   const [filtroTipo, setFiltroTipo]       = useState<TipoLancamento | "">("")
   const [filtroStatus, setFiltroStatus]   = useState<StatusLancamento | "">("")
+  const [buscaReceber, setBuscaReceber]   = useState("")
+  const [filtroReceber, setFiltroReceber] = useState<"todos" | "pendente" | "parcial">("todos")
   const [confirmarDel, setConfirmarDel]   = useState<string | null>(null)
 
   // Pedidos elegíveis (fechado, em produção, entregue — exceto perdido)
@@ -636,9 +638,41 @@ export function FinanceiroView({
         {/* ── A RECEBER ── */}
         {tab === "receber" && (
           <div className="space-y-2">
-            <p className="text-[11.5px] text-[#8E8E93] mb-4">
+            <p className="text-[11.5px] text-[#8E8E93] mb-3">
               Pedidos fechados ou em produção, e ganhos de parcerias pendentes.
             </p>
+
+            {/* Search + filter */}
+            <div className="flex flex-col gap-2 mb-4">
+              <div className="flex items-center gap-2 h-9 border border-[rgba(60,60,67,0.12)] rounded-xl px-3 bg-white">
+                <svg className="w-3.5 h-3.5 text-[rgba(60,60,67,0.3)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0Z" />
+                </svg>
+                <input
+                  type="text"
+                  value={buscaReceber}
+                  onChange={e => setBuscaReceber(e.target.value)}
+                  placeholder="Buscar por cliente ou pedido…"
+                  className="flex-1 text-[12.5px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] bg-transparent focus:outline-none"
+                />
+                {buscaReceber && (
+                  <button onClick={() => setBuscaReceber("")} className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] text-base leading-none">×</button>
+                )}
+              </div>
+              <div className="flex gap-1.5">
+                {(["todos", "pendente", "parcial"] as const).map(f => (
+                  <button key={f}
+                    onClick={() => setFiltroReceber(f)}
+                    className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-colors ${
+                      filtroReceber === f
+                        ? "bg-[#1C1C1E] text-white"
+                        : "bg-[rgba(116,116,128,0.08)] text-[#8E8E93] hover:bg-[rgba(116,116,128,0.14)]"
+                    }`}>
+                    {f === "todos" ? "Todos" : f === "pendente" ? "Sem registro" : "Em aberto"}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Parcerias pendentes (comissão ou ganho — ambos são receita) */}
             {negociosPendentes.length > 0 && (
@@ -673,10 +707,18 @@ export function FinanceiroView({
             {pedidosElegiveis.length === 0 ? (
               <Empty msg="Nenhum pedido fechado ainda." />
             ) : (() => {
+              // Apply search filter
+              const q = buscaReceber.toLowerCase().trim()
+              const pedidosBuscados = q
+                ? pedidosElegiveis.filter(c =>
+                    c.nomeCliente.toLowerCase().includes(q) || c.numero.toLowerCase().includes(q)
+                  )
+                : pedidosElegiveis
+
               // Group by lote (cards with same loteId → one row)
               const loteGroups: Record<string, KanbanCard[]> = {}
               const solos: KanbanCard[] = []
-              for (const card of pedidosElegiveis) {
+              for (const card of pedidosBuscados) {
                 if (card.loteId) {
                   if (!loteGroups[card.loteId]) loteGroups[card.loteId] = []
                   loteGroups[card.loteId].push(card)
@@ -684,7 +726,38 @@ export function FinanceiroView({
                   solos.push(card)
                 }
               }
-              const loteEntries = Object.entries(loteGroups)
+
+              // Apply status filter
+              const loteEntries = Object.entries(loteGroups).filter(([loteId, cards]) => {
+                if (filtroReceber === "todos") return true
+                const pags = pagamentosPorLote[loteId] ?? []
+                if (filtroReceber === "pendente") return pags.length === 0
+                // "parcial" = tem registro mas não está completo
+                if (pags.length === 0) return false
+                const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+                const sobrasLote = sobrasPorLote[loteId] ?? []
+                const total = cards.reduce((s, c) => s + c.preco, 0) + sobrasLote.reduce((s, l) => s + l.valor, 0)
+                return totalPago < total
+              })
+              const solosFiltrados = solos.filter(card => {
+                if (filtroReceber === "todos") return true
+                const pags = pagamentosPorCard[card.id] ?? []
+                if (filtroReceber === "pendente") return pags.length === 0
+                if (pags.length === 0) return false
+                const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+                const sobrasCard = sobrasPorCard[card.id] ?? []
+                const total = card.preco + sobrasCard.reduce((s, l) => s + l.valor, 0)
+                return totalPago < total
+              })
+
+              if (loteEntries.length === 0 && solosFiltrados.length === 0) {
+                const msg = q
+                  ? `Nenhum resultado para "${buscaReceber}".`
+                  : filtroReceber === "pendente"
+                    ? "Todos os pedidos já têm pagamento registrado."
+                    : "Nenhum pedido em aberto."
+                return <Empty msg={msg} />
+              }
 
               return (
                 <>
@@ -794,7 +867,7 @@ export function FinanceiroView({
                   })}
 
                   {/* Solo cards */}
-                  {solos.sort((a, b) => b.preco - a.preco).map(card => {
+                  {solosFiltrados.sort((a, b) => b.preco - a.preco).map(card => {
                     const pagamentosCard = pagamentosPorCard[card.id] ?? []
                     const sobrasCard = sobrasPorCard[card.id] ?? []
                     const totalSobrasCard = sobrasCard.reduce((s, l) => s + l.valor, 0)
