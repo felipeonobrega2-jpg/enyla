@@ -451,6 +451,33 @@ export function FinanceiroView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lancamentos, negocios, periodo, pedidosElegiveis, lancPorCard])
 
+  // Pagamentos vencidos — pendentes com dataVencimento no passado, agrupados por lote/card
+  const vencidos = useMemo(() => {
+    const hj = hoje()
+    const atrasados = lancamentos.filter(l =>
+      l.tipo === "receita" && l.status === "pendente" && l.dataVencimento < hj
+    )
+    const grupos: Record<string, {
+      key: string; loteId?: string; cardId?: string
+      nomeCliente: string; loteNumero?: string; cardNumero?: string
+      total: number; diasAtraso: number
+    }> = {}
+    for (const l of atrasados) {
+      const key = l.loteId ? `lote:${l.loteId}` : `card:${l.cardId}`
+      if (!grupos[key]) {
+        const dias = Math.floor((Date.now() - new Date(l.dataVencimento).getTime()) / 86_400_000)
+        grupos[key] = {
+          key, loteId: l.loteId, cardId: l.cardId,
+          nomeCliente: l.nomeCliente || "",
+          loteNumero: l.loteNumero, cardNumero: l.cardNumero,
+          total: 0, diasAtraso: dias,
+        }
+      }
+      grupos[key].total += l.valor
+    }
+    return Object.values(grupos).sort((a, b) => b.total - a.total)
+  }, [lancamentos])
+
   // DRE por categoria de despesas
   const dreDesp = useMemo(() => {
     const map: Record<string, number> = {}
@@ -491,16 +518,22 @@ export function FinanceiroView({
 
         {/* Tabs */}
         <div className="flex gap-1 border-b border-[rgba(60,60,67,0.08)]">
-          {([
-            ["dash",       "Visão geral"],
-            ["receber",    `A receber${kpis.naoRegistrados > 0 ? ` (${kpis.naoRegistrados})` : ""}`],
-            ["lancamentos","Lançamentos"],
-          ] as const).map(([t, l]) => (
+          {(["dash", "receber", "lancamentos"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-2.5 text-[12.5px] font-semibold border-b-2 transition-colors -mb-px ${
+              className={`px-4 py-2.5 text-[12.5px] font-semibold border-b-2 transition-colors -mb-px flex items-center gap-1.5 ${
                 tab === t ? "border-slate-800 text-[#1C1C1E]" : "border-transparent text-[#8E8E93] hover:text-[rgba(60,60,67,0.6)]"
               }`}>
-              {l}
+              {t === "dash" ? "Visão geral" : t === "lancamentos" ? "Lançamentos" : (
+                <>
+                  A receber
+                  {kpis.naoRegistrados > 0 && (
+                    <span className="text-[10px] font-bold bg-[rgba(116,116,128,0.1)] text-[#8E8E93] rounded-full px-1.5 py-0.5 leading-none">{kpis.naoRegistrados}</span>
+                  )}
+                  {vencidos.length > 0 && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#FF3B30] shrink-0" />
+                  )}
+                </>
+              )}
             </button>
           ))}
         </div>
@@ -673,6 +706,37 @@ export function FinanceiroView({
                 ))}
               </div>
             </div>
+
+            {/* Vencidos — pagamentos registrados com data no passado */}
+            {vencidos.length > 0 && (
+              <div className="rounded-2xl border border-[#FF3B30]/20 bg-[#FF3B30]/[0.03] overflow-hidden mb-4">
+                <div className="px-5 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#FF3B30] shrink-0" />
+                    <span className="text-[11px] font-semibold text-[#FF3B30] uppercase tracking-wide">
+                      {vencidos.length} vencido{vencidos.length > 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <span className="text-[13px] font-semibold text-[#FF3B30] tabular-nums">
+                    {brl(vencidos.reduce((s, v) => s + v.total, 0))}
+                  </span>
+                </div>
+                <div className="border-t border-[#FF3B30]/10 divide-y divide-[#FF3B30]/[0.07]">
+                  {vencidos.map(v => (
+                    <div key={v.key} className="px-5 py-2.5 flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[12.5px] font-medium text-[#1C1C1E]">{v.nomeCliente}</span>
+                        {(v.loteNumero || v.cardNumero) && (
+                          <span className="text-[11px] text-[#8E8E93] ml-2">{v.loteNumero ?? v.cardNumero}</span>
+                        )}
+                      </div>
+                      <span className="text-[10.5px] text-[#FF3B30]/70 shrink-0">{v.diasAtraso}d em atraso</span>
+                      <span className="text-[12px] font-semibold text-[#FF3B30] tabular-nums">{brl(v.total)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Parcerias pendentes (comissão ou ganho — ambos são receita) */}
             {negociosPendentes.length > 0 && (
