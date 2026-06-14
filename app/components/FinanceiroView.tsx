@@ -826,26 +826,27 @@ export function FinanceiroView({
                 }
               }
 
-              // Apply status filter — always exclude 100% paid
+              // Apply status filter ("todos" shows everything including fully paid)
               const loteEntries = Object.entries(loteGroups).filter(([loteId, cards]) => {
+                if (filtroReceber === "todos") return true
                 const pags = pagamentosPorLote[loteId] ?? []
+                if (filtroReceber === "pendente") return pags.length === 0
+                // "parcial" = tem registro mas não está completo
+                if (pags.length === 0) return false
                 const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
                 const sobrasLote = sobrasPorLote[loteId] ?? []
                 const total = cards.reduce((s, c) => s + c.preco, 0) + sobrasLote.reduce((s, l) => s + l.valor, 0)
-                if (total > 0 && totalPago >= total) return false
-                if (filtroReceber === "todos") return true
-                if (filtroReceber === "pendente") return pags.length === 0
-                return pags.length > 0
+                return totalPago < total
               })
               const solosFiltrados = solos.filter(card => {
+                if (filtroReceber === "todos") return true
                 const pags = pagamentosPorCard[card.id] ?? []
+                if (filtroReceber === "pendente") return pags.length === 0
+                if (pags.length === 0) return false
                 const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
                 const sobrasCard = sobrasPorCard[card.id] ?? []
                 const total = card.preco + sobrasCard.reduce((s, l) => s + l.valor, 0)
-                if (total > 0 && totalPago >= total) return false
-                if (filtroReceber === "todos") return true
-                if (filtroReceber === "pendente") return pags.length === 0
-                return pags.length > 0
+                return totalPago < total
               })
 
               if (loteEntries.length === 0 && solosFiltrados.length === 0) {
