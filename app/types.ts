@@ -112,6 +112,7 @@ export type LinhaPropostaCustom = {
 export type ItemTerceirizado = {
   id: string
   nome: string
+  descricao?: string
   fornecedor: string
   quantidade: number
   custoTotal: number   // custo total pago ao fornecedor

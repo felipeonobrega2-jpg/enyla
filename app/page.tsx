@@ -644,7 +644,7 @@ export default function Home() {
         id: tCardId,
         numero: tNumero,
         nomeCliente: draft.nomeCliente || "Sem nome",
-        dimensoes: t.nome,
+        dimensoes: t.descricao || t.nome,
         materialNome: "Terceirizado",
         preco: t.precoTotal,
         quantidade: t.quantidade,

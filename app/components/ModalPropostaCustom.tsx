@@ -208,6 +208,9 @@ export function ModalPropostaCustom({
                 <input type="text" value={t.nome} onChange={e => updateTerceirizado(t.id, "nome", e.target.value)}
                   placeholder="Nome do produto (ex: Sacola BellaLiz)"
                   className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
+                <input type="text" value={t.descricao ?? ""} onChange={e => updateTerceirizado(t.id, "descricao", e.target.value)}
+                  placeholder="Descrição (ex: Adesivo vinil 10×10cm)"
+                  className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[12.5px] text-[rgba(60,60,67,0.75)] placeholder:text-[rgba(60,60,67,0.25)] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Fornecedor</label>
@@ -227,7 +230,7 @@ export function ModalPropostaCustom({
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Quantidade</label>
-                    <input type="number" min={1} value={t.quantidade || ""} onChange={e => updateTerceirizado(t.id, "quantidade", parseInt(e.target.value) || 1)}
+                    <input type="number" min={0} value={t.quantidade === 0 ? "" : t.quantidade} onChange={e => updateTerceirizado(t.id, "quantidade", e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
                       className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
                   </div>
                   <div className="space-y-1">
