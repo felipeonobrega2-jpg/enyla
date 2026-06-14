@@ -319,16 +319,8 @@ export function FinanceiroView({
   onDelete: (id: string) => void
   onRegistrarSobra?: (card: KanbanCard) => void
 }) {
-  const [tab, setTab] = useState<"dash" | "receber" | "lancamentos" | "analytics">(() => {
-    if (typeof window === "undefined") return "dash"
-    const v = sessionStorage.getItem("fin:tab")
-    return (["dash", "receber", "lancamentos", "analytics"].includes(v ?? "") ? v : "dash") as "dash" | "receber" | "lancamentos" | "analytics"
-  })
-  const [periodo, setPeriodo] = useState<Periodo>(() => {
-    if (typeof window === "undefined") return "mes"
-    const v = sessionStorage.getItem("fin:periodo")
-    return (["mes", "trimestre", "semestre", "ano", "tudo"].includes(v ?? "") ? v : "mes") as Periodo
-  })
+  const [tab, setTab] = useState<"dash" | "receber" | "lancamentos" | "analytics">("dash")
+  const [periodo, setPeriodo] = useState<Periodo>("mes")
   const [modalLanc, setModalLanc]         = useState<Partial<LancamentoFinanceiro> | true | null>(null)
   const [modalPag, setModalPag]           = useState<LancamentoFinanceiro | null>(null)
   const [filtroTipo, setFiltroTipo]       = useState<TipoLancamento | "">("")
@@ -337,8 +329,15 @@ export function FinanceiroView({
   const [filtroReceber, setFiltroReceber] = useState<"todos" | "pendente" | "parcial">("todos")
   const [confirmarDel, setConfirmarDel]   = useState<string | null>(null)
 
-  useEffect(() => { sessionStorage.setItem("fin:tab", tab) }, [tab])
-  useEffect(() => { sessionStorage.setItem("fin:periodo", periodo) }, [periodo])
+  // Restore on mount — write effects would corrupt sessionStorage during SSR hydration
+  useEffect(() => {
+    const t = sessionStorage.getItem("fin:tab")
+    if (t && ["dash", "receber", "lancamentos", "analytics"].includes(t))
+      setTab(t as "dash" | "receber" | "lancamentos" | "analytics")
+    const p = sessionStorage.getItem("fin:periodo")
+    if (p && ["mes", "trimestre", "semestre", "ano", "tudo"].includes(p))
+      setPeriodo(p as Periodo)
+  }, [])
 
   // Pedidos elegíveis (fechado, em produção, entregue — exceto perdido)
   const pedidosElegiveis = useMemo(() =>
@@ -513,7 +512,7 @@ export function FinanceiroView({
             <p className="text-[12px] text-[#8E8E93] mt-0.5">Receitas, despesas e fluxo de caixa</p>
           </div>
           <div className="flex items-center gap-2">
-            <select value={periodo} onChange={e => setPeriodo(e.target.value as Periodo)}
+            <select value={periodo} onChange={e => { const v = e.target.value as Periodo; setPeriodo(v); sessionStorage.setItem("fin:periodo", v) }}
               className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[rgba(60,60,67,0.6)] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
               {(Object.entries(PERIODO_LABEL) as [Periodo, string][]).map(([v, l]) => (
                 <option key={v} value={v}>{l}</option>
@@ -532,7 +531,7 @@ export function FinanceiroView({
         {/* Tabs */}
         <div className="flex gap-1 border-b border-[rgba(60,60,67,0.08)]">
           {(["dash", "receber", "lancamentos", "analytics"] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
+            <button key={t} onClick={() => { setTab(t); sessionStorage.setItem("fin:tab", t) }}
               className={`px-4 py-2.5 text-[12.5px] font-semibold border-b-2 transition-colors -mb-px flex items-center gap-1.5 ${
                 tab === t ? "border-slate-800 text-[#1C1C1E]" : "border-transparent text-[#8E8E93] hover:text-[rgba(60,60,67,0.6)]"
               }`}>
