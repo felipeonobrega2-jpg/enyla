@@ -109,6 +109,15 @@ export type LinhaPropostaCustom = {
   isIdeal: boolean
 }
 
+export type ItemTerceirizado = {
+  id: string
+  nome: string
+  fornecedor: string
+  quantidade: number
+  custoTotal: number   // custo total pago ao fornecedor
+  precoTotal: number   // preço total cobrado ao cliente
+}
+
 export type PropostaCustom = {
   id: string
   numero: string
@@ -126,6 +135,7 @@ export type PropostaCustom = {
   linhas: LinhaPropostaCustom[]
   parcFator: number
   cardId: string
+  terceirizados?: ItemTerceirizado[]
 }
 
 export type Cliente = {

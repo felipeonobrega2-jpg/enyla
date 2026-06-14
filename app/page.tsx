@@ -633,6 +633,35 @@ export default function Home() {
     }).catch(() => {})
     criarTracking(card)
 
+    // Criar cards para itens terceirizados
+    const terceirs = (draft.terceirizados ?? []).filter(t => t.nome.trim())
+    for (let i = 0; i < terceirs.length; i++) {
+      const t = terceirs[i]
+      const tContador = novoContador + 1 + i
+      const tNumero = `PRP-${ano}-${String(tContador).padStart(3, "0")}`
+      const tCardId = `prop-${Date.now()}-t${i}`
+      const tCard: KanbanCard = {
+        id: tCardId,
+        numero: tNumero,
+        nomeCliente: draft.nomeCliente || "Sem nome",
+        dimensoes: t.nome,
+        materialNome: "Terceirizado",
+        preco: t.precoTotal,
+        quantidade: t.quantidade,
+        data,
+        coluna: 0,
+        fornecedor: t.fornecedor || undefined,
+        custoTerceiro: t.custoTotal || undefined,
+      }
+      setKanban(prev => [...prev, tCard])
+      fetch("/api/kanban", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(tCard),
+      }).catch(() => {})
+    }
+    if (terceirs.length > 0) setContadorProp(novoContador + terceirs.length)
+
     const nomeClean = draft.nomeCliente.trim()
     if (nomeClean && !clientes.some(c => c.nome.toLowerCase() === nomeClean.toLowerCase())) {
       const novoCliente = { id: Date.now().toString(), nome: nomeClean, criadoEm: data }

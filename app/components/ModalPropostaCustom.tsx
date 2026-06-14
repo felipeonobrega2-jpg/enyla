@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Cliente, PropostaCustom, LinhaPropostaCustom } from "../types"
+import { Cliente, PropostaCustom, LinhaPropostaCustom, ItemTerceirizado } from "../types"
 import { Material } from "../config"
 import { brl } from "../utils"
 import { ClienteCombobox, ClienteContactCard } from "./ClienteFields"
@@ -53,6 +53,10 @@ export function ModalPropostaCustom({
       { id: "3", quantidade: 10000, unitario: 0, ativa: true,  isIdeal: false },
     ]
   )
+  const [abaModal, setAbaModal] = useState<"nossa" | "terceirizado">("nossa")
+  const [terceirizados, setTerceirizados] = useState<ItemTerceirizado[]>(
+    initialData?.terceirizados ?? []
+  )
 
   function addLinha() {
     setLinhas(prev => [...prev, {
@@ -84,10 +88,23 @@ export function ModalPropostaCustom({
     }))
   }
 
+  function addTerceirizado() {
+    setTerceirizados(prev => [...prev, {
+      id: Date.now().toString(),
+      nome: "", fornecedor: "", quantidade: 1, custoTotal: 0, precoTotal: 0,
+    }])
+  }
+  function removeTerceirizado(id: string) {
+    setTerceirizados(prev => prev.filter(t => t.id !== id))
+  }
+  function updateTerceirizado(id: string, field: keyof ItemTerceirizado, value: unknown) {
+    setTerceirizados(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t))
+  }
+
   function buildDraft(): Omit<PropostaCustom, "id" | "numero" | "cardId"> {
     const [y, m, d] = dataInput.split("-")
     const dataFormatada = `${d}/${m}/${y}, ${new Date().toLocaleTimeString("pt-BR")}`
-    return { nomeCliente, descricao, material, dimensoes, incluirVerniz, comFaca, valorFaca, numSKUs, validadeDias, obsCliente, linhas, parcFator, data: dataFormatada }
+    return { nomeCliente, descricao, material, dimensoes, incluirVerniz, comFaca, valorFaca, numSKUs, validadeDias, obsCliente, linhas, parcFator, data: dataFormatada, terceirizados: terceirizados.filter(t => t.nome.trim()) }
   }
 
   const linhasAtivas = linhas.filter(l => l.ativa && l.quantidade > 0 && l.unitario >= 0)
@@ -106,7 +123,7 @@ export function ModalPropostaCustom({
 
         {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] shrink-0">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start justify-between gap-3 mb-3">
             <div>
               <p className="text-[9.5px] uppercase tracking-wide font-bold text-[#AF52DE] mb-1">Nova Proposta Personalizada</p>
               <p className="font-bold text-[#1C1C1E] text-[15px] leading-snug">Defina as quantidades e preços manualmente</p>
@@ -114,10 +131,79 @@ export function ModalPropostaCustom({
             <button onClick={onClose}
               className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
           </div>
+          <div className="flex gap-1 bg-[rgba(116,116,128,0.08)] p-0.5 rounded-xl w-fit">
+            {(["nossa", "terceirizado"] as const).map(aba => (
+              <button key={aba} onClick={() => setAbaModal(aba)}
+                className={`px-4 py-1.5 rounded-[10px] text-[11.5px] font-semibold transition-all ${
+                  abaModal === aba ? "bg-white text-[#1C1C1E] shadow-sm" : "text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)]"
+                }`}>
+                {aba === "nossa" ? "Nossa" : `Terceirizado${terceirizados.filter(t => t.nome.trim()).length > 0 ? ` (${terceirizados.filter(t => t.nome.trim()).length})` : ""}`}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Body */}
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+
+        {abaModal === "terceirizado" && (
+          <div className="space-y-4">
+            <p className="text-[11px] text-[#8E8E93]">Itens que você compra de terceiros e revende ao cliente no mesmo lote.</p>
+            {terceirizados.length === 0 && (
+              <div className="text-center py-8 text-[12px] text-[rgba(60,60,67,0.3)]">Nenhum item terceirizado ainda.</div>
+            )}
+            {terceirizados.map((t, i) => (
+              <div key={t.id} className="border border-[rgba(60,60,67,0.10)] rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-bold text-[#8E8E93] uppercase tracking-wide">Item {i + 1}</p>
+                  <button onClick={() => removeTerceirizado(t.id)} className="text-[rgba(60,60,67,0.25)] hover:text-[#FF3B30] transition-colors text-lg leading-none">×</button>
+                </div>
+                <input type="text" value={t.nome} onChange={e => updateTerceirizado(t.id, "nome", e.target.value)}
+                  placeholder="Nome do produto (ex: Sacola BellaLiz)"
+                  className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Fornecedor</label>
+                    <input type="text" value={t.fornecedor} onChange={e => updateTerceirizado(t.id, "fornecedor", e.target.value)}
+                      placeholder="ex: Marcelino"
+                      className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Quantidade</label>
+                    <input type="number" min={1} value={t.quantidade || ""} onChange={e => updateTerceirizado(t.id, "quantidade", parseInt(e.target.value) || 1)}
+                      className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Custo ao fornecedor (R$)</label>
+                    <input type="number" min={0} step="0.01" value={t.custoTotal || ""} onChange={e => updateTerceirizado(t.id, "custoTotal", parseFloat(e.target.value) || 0)}
+                      placeholder="0,00"
+                      className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Preço ao cliente (R$)</label>
+                    <input type="number" min={0} step="0.01" value={t.precoTotal || ""} onChange={e => updateTerceirizado(t.id, "precoTotal", parseFloat(e.target.value) || 0)}
+                      placeholder="0,00"
+                      className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
+                  </div>
+                </div>
+                {t.custoTotal > 0 && t.precoTotal > 0 && (
+                  <p className="text-[10.5px] text-[#34C759] font-medium">
+                    Margem: {brl(t.precoTotal - t.custoTotal)} ({Math.round(((t.precoTotal - t.custoTotal) / t.precoTotal) * 100)}%)
+                  </p>
+                )}
+              </div>
+            ))}
+            <button onClick={addTerceirizado}
+              className="flex items-center gap-1.5 text-[12px] text-[#FF9500] hover:text-[#E68600] font-semibold transition-colors">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Adicionar item terceirizado
+            </button>
+          </div>
+        )}
+
+        {abaModal === "nossa" && <>
 
           {/* Cliente */}
           <div className="space-y-2">
@@ -369,6 +455,7 @@ export function ModalPropostaCustom({
             />
           </div>
 
+        </>}
         </div>
 
         {/* Footer */}
