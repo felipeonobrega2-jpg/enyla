@@ -364,6 +364,7 @@ export function KanbanView({
                       onLoteRename={onLoteRename}
                       negocios={negocios}
                       onUpdateNegocio={onUpdateNegocio}
+                      allCards={cards}
                     />
                   ))}
                 </div>
@@ -447,7 +448,7 @@ export function KanbanView({
 
 function KanbanCardItem({
   card, colIdx, isDragging, colors, onDragStart, onDragEnd, onDelete, onMove, onSetMotivo, onDetalhes, totalCols,
-  lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge, onLoteRename, negocios, onUpdateNegocio,
+  lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge, onLoteRename, negocios, onUpdateNegocio, allCards,
 }: {
   card: KanbanCard
   colIdx: number
@@ -468,6 +469,7 @@ function KanbanCardItem({
   onLoteRename?: (loteId: string, newNumero: string) => Promise<{ ok: boolean; error?: string }>
   negocios?: NegocioParceiro[]
   onUpdateNegocio?: (n: NegocioParceiro) => void
+  allCards?: KanbanCard[]
 }) {
   const isPerdido = colIdx === COL_PERDIDO
   const [confirmando, setConfirmando] = useState(false)
@@ -828,6 +830,45 @@ function KanbanCardItem({
                           Produto de parceiro
                         </button>
                       )}
+                    </div>
+                  )
+                })()}
+
+                {/* Terceirizados vinculados ao lote */}
+                {!editingLote && (() => {
+                  const tercs = (allCards ?? []).filter(c => c.loteId === card.loteId && c.materialNome === "Terceirizado")
+                  if (tercs.length === 0) return null
+                  return (
+                    <div className="space-y-1.5">
+                      <p className="text-[8.5px] uppercase tracking-wide font-semibold" style={{ color: "#FF9500" }}>
+                        Terceirizados ({tercs.length})
+                      </p>
+                      {tercs.map(t => (
+                        <button key={t.id} onClick={() => onDetalhes?.(t)}
+                          className="w-full bg-white rounded-xl border px-3 py-2.5 text-left shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:bg-[#FF9500]/5 transition-colors"
+                          style={{ borderColor: "rgba(255,149,0,0.20)" }}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[11px] font-semibold leading-snug truncate" style={{ color: "#1C1C1E" }}>
+                                {t.dimensoes || t.numero}
+                              </p>
+                              {t.fornecedor && (
+                                <p className="text-[9px] mt-0.5" style={{ color: "#FF9500" }}>
+                                  via {t.fornecedor}
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-[11px] font-bold tabular-nums" style={{ color: "#1C1C1E" }}>
+                                {brl(t.preco)}
+                              </p>
+                              {t.quantidade > 0 && (
+                                <p className="text-[9px]" style={{ color: "#8E8E93" }}>{num(t.quantidade)} un</p>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
                     </div>
                   )
                 })()}
