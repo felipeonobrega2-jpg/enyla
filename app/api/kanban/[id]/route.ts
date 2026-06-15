@@ -8,7 +8,15 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await req.json()
-    await supabase.from("KanbanCard").update(body).eq("id", id)
+    // Exclude columns not yet in Supabase. Remove after ALTER TABLE migration.
+    const { fornecedor: _f, custoTerceiro: _c, dataEntregaReal: _d, ...safeBody } = body
+    void _f; void _c; void _d
+    if (Object.keys(safeBody).length === 0) return NextResponse.json({ ok: true })
+    const { error } = await supabase.from("KanbanCard").update(safeBody).eq("id", id)
+    if (error) {
+      console.error("Kanban PATCH error:", error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)
