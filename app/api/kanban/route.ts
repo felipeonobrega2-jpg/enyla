@@ -5,17 +5,24 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     await supabase.from("KanbanCard").upsert({
-      id:            body.id,
-      numero:        body.numero,
-      nomeCliente:   body.nomeCliente,
-      dimensoes:     body.dimensoes,
-      materialNome:  body.materialNome,
-      preco:         body.preco,
-      quantidade:    body.quantidade,
-      data:          body.data,
-      coluna:        body.coluna ?? 0,
-      motivoPerdido: body.motivoPerdido ?? null,
-      opcoes:        body.opcoes ?? null,
+      id:                  body.id,
+      numero:              body.numero,
+      nomeCliente:         body.nomeCliente,
+      dimensoes:           body.dimensoes,
+      materialNome:        body.materialNome,
+      preco:               body.preco,
+      quantidade:          body.quantidade,
+      data:                body.data,
+      coluna:              body.coluna ?? 0,
+      motivoPerdido:       body.motivoPerdido ?? null,
+      opcoes:              body.opcoes ?? null,
+      loteId:              body.loteId ?? null,
+      loteNumero:          body.loteNumero ?? null,
+      dataFechamento:      body.dataFechamento ?? null,
+      dataEntregaPrevista: body.dataEntregaPrevista ?? null,
+      dataEntregaReal:     body.dataEntregaReal ?? null,
+      fornecedor:          body.fornecedor ?? null,
+      custoTerceiro:       body.custoTerceiro ?? null,
     }, { onConflict: "id" })
     return NextResponse.json({ ok: true })
   } catch (e) {
