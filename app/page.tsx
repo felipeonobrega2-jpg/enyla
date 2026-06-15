@@ -122,7 +122,7 @@ export default function Home() {
         if (d.propostasCustom)        setPropostasCustom(d.propostasCustom)
         if (d.contadorProp !== undefined) setContadorProp(d.contadorProp)
         if (d.kanban)                 setKanban(d.kanban)
-        if (d.config)                 setConfig(d.config)
+        if (d.config)                 setConfig(c => ({ ...CONFIG_PADRAO, ...c, ...d.config }))
         if (d.parceiros)              setParceiros(d.parceiros)
         if (d.negocios)               setNegocios(d.negocios)
         if (d.lancamentos)            setLancamentos(d.lancamentos)
@@ -582,7 +582,7 @@ export default function Home() {
         if (d.propostasCustom) setPropostasCustom(d.propostasCustom)
         if (d.contadorProp)   setContadorProp(d.contadorProp)
         if (d.kanban)         setKanban(d.kanban)
-        if (d.config)         { setConfig(d.config); setResult(calcular(form, d.config)) }
+        if (d.config)         { const cfg = { ...CONFIG_PADRAO, ...d.config }; setConfig(cfg); setResult(calcular(form, cfg)) }
         showToast("Backup restaurado com sucesso!")
       } catch {
         alert("Erro ao ler o arquivo. Verifique se é um backup válido.")
