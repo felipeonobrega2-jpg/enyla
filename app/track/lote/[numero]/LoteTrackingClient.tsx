@@ -453,9 +453,9 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
       if (res.ok) {
         const d = await res.json()
         if (d.lote) setLote(d.lote)
-        if (d.cards) setCards(d.cards)
-        if (d.parceiros) setParceiros(d.parceiros)
-        if (d.pagamentos) setPagamentos(d.pagamentos)
+        if (Array.isArray(d.cards) && d.cards.length > 0) setCards(d.cards)
+        if (Array.isArray(d.parceiros)) setParceiros(d.parceiros)
+        if (Array.isArray(d.pagamentos)) setPagamentos(d.pagamentos)
       }
       setLastUpdate(0)
     } catch { /* silent */ } finally {

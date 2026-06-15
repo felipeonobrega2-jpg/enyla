@@ -20,7 +20,7 @@ export async function GET(
     }
 
     const [{ data: cards }, { data: parceiros }, { data: pagamentos }] = await Promise.all([
-      supabase.from("KanbanCard").select("*").eq("loteId", lote.id).order("createdAt", { ascending: true }),
+      supabase.from("KanbanCard").select("*").eq("loteId", lote.id),
       supabase.from("NegocioParceiro").select("*").eq("loteId", lote.id),
       supabase.from("LancamentoFinanceiro")
         .select("id, valor, status, formaPagamento, dataVencimento, dataPagamento")
