@@ -1272,6 +1272,11 @@ export default function Home() {
                 fetch(`/api/lancamentos/${id}`, { method: "DELETE" }).catch(() => {})
               }}
               onRegistrarSobra={abrirSobra}
+              onDeleteCard={id => {
+                setKanban(prev => prev.filter(c => c.id !== id))
+                fetch(`/api/kanban/${id}`, { method: "DELETE" }).catch(() => {})
+              }}
+              onDetalhesCard={card => setDetalheModal({ tipo: "kanban", card })}
             />
           ) : view === "parceiros" ? (
             <ParceirosView

@@ -309,6 +309,8 @@ export function FinanceiroView({
   onUpdate,
   onDelete,
   onRegistrarSobra,
+  onDeleteCard,
+  onDetalhesCard,
 }: {
   lancamentos: LancamentoFinanceiro[]
   kanban: KanbanCard[]
@@ -318,6 +320,8 @@ export function FinanceiroView({
   onUpdate: (id: string, updates: Partial<LancamentoFinanceiro>) => void
   onDelete: (id: string) => void
   onRegistrarSobra?: (card: KanbanCard) => void
+  onDeleteCard?: (id: string) => void
+  onDetalhesCard?: (card: KanbanCard) => void
 }) {
   const [tab, setTab] = useState<"dash" | "receber" | "lancamentos" | "analytics">("dash")
   const [periodo, setPeriodo] = useState<Periodo>("mes")
@@ -1105,7 +1109,67 @@ export function FinanceiroView({
                 </>
               )
             })()}
-          </div>
+          {/* ── Terceirizados ── */}
+          {(() => {
+            const tercs = kanban.filter(c => c.materialNome === "Terceirizado")
+            if (tercs.length === 0) return null
+            return (
+              <div className="mt-6 space-y-2">
+                <div className="flex items-center gap-2">
+                  <p className="text-[9.5px] uppercase tracking-wide font-bold" style={{ color: "#FF9500" }}>
+                    Terceirizados ({tercs.length})
+                  </p>
+                  <div className="flex-1 h-px" style={{ background: "rgba(255,149,0,0.2)" }} />
+                </div>
+                {tercs.map(t => (
+                  <div key={t.id}
+                    className="rounded-2xl border px-4 py-3 flex items-start justify-between gap-3"
+                    style={{ background: "rgba(255,149,0,0.04)", borderColor: "rgba(255,149,0,0.15)" }}>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                        <p className="text-[12.5px] font-semibold truncate" style={{ color: "#1C1C1E" }}>
+                          {t.dimensoes || t.numero}
+                        </p>
+                        {t.loteNumero && (
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(0,122,255,0.08)", color: "#007AFF" }}>
+                            {t.loteNumero}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px]" style={{ color: "#8E8E93" }}>
+                        {t.nomeCliente}{t.fornecedor ? ` · via ${t.fornecedor}` : ""}
+                      </p>
+                      {t.custoTerceiro != null && t.custoTerceiro > 0 && (
+                        <p className="text-[10px] mt-0.5" style={{ color: "#FF9500" }}>
+                          Custo: {brl(t.custoTerceiro)} · Margem: {brl(t.preco - t.custoTerceiro)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0 flex flex-col items-end gap-2">
+                      <p className="text-[13px] font-bold tabular-nums" style={{ color: "#1C1C1E" }}>{brl(t.preco)}</p>
+                      <div className="flex gap-1.5">
+                        {onDetalhesCard && (
+                          <button onClick={() => onDetalhesCard(t)}
+                            className="text-[10.5px] font-medium px-2.5 py-1 rounded-lg transition-colors"
+                            style={{ background: "rgba(0,122,255,0.08)", color: "#007AFF" }}>
+                            Detalhes
+                          </button>
+                        )}
+                        {onDeleteCard && (
+                          <button onClick={() => onDeleteCard(t.id)}
+                            className="text-[10.5px] font-medium px-2.5 py-1 rounded-lg transition-colors"
+                            style={{ background: "rgba(255,59,48,0.08)", color: "#FF3B30" }}>
+                            Excluir
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </div>
         )}
 
         {/* ── LANÇAMENTOS ── */}
