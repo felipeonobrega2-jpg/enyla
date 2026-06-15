@@ -24,6 +24,8 @@ export type Configuracoes = {
   multiplicadores: Multiplicadores
   materiais: Material[]
   apiKey: string
+  metaMensal: number
+  baselineFaturamento: number
 }
 
 export const CONFIG_PADRAO: Configuracoes = {
@@ -47,6 +49,8 @@ export const CONFIG_PADRAO: Configuracoes = {
     { id: "cartao350", nome: "Cartão 350g",  precos: { "66x96": 225, "77x113": 310 } },
   ],
   apiKey: "",
+  metaMensal: 10000,
+  baselineFaturamento: 0,
 }
 
 export const defaultConfig = CONFIG_PADRAO
@@ -61,6 +65,8 @@ export function carregarConfig(): Configuracoes {
       multiplicadores: { ...CONFIG_PADRAO.multiplicadores, ...saved.multiplicadores },
       materiais: saved.materiais?.length ? saved.materiais : CONFIG_PADRAO.materiais,
       apiKey: saved.apiKey ?? "",
+      metaMensal: saved.metaMensal ?? CONFIG_PADRAO.metaMensal,
+      baselineFaturamento: saved.baselineFaturamento ?? 0,
     }
   } catch {
     return CONFIG_PADRAO
