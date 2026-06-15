@@ -486,8 +486,10 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
     )
   }
 
-  const activeCards  = cards.filter(c => c.coluna !== 10)
-  const totalValor   = activeCards.reduce((s, c) => s + c.preco, 0)
+  const prodCards    = cards.filter(c => c.materialNome !== "Terceirizado")
+  const tercsCards   = cards.filter(c => c.materialNome === "Terceirizado")
+  const activeCards  = prodCards.filter(c => c.coluna !== 10)
+  const totalValor   = cards.filter(c => c.coluna !== 10).reduce((s, c) => s + c.preco, 0)
                      + parceiros.reduce((s, p) => s + (p.valorVenda ?? 0), 0)
   const totalQtd     = activeCards.reduce((s, c) => s + c.quantidade, 0)
   const allEntregue  = activeCards.length > 0 && activeCards.every(c => c.coluna === 9)
@@ -500,8 +502,8 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
   const hasPagamentos = pagamentos.length > 0
   const overallPct   = progressPct(minColuna)
 
-  // Single-product mode: 1 internal card, no partner products
-  const isSingleMode = cards.length === 1 && parceiros.length === 0
+  // Single-product mode: 1 production card, no partner/terceirizado products
+  const isSingleMode = prodCards.length === 1 && parceiros.length === 0 && tercsCards.length === 0
 
   const header = (
     <div className="bg-white border-b border-[rgba(60,60,67,0.12)] sticky top-0 z-10">
@@ -830,18 +832,44 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
           )}
         </div>
 
-        {/* All products — internal and partner merged, no distinction shown */}
-        {(cards.length > 0 || parceiros.length > 0) && (
+        {/* Production cards + partner items */}
+        {(prodCards.length > 0 || parceiros.length > 0) && (
           <div className="space-y-3">
             <p className="text-[10.5px] uppercase tracking-wide font-bold text-[#8E8E93] px-1">
               Toque para ver o progresso detalhado
             </p>
-            {cards.map(card => <ProductCard key={card.id} card={card} />)}
+            {prodCards.map(card => <ProductCard key={card.id} card={card} />)}
             {parceiros.map(p => <PartnerCard key={p.id} item={p} />)}
           </div>
         )}
 
-        {cards.length === 0 && parceiros.length === 0 && (
+        {/* Terceirizado items — simple display, no production stages */}
+        {tercsCards.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[10.5px] uppercase tracking-wide font-bold text-[#8E8E93] px-1">
+              Itens adicionais
+            </p>
+            {tercsCards.map(t => (
+              <div key={t.id} className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04)] px-4 py-3.5 flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-[#1C1C1E] text-sm truncate">{t.dimensoes || t.numero}</p>
+                  {t.quantidade > 0 && (
+                    <p className="text-[#8E8E93] text-xs mt-0.5">{num(t.quantidade)} un</p>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-bold text-[#1C1C1E] tabular-nums">{brl(t.preco)}</p>
+                  <span className="text-[9.5px] font-semibold px-2 py-0.5 rounded-full mt-1 inline-block"
+                    style={{ background: "rgba(52,199,89,0.1)", color: "#34C759" }}>
+                    Confirmado
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {cards.length === 0 && parceiros.length === 0 && tercsCards.length === 0 && (
           <div className="text-center py-8 text-[#8E8E93] text-sm">
             Nenhum produto encontrado neste lote.
           </div>
