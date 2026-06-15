@@ -492,6 +492,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
   const totalValor   = cards.filter(c => c.coluna !== 10).reduce((s, c) => s + c.preco, 0)
                      + parceiros.reduce((s, p) => s + (p.valorVenda ?? 0), 0)
   const totalQtd     = activeCards.reduce((s, c) => s + c.quantidade, 0)
+                     + tercsCards.reduce((s, c) => s + c.quantidade, 0)
   const allEntregue  = activeCards.length > 0 && activeCards.every(c => c.coluna === 9)
   const minColuna    = activeCards.length > 0 ? Math.min(...activeCards.map(c => c.coluna)) : 0
 
@@ -797,7 +798,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
           <div className="grid grid-cols-3 gap-0 mx-4 mt-3 bg-white/10 rounded-xl overflow-hidden divide-x divide-white/10" style={{ marginBottom: hasPagamentos ? 12 : 16 }}>
             <div className="px-3 py-3 text-center">
               <p className="text-[9px] font-bold uppercase tracking-wide text-white/60 mb-1">Produtos</p>
-              <p className="text-xl font-semibold text-white tabular-nums">{activeCards.length + parceiros.length}</p>
+              <p className="text-xl font-semibold text-white tabular-nums">{activeCards.length + parceiros.length + tercsCards.length}</p>
             </div>
             <div className="px-3 py-3 text-center">
               <p className="text-[9px] font-bold uppercase tracking-wide text-white/60 mb-1">Unidades</p>
