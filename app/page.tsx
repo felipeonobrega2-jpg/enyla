@@ -1349,6 +1349,18 @@ export default function Home() {
                   body: JSON.stringify({ coluna }),
                 }).catch(() => {})
               }}
+              onEdit={(id, fields) => {
+                setKanban(prev => prev.map(c => c.id === id ? { ...c, ...fields } : c))
+                fetch(`/api/kanban/${id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(fields),
+                }).catch(() => {})
+              }}
+              onDelete={id => {
+                setKanban(prev => prev.filter(c => c.id !== id))
+                fetch(`/api/kanban/${id}`, { method: "DELETE" }).catch(() => {})
+              }}
             />
           ) : !r ? (
             <EmptyState />
