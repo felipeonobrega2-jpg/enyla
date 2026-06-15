@@ -276,7 +276,7 @@ export function GamificacaoView({
 
 export function SidebarGamificacao({
   kanban,
-  metaMensal,
+  baselineFaturamento,
   onClick,
 }: {
   kanban: KanbanCard[]
@@ -284,44 +284,43 @@ export function SidebarGamificacao({
   baselineFaturamento: number
   onClick: () => void
 }) {
-  const fechados = kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO)
+  const totalFaturado = useMemo(() => {
+    const fechados = kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO)
+    return baselineFaturamento + fechados.reduce((s, c) => s + c.preco, 0)
+  }, [kanban, baselineFaturamento])
 
-  const faturadoMes = useMemo(() => {
-    const hoje = new Date()
-    const mes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`
-    return fechados
-      .filter(c => (c.dataFechamento ?? "").startsWith(mes))
-      .reduce((s, c) => s + c.preco, 0)
-  }, [fechados])
+  const proximoMarco = MARCOS.find(m => m.threshold > totalFaturado) ?? null
+  const pct = proximoMarco ? Math.min(totalFaturado / proximoMarco.threshold, 1) : 1
+  const falta = proximoMarco ? proximoMarco.threshold - totalFaturado : 0
 
-  const streak = useMemo(() => calcularStreak(kanban), [kanban])
-
-  const pct = metaMensal > 0 ? Math.min(faturadoMes / metaMensal, 1) : 0
-  const mesNome = new Date().toLocaleDateString("pt-BR", { month: "short" }).replace(".", "")
+  function fmtShort(v: number) {
+    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1).replace(".", ",")}M`
+    if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`
+    return `${v}`
+  }
 
   return (
     <button onClick={onClick}
       className="w-full px-3 py-2.5 text-left transition-colors hover:bg-white/[0.04] rounded-xl"
       style={{ margin: "0 8px", width: "calc(100% - 16px)" }}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] text-zinc-500 uppercase tracking-wide font-semibold">Streak</span>
-        <span className={`text-[10.5px] font-bold tabular-nums ${streak > 0 ? "text-[#FF9500]" : "text-zinc-600"}`}>
-          {streak}d
-        </span>
-      </div>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] text-zinc-500 capitalize">{mesNome}</span>
-        <span className="text-[10px] font-medium tabular-nums text-zinc-500">
+        <span className="text-[10px] text-zinc-500 uppercase tracking-wide font-semibold">Próximo marco</span>
+        <span className="text-[10.5px] font-bold tabular-nums" style={{ color: "#FF9500" }}>
           {Math.round(pct * 100)}%
         </span>
       </div>
+      <p className="text-[11px] font-semibold leading-snug mb-1.5 truncate" style={{ color: proximoMarco ? "rgba(255,255,255,0.75)" : "#34C759" }}>
+        {proximoMarco ? `${proximoMarco.label} · ${proximoMarco.sub}` : "Todos conquistados!"}
+      </p>
       <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
         <div className="h-full rounded-full transition-all duration-500"
-          style={{
-            width: `${pct * 100}%`,
-            background: pct >= 1 ? "#34C759" : pct >= 0.7 ? "#FF9500" : "#007AFF",
-          }} />
+          style={{ width: `${pct * 100}%`, background: proximoMarco ? "#FF9500" : "#34C759" }} />
       </div>
+      {proximoMarco && falta > 0 && (
+        <p className="text-[9px] mt-1 tabular-nums" style={{ color: "rgba(255,255,255,0.3)" }}>
+          Faltam R${fmtShort(falta)}
+        </p>
+      )}
     </button>
   )
 }

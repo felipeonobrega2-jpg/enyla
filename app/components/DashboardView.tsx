@@ -8,6 +8,15 @@ import {
 import { Configuracoes } from "../config"
 import { brl, num } from "../utils"
 
+const MARCOS = [
+  { threshold: 10_000,     label: "Primeiro Salto",    sub: "R$10 mil"     },
+  { threshold: 50_000,     label: "Tração Real",        sub: "R$50 mil"     },
+  { threshold: 100_000,    label: "6 Dígitos",          sub: "R$100 mil"    },
+  { threshold: 500_000,    label: "Meio Milhão",        sub: "R$500 mil"    },
+  { threshold: 1_000_000,  label: "Primeiro Milhão",    sub: "R$1 milhão"   },
+  { threshold: 10_000_000, label: "Empresa de Verdade", sub: "R$10 milhões" },
+]
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type HistoricoItem = { form: FormData; calculo: Calculo; data: string; numero?: string }
@@ -593,6 +602,79 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
           </div>
         </div>
       </div>
+
+      {/* ── Próximo marco ──────────────────────────────────────────────────── */}
+      {(() => {
+        const totalFaturado = (_config.baselineFaturamento ?? 0)
+          + kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO).reduce((s, c) => s + c.preco, 0)
+        const proximoMarco = MARCOS.find(m => m.threshold > totalFaturado) ?? null
+        const anteriorMarco = proximoMarco
+          ? (MARCOS[MARCOS.indexOf(proximoMarco) - 1] ?? null)
+          : MARCOS[MARCOS.length - 1]
+        const base = anteriorMarco?.threshold ?? 0
+        const topo = proximoMarco?.threshold ?? totalFaturado
+        const pct = topo > base ? Math.min((totalFaturado - base) / (topo - base), 1) : 1
+        const pctGlobal = proximoMarco ? Math.min(totalFaturado / proximoMarco.threshold, 1) : 1
+
+        return (
+          <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] px-5 py-4">
+            <div className="flex items-center gap-5">
+              {/* Left: labels */}
+              <div className="shrink-0">
+                <p className="text-[10.5px] font-medium text-[#8E8E93] mb-1">
+                  {proximoMarco ? "Próximo marco" : "Faturamento total"}
+                </p>
+                <p className="text-[15px] font-semibold text-[#1C1C1E] leading-snug">
+                  {proximoMarco ? proximoMarco.label : "Todos os marcos conquistados!"}
+                </p>
+                {proximoMarco && (
+                  <p className="text-[11px] tabular-nums font-medium mt-0.5" style={{ color: "#FF9500" }}>
+                    {proximoMarco.sub}
+                  </p>
+                )}
+              </div>
+
+              {/* Center: bar */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1.5">
+                  {anteriorMarco && (
+                    <span className="text-[9.5px] text-[#8E8E93] tabular-nums">{anteriorMarco.sub}</span>
+                  )}
+                  <span className="text-[9.5px] text-[#8E8E93] tabular-nums ml-auto">
+                    {brl(totalFaturado)}
+                  </span>
+                  {proximoMarco && (
+                    <span className="text-[9.5px] text-[#8E8E93] tabular-nums ml-2">{proximoMarco.sub}</span>
+                  )}
+                </div>
+                <div className="relative h-2 rounded-full overflow-hidden bg-[rgba(0,0,0,0.06)]">
+                  <div className="absolute inset-y-0 left-0 rounded-full transition-all duration-700"
+                    style={{ width: `${pct * 100}%`, background: proximoMarco ? "#FF9500" : "#34C759" }} />
+                  {/* Current position marker */}
+                  <div className="absolute inset-y-0 flex items-center transition-all duration-700"
+                    style={{ left: `${Math.max(pct * 100 - 0.5, 0)}%` }}>
+                    <div className="w-2 h-2 rounded-full bg-white shadow-md border-2"
+                      style={{ borderColor: proximoMarco ? "#FF9500" : "#34C759" }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: percentage + falta */}
+              <div className="shrink-0 text-right">
+                <p className="text-[22px] font-semibold tabular-nums leading-none"
+                  style={{ color: proximoMarco ? "#FF9500" : "#34C759" }}>
+                  {Math.round(pctGlobal * 100)}%
+                </p>
+                {proximoMarco && (
+                  <p className="text-[10px] text-[#8E8E93] mt-1 tabular-nums">
+                    Faltam {brl(proximoMarco.threshold - totalFaturado)}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── KPI Row 1 – Financial metrics ──────────────────────────────────── */}
       <div className="grid grid-cols-5 gap-3">
