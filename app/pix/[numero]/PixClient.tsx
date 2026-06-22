@@ -1,244 +1,242 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import QRCode from "qrcode"
 import { gerarPixPayload } from "@/app/lib/pix"
 
-const CHAVE_PIX = "financeiro@enyla.com.br"
+const CHAVE_PIX      = "financeiro@enyla.com.br"
 const NOME_RECEBEDOR = "Enyla"
-const CIDADE = "Natal"
+const CIDADE         = "Natal"
 
-const brl = (v: number) =>
-  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 
-type CopyState = "idle" | "copied"
+interface PixData { valor: number; cliente: string; expISO: string | null }
 
-function CopyButton({
-  text,
-  label,
-  sublabel,
-  accent = "#007AFF",
-}: {
-  text: string
-  label: string
-  sublabel?: string
-  accent?: string
-}) {
-  const [state, setState] = useState<CopyState>("idle")
+function useCountdown(expISO: string | null) {
+  const [msLeft, setMsLeft] = useState<number>(() =>
+    expISO ? Math.max(0, new Date(expISO).getTime() - Date.now()) : -1
+  )
+  useEffect(() => {
+    if (!expISO) return
+    const tick = () => setMsLeft(Math.max(0, new Date(expISO).getTime() - Date.now()))
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [expISO])
+  return msLeft
+}
+
+function fmtCountdown(ms: number) {
+  const t = Math.floor(ms / 1000)
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return { h: pad(Math.floor(t / 3600)), m: pad(Math.floor((t % 3600) / 60)), s: pad(t % 60) }
+}
+
+function fmtExpTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+}
+
+export default function PixClient({ numero }: { numero: string }) {
+  // Read URL params directly on the client — most reliable across all browsers/devices
+  const params = useSearchParams()
+  const v = params.get("v")
+  // support both ?e= (new short) and ?exp= (old format)
+  const e = params.get("e") ?? params.get("exp")
+  const c = params.get("c")
+
+  const fromUrl: PixData | null = v
+    ? { valor: parseFloat(v) || 0, cliente: c ?? "", expISO: e }
+    : null
+
+  const [apiData,   setApiData]   = useState<PixData | null>(null)
+  const [loading,   setLoading]   = useState(!fromUrl)
+  const [notFound,  setNotFound]  = useState(false)
+  const [copied,    setCopied]    = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+
+  const data: PixData | null = fromUrl ?? apiData
+
+  useEffect(() => {
+    if (fromUrl) return // URL params present — use them directly
+    // Short URL: fetch from DB
+    fetch(`/api/pix-link/${encodeURIComponent(numero)}`)
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then((d: PixData) => setApiData(d))
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numero])
+
+  const msLeft  = useCountdown(data?.expISO ?? null)
+  const expired = data?.expISO != null && msLeft === 0
+
+  const payload = data ? gerarPixPayload({
+    chave: CHAVE_PIX, nome: NOME_RECEBEDOR, cidade: CIDADE,
+    valor: data.valor,
+    txid: numero.replace(/[^a-zA-Z0-9]/g, "").slice(0, 25),
+    descricao: `Lote ${numero}`,
+  }) : ""
+
+  useEffect(() => {
+    if (!payload || expired) return
+    QRCode.toDataURL(payload, {
+      errorCorrectionLevel: "M", margin: 1, width: 320,
+      color: { dark: "#1C1C1E", light: "#FFFFFF" },
+    }).then(setQrDataUrl).catch(() => {})
+  }, [payload, expired])
 
   function copy() {
-    navigator.clipboard.writeText(text).then(() => {
-      setState("copied")
-      setTimeout(() => setState("idle"), 2000)
+    navigator.clipboard.writeText(payload).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 3000)
     })
   }
 
-  const copied = state === "copied"
+  // ── Loading ───────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="min-h-[100dvh] bg-white flex items-center justify-center">
+        <div className="w-6 h-6 border-2 rounded-full animate-spin"
+          style={{ borderColor: "#1C1C1E", borderTopColor: "transparent" }} />
+      </div>
+    )
+  }
+
+  // ── Not found ─────────────────────────────────────────────────────────────
+  if (notFound || !data) {
+    return (
+      <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-5 text-center gap-4">
+        <p className="text-[10px] font-bold tracking-[0.28em] uppercase text-[rgba(60,60,67,0.4)]">ENYLA</p>
+        <p className="text-[18px] font-bold text-[#1C1C1E]">Link inválido</p>
+        <p className="text-[13px] text-[#8E8E93]">Solicite um novo link ao vendedor.</p>
+      </div>
+    )
+  }
+
+  // ── Urgency ───────────────────────────────────────────────────────────────
+  const nearEnd  = msLeft >= 0 && msLeft < 30 * 60 * 1000
+  const urgent   = msLeft >= 0 && msLeft < 60 * 60 * 1000
+  const timerBg  = nearEnd ? "#FF3B30" : urgent ? "#FF9500" : "#1C1C1E"
+
+  // ── Expired ───────────────────────────────────────────────────────────────
+  if (expired) {
+    return (
+      <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-5 text-center gap-4">
+        <p className="text-[10px] font-bold tracking-[0.28em] uppercase text-[rgba(60,60,67,0.4)]">ENYLA</p>
+        <div className="w-14 h-14 rounded-full bg-[#FF3B30]/10 flex items-center justify-center">
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="#FF3B30" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+          </svg>
+        </div>
+        <p className="text-[18px] font-bold text-[#1C1C1E]">Link expirado</p>
+        <p className="text-[13px] text-[#8E8E93]">Solicite um novo link ao vendedor.</p>
+      </div>
+    )
+  }
+
+  const timer = (data.expISO && msLeft >= 0) ? fmtCountdown(msLeft) : null
+  const { valor, cliente, expISO } = data
 
   return (
-    <button
-      onClick={copy}
-      className="w-full rounded-2xl border transition-all active:scale-[0.98]"
-      style={{
-        background: copied ? `${accent}10` : "white",
-        borderColor: copied ? accent : "rgba(60,60,67,0.12)",
-        padding: "14px 16px",
-      }}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-left min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#8E8E93" }}>
-            {label}
-          </p>
-          {sublabel && (
-            <p className="mt-0.5 text-[13px] font-mono truncate" style={{ color: "#1C1C1E" }}>
-              {sublabel}
+    <div className="min-h-[100dvh] bg-white flex flex-col">
+
+      {/* ── Countdown banner ─────────────────────────────────────────────── */}
+      {expISO && timer && (
+        <div className={`w-full flex items-center justify-center gap-3 px-4 py-3 transition-colors duration-500 ${nearEnd ? "animate-pulse" : ""}`}
+          style={{ background: timerBg }}>
+          <div className="flex items-center gap-1">
+            {[timer.h, timer.m, timer.s].map((unit, i) => (
+              <div key={i} className="flex items-center gap-1">
+                <div className="flex gap-[2px]">
+                  {unit.split("").map((d, j) => (
+                    <span key={j}
+                      className="inline-flex items-center justify-center w-6 h-8 rounded-md text-[15px] font-bold tabular-nums text-white"
+                      style={{ background: "rgba(255,255,255,0.18)" }}>
+                      {d}
+                    </span>
+                  ))}
+                </div>
+                {i < 2 && <span className="text-[14px] font-bold text-white opacity-70 mx-0.5">:</span>}
+              </div>
+            ))}
+          </div>
+          <div className="text-white">
+            <p className="text-[11px] font-semibold leading-tight opacity-90">
+              {nearEnd ? "Expirando agora!" : urgent ? "Expira em breve" : "Link válido até"}
             </p>
-          )}
+            <p className="text-[10px] opacity-60 leading-tight">{fmtExpTime(expISO)}</p>
+          </div>
         </div>
-        <div
-          className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all"
-          style={{
-            background: copied ? accent : `${accent}15`,
-            color: copied ? "white" : accent,
-          }}
-        >
-          {copied ? (
-            <>
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-              </svg>
-              Copiado
-            </>
+      )}
+
+      {/* ── Body ─────────────────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col items-center px-5 pt-7 pb-8 w-full max-w-[360px] mx-auto">
+
+        <p className="text-[10px] font-bold tracking-[0.28em] uppercase text-[rgba(60,60,67,0.4)] mb-6">ENYLA</p>
+
+        <div className="rounded-2xl overflow-hidden mb-6"
+          style={{ background: "#F7F7F7", padding: "14px", border: "1px solid rgba(0,0,0,0.07)" }}>
+          {qrDataUrl ? (
+            <img src={qrDataUrl} alt="QR Code PIX" width={210} height={210}
+              className="block rounded-xl" style={{ imageRendering: "pixelated" }} />
           ) : (
-            <>
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
-              </svg>
-              Copiar
-            </>
+            <div className="w-[210px] h-[210px] flex items-center justify-center">
+              <div className="w-5 h-5 border-2 rounded-full animate-spin"
+                style={{ borderColor: "#1C1C1E", borderTopColor: "transparent" }} />
+            </div>
           )}
         </div>
-      </div>
-    </button>
-  )
-}
 
-export default function PixClient({
-  numero,
-  valor,
-  cliente,
-}: {
-  numero: string
-  valor: number
-  cliente: string
-}) {
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
-
-  const payload = gerarPixPayload({
-    chave: CHAVE_PIX,
-    nome: NOME_RECEBEDOR,
-    cidade: CIDADE,
-    valor,
-    txid: numero.replace(/[^a-zA-Z0-9]/g, "").slice(0, 25),
-    descricao: `Pedido ${numero}`,
-  })
-
-  useEffect(() => {
-    QRCode.toDataURL(payload, {
-      errorCorrectionLevel: "M",
-      margin: 1,
-      width: 256,
-      color: { dark: "#1C1C1E", light: "#FFFFFF" },
-    })
-      .then(setQrDataUrl)
-      .catch(() => {})
-  }, [payload])
-
-  return (
-    <div
-      className="min-h-screen flex flex-col"
-      style={{ background: "linear-gradient(160deg, #f5f5f7 0%, #ececf1 100%)" }}
-    >
-      {/* Header */}
-      <div className="px-5 pt-12 pb-6 text-center">
-        <p
-          className="text-[11px] font-bold tracking-[0.12em] uppercase mb-1"
-          style={{ color: "#007AFF" }}
-        >
-          Enyla Embalagens
-        </p>
-        <p className="text-[22px] font-bold" style={{ color: "#1C1C1E", letterSpacing: "-0.5px" }}>
-          Pagamento via PIX
-        </p>
-        {cliente && (
-          <p className="mt-1 text-[14px]" style={{ color: "#8E8E93" }}>
-            Olá, {cliente.split(" ")[0]} 👋
+        <div className="text-center mb-6 w-full">
+          <p className="text-[12px] text-[#8E8E93] mb-1">
+            Lote {numero}{cliente ? ` · ${cliente.split(" ")[0]}` : ""}
           </p>
-        )}
-      </div>
-
-      {/* Card principal */}
-      <div className="flex-1 px-4 pb-10 space-y-3 max-w-sm mx-auto w-full">
-
-        {/* Valor + pedido */}
-        <div
-          className="rounded-3xl px-5 py-5 text-center shadow-sm"
-          style={{ background: "white", border: "1px solid rgba(60,60,67,0.08)" }}
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: "#8E8E93" }}>
-            Pedido {numero}
-          </p>
-          <p
-            className="text-[38px] font-bold tabular-nums leading-none"
-            style={{ color: "#1C1C1E", letterSpacing: "-1px" }}
-          >
+          <p className="font-bold text-[#1C1C1E] tabular-nums leading-none"
+            style={{ fontSize: "clamp(32px, 10vw, 46px)", letterSpacing: "-1.5px" }}>
             {valor > 0 ? brl(valor) : "—"}
           </p>
-          {valor > 0 && (
-            <p className="mt-1.5 text-[12px]" style={{ color: "#34C759" }}>
-              Valor já preenchido automaticamente
-            </p>
+        </div>
+
+        <button onClick={copy}
+          className="w-full py-4 rounded-2xl text-[15px] font-semibold transition-all duration-200 active:scale-[0.98] mb-8"
+          style={{ background: copied ? "#34C759" : "#1C1C1E", color: "white" }}>
+          {copied ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+              Código copiado!
+            </span>
+          ) : (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
+              </svg>
+              Copiar código PIX
+            </span>
           )}
+        </button>
+
+        <div className="w-full space-y-3.5">
+          {([
+            <>Abra o app do banco e acesse <strong className="text-[#1C1C1E]">PIX → Copia e Cola</strong></>,
+            <>Cole o código e confirme o valor {valor > 0 && <strong className="text-[#1C1C1E]">{brl(valor)}</strong>}</>,
+            <>Envie o comprovante pelo <strong className="text-[#1C1C1E]">WhatsApp</strong></>,
+          ] as React.ReactNode[]).map((text, i) => (
+            <div key={i} className="flex gap-3 items-start">
+              <span className="shrink-0 w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center mt-0.5"
+                style={{ background: "rgba(0,0,0,0.06)", color: "#1C1C1E" }}>
+                {i + 1}
+              </span>
+              <p className="text-[13px] text-[#8E8E93] leading-snug">{text}</p>
+            </div>
+          ))}
         </div>
+      </div>
 
-        {/* QR Code */}
-        <div
-          className="rounded-3xl px-5 py-5 flex flex-col items-center gap-3 shadow-sm"
-          style={{ background: "white", border: "1px solid rgba(60,60,67,0.08)" }}
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-wide self-start" style={{ color: "#8E8E93" }}>
-            QR Code PIX
-          </p>
-
-          <div
-            className="rounded-2xl p-3"
-            style={{ background: "#F2F2F7" }}
-          >
-            {qrDataUrl ? (
-              <img
-                src={qrDataUrl}
-                alt="QR Code PIX"
-                width={200}
-                height={200}
-                className="rounded-xl block"
-              />
-            ) : (
-              <div
-                className="w-[200px] h-[200px] rounded-xl flex items-center justify-center"
-                style={{ background: "#F2F2F7" }}
-              >
-                <div
-                  className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
-                  style={{ borderColor: "#007AFF", borderTopColor: "transparent" }}
-                />
-              </div>
-            )}
-          </div>
-
-          <p className="text-[11.5px] text-center" style={{ color: "#8E8E93" }}>
-            Aponte a câmera do seu banco para o código acima
-          </p>
-        </div>
-
-        {/* Copiar chave */}
-        <CopyButton
-          text={CHAVE_PIX}
-          label="Chave PIX (e-mail)"
-          sublabel={CHAVE_PIX}
-          accent="#007AFF"
-        />
-
-        {/* Copiar código completo */}
-        <CopyButton
-          text={payload}
-          label="PIX Copia e Cola"
-          sublabel={payload.slice(0, 32) + "…"}
-          accent="#34C759"
-        />
-
-        {/* Rodapé informativo */}
-        <div
-          className="rounded-2xl px-4 py-4 flex gap-3"
-          style={{ background: "rgba(0,122,255,0.06)", border: "1px solid rgba(0,122,255,0.12)" }}
-        >
-          <svg className="w-4 h-4 mt-0.5 shrink-0 text-[#007AFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-          </svg>
-          <div className="space-y-0.5">
-            <p className="text-[12px] font-semibold" style={{ color: "#007AFF" }}>
-              Pagamento instantâneo
-            </p>
-            <p className="text-[11.5px] leading-relaxed" style={{ color: "rgba(0,122,255,0.75)" }}>
-              Funciona em qualquer app de banco. Após o pagamento, envie o comprovante pelo WhatsApp.
-            </p>
-          </div>
-        </div>
-
-        {/* Branding */}
-        <p className="text-center text-[10.5px] pt-2" style={{ color: "rgba(60,60,67,0.3)" }}>
-          Enyla Embalagens · {CIDADE}
-        </p>
+      <div className="py-4 text-center">
+        <p className="text-[10px] tracking-wide" style={{ color: "rgba(60,60,67,0.25)" }}>enyla.com.br</p>
       </div>
     </div>
   )

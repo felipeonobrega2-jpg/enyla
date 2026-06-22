@@ -25,10 +25,18 @@ import { ModalDetalhe, DetalheData } from "./components/ModalDetalhe"
 import { ModalSobra } from "./components/ModalSobra"
 import { GamificacaoView, SidebarGamificacao } from "./components/GamificacaoView"
 import { TerceirizadosView } from "./components/TerceirizadosView"
+import BuscaGlobal from "./components/BuscaGlobal"
+
+function unpackTerceirizado(card: KanbanCard): KanbanCard {
+  if (card.materialNome !== "Terceirizado") return card
+  const ops = card.opcoes as unknown as { _x?: { fornecedor?: string; custoTerceiro?: number } } | null
+  if (!ops?._x) return card
+  return { ...card, opcoes: undefined, fornecedor: ops._x.fornecedor || card.fornecedor, custoTerceiro: ops._x.custoTerceiro ?? card.custoTerceiro }
+}
 
 const FORM_INICIAL: FormData = {
   nomeCliente: "", frente: 0, lateral: 0, alturaBox: 0, abaColagem: 1,
-  incluirVerniz: false, comFaca: true, valorFaca: 0,
+  incluirVerniz: true, comFaca: true, valorFaca: 0,
   numSKUs: 1, numArtes: 1, quantidades: [...QUANTIDADES_PADRAO], customPecasChapa: null,
   obsInterna: "", obsCliente: "", validadeDias: 7, materialId: "cartao300", materialNome: "Cartão 300g",
 }
@@ -78,6 +86,7 @@ export default function Home() {
   const [novaQtd, setNovaQtd] = useState("")
   const [toast, setToast]     = useState("")
   const [historico, setHistorico] = useState<Array<{ form: FormData; calculo: Calculo; data: string; numero?: string }>>([])
+  const [editandoHistorico, setEditandoHistorico] = useState<string | null>(null)
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
   const [contador, setContador] = useState<number>(0)
   const [view, setView]       = useState<"orcamento" | "historico" | "clientes" | "kanban" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados">("dashboard")
@@ -98,8 +107,21 @@ export default function Home() {
     loteId?: string; loteNumero?: string; preco: number
   } | null>(null)
   const [modalSobra, setModalSobra] = useState<{ card: KanbanCard; loteCards: KanbanCard[] } | null>(null)
+  const [buscaAberta, setBuscaAberta] = useState(false)
   const { isDark, setTheme, theme } = useTheme()
   const expirySweepDone = useRef(false)
+
+  // Cmd+K global search shortcut
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault()
+        setBuscaAberta(v => !v)
+      }
+    }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [])
 
   // Persist main view across F5 — read on mount, write in navigate()
   useEffect(() => {
@@ -122,7 +144,7 @@ export default function Home() {
         if (d.clientes)               setClientes(d.clientes)
         if (d.propostasCustom)        setPropostasCustom(d.propostasCustom)
         if (d.contadorProp !== undefined) setContadorProp(d.contadorProp)
-        if (d.kanban)                 setKanban(d.kanban)
+        if (d.kanban)                 setKanban(d.kanban.map(unpackTerceirizado))
         if (d.config)                 setConfig(c => ({ ...CONFIG_PADRAO, ...c, ...d.config }))
         if (d.parceiros)              setParceiros(d.parceiros)
         if (d.negocios)               setNegocios(d.negocios)
@@ -485,6 +507,81 @@ export default function Home() {
     showToast("Orçamento replicado na mesa atual.")
   }
 
+  function personalizarHistorico(item: { form: FormData; calculo: Calculo; numero?: string; data: string }) {
+    const cardId = kanban.find(c => c.numero === item.numero)?.id ?? `hist-${item.numero}`
+    setDetalheModal(null)
+    setModalSalvar({
+      form: item.form,
+      calculo: item.calculo,
+      numero: item.numero ?? "",
+      data: item.data,
+      cardId,
+    })
+  }
+
+  function editarHistorico(item: { form: FormData; calculo: Calculo; numero?: string }) {
+    if (!item.numero) return
+    setForm({ ...item.form })
+    setResult(calcular(item.form, config))
+    setEditandoHistorico(item.numero)
+    setView("orcamento")
+    setDetalheModal(null)
+  }
+
+  function cancelarEdicaoHistorico() {
+    setEditandoHistorico(null)
+    setForm(FORM_INICIAL)
+    setResult(null)
+    setView("historico")
+  }
+
+  function salvarEdicaoHistorico() {
+    if (!result || !editandoHistorico) return
+    const numero = editandoHistorico
+    const original = historico.find(h => h.numero === numero)
+    const data = original?.data ?? new Date().toLocaleString("pt-BR")
+    const historicoItem = { form: { ...form }, calculo: result, data, numero }
+    setHistorico(prev => prev.map(h => h.numero === numero ? historicoItem : h))
+    fetch("/api/historico", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(historicoItem),
+    }).catch(() => {})
+
+    // Sincroniza o card do kanban vinculado (se existir)
+    const card = kanban.find(c => c.numero === numero)
+    if (card) {
+      const ideal = result.tabela.find(l => l.quantidade === result.sweetSpotIdealQtd) ?? result.tabela[result.tabela.length - 1]
+      const aindaNaoFechado = card.coluna < COL_FECHADO
+      const updates = {
+        nomeCliente: form.nomeCliente || "Sem nome",
+        dimensoes: `${form.frente}×${form.alturaBox}×${form.lateral}`,
+        materialNome: form.materialNome,
+        opcoes: result.tabela.map(l => ({
+          quantidade: l.quantidade,
+          preco:     form.comFaca ? l.precoComFaca    : l.precoSemFaca,
+          unitario:  form.comFaca ? l.unitarioComFaca : l.unitarioSemFaca,
+        })),
+        ...(aindaNaoFechado ? {
+          preco: form.comFaca ? ideal.precoComFaca : ideal.precoSemFaca,
+          quantidade: ideal.quantidade,
+        } : {}),
+      }
+      setKanban(prev => prev.map(c => c.id === card.id ? { ...c, ...updates } : c))
+      fetch(`/api/kanban/${card.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      }).catch(() => {})
+    }
+
+    setEditandoHistorico(null)
+    setForm(FORM_INICIAL)
+    setResult(null)
+    setView("historico")
+    showToast(`Orçamento ${numero} atualizado.`)
+  }
+
   function abrirPdf(html: string) {
     const blob = new Blob([html], { type: "text/html;charset=utf-8" })
     const url  = URL.createObjectURL(blob)
@@ -762,6 +859,18 @@ export default function Home() {
         {/* Nav */}
         <div className="flex-1 px-2 pb-2 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
 
+          {/* Search */}
+          <button
+            onClick={() => setBuscaAberta(true)}
+            className="w-full flex items-center gap-2 px-2.5 py-2 mb-1 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05] transition-colors group"
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+            <span className="flex-1 text-left text-[12px] font-medium">Buscar</span>
+            <kbd className="text-[9px] bg-white/[0.07] text-zinc-500 group-hover:text-zinc-400 px-1.5 py-0.5 rounded font-medium shrink-0">⌘K</kbd>
+          </button>
+
           <NavItem active={view === "dashboard"} onClick={() => navigate("dashboard")} label="Dashboard"
             icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" /></svg>}
           />
@@ -1030,9 +1139,18 @@ export default function Home() {
 
           {/* Ações */}
           <div className="p-5 mt-auto space-y-2 border-t border-[rgba(60,60,67,0.08)] bg-white">
-            <button onClick={salvar} disabled={!r}
+            {editandoHistorico && (
+              <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#007AFF]/[0.06] border border-[#007AFF]/15">
+                <p className="text-[11.5px] font-semibold text-[#007AFF]">Editando {editandoHistorico}</p>
+                <button onClick={cancelarEdicaoHistorico}
+                  className="text-[11px] font-medium text-[#8E8E93] hover:text-[#1C1C1E] transition-colors">
+                  Cancelar
+                </button>
+              </div>
+            )}
+            <button onClick={editandoHistorico ? salvarEdicaoHistorico : salvar} disabled={!r}
               className="w-full h-11 bg-[#007AFF] hover:bg-[#0062CC] active:bg-[#004EA8] active:scale-[0.99] disabled:opacity-30 disabled:cursor-not-allowed text-white text-[13px] font-bold rounded-xl transition-all duration-150 shadow-sm shadow-[#007AFF]/15 disabled:shadow-none">
-              Salvar orçamento
+              {editandoHistorico ? "Salvar alterações" : "Salvar orçamento"}
             </button>
             {r && (
               <>
@@ -1096,6 +1214,7 @@ export default function Home() {
           ) : view === "forma" ? (
             <FormaView
               apiKey={config.apiKey}
+              materiais={config.materiais.map(m => ({ id: m.id, nome: m.nome }))}
               onUsarLayout={layout => {
                 const mat = config.materiais.find(m => m.id === layout.materialId)
                 setForm(prev => {
@@ -1120,6 +1239,8 @@ export default function Home() {
               historico={historico}
               kanban={kanban}
               propostasCustom={propostasCustom}
+              lancamentos={lancamentos}
+              cadastro={clientes}
               onReplicar={replicar}
               onWhatsApp={(item) => compartilharWhatsApp(item.form, item.calculo, item.numero)}
             />
@@ -1232,6 +1353,7 @@ export default function Home() {
                   body: JSON.stringify({ ...n, loteId: n.loteId ?? null, loteNumero: n.loteNumero ?? null, statusLote: n.statusLote ?? null }),
                 }).catch(() => {})
               }}
+              onAddLancamento={l => setLancamentos(prev => [l, ...prev])}
             />
           ) : view === "historico" ? (
             <HistoricoView
@@ -1261,16 +1383,7 @@ export default function Home() {
                   setDetalheModal({ tipo: "historico", item })
                 }
               }}
-              onPersonalizar={(item) => {
-                const cardId = kanban.find(c => c.numero === item.numero)?.id ?? `hist-${item.numero}`
-                setModalSalvar({
-                  form: item.form,
-                  calculo: item.calculo,
-                  numero: item.numero ?? "",
-                  data: item.data,
-                  cardId,
-                })
-              }}
+              onPersonalizar={personalizarHistorico}
             />
           ) : view === "financeiro" ? (
             <FinanceiroView
@@ -1585,6 +1698,8 @@ export default function Home() {
           parcFator={config.multiplicadores.parcelamento12x}
           onClose={() => setDetalheModal(null)}
           onEditar={(p) => { setDetalheModal(null); setEditandoProposta(p) }}
+          onEditarHistorico={editarHistorico}
+          onPersonalizarHistorico={personalizarHistorico}
           onSaveDelivery={"card" in detalheModal && detalheModal.card ? salvarDataEntrega : undefined}
           onSaveDeliveryReal={"card" in detalheModal && detalheModal.card ? salvarDataEntregaReal : undefined}
           onSaveCloseDate={"card" in detalheModal && detalheModal.card ? salvarDataFechamento : undefined}
@@ -1686,6 +1801,18 @@ export default function Home() {
             const existing = clientes.find(c => c.nome.toLowerCase() === nome.toLowerCase())
             existing ? atualizarCliente(existing.id, updates) : criarClienteComDados(nome, updates)
           }}
+        />
+      )}
+
+      {/* ── Busca global ────────────────────────────────────────────────────── */}
+      {buscaAberta && (
+        <BuscaGlobal
+          historico={historico}
+          kanban={kanban}
+          clientes={clientes}
+          lancamentos={lancamentos}
+          onClose={() => setBuscaAberta(false)}
+          onNavigate={v => navigate(v as typeof view)}
         />
       )}
 

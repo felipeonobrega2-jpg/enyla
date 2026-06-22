@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { gerarDielineSVG } from "./dielineGen"
 
 type LayoutSugerido = {
@@ -23,6 +23,16 @@ type MsgContent =
   | { type: "text"; text: string }
   | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
 
+type FormaConversa = {
+  id: string
+  titulo: string
+  criadaEm: string
+  msgs: Msg[]
+}
+
+const STORAGE_KEY = "forma:conversas"
+const MAX_CONVERSAS = 25
+
 function parseLayout(text: string): LayoutSugerido | null {
   const match = text.match(/```layout\s*([\s\S]*?)```/)
   if (!match) return null
@@ -34,9 +44,45 @@ function parseLayout(text: string): LayoutSugerido | null {
 }
 
 function renderText(text: string) {
-  // Remove bloco layout do texto visível
   const clean = text.replace(/```layout[\s\S]*?```/g, "").trim()
   return clean
+}
+
+function stripImages(msgs: Msg[]): Msg[] {
+  return msgs.map(m => {
+    if (typeof m.content === "string") return m
+    const stripped = m.content.map(c =>
+      c.type === "image" ? { type: "text" as const, text: "[imagem]" } : c
+    )
+    return { ...m, content: stripped }
+  })
+}
+
+function loadConversas(): FormaConversa[] {
+  if (typeof window === "undefined") return []
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function saveConversas(conversas: FormaConversa[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversas.slice(0, MAX_CONVERSAS)))
+  } catch {
+    // quota exceeded — ignore
+  }
+}
+
+function msgTitulo(msgs: Msg[]): string {
+  const first = msgs.find(m => m.role === "user")
+  if (!first) return "Nova conversa"
+  const txt = typeof first.content === "string"
+    ? first.content
+    : first.content.filter(c => c.type === "text").map(c => c.type === "text" ? c.text : "").join("")
+  return txt.slice(0, 60) || "Nova conversa"
 }
 
 type LayoutCardProps = {
@@ -68,7 +114,6 @@ function LayoutCard({ layout, onUsar }: LayoutCardProps) {
     <div className="bg-blue-50 border border-blue-200 rounded-2xl rounded-tl-sm p-4 space-y-3 max-w-[75vw]">
       <p className="text-[10px] uppercase tracking-wide font-bold text-blue-500">Layout sugerido — faca aberta</p>
 
-      {/* Dieline SVG */}
       <div className="bg-white rounded-xl border border-blue-100 overflow-auto p-2">
         <div
           className="min-w-0"
@@ -76,7 +121,6 @@ function LayoutCard({ layout, onUsar }: LayoutCardProps) {
         />
       </div>
 
-      {/* Dimension chips */}
       <div className="grid grid-cols-3 gap-2">
         {[
           ["Largura",      `${layout.largura} cm`],
@@ -93,7 +137,6 @@ function LayoutCard({ layout, onUsar }: LayoutCardProps) {
         ))}
       </div>
 
-      {/* Actions */}
       <div className="flex gap-2">
         <button
           onClick={downloadSVG}
@@ -112,9 +155,11 @@ function LayoutCard({ layout, onUsar }: LayoutCardProps) {
 
 export default function FormaView({
   apiKey,
+  materiais,
   onUsarLayout,
 }: {
   apiKey: string
+  materiais?: Array<{ id: string; nome: string }>
   onUsarLayout: (layout: LayoutSugerido) => void
 }) {
   const [msgs, setMsgs]       = useState<Msg[]>([])
@@ -123,12 +168,80 @@ export default function FormaView({
   const [imgB64, setImgB64]   = useState<{ data: string; media_type: string } | null>(null)
   const [imgPreview, setImgPreview] = useState<string | null>(null)
   const [erro, setErro]       = useState("")
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const fileRef   = useRef<HTMLInputElement>(null)
+  const [conversas, setConversas] = useState<FormaConversa[]>([])
+  const [showHistory, setShowHistory] = useState(false)
+
+  const bottomRef  = useRef<HTMLDivElement>(null)
+  const fileRef    = useRef<HTMLInputElement>(null)
+  const historyRef = useRef<HTMLDivElement>(null)
+  const conversaAtualIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    setConversas(loadConversas())
+  }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [msgs, loading])
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (historyRef.current && !historyRef.current.contains(e.target as Node)) {
+        setShowHistory(false)
+      }
+    }
+    if (showHistory) document.addEventListener("mousedown", onClickOutside)
+    return () => document.removeEventListener("mousedown", onClickOutside)
+  }, [showHistory])
+
+  const autoSalvar = useCallback((updatedMsgs: Msg[]) => {
+    if (updatedMsgs.length === 0) return
+    const stripped = stripImages(updatedMsgs)
+    const all = loadConversas()
+
+    if (conversaAtualIdRef.current) {
+      const idx = all.findIndex(c => c.id === conversaAtualIdRef.current)
+      if (idx >= 0) {
+        all[idx] = { ...all[idx], msgs: stripped, titulo: msgTitulo(stripped) }
+        saveConversas(all)
+        setConversas([...all])
+        return
+      }
+    }
+
+    const novaId = crypto.randomUUID()
+    conversaAtualIdRef.current = novaId
+    const nova: FormaConversa = {
+      id: novaId,
+      titulo: msgTitulo(stripped),
+      criadaEm: new Date().toISOString(),
+      msgs: stripped,
+    }
+    const updated = [nova, ...all]
+    saveConversas(updated)
+    setConversas(updated)
+  }, [])
+
+  function carregarConversa(conversa: FormaConversa) {
+    setMsgs(conversa.msgs)
+    conversaAtualIdRef.current = conversa.id
+    setInput("")
+    setImgB64(null)
+    setImgPreview(null)
+    setErro("")
+    setShowHistory(false)
+  }
+
+  function deletarConversa(id: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    const updated = conversas.filter(c => c.id !== id)
+    saveConversas(updated)
+    setConversas(updated)
+    if (conversaAtualIdRef.current === id) {
+      conversaAtualIdRef.current = null
+      setMsgs([])
+    }
+  }
 
   function handleImage(file: File) {
     const reader = new FileReader()
@@ -147,7 +260,6 @@ export default function FormaView({
     if (!text && !imgB64) return
     if (!apiKey) { setErro("Configure sua chave de API em Configurações."); return }
 
-    // Monta conteúdo da mensagem
     const userContent: MsgContent[] = []
     if (imgB64) userContent.push({ type: "image", source: { type: "base64", ...imgB64 } })
     if (text) userContent.push({ type: "text", text })
@@ -161,20 +273,22 @@ export default function FormaView({
     setErro("")
     setLoading(true)
 
-    // Prepara histórico para a API (apenas role + content sem campo layout)
     const apiMsgs = nextMsgs.map(m => ({ role: m.role, content: m.content }))
 
     try {
       const res = await fetch("/api/forma", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: apiMsgs, apiKey }),
+        body: JSON.stringify({ messages: apiMsgs, apiKey, materiais }),
       })
       const data = await res.json()
       if (data.error) { setErro(data.error); setLoading(false); return }
-      const text = data.content?.[0]?.text ?? ""
-      const layout = parseLayout(text)
-      setMsgs(prev => [...prev, { role: "assistant", content: text, layout: layout ?? undefined }])
+      const textBlock = data.content?.find((b: { type: string }) => b.type === "text")
+      const replyText = textBlock?.text ?? ""
+      const layout = parseLayout(replyText)
+      const finalMsgs: Msg[] = [...nextMsgs, { role: "assistant", content: replyText, layout: layout ?? undefined }]
+      setMsgs(finalMsgs)
+      autoSalvar(finalMsgs)
     } catch {
       setErro("Erro de conexão com a API.")
     }
@@ -182,6 +296,7 @@ export default function FormaView({
   }
 
   function limpar() {
+    conversaAtualIdRef.current = null
     setMsgs([])
     setInput("")
     setImgB64(null)
@@ -203,12 +318,70 @@ export default function FormaView({
           <p className="font-bold text-slate-800 text-sm leading-tight">Forma</p>
           <p className="text-[10px] text-slate-400">IA de design de embalagens</p>
         </div>
-        {msgs.length > 0 && (
-          <button onClick={limpar}
-            className="ml-auto text-[11px] text-slate-400 hover:text-slate-600 border border-slate-200 hover:bg-slate-50 px-2.5 py-1 rounded-lg transition-colors">
-            Nova conversa
-          </button>
-        )}
+
+        <div className="ml-auto flex items-center gap-2">
+          {/* Histórico */}
+          <div className="relative" ref={historyRef}>
+            <button
+              onClick={() => setShowHistory(v => !v)}
+              title="Histórico de conversas"
+              className="w-8 h-8 flex items-center justify-center border border-slate-200 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-slate-600 transition-colors relative">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+              </svg>
+              {conversas.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-slate-700 text-white text-[8px] font-bold rounded-full flex items-center justify-center leading-none">
+                  {conversas.length > 9 ? "9+" : conversas.length}
+                </span>
+              )}
+            </button>
+
+            {showHistory && (
+              <div className="absolute right-0 top-10 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                  <p className="text-xs font-semibold text-slate-600">Conversas anteriores</p>
+                  <span className="text-[10px] text-slate-400">{conversas.length}/{MAX_CONVERSAS}</span>
+                </div>
+                {conversas.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-xs text-slate-400">
+                    Nenhuma conversa salva ainda.
+                  </div>
+                ) : (
+                  <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
+                    {conversas.map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => carregarConversa(c)}
+                        className={`w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors group flex items-start gap-2 ${
+                          conversaAtualIdRef.current === c.id ? "bg-blue-50" : ""
+                        }`}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-slate-700 truncate leading-snug">{c.titulo}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">
+                            {new Date(c.criadaEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                            {" · "}{c.msgs.length} msgs
+                          </p>
+                        </div>
+                        <span
+                          onClick={e => deletarConversa(c.id, e)}
+                          className="mt-0.5 text-slate-300 hover:text-rose-400 text-base leading-none opacity-0 group-hover:opacity-100 transition-opacity shrink-0 cursor-pointer select-none">
+                          ×
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {msgs.length > 0 && (
+            <button onClick={limpar}
+              className="text-[11px] text-slate-400 hover:text-slate-600 border border-slate-200 hover:bg-slate-50 px-2.5 py-1 rounded-lg transition-colors">
+              Nova conversa
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Aviso sem chave */}
@@ -256,14 +429,12 @@ export default function FormaView({
               </div>
             )}
             <div className={`max-w-[75%] space-y-2`}>
-              {/* Imagens no msg do usuário */}
               {Array.isArray(msg.content) && msg.content.filter(c => c.type === "image").map((c, j) => (
                 c.type === "image" && (
                   <img key={j} src={`data:${c.source.media_type};base64,${c.source.data}`}
                     className="rounded-xl max-h-48 object-contain border border-slate-200" alt="referência" />
                 )
               ))}
-              {/* Texto */}
               {(() => {
                 const txt = typeof msg.content === "string"
                   ? msg.content
@@ -280,7 +451,6 @@ export default function FormaView({
                   </div>
                 )
               })()}
-              {/* Card de layout sugerido */}
               {msg.layout && (
                 <LayoutCard layout={msg.layout} onUsar={() => onUsarLayout(msg.layout!)} />
               )}

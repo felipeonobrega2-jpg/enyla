@@ -192,10 +192,16 @@ export function calcular(form: FormData, config: Configuracoes): Calculo | null 
   const tabela = quantidades.map((q) => calcularLinha(q, formatoEfetivo, form, custoImpressaoFixo, config))
 
   const sweetMin = tabela.find((l) => l.margemComFaca >= 40) ?? tabela[0]
-  const sweetIdeal = tabela.reduce(
-    (best, curr) => (curr.margemSemFaca > best.margemSemFaca ? curr : best),
-    tabela[0]
-  )
+  // Elbow: primeira quantidade onde passar para o próximo tier melhora menos de 15% no preço unitário
+  const sweetIdeal = (() => {
+    for (let i = 0; i < tabela.length - 1; i++) {
+      const curr = tabela[i].unitarioSemFaca
+      const next = tabela[i + 1].unitarioSemFaca
+      if (curr <= 0) continue
+      if ((curr - next) / curr < 0.15) return tabela[i]
+    }
+    return tabela[tabela.length - 1]
+  })()
 
   return {
     dieline,

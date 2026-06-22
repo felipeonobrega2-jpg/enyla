@@ -1,26 +1,32 @@
 "use client"
 
 import { useState } from "react"
-import { KanbanCard, COLUNAS_KANBAN, COL_FECHADO, COL_PERDIDO, PropostaCustom } from "../types"
+import { KanbanCard, COLUNAS_KANBAN, COL_FECHADO, COL_PERDIDO, PropostaCustom, Cliente, LancamentoFinanceiro } from "../types"
 import { brl } from "../utils"
 import { HistItem } from "./HistoricoView"
 import { COL_COLORS } from "./kanban-colors"
+import { ClientePerfilModal } from "./ClientePerfilModal"
 
 export function ClientesView({
   historico,
   kanban,
   propostasCustom,
+  lancamentos,
+  cadastro,
   onReplicar,
   onWhatsApp,
 }: {
   historico: HistItem[]
   kanban: KanbanCard[]
   propostasCustom: PropostaCustom[]
+  lancamentos: LancamentoFinanceiro[]
+  cadastro: Cliente[]
   onReplicar: (item: HistItem) => void
   onWhatsApp: (item: HistItem) => void
 }) {
   const [busca, setBusca] = useState("")
   const [expandido, setExpandido] = useState<string | null>(null)
+  const [perfilAberto, setPerfilAberto] = useState<string | null>(null)
   const [ordem, setOrdem] = useState<"valor" | "nome" | "orcamentos" | "recente">("valor")
 
   const precoIdeal = (item: HistItem) => {
@@ -141,20 +147,22 @@ export function ClientesView({
           return (
             <div key={nome} className="bg-white border border-[rgba(60,60,67,0.08)] rounded-xl overflow-hidden hover:border-[rgba(60,60,67,0.12)] transition-colors">
 
-              <button
-                onClick={() => setExpandido(aberto ? null : nome)}
-                className="w-full flex items-center gap-4 px-5 py-4 text-left"
-              >
-                <div className="w-10 h-10 rounded-full bg-[#1C1C1E] text-white text-sm font-bold flex items-center justify-center shrink-0">
-                  {inicial}
-                </div>
+              <div className="w-full flex items-center gap-4 px-5 py-4">
+                <button
+                  onClick={() => setExpandido(aberto ? null : nome)}
+                  className="flex items-center gap-4 flex-1 min-w-0 text-left"
+                >
+                  <div className="w-10 h-10 rounded-full bg-[#1C1C1E] text-white text-sm font-bold flex items-center justify-center shrink-0">
+                    {inicial}
+                  </div>
 
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-[#1C1C1E]">{nome}</p>
-                  <p className="text-[11px] text-[#8E8E93] mt-0.5">
-                    {totalItens} registro{totalItens !== 1 ? "s" : ""} · última atividade {ultimaData}
-                  </p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-[#1C1C1E]">{nome}</p>
+                    <p className="text-[11px] text-[#8E8E93] mt-0.5">
+                      {totalItens} registro{totalItens !== 1 ? "s" : ""} · última atividade {ultimaData}
+                    </p>
+                  </div>
+                </button>
 
                 <div className="flex items-center gap-5 shrink-0">
                   <div className="flex items-center gap-2 text-[11px]">
@@ -185,12 +193,19 @@ export function ClientesView({
                     )}
                   </div>
 
-                  <svg className={`w-4 h-4 text-[#8E8E93] transition-transform shrink-0 ${aberto ? "rotate-180" : ""}`}
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <button onClick={() => setPerfilAberto(nome)}
+                    className="px-3 h-8 text-[11px] font-semibold text-[#007AFF] bg-[#007AFF]/[0.08] hover:bg-[#007AFF]/[0.14] rounded-lg transition-colors shrink-0">
+                    Perfil
+                  </button>
+
+                  <button onClick={() => setExpandido(aberto ? null : nome)} className="shrink-0">
+                    <svg className={`w-4 h-4 text-[#8E8E93] transition-transform ${aberto ? "rotate-180" : ""}`}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
                 </div>
-              </button>
+              </div>
 
               {aberto && (
                 <div className="border-t border-[rgba(60,60,67,0.06)] divide-y divide-[rgba(0,0,0,0.03)]">
@@ -277,6 +292,24 @@ export function ClientesView({
           )
         })}
       </div>
+
+      {perfilAberto && (() => {
+        const c = clientes.find(c => c.nome === perfilAberto)
+        if (!c) return null
+        return (
+          <ClientePerfilModal
+            nome={c.nome}
+            cadastro={cadastro.find(cl => cl.nome.trim().toLowerCase() === c.nome.toLowerCase()) ?? null}
+            itens={c.itens}
+            propostas={c.propostas}
+            kanban={kanban}
+            lancamentos={lancamentos}
+            onClose={() => setPerfilAberto(null)}
+            onReplicar={onReplicar}
+            onWhatsApp={onWhatsApp}
+          />
+        )
+      })()}
     </div>
   )
 }

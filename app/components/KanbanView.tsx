@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useRef } from "react"
-import { KanbanCard, KanbanOpcao, Lote, NegocioParceiro, StatusLoteParceiro, COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO } from "../types"
+import { useState, useRef, useEffect } from "react"
+import { KanbanCard, KanbanOpcao, Lote, LancamentoFinanceiro, NegocioParceiro, StatusLoteParceiro, COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO } from "../types"
 import { brl, num } from "../utils"
 import { COL_COLORS } from "./kanban-colors"
 
@@ -13,6 +13,151 @@ const PARTNER_STEPS_K: { id: StatusLoteParceiro; label: string }[] = [
 ]
 
 type ModalFechamento = { card: KanbanCard; opcaoIdx: number }
+
+// ── PIX emit modal ────────────────────────────────────────────────────────────
+function PixEmitModal({ card, loteTotal, onClose, onAddLancamento }: {
+  card: KanbanCard
+  loteTotal: number
+  onClose: () => void
+  onAddLancamento?: (l: LancamentoFinanceiro) => void
+}) {
+  const today = new Date().toISOString().slice(0, 10)
+  const [valor,   setValor]   = useState(loteTotal > 0 ? loteTotal.toFixed(2) : "")
+  const [expDate, setExpDate] = useState(today)
+  const [expTime, setExpTime] = useState("23:59")
+  const [copied,  setCopied]  = useState(false)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => { requestAnimationFrame(() => setVisible(true)) }, [])
+
+  function dismiss() { setVisible(false); setTimeout(onClose, 180) }
+
+  function emit() {
+    const v = parseFloat(valor.replace(",", "."))
+    if (!v || !card.loteNumero) return
+    const e = `${expDate}T${expTime}`
+    const url = `${window.location.origin}/pix/${card.loteNumero}?v=${v}&e=${encodeURIComponent(e)}`
+
+    const lanc: LancamentoFinanceiro = {
+      id:             crypto.randomUUID(),
+      tipo:           "receita",
+      descricao:      `PIX · Lote ${card.loteNumero}`,
+      valor:          v,
+      dataVencimento: expDate,
+      status:         "pendente",
+      loteId:         card.loteId ?? undefined,
+      loteNumero:     card.loteNumero,
+      nomeCliente:    card.nomeCliente,
+      categoria:      "pix_link",
+      formaPagamento: "pix",
+      criadoEm:       new Date().toISOString(),
+    }
+
+    fetch("/api/lancamentos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(lanc),
+    }).catch(() => {})
+    onAddLancamento?.(lanc)
+
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => { setCopied(false); dismiss() }, 2200)
+    })
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center transition-all duration-180"
+      style={{ background: visible ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0)", backdropFilter: visible ? "blur(4px)" : "none" }}
+      onClick={e => { if (e.target === e.currentTarget) dismiss() }}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mx-4 overflow-hidden transition-all duration-200"
+        style={{ transform: visible ? "scale(1) translateY(0)" : "scale(0.94) translateY(12px)", opacity: visible ? 1 : 0 }}
+      >
+        {/* Header */}
+        <div className="px-5 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-start justify-between gap-3">
+          <div>
+            <p className="font-bold text-[14px] text-[#1C1C1E]">Emitir link de pagamento</p>
+            <p className="text-[11px] text-[#8E8E93] mt-0.5">
+              Lote <span className="font-semibold text-[#007AFF]">{card.loteNumero}</span>
+              {" · "}{card.nomeCliente.split(" ")[0]}
+            </p>
+          </div>
+          <button onClick={dismiss}
+            className="w-7 h-7 rounded-full bg-[rgba(116,116,128,0.1)] flex items-center justify-center text-[#8E8E93] hover:bg-[rgba(116,116,128,0.18)] transition-colors text-lg leading-none shrink-0">
+            ×
+          </button>
+        </div>
+
+        {/* Fields */}
+        <div className="px-5 py-4 space-y-4">
+
+          {/* Valor */}
+          <div>
+            <label className="text-[9.5px] font-bold uppercase tracking-wide text-[#8E8E93] block mb-1.5">Valor</label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] text-[#8E8E93] font-medium pointer-events-none">R$</span>
+              <input
+                type="number" autoFocus min={0} step={0.01}
+                value={valor} onChange={e => setValor(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && emit()}
+                placeholder="0,00"
+                className="w-full pl-9 pr-20 py-2.5 border border-[rgba(0,0,0,0.12)] rounded-xl text-[15px] font-semibold text-[#1C1C1E] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] transition-colors"
+              />
+              {loteTotal > 0 && (
+                <button
+                  onClick={() => setValor((loteTotal / 2).toFixed(2))}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-[#007AFF] bg-[#007AFF]/[0.08] hover:bg-[#007AFF]/[0.14] px-2.5 py-1 rounded-lg transition-colors">
+                  Metade
+                </button>
+              )}
+            </div>
+            {loteTotal > 0 && (
+              <button onClick={() => setValor(loteTotal.toFixed(2))}
+                className="mt-1 text-[10px] text-[#007AFF] hover:underline">
+                Usar total do lote: {brl(loteTotal)}
+              </button>
+            )}
+          </div>
+
+          {/* Expiração */}
+          <div>
+            <label className="text-[9.5px] font-bold uppercase tracking-wide text-[#8E8E93] block mb-1.5">Expira em</label>
+            <div className="grid grid-cols-[1fr_100px] gap-2">
+              <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)}
+                className="w-full px-3 py-2.5 border border-[rgba(0,0,0,0.12)] rounded-xl text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] transition-colors"
+              />
+              <input type="time" value={expTime} onChange={e => setExpTime(e.target.value)}
+                className="w-full px-3 py-2.5 border border-[rgba(0,0,0,0.12)] rounded-xl text-[13px] text-[#1C1C1E] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] transition-colors"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 pb-5 flex gap-2">
+          <button onClick={dismiss}
+            className="flex-1 py-2.5 rounded-xl text-[13px] font-medium text-[#8E8E93] hover:bg-[#F2F2F7] transition-colors border border-[rgba(0,0,0,0.08)]">
+            Cancelar
+          </button>
+          <button onClick={emit} disabled={!valor || copied}
+            className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-all disabled:opacity-40"
+            style={{ background: copied ? "#34C759" : "#1C1C1E" }}
+          >
+            {copied ? (
+              <span className="flex items-center justify-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                Link copiado!
+              </span>
+            ) : "Gerar e copiar link"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function KanbanView({
   cards,
@@ -29,6 +174,7 @@ export function KanbanView({
   onLoteRename,
   negocios,
   onUpdateNegocio,
+  onAddLancamento,
 }: {
   cards: KanbanCard[]
   onMove: (id: string, coluna: number) => void
@@ -44,6 +190,7 @@ export function KanbanView({
   onLoteRename?: (loteId: string, newNumero: string) => Promise<{ ok: boolean; error?: string }>
   negocios?: NegocioParceiro[]
   onUpdateNegocio?: (n: NegocioParceiro) => void
+  onAddLancamento?: (l: LancamentoFinanceiro) => void
 }) {
   const [dragId, setDragId]       = useState<string | null>(null)
   const [overCol, setOverCol]     = useState<number | null>(null)
@@ -365,6 +512,7 @@ export function KanbanView({
                       negocios={negocios}
                       onUpdateNegocio={onUpdateNegocio}
                       allCards={cards}
+                      onAddLancamento={onAddLancamento}
                     />
                   ))}
                 </div>
@@ -449,6 +597,7 @@ export function KanbanView({
 function KanbanCardItem({
   card, colIdx, isDragging, colors, onDragStart, onDragEnd, onDelete, onMove, onSetMotivo, onDetalhes, totalCols,
   lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge, onLoteRename, negocios, onUpdateNegocio, allCards,
+  onAddLancamento,
 }: {
   card: KanbanCard
   colIdx: number
@@ -470,12 +619,15 @@ function KanbanCardItem({
   negocios?: NegocioParceiro[]
   onUpdateNegocio?: (n: NegocioParceiro) => void
   allCards?: KanbanCard[]
+  onAddLancamento?: (l: LancamentoFinanceiro) => void
 }) {
   const isPerdido = colIdx === COL_PERDIDO
   const [confirmando, setConfirmando] = useState(false)
   const [motivoRascunho, setMotivoRascunho] = useState("")
-  const [copiedId, setCopiedId] = useState(false)
-  const [showLotePanel, setShowLotePanel] = useState(false)
+  const [copiedId,       setCopiedId]       = useState(false)
+  const [copiedLoteLink, setCopiedLoteLink] = useState<"track" | null>(null)
+  const [showLotePanel,  setShowLotePanel]  = useState(false)
+  const [showPixModal,   setShowPixModal]   = useState(false)
 
   const [criandoLote, setCriandoLote] = useState(false)
   const [merging, setMerging] = useState(false)
@@ -489,6 +641,11 @@ function KanbanCardItem({
   const clientLotes = (lotes ?? []).filter(l =>
     l.nomeCliente.toLowerCase() === card.nomeCliente.toLowerCase() && l.id !== card.loteId
   )
+
+  // Total do lote = soma de todos os cards do mesmo lote (inclusive terceirizados)
+  const loteTotal = card.loteId
+    ? (allCards ?? []).filter(c => c.loteId === card.loteId).reduce((s, c) => s + c.preco, 0)
+    : card.preco
 
   async function handleCriarLote() {
     if (!onLoteCreate || !onLoteAssign) return
@@ -551,6 +708,7 @@ function KanbanCardItem({
   }
 
   return (
+    <>
     <div
       draggable={!confirmando}
       onDragStart={e => !confirmando && onDragStart(e, card.id)}
@@ -760,6 +918,45 @@ function KanbanCardItem({
                 </div>
                 {loteRenameError && <p className="text-[9px] text-rose-500 -mt-2">{loteRenameError}</p>}
 
+                {/* Quick links */}
+                {!editingLote && (
+                  <div className="space-y-1.5">
+
+                    {/* Rastreamento */}
+                    <button
+                      onClick={() => {
+                        const url = `${window.location.origin}/track/lote/${encodeURIComponent(card.loteNumero!)}`
+                        navigator.clipboard.writeText(url).then(() => {
+                          setCopiedLoteLink("track"); setTimeout(() => setCopiedLoteLink(null), 2000)
+                        })
+                      }}
+                      className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10.5px] font-semibold transition-all"
+                      style={copiedLoteLink === "track"
+                        ? { background: "rgba(52,199,89,0.12)", color: "#34C759" }
+                        : { background: "rgba(0,122,255,0.08)", color: "#007AFF" }}
+                    >
+                      {copiedLoteLink === "track" ? (
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                      ) : (
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+                      )}
+                      {copiedLoteLink === "track" ? "Copiado!" : "Copiar link rastreamento"}
+                    </button>
+
+                    {/* Emitir link de pagamento */}
+                    <button
+                      onClick={() => setShowPixModal(true)}
+                      className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10.5px] font-semibold transition-all"
+                      style={{ background: "rgba(52,199,89,0.1)", color: "#34C759" }}
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125H18M15 10.5H9" />
+                      </svg>
+                      Emitir link de pagamento
+                    </button>
+                  </div>
+                )}
+
                 {/* Partner products */}
                 {!editingLote && (() => {
                   const vinculados = (negocios ?? []).filter(n => n.loteId === card.loteId)
@@ -965,6 +1162,12 @@ function KanbanCardItem({
           </div>
         )}
       </div>
+
     </div>
+
+    {showPixModal && card.loteNumero && (
+      <PixEmitModal card={card} loteTotal={loteTotal} onClose={() => setShowPixModal(false)} onAddLancamento={onAddLancamento} />
+    )}
+    </>
   )
 }

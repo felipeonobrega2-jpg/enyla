@@ -354,8 +354,10 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem): string {
     • Preços válidos para aprovação em até <strong>${validadeDias} dias corridos</strong>${dataVencimento ? ` (até ${dataVencimento})` : ""}.<br>
     • Contamos com designer próprio — desenvolvimento de arte incluso sem custo adicional.<br>
     • Prazo de entrega contado a partir da <strong>aprovação final da arte</strong>.<br>
+    • A quantidade final do lote pode variar <strong>até 10%</strong> para mais ou para menos.<br>
+    • Pagamentos à vista: coletamos <strong>50% do valor total</strong> no fechamento do pedido. O restante é pago somente na entrega.<br>
     ${form.comFaca && form.valorFaca > 0
-      ? `• A faca de corte é produzida uma única vez e permanece com o cliente para reutilização em pedidos futuros.<br>`
+      ? `• A faca de corte é um <strong>investimento único</strong> — reutilizada em todos os pedidos futuros do mesmo produto.<br>`
       : ""}
     • Pedido mínimo: <strong>${num(sweetMin.quantidade)} unidades</strong>.
     ${form.obsCliente ? `<br><br>${form.obsCliente.replace(/</g, "&lt;").replace(/\n/g, "<br>")}` : ""}
@@ -628,7 +630,9 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom): string {
     • Preços válidos para aprovação em até <strong>${p.validadeDias ?? 7} dias corridos</strong>${dataVencimento ? ` (até ${dataVencimento})` : ""}.<br>
     • Contamos com designer próprio — desenvolvimento de arte incluso sem custo adicional.<br>
     • Prazo de entrega contado a partir da <strong>aprovação final da arte</strong>.<br>
-    ${p.comFaca && p.valorFaca > 0 ? `• A faca de corte é produzida uma única vez e permanece com o cliente para reutilização em pedidos futuros.<br>` : ""}
+    • A quantidade final do lote pode variar <strong>até 10%</strong> para mais ou para menos.<br>
+    • Pagamentos à vista: coletamos <strong>50% do valor total</strong> no fechamento do pedido. O restante é pago somente na entrega.<br>
+    ${p.comFaca && p.valorFaca > 0 ? `• A faca de corte é um <strong>investimento único</strong> — reutilizada em todos os pedidos futuros do mesmo produto.<br>` : ""}
     ${minLinha && ideal && minLinha !== ideal ? `• Pedido mínimo: <strong>${num(minLinha.quantidade)} unidades</strong>.<br>` : ""}
     ${p.obsCliente ? `<br>${p.obsCliente.replace(/</g, "&lt;").replace(/\n/g, "<br>")}` : ""}
   </div>

@@ -252,16 +252,201 @@ const GRUPOS_PERIODO: { label: string; items: { id: Periodo; label: string }[] }
   },
 ]
 
+// ─── Gerador de relatório mensal ─────────────────────────────────────────────
+
+function gerarHtmlRelatorio({
+  periodoLabel, dreRec, dreDesp,
+  kpisData, topClientesData, materiaisData,
+  aReceber, aReceberCount, vencidos, vencidosCount,
+  dataGeracao,
+}: {
+  periodoLabel: string
+  dreRec: number; dreDesp: number
+  kpisData: { receita: number; fechamentos: number; ticket: number; conversao: number; emProducaoCount: number; pipelineGlobal: number; total: number; clientesUnicos: number }
+  topClientesData: { nome: string; total: number; count: number }[]
+  materiaisData: { nome: string; count: number; value: number }[]
+  aReceber: number; aReceberCount: number
+  vencidos: number; vencidosCount: number
+  dataGeracao: string
+}): string {
+  const resultado = dreRec - dreDesp
+  const kpiBoxes = [
+    { label: "Receita confirmada",   val: brl(dreRec),                      sub: "no período"             },
+    { label: "Fechamentos",          val: String(kpisData.fechamentos),     sub: `${kpisData.total} orçamentos` },
+    { label: "Ticket médio",         val: brl(kpisData.ticket),             sub: "por negócio"            },
+    { label: "Conversão",            val: `${num(kpisData.conversao, 1)}%`, sub: "dos orçamentos"         },
+    { label: "Em produção",          val: String(kpisData.emProducaoCount), sub: brl(kpisData.pipelineGlobal) + " pipeline" },
+  ].map(k => `
+    <div class="kpi-box">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-val">${k.val}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`).join("")
+
+  const clientesRows = topClientesData.slice(0, 6).map((c, i) => `
+    <tr>
+      <td class="muted" style="width:20px">${i + 1}</td>
+      <td>${c.nome}</td>
+      <td class="right">${brl(c.total)}</td>
+      <td class="right muted">${c.count}×</td>
+    </tr>`).join("") || `<tr><td colspan="4" class="muted" style="text-align:center;padding:12px">Sem dados</td></tr>`
+
+  const matRows = materiaisData.slice(0, 6).map(m => `
+    <tr>
+      <td>${m.nome}</td>
+      <td class="right">${m.count} pedido${m.count !== 1 ? "s" : ""}</td>
+      <td class="right muted">${brl(m.value)}</td>
+    </tr>`).join("") || `<tr><td colspan="3" class="muted" style="text-align:center;padding:12px">Sem dados</td></tr>`
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Relatório · ${periodoLabel}</title>
+<style>
+  @page { margin: 18mm 16mm; size: A4 portrait; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; font-size: 10px; color: #111; line-height: 1.45; }
+
+  .header { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 10px; border-bottom: 2px solid #111; margin-bottom: 16px; }
+  .brand { font-size: 22px; font-weight: 800; letter-spacing: -0.04em; }
+  .header-right { text-align: right; }
+  .period { font-size: 13px; font-weight: 700; }
+  .gen-date { font-size: 8.5px; color: #888; margin-top: 2px; }
+
+  h2 { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #888; margin-bottom: 7px; }
+  section { margin-bottom: 15px; }
+
+  .dre { background: #f7f7f7; border-radius: 6px; padding: 11px 14px; }
+  .dre-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; }
+  .dre-sep { border-top: 1px solid #ddd; margin: 7px 0 5px; }
+  .dre-total { display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; }
+  .green { color: #166534; }
+  .red   { color: #991b1b; }
+  .tn    { font-variant-numeric: tabular-nums; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; }
+  .kpi-box  { border: 1px solid #e5e5e5; border-radius: 6px; padding: 8px 10px; }
+  .kpi-label { font-size: 7.5px; color: #888; text-transform: uppercase; letter-spacing: 0.06em; }
+  .kpi-val  { font-size: 16px; font-weight: 700; margin: 3px 0 2px; font-variant-numeric: tabular-nums; }
+  .kpi-sub  { font-size: 7.5px; color: #aaa; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  th { text-align: left; padding: 4px 8px; background: #f3f3f3; font-size: 7.5px; text-transform: uppercase; letter-spacing: 0.06em; color: #888; font-weight: 700; }
+  td { padding: 5px 8px; border-bottom: 1px solid #f0f0f0; }
+  td.right { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  td.muted { color: #888; }
+
+  .fin-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+  .fin-box  { border-radius: 6px; padding: 10px 12px; }
+  .fin-green { background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .fin-amber { background: #fffbeb; border: 1px solid #fde68a; }
+  .fin-red   { background: #fef2f2; border: 1px solid #fecaca; }
+  .fin-label { font-size: 7.5px; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+  .fin-val   { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .fin-green .fin-val { color: #166534; }
+  .fin-amber .fin-val { color: #92400e; }
+  .fin-red   .fin-val { color: #991b1b; }
+  .fin-sub   { font-size: 8px; margin-top: 3px; }
+  .fin-green .fin-sub { color: #4ade80; }
+  .fin-amber .fin-sub { color: #f59e0b; }
+  .fin-red   .fin-sub { color: #f87171; }
+
+  .footer { border-top: 1px solid #e5e5e5; margin-top: 16px; padding-top: 7px; font-size: 8px; color: #aaa; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="brand">Enyla.</div>
+  <div class="header-right">
+    <div class="period">Relatório · ${periodoLabel}</div>
+    <div class="gen-date">Gerado em ${dataGeracao}</div>
+  </div>
+</div>
+
+<section>
+  <h2>Resultado do Período</h2>
+  <div class="dre">
+    <div class="dre-row"><span>Receita confirmada</span><span class="green tn">${brl(dreRec)}</span></div>
+    <div class="dre-row"><span>Despesas pagas</span><span class="red tn">(${brl(dreDesp)})</span></div>
+    <div class="dre-sep"></div>
+    <div class="dre-total">
+      <span>Resultado líquido</span>
+      <span class="${resultado >= 0 ? "green" : "red"} tn">${brl(resultado)}</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Indicadores Operacionais</h2>
+  <div class="kpi-grid">${kpiBoxes}</div>
+</section>
+
+<section class="two-col">
+  <div>
+    <h2>Top Clientes</h2>
+    <table>
+      <thead><tr><th>#</th><th>Cliente</th><th style="text-align:right">Total</th><th style="text-align:right">Pedidos</th></tr></thead>
+      <tbody>${clientesRows}</tbody>
+    </table>
+  </div>
+  <div>
+    <h2>Materiais</h2>
+    <table>
+      <thead><tr><th>Material</th><th style="text-align:right">Qtd</th><th style="text-align:right">Valor</th></tr></thead>
+      <tbody>${matRows}</tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Situação Financeira (Global)</h2>
+  <div class="fin-grid">
+    <div class="fin-box fin-green">
+      <div class="fin-label">Recebido no período</div>
+      <div class="fin-val">${brl(dreRec)}</div>
+      <div class="fin-sub">receita confirmada</div>
+    </div>
+    <div class="fin-box fin-amber">
+      <div class="fin-label">A receber</div>
+      <div class="fin-val">${brl(aReceber)}</div>
+      <div class="fin-sub">${aReceberCount} título${aReceberCount !== 1 ? "s" : ""} pendente${aReceberCount !== 1 ? "s" : ""}</div>
+    </div>
+    <div class="fin-box fin-red">
+      <div class="fin-label">Em atraso</div>
+      <div class="fin-val">${brl(vencidos)}</div>
+      <div class="fin-sub">${vencidosCount} título${vencidosCount !== 1 ? "s" : ""} vencido${vencidosCount !== 1 ? "s" : ""}</div>
+    </div>
+  </div>
+</section>
+
+<div class="footer">
+  <span>Enyla · Gestão Gráfica</span>
+  <span>${dataGeracao}</span>
+</div>
+
+</body>
+</html>`
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
 export default function DashboardView({ historico, kanban, propostasCustom: _propostasCustom, clientes: _clientes, config: _config, lancamentos = [] }: Props) {
   const [periodo, setPeriodo] = useState<Periodo>("mes")
   const [dataInicio, setDataInicio] = useState("")
   const [dataFim, setDataFim]   = useState("")
-  const [showMenu, setShowMenu] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const [showMenu, setShowMenu]       = useState(false)
+  const [showAlertas, setShowAlertas] = useState(false)
+  const menuRef    = useRef<HTMLDivElement>(null)
+  const alertasRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false)
+      if (menuRef.current    && !menuRef.current.contains(e.target as Node))    setShowMenu(false)
+      if (alertasRef.current && !alertasRef.current.contains(e.target as Node)) setShowAlertas(false)
     }
     document.addEventListener("mousedown", handleClick)
     return () => document.removeEventListener("mousedown", handleClick)
@@ -511,8 +696,72 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       .slice(0, 10)
   }, [filteredCards])
 
+  // ── Alertas ativos ───────────────────────────────────────────────────────────
+  const alertas = useMemo(() => {
+    const hj = new Date().toISOString().split("T")[0]
+    const amanha = (() => {
+      const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split("T")[0]
+    })()
+
+    const vencidos = lancamentos.filter(l =>
+      l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra" && l.dataVencimento < hj
+    )
+    const vencendoHoje = lancamentos.filter(l =>
+      l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra" &&
+      (l.dataVencimento === hj || l.dataVencimento === amanha)
+    )
+    const parados = kanban.filter(c => {
+      if (c.coluna < 2 || c.coluna > 8) return false
+      const ref = c.dataFechamento
+      if (!ref) return false
+      return Math.floor((Date.now() - new Date(ref + "T00:00:00").getTime()) / 86_400_000) >= 10
+    })
+    const semRegistro = kanban.filter(c => {
+      if (c.coluna === 0 || c.coluna === COL_PERDIDO) return false
+      if (!c.dataFechamento) return false
+      if (Math.floor((Date.now() - new Date(c.dataFechamento + "T00:00:00").getTime()) / 86_400_000) > 45) return false
+      return !lancamentos.some(l => l.cardId === c.id)
+    })
+    return { vencidos, vencendoHoje, parados, semRegistro }
+  }, [lancamentos, kanban])
+
   // ── Periodo label ────────────────────────────────────────────────────────────
   const periodoLabel = (p: Periodo) => PERIODO_LABEL[p] ?? p
+
+  // ── Relatório PDF ────────────────────────────────────────────────────────────
+  function abrirRelatorio() {
+    const hj = new Date().toISOString().split("T")[0]
+    const { from, to } = periodBounds
+    const inPer = (l: LancamentoFinanceiro) => {
+      const ref = l.dataPagamento || l.dataVencimento
+      if (!ref) return false
+      const d = new Date(ref + "T12:00:00")
+      if (from && d < from) return false
+      if (to   && d > to)   return false
+      return true
+    }
+    const dreRec  = lancamentos.filter(l => l.tipo === "receita" && l.status === "pago" && inPer(l)).reduce((s, l) => s + l.valor, 0)
+    const dreDesp = lancamentos.filter(l => l.tipo === "despesa" && l.status === "pago" && inPer(l)).reduce((s, l) => s + l.valor, 0)
+    const pendentes   = lancamentos.filter(l => l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra")
+    const vencidosArr = pendentes.filter(l => l.dataVencimento < hj)
+    const html = gerarHtmlRelatorio({
+      periodoLabel: periodoLabel(periodo),
+      dreRec, dreDesp,
+      kpisData: kpis,
+      topClientesData: topClientes.clientes,
+      materiaisData: materiais.materiais,
+      aReceber:      pendentes.reduce((s, l) => s + l.valor, 0),
+      aReceberCount: pendentes.length,
+      vencidos:      vencidosArr.reduce((s, l) => s + l.valor, 0),
+      vencidosCount: vencidosArr.length,
+      dataGeracao:   new Date().toLocaleString("pt-BR"),
+    })
+    const w = window.open("", "_blank")
+    if (!w) return
+    w.document.write(html)
+    w.document.close()
+    setTimeout(() => w.print(), 500)
+  }
 
   // ─── Empty state ─────────────────────────────────────────────────────────────
   if (kanban.length === 0) {
@@ -597,8 +846,170 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
               className="h-8 border border-[rgba(0,0,0,0.12)] rounded-lg px-2 text-[11.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25 focus:border-[#007AFF]" />
           </div>
 
-          <div className="ml-auto text-[11px] text-[#8E8E93] font-medium tabular-nums bg-white border border-[rgba(0,0,0,0.12)] rounded-full px-3 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-            {filteredCards.length} orçamento{filteredCards.length !== 1 ? "s" : ""} no período
+          <button
+            onClick={abrirRelatorio}
+            className="flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-medium bg-white border border-[rgba(0,0,0,0.12)] text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)] transition-colors shadow-[0_1px_2px_rgba(0,0,0,0.04)] shrink-0"
+          >
+            <svg className="w-3.5 h-3.5 text-[#8E8E93]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Relatório PDF
+          </button>
+
+          <div className="ml-auto flex items-center gap-2">
+            {/* Alert bell */}
+            {(() => {
+              const total = alertas.vencidos.length + alertas.vencendoHoje.length + alertas.parados.length + alertas.semRegistro.length
+              if (total === 0) return null
+              const cor = alertas.vencidos.length > 0 ? "#FF3B30" : "#FF9500"
+              const hj  = new Date().toISOString().split("T")[0]
+              return (
+                <div className="relative" ref={alertasRef}>
+                  <button
+                    onClick={() => setShowAlertas(v => !v)}
+                    className="relative w-8 h-8 flex items-center justify-center bg-white border border-[rgba(0,0,0,0.12)] rounded-full hover:bg-[rgba(0,0,0,0.03)] transition-colors shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                  >
+                    <svg className="w-4 h-4 text-[#8E8E93]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+                    </svg>
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full text-white text-[9px] font-bold flex items-center justify-center px-1 leading-none"
+                      style={{ background: cor }}>
+                      {total}
+                    </span>
+                  </button>
+
+                  {showAlertas && (
+                    <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl border border-[rgba(0,0,0,0.1)] shadow-[0_8px_32px_rgba(0,0,0,0.12)] z-50 overflow-hidden">
+                      {/* Header */}
+                      <div className="px-4 py-3 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-[13px] text-[#1C1C1E]">Alertas</p>
+                          <p className="text-[10px] text-[#8E8E93] mt-0.5">{total} item{total !== 1 ? "s" : ""} precisando atenção</p>
+                        </div>
+                        <button onClick={() => setShowAlertas(false)}
+                          className="w-6 h-6 rounded-full bg-[rgba(116,116,128,0.1)] flex items-center justify-center text-[#8E8E93] hover:bg-[rgba(116,116,128,0.18)] text-base leading-none transition-colors">
+                          ×
+                        </button>
+                      </div>
+
+                      <div className="max-h-[60vh] overflow-y-auto divide-y divide-[rgba(60,60,67,0.06)]">
+
+                        {/* Vencidos */}
+                        {alertas.vencidos.length > 0 && (
+                          <div>
+                            <div className="px-4 pt-3 pb-1.5 flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-[#FF3B30] shrink-0" />
+                              <p className="text-[9.5px] font-bold uppercase tracking-wide text-[#FF3B30] flex-1">Vencidos</p>
+                              <p className="text-[9.5px] font-semibold text-[#FF3B30] tabular-nums">
+                                {brl(alertas.vencidos.reduce((s, l) => s + l.valor, 0))}
+                              </p>
+                            </div>
+                            {alertas.vencidos.slice(0, 5).map(l => (
+                              <div key={l.id} className="px-4 py-2 flex items-start gap-3 hover:bg-[rgba(0,0,0,0.02)] transition-colors">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[11.5px] font-medium text-[#1C1C1E] truncate">{l.descricao}</p>
+                                  <p className="text-[10px] text-[#8E8E93]">{l.nomeCliente ?? "—"} · venceu {l.dataVencimento}</p>
+                                </div>
+                                <p className="text-[11px] font-bold text-[#FF3B30] tabular-nums shrink-0">{brl(l.valor)}</p>
+                              </div>
+                            ))}
+                            {alertas.vencidos.length > 5 && (
+                              <p className="px-4 pb-2.5 text-[10px] text-[#8E8E93]">+{alertas.vencidos.length - 5} mais</p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Vencem hoje/amanhã */}
+                        {alertas.vencendoHoje.length > 0 && (
+                          <div>
+                            <div className="px-4 pt-3 pb-1.5 flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-[#FF9500] shrink-0" />
+                              <p className="text-[9.5px] font-bold uppercase tracking-wide text-[#FF9500] flex-1">Vencem hoje ou amanhã</p>
+                              <p className="text-[9.5px] font-semibold text-[#FF9500] tabular-nums">
+                                {brl(alertas.vencendoHoje.reduce((s, l) => s + l.valor, 0))}
+                              </p>
+                            </div>
+                            {alertas.vencendoHoje.slice(0, 5).map(l => (
+                              <div key={l.id} className="px-4 py-2 flex items-start gap-3 hover:bg-[rgba(0,0,0,0.02)] transition-colors">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[11.5px] font-medium text-[#1C1C1E] truncate">{l.descricao}</p>
+                                  <p className="text-[10px] text-[#8E8E93]">
+                                    {l.nomeCliente ?? "—"} · {l.dataVencimento === hj ? "vence hoje" : "vence amanhã"}
+                                  </p>
+                                </div>
+                                <p className="text-[11px] font-bold text-[#FF9500] tabular-nums shrink-0">{brl(l.valor)}</p>
+                              </div>
+                            ))}
+                            {alertas.vencendoHoje.length > 5 && (
+                              <p className="px-4 pb-2.5 text-[10px] text-[#8E8E93]">+{alertas.vencendoHoje.length - 5} mais</p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Parados em produção */}
+                        {alertas.parados.length > 0 && (
+                          <div>
+                            <div className="px-4 pt-3 pb-1.5 flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-[#FF9500] shrink-0" />
+                              <p className="text-[9.5px] font-bold uppercase tracking-wide text-[#FF9500] flex-1">Parados em produção</p>
+                            </div>
+                            {alertas.parados.slice(0, 5).map(c => {
+                              const dias = Math.floor((Date.now() - new Date(c.dataFechamento! + "T00:00:00").getTime()) / 86_400_000)
+                              return (
+                                <div key={c.id} className="px-4 py-2 flex items-start gap-3 hover:bg-[rgba(0,0,0,0.02)] transition-colors">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[11.5px] font-medium text-[#1C1C1E] truncate">
+                                      {c.numero ? `#${c.numero} · ` : ""}{c.nomeCliente}
+                                    </p>
+                                    <p className="text-[10px] text-[#8E8E93]">{COLUNAS_KANBAN[c.coluna]} · {dias} dias</p>
+                                  </div>
+                                  <p className="text-[11px] font-semibold text-[#8E8E93] tabular-nums shrink-0">{brl(c.preco)}</p>
+                                </div>
+                              )
+                            })}
+                            {alertas.parados.length > 5 && (
+                              <p className="px-4 pb-2.5 text-[10px] text-[#8E8E93]">+{alertas.parados.length - 5} mais</p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Sem lançamento */}
+                        {alertas.semRegistro.length > 0 && (
+                          <div>
+                            <div className="px-4 pt-3 pb-1.5 flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-[#8E8E93] shrink-0" />
+                              <p className="text-[9.5px] font-bold uppercase tracking-wide text-[#8E8E93] flex-1">Sem lançamento financeiro</p>
+                              <p className="text-[9.5px] font-semibold text-[#8E8E93] tabular-nums">
+                                {brl(alertas.semRegistro.reduce((s, c) => s + c.preco, 0))}
+                              </p>
+                            </div>
+                            {alertas.semRegistro.slice(0, 5).map(c => (
+                              <div key={c.id} className="px-4 py-2 flex items-start gap-3 hover:bg-[rgba(0,0,0,0.02)] transition-colors">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[11.5px] font-medium text-[#1C1C1E] truncate">
+                                    {c.numero ? `#${c.numero} · ` : ""}{c.nomeCliente}
+                                  </p>
+                                  <p className="text-[10px] text-[#8E8E93]">Fechado {c.dataFechamento} · {COLUNAS_KANBAN[c.coluna]}</p>
+                                </div>
+                                <p className="text-[11px] font-semibold text-[#8E8E93] tabular-nums shrink-0">{brl(c.preco)}</p>
+                              </div>
+                            ))}
+                            {alertas.semRegistro.length > 5 && (
+                              <p className="px-4 pb-2.5 text-[10px] text-[#8E8E93]">+{alertas.semRegistro.length - 5} mais</p>
+                            )}
+                          </div>
+                        )}
+
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
+            <div className="text-[11px] text-[#8E8E93] font-medium tabular-nums bg-white border border-[rgba(0,0,0,0.12)] rounded-full px-3 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+              {filteredCards.length} orçamento{filteredCards.length !== 1 ? "s" : ""} no período
+            </div>
           </div>
         </div>
       </div>

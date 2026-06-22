@@ -323,7 +323,7 @@ export function FinanceiroView({
   onDeleteCard?: (id: string) => void
   onDetalhesCard?: (card: KanbanCard) => void
 }) {
-  const [tab, setTab] = useState<"dash" | "receber" | "lancamentos" | "analytics">("dash")
+  const [tab, setTab] = useState<"dash" | "receber" | "lancamentos" | "analytics" | "pix">("dash")
   const [periodo, setPeriodo] = useState<Periodo>("mes")
   const [modalLanc, setModalLanc]         = useState<Partial<LancamentoFinanceiro> | true | null>(null)
   const [modalPag, setModalPag]           = useState<LancamentoFinanceiro | null>(null)
@@ -336,8 +336,8 @@ export function FinanceiroView({
   // Restore on mount — write effects would corrupt sessionStorage during SSR hydration
   useEffect(() => {
     const t = sessionStorage.getItem("fin:tab")
-    if (t && ["dash", "receber", "lancamentos", "analytics"].includes(t))
-      setTab(t as "dash" | "receber" | "lancamentos" | "analytics")
+    if (t && ["dash", "receber", "lancamentos", "analytics", "pix"].includes(t))
+      setTab(t as "dash" | "receber" | "lancamentos" | "analytics" | "pix")
     const p = sessionStorage.getItem("fin:periodo")
     if (p && ["mes", "trimestre", "semestre", "ano", "tudo"].includes(p))
       setPeriodo(p as Periodo)
@@ -509,6 +509,24 @@ export function FinanceiroView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lancamentos, negocios, periodo, pedidosElegiveis, lancPorCard, pagamentosPorLote, pagamentosPorCard, sobrasPorLote, sobrasPorCard])
 
+  // Margem de pedidos terceirizados (preço cobrado − custo pago ao fornecedor), no período selecionado
+  const margemTerceiros = useMemo(() => {
+    const fromRef = from?.toISOString().split("T")[0]
+    const itens = pedidosElegiveis
+      .filter(c => c.materialNome === "Terceirizado" && c.custoTerceiro != null && c.custoTerceiro > 0)
+      .filter(c => !fromRef || (c.dataFechamento ?? c.data) >= fromRef)
+      .map(c => ({ ...c, margem: c.preco - (c.custoTerceiro ?? 0) }))
+      .sort((a, b) => (b.dataFechamento ?? b.data).localeCompare(a.dataFechamento ?? a.data))
+
+    const totalPreco  = itens.reduce((s, c) => s + c.preco, 0)
+    const totalCusto  = itens.reduce((s, c) => s + (c.custoTerceiro ?? 0), 0)
+    const totalMargem = totalPreco - totalCusto
+    const pct = totalPreco > 0 ? (totalMargem / totalPreco) * 100 : 0
+
+    return { itens, totalPreco, totalCusto, totalMargem, pct }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidosElegiveis, periodo])
+
   // Pagamentos vencidos — pendentes com dataVencimento no passado, agrupados por lote/card
   const vencidos = useMemo(() => {
     const hj = hoje()
@@ -536,6 +554,26 @@ export function FinanceiroView({
     }
     return Object.values(grupos).sort((a, b) => b.total - a.total)
   }, [lancamentos])
+
+  // PIX links emitidos
+  const pixLinks = useMemo(() => {
+    const hj = hoje()
+    return lancamentos
+      .filter(l => l.categoria === "pix_link")
+      .map(l => ({
+        ...l,
+        pixStatus: l.status === "pago" ? "recebido" as const
+          : l.dataVencimento < hj ? "expirado" as const
+          : "pendente" as const,
+      }))
+      .sort((a, b) => b.criadoEm.localeCompare(a.criadoEm))
+  }, [lancamentos])
+
+  const pixPendentes  = pixLinks.filter(p => p.pixStatus === "pendente")
+  const pixExpirados  = pixLinks.filter(p => p.pixStatus === "expirado")
+  const pixRecebidos  = pixLinks.filter(p => p.pixStatus === "recebido")
+
+  const [showPixHist, setShowPixHist] = useState(false)
 
   // DRE por categoria de despesas
   const dreDesp = useMemo(() => {
@@ -577,22 +615,32 @@ export function FinanceiroView({
 
         {/* Tabs */}
         <div className="flex gap-1 border-b border-[rgba(60,60,67,0.08)]">
-          {(["dash", "receber", "lancamentos", "analytics"] as const).map(t => (
+          {(["dash", "receber", "lancamentos", "analytics", "pix"] as const).map(t => (
             <button key={t} onClick={() => { setTab(t); sessionStorage.setItem("fin:tab", t) }}
               className={`px-4 py-2.5 text-[12.5px] font-semibold border-b-2 transition-colors -mb-px flex items-center gap-1.5 ${
                 tab === t ? "border-slate-800 text-[#1C1C1E]" : "border-transparent text-[#8E8E93] hover:text-[rgba(60,60,67,0.6)]"
               }`}>
-              {t === "dash" ? "Visão geral" : t === "lancamentos" ? "Lançamentos" : t === "analytics" ? "Analytics" : (
-                <>
-                  A receber
-                  {kpis.naoRegistrados > 0 && (
-                    <span className="text-[10px] font-bold bg-[rgba(116,116,128,0.1)] text-[#8E8E93] rounded-full px-1.5 py-0.5 leading-none">{kpis.naoRegistrados}</span>
-                  )}
-                  {vencidos.length > 0 && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#FF3B30] shrink-0" />
-                  )}
-                </>
-              )}
+              {t === "dash" ? "Visão geral"
+                : t === "lancamentos" ? "Lançamentos"
+                : t === "analytics" ? "Analytics"
+                : t === "pix" ? (
+                  <>
+                    PIX
+                    {pixPendentes.length > 0 && (
+                      <span className="text-[10px] font-bold bg-[#007AFF]/10 text-[#007AFF] rounded-full px-1.5 py-0.5 leading-none">{pixPendentes.length}</span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    A receber
+                    {kpis.naoRegistrados > 0 && (
+                      <span className="text-[10px] font-bold bg-[rgba(116,116,128,0.1)] text-[#8E8E93] rounded-full px-1.5 py-0.5 leading-none">{kpis.naoRegistrados}</span>
+                    )}
+                    {vencidos.length > 0 && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF3B30] shrink-0" />
+                    )}
+                  </>
+                )}
             </button>
           ))}
         </div>
@@ -605,7 +653,7 @@ export function FinanceiroView({
         {tab === "dash" && (
           <div className="space-y-6">
             {/* KPIs */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <KpiCard label="Recebido" value={brl(kpis.recebido)} color="green"
                 sub={PERIODO_LABEL[periodo].toLowerCase()} />
               <KpiCard label="Despesas pagas" value={brl(kpis.despesasPg)} color="rose"
@@ -617,6 +665,9 @@ export function FinanceiroView({
                 sub={`${kpis.naoRegistrados} pedido${kpis.naoRegistrados !== 1 ? "s" : ""} incompleto${kpis.naoRegistrados !== 1 ? "s" : ""}`} />
               <KpiCard label="Em atraso" value={brl(kpis.emAtraso)} color="rose"
                 sub={`${lancamentos.filter(l => l.tipo === "receita" && statusEfetivo(l) === "atrasado").length} títulos`} />
+              <KpiCard label="Margem terceiriz." value={brl(margemTerceiros.totalMargem)}
+                color={margemTerceiros.totalMargem >= 0 ? "blue" : "rose"}
+                sub={margemTerceiros.itens.length > 0 ? `${margemTerceiros.pct.toFixed(0)}% sobre ${brl(margemTerceiros.totalPreco)}` : "sem terceirizados"} />
             </div>
 
             {/* DRE simples */}
@@ -639,6 +690,49 @@ export function FinanceiroView({
                   bold accent={kpis.resultado >= 0 ? "green" : "rose"} separator />
               </div>
             </div>
+
+            {/* Margem de terceirizados — preço cobrado vs. custo pago ao fornecedor */}
+            {margemTerceiros.itens.length > 0 && (
+              <div className="bg-white border border-[#FF9500]/20 rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-[#FF9500]/15 flex items-center justify-between">
+                  <p className="font-bold text-[#1C1C1E] text-[13px]">Margem — Terceirizados</p>
+                  <p className="font-semibold text-[13px] tabular-nums"
+                    style={{ color: margemTerceiros.totalMargem >= 0 ? "#34C759" : "#FF3B30" }}>
+                    {brl(margemTerceiros.totalMargem)} · {margemTerceiros.pct.toFixed(0)}%
+                  </p>
+                </div>
+                <div className="divide-y divide-slate-50">
+                  {margemTerceiros.itens.slice(0, 8).map(c => (
+                    <div key={c.id} className="px-5 py-3 flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-[12.5px] font-semibold text-[rgba(60,60,67,0.75)] truncate">
+                            {c.dimensoes || c.numero}
+                          </p>
+                          {c.loteNumero && (
+                            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-[#007AFF]/10 text-[#007AFF] shrink-0">
+                              {c.loteNumero}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[#8E8E93] mt-0.5">
+                          {c.nomeCliente}{c.fornecedor ? ` · via ${c.fornecedor}` : ""}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-[13px] font-bold tabular-nums"
+                          style={{ color: c.margem >= 0 ? "#34C759" : "#FF3B30" }}>
+                          {brl(c.margem)}
+                        </p>
+                        <p className="text-[10px] text-[#8E8E93] tabular-nums">
+                          {brl(c.preco)} − {brl(c.custoTerceiro ?? 0)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Parcerias recentes pagas — sempre visíveis independente do período */}
             {negociosPagosTodos.length > 0 && (
@@ -1293,6 +1387,115 @@ export function FinanceiroView({
         {/* ── ANALYTICS ── */}
         {tab === "analytics" && (
           <AnalyticsView lancamentos={lancamentos} kanban={kanban} negocios={negocios} />
+        )}
+
+        {/* ── PIX ── */}
+        {tab === "pix" && (
+          <div className="max-w-xl space-y-6">
+
+            {/* Pendentes */}
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[#8E8E93] mb-3">
+                Aguardando pagamento
+              </p>
+              {pixPendentes.length === 0 ? (
+                <div className="text-center py-10 text-[13px] text-[#8E8E93]">
+                  Nenhum link PIX pendente.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {pixPendentes.map(p => (
+                    <div key={p.id} className="bg-white rounded-2xl border border-[rgba(0,0,0,0.08)] p-4 flex items-center gap-4">
+                      <div className="w-8 h-8 rounded-full bg-[#007AFF]/10 flex items-center justify-center shrink-0">
+                        <svg className="w-4 h-4 text-[#007AFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-[#1C1C1E] truncate">
+                          {p.loteNumero ?? "—"} · {p.nomeCliente?.split(" ")[0]}
+                        </p>
+                        <p className="text-[11px] text-[#8E8E93]">
+                          Vence {new Date(p.dataVencimento + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                        </p>
+                      </div>
+                      <p className="text-[15px] font-bold text-[#1C1C1E] tabular-nums shrink-0">{brl(p.valor)}</p>
+                      <button
+                        onClick={() => onUpdate(p.id, { status: "pago", dataPagamento: hoje() })}
+                        className="shrink-0 px-3 py-1.5 rounded-xl text-[12px] font-semibold text-white bg-[#34C759] hover:bg-[#2fb350] transition-colors active:scale-95"
+                      >
+                        Recebido
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Recebidos */}
+            {pixRecebidos.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-[#8E8E93] mb-3">Recebidos</p>
+                <div className="space-y-2">
+                  {pixRecebidos.map(p => (
+                    <div key={p.id} className="bg-[#F2F2F7] rounded-2xl p-4 flex items-center gap-4">
+                      <div className="w-8 h-8 rounded-full bg-[#34C759]/15 flex items-center justify-center shrink-0">
+                        <svg className="w-4 h-4 text-[#34C759]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-[#1C1C1E] truncate">
+                          {p.loteNumero ?? "—"} · {p.nomeCliente?.split(" ")[0]}
+                        </p>
+                        <p className="text-[11px] text-[#8E8E93]">
+                          Recebido {p.dataPagamento ? new Date(p.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—"}
+                        </p>
+                      </div>
+                      <p className="text-[15px] font-bold text-[#34C759] tabular-nums shrink-0">{brl(p.valor)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Histórico (expirados) */}
+            {pixExpirados.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setShowPixHist(h => !h)}
+                  className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-[#8E8E93] hover:text-[#1C1C1E] transition-colors mb-3"
+                >
+                  <svg className={`w-3.5 h-3.5 transition-transform ${showPixHist ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                  Histórico · {pixExpirados.length} expirado{pixExpirados.length > 1 ? "s" : ""}
+                </button>
+                {showPixHist && (
+                  <div className="space-y-2">
+                    {pixExpirados.map(p => (
+                      <div key={p.id} className="bg-[#F2F2F7] rounded-2xl p-4 flex items-center gap-4 opacity-60">
+                        <div className="w-8 h-8 rounded-full bg-[rgba(0,0,0,0.06)] flex items-center justify-center shrink-0">
+                          <svg className="w-4 h-4 text-[#8E8E93]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-semibold text-[#1C1C1E] truncate">
+                            {p.loteNumero ?? "—"} · {p.nomeCliente?.split(" ")[0]}
+                          </p>
+                          <p className="text-[11px] text-[#8E8E93]">
+                            Expirou {new Date(p.dataVencimento + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                          </p>
+                        </div>
+                        <p className="text-[15px] font-bold text-[#8E8E93] tabular-nums shrink-0">{brl(p.valor)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
