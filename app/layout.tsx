@@ -1,10 +1,21 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "./components/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "ENYLA — Orçamentos",
   description: "Sistema de orçamentos para embalagens e caixas",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "ENYLA",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#007AFF",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
