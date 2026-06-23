@@ -1353,7 +1353,20 @@ export default function Home() {
                   body: JSON.stringify({ ...n, loteId: n.loteId ?? null, loteNumero: n.loteNumero ?? null, statusLote: n.statusLote ?? null }),
                 }).catch(() => {})
               }}
-              onAddLancamento={l => setLancamentos(prev => [l, ...prev])}
+              onAddLancamento={l => {
+                // Reemitir um link PIX para o mesmo lote cancela os links anteriores
+                // ainda não pagos (senão cada reemissão soma "a receber" duplicado).
+                if (l.categoria === "pix_link" && l.loteId) {
+                  const obsoletos = lancamentos.filter(x =>
+                    x.categoria === "pix_link" && x.loteId === l.loteId && x.status !== "pago"
+                  )
+                  obsoletos.forEach(o => fetch(`/api/lancamentos/${o.id}`, { method: "DELETE" }).catch(() => {}))
+                  const obsoletoIds = new Set(obsoletos.map(o => o.id))
+                  setLancamentos(prev => [l, ...prev.filter(x => !obsoletoIds.has(x.id))])
+                } else {
+                  setLancamentos(prev => [l, ...prev])
+                }
+              }}
             />
           ) : view === "historico" ? (
             <HistoricoView
