@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { FormData, Calculo, PropostaCustom, KanbanCard, COLUNAS_KANBAN, COL_FECHADO, COL_EXPEDICAO, COL_PERDIDO } from "../types"
+import { FormData, Calculo, PropostaCustom, KanbanCard, LancamentoFinanceiro, COLUNAS_KANBAN, COL_FECHADO, COL_EXPEDICAO, COL_PERDIDO } from "../types"
 import { brl, num } from "../utils"
 
 type HistItem = { form: FormData; calculo: Calculo; data: string; numero?: string }
@@ -14,7 +14,7 @@ export type DetalheData =
 export function ModalDetalhe({
   data, parcFator, onClose, onEditar, onEditarHistorico, onPersonalizarHistorico,
   onSaveDelivery, onSaveDeliveryReal, onSaveCloseDate,
-  onRegistrarSobra, onSaveFornecedor,
+  onRegistrarSobra, onSaveFornecedor, lancamentos,
 }: {
   data: DetalheData
   parcFator: number
@@ -27,6 +27,7 @@ export function ModalDetalhe({
   onSaveCloseDate?: (cardId: string, date: string) => void
   onRegistrarSobra?: (card: KanbanCard) => void
   onSaveFornecedor?: (cardId: string, fornecedor: string | null, custo: number | null) => void
+  lancamentos?: LancamentoFinanceiro[]
 }) {
   const isH = data.tipo === "historico"
   const isP = data.tipo === "proposta"
@@ -43,6 +44,13 @@ export function ModalDetalhe({
   const [pixCopied, setPixCopied] = useState(false)
 
   const isTerceirizado = card?.materialNome === "Terceirizado"
+
+  const despesasVinculadas = useMemo(() => {
+    if (!card || !lancamentos) return []
+    return lancamentos.filter(l => l.tipo === "despesa" && l.cardId === card.id && l.status === "pago")
+  }, [card, lancamentos])
+  const totalDespesas = despesasVinculadas.reduce((s, l) => s + l.valor, 0)
+  const lucroReal = (card?.preco ?? 0) - totalDespesas
 
   // Dirty check — only relevant fields
   const isDirty = useMemo(() => {
@@ -367,6 +375,29 @@ export function ModalDetalhe({
                     className="w-full h-9 border border-[rgba(0,0,0,0.1)] rounded-xl px-2.5 text-[12.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#FF9500]/20 focus:border-[#FF9500] transition-colors tabular-nums"
                   />
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Despesas vinculadas a este pedido */}
+          {card && despesasVinculadas.length > 0 && (
+            <div className="px-5 py-4 border-t border-[rgba(60,60,67,0.08)] space-y-2">
+              <p className="text-[9.5px] uppercase tracking-wide text-[#8E8E93] font-semibold">
+                Despesas vinculadas
+              </p>
+              <div className="space-y-1.5">
+                {despesasVinculadas.map(l => (
+                  <div key={l.id} className="flex items-center justify-between text-[12px]">
+                    <span className="text-[rgba(60,60,67,0.7)] truncate">{l.descricao}</span>
+                    <span className="text-rose-600 font-medium tabular-nums shrink-0 ml-2">−{brl(l.valor)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center justify-between pt-1.5 border-t border-[rgba(60,60,67,0.06)]">
+                <span className="text-[11.5px] font-semibold text-[#1C1C1E]">Lucro real</span>
+                <span className="text-[13px] font-bold tabular-nums" style={{ color: lucroReal >= 0 ? "#34C759" : "#FF3B30" }}>
+                  {brl(lucroReal)}
+                </span>
               </div>
             </div>
           )}

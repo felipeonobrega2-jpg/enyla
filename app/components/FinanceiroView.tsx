@@ -69,9 +69,13 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
   function handleCard(id: string) {
     setCardId(id)
     const c = kanban.find(x => x.id === id)
-    if (c) {
+    if (!c) return
+    const loteTag = c.loteNumero ? ` [${c.loteNumero}]` : ""
+    if (tipo === "receita") {
       setValor(String(c.preco))
-      const loteTag = c.loteNumero ? ` [${c.loteNumero}]` : ""
+      setDescricao(`Pedido ${c.numero} — ${c.nomeCliente}${loteTag}`)
+    } else if (!descricao.trim()) {
+      // Despesa: não sobrescreve valor (custo do gasto é independente do preço do pedido)
       setDescricao(`Pedido ${c.numero} — ${c.nomeCliente}${loteTag}`)
     }
   }
@@ -101,6 +105,8 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
   }
 
   const pedidosAbertos = kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO)
+  // Despesa pode ser vinculada a qualquer pedido ativo (custo pode ocorrer antes do fechamento)
+  const pedidosVinculaveis = tipo === "receita" ? pedidosAbertos : kanban.filter(c => c.coluna !== COL_PERDIDO)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
@@ -132,12 +138,12 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
             </div>
           </Field>
 
-          {/* Vincular a pedido (só receita) */}
-          {tipo === "receita" && pedidosAbertos.length > 0 && (
+          {/* Vincular a pedido (receita ou despesa) */}
+          {pedidosVinculaveis.length > 0 && (
             <Field label="Vincular a pedido (opcional)">
               <select value={cardId} onChange={e => handleCard(e.target.value)} className={inp()}>
                 <option value="">— Nenhum —</option>
-                {pedidosAbertos.map(c => (
+                {pedidosVinculaveis.map(c => (
                   <option key={c.id} value={c.id}>
                     {c.numero} — {c.nomeCliente} — {brl(c.preco)}
                   </option>

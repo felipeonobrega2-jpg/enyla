@@ -1705,6 +1705,7 @@ export default function Home() {
           onSaveCloseDate={"card" in detalheModal && detalheModal.card ? salvarDataFechamento : undefined}
           onRegistrarSobra={"card" in detalheModal && detalheModal.card ? abrirSobra : undefined}
           onSaveFornecedor={"card" in detalheModal && detalheModal.card ? salvarFornecedor : undefined}
+          lancamentos={lancamentos}
         />
       )}
 
