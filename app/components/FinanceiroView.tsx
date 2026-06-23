@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import {
   LancamentoFinanceiro, TipoLancamento, StatusLancamento,
   FormaPagamento, KanbanCard, COL_FECHADO, COL_EXPEDICAO, COL_PERDIDO, NegocioParceiro, Lote,
@@ -141,14 +141,7 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
           {/* Vincular a pedido (receita ou despesa) */}
           {pedidosVinculaveis.length > 0 && (
             <Field label="Vincular a pedido (opcional)">
-              <select value={cardId} onChange={e => handleCard(e.target.value)} className={inp()}>
-                <option value="">— Nenhum —</option>
-                {pedidosVinculaveis.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.numero} — {c.nomeCliente} — {brl(c.preco)}
-                  </option>
-                ))}
-              </select>
+              <PedidoCombobox pedidos={pedidosVinculaveis} value={cardId} onChange={handleCard} />
             </Field>
           )}
 
@@ -220,6 +213,76 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function PedidoCombobox({
+  pedidos, value, onChange,
+}: {
+  pedidos: KanbanCard[]
+  value: string
+  onChange: (id: string) => void
+}) {
+  const [query, setQuery] = useState("")
+  const [open, setOpen]   = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const selected = pedidos.find(c => c.id === value)
+
+  const matches = query.trim().length > 0
+    ? pedidos.filter(c =>
+        c.numero.toLowerCase().includes(query.toLowerCase()) ||
+        c.nomeCliente.toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 8)
+    : []
+
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", onDown)
+    return () => document.removeEventListener("mousedown", onDown)
+  }, [])
+
+  if (selected) {
+    return (
+      <div className="flex items-center justify-between gap-2 h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 bg-[#F2F2F7]">
+        <span className="text-[12.5px] text-[#1C1C1E] font-medium truncate">
+          {selected.numero} — {selected.nomeCliente} — {brl(selected.preco)}
+        </span>
+        <button onClick={() => { onChange(""); setQuery("") }}
+          className="text-[rgba(60,60,67,0.4)] hover:text-[#8E8E93] text-base leading-none shrink-0">
+          ×
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        type="text"
+        value={query}
+        placeholder="Buscar por número ou cliente…"
+        className={inp()}
+        onChange={e => { setQuery(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(query.trim().length > 0)}
+      />
+      {open && query.trim().length > 0 && (
+        <div className="absolute top-full left-0 right-0 z-50 mt-1.5 bg-white border border-[rgba(60,60,67,0.12)] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+          {matches.length > 0 ? matches.map(c => (
+            <button key={c.id}
+              onMouseDown={e => { e.preventDefault(); onChange(c.id); setQuery(""); setOpen(false) }}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-[#F2F2F7] transition-colors">
+              <span className="text-[12px] font-medium text-[#1C1C1E] truncate">{c.numero} — {c.nomeCliente}</span>
+              <span className="text-[11px] text-[#8E8E93] shrink-0">{brl(c.preco)}</span>
+            </button>
+          )) : (
+            <p className="px-3 py-2.5 text-[11.5px] text-[#8E8E93]">Nenhum pedido encontrado</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
