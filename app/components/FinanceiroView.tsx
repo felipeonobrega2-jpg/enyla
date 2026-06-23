@@ -65,24 +65,65 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
   const [dataVenc, setDataVenc]       = useState(inicial?.dataVencimento ?? hoje())
   const [dataPag, setDataPag]         = useState(inicial?.dataPagamento ?? "")
   const [status, setStatus]           = useState<StatusLancamento>(inicial?.status === "pago" ? "pago" : "pendente")
-  const [cardId, setCardId]           = useState(inicial?.cardId ?? "")
+  const [vinculoKey, setVinculoKey]   = useState(inicial?.loteId ? `lote:${inicial.loteId}` : inicial?.cardId ? `card:${inicial.cardId}` : "")
   const [categoria, setCategoria]     = useState(inicial?.categoria ?? "")
   const [forma, setForma]             = useState<FormaPagamento | "">(inicial?.formaPagamento ?? "")
   const [obs, setObs]                 = useState(inicial?.obs ?? "")
 
-  const cardSel = kanban.find(c => c.id === cardId)
+  const pedidosAbertos = kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO)
+  // Despesa pode ser vinculada a qualquer pedido ativo (custo pode ocorrer antes do fechamento)
+  const elegiveis = tipo === "receita" ? pedidosAbertos : kanban.filter(c => c.coluna !== COL_PERDIDO)
 
-  function handleCard(id: string) {
-    setCardId(id)
-    const c = kanban.find(x => x.id === id)
-    if (!c) return
-    const loteTag = c.loteNumero ? ` [${c.loteNumero}]` : ""
+  // Agrupa por lote — pedidos sem lote entram individualmente
+  const vinculaveis = useMemo(() => {
+    const porLote = new Map<string, KanbanCard[]>()
+    const solos: KanbanCard[] = []
+    for (const c of elegiveis) {
+      if (c.loteId) {
+        const arr = porLote.get(c.loteId) ?? []
+        arr.push(c)
+        porLote.set(c.loteId, arr)
+      } else {
+        solos.push(c)
+      }
+    }
+    const itens: VinculoItem[] = []
+    for (const [loteId, cards] of porLote) {
+      itens.push({
+        key: `lote:${loteId}`,
+        numero: cards[0].loteNumero ?? loteId,
+        nomeCliente: cards[0].nomeCliente,
+        valor: cards.reduce((s, c) => s + c.preco, 0),
+        loteId,
+        loteNumero: cards[0].loteNumero,
+      })
+    }
+    for (const c of solos) {
+      itens.push({
+        key: `card:${c.id}`,
+        numero: c.numero,
+        nomeCliente: c.nomeCliente,
+        valor: c.preco,
+        cardId: c.id,
+        cardNumero: c.numero,
+      })
+    }
+    return itens
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elegiveis])
+
+  const vinculoSel = vinculaveis.find(v => v.key === vinculoKey)
+
+  function handleVinculo(key: string) {
+    setVinculoKey(key)
+    const v = vinculaveis.find(x => x.key === key)
+    if (!v) return
     if (tipo === "receita") {
-      setValor(String(c.preco))
-      setDescricao(`Pedido ${c.numero} — ${c.nomeCliente}${loteTag}`)
+      setValor(String(v.valor))
+      setDescricao(v.loteId ? `Lote ${v.numero} — ${v.nomeCliente}` : `Pedido ${v.numero} — ${v.nomeCliente}`)
     } else if (!descricao.trim()) {
       // Despesa: não sobrescreve valor (custo do gasto é independente do preço do pedido)
-      setDescricao(`Pedido ${c.numero} — ${c.nomeCliente}${loteTag}`)
+      setDescricao(v.loteId ? `Lote ${v.numero} — ${v.nomeCliente}` : `Pedido ${v.numero} — ${v.nomeCliente}`)
     }
   }
 
@@ -97,11 +138,11 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
       dataVencimento: dataVenc,
       dataPagamento:  status === "pago" ? (dataPag || dataVenc) : undefined,
       status:         status === "pago" ? "pago" : "pendente",
-      cardId:         cardId || undefined,
-      cardNumero:     cardSel?.numero || inicial?.cardNumero,
-      nomeCliente:    cardSel?.nomeCliente || inicial?.nomeCliente,
-      loteId:         cardSel?.loteId || inicial?.loteId,
-      loteNumero:     cardSel?.loteNumero || inicial?.loteNumero,
+      cardId:         vinculoSel?.cardId || undefined,
+      cardNumero:     vinculoSel?.cardNumero || inicial?.cardNumero,
+      nomeCliente:    vinculoSel?.nomeCliente || inicial?.nomeCliente,
+      loteId:         vinculoSel?.loteId || inicial?.loteId,
+      loteNumero:     vinculoSel?.loteNumero || (vinculoSel ? undefined : inicial?.loteNumero),
       categoria:      categoria || undefined,
       formaPagamento: forma || undefined,
       obs:            obs.trim() || undefined,
@@ -109,10 +150,6 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
     })
     onClose()
   }
-
-  const pedidosAbertos = kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO)
-  // Despesa pode ser vinculada a qualquer pedido ativo (custo pode ocorrer antes do fechamento)
-  const pedidosVinculaveis = tipo === "receita" ? pedidosAbertos : kanban.filter(c => c.coluna !== COL_PERDIDO)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
@@ -144,10 +181,10 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
             </div>
           </Field>
 
-          {/* Vincular a pedido (receita ou despesa) */}
-          {pedidosVinculaveis.length > 0 && (
-            <Field label="Vincular a pedido (opcional)">
-              <PedidoCombobox pedidos={pedidosVinculaveis} value={cardId} onChange={handleCard} />
+          {/* Vincular a lote (ou pedido solo, se não estiver em lote) */}
+          {vinculaveis.length > 0 && (
+            <Field label="Vincular a lote (opcional)">
+              <VinculoCombobox itens={vinculaveis} value={vinculoKey} onChange={handleVinculo} />
             </Field>
           )}
 
@@ -223,23 +260,34 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
   )
 }
 
-function PedidoCombobox({
-  pedidos, value, onChange,
+type VinculoItem = {
+  key: string
+  numero: string
+  nomeCliente: string
+  valor: number
+  loteId?: string
+  loteNumero?: string
+  cardId?: string
+  cardNumero?: string
+}
+
+function VinculoCombobox({
+  itens, value, onChange,
 }: {
-  pedidos: KanbanCard[]
+  itens: VinculoItem[]
   value: string
-  onChange: (id: string) => void
+  onChange: (key: string) => void
 }) {
   const [query, setQuery] = useState("")
   const [open, setOpen]   = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const selected = pedidos.find(c => c.id === value)
+  const selected = itens.find(v => v.key === value)
 
   const matches = query.trim().length > 0
-    ? pedidos.filter(c =>
-        c.numero.toLowerCase().includes(query.toLowerCase()) ||
-        c.nomeCliente.toLowerCase().includes(query.toLowerCase())
+    ? itens.filter(v =>
+        v.numero.toLowerCase().includes(query.toLowerCase()) ||
+        v.nomeCliente.toLowerCase().includes(query.toLowerCase())
       ).slice(0, 8)
     : []
 
@@ -255,7 +303,7 @@ function PedidoCombobox({
     return (
       <div className="flex items-center justify-between gap-2 h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 bg-[#F2F2F7]">
         <span className="text-[12.5px] text-[#1C1C1E] font-medium truncate">
-          {selected.numero} — {selected.nomeCliente} — {brl(selected.preco)}
+          {selected.numero} — {selected.nomeCliente} — {brl(selected.valor)}
         </span>
         <button onClick={() => { onChange(""); setQuery("") }}
           className="text-[rgba(60,60,67,0.4)] hover:text-[#8E8E93] text-base leading-none shrink-0">
@@ -270,22 +318,22 @@ function PedidoCombobox({
       <input
         type="text"
         value={query}
-        placeholder="Buscar por número ou cliente…"
+        placeholder="Buscar por lote, pedido ou cliente…"
         className={inp()}
         onChange={e => { setQuery(e.target.value); setOpen(true) }}
         onFocus={() => setOpen(query.trim().length > 0)}
       />
       {open && query.trim().length > 0 && (
         <div className="absolute top-full left-0 right-0 z-50 mt-1.5 bg-white border border-[rgba(60,60,67,0.12)] rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
-          {matches.length > 0 ? matches.map(c => (
-            <button key={c.id}
-              onMouseDown={e => { e.preventDefault(); onChange(c.id); setQuery(""); setOpen(false) }}
+          {matches.length > 0 ? matches.map(v => (
+            <button key={v.key}
+              onMouseDown={e => { e.preventDefault(); onChange(v.key); setQuery(""); setOpen(false) }}
               className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-[#F2F2F7] transition-colors">
-              <span className="text-[12px] font-medium text-[#1C1C1E] truncate">{c.numero} — {c.nomeCliente}</span>
-              <span className="text-[11px] text-[#8E8E93] shrink-0">{brl(c.preco)}</span>
+              <span className="text-[12px] font-medium text-[#1C1C1E] truncate">{v.numero} — {v.nomeCliente}</span>
+              <span className="text-[11px] text-[#8E8E93] shrink-0">{brl(v.valor)}</span>
             </button>
           )) : (
-            <p className="px-3 py-2.5 text-[11.5px] text-[#8E8E93]">Nenhum pedido encontrado</p>
+            <p className="px-3 py-2.5 text-[11.5px] text-[#8E8E93]">Nenhum resultado encontrado</p>
           )}
         </div>
       )}
