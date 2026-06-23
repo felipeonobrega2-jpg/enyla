@@ -703,8 +703,10 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split("T")[0]
     })()
 
+    // Link PIX vencido e não pago deixa de ser receita pendente (o cliente não vai mais pagar aquele link específico)
     const vencidos = lancamentos.filter(l =>
-      l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra" && l.dataVencimento < hj
+      l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra" && l.dataVencimento < hj &&
+      l.categoria !== "pix_link"
     )
     const vencendoHoje = lancamentos.filter(l =>
       l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra" &&
@@ -742,7 +744,10 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
     }
     const dreRec  = lancamentos.filter(l => l.tipo === "receita" && l.status === "pago" && inPer(l)).reduce((s, l) => s + l.valor, 0)
     const dreDesp = lancamentos.filter(l => l.tipo === "despesa" && l.status === "pago" && inPer(l)).reduce((s, l) => s + l.valor, 0)
-    const pendentes   = lancamentos.filter(l => l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra")
+    const pendentes   = lancamentos.filter(l =>
+      l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra" &&
+      !(l.categoria === "pix_link" && l.dataVencimento < hj)
+    )
     const vencidosArr = pendentes.filter(l => l.dataVencimento < hj)
     const html = gerarHtmlRelatorio({
       periodoLabel: periodoLabel(periodo),

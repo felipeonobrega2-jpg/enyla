@@ -33,6 +33,12 @@ function statusEfetivo(l: LancamentoFinanceiro): StatusLancamento {
   return "pendente"
 }
 
+// Link PIX vencido e não pago: o link expirou, o cliente não vai mais pagar
+// aquele link específico — deixa de ser receita pendente (só conta de novo se reemitido).
+function pixVencido(l: LancamentoFinanceiro): boolean {
+  return l.categoria === "pix_link" && l.status !== "pago" && l.dataVencimento < hoje()
+}
+
 const STATUS_CLS: Record<StatusLancamento, string> = {
   pago:     "bg-emerald-50 text-emerald-700 border-emerald-200",
   pendente: "bg-amber-50 text-amber-700 border-amber-200",
@@ -514,7 +520,7 @@ export function FinanceiroView({
     const all = lancamentos.filter(inPeriodo)
     const recebidas = all.filter(l => l.tipo === "receita" && l.status === "pago")
     const despesas  = all.filter(l => l.tipo === "despesa" && l.status === "pago")
-    const pendentes = lancamentos.filter(l => l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra")
+    const pendentes = lancamentos.filter(l => l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra" && !pixVencido(l))
     const atrasados = pendentes.filter(l => l.dataVencimento < hoje())
 
     const totalParceiros = negociosPagos.reduce((s, n) => s + n.comissaoValor, 0)
@@ -601,7 +607,7 @@ export function FinanceiroView({
   const vencidos = useMemo(() => {
     const hj = hoje()
     const atrasados = lancamentos.filter(l =>
-      l.tipo === "receita" && l.status === "pendente" && l.dataVencimento < hj && l.categoria !== "sobra"
+      l.tipo === "receita" && l.status === "pendente" && l.dataVencimento < hj && l.categoria !== "sobra" && !pixVencido(l)
     )
     const grupos: Record<string, {
       key: string; loteId?: string; cardId?: string
@@ -833,7 +839,7 @@ export function FinanceiroView({
             )}
 
             {/* Próximos recebimentos — lançamentos pendentes + parcerias pendentes */}
-            {(lancamentos.filter(l => l.tipo === "receita" && statusEfetivo(l) !== "pago" && l.categoria !== "sobra").length > 0 || negociosPendentes.length > 0) && (
+            {(lancamentos.filter(l => l.tipo === "receita" && statusEfetivo(l) !== "pago" && l.categoria !== "sobra" && !pixVencido(l)).length > 0 || negociosPendentes.length > 0) && (
               <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-[rgba(60,60,67,0.08)]">
                   <p className="font-bold text-[#1C1C1E] text-[13px]">Próximos recebimentos</p>
@@ -860,7 +866,7 @@ export function FinanceiroView({
                   ))}
                   {/* Lançamentos pendentes */}
                   {lancamentos
-                    .filter(l => l.tipo === "receita" && statusEfetivo(l) !== "pago" && l.categoria !== "sobra")
+                    .filter(l => l.tipo === "receita" && statusEfetivo(l) !== "pago" && l.categoria !== "sobra" && !pixVencido(l))
                     .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))
                     .slice(0, 8)
                     .map(l => {

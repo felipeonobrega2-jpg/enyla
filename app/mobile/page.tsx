@@ -171,9 +171,13 @@ export default function MobilePage() {
       .filter(l => l.tipo === "receita" && l.status === "pago" && l.dataPagamento && inRange(parseIso(l.dataPagamento), from, to))
       .reduce((s, l) => s + l.valor, 0)
 
-    const pendentes = lancamentos.filter(l => l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra")
-    const aReceber = pendentes.reduce((s, l) => s + l.valor, 0)
     const hj = now.toISOString().split("T")[0]
+    // Link PIX vencido e não pago deixa de ser receita pendente (o cliente não vai mais pagar aquele link específico)
+    const pendentes = lancamentos.filter(l =>
+      l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra" &&
+      !(l.categoria === "pix_link" && l.dataVencimento < hj)
+    )
+    const aReceber = pendentes.reduce((s, l) => s + l.valor, 0)
     const vencidos = pendentes
       .filter(l => l.dataVencimento < hj)
       .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))

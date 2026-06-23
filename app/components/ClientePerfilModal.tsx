@@ -50,7 +50,10 @@ export function ClientePerfilModal({
 
   const lancCliente = lancamentos.filter(l => (l.nomeCliente ?? "").trim().toLowerCase() === nome.toLowerCase())
   const recebido  = lancCliente.filter(l => l.tipo === "receita" && l.status === "pago").reduce((s, l) => s + l.valor, 0)
-  const pendentes = lancCliente.filter(l => l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra")
+  const pendentes = lancCliente.filter(l =>
+    l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra" &&
+    !(l.categoria === "pix_link" && l.dataVencimento < hoje())
+  )
   const aReceber  = pendentes.reduce((s, l) => s + l.valor, 0)
   const atrasados = pendentes.filter(l => l.dataVencimento < hoje())
   const emAtraso  = atrasados.reduce((s, l) => s + l.valor, 0)
