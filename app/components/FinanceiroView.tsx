@@ -328,7 +328,6 @@ export function FinanceiroView({
   const [modalLanc, setModalLanc]         = useState<Partial<LancamentoFinanceiro> | true | null>(null)
   const [modalPag, setModalPag]           = useState<LancamentoFinanceiro | null>(null)
   const [filtroTipo, setFiltroTipo]       = useState<TipoLancamento | "">("")
-  const [filtroStatus, setFiltroStatus]   = useState<StatusLancamento | "">("")
   const [buscaReceber, setBuscaReceber]   = useState("")
   const [filtroReceber, setFiltroReceber] = useState<"aberto" | "pendente" | "parcial" | "todos">("aberto")
   const [confirmarDel, setConfirmarDel]   = useState<string | null>(null)
@@ -418,12 +417,14 @@ export function FinanceiroView({
     return ref >= from.toISOString().split("T")[0]
   }
 
+  // "Lançamentos" mostra apenas movimentos concretizados (pagos) — pendentes
+  // (ex.: links PIX recém-emitidos) ficam nas abas "A receber" e "PIX".
   const lancFiltrados = useMemo(() => lancamentos
+    .filter(l => l.status === "pago")
     .filter(inPeriodo)
-    .filter(l => !filtroTipo || l.tipo === filtroTipo)
-    .filter(l => !filtroStatus || statusEfetivo(l) === filtroStatus),
+    .filter(l => !filtroTipo || l.tipo === filtroTipo),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lancamentos, periodo, filtroTipo, filtroStatus]
+    [lancamentos, periodo, filtroTipo]
   )
 
   // Parcerias — comissão e ganho são AMBOS receita do usuário
@@ -1276,17 +1277,10 @@ export function FinanceiroView({
                 <option value="receita">Receitas</option>
                 <option value="despesa">Despesas</option>
               </select>
-              <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value as StatusLancamento | "")}
-                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[rgba(60,60,67,0.6)] bg-white focus:outline-none">
-                <option value="">Todos os status</option>
-                <option value="pago">Pago</option>
-                <option value="pendente">Pendente</option>
-                <option value="atrasado">Em atraso</option>
-              </select>
             </div>
 
-            {/* Negócios de parcerias — sempre visíveis (sem filtro de período) */}
-            {negocios.filter(n => n.status !== "cancelado" && (!filtroTipo || filtroTipo === "receita") && (!filtroStatus || filtroStatus === (n.status === "pago" ? "pago" : "pendente"))).map(n => (
+            {/* Negócios de parcerias concretizados, respeitando o período selecionado */}
+            {negocios.filter(n => n.status === "pago" && (!filtroTipo || filtroTipo === "receita") && negociosInPeriodo(n)).map(n => (
               <div key={`neg-${n.id}`}
                 className="bg-white border border-violet-100 rounded-2xl px-5 py-4 flex items-center gap-3 hover:border-violet-200 transition-colors">
                 <div className="w-1.5 h-10 rounded-full shrink-0 bg-violet-400" />
