@@ -471,11 +471,11 @@ export function FinanceiroView({
     [kanban]
   )
 
-  // Todos os pagamentos por loteId (exclui sobras) — suporta múltiplos parciais
+  // Todos os pagamentos por loteId (exclui sobras e PIX vencidos/não pagos) — suporta múltiplos parciais
   const pagamentosPorLote = useMemo(() => {
     const m: Record<string, LancamentoFinanceiro[]> = {}
     for (const l of lancamentos) {
-      if (l.tipo === "receita" && l.loteId && l.categoria !== "sobra") {
+      if (l.tipo === "receita" && l.loteId && l.categoria !== "sobra" && !pixVencido(l)) {
         if (!m[l.loteId]) m[l.loteId] = []
         m[l.loteId].push(l)
       }
@@ -483,11 +483,11 @@ export function FinanceiroView({
     return m
   }, [lancamentos])
 
-  // Todos os pagamentos por cardId (exclui sobras)
+  // Todos os pagamentos por cardId (exclui sobras e PIX vencidos/não pagos)
   const pagamentosPorCard = useMemo(() => {
     const m: Record<string, LancamentoFinanceiro[]> = {}
     for (const l of lancamentos) {
-      if (l.tipo === "receita" && l.cardId && l.categoria !== "sobra") {
+      if (l.tipo === "receita" && l.cardId && l.categoria !== "sobra" && !pixVencido(l)) {
         if (!m[l.cardId]) m[l.cardId] = []
         m[l.cardId].push(l)
       }
@@ -1144,6 +1144,7 @@ export function FinanceiroView({
                               {cards.length} produto{cards.length > 1 ? "s" : ""}
                               {pagamentosLote.length > 0 && !completo && ` · ${brl(totalPago)} recebido`}
                               {sobrasLote.length > 0 && ` · +${brl(totalSobras)} sobras`}
+                              {!completo && total > 0 && <span className="text-amber-600 font-medium"> · {brl(restante)} restante</span>}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
@@ -1251,6 +1252,7 @@ export function FinanceiroView({
                               {[card.dimensoes, card.materialNome].filter(Boolean).join(" · ")}
                               {pagamentosCard.length > 0 && !completoCard && ` · ${brl(totalPagoCard)} recebido`}
                               {sobrasCard.length > 0 && ` · +${brl(totalSobrasCard)} sobras`}
+                              {!completoCard && totalCard > 0 && <span className="text-amber-600 font-medium"> · {brl(restanteCard)} restante</span>}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
