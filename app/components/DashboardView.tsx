@@ -74,9 +74,17 @@ function colBg(col: number): string {
 
 // ─── SVG Monthly Chart ────────────────────────────────────────────────────────
 
-interface MonthlyDatum { label: string; volume: number; receita: number }
+interface MonthlyDatum { label: string; year: number; month: number; volume: number; receita: number }
 
-function MonthlyChart({ data }: { data: MonthlyDatum[] }) {
+type MesItem = { tipo: "pedido" | "sobra"; numero?: string; nomeCliente: string; valor: number; data: string; coluna?: number }
+
+function fmtItemData(s: string): string {
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`
+  return s.split(",")[0] ?? s
+}
+
+function MonthlyChart({ data, onSelectMonth }: { data: MonthlyDatum[]; onSelectMonth?: (index: number) => void }) {
   const [hovered, setHovered] = useState<number | null>(null)
 
   const W = 560, H = 160
@@ -131,6 +139,8 @@ function MonthlyChart({ data }: { data: MonthlyDatum[] }) {
             <g key={i}
               onMouseEnter={() => setHovered(i)}
               onMouseLeave={() => setHovered(null)}
+              onClick={() => onSelectMonth?.(i)}
+              style={{ cursor: onSelectMonth ? "pointer" : undefined }}
             >
               {/* Invisible hit area */}
               <rect x={gx - barGap} y={PAD_T} width={barW * 2 + barGap * 3} height={chartH}
@@ -188,6 +198,85 @@ function MonthlyChart({ data }: { data: MonthlyDatum[] }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function MesDetalheModal({
+  mes, onClose,
+}: {
+  mes: { label: string; year: number; volumeItems: MesItem[]; receitaItems: MesItem[] }
+  onClose: () => void
+}) {
+  const [aba, setAba] = useState<"volume" | "receita">("volume")
+  const itens = aba === "volume" ? mes.volumeItems : mes.receitaItems
+  const total = itens.reduce((s, i) => s + i.valor, 0)
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col overflow-hidden" style={{ maxHeight: "80vh" }}>
+
+        {/* Header */}
+        <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] shrink-0 flex items-start justify-between gap-3">
+          <div>
+            <p className="font-bold text-[#1C1C1E] text-[16px] leading-tight">{mes.label} de {mes.year}</p>
+            <p className="text-[11px] text-[#8E8E93] mt-0.5">{itens.length} item{itens.length !== 1 ? "s" : ""} · {brl(total)}</p>
+          </div>
+          <button onClick={onClose}
+            className="w-7 h-7 rounded-full bg-[rgba(116,116,128,0.1)] flex items-center justify-center text-[#8E8E93] hover:bg-[rgba(116,116,128,0.18)] transition-colors text-lg leading-none shrink-0">
+            ×
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1.5 px-6 pt-3 shrink-0">
+          {([
+            { id: "volume" as const,  label: "Volume orçado",       count: mes.volumeItems.length },
+            { id: "receita" as const, label: "Receita confirmada",  count: mes.receitaItems.length },
+          ]).map(t => (
+            <button key={t.id} onClick={() => setAba(t.id)}
+              className={`px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors ${
+                aba === t.id ? "bg-[#1C1C1E] text-white" : "text-[#8E8E93] hover:bg-[rgba(116,116,128,0.08)]"
+              }`}>
+              {t.label} ({t.count})
+            </button>
+          ))}
+        </div>
+
+        {/* List */}
+        <div className="overflow-y-auto flex-1 px-6 py-4">
+          {itens.length === 0 ? (
+            <p className="text-[12px] text-[#8E8E93] text-center py-8">Nenhum item neste mês.</p>
+          ) : (
+            <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-xl divide-y divide-[rgba(0,0,0,0.04)] overflow-hidden">
+              {itens.map((item, i) => (
+                <div key={i} className="px-4 py-2.5 flex items-center gap-3">
+                  {item.numero && (
+                    <span className="text-[9.5px] font-bold text-[#007AFF] bg-[#007AFF]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">{item.numero}</span>
+                  )}
+                  {item.tipo === "sobra" && (
+                    <span className="text-[9.5px] font-semibold text-[#FF9500] bg-[#FF9500]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">Sobra</span>
+                  )}
+                  <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.75)] truncate">{item.nomeCliente}</p>
+                  <p className="text-[10.5px] text-[#8E8E93] shrink-0 tabular-nums">{fmtItemData(item.data)}</p>
+                  <p className="font-semibold text-[#1C1C1E] text-[12.5px] tabular-nums shrink-0">{brl(item.valor)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3.5 border-t border-[rgba(60,60,67,0.08)] shrink-0 flex justify-end">
+          <button onClick={onClose}
+            className="px-5 h-9 text-[12.5px] font-medium text-[#8E8E93] hover:bg-[rgba(116,116,128,0.06)] rounded-xl transition-colors">
+            Fechar
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -588,7 +677,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
     const months: MonthlyDatum[] = []
     for (let i = 11; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      months.push({ label: MESES_PT[d.getMonth()], volume: 0, receita: 0 })
+      months.push({ label: MESES_PT[d.getMonth()], year: d.getFullYear(), month: d.getMonth(), volume: 0, receita: 0 })
     }
     kanban.forEach(card => {
       // Volume bar: by quote date
@@ -618,6 +707,48 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       })
     return months
   }, [kanban, lancamentos])
+
+  // ── Detalhe do mês selecionado no gráfico ────────────────────────────────────
+  const [modalMesIdx, setModalMesIdx] = useState<number | null>(null)
+
+  const mesSelecionado = useMemo(() => {
+    if (modalMesIdx === null) return null
+    const mes = monthlyData[modalMesIdx]
+    if (!mes) return null
+
+    const volumeItems: MesItem[] = kanban
+      .filter(c => {
+        const cd = parseDataBr(c.data)
+        return cd.getFullYear() === mes.year && cd.getMonth() === mes.month
+      })
+      .map(c => ({ tipo: "pedido" as const, numero: c.numero, nomeCliente: c.nomeCliente, valor: c.preco, data: c.data, coluna: c.coluna }))
+      .sort((a, b) => b.valor - a.valor)
+
+    const fechadosCards: MesItem[] = kanban
+      .filter(c => c.coluna !== 0 && c.coluna !== COL_PERDIDO)
+      .filter(c => {
+        const cd = parseDataBr(c.dataFechamento ?? c.data)
+        return cd.getFullYear() === mes.year && cd.getMonth() === mes.month
+      })
+      .map(c => ({ tipo: "pedido" as const, numero: c.numero, nomeCliente: c.nomeCliente, valor: c.preco, data: c.dataFechamento ?? c.data, coluna: c.coluna }))
+
+    const sobrasItems: MesItem[] = lancamentos
+      .filter(l => l.categoria === "sobra" && l.tipo === "receita")
+      .filter(l => {
+        const ref = l.dataPagamento || l.dataVencimento
+        if (!ref) return false
+        const d = new Date(ref + "T12:00:00")
+        return d.getFullYear() === mes.year && d.getMonth() === mes.month
+      })
+      .map(l => ({ tipo: "sobra" as const, nomeCliente: l.nomeCliente ?? l.descricao, valor: l.valor, data: l.dataPagamento || l.dataVencimento || "" }))
+
+    return {
+      label: mes.label,
+      year: mes.year,
+      volumeItems,
+      receitaItems: [...fechadosCards, ...sobrasItems].sort((a, b) => b.valor - a.valor),
+    }
+  }, [modalMesIdx, monthlyData, kanban, lancamentos])
 
   // ── Funil ───────────────────────────────────────────────────────────────────
   const funil = useMemo(() => {
@@ -786,6 +917,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
   }
 
   return (
+    <>
     <div className="max-w-[1280px] mx-auto px-6 py-5 space-y-5">
 
       {/* ── Filter bar ─────────────────────────────────────────────────────── */}
@@ -1182,7 +1314,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
             <div className="flex-1 h-px bg-[rgba(60,60,67,0.12)]" />
             <p className="text-[10px] text-[#8E8E93]">últimos 12 meses</p>
           </div>
-          <MonthlyChart data={monthlyData} />
+          <MonthlyChart data={monthlyData} onSelectMonth={setModalMesIdx} />
         </div>
 
         {/* Funil de vendas */}
@@ -1390,5 +1522,9 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
         )}
       </div>
     </div>
+    {mesSelecionado && (
+      <MesDetalheModal mes={mesSelecionado} onClose={() => setModalMesIdx(null)} />
+    )}
+    </>
   )
 }
