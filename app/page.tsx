@@ -11,6 +11,7 @@ import { Configuracoes, CONFIG_PADRAO } from "./config"
 import LayoutChapaVisual from "./LayoutChapaVisual"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom } from "./pdf"
 import FormaView from "./FormaView"
+import FormaBubble from "./components/FormaBubble"
 import { brl, num } from "./utils"
 import { FormSection, Label, NumberInput, KpiCard, Section, TH, TabelaRow, AnaliseEstrategica, EmptyState } from "./components/ui"
 import { HistoricoView } from "./components/HistoricoView"
@@ -1844,6 +1845,9 @@ export default function Home() {
           }}
         />
       )}
+
+      {/* ── Forma — assistente flutuante ────────────────────────────────────── */}
+      <FormaBubble apiKey={config.apiKey} />
     </div>
   )
 }
