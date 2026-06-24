@@ -513,7 +513,6 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
         <div>
           <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1118} height={162}
             className="h-4 w-auto" priority />
-          <p className="text-[#8E8E93] text-[10px] mt-1 tracking-wide">Comunicação Visual</p>
         </div>
         <div className="ml-auto">
           <span className="text-[10px] font-bold text-[#007AFF] bg-[#007AFF]/10 border border-[#007AFF]/20 px-2.5 py-1 rounded-full font-mono">
@@ -760,7 +759,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
 
           {pagamentosCard}
           {refreshBar}
-          <p className="text-center text-[10px] pb-2" style={{ color: "rgba(60,60,67,0.36)" }}>ENYLA Comunicação Visual · {loteNumero}</p>
+          <p className="text-center text-[10px] pb-2" style={{ color: "rgba(60,60,67,0.36)" }}>ENYLA · {loteNumero}</p>
         </div>
       </div>
     )
@@ -880,7 +879,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
 
         {pagamentosCard}
         {refreshBar}
-        <p className="text-center text-[10px] pb-2" style={{ color: "rgba(60,60,67,0.36)" }}>ENYLA Comunicação Visual · {loteNumero}</p>
+        <p className="text-center text-[10px] pb-2" style={{ color: "rgba(60,60,67,0.36)" }}>ENYLA · {loteNumero}</p>
       </div>
     </div>
   )

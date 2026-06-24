@@ -42,8 +42,7 @@ export default function LoginPage() {
         {/* Brand mark */}
         <div className="flex flex-col items-center mb-10">
           <Image src="/brand/enyla-wordmark-light.png" alt="Enyla" width={1094} height={159}
-            className="h-9 w-auto mb-3" priority />
-          <p className="text-zinc-500 text-xs mt-1.5 tracking-wide uppercase font-medium">Comunicação Visual</p>
+            className="h-9 w-auto" priority />
         </div>
 
         {/* Card */}
@@ -110,7 +109,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-zinc-700 text-[10.5px] mt-8">
-          ENYLA Comunicação Visual · Sistema interno
+          ENYLA · Sistema interno
         </p>
       </div>
     </div>

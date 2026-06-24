@@ -85,7 +85,7 @@ export function gerarHtmlOrcamento(item: HistoricoItem): string {
 </head>
 <body>
 
-  <div class="logo"><img src="${LOGO_ENYLA_B64}" alt="Enyla" style="height:20px;display:block;margin-bottom:4px" /><span style="display:block;font-size:11px;color:#64748b;font-weight:400">Orçamentista de Embalagens</span></div>
+  <div class="logo"><img src="${LOGO_ENYLA_B64}" alt="Enyla" style="height:20px;display:block" /></div>
 
   <div class="client-block">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
@@ -183,7 +183,7 @@ export function gerarHtmlOrcamento(item: HistoricoItem): string {
   </div>` : ""}
 
   <div class="footer">
-    ENYLA · Orçamentista de Embalagens · ${data}
+    ENYLA · ${data}
   </div>
 
 </body>

@@ -513,7 +513,7 @@ function gerarHtmlRelatorio({
 </section>
 
 <div class="footer">
-  <span>Enyla · Gestão Gráfica</span>
+  <span>Enyla</span>
   <span>${dataGeracao}</span>
 </div>
 
