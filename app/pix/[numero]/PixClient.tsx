@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
+import Image from "next/image"
 import QRCode from "qrcode"
 import { gerarPixPayload } from "@/app/lib/pix"
 
@@ -107,7 +108,8 @@ export default function PixClient({ numero }: { numero: string }) {
   if (notFound || !data) {
     return (
       <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-5 text-center gap-4">
-        <p className="text-[10px] font-bold tracking-[0.28em] uppercase text-[rgba(60,60,67,0.4)]">ENYLA</p>
+        <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1118} height={162}
+          className="h-3.5 w-auto opacity-60" />
         <p className="text-[18px] font-bold text-[#1C1C1E]">Link inválido</p>
         <p className="text-[13px] text-[#8E8E93]">Solicite um novo link ao vendedor.</p>
       </div>
@@ -123,7 +125,8 @@ export default function PixClient({ numero }: { numero: string }) {
   if (expired) {
     return (
       <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-5 text-center gap-4">
-        <p className="text-[10px] font-bold tracking-[0.28em] uppercase text-[rgba(60,60,67,0.4)]">ENYLA</p>
+        <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1118} height={162}
+          className="h-3.5 w-auto opacity-60" />
         <div className="w-14 h-14 rounded-full bg-[#FF3B30]/10 flex items-center justify-center">
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="#FF3B30" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
@@ -173,7 +176,8 @@ export default function PixClient({ numero }: { numero: string }) {
       {/* ── Body ─────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col items-center px-5 pt-7 pb-8 w-full max-w-[360px] mx-auto">
 
-        <p className="text-[10px] font-bold tracking-[0.28em] uppercase text-[rgba(60,60,67,0.4)] mb-6">ENYLA</p>
+        <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1118} height={162}
+          className="h-3.5 w-auto opacity-60 mb-6" />
 
         <div className="rounded-2xl overflow-hidden mb-6"
           style={{ background: "#F7F7F7", padding: "14px", border: "1px solid rgba(0,0,0,0.07)" }}>

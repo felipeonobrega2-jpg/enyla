@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Image from "next/image"
 import { KanbanCard, LancamentoFinanceiro, COLUNAS_KANBAN, COL_FECHADO, COL_PERDIDO, COL_ENTREGUE } from "../types"
 import { Configuracoes, CONFIG_PADRAO } from "../config"
 import { brl } from "../utils"
@@ -226,7 +227,8 @@ export default function MobilePage() {
   return (
     <div className="min-h-screen bg-[#F2F2F7] pb-10">
       <header className="bg-white border-b border-[rgba(60,60,67,0.08)] px-4 pt-[max(env(safe-area-inset-top),16px)] pb-3 sticky top-0 z-10">
-        <h1 className="text-[18px] font-semibold text-[#1C1C1E] mb-3">ENYLA</h1>
+        <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1118} height={162}
+          className="h-5 w-auto mb-3" priority />
         <div className="flex gap-1.5 overflow-x-auto -mx-4 px-4 [&::-webkit-scrollbar]:hidden">
           {PERIODOS.map(p => (
             <button

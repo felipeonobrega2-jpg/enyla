@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import Image from 'next/image'
 import type { TrackingEntry, TrackingEtapa } from '../../utils/tracking-store'
 
 const ETAPAS = [
@@ -164,8 +165,9 @@ export default function TrackingClient({ initialData, numero }: Props) {
       <div className="bg-white border-b border-[rgba(60,60,67,0.12)] sticky top-0 z-10">
         <div className="max-w-md mx-auto px-5 h-14 flex items-center gap-3">
           <div>
-            <p className="font-bold text-[#1C1C1E] text-base tracking-tight leading-none">ENYLA</p>
-            <p className="text-[#8E8E93] text-[10px] mt-0.5 tracking-wide">Comunicação Visual</p>
+            <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1118} height={162}
+              className="h-4 w-auto" priority />
+            <p className="text-[#8E8E93] text-[10px] mt-1 tracking-wide">Comunicação Visual</p>
           </div>
           <div className="ml-auto">
             <span className="text-[10px] font-bold text-[#007AFF] bg-[#007AFF]/10 border border-[#007AFF]/20 px-2.5 py-1 rounded-full font-mono">{numero}</span>

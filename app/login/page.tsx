@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 
 export default function LoginPage() {
   const [password, setPassword] = useState("")
@@ -40,13 +41,8 @@ export default function LoginPage() {
 
         {/* Brand mark */}
         <div className="flex flex-col items-center mb-10">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5 shadow-lg shadow-indigo-900/40"
-            style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" }}>
-            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 3.75 9v.878m14.25-3A2.25 2.25 0 0 1 20.25 9v.878M3.75 9.878c.235-.083.487-.128.75-.128h15c.263 0 .515.045.75.128m-16.5 0A2.25 2.25 0 0 0 2.25 12v6a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-6a2.25 2.25 0 0 0-1.5-2.122" />
-            </svg>
-          </div>
-          <h1 className="text-white font-black text-2xl tracking-tight leading-none">ENYLA</h1>
+          <Image src="/brand/enyla-wordmark-light.png" alt="Enyla" width={1094} height={159}
+            className="h-9 w-auto mb-3" priority />
           <p className="text-zinc-500 text-xs mt-1.5 tracking-wide uppercase font-medium">Comunicação Visual</p>
         </div>
 

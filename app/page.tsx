@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef } from "react"
+import Image from "next/image"
 import { useTheme } from "./components/ThemeProvider"
 import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, COL_FECHADO, COL_PERDIDO, COLUNAS_KANBAN, Parceiro, NegocioParceiro, LancamentoFinanceiro, Lote } from "./types"
 import DashboardView from "./components/DashboardView"
@@ -837,8 +838,9 @@ export default function Home() {
         <div className="px-4 pt-5 pb-4 shrink-0">
           <div className="flex items-center">
             <div className="min-w-0 flex-1">
-              <p className="text-white font-semibold text-[16px] leading-none tracking-[-0.02em]">Enyla</p>
-              <p className="text-zinc-600 text-[10px] font-medium mt-1">Gestão Gráfica</p>
+              <Image src="/brand/enyla-wordmark-light.png" alt="Enyla" width={1094} height={159}
+                className="h-4 w-auto" priority />
+              <p className="text-zinc-600 text-[10px] font-medium mt-1.5">Gestão Gráfica</p>
             </div>
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "system" : "dark")}
