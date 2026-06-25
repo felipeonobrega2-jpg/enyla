@@ -396,6 +396,61 @@ function ModalPagamento({ lancamento, onSave, onClose }: {
   )
 }
 
+function ModalReceberDetalhe({ itens, total, onClose, onVerTudo }: {
+  itens: Array<{ key: string; cliente: string; label: string; total: number; pago: number; restante: number; tipo: "pedido" | "parceria" }>
+  total: number
+  onClose: () => void
+  onVerTudo: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden max-h-[80vh] flex flex-col">
+        <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between shrink-0">
+          <div>
+            <p className="font-bold text-[#1C1C1E] text-[14px]">A receber</p>
+            <p className="text-[11px] text-[#8E8E93] mt-0.5">{itens.length} item{itens.length !== 1 ? "s" : ""} em aberto</p>
+          </div>
+          <button onClick={onClose} className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] text-xl leading-none ml-3">×</button>
+        </div>
+
+        <div className="px-6 py-4 border-b border-[rgba(60,60,67,0.08)] bg-amber-50/50 shrink-0">
+          <p className="text-[11px] text-amber-700 font-medium">Total a receber</p>
+          <p className="font-semibold text-[24px] text-amber-700 tabular-nums">{brl(total)}</p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto divide-y divide-[rgba(60,60,67,0.06)]">
+          {itens.length === 0 ? (
+            <p className="text-center text-[12px] text-[#8E8E93] py-8">Nada em aberto. 🎉</p>
+          ) : itens.map(item => (
+            <div key={item.key} className="px-6 py-3 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-[#1C1C1E] text-[12.5px] truncate">{item.cliente}</span>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[rgba(116,116,128,0.08)] text-[#8E8E93] shrink-0">
+                    {item.tipo === "parceria" ? "Parceria" : item.label}
+                  </span>
+                </div>
+                {item.pago > 0 && (
+                  <p className="text-[10.5px] text-[#8E8E93] mt-0.5">{brl(item.pago)} pago de {brl(item.total)}</p>
+                )}
+              </div>
+              <p className="font-semibold text-[13px] text-amber-700 tabular-nums shrink-0">{brl(item.restante)}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="px-6 py-4 border-t border-[rgba(60,60,67,0.08)] shrink-0">
+          <button onClick={onVerTudo}
+            className="w-full py-2.5 text-[12.5px] font-semibold text-white bg-[#1C1C1E] hover:bg-black rounded-xl transition-colors">
+            Ver detalhes e registrar pagamentos →
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Período helpers ──────────────────────────────────────────────────────────
 
 type Periodo = "mes" | "trimestre" | "semestre" | "ano" | "tudo"
@@ -454,6 +509,7 @@ export function FinanceiroView({
   const [buscaReceber, setBuscaReceber]   = useState("")
   const [filtroReceber, setFiltroReceber] = useState<"aberto" | "pendente" | "parcial" | "todos">("aberto")
   const [confirmarDel, setConfirmarDel]   = useState<string | null>(null)
+  const [modalReceber, setModalReceber]   = useState(false)
 
   // Restore on mount — write effects would corrupt sessionStorage during SSR hydration
   useEffect(() => {
@@ -633,6 +689,43 @@ export function FinanceiroView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lancamentos, negocios, periodo, pedidosElegiveis, lancPorCard, pagamentosPorLote, pagamentosPorCard, sobrasPorLote, sobrasPorCard])
 
+  // Itens que compõem o "A receber" — mesma lógica do kpis.aReceber, mas detalhada item a item
+  const receberItens = useMemo(() => {
+    type ItemReceber = { key: string; cliente: string; label: string; total: number; pago: number; restante: number; tipo: "pedido" | "parceria" }
+    const itens: ItemReceber[] = []
+    const lotesSeen = new Set<string>()
+
+    for (const c of pedidosElegiveis) {
+      if (c.loteId) {
+        if (lotesSeen.has(c.loteId)) continue
+        lotesSeen.add(c.loteId)
+        const pags = pagamentosPorLote[c.loteId] ?? []
+        const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+        const loteCards = pedidosElegiveis.filter(cc => cc.loteId === c.loteId)
+        const sobrasLote = sobrasPorLote[c.loteId] ?? []
+        const total = loteCards.reduce((s, cc) => s + cc.preco, 0) + sobrasLote.reduce((s, l) => s + l.valor, 0)
+        if (totalPago < total) {
+          itens.push({ key: `lote-${c.loteId}`, cliente: c.nomeCliente, label: c.loteNumero ?? "Lote", total, pago: totalPago, restante: total - totalPago, tipo: "pedido" })
+        }
+      } else {
+        const pags = pagamentosPorCard[c.id] ?? []
+        const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+        const sobrasCard = sobrasPorCard[c.id] ?? []
+        const total = c.preco + sobrasCard.reduce((s, l) => s + l.valor, 0)
+        if (totalPago < total) {
+          itens.push({ key: `card-${c.id}`, cliente: c.nomeCliente, label: c.numero || "Pedido", total, pago: totalPago, restante: total - totalPago, tipo: "pedido" })
+        }
+      }
+    }
+
+    for (const n of negociosPendentes) {
+      itens.push({ key: `negocio-${n.id}`, cliente: n.parceiroNome, label: n.descricao, total: n.comissaoValor, pago: 0, restante: n.comissaoValor, tipo: "parceria" })
+    }
+
+    return itens.sort((a, b) => b.restante - a.restante)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidosElegiveis, pagamentosPorLote, pagamentosPorCard, sobrasPorLote, sobrasPorCard, negociosPendentes])
+
   // Margem de pedidos terceirizados (preço cobrado − custo pago ao fornecedor), no período selecionado
   const margemTerceiros = useMemo(() => {
     const fromRef = from?.toISOString().split("T")[0]
@@ -786,7 +879,8 @@ export function FinanceiroView({
                 color={kpis.resultado >= 0 ? "blue" : "rose"}
                 sub="receitas − despesas" />
               <KpiCard label="A receber" value={brl(kpis.aReceber)} color="amber"
-                sub={`${kpis.naoRegistrados} pedido${kpis.naoRegistrados !== 1 ? "s" : ""} incompleto${kpis.naoRegistrados !== 1 ? "s" : ""}`} />
+                sub={`${kpis.naoRegistrados} pedido${kpis.naoRegistrados !== 1 ? "s" : ""} incompleto${kpis.naoRegistrados !== 1 ? "s" : ""}`}
+                onClick={() => setModalReceber(true)} />
               <KpiCard label="Em atraso" value={brl(kpis.emAtraso)} color="rose"
                 sub={`${lancamentos.filter(l => l.tipo === "receita" && statusEfetivo(l) === "atrasado").length} títulos`} />
               <KpiCard label="Margem terceiriz." value={brl(margemTerceiros.totalMargem)}
@@ -1639,6 +1733,15 @@ export function FinanceiroView({
         />
       )}
 
+      {modalReceber && (
+        <ModalReceberDetalhe
+          itens={receberItens}
+          total={kpis.aReceber}
+          onClose={() => setModalReceber(false)}
+          onVerTudo={() => { setModalReceber(false); setTab("receber") }}
+        />
+      )}
+
       {confirmarDel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mx-4 p-6 text-center">
@@ -1663,20 +1766,23 @@ export function FinanceiroView({
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function KpiCard({ label, value, sub, color }: {
+function KpiCard({ label, value, sub, color, onClick }: {
   label: string; value: string; sub: string
   color: "green" | "rose" | "blue" | "amber"
+  onClick?: () => void
 }) {
   const cls = color === "green"  ? "text-emerald-700"
             : color === "rose"   ? "text-rose-600"
             : color === "amber"  ? "text-amber-600"
             :                      "text-blue-700"
+  const Tag = onClick ? "button" : "div"
   return (
-    <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-4 py-3">
+    <Tag onClick={onClick}
+      className={`bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-4 py-3 text-left w-full ${onClick ? "hover:shadow-md hover:-translate-y-px transition-all duration-200 cursor-pointer" : ""}`}>
       <p className="text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">{label}</p>
       <p className={`font-semibold text-[17px] tabular-nums mt-0.5 ${cls}`}>{value}</p>
       <p className="text-[10.5px] text-[#8E8E93] mt-0.5">{sub}</p>
-    </div>
+    </Tag>
   )
 }
 
