@@ -27,6 +27,7 @@ export async function PATCH(
       await Promise.all([
         supabase.from("KanbanCard").update({ loteNumero: numeroFinal }).eq("loteId", id),
         supabase.from("NegocioParceiro").update({ loteNumero: numeroFinal }).eq("loteId", id),
+        supabase.from("LancamentoFinanceiro").update({ loteNumero: numeroFinal }).eq("loteId", id),
       ])
       return NextResponse.json({ ok: true, numero: numeroFinal })
     }

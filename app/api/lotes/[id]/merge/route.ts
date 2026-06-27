@@ -21,6 +21,12 @@ export async function POST(
       .update({ loteId: targetLoteId, loteNumero: targetLoteNumero })
       .eq("loteId", id)
 
+    // Move all financial entries from source lote → target lote
+    await supabase
+      .from("LancamentoFinanceiro")
+      .update({ loteId: targetLoteId, loteNumero: targetLoteNumero })
+      .eq("loteId", id)
+
     // Delete the now-empty source lote
     await supabase.from("Lote").delete().eq("id", id)
 
