@@ -4,8 +4,7 @@ import { Cliente, KanbanCard, LancamentoFinanceiro, PropostaCustom, COLUNAS_KANB
 import { brl } from "../utils"
 import { HistItem } from "./HistoricoView"
 import { COL_COLORS } from "./kanban-colors"
-
-const hoje = () => new Date().toISOString().split("T")[0]
+import { hoje, isReceitaPendenteValida, isAtrasada, calcularPedidosFechados, pedidosAbertos } from "../lib/financeiro"
 
 function parseDataBR(dataBR: string): Date | null {
   // datas salvas como toLocaleString("pt-BR") → "dd/mm/aaaa, hh:mm:ss"
@@ -72,13 +71,14 @@ export function ClientePerfilModal({
     : null
 
   const lancCliente = lancamentos.filter(l => (l.nomeCliente ?? "").trim().toLowerCase() === nome.toLowerCase())
-  const pendentes = lancCliente.filter(l =>
-    l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra" &&
-    !(l.categoria === "pix_link" && l.dataVencimento < hoje())
-  )
-  const aReceber  = pendentes.reduce((s, l) => s + l.valor, 0)
-  const atrasados = pendentes.filter(l => l.dataVencimento < hoje())
-  const emAtraso  = atrasados.reduce((s, l) => s + l.valor, 0)
+  const pendentes = lancCliente.filter(isReceitaPendenteValida)
+  const emAtraso  = lancCliente.filter(isAtrasada).reduce((s, l) => s + l.valor, 0)
+
+  // "A receber" por pedido (não só por lançamento) — cobre pedidos fechados que ainda
+  // não têm nenhum lançamento registrado, que ficariam de fora se fosse só lancCliente.
+  const aReceber = pedidosAbertos(calcularPedidosFechados(kanban, lancamentos))
+    .filter(p => p.cliente.trim().toLowerCase() === nome.toLowerCase())
+    .reduce((s, p) => s + p.restante, 0)
 
   const totalItens  = itens.length + propostas.length
   // LTV = soma do preço real dos pedidos efetivamente fechados (KanbanCard.preco),

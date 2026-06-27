@@ -3,10 +3,16 @@
 import { useState, useMemo, useEffect, useRef } from "react"
 import {
   LancamentoFinanceiro, TipoLancamento, StatusLancamento,
-  FormaPagamento, KanbanCard, COL_FECHADO, COL_EXPEDICAO, COL_PERDIDO, NegocioParceiro, Lote,
+  FormaPagamento, KanbanCard, COL_EXPEDICAO, COL_PERDIDO, NegocioParceiro, Lote,
 } from "../types"
 import { brl } from "../utils"
 import { AnalyticsView } from "./AnalyticsView"
+import {
+  hoje, pixVencido, isReceitaPendenteValida, isAtrasada, pedidosElegiveis as calcPedidosElegiveis,
+  pagamentosPorLote as calcPagamentosPorLote, pagamentosPorCard as calcPagamentosPorCard,
+  sobrasPorLote as calcSobrasPorLote, sobrasPorCard as calcSobrasPorCard,
+  calcularPedidosFechados, pedidosAbertos, contarNaoRegistrados, calcularVencidos,
+} from "../lib/financeiro"
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -25,18 +31,10 @@ const CATEGORIAS_DESP = [
   "Impostos", "Marketing", "Serviços", "Outros",
 ]
 
-const hoje = () => new Date().toISOString().split("T")[0]
-
 function statusEfetivo(l: LancamentoFinanceiro): StatusLancamento {
   if (l.status === "pago") return "pago"
   if (l.dataVencimento < hoje()) return "atrasado"
   return "pendente"
-}
-
-// Link PIX vencido e não pago: o link expirou, o cliente não vai mais pagar
-// aquele link específico — deixa de ser receita pendente (só conta de novo se reemitido).
-function pixVencido(l: LancamentoFinanceiro): boolean {
-  return l.categoria === "pix_link" && l.status !== "pago" && l.dataVencimento < hoje()
 }
 
 const STATUS_CLS: Record<StatusLancamento, string> = {
@@ -70,9 +68,9 @@ function ModalLancamento({ inicial, kanban, onSave, onClose }: ModalLancProps) {
   const [forma, setForma]             = useState<FormaPagamento | "">(inicial?.formaPagamento ?? "")
   const [obs, setObs]                 = useState(inicial?.obs ?? "")
 
-  const pedidosAbertos = kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO)
+  const pedidosFechados = calcPedidosElegiveis(kanban)
   // Despesa pode ser vinculada a qualquer pedido ativo (custo pode ocorrer antes do fechamento)
-  const elegiveis = tipo === "receita" ? pedidosAbertos : kanban.filter(c => c.coluna !== COL_PERDIDO)
+  const elegiveis = tipo === "receita" ? pedidosFechados : kanban.filter(c => c.coluna !== COL_PERDIDO)
 
   // Agrupa por lote — pedidos sem lote entram individualmente
   const vinculaveis = useMemo(() => {
@@ -522,71 +520,11 @@ export function FinanceiroView({
   }, [])
 
   // Pedidos elegíveis (fechado, em produção, entregue — exceto perdido)
-  const pedidosElegiveis = useMemo(() =>
-    kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO),
-    [kanban]
-  )
-
-  // Todos os pagamentos por loteId (exclui sobras e PIX vencidos/não pagos) — suporta múltiplos parciais
-  const pagamentosPorLote = useMemo(() => {
-    const m: Record<string, LancamentoFinanceiro[]> = {}
-    for (const l of lancamentos) {
-      if (l.tipo === "receita" && l.loteId && l.categoria !== "sobra" && !pixVencido(l)) {
-        if (!m[l.loteId]) m[l.loteId] = []
-        m[l.loteId].push(l)
-      }
-    }
-    return m
-  }, [lancamentos])
-
-  // Todos os pagamentos por cardId (exclui sobras e PIX vencidos/não pagos)
-  const pagamentosPorCard = useMemo(() => {
-    const m: Record<string, LancamentoFinanceiro[]> = {}
-    for (const l of lancamentos) {
-      if (l.tipo === "receita" && l.cardId && l.categoria !== "sobra" && !pixVencido(l)) {
-        if (!m[l.cardId]) m[l.cardId] = []
-        m[l.cardId].push(l)
-      }
-    }
-    return m
-  }, [lancamentos])
-
-  // Backward-compat: single entry maps (used in kpis / pending list)
-  const lancPorLote = useMemo(() => {
-    const m: Record<string, LancamentoFinanceiro> = {}
-    for (const [lid, arr] of Object.entries(pagamentosPorLote)) m[lid] = arr[arr.length - 1]
-    return m
-  }, [pagamentosPorLote])
-
-  const lancPorCard = useMemo(() => {
-    const m: Record<string, LancamentoFinanceiro> = {}
-    for (const [cid, arr] of Object.entries(pagamentosPorCard)) m[cid] = arr[arr.length - 1]
-    return m
-  }, [pagamentosPorCard])
-
-  // Sobras por loteId (soma dos valores)
-  const sobrasPorLote = useMemo(() => {
-    const m: Record<string, LancamentoFinanceiro[]> = {}
-    for (const l of lancamentos) {
-      if (l.categoria === "sobra" && l.loteId) {
-        if (!m[l.loteId]) m[l.loteId] = []
-        m[l.loteId].push(l)
-      }
-    }
-    return m
-  }, [lancamentos])
-
-  // Sobras por cardId (cards solo sem lote)
-  const sobrasPorCard = useMemo(() => {
-    const m: Record<string, LancamentoFinanceiro[]> = {}
-    for (const l of lancamentos) {
-      if (l.categoria === "sobra" && l.cardId && !l.loteId) {
-        if (!m[l.cardId]) m[l.cardId] = []
-        m[l.cardId].push(l)
-      }
-    }
-    return m
-  }, [lancamentos])
+  const pedidosElegiveis = useMemo(() => calcPedidosElegiveis(kanban), [kanban])
+  const pagamentosPorLote = useMemo(() => calcPagamentosPorLote(lancamentos), [lancamentos])
+  const pagamentosPorCard = useMemo(() => calcPagamentosPorCard(lancamentos), [lancamentos])
+  const sobrasPorLote = useMemo(() => calcSobrasPorLote(lancamentos), [lancamentos])
+  const sobrasPorCard = useMemo(() => calcSobrasPorCard(lancamentos), [lancamentos])
 
   // Filtrar por período
   const { from } = periodoRange(periodo)
@@ -620,41 +558,21 @@ export function FinanceiroView({
   const negociosPendentes  = negocios.filter(n => n.status === "pendente")
 
   // KPIs (período selecionado)
+  // Pedidos fechados com saldo aberto (total vs. pago) — base de "a receber", "em atraso" e
+  // do contador de não-registrados. Uma única passada, em vez de recalcular o mesmo loop 3x.
+  const pedidosFechadosTotais = useMemo(() => calcularPedidosFechados(kanban, lancamentos), [kanban, lancamentos])
+  const pedidosEmAberto = useMemo(() => pedidosAbertos(pedidosFechadosTotais), [pedidosFechadosTotais])
+
   const kpis = useMemo(() => {
     const all = lancamentos.filter(inPeriodo)
     const recebidas = all.filter(l => l.tipo === "receita" && l.status === "pago")
     const despesas  = all.filter(l => l.tipo === "despesa" && l.status === "pago")
-    const pendentes = lancamentos.filter(l => l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra" && !pixVencido(l))
-    const atrasados = pendentes.filter(l => l.dataVencimento < hoje())
+    const atrasados = lancamentos.filter(isAtrasada)
 
     const totalParceiros = negociosPagos.reduce((s, n) => s + n.comissaoValor, 0)
     const totalRecebido  = recebidas.reduce((s, l) => s + l.valor, 0) + totalParceiros
     const totalDespesas  = despesas.reduce((s, l) => s + l.valor, 0)
-
-    // Soma o que falta receber de cada lote/card incompleto (total − já pago)
-    const aReceberPedidos = (() => {
-      const lotesSeen = new Set<string>()
-      let sum = 0
-      for (const c of pedidosElegiveis) {
-        if (c.loteId) {
-          if (lotesSeen.has(c.loteId)) continue
-          lotesSeen.add(c.loteId)
-          const pags = pagamentosPorLote[c.loteId] ?? []
-          const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
-          const loteCards = pedidosElegiveis.filter(cc => cc.loteId === c.loteId)
-          const sobrasLote = sobrasPorLote[c.loteId] ?? []
-          const total = loteCards.reduce((s, cc) => s + cc.preco, 0) + sobrasLote.reduce((s, l) => s + l.valor, 0)
-          if (totalPago < total) sum += total - totalPago
-        } else {
-          const pags = pagamentosPorCard[c.id] ?? []
-          const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
-          const sobrasCard = sobrasPorCard[c.id] ?? []
-          const total = c.preco + sobrasCard.reduce((s, l) => s + l.valor, 0)
-          if (totalPago < total) sum += total - totalPago
-        }
-      }
-      return sum
-    })()
+    const aReceberPedidos = pedidosEmAberto.reduce((s, i) => s + i.restante, 0)
 
     return {
       recebido:   totalRecebido,
@@ -662,69 +580,22 @@ export function FinanceiroView({
       aReceber:   aReceberPedidos + negociosPendentes.reduce((s, n) => s + n.comissaoValor, 0),
       emAtraso:   atrasados.reduce((s, l) => s + l.valor, 0),
       resultado:  totalRecebido - totalDespesas,
-      naoRegistrados: (() => {
-        const lotesSeen = new Set<string>()
-        let count = 0
-        for (const c of pedidosElegiveis) {
-          if (c.loteId) {
-            if (lotesSeen.has(c.loteId)) continue
-            lotesSeen.add(c.loteId)
-            const pags = pagamentosPorLote[c.loteId] ?? []
-            const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
-            const loteCards = pedidosElegiveis.filter(cc => cc.loteId === c.loteId)
-            const sobrasLote = sobrasPorLote[c.loteId] ?? []
-            const total = loteCards.reduce((s, cc) => s + cc.preco, 0) + sobrasLote.reduce((s, l) => s + l.valor, 0)
-            if (total === 0 || totalPago < total) count++
-          } else {
-            const pags = pagamentosPorCard[c.id] ?? []
-            const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
-            const sobrasCard = sobrasPorCard[c.id] ?? []
-            const total = c.preco + sobrasCard.reduce((s, l) => s + l.valor, 0)
-            if (total === 0 || totalPago < total) count++
-          }
-        }
-        return count
-      })(),
+      naoRegistrados: contarNaoRegistrados(pedidosFechadosTotais),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lancamentos, negocios, periodo, pedidosElegiveis, lancPorCard, pagamentosPorLote, pagamentosPorCard, sobrasPorLote, sobrasPorCard])
+  }, [lancamentos, negocios, periodo, pedidosEmAberto, pedidosFechadosTotais])
 
-  // Itens que compõem o "A receber" — mesma lógica do kpis.aReceber, mas detalhada item a item
+  // Itens que compõem o "A receber" — mesma base do kpis.aReceber, detalhada item a item
   const receberItens = useMemo(() => {
     type ItemReceber = { key: string; cliente: string; label: string; total: number; pago: number; restante: number; tipo: "pedido" | "parceria" }
-    const itens: ItemReceber[] = []
-    const lotesSeen = new Set<string>()
-
-    for (const c of pedidosElegiveis) {
-      if (c.loteId) {
-        if (lotesSeen.has(c.loteId)) continue
-        lotesSeen.add(c.loteId)
-        const pags = pagamentosPorLote[c.loteId] ?? []
-        const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
-        const loteCards = pedidosElegiveis.filter(cc => cc.loteId === c.loteId)
-        const sobrasLote = sobrasPorLote[c.loteId] ?? []
-        const total = loteCards.reduce((s, cc) => s + cc.preco, 0) + sobrasLote.reduce((s, l) => s + l.valor, 0)
-        if (totalPago < total) {
-          itens.push({ key: `lote-${c.loteId}`, cliente: c.nomeCliente, label: c.loteNumero ?? "Lote", total, pago: totalPago, restante: total - totalPago, tipo: "pedido" })
-        }
-      } else {
-        const pags = pagamentosPorCard[c.id] ?? []
-        const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
-        const sobrasCard = sobrasPorCard[c.id] ?? []
-        const total = c.preco + sobrasCard.reduce((s, l) => s + l.valor, 0)
-        if (totalPago < total) {
-          itens.push({ key: `card-${c.id}`, cliente: c.nomeCliente, label: c.numero || "Pedido", total, pago: totalPago, restante: total - totalPago, tipo: "pedido" })
-        }
-      }
-    }
+    const itens: ItemReceber[] = pedidosEmAberto.map(i => ({ ...i, tipo: "pedido" as const }))
 
     for (const n of negociosPendentes) {
       itens.push({ key: `negocio-${n.id}`, cliente: n.parceiroNome, label: n.descricao, total: n.comissaoValor, pago: 0, restante: n.comissaoValor, tipo: "parceria" })
     }
 
     return itens.sort((a, b) => b.restante - a.restante)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pedidosElegiveis, pagamentosPorLote, pagamentosPorCard, sobrasPorLote, sobrasPorCard, negociosPendentes])
+  }, [pedidosEmAberto, negociosPendentes])
 
   // Margem de pedidos terceirizados (preço cobrado − custo pago ao fornecedor), no período selecionado
   const margemTerceiros = useMemo(() => {
@@ -745,32 +616,7 @@ export function FinanceiroView({
   }, [pedidosElegiveis, periodo])
 
   // Pagamentos vencidos — pendentes com dataVencimento no passado, agrupados por lote/card
-  const vencidos = useMemo(() => {
-    const hj = hoje()
-    const atrasados = lancamentos.filter(l =>
-      l.tipo === "receita" && l.status === "pendente" && l.dataVencimento < hj && l.categoria !== "sobra" && !pixVencido(l)
-    )
-    const grupos: Record<string, {
-      key: string; loteId?: string; cardId?: string
-      nomeCliente: string; loteNumero?: string; cardNumero?: string
-      total: number; diasAtraso: number; lancamentos: LancamentoFinanceiro[]
-    }> = {}
-    for (const l of atrasados) {
-      const key = l.loteId ? `lote:${l.loteId}` : `card:${l.cardId}`
-      if (!grupos[key]) {
-        const dias = Math.floor((Date.now() - new Date(l.dataVencimento).getTime()) / 86_400_000)
-        grupos[key] = {
-          key, loteId: l.loteId, cardId: l.cardId,
-          nomeCliente: l.nomeCliente || "",
-          loteNumero: l.loteNumero, cardNumero: l.cardNumero,
-          total: 0, diasAtraso: dias, lancamentos: [],
-        }
-      }
-      grupos[key].total += l.valor
-      grupos[key].lancamentos.push(l)
-    }
-    return Object.values(grupos).sort((a, b) => b.total - a.total)
-  }, [lancamentos])
+  const vencidos = useMemo(() => calcularVencidos(lancamentos), [lancamentos])
 
   // PIX links emitidos
   const pixLinks = useMemo(() => {
@@ -981,7 +827,7 @@ export function FinanceiroView({
             )}
 
             {/* Próximos recebimentos — lançamentos pendentes + parcerias pendentes */}
-            {(lancamentos.filter(l => l.tipo === "receita" && statusEfetivo(l) !== "pago" && l.categoria !== "sobra" && !pixVencido(l)).length > 0 || negociosPendentes.length > 0) && (
+            {(lancamentos.filter(l => isReceitaPendenteValida(l)).length > 0 || negociosPendentes.length > 0) && (
               <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl overflow-hidden">
                 <div className="px-5 py-4 border-b border-[rgba(60,60,67,0.08)]">
                   <p className="font-bold text-[#1C1C1E] text-[13px]">Próximos recebimentos</p>
@@ -1008,7 +854,7 @@ export function FinanceiroView({
                   ))}
                   {/* Lançamentos pendentes */}
                   {lancamentos
-                    .filter(l => l.tipo === "receita" && statusEfetivo(l) !== "pago" && l.categoria !== "sobra" && !pixVencido(l))
+                    .filter(l => isReceitaPendenteValida(l))
                     .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))
                     .slice(0, 8)
                     .map(l => {

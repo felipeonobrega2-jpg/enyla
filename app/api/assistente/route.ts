@@ -1,4 +1,6 @@
 import { supabase } from "@/app/lib/supabase"
+import { calcularResumoFinanceiro } from "@/app/lib/financeiro"
+import type { KanbanCard, LancamentoFinanceiro, NegocioParceiro } from "@/app/types"
 
 type ChatMsg = { role: "user" | "assistant"; content: string }
 
@@ -6,7 +8,7 @@ const TOOLS = [
   {
     name: "consultar_dados",
     description:
-      "Retorna um snapshot completo e atual dos dados reais do sistema: orçamentos (histórico), pedidos (kanban), clientes, propostas customizadas, parceiros, negócios com parceiros, lançamentos financeiros e lotes. Use esta ferramenta sempre que a pergunta envolver números, valores, status, pedidos, clientes ou qualquer dado concreto do negócio — não responda de memória.",
+      "Retorna um snapshot completo e atual dos dados reais do sistema: orçamentos (histórico), pedidos (kanban), clientes, propostas customizadas, parceiros, negócios com parceiros, lançamentos financeiros, lotes, e um resumoFinanceiro já calculado (recebido/a receber/em atraso, com as exclusões de sobra e PIX vencido já aplicadas). Use esta ferramenta sempre que a pergunta envolver números, valores, status, pedidos, clientes ou qualquer dado concreto do negócio — não responda de memória.",
     input_schema: { type: "object" as const, properties: {} },
   },
 ]
@@ -23,15 +25,22 @@ async function consultarDados() {
     supabase.from("Lote").select("*").order("criadoEm", { ascending: false }),
   ])
 
+  const kanbanData      = (kanban.data ?? []) as KanbanCard[]
+  const lancamentosData = (lancamentos.data ?? []) as LancamentoFinanceiro[]
+  const negociosData    = (negocios.data ?? []) as NegocioParceiro[]
+
   return {
     historico: historico.data ?? [],
-    kanban: kanban.data ?? [],
+    kanban: kanbanData,
     clientes: clientes.data ?? [],
     propostasCustom: propostas.data ?? [],
     parceiros: parceiros.data ?? [],
-    negocios: negocios.data ?? [],
-    lancamentos: lancamentos.data ?? [],
+    negocios: negociosData,
+    lancamentos: lancamentosData,
     lotes: lotes.data ?? [],
+    // Já calculado com as mesmas regras do painel Financeiro (exclui sobra e PIX vencido de
+    // "a receber"/"em atraso") — use estes totais em vez de somar lancamentos na mão.
+    resumoFinanceiro: calcularResumoFinanceiro(kanbanData, lancamentosData, negociosData),
   }
 }
 
@@ -49,19 +58,28 @@ Hoje é ${hoje}.
 - Se os dados não tiverem o que foi pedido, diga isso claramente — não invente.
 - Responda sempre em português brasileiro, em texto corrido (sem markdown pesado, sem títulos) já que a resposta aparece numa bolha de chat pequena.
 
+## resumoFinanceiro — USE ISTO PRA "A RECEBER"/"EM ATRASO"/"RECEBIDO"
+
+O retorno de consultar_dados inclui um campo resumoFinanceiro já calculado com EXATAMENTE
+as mesmas regras do painel Financeiro do sistema (mesmo código, não reimplementado por você):
+- recebidoTotal: tudo que já entrou (receita paga, sobras pagas inclusas, + comissões pagas).
+- aReceberTotal / emAtrasoTotal: já excluem categoria "sobra" e PIX vencido automaticamente.
+- pedidosAbertos: lista de pedidos fechados com saldo pendente (cliente, total, pago, restante)
+  — inclui pedidos que ainda não têm NENHUM lançamento registrado.
+- vencidos: lançamentos de receita pendentes e já vencidos, agrupados por pedido.
+
+Para perguntas sobre esses números, leia resumoFinanceiro diretamente — não some lancamentos
+na mão. Se precisar filtrar por cliente/período específico, aí sim itere lancamentos/kanban
+brutos, mas aplicando a mesma lógica (exclui categoria="sobra" e PIX vencido vencido de
+"a receber"/"em atraso"; sobra paga conta em "recebido" normalmente).
+
 ## SIGNIFICADO DOS CAMPOS (LancamentoFinanceiro)
 
 - tipo: "receita" ou "despesa".
 - status: "pago" ou "pendente". Pendente com dataVencimento < hoje = atrasado/vencido.
 - categoria "pix_link": receita recebida via link de pagamento PIX gerado pelo sistema.
+- categoria "sobra": troco/excedente de pagamento — nunca conta em "a receber"/"em atraso", mas conta em "recebido" se já paga.
 - cardId/cardNumero, loteId/loteNumero: vínculo com o pedido (KanbanCard) ou lote de pedidos correspondente.
-- Faturamento/recebido = soma de valor onde tipo="receita" e status="pago" (mais comissões pagas em NegocioParceiro, se relevante à pergunta). Sobras pagas entram normalmente aqui.
-
-REGRAS OBRIGATÓRIAS para "a receber" e "em atraso" (idênticas ao painel Financeiro do sistema — não desvie delas):
-1. categoria "sobra" (troco/excedente) NUNCA conta como "a receber" ou "em atraso", mesmo se pendente e vencida. Só apareça em respostas sobre sobras se a pergunta for especificamente sobre isso.
-2. PIX vencido — categoria "pix_link" com status!="pago" e dataVencimento no passado — também NUNCA conta como "a receber" ou "em atraso". Um link PIX vencido perdeu validade; não é mais cobrável daquela forma, então é excluído (diferente de um boleto/combinado vencido, que continua valendo).
-3. Logo, "a receber" = receita com status!="pago", excluindo categoria="sobra" E excluindo PIX vencido (regra 2). "Em atraso" = o subconjunto disso com dataVencimento < hoje.
-Se calcular esses números sem aplicar as duas exclusões acima, o valor vai ficar diferente do que aparece no painel — sempre aplique as exclusões.
 
 ## SIGNIFICADO DOS CAMPOS (KanbanCard — pedidos)
 
