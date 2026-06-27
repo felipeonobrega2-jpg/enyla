@@ -7,12 +7,24 @@ import { COL_COLORS } from "./kanban-colors"
 
 const hoje = () => new Date().toISOString().split("T")[0]
 
-function diasDesde(dataBR: string) {
+function parseDataBR(dataBR: string): Date | null {
   // datas salvas como toLocaleString("pt-BR") → "dd/mm/aaaa, hh:mm:ss"
   const [d, m, a] = dataBR.split(",")[0].split("/")
   if (!d || !m || !a) return null
-  const dt = new Date(Number(a), Number(m) - 1, Number(d))
+  return new Date(Number(a), Number(m) - 1, Number(d))
+}
+
+function diasDesde(dataBR: string) {
+  const dt = parseDataBR(dataBR)
+  if (!dt) return null
   return Math.floor((Date.now() - dt.getTime()) / 86_400_000)
+}
+
+// Data em que o pedido virou venda de fato: prioriza dataFechamento (ISO, setada
+// quando o card fecha) e cai pra data do orçamento (pt-BR) se não tiver.
+function dataPedido(c: KanbanCard): Date | null {
+  if (c.dataFechamento) return new Date(`${c.dataFechamento}T00:00:00`)
+  return parseDataBR(c.data)
 }
 
 export function ClientePerfilModal({
@@ -43,13 +55,23 @@ export function ClientePerfilModal({
     itens.some(i => i.numero && i.numero === c.numero) ||
     propostas.some(p => p.cardId && p.cardId === c.id)
   )
-  const fechados  = cardsCliente.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO).length
+  const cardsFechados = cardsCliente.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO)
+  const fechados  = cardsFechados.length
   const perdidos  = cardsCliente.filter(c => c.coluna === COL_PERDIDO).length
   const decididos = fechados + perdidos
   const conversao = decididos > 0 ? Math.round((fechados / decididos) * 100) : null
 
+  // Frequência de pedido: intervalo médio entre as vendas fechadas (não entre orçamentos
+  // gerados, que podem nunca ter virado venda)
+  const datasFechados = cardsFechados
+    .map(dataPedido)
+    .filter((d): d is Date => d !== null)
+    .sort((a, b) => a.getTime() - b.getTime())
+  const frequenciaDias = datasFechados.length >= 2
+    ? Math.round((datasFechados[datasFechados.length - 1].getTime() - datasFechados[0].getTime()) / 86_400_000 / (datasFechados.length - 1))
+    : null
+
   const lancCliente = lancamentos.filter(l => (l.nomeCliente ?? "").trim().toLowerCase() === nome.toLowerCase())
-  const recebido  = lancCliente.filter(l => l.tipo === "receita" && l.status === "pago").reduce((s, l) => s + l.valor, 0)
   const pendentes = lancCliente.filter(l =>
     l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra" &&
     !(l.categoria === "pix_link" && l.dataVencimento < hoje())
@@ -59,8 +81,10 @@ export function ClientePerfilModal({
   const emAtraso  = atrasados.reduce((s, l) => s + l.valor, 0)
 
   const totalItens  = itens.length + propostas.length
-  const ltv         = itens.reduce((s, i) => s + precoIdeal(i), 0) + propostas.reduce((s, p) => s + precoPropostaIdeal(p), 0) + recebido
-  const ticketMedio = totalItens > 0 ? ltv / totalItens : 0
+  // LTV = soma do preço real dos pedidos efetivamente fechados (KanbanCard.preco),
+  // não da soma de todo orçamento/proposta já calculado — boa parte nunca virou venda.
+  const ltv         = cardsFechados.reduce((s, c) => s + c.preco, 0)
+  const ticketMedio = fechados > 0 ? ltv / fechados : 0
 
   const datas = [...itens.map(i => i.data), ...propostas.map(p => p.data)].filter(Boolean)
   const ultimaData = datas[0] ?? null
@@ -103,13 +127,15 @@ export function ClientePerfilModal({
         <div className="overflow-y-auto flex-1">
 
           {/* KPIs */}
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5 px-6 pt-5">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5 px-6 pt-5">
             <Kpi label="Total gasto (LTV)" value={brl(ltv)} />
             <Kpi label="Ticket médio" value={brl(ticketMedio)} />
             <Kpi label="A receber" value={brl(aReceber)} color={aReceber > 0 ? "amber" : undefined} />
             <Kpi label="Em atraso" value={brl(emAtraso)} color={emAtraso > 0 ? "rose" : undefined} />
             <Kpi label="Conversão" value={conversao !== null ? `${conversao}%` : "—"}
               color={conversao !== null ? (conversao >= 60 ? "green" : conversao >= 35 ? "amber" : "rose") : undefined} />
+            <Kpi label="Frequência" value={frequenciaDias !== null ? `${frequenciaDias}d` : "—"}
+              sub={frequenciaDias !== null ? "entre pedidos" : fechados > 0 ? "1º pedido" : undefined} />
           </div>
 
           {cadastro?.notas && (
@@ -239,12 +265,13 @@ export function ClientePerfilModal({
   )
 }
 
-function Kpi({ label, value, color }: { label: string; value: string; color?: "green" | "rose" | "amber" }) {
+function Kpi({ label, value, color, sub }: { label: string; value: string; color?: "green" | "rose" | "amber"; sub?: string }) {
   const cls = color === "green" ? "text-emerald-700" : color === "rose" ? "text-rose-600" : color === "amber" ? "text-amber-600" : "text-[#1C1C1E]"
   return (
     <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-xl px-3 py-2.5">
       <p className="text-[9px] uppercase tracking-wider text-[#8E8E93] font-semibold leading-tight">{label}</p>
       <p className={`font-semibold text-[14px] tabular-nums mt-1 ${cls}`}>{value}</p>
+      {sub && <p className="text-[9.5px] text-[#8E8E93] mt-0.5 leading-tight">{sub}</p>}
     </div>
   )
 }
