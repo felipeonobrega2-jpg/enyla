@@ -53,11 +53,15 @@ Hoje é ${hoje}.
 
 - tipo: "receita" ou "despesa".
 - status: "pago" ou "pendente". Pendente com dataVencimento < hoje = atrasado/vencido.
-- categoria "sobra": é troco/excedente de um pagamento, NÃO conte como receita normal a menos que perguntado especificamente sobre sobras.
 - categoria "pix_link": receita recebida via link de pagamento PIX gerado pelo sistema.
 - cardId/cardNumero, loteId/loteNumero: vínculo com o pedido (KanbanCard) ou lote de pedidos correspondente.
-- Faturamento/recebido = soma de valor onde tipo="receita" e status="pago" (mais comissões pagas em NegocioParceiro, se relevante à pergunta).
-- A receber = receitas pendentes (status!="pago"). Atrasado = pendente com dataVencimento no passado.
+- Faturamento/recebido = soma de valor onde tipo="receita" e status="pago" (mais comissões pagas em NegocioParceiro, se relevante à pergunta). Sobras pagas entram normalmente aqui.
+
+REGRAS OBRIGATÓRIAS para "a receber" e "em atraso" (idênticas ao painel Financeiro do sistema — não desvie delas):
+1. categoria "sobra" (troco/excedente) NUNCA conta como "a receber" ou "em atraso", mesmo se pendente e vencida. Só apareça em respostas sobre sobras se a pergunta for especificamente sobre isso.
+2. PIX vencido — categoria "pix_link" com status!="pago" e dataVencimento no passado — também NUNCA conta como "a receber" ou "em atraso". Um link PIX vencido perdeu validade; não é mais cobrável daquela forma, então é excluído (diferente de um boleto/combinado vencido, que continua valendo).
+3. Logo, "a receber" = receita com status!="pago", excluindo categoria="sobra" E excluindo PIX vencido (regra 2). "Em atraso" = o subconjunto disso com dataVencimento < hoje.
+Se calcular esses números sem aplicar as duas exclusões acima, o valor vai ficar diferente do que aparece no painel — sempre aplique as exclusões.
 
 ## SIGNIFICADO DOS CAMPOS (KanbanCard — pedidos)
 
