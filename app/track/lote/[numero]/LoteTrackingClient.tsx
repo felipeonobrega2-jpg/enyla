@@ -118,7 +118,9 @@ function calcDelivery(etapas: TrackingEtapa[], colunaAtual: number, override?: s
     const d = parseBRDate(entregueEtapa.dataHora)
     if (d) return { text: formatDateLong(d), isEstimate: false, delivered: true }
   }
-  const producaoEtapa = etapas.find(e => e.coluna === 4)
+  // usa a etapa de produção mais antiga registrada (>= 4), pois o pedido pode ter
+  // saltado direto pra uma coluna mais avançada sem nunca logar exatamente a coluna 4
+  const producaoEtapa = etapas.filter(e => e.coluna >= 4).sort((a, b) => a.coluna - b.coluna)[0]
   if (producaoEtapa) {
     const d = parseBRDate(producaoEtapa.dataHora)
     if (d) { d.setDate(d.getDate() + 15); return { text: formatDateLong(d), isEstimate: true, delivered: false } }
@@ -470,6 +472,18 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
     return () => { clearInterval(interval); clearInterval(counter) }
   }, [loteNumero])
 
+  // Modo single-product precisa das etapas/dataEntregaPrevista do card pra calcular o
+  // prazo de entrega — esse dado só existe na Tracking, não no payload do lote.
+  const singleCardNumero = cards.length === 1 ? cards[0].numero : null
+  const [singleEntry, setSingleEntry] = useState<TrackingEntry | null>(null)
+  useEffect(() => {
+    if (!singleCardNumero) return
+    fetch(`/api/track/${encodeURIComponent(singleCardNumero)}`, { cache: "no-store" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setSingleEntry(d))
+      .catch(() => {})
+  }, [singleCardNumero])
+
   if (!lote) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4" style={{ background: "#F2F2F7" }}>
@@ -708,6 +722,8 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
           {/* Active / Delivered hero */}
           {!isCancelled && !isPending && currentEtapa && (() => {
             const artApproved = card.coluna >= 4
+            const activeEtapasCard = singleEntry ? singleEntry.etapas.filter(e => e.coluna <= card.coluna) : []
+            const delivery = calcDelivery(activeEtapasCard, card.coluna, singleEntry?.dataEntregaPrevista)
             return (
               <>
                 <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: isEntregue ? "#34C759" : "#007AFF" }}>
@@ -737,17 +753,32 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
                     </div>
                   </div>
 
-                  {/* Delivery date — computed from lote tracking data (no secondary fetch needed) */}
+                  {/* Delivery date */}
                   <div className={`mx-4 mb-4 rounded-xl px-4 py-3 ${isEntregue ? "bg-white/20" : "bg-white/10"}`}>
-                    <div className="flex items-start gap-2.5">
-                      <svg className="w-4 h-4 text-white/70 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-white/50">Previsão de entrega</p>
-                        <p className="text-white/70 text-[12.5px] mt-0.5 leading-relaxed">
-                          {artApproved ? "Calculando prazo…" : "Após a aprovação da arte, a data prevista será calculada automaticamente."}
-                        </p>
+                    {delivery ? (
+                      <div className="flex items-start gap-2.5">
+                        <svg className="w-4 h-4 text-white/80 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" /></svg>
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-white/60">
+                            {delivery.delivered ? "Data de entrega" : "Previsão de entrega"}
+                          </p>
+                          <p className="text-white font-semibold text-[13.5px] mt-0.5 capitalize">{delivery.text}</p>
+                          {delivery.isEstimate && (
+                            <p className="text-white/50 text-[10px] mt-0.5">Estimativa · pode variar conforme produção</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex items-start gap-2.5">
+                        <svg className="w-4 h-4 text-white/50 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-white/50">Previsão de entrega</p>
+                          <p className="text-white/70 text-[12.5px] mt-0.5 leading-relaxed">
+                            {artApproved ? "Calculando prazo…" : "Após a aprovação da arte, a data prevista será calculada automaticamente."}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

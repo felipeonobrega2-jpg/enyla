@@ -47,8 +47,10 @@ function calcDelivery(etapas: TrackingEtapa[], colunaAtual: number, override?: s
     const d = parseBRDate(entregueEtapa.dataHora)
     if (d) return { text: formatDateLong(d), isEstimate: false, delivered: true, isOverride: false }
   }
-  // Art approved: production queue entry (col 4)
-  const producaoEtapa = etapas.find(e => e.coluna === 4)
+  // Art approved: production queue entry (col 4) — usa a etapa de produção mais
+  // antiga registrada (>= 4), pois o pedido pode ter saltado direto pra uma coluna
+  // mais avançada sem nunca logar exatamente a coluna 4
+  const producaoEtapa = etapas.filter(e => e.coluna >= 4).sort((a, b) => a.coluna - b.coluna)[0]
   if (producaoEtapa) {
     const d = parseBRDate(producaoEtapa.dataHora)
     if (d) {
