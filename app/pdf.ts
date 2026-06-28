@@ -59,7 +59,7 @@ export function gerarHtmlOrcamento(item: HistoricoItem): string {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Orçamento — ${form.nomeCliente || "Cliente"} — ${data}</title>
   <style>
-    *{box-sizing:border-box;margin:0;padding:0}
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     body{font-family:system-ui,-apple-system,sans-serif;font-size:12px;color:#1e293b;background:#fff;padding:28px 32px}
     h1{font-size:22px;font-weight:800;color:#0f172a}
     h2{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;font-weight:700;margin:22px 0 8px}
@@ -78,6 +78,7 @@ export function gerarHtmlOrcamento(item: HistoricoItem): string {
     .rec-box p{font-size:11.5px;color:#475569;line-height:1.6}
     .footer{margin-top:28px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8}
     @media print{
+      *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
       body{padding:16px 20px}
       @page{margin:1cm}
     }
@@ -200,7 +201,7 @@ const LOGO_LIGHT_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABEYAAACfCA
 // estilo "cards" usado antes.
 function estiloPropostaCliente(): string {
   return `
-    *{box-sizing:border-box;margin:0;padding:0}
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     body{font-family:system-ui,-apple-system,sans-serif;font-size:11.5px;color:#1e293b;background:#fff}
     .page{padding:30px 38px;min-height:100vh}
     .page-break{break-before:page;page-break-before:always}
@@ -241,6 +242,7 @@ function estiloPropostaCliente(): string {
     .cond-item .cond-texto{font-size:11px;color:#475569;line-height:1.7}
 
     @media print{
+      *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
       .page{padding:16px 20px}
       @page{margin:1cm}
     }
