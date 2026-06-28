@@ -1123,7 +1123,7 @@ export default function Home() {
               <div>
                 <Label>Prazo de entrega (dias úteis, após aprovação da arte) *</Label>
                 <div className="flex gap-1.5 flex-wrap">
-                  {[15, 20, 30].map(d => (
+                  {[7, 10, 14].map(d => (
                     <button key={d} type="button"
                       onClick={() => set("prazoEntrega", d)}
                       className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${

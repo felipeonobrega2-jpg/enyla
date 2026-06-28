@@ -337,6 +337,7 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem): string {
   const sweetMin  = tabela.find(l => l.quantidade === sweetSpotMinimoQtd) ?? tabela[0]
   const precoKey  = form.comFaca ? "precoComFaca"    : "precoSemFaca"
   const unitKey   = form.comFaca ? "unitarioComFaca" : "unitarioSemFaca"
+  const parc12Key = form.comFaca ? "parcela12xComFaca" : "parcela12xSemFaca"
 
   const tabelaValida = tabela.filter(l => l.quantidade > 0 && (l[unitKey as keyof typeof l] as number) > 0)
 
@@ -345,6 +346,7 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem): string {
     const isMin   = l.quantidade === sweetSpotMinimoQtd && !isIdeal
     const preco = l[precoKey as keyof typeof l] as number
     const unit  = l[unitKey as keyof typeof l] as number
+    const parc  = l[parc12Key as keyof typeof l] as number
     return `
       <div class="valores-row">
         <span class="lbl">Quant.:</span>
@@ -353,7 +355,7 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem): string {
           ${isMin   ? '<span class="tag" style="background:#f59e0b">MÍNIMO</span>'  : ""}
         </span>
         <span class="lbl">Unit.:</span>
-        <span class="v-unit">${brl(unit)}</span>
+        <span class="v-unit">${brl(unit)} <span style="color:#94a3b8;font-size:9.5px">· ${brl(parc)}/mês em 12×</span></span>
         <span class="v-total">${brl(preco)}</span>
       </div>`
   }).join("")
@@ -451,6 +453,7 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom): string {
     const isIdeal = l.isIdeal
     const isMin   = l === minLinha && !isIdeal
     const total   = l.unitario * l.quantidade
+    const parc    = (total * p.parcFator) / 12
     return `
       <div class="valores-row">
         <span class="lbl">Quant.:</span>
@@ -459,7 +462,7 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom): string {
           ${isMin   ? '<span class="tag" style="background:#f59e0b">MÍNIMO</span>'  : ""}
         </span>
         <span class="lbl">Unit.:</span>
-        <span class="v-unit">${brl(l.unitario)}</span>
+        <span class="v-unit">${brl(l.unitario)} <span style="color:#94a3b8;font-size:9.5px">· ${brl(parc)}/mês em 12×</span></span>
         <span class="v-total">${brl(total)}</span>
       </div>`
   }).join("")
