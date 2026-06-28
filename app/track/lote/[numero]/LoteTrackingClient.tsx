@@ -525,7 +525,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
     <div className="bg-white border-b border-[rgba(60,60,67,0.12)] sticky top-0 z-10">
       <div className="max-w-md mx-auto px-5 h-14 flex items-center gap-3">
         <div>
-          <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1118} height={162}
+          <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1335} height={328}
             className="h-4 w-auto" priority />
         </div>
         <div className="ml-auto">

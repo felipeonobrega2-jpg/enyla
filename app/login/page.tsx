@@ -41,7 +41,7 @@ export default function LoginPage() {
 
         {/* Brand mark */}
         <div className="flex flex-col items-center mb-10">
-          <Image src="/brand/enyla-wordmark-light.png" alt="Enyla" width={1094} height={159}
+          <Image src="/brand/enyla-wordmark-light.png" alt="Enyla" width={1335} height={328}
             className="h-9 w-auto" priority />
         </div>
 

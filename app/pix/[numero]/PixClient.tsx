@@ -108,7 +108,7 @@ export default function PixClient({ numero }: { numero: string }) {
   if (notFound || !data) {
     return (
       <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-5 text-center gap-4">
-        <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1118} height={162}
+        <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1335} height={328}
           className="h-3.5 w-auto opacity-60" />
         <p className="text-[18px] font-bold text-[#1C1C1E]">Link inválido</p>
         <p className="text-[13px] text-[#8E8E93]">Solicite um novo link ao vendedor.</p>
@@ -125,7 +125,7 @@ export default function PixClient({ numero }: { numero: string }) {
   if (expired) {
     return (
       <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-5 text-center gap-4">
-        <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1118} height={162}
+        <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1335} height={328}
           className="h-3.5 w-auto opacity-60" />
         <div className="w-14 h-14 rounded-full bg-[#FF3B30]/10 flex items-center justify-center">
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="#FF3B30" strokeWidth={2}>
@@ -176,7 +176,7 @@ export default function PixClient({ numero }: { numero: string }) {
       {/* ── Body ─────────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col items-center px-5 pt-7 pb-8 w-full max-w-[360px] mx-auto">
 
-        <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1118} height={162}
+        <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1335} height={328}
           className="h-3.5 w-auto opacity-60 mb-6" />
 
         <div className="rounded-2xl overflow-hidden mb-6"
