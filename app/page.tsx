@@ -57,10 +57,10 @@ function NavItem({ active, onClick, icon, label, badge, accent }: {
         active
           ? "bg-white/[0.09] text-white font-semibold"
           : accent
-            ? "text-[#007AFF] font-semibold bg-[#007AFF]/[0.12] hover:bg-[#007AFF]/[0.18]"
+            ? "text-[#5009c4] font-semibold bg-[#5009c4]/[0.12] hover:bg-[#5009c4]/[0.18]"
             : "text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.05] font-medium"
       }`}>
-      <span className={`shrink-0 transition-colors ${active ? "text-white" : accent ? "text-[#007AFF]" : "text-zinc-600"}`}>
+      <span className={`shrink-0 transition-colors ${active ? "text-white" : accent ? "text-[#5009c4]" : "text-zinc-600"}`}>
         {icon}
       </span>
       <span className="flex-1 text-left truncate">{label}</span>
@@ -930,7 +930,7 @@ export default function Home() {
         <div className="px-2 py-3 shrink-0 space-y-1" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
           <button
             onClick={() => setModalPropostaCustom(true)}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12.5px] font-semibold transition-all duration-100 text-white mb-1 bg-[#007AFF] hover:bg-[#0062CC] active:bg-[#004EA8]">
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12.5px] font-semibold transition-all duration-100 text-white mb-1 bg-[#5009c4] hover:bg-[#4307a6] active:bg-[#370689]">
             <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
@@ -1002,16 +1002,16 @@ export default function Home() {
                   onClick={() => { set("materialId", m.id); set("materialNome", m.nome) }}
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border-2 text-left transition-all duration-150 ${
                     form.materialId === m.id
-                      ? "border-[#007AFF]/30 bg-[#007AFF]/[0.04] shadow-sm"
+                      ? "border-[#5009c4]/30 bg-[#5009c4]/[0.04] shadow-sm"
                       : "border-[rgba(60,60,67,0.08)] hover:border-[rgba(60,60,67,0.12)] hover:bg-[rgba(116,116,128,0.04)]/50"
                   }`}>
                   <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-150 ${
-                    form.materialId === m.id ? "border-[#007AFF] bg-[#007AFF]" : "border-slate-300"
+                    form.materialId === m.id ? "border-[#5009c4] bg-[#5009c4]" : "border-slate-300"
                   }`}>
                     {form.materialId === m.id && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                   </div>
                   <span className={`text-[12.5px] font-medium transition-colors ${
-                    form.materialId === m.id ? "text-[#007AFF]" : "text-[rgba(60,60,67,0.75)]"
+                    form.materialId === m.id ? "text-[#5009c4]" : "text-[rgba(60,60,67,0.75)]"
                   }`}>{m.nome}</span>
                 </button>
               ))}
@@ -1034,7 +1034,7 @@ export default function Home() {
 
             {/* Toggle Verniz */}
             <label className="flex items-center gap-2.5 py-1.5 cursor-pointer select-none group" onClick={() => set("incluirVerniz", !form.incluirVerniz)}>
-              <div className={`w-8 h-4 rounded-full transition-colors relative ${form.incluirVerniz ? "bg-[#007AFF]" : "bg-slate-200"}`}>
+              <div className={`w-8 h-4 rounded-full transition-colors relative ${form.incluirVerniz ? "bg-[#5009c4]" : "bg-slate-200"}`}>
                 <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${form.incluirVerniz ? "translate-x-4" : "translate-x-0.5"}`} />
               </div>
               <span className="text-[12.5px] text-[rgba(60,60,67,0.6)] group-hover:text-slate-900 transition-colors duration-150">Verniz UV</span>
@@ -1064,7 +1064,7 @@ export default function Home() {
                     value={form.valorFaca || ""}
                     onChange={e => set("valorFaca", Number(e.target.value))}
                     placeholder="Valor da faca"
-                    className="w-full h-10 border border-[rgba(60,60,67,0.12)] rounded-xl pl-8 pr-3 py-2 text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] hover:border-slate-300 transition-all duration-150" />
+                    className="w-full h-10 border border-[rgba(60,60,67,0.12)] rounded-xl pl-8 pr-3 py-2 text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#5009c4]/20 focus:border-[#5009c4] hover:border-slate-300 transition-all duration-150" />
                 </div>
               )}
             </div>
@@ -1086,9 +1086,9 @@ export default function Home() {
                 onChange={e => setNovaQtd(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && addQtd()}
                 placeholder="Adicionar quantidade…"
-                className="flex-1 border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-1.5 text-[13px] text-slate-900 placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF]" />
+                className="flex-1 border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-1.5 text-[13px] text-slate-900 placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-[#5009c4]/20 focus:border-[#5009c4]" />
               <button onClick={addQtd}
-                className="px-3 bg-[#007AFF] hover:bg-[#0062CC] text-white rounded-lg text-sm font-bold transition-colors">+</button>
+                className="px-3 bg-[#5009c4] hover:bg-[#4307a6] text-white rounded-lg text-sm font-bold transition-colors">+</button>
             </div>
           </FormSection>
 
@@ -1112,7 +1112,7 @@ export default function Home() {
                   <input type="number" min={1} max={365}
                     value={form.validadeDias}
                     onChange={e => set("validadeDias", Math.max(1, Number(e.target.value)))}
-                    className="w-20 border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 text-xs text-slate-900 text-center focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF]"
+                    className="w-20 border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 text-xs text-slate-900 text-center focus:outline-none focus:ring-2 focus:ring-[#5009c4]/20 focus:border-[#5009c4]"
                     title="Valor personalizado"
                   />
                 </div>
@@ -1124,7 +1124,7 @@ export default function Home() {
                   onChange={e => set("obsInterna", e.target.value)}
                   placeholder="Notas internas, condições especiais, prazo…"
                   rows={3}
-                  className="w-full border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-2 text-[13px] text-slate-900 placeholder:text-[rgba(60,60,67,0.3)] resize-none focus:outline-none focus:ring-2 focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] transition"
+                  className="w-full border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-2 text-[13px] text-slate-900 placeholder:text-[rgba(60,60,67,0.3)] resize-none focus:outline-none focus:ring-2 focus:ring-2 focus:ring-[#5009c4]/20 focus:border-[#5009c4] transition"
                 />
               </div>
               <div>
@@ -1134,7 +1134,7 @@ export default function Home() {
                   onChange={e => set("obsCliente", e.target.value)}
                   placeholder="Aparece na proposta enviada ao cliente…"
                   rows={3}
-                  className="w-full border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-2 text-[13px] text-slate-900 placeholder:text-[rgba(60,60,67,0.3)] resize-none focus:outline-none focus:ring-2 focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] transition"
+                  className="w-full border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-2 text-[13px] text-slate-900 placeholder:text-[rgba(60,60,67,0.3)] resize-none focus:outline-none focus:ring-2 focus:ring-2 focus:ring-[#5009c4]/20 focus:border-[#5009c4] transition"
                 />
               </div>
             </div>
@@ -1143,8 +1143,8 @@ export default function Home() {
           {/* Ações */}
           <div className="p-5 mt-auto space-y-2 border-t border-[rgba(60,60,67,0.08)] bg-white">
             {editandoHistorico && (
-              <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#007AFF]/[0.06] border border-[#007AFF]/15">
-                <p className="text-[11.5px] font-semibold text-[#007AFF]">Editando {editandoHistorico}</p>
+              <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#5009c4]/[0.06] border border-[#5009c4]/15">
+                <p className="text-[11.5px] font-semibold text-[#5009c4]">Editando {editandoHistorico}</p>
                 <button onClick={cancelarEdicaoHistorico}
                   className="text-[11px] font-medium text-[#8E8E93] hover:text-[#1C1C1E] transition-colors">
                   Cancelar
@@ -1152,7 +1152,7 @@ export default function Home() {
               </div>
             )}
             <button onClick={editandoHistorico ? salvarEdicaoHistorico : salvar} disabled={!r}
-              className="w-full h-11 bg-[#007AFF] hover:bg-[#0062CC] active:bg-[#004EA8] active:scale-[0.99] disabled:opacity-30 disabled:cursor-not-allowed text-white text-[13px] font-bold rounded-xl transition-all duration-150 shadow-sm shadow-[#007AFF]/15 disabled:shadow-none">
+              className="w-full h-11 bg-[#5009c4] hover:bg-[#4307a6] active:bg-[#370689] active:scale-[0.99] disabled:opacity-30 disabled:cursor-not-allowed text-white text-[13px] font-bold rounded-xl transition-all duration-150 shadow-sm shadow-[#5009c4]/15 disabled:shadow-none">
               {editandoHistorico ? "Salvar alterações" : "Salvar orçamento"}
             </button>
             {r && (
@@ -1168,7 +1168,7 @@ export default function Home() {
                     PDF Gráfica
                   </button>
                   <button onClick={() => downloadPdfCliente({ form, calculo: r, data: new Date().toLocaleString("pt-BR") })}
-                    className="flex-1 h-9 border border-[#007AFF]/25 hover:border-[#007AFF]/40 hover:bg-[#007AFF]/[0.04] text-[#007AFF] text-[11.5px] font-medium rounded-xl transition-all duration-150">
+                    className="flex-1 h-9 border border-[#5009c4]/25 hover:border-[#5009c4]/40 hover:bg-[#5009c4]/[0.04] text-[#5009c4] text-[11.5px] font-medium rounded-xl transition-all duration-150">
                     PDF Cliente
                   </button>
                 </div>
@@ -1499,7 +1499,7 @@ export default function Home() {
               {/* Header do orçamento */}
               {form.nomeCliente && (
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-[#007AFF] text-white text-xs font-bold flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-[#5009c4] text-white text-xs font-bold flex items-center justify-center">
                     {form.nomeCliente[0].toUpperCase()}
                   </div>
                   <div>
@@ -1595,7 +1595,7 @@ export default function Home() {
                   />
                   <div className="flex gap-5 mt-3 pt-3 border-t border-[rgba(60,60,67,0.06)] text-xs text-[#8E8E93]">
                     <span className="flex items-center gap-1.5">
-                      <span className="w-5 h-px bg-[#007AFF] block" /> linha de corte
+                      <span className="w-5 h-px bg-[#5009c4] block" /> linha de corte
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="w-5 border-t border-dashed border-red-500 block" /> vinco de dobra
@@ -1618,7 +1618,7 @@ export default function Home() {
                             <th className="sticky left-0 bg-[rgba(116,116,128,0.04)] px-4 py-3 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold border-r border-[rgba(60,60,67,0.08)]">Qtd</th>
                             <th colSpan={3} className="px-3 py-2 text-center text-[10px] uppercase tracking-wider text-[rgba(60,60,67,0.3)] font-semibold border-r border-[rgba(60,60,67,0.06)]">Produção</th>
                             <th colSpan={form.incluirVerniz ? 6 : 5} className="px-3 py-2 text-center text-[10px] uppercase tracking-wider text-[rgba(60,60,67,0.3)] font-semibold border-r border-[rgba(60,60,67,0.06)]">Custos</th>
-                            <th colSpan={form.comFaca ? 4 : 2} className="px-3 py-2 text-center text-[10px] uppercase tracking-wider text-[#007AFF]/70 font-semibold">Preços</th>
+                            <th colSpan={form.comFaca ? 4 : 2} className="px-3 py-2 text-center text-[10px] uppercase tracking-wider text-[#5009c4]/70 font-semibold">Preços</th>
                           </tr>
                           <tr className="bg-[rgba(116,116,128,0.04)] border-b border-[rgba(60,60,67,0.08)]">
                             <th className="sticky left-0 bg-[rgba(116,116,128,0.04)] px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold border-r border-[rgba(60,60,67,0.08)]" />
@@ -1887,8 +1887,8 @@ function ModalSinalEntrada({
           <>
             {/* Header */}
             <div className="px-6 pt-6 pb-4">
-              <div className="w-10 h-10 rounded-xl bg-[#007AFF]/10 flex items-center justify-center mb-4">
-                <svg className="w-5 h-5 text-[#007AFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <div className="w-10 h-10 rounded-xl bg-[#5009c4]/10 flex items-center justify-center mb-4">
+                <svg className="w-5 h-5 text-[#5009c4]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                 </svg>
               </div>
@@ -1904,7 +1904,7 @@ function ModalSinalEntrada({
               </button>
               <button onClick={() => setStep("form")}
                 className="flex-1 py-2.5 text-[13px] font-bold text-white rounded-xl transition-colors"
-                style={{ background: "#007AFF" }}>
+                style={{ background: "#5009c4" }}>
                 Sim, registrar
               </button>
             </div>
@@ -1933,7 +1933,7 @@ function ModalSinalEntrada({
                     onKeyDown={e => e.key === "Enter" && confirmar()}
                     placeholder="0,00"
                     autoFocus
-                    className="w-full h-11 border border-[rgba(60,60,67,0.12)] rounded-xl pl-9 pr-3 text-[14px] font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] transition-all"
+                    className="w-full h-11 border border-[rgba(60,60,67,0.12)] rounded-xl pl-9 pr-3 text-[14px] font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#5009c4]/20 focus:border-[#5009c4] transition-all"
                   />
                 </div>
               </div>
@@ -1946,7 +1946,7 @@ function ModalSinalEntrada({
                     <button key={f} onClick={() => setForma(f)}
                       className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-all capitalize ${
                         forma === f
-                          ? "bg-[#007AFF] text-white border-[#007AFF] shadow-sm"
+                          ? "bg-[#5009c4] text-white border-[#5009c4] shadow-sm"
                           : "border-[rgba(60,60,67,0.12)] text-[rgba(60,60,67,0.6)] hover:border-slate-300 hover:bg-[rgba(116,116,128,0.04)]"
                       }`}>
                       {f}
@@ -1963,7 +1963,7 @@ function ModalSinalEntrada({
               </button>
               <button onClick={confirmar} disabled={valorNum <= 0}
                 className="flex-1 py-2.5 text-[13px] font-bold text-white rounded-xl transition-all disabled:opacity-40"
-                style={{ background: "#007AFF" }}>
+                style={{ background: "#5009c4" }}>
                 Confirmar sinal
               </button>
             </div>

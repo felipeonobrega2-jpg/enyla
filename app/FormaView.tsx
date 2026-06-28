@@ -111,10 +111,10 @@ function LayoutCard({ layout, onUsar }: LayoutCardProps) {
   }
 
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded-2xl rounded-tl-sm p-4 space-y-3 max-w-[75vw]">
-      <p className="text-[10px] uppercase tracking-wide font-bold text-blue-500">Layout sugerido — faca aberta</p>
+    <div className="bg-violet-50 border border-violet-200 rounded-2xl rounded-tl-sm p-4 space-y-3 max-w-[75vw]">
+      <p className="text-[10px] uppercase tracking-wide font-bold text-violet-500">Layout sugerido — faca aberta</p>
 
-      <div className="bg-white rounded-xl border border-blue-100 overflow-auto p-2">
+      <div className="bg-white rounded-xl border border-violet-100 overflow-auto p-2">
         <div
           className="min-w-0"
           dangerouslySetInnerHTML={{ __html: svgString }}
@@ -130,8 +130,8 @@ function LayoutCard({ layout, onUsar }: LayoutCardProps) {
           ["Material",     layout.materialNome],
           ["Tipo",         layout.tipo],
         ].map(([l, v]) => (
-          <div key={l} className="bg-white rounded-lg px-2.5 py-2 border border-blue-100">
-            <p className="text-[9px] text-blue-400 uppercase tracking-wide font-semibold">{l}</p>
+          <div key={l} className="bg-white rounded-lg px-2.5 py-2 border border-violet-100">
+            <p className="text-[9px] text-violet-400 uppercase tracking-wide font-semibold">{l}</p>
             <p className="text-xs font-bold text-slate-800 mt-0.5 leading-tight">{v}</p>
           </div>
         ))}
@@ -140,7 +140,7 @@ function LayoutCard({ layout, onUsar }: LayoutCardProps) {
       <div className="flex gap-2">
         <button
           onClick={downloadSVG}
-          className="flex-1 py-2 bg-white hover:bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold rounded-xl transition-colors">
+          className="flex-1 py-2 bg-white hover:bg-violet-50 border border-violet-200 text-violet-700 text-xs font-semibold rounded-xl transition-colors">
           Baixar faca (.svg) ↓
         </button>
         <button
@@ -353,7 +353,7 @@ export default function FormaView({
                         key={c.id}
                         onClick={() => carregarConversa(c)}
                         className={`w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors group flex items-start gap-2 ${
-                          conversaAtualIdRef.current === c.id ? "bg-blue-50" : ""
+                          conversaAtualIdRef.current === c.id ? "bg-violet-50" : ""
                         }`}>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-medium text-slate-700 truncate leading-snug">{c.titulo}</p>

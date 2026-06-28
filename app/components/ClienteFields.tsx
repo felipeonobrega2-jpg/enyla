@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Cliente } from "../types"
 
-const inputCls = "w-full h-9 border border-slate-200 rounded-lg px-3 text-[13px] text-slate-900 placeholder:text-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-400 transition-all"
+const inputCls = "w-full h-9 border border-slate-200 rounded-lg px-3 text-[13px] text-slate-900 placeholder:text-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/25 focus:border-violet-400 transition-all"
 
 export function ClienteCombobox({
   value, onChange, clientes,
@@ -65,7 +65,7 @@ export function ClienteCombobox({
               onMouseDown={e => { e.preventDefault(); select(c.nome) }}
               onMouseEnter={() => setHighlighted(i)}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
-                i === highlighted ? "bg-blue-50" : "hover:bg-slate-50"
+                i === highlighted ? "bg-violet-50" : "hover:bg-slate-50"
               }`}
             >
               <div className="w-7 h-7 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
@@ -78,7 +78,7 @@ export function ClienteCombobox({
                 </p>
               </div>
               {i === highlighted && (
-                <svg className="w-3 h-3 text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <svg className="w-3 h-3 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                 </svg>
               )}
@@ -117,7 +117,7 @@ export function ClienteContactCard({
             <p className="text-[9.5px] text-slate-400 mt-0.5">{cliente.telefone}</p>
           )}
           {!hasData && (
-            <p className="text-[9.5px] text-blue-500 mt-0.5">+ Adicionar contato</p>
+            <p className="text-[9.5px] text-violet-500 mt-0.5">+ Adicionar contato</p>
           )}
         </div>
         <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform shrink-0 ${aberto ? "rotate-180" : ""}`}
@@ -143,7 +143,7 @@ export function ClienteContactCard({
           />
           <ContactField
             icon={
-              <svg className="w-3.5 h-3.5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <svg className="w-3.5 h-3.5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             }

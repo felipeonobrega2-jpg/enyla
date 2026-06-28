@@ -17,7 +17,7 @@ export function Label({ children }: { children: React.ReactNode }) {
   return <p className="text-[10.5px] text-[rgba(60,60,67,0.55)] font-medium mb-1.5">{children}</p>
 }
 
-const inputCls = "w-full h-10 border rounded-xl px-3 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] transition-all duration-150 hover:border-[rgba(60,60,67,0.25)]"
+const inputCls = "w-full h-10 border rounded-xl px-3 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] bg-white focus:outline-none focus:ring-2 focus:ring-[#5009c4]/20 focus:border-[#5009c4] transition-all duration-150 hover:border-[rgba(60,60,67,0.25)]"
 
 export function TextInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
@@ -65,7 +65,7 @@ export function Section({ title, children }: { title: string; children: React.Re
 export function TH({ children, br, blue }: { children?: React.ReactNode; br?: boolean; blue?: boolean }) {
   return (
     <th className={`px-3 py-3 text-left text-[9.5px] uppercase font-semibold whitespace-nowrap
-      ${blue ? "text-[#007AFF]" : "text-[rgba(60,60,67,0.4)]"}
+      ${blue ? "text-[#5009c4]" : "text-[rgba(60,60,67,0.4)]"}
       ${br ? "border-r border-[rgba(60,60,67,0.08)]" : ""}`}>
       {children}
     </th>
@@ -78,7 +78,7 @@ export function TD({ children, bold, muted, blue, green, mono, br }: {
   return (
     <td className={`px-3 py-2.5 whitespace-nowrap text-[12.5px]
       ${bold ? "font-semibold" : ""}
-      ${muted ? "text-[rgba(60,60,67,0.4)]" : blue ? "text-[#007AFF]" : green ? "text-[#34C759]" : "text-[#1C1C1E]"}
+      ${muted ? "text-[rgba(60,60,67,0.4)]" : blue ? "text-[#5009c4]" : green ? "text-[#34C759]" : "text-[#1C1C1E]"}
       ${mono ? "tabular-nums" : ""}
       ${br ? "border-r border-[rgba(60,60,67,0.08)]" : ""}`}>
       {children}
@@ -89,9 +89,9 @@ export function TD({ children, bold, muted, blue, green, mono, br }: {
 export function TabelaRow({ linha, comFaca, incluirVerniz, isMin, isIdeal }: {
   linha: LinhaTabela; comFaca: boolean; incluirVerniz: boolean; isMin: boolean; isIdeal: boolean
 }) {
-  const rowCls = isIdeal ? "bg-[#007AFF]/[0.04] hover:bg-[#007AFF]/[0.07]" : isMin ? "bg-[#FF9500]/[0.04] hover:bg-[#FF9500]/[0.07]" : "hover:bg-[rgba(0,0,0,0.02)]"
+  const rowCls = isIdeal ? "bg-[#5009c4]/[0.04] hover:bg-[#5009c4]/[0.07]" : isMin ? "bg-[#FF9500]/[0.04] hover:bg-[#FF9500]/[0.07]" : "hover:bg-[rgba(0,0,0,0.02)]"
   const stickyBg = isIdeal ? "bg-[#EEF5FF]" : isMin ? "bg-[#FFF8EE]" : "bg-white"
-  const leftBorder = isIdeal ? "border-l-[3px] border-l-[#007AFF]" : isMin ? "border-l-[3px] border-l-[#FF9500]" : ""
+  const leftBorder = isIdeal ? "border-l-[3px] border-l-[#5009c4]" : isMin ? "border-l-[3px] border-l-[#FF9500]" : ""
 
   return (
     <tr className={`transition-colors ${rowCls}`}>
@@ -99,7 +99,7 @@ export function TabelaRow({ linha, comFaca, incluirVerniz, isMin, isIdeal }: {
         style={{ borderRight: "1px solid rgba(60,60,67,0.08)" }}>
         <span className="flex items-center gap-2">
           {num(linha.quantidade)}
-          {isIdeal && <span className="text-[8.5px] bg-[#007AFF] text-white px-2 py-0.5 rounded-full font-bold tracking-wide">IDEAL</span>}
+          {isIdeal && <span className="text-[8.5px] bg-[#5009c4] text-white px-2 py-0.5 rounded-full font-bold tracking-wide">IDEAL</span>}
           {isMin && !isIdeal && <span className="text-[8.5px] bg-[#FF9500] text-white px-2 py-0.5 rounded-full font-bold tracking-wide">MÍN</span>}
         </span>
       </td>
@@ -140,7 +140,7 @@ export function AnaliseEstrategica({ calculo, comFaca, cliente }: { calculo: Cal
   const lucroKey = comFaca ? "lucroComFaca" : "lucroSemFaca"
 
   const cards = [
-    { tag: "Para o cliente",       desc: "Menor custo por unidade",      linha: menorUnit,    cor: "border-[#007AFF]/15 bg-[#007AFF]/[0.03]", tagCor: "bg-[#007AFF]/10 text-[#007AFF]" },
+    { tag: "Para o cliente",       desc: "Menor custo por unidade",      linha: menorUnit,    cor: "border-[#5009c4]/15 bg-[#5009c4]/[0.03]", tagCor: "bg-[#5009c4]/10 text-[#5009c4]" },
     { tag: "Maior rentabilidade",  desc: "Melhor margem para a gráfica", linha: melhorMargem, cor: "border-[#34C759]/20 bg-[#34C759]/[0.03]",  tagCor: "bg-[#34C759]/10 text-[#34C759]" },
     { tag: "Sweet spot ideal",     desc: "Equilíbrio preço × lucro",     linha: sweetIdeal,   cor: "border-[#FF9500]/20 bg-[#FF9500]/[0.03]",  tagCor: "bg-[#FF9500]/10 text-[#FF9500]" },
   ]
@@ -188,7 +188,7 @@ export function EmptyState() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
           </svg>
         </div>
-        <div className="absolute -bottom-2 -right-2 w-7 h-7 rounded-xl bg-[#007AFF] flex items-center justify-center shadow-md shadow-[#007AFF]/30">
+        <div className="absolute -bottom-2 -right-2 w-7 h-7 rounded-xl bg-[#5009c4] flex items-center justify-center shadow-md shadow-[#5009c4]/30">
           <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>

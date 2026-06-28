@@ -29,12 +29,12 @@ export function gerarHtmlOrcamento(item: HistoricoItem): string {
     const isMin   = l.quantidade === sweetSpotMinimoQtd && !isIdeal
     const margem  = form.comFaca ? l.margemComFaca : l.margemSemFaca
     const margemCor = margem >= 48 ? "#16a34a" : margem >= 35 ? "#d97706" : "#dc2626"
-    const bg = isIdeal ? "#eff6ff" : isMin ? "#fffbeb" : "transparent"
+    const bg = isIdeal ? "#f8f5fc" : isMin ? "#fffbeb" : "transparent"
     return `
       <tr style="background:${bg}">
         <td style="font-weight:${isIdeal || isMin ? "700" : "400"}">
           ${num(l.quantidade)}
-          ${isIdeal ? ' <span style="background:#2563eb;color:#fff;font-size:9px;padding:1px 5px;border-radius:9999px;font-weight:700">IDEAL</span>' : ""}
+          ${isIdeal ? ' <span style="background:#5009c4;color:#fff;font-size:9px;padding:1px 5px;border-radius:9999px;font-weight:700">IDEAL</span>' : ""}
           ${isMin   ? ' <span style="background:#f59e0b;color:#fff;font-size:9px;padding:1px 5px;border-radius:9999px;font-weight:700">MÍN</span>'  : ""}
         </td>
         <td>${num(l.folhasPacote)}</td>
@@ -45,8 +45,8 @@ export function gerarHtmlOrcamento(item: HistoricoItem): string {
         <td>${brl(l.custoColagem)}</td>
         <td>${brl(l.custoArte)}</td>
         <td>${brl(l.custoTotalSemFaca)}</td>
-        <td style="font-weight:700;color:#1d4ed8">${brl(l.precoSemFaca)}</td>
-        ${form.comFaca ? `<td>${brl(l.custoTotalComFaca)}</td><td style="font-weight:700;color:#1d4ed8">${brl(l.precoComFaca)}</td>` : ""}
+        <td style="font-weight:700;color:#5009c4">${brl(l.precoSemFaca)}</td>
+        ${form.comFaca ? `<td>${brl(l.custoTotalComFaca)}</td><td style="font-weight:700;color:#5009c4">${brl(l.precoComFaca)}</td>` : ""}
         <td>${brl(l.unitarioSemFaca)}</td>
         ${form.comFaca ? `<td>${brl(l.unitarioComFaca)}</td>` : ""}
         <td style="color:${margemCor};font-weight:600">${num(margem, 1)}%</td>
@@ -66,9 +66,9 @@ export function gerarHtmlOrcamento(item: HistoricoItem): string {
     body{font-family:system-ui,-apple-system,sans-serif;font-size:12px;color:#1e293b;background:#fff;padding:28px 32px}
     h1{font-size:22px;font-weight:800;color:#0f172a}
     h2{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;font-weight:700;margin:22px 0 8px}
-    .logo{font-size:15px;font-weight:900;color:#1e3a8a;letter-spacing:-.02em;margin-bottom:16px}
+    .logo{font-size:15px;font-weight:900;color:#5009c4;letter-spacing:-.02em;margin-bottom:16px}
     .logo span{color:#64748b;font-weight:400;margin-left:6px;font-size:11px}
-    .client-block{border-bottom:2px solid #1e3a8a;padding-bottom:14px;margin-bottom:4px}
+    .client-block{border-bottom:2px solid #5009c4;padding-bottom:14px;margin-bottom:4px}
     .kpis{display:flex;flex-wrap:wrap;gap:10px}
     .kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;min-width:100px}
     .kpi-label{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;font-weight:700}
@@ -94,7 +94,7 @@ export function gerarHtmlOrcamento(item: HistoricoItem): string {
   <div class="client-block">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
       <h1>${form.nomeCliente || "Orçamento sem nome"}</h1>
-      ${item.numero ? `<span style="font-size:12px;font-weight:700;color:#1e3a8a;background:#eff6ff;border:1px solid #bfdbfe;padding:4px 10px;border-radius:6px;white-space:nowrap">${item.numero}</span>` : ""}
+      ${item.numero ? `<span style="font-size:12px;font-weight:700;color:#5009c4;background:#f8f5fc;border:1px solid #d3c1f0;padding:4px 10px;border-radius:6px;white-space:nowrap">${item.numero}</span>` : ""}
     </div>
     <p style="color:#64748b;font-size:11px;margin-top:3px">Gerado em ${data}</p>
   </div>
@@ -157,7 +157,7 @@ export function gerarHtmlOrcamento(item: HistoricoItem): string {
 
   <h2>Análise Estratégica</h2>
   <div class="kpis">
-    <div class="kpi" style="border-color:#bfdbfe;background:#eff6ff">
+    <div class="kpi" style="border-color:#d3c1f0;background:#f8f5fc">
       <div class="kpi-label" style="color:#3b82f6">Para o cliente</div>
       <div class="kpi-value">${brl(sweetIdeal[precoKey as keyof typeof sweetIdeal] as number)}</div>
       <div class="kpi-sub">${num(sweetIdeal.quantidade)} un · ${brl(sweetIdeal[unitKey as keyof typeof sweetIdeal] as number)}/un · margem ${num(sweetIdeal[margKey as keyof typeof sweetIdeal] as number, 1)}%</div>

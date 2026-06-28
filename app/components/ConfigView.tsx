@@ -80,7 +80,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
             Restaurar padrões
           </button>
           <button onClick={() => onSave(draft)}
-            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors">
+            className="px-4 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-lg transition-colors">
             Salvar configurações
           </button>
         </div>
@@ -101,7 +101,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
             value={draft.apiKey}
             onChange={e => setDraft(d => ({ ...d, apiKey: e.target.value }))}
             placeholder="sk-ant-api03-…"
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 font-mono placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 font-mono placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
           />
         </div>
       </div>
@@ -123,7 +123,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
                 onClick={() => setTheme(opt.value)}
                 className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 text-xs font-semibold transition-all ${
                   theme === opt.value
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400"
+                    ? "border-violet-500 bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-400"
                     : "border-slate-200 dark:border-[#30363d] text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-[#484f58] hover:bg-slate-50 dark:hover:bg-[#1e2535]"
                 }`}
               >
@@ -151,7 +151,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
                 <input type="number" min={0} step={0.01}
                   value={draft.custos[k]}
                   onChange={e => setCusto(k, Number(e.target.value))}
-                  className="w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm text-right text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                  className="w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm text-right text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent" />
               </div>
             </div>
           ))}
@@ -172,7 +172,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
               <input type="number" min={0} step={0.01}
                 value={draft.multiplicadores[k]}
                 onChange={e => setMult(k, Number(e.target.value))}
-                className="w-32 border border-slate-200 rounded-lg px-3 py-2 text-sm text-right text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                className="w-32 border border-slate-200 rounded-lg px-3 py-2 text-sm text-right text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent" />
             </div>
           ))}
         </div>
@@ -240,7 +240,7 @@ function MaterialRow({ m, formatoIds, onNomeChange, onPrecoChange, onRemove }: {
         value={nome}
         onChange={e => setNome(e.target.value)}
         onBlur={e => onNomeChange(m.id, e.target.value)}
-        className="flex-1 border border-transparent hover:border-slate-200 focus:border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+        className="flex-1 border border-transparent hover:border-slate-200 focus:border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 transition"
       />
       {formatoIds.map(fmtId => (
         <div key={fmtId} className="relative w-28">
@@ -248,7 +248,7 @@ function MaterialRow({ m, formatoIds, onNomeChange, onPrecoChange, onRemove }: {
           <input type="number" min={0} step={1}
             value={m.precos[fmtId] ?? 0}
             onChange={e => onPrecoChange(m.id, fmtId, Number(e.target.value))}
-            className="w-full border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-sm text-right text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            className="w-full border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-sm text-right text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent" />
         </div>
       ))}
       <button onClick={() => onRemove(m.id)}
@@ -322,10 +322,10 @@ function MaterialConfig({
           onChange={e => setNovoNome(e.target.value)}
           onKeyDown={e => e.key === "Enter" && adicionar()}
           placeholder="Novo material (ex: Couchê 170g)…"
-          className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
         />
         <button onClick={adicionar}
-          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors">
+          className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-lg transition-colors">
           + Adicionar
         </button>
       </div>

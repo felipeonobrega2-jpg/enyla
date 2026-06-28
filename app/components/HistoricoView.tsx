@@ -102,7 +102,7 @@ export function HistoricoView({
             value={busca}
             onChange={e => setBusca(e.target.value)}
             placeholder="Buscar por cliente, número ou data…"
-            className="w-full border border-[rgba(0,0,0,0.12)] rounded-xl pl-9 pr-9 py-2.5 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.36)] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25 focus:border-[#007AFF] bg-white transition-all"
+            className="w-full border border-[rgba(0,0,0,0.12)] rounded-xl pl-9 pr-9 py-2.5 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.36)] focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4] bg-white transition-all"
           />
           {busca && (
             <button onClick={() => setBusca("")}
@@ -112,7 +112,7 @@ export function HistoricoView({
         <select
           value={ordem}
           onChange={e => setOrdem(e.target.value as OrdemHistorico)}
-          className="border border-[rgba(0,0,0,0.12)] rounded-xl px-3 py-2.5 text-[13px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25 focus:border-[#007AFF] cursor-pointer transition-all"
+          className="border border-[rgba(0,0,0,0.12)] rounded-xl px-3 py-2.5 text-[13px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4] cursor-pointer transition-all"
         >
           <option value="recente">Mais recentes</option>
           <option value="antigo">Mais antigos</option>
@@ -155,7 +155,7 @@ export function HistoricoView({
                   <button
                     onClick={() => onDetalhes?.(item)}
                     className="w-10 h-10 rounded-full text-white text-[13px] font-bold flex items-center justify-center shrink-0 transition-colors"
-                    style={{ background: "#007AFF" }}
+                    style={{ background: "#5009c4" }}
                     tabIndex={-1}
                   >
                     {initial}
@@ -171,7 +171,7 @@ export function HistoricoView({
                         {item.form.nomeCliente || "Sem nome"}
                       </span>
                       {item.numero && (
-                        <span className="shrink-0 text-[10px] font-bold text-[#007AFF] bg-[#007AFF]/10 border border-[#007AFF]/20 px-1.5 py-0.5 rounded-full tabular-nums">
+                        <span className="shrink-0 text-[10px] font-bold text-[#5009c4] bg-[#5009c4]/10 border border-[#5009c4]/20 px-1.5 py-0.5 rounded-full tabular-nums">
                           {item.numero}
                         </span>
                       )}
@@ -239,7 +239,7 @@ export function HistoricoView({
                   <button
                     onClick={() => onDetalhes?.(p)}
                     className="w-10 h-10 rounded-full text-white text-[13px] font-bold flex items-center justify-center shrink-0 transition-colors"
-                    style={{ background: "#007AFF" }}
+                    style={{ background: "#5009c4" }}
                     tabIndex={-1}
                   >
                     {initial}
@@ -254,7 +254,7 @@ export function HistoricoView({
                       <span className="font-semibold text-[14px] text-[#1C1C1E] leading-snug">
                         {p.nomeCliente || "Sem nome"}
                       </span>
-                      <span className="shrink-0 text-[10px] font-bold text-[#007AFF] bg-[#007AFF]/10 border border-[#007AFF]/20 px-1.5 py-0.5 rounded-full tabular-nums">
+                      <span className="shrink-0 text-[10px] font-bold text-[#5009c4] bg-[#5009c4]/10 border border-[#5009c4]/20 px-1.5 py-0.5 rounded-full tabular-nums">
                         {p.numero}
                       </span>
                     </div>
@@ -320,10 +320,10 @@ function IconBtn({
 }) {
   const colors = {
     slate:  "text-[#8E8E93] hover:bg-[rgba(0,0,0,0.04)] hover:text-[#1C1C1E]",
-    blue:   "text-[#007AFF] hover:bg-[#007AFF]/5 hover:text-[#0062CC]",
+    blue:   "text-[#5009c4] hover:bg-[#5009c4]/5 hover:text-[#4307a6]",
     green:  "text-[#34C759] hover:bg-[#34C759]/5 hover:text-[#248A3D]",
     red:    "text-[#FF3B30] hover:bg-[#FF3B30]/5 hover:text-[#D70015]",
-    violet: "text-[#007AFF] hover:bg-[#007AFF]/5 hover:text-[#0062CC]",
+    violet: "text-[#5009c4] hover:bg-[#5009c4]/5 hover:text-[#4307a6]",
   }
   return (
     <button

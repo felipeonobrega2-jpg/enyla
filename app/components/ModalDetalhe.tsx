@@ -120,7 +120,7 @@ export function ModalDetalhe({
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border tabular-nums shrink-0 ${
                     isCustom
                       ? "text-[#AF52DE] bg-[#AF52DE]/[0.08] border-[#AF52DE]/20"
-                      : "text-[#007AFF] bg-[#007AFF]/[0.08] border-[#007AFF]/20"
+                      : "text-[#5009c4] bg-[#5009c4]/[0.08] border-[#5009c4]/20"
                   }`}>{numero}</span>
                 )}
                 <span className="text-[11px] text-[#8E8E93]">{dataStr}</span>
@@ -197,7 +197,7 @@ export function ModalDetalhe({
                   const isMin   = l.quantidade === data.item.calculo.sweetSpotMinimoQtd
                   return (
                     <tr key={l.quantidade}
-                      className={isIdeal ? "bg-blue-50/50" : isMin ? "bg-amber-50/40" : "hover:bg-[rgba(116,116,128,0.04)]"}>
+                      className={isIdeal ? "bg-violet-50/50" : isMin ? "bg-amber-50/40" : "hover:bg-[rgba(116,116,128,0.04)]"}>
                       <td className="py-3 px-5">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-[13px] text-[#1C1C1E] tabular-nums">{num(l.quantidade)}</span>
@@ -206,7 +206,7 @@ export function ModalDetalhe({
                         </div>
                       </td>
                       <td className="py-3 px-4 text-right text-[12.5px] text-[rgba(60,60,67,0.6)] tabular-nums">{brl(unit)}</td>
-                      <td className="py-3 px-4 text-right font-bold text-[13px] text-blue-700 tabular-nums">{brl(total)}</td>
+                      <td className="py-3 px-4 text-right font-bold text-[13px] text-violet-700 tabular-nums">{brl(total)}</td>
                       <td className="py-3 px-5 text-right text-[11.5px] text-[#8E8E93] tabular-nums">{brl(parc)}</td>
                     </tr>
                   )
@@ -216,7 +216,7 @@ export function ModalDetalhe({
                   const total = l.unitario * l.quantidade
                   const parc  = (total * parcFator) / 12
                   return (
-                    <tr key={i} className={l.isIdeal ? "bg-blue-50/50" : "hover:bg-[rgba(116,116,128,0.04)]"}>
+                    <tr key={i} className={l.isIdeal ? "bg-violet-50/50" : "hover:bg-[rgba(116,116,128,0.04)]"}>
                       <td className="py-3 px-5">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-[13px] text-[#1C1C1E] tabular-nums">{num(l.quantidade)}</span>
@@ -241,7 +241,7 @@ export function ModalDetalhe({
                         </div>
                       </td>
                       <td className="py-3 px-4 text-right text-[12.5px] text-[rgba(60,60,67,0.6)] tabular-nums">{brl(op.unitario)}</td>
-                      <td className="py-3 px-4 text-right font-bold text-[13px] text-blue-700 tabular-nums">{brl(op.preco)}</td>
+                      <td className="py-3 px-4 text-right font-bold text-[13px] text-violet-700 tabular-nums">{brl(op.preco)}</td>
                     </tr>
                   )
                 })}
@@ -317,7 +317,7 @@ export function ModalDetalhe({
                   <div>
                     <label className="text-[9.5px] text-[rgba(60,60,67,0.5)] font-medium block mb-1">Fechamento</label>
                     <input type="date" value={closeDate} onChange={e => setCloseDate(e.target.value)}
-                      className="w-full h-9 border border-[rgba(0,0,0,0.1)] rounded-xl px-2.5 text-[12.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] transition-colors"
+                      className="w-full h-9 border border-[rgba(0,0,0,0.1)] rounded-xl px-2.5 text-[12.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#5009c4]/20 focus:border-[#5009c4] transition-colors"
                     />
                     {closeDate && (
                       <p className="text-[9.5px] text-[#8E8E93] mt-1">{fmtDate(closeDate)}</p>
@@ -331,7 +331,7 @@ export function ModalDetalhe({
                     <label className="text-[9.5px] text-[rgba(60,60,67,0.5)] font-medium block mb-1">Entrega prevista</label>
                     <div className="relative">
                       <input type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)}
-                        className="w-full h-9 border border-[rgba(0,0,0,0.1)] rounded-xl px-2.5 text-[12.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] transition-colors"
+                        className="w-full h-9 border border-[rgba(0,0,0,0.1)] rounded-xl px-2.5 text-[12.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#5009c4]/20 focus:border-[#5009c4] transition-colors"
                       />
                     </div>
                     {deliveryDate && (
@@ -468,7 +468,7 @@ export function ModalDetalhe({
           {isH && onPersonalizarHistorico && (
             <button
               onClick={() => onPersonalizarHistorico(data.item)}
-              className="px-4 h-9 text-[12px] font-semibold text-[#007AFF] bg-[#007AFF]/[0.08] hover:bg-[#007AFF]/[0.14] rounded-xl transition-colors shrink-0"
+              className="px-4 h-9 text-[12px] font-semibold text-[#5009c4] bg-[#5009c4]/[0.08] hover:bg-[#5009c4]/[0.14] rounded-xl transition-colors shrink-0"
             >
               Personalizar valores
             </button>
@@ -478,7 +478,7 @@ export function ModalDetalhe({
           {isH && onEditarHistorico && (
             <button
               onClick={() => onEditarHistorico(data.item)}
-              className="px-4 h-9 text-[12px] font-semibold text-white bg-[#007AFF] hover:bg-[#0062CC] rounded-xl transition-colors shrink-0"
+              className="px-4 h-9 text-[12px] font-semibold text-white bg-[#5009c4] hover:bg-[#4307a6] rounded-xl transition-colors shrink-0"
             >
               Editar orçamento
             </button>
@@ -489,7 +489,7 @@ export function ModalDetalhe({
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-5 h-9 text-[12.5px] font-semibold text-white bg-[#007AFF] hover:bg-[#0062CC] rounded-xl transition-colors disabled:opacity-50 shrink-0"
+              className="px-5 h-9 text-[12.5px] font-semibold text-white bg-[#5009c4] hover:bg-[#4307a6] rounded-xl transition-colors disabled:opacity-50 shrink-0"
             >
               {saving ? "Salvando…" : "Salvar"}
             </button>
@@ -510,7 +510,7 @@ export function ModalDetalhe({
 function Pill({ children, blue, red }: { children: React.ReactNode; blue?: boolean; red?: boolean }) {
   return (
     <span className={`text-[10.5px] px-2 py-0.5 rounded-full font-medium ${
-      blue ? "bg-[#007AFF]/[0.08] text-[#007AFF] border border-[#007AFF]/15"
+      blue ? "bg-[#5009c4]/[0.08] text-[#5009c4] border border-[#5009c4]/15"
       : red ? "bg-[#FF3B30]/[0.08] text-[#FF3B30] border border-[#FF3B30]/15"
       : "bg-[rgba(116,116,128,0.08)] text-[rgba(60,60,67,0.6)]"
     }`}>{children}</span>
@@ -518,7 +518,7 @@ function Pill({ children, blue, red }: { children: React.ReactNode; blue?: boole
 }
 
 function Badge({ children, color }: { children: React.ReactNode; color: "blue" | "amber" | "green" }) {
-  const cls = color === "blue"  ? "bg-blue-600 text-white"
+  const cls = color === "blue"  ? "bg-violet-600 text-white"
             : color === "amber" ? "bg-amber-500 text-white"
             :                     "bg-green-600 text-white"
   return (

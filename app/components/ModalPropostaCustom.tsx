@@ -329,12 +329,12 @@ export function ModalPropostaCustom({
                 onClick={() => setIncluirVerniz(v => !v)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-[12px] font-medium transition-all ${
                   incluirVerniz
-                    ? "border-blue-400 bg-blue-50 text-blue-700"
+                    ? "border-violet-400 bg-violet-50 text-violet-700"
                     : "border-[rgba(60,60,67,0.12)] bg-white text-[#8E8E93] hover:border-slate-300"
                 }`}
               >
                 <span className={`w-[14px] h-[14px] rounded-[4px] border-2 flex items-center justify-center shrink-0 transition-all ${
-                  incluirVerniz ? "border-blue-600 bg-blue-600" : "border-slate-300"
+                  incluirVerniz ? "border-violet-600 bg-violet-600" : "border-slate-300"
                 }`}>
                   {incluirVerniz && <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
                 </span>
@@ -454,7 +454,7 @@ export function ModalPropostaCustom({
                           <button
                             onClick={() => updateLinha(l.id, "isIdeal", true)}
                             className={`w-[16px] h-[16px] rounded-full border-2 flex items-center justify-center mx-auto transition-all ${
-                              l.isIdeal ? "border-[#007AFF] bg-[#007AFF]" : "border-[rgba(60,60,67,0.2)] bg-white hover:border-[#007AFF]/60"
+                              l.isIdeal ? "border-[#5009c4] bg-[#5009c4]" : "border-[rgba(60,60,67,0.2)] bg-white hover:border-[#5009c4]/60"
                             }`}
                           >
                             {l.isIdeal && <span className="w-1.5 h-1.5 rounded-full bg-white block" />}
@@ -648,11 +648,11 @@ export function BoxPreview3D({
   const edge = "rgba(100,116,139,0.20)"
 
   // Face colors: simulate ambient lighting
-  const cFront  = incluirVerniz ? "linear-gradient(150deg,#eff6ff,#dbeafe)" : "linear-gradient(150deg,#f8fafc,#eef2f7)"
-  const cSideR  = incluirVerniz ? "linear-gradient(160deg,#dbeafe,#c3d9f7)" : "linear-gradient(160deg,#e4eaf2,#d8e0ea)"
-  const cSideL  = incluirVerniz ? "linear-gradient(160deg,#bfdbfe,#a5c8f7)" : "linear-gradient(160deg,#d8e0ea,#cdd5df)"
+  const cFront  = incluirVerniz ? "linear-gradient(150deg,#f8f5fc,#eae1f7)" : "linear-gradient(150deg,#f8fafc,#eef2f7)"
+  const cSideR  = incluirVerniz ? "linear-gradient(160deg,#eae1f7,#dccdf3)" : "linear-gradient(160deg,#e4eaf2,#d8e0ea)"
+  const cSideL  = incluirVerniz ? "linear-gradient(160deg,#d3c1f0,#c1a8ea)" : "linear-gradient(160deg,#d8e0ea,#cdd5df)"
   const cTop    = incluirVerniz ? "linear-gradient(145deg,#f0f9ff,#e0f2fe)" : "linear-gradient(145deg,#f8fafc,#ecf1f7)"
-  const cDark   = incluirVerniz ? "#93c5fd" : "#c8d3de"
+  const cDark   = incluirVerniz ? "#b090e4" : "#c8d3de"
 
   const sceneW = W + D + 90
   const sceneH = H + D + 90
@@ -696,7 +696,7 @@ export function BoxPreview3D({
         ))}
         <span className="text-[#8E8E93] text-[11px]">cm</span>
         {materialNome && <span className="text-[rgba(60,60,67,0.3)] text-[10px] ml-1">{materialNome}</span>}
-        {incluirVerniz && <span className="text-blue-500 text-[9px] font-bold bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full ml-1">UV</span>}
+        {incluirVerniz && <span className="text-violet-500 text-[9px] font-bold bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full ml-1">UV</span>}
       </div>
 
       <p className="text-[9px] text-[rgba(60,60,67,0.3)] tracking-wide uppercase">arraste para girar</p>

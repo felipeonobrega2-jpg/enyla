@@ -137,7 +137,7 @@ export function AnalyticsView({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Faturamento 12m", value: brl(kpis.total12m), color: "#34C759" },
-          { label: "Ticket médio", value: brl(kpis.ticketMedio), color: "#007AFF" },
+          { label: "Ticket médio", value: brl(kpis.ticketMedio), color: "#5009c4" },
           { label: "Melhor mês", value: `${kpis.melhorMes?.label ?? "—"} · ${brl(kpis.melhorMes?.receita ?? 0)}`, color: "#AF52DE" },
           { label: "Despesas 12m", value: brl(kpis.totalDespesas12m), color: "#FF3B30" },
         ].map(k => (
@@ -185,7 +185,7 @@ export function AnalyticsView({
                   <span className="text-[11.5px] text-[#1C1C1E] w-28 truncate shrink-0">{name}</span>
                   <div className="flex-1 h-1.5 bg-[rgba(60,60,67,0.06)] rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-[#007AFF] rounded-full transition-all"
+                      className="h-full bg-[#5009c4] rounded-full transition-all"
                       style={{ width: `${(value / clienteMax) * 100}%`, opacity: 0.7 + (0.3 * (1 - i / 6)) }}
                     />
                   </div>
@@ -202,7 +202,7 @@ export function AnalyticsView({
           <BarChart
             data={monthlyData.map(m => ({ label: m.label, value: m.pedidos }))}
             height={140}
-            color="#007AFF"
+            color="#5009c4"
           />
         </div>
       </div>

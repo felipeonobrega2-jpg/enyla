@@ -208,7 +208,7 @@ export default function LayoutChapaVisual({ layout: initLayout, dieline, formDat
             className={`w-16 border rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-2 focus:border-transparent transition
               ${customPecas !== null && customPecas > layout.pecasPorChapa
                 ? "border-rose-300 focus:ring-rose-400 bg-rose-50 text-rose-700"
-                : "border-slate-200 focus:ring-blue-500"
+                : "border-slate-200 focus:ring-violet-500"
               }`}
           />
           {customPecas !== null && customPecas > layout.pecasPorChapa ? (
@@ -295,7 +295,7 @@ export default function LayoutChapaVisual({ layout: initLayout, dieline, formDat
       ) : (
         <div className="flex gap-5 mt-2.5 pt-2 border-t border-slate-50 text-[11px] text-slate-400">
           <span className="flex items-center gap-1.5">
-            <span className="w-5 h-px bg-blue-700 block" /> corte
+            <span className="w-5 h-px bg-violet-700 block" /> corte
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-5 border-t border-dashed border-red-500 block" /> vinco
@@ -349,13 +349,13 @@ function PieceSVG({
   const sw    = Math.max(0.7, s * 0.065)
   const fw    = Math.max(0.5, s * 0.050)
   const fDash = `${s * 2.5} ${s * 1.2}`
-  const CUT   = "#1e3a8a"
+  const CUT   = "#5009c4"
   const FOLD  = "#dc2626"
 
   // ── Fills ─────────────────────────────────────────────────────────
-  const bodyFill = isSelected ? "#dbeafe" : "#f8fafc"
-  const sideFill = isSelected ? "#dbeafe" : "#f1f5f9"
-  const flapFill = isSelected ? "#bfdbfe" : "#e8f0fe"
+  const bodyFill = isSelected ? "#eae1f7" : "#f8fafc"
+  const sideFill = isSelected ? "#eae1f7" : "#f1f5f9"
+  const flapFill = isSelected ? "#d3c1f0" : "#e8f0fe"
   const glueFill = "#dde3ec"
 
   // ── Top tuck flap — bezier arch (front panel) ─────────────────────
@@ -418,7 +418,7 @@ function PieceSVG({
       {/* Selection ring */}
       {isSelected && (
         <rect x={px - 2} y={py - 2} width={dW + 4} height={dH + 4}
-          fill="none" stroke="#2563eb" strokeWidth={2} rx={3}
+          fill="none" stroke="#5009c4" strokeWidth={2} rx={3}
           strokeDasharray="6 3" />
       )}
 
@@ -477,12 +477,12 @@ function PieceSVG({
       <g onClick={onRotate} style={{ cursor: "pointer" }}>
         <circle cx={cx} cy={cy} r={btnR}
           fill="rgba(255,255,255,0.90)"
-          stroke={isSelected ? "#2563eb" : "#64748b"}
+          stroke={isSelected ? "#5009c4" : "#64748b"}
           strokeWidth={isSelected ? 1.5 : 0.8}
         />
         <text x={cx} y={cy}
           textAnchor="middle" dominantBaseline="central"
-          fontSize={btnFS} fill={isSelected ? "#1d4ed8" : "#334155"}
+          fontSize={btnFS} fill={isSelected ? "#5009c4" : "#334155"}
           style={{ userSelect: "none" }}>
           ↻
         </text>

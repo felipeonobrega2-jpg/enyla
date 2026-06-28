@@ -96,7 +96,7 @@ export function GamificacaoView({
                 <p className="text-[10px] text-[#8E8E93] tabular-nums">{Math.round(pctProximo * 100)}%</p>
               </div>
               <div className="h-1 rounded-full bg-[rgba(0,0,0,0.06)] overflow-hidden">
-                <div className="h-full rounded-full bg-[#007AFF] transition-all duration-500"
+                <div className="h-full rounded-full bg-[#5009c4] transition-all duration-500"
                   style={{ width: `${pctProximo * 100}%` }} />
               </div>
             </>
@@ -105,7 +105,7 @@ export function GamificacaoView({
           )}
           <button
             onClick={() => { setEditandoBaseline(true); setDraftBaseline(String(baselineFaturamento)) }}
-            className="mt-3 text-[9.5px] text-[#007AFF] hover:underline">
+            className="mt-3 text-[9.5px] text-[#5009c4] hover:underline">
             {baselineFaturamento > 0 ? `Inclui ${brl(baselineFaturamento)} anterior ao sistema` : "+ Adicionar faturamento anterior"}
           </button>
         </div>
@@ -122,7 +122,7 @@ export function GamificacaoView({
             <div className="h-full rounded-full transition-all duration-500"
               style={{
                 width: `${pctMes * 100}%`,
-                background: pctMes >= 1 ? "#34C759" : pctMes >= 0.7 ? "#FF9500" : "#007AFF",
+                background: pctMes >= 1 ? "#34C759" : pctMes >= 0.7 ? "#FF9500" : "#5009c4",
               }} />
           </div>
           {pctMes < 1 && faturadoMes > 0 && (
@@ -135,7 +135,7 @@ export function GamificacaoView({
           )}
           <button
             onClick={() => { setEditandoMeta(true); setDraftMeta(String(metaMensal)) }}
-            className="mt-2 text-[9.5px] text-[#007AFF] hover:underline">
+            className="mt-2 text-[9.5px] text-[#5009c4] hover:underline">
             Alterar meta
           </button>
         </div>
@@ -186,7 +186,7 @@ export function GamificacaoView({
                   <div className="h-full rounded-full transition-all duration-500"
                     style={{
                       width: `${pct * 100}%`,
-                      background: desbloqueado ? "#34C759" : "#007AFF",
+                      background: desbloqueado ? "#34C759" : "#5009c4",
                     }} />
                 </div>
               </div>
@@ -214,7 +214,7 @@ export function GamificacaoView({
                     if (e.key === "Enter") { onSaveConfig({ metaMensal: Number(draftMeta) || metaMensal }); setEditandoMeta(false) }
                     if (e.key === "Escape") setEditandoMeta(false)
                   }}
-                  className="w-full border border-[rgba(0,0,0,0.12)] rounded-xl pl-9 pr-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25 focus:border-[#007AFF]"
+                  className="w-full border border-[rgba(0,0,0,0.12)] rounded-xl pl-9 pr-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4]"
                 />
               </div>
               <div className="flex gap-2">
@@ -223,7 +223,7 @@ export function GamificacaoView({
                   Cancelar
                 </button>
                 <button onClick={() => { onSaveConfig({ metaMensal: Number(draftMeta) || metaMensal }); setEditandoMeta(false) }}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#007AFF] hover:bg-[#0062CC] transition-colors">
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#5009c4] hover:bg-[#4307a6] transition-colors">
                   Salvar
                 </button>
               </div>
@@ -251,7 +251,7 @@ export function GamificacaoView({
                     if (e.key === "Enter") { onSaveConfig({ baselineFaturamento: Number(draftBaseline) || 0 }); setEditandoBaseline(false) }
                     if (e.key === "Escape") setEditandoBaseline(false)
                   }}
-                  className="w-full border border-[rgba(0,0,0,0.12)] rounded-xl pl-9 pr-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25 focus:border-[#007AFF]"
+                  className="w-full border border-[rgba(0,0,0,0.12)] rounded-xl pl-9 pr-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4]"
                 />
               </div>
               <div className="flex gap-2">
@@ -260,7 +260,7 @@ export function GamificacaoView({
                   Cancelar
                 </button>
                 <button onClick={() => { onSaveConfig({ baselineFaturamento: Number(draftBaseline) || 0 }); setEditandoBaseline(false) }}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#007AFF] hover:bg-[#0062CC] transition-colors">
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#5009c4] hover:bg-[#4307a6] transition-colors">
                   Salvar
                 </button>
               </div>

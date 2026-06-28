@@ -142,7 +142,7 @@ export function ModalSobra({
                     onClick={() => setModo(m)}
                     className={`py-2.5 rounded-xl border text-[12px] font-semibold transition-colors ${
                       modo === m
-                        ? "border-[#007AFF] bg-[#007AFF]/[0.07] text-[#007AFF]"
+                        ? "border-[#5009c4] bg-[#5009c4]/[0.07] text-[#5009c4]"
                         : "border-[rgba(60,60,67,0.12)] text-[#8E8E93] hover:border-[rgba(60,60,67,0.25)]"
                     }`}
                   >
@@ -203,7 +203,7 @@ export function ModalSobra({
               {itens.map((it, idx) => (
                 <div key={it.cardId} className="rounded-xl border border-[rgba(60,60,67,0.1)] overflow-hidden">
                   <div className="px-3 py-2 bg-[rgba(60,60,67,0.02)] border-b border-[rgba(60,60,67,0.06)] flex items-center gap-2">
-                    <span className="text-[9.5px] font-bold text-[#007AFF] bg-[#007AFF]/[0.08] border border-[#007AFF]/20 px-1.5 py-0.5 rounded-full">{it.cardNumero}</span>
+                    <span className="text-[9.5px] font-bold text-[#5009c4] bg-[#5009c4]/[0.08] border border-[#5009c4]/20 px-1.5 py-0.5 rounded-full">{it.cardNumero}</span>
                     <span className="text-[11px] text-[rgba(60,60,67,0.6)] truncate flex-1">{it.descricao}</span>
                   </div>
                   <div className="p-3 grid grid-cols-2 gap-2">
@@ -215,7 +215,7 @@ export function ModalSobra({
                         value={it.quantidade}
                         onChange={e => updateItem(idx, "quantidade", e.target.value)}
                         placeholder="ex: 1.500"
-                        className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-2.5 py-1.5 text-[12px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-1 focus:ring-[#007AFF]/30"
+                        className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-2.5 py-1.5 text-[12px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-1 focus:ring-[#5009c4]/30"
                       />
                     </div>
                     <div className="space-y-1">
@@ -226,7 +226,7 @@ export function ModalSobra({
                         value={it.valor}
                         onChange={e => updateItem(idx, "valor", e.target.value)}
                         placeholder="0,00"
-                        className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-2.5 py-1.5 text-[12px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-1 focus:ring-[#007AFF]/30"
+                        className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-2.5 py-1.5 text-[12px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-1 focus:ring-[#5009c4]/30"
                       />
                     </div>
                   </div>
@@ -243,7 +243,7 @@ export function ModalSobra({
                 type="date"
                 value={data}
                 onChange={e => setData(e.target.value)}
-                className="w-full border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-2 text-[12.5px] text-[#1C1C1E] focus:outline-none focus:ring-1 focus:ring-[#007AFF]/30"
+                className="w-full border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-2 text-[12.5px] text-[#1C1C1E] focus:outline-none focus:ring-1 focus:ring-[#5009c4]/30"
               />
             </div>
             <div className="space-y-1.5">
@@ -251,7 +251,7 @@ export function ModalSobra({
               <select
                 value={status}
                 onChange={e => setStatus(e.target.value as "pago" | "pendente")}
-                className="w-full border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-2 text-[12.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-1 focus:ring-[#007AFF]/30"
+                className="w-full border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-2 text-[12.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-1 focus:ring-[#5009c4]/30"
               >
                 <option value="pendente">A receber</option>
                 <option value="pago">Recebido</option>

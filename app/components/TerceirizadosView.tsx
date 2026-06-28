@@ -8,7 +8,7 @@ const CARD = "bg-white border border-[rgba(0,0,0,0.06)] rounded-xl shadow-[0_1px
 
 const S = {
   aguardando: { label: "Aguardando",  color: "#FF9500", bg: "rgba(255,149,0,0.1)",  coluna: 1 },
-  recebido:   { label: "Recebido",    color: "#007AFF", bg: "rgba(0,122,255,0.1)", coluna: 8 },
+  recebido:   { label: "Recebido",    color: "#5009c4", bg: "rgba(80,9,196,0.1)", coluna: 8 },
   entregue:   { label: "Entregue",    color: "#34C759", bg: "rgba(52,199,89,0.1)", coluna: 9 },
 } as const
 type SK = keyof typeof S
@@ -33,7 +33,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-const inputCls = "w-full border border-[rgba(0,0,0,0.12)] rounded-xl px-3.5 py-2.5 text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] transition-colors placeholder:text-[rgba(60,60,67,0.3)] tabular-nums bg-white"
+const inputCls = "w-full border border-[rgba(0,0,0,0.12)] rounded-xl px-3.5 py-2.5 text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-[#5009c4]/20 focus:border-[#5009c4] transition-colors placeholder:text-[rgba(60,60,67,0.3)] tabular-nums bg-white"
 
 // ── Edit modal ─────────────────────────────────────────────────────────────────
 function EditModal({ card, onSave, onClose }: {
@@ -176,7 +176,7 @@ function EditModal({ card, onSave, onClose }: {
             Cancelar
           </button>
           <button onClick={save}
-            className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-white bg-[#007AFF] hover:bg-[#0062CC] active:bg-[#004EA8] transition-colors">
+            className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-white bg-[#5009c4] hover:bg-[#4307a6] active:bg-[#370689] transition-colors">
             Salvar
           </button>
         </div>
@@ -343,7 +343,7 @@ function TercCard({ card, onMove, onEdit, onDelete }: {
           <div className="flex items-center gap-0.5 shrink-0">
             <button
               onClick={() => setEditing(true)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-[#8E8E93] hover:text-[#007AFF] hover:bg-[#007AFF]/[0.08] transition-all"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-[#8E8E93] hover:text-[#5009c4] hover:bg-[#5009c4]/[0.08] transition-all"
               title="Editar"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -455,11 +455,11 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
           {/* Recebido */}
           <div className={`${CARD} px-3.5 py-3`}>
             <div className="flex items-center gap-1.5 mb-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#007AFF]" />
+              <div className="w-1.5 h-1.5 rounded-full bg-[#5009c4]" />
               <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold">Recebido</p>
             </div>
             <p className="text-[22px] font-semibold leading-none tabular-nums"
-              style={{ color: kpis.nRecebido > 0 ? "#007AFF" : "#C7C7CC" }}>
+              style={{ color: kpis.nRecebido > 0 ? "#5009c4" : "#C7C7CC" }}>
               {kpis.nRecebido}
             </p>
             <p className="text-[10px] text-[#8E8E93] mt-1 tabular-nums">&nbsp;</p>
@@ -527,7 +527,7 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
 
               {/* Group header */}
               <div className="flex items-center gap-2 px-0.5">
-                <span className="text-[10px] font-bold font-mono text-[#007AFF] bg-[#007AFF]/[0.08] px-1.5 py-0.5 rounded-md">
+                <span className="text-[10px] font-bold font-mono text-[#5009c4] bg-[#5009c4]/[0.08] px-1.5 py-0.5 rounded-md">
                   {group.loteNumero}
                 </span>
                 <span className="text-[12px] font-semibold text-[#1C1C1E]">{group.nomeCliente}</span>

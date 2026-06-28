@@ -661,7 +661,7 @@ export function FinanceiroView({
           </div>
           <div className="flex items-center gap-2">
             <select value={periodo} onChange={e => { const v = e.target.value as Periodo; setPeriodo(v); sessionStorage.setItem("fin:periodo", v) }}
-              className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[rgba(60,60,67,0.6)] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
+              className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[rgba(60,60,67,0.6)] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400">
               {(Object.entries(PERIODO_LABEL) as [Periodo, string][]).map(([v, l]) => (
                 <option key={v} value={v}>{l}</option>
               ))}
@@ -690,7 +690,7 @@ export function FinanceiroView({
                   <>
                     PIX
                     {pixPendentes.length > 0 && (
-                      <span className="text-[10px] font-bold bg-[#007AFF]/10 text-[#007AFF] rounded-full px-1.5 py-0.5 leading-none">{pixPendentes.length}</span>
+                      <span className="text-[10px] font-bold bg-[#5009c4]/10 text-[#5009c4] rounded-full px-1.5 py-0.5 leading-none">{pixPendentes.length}</span>
                     )}
                   </>
                 ) : (
@@ -774,7 +774,7 @@ export function FinanceiroView({
                             {c.dimensoes || c.numero}
                           </p>
                           {c.loteNumero && (
-                            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-[#007AFF]/10 text-[#007AFF] shrink-0">
+                            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-[#5009c4]/10 text-[#5009c4] shrink-0">
                               {c.loteNumero}
                             </span>
                           )}
@@ -1122,7 +1122,7 @@ export function FinanceiroView({
                         <div className="border-t border-[rgba(60,60,67,0.05)] divide-y divide-[rgba(60,60,67,0.04)]">
                           {cards.map(card => (
                             <div key={card.id} className="px-5 py-2.5 flex items-center gap-3">
-                              <span className="text-[9.5px] font-bold text-[#007AFF] bg-[#007AFF]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">{card.numero}</span>
+                              <span className="text-[9.5px] font-bold text-[#5009c4] bg-[#5009c4]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">{card.numero}</span>
                               <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.55)] truncate">{card.dimensoes}{card.materialNome ? ` · ${card.materialNome}` : ""}</p>
                               <p className="text-[12px] font-medium text-[rgba(60,60,67,0.75)] tabular-nums">{brl(card.preco)}</p>
                             </div>
@@ -1181,7 +1181,7 @@ export function FinanceiroView({
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-[#1C1C1E] text-[14px] leading-tight">{card.nomeCliente}</span>
-                              <span className="text-[9.5px] font-bold text-[#007AFF] bg-[#007AFF]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">{card.numero}</span>
+                              <span className="text-[9.5px] font-bold text-[#5009c4] bg-[#5009c4]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">{card.numero}</span>
                               {completoCard && (
                                 <svg className="w-3.5 h-3.5 text-[#34C759] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -1291,7 +1291,7 @@ export function FinanceiroView({
                           {t.dimensoes || t.numero}
                         </p>
                         {t.loteNumero && (
-                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(0,122,255,0.08)", color: "#007AFF" }}>
+                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(80,9,196,0.08)", color: "#5009c4" }}>
                             {t.loteNumero}
                           </span>
                         )}
@@ -1311,7 +1311,7 @@ export function FinanceiroView({
                         {onDetalhesCard && (
                           <button onClick={() => onDetalhesCard(t)}
                             className="text-[10.5px] font-medium px-2.5 py-1 rounded-lg transition-colors"
-                            style={{ background: "rgba(0,122,255,0.08)", color: "#007AFF" }}>
+                            style={{ background: "rgba(80,9,196,0.08)", color: "#5009c4" }}>
                             Detalhes
                           </button>
                         )}
@@ -1465,8 +1465,8 @@ export function FinanceiroView({
                 <div className="space-y-2">
                   {pixPendentes.map(p => (
                     <div key={p.id} className="bg-white rounded-2xl border border-[rgba(0,0,0,0.08)] p-4 flex items-center gap-4">
-                      <div className="w-8 h-8 rounded-full bg-[#007AFF]/10 flex items-center justify-center shrink-0">
-                        <svg className="w-4 h-4 text-[#007AFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <div className="w-8 h-8 rounded-full bg-[#5009c4]/10 flex items-center justify-center shrink-0">
+                        <svg className="w-4 h-4 text-[#5009c4]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                         </svg>
                       </div>
@@ -1620,7 +1620,7 @@ function KpiCard({ label, value, sub, color, onClick }: {
   const cls = color === "green"  ? "text-emerald-700"
             : color === "rose"   ? "text-rose-600"
             : color === "amber"  ? "text-amber-600"
-            :                      "text-blue-700"
+            :                      "text-violet-700"
   const Tag = onClick ? "button" : "div"
   return (
     <Tag onClick={onClick}
@@ -1668,7 +1668,7 @@ function Empty({ msg }: { msg: string }) {
 }
 
 function inp() {
-  return "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+  return "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"
 }
 
 function capitalize(s: string) {

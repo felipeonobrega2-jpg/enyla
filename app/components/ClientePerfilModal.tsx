@@ -190,7 +190,7 @@ export function ClientePerfilModal({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         {item.numero && (
-                          <span className="text-[10px] font-bold text-[#007AFF] bg-[#007AFF]/[0.08] border border-[#007AFF]/20 px-1.5 py-0.5 rounded-full">
+                          <span className="text-[10px] font-bold text-[#5009c4] bg-[#5009c4]/[0.08] border border-[#5009c4]/20 px-1.5 py-0.5 rounded-full">
                             {item.numero}
                           </span>
                         )}

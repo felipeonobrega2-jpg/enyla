@@ -84,10 +84,10 @@ function etapaLabel(coluna: number): string {
 }
 
 function etapaColorCls(coluna: number): string {
-  if (coluna === 0) return "bg-[#007AFF]/10 text-[#007AFF]"
+  if (coluna === 0) return "bg-[#5009c4]/10 text-[#5009c4]"
   if (coluna === 9) return "bg-[#34C759]/10 text-[#34C759]"
   if (coluna === 10) return "bg-[rgba(116,116,128,0.08)] text-[#8E8E93]"
-  return "bg-[#007AFF]/10 text-[#007AFF]"
+  return "bg-[#5009c4]/10 text-[#5009c4]"
 }
 
 function progressPct(coluna: number) {
@@ -158,7 +158,7 @@ function ExpandedTimeline({ numero }: { numero: string }) {
 
   if (loading) return (
     <div className="px-4 py-4 flex items-center justify-center">
-      <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#007AFF", borderTopColor: "transparent" }} />
+      <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#5009c4", borderTopColor: "transparent" }} />
     </div>
   )
 
@@ -193,8 +193,8 @@ function ExpandedTimeline({ numero }: { numero: string }) {
                     </div>
                   ) : current ? (
                     <div className="relative w-7 h-7">
-                      <div className="absolute inset-0 rounded-full animate-ping" style={{ background: isDelivered ? "rgba(52,199,89,0.3)" : "rgba(0,122,255,0.3)" }} />
-                      <div className="relative w-7 h-7 rounded-full flex items-center justify-center shadow-md" style={{ background: isDelivered ? "#34C759" : "#007AFF" }}>
+                      <div className="absolute inset-0 rounded-full animate-ping" style={{ background: isDelivered ? "rgba(52,199,89,0.3)" : "rgba(80,9,196,0.3)" }} />
+                      <div className="relative w-7 h-7 rounded-full flex items-center justify-center shadow-md" style={{ background: isDelivered ? "#34C759" : "#5009c4" }}>
                         <div className="w-2 h-2 rounded-full bg-white" />
                       </div>
                     </div>
@@ -207,7 +207,7 @@ function ExpandedTimeline({ numero }: { numero: string }) {
                   )}
                 </div>
                 {!isLast && (
-                  <div className="w-0.5 flex-1 my-0.5 min-h-[12px] rounded-full" style={{ background: completed ? "rgba(52,199,89,0.5)" : current ? "rgba(0,122,255,0.2)" : "rgba(0,0,0,0.08)" }} />
+                  <div className="w-0.5 flex-1 my-0.5 min-h-[12px] rounded-full" style={{ background: completed ? "rgba(52,199,89,0.5)" : current ? "rgba(80,9,196,0.2)" : "rgba(0,0,0,0.08)" }} />
                 )}
               </div>
               <div className={`flex-1 min-w-0 ${isLast ? "pb-0" : "pb-2.5"}`}>
@@ -218,7 +218,7 @@ function ExpandedTimeline({ numero }: { numero: string }) {
                   {ts && <span className="text-[9.5px] text-[#8E8E93] tabular-nums shrink-0">{ts}</span>}
                   {current && !ts && (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
-                      style={{ background: isDelivered ? "rgba(52,199,89,0.12)" : "rgba(0,122,255,0.12)", color: isDelivered ? "#34C759" : "#007AFF" }}>
+                      style={{ background: isDelivered ? "rgba(52,199,89,0.12)" : "rgba(80,9,196,0.12)", color: isDelivered ? "#34C759" : "#5009c4" }}>
                       {isDelivered ? "Entregue" : "Agora"}
                     </span>
                   )}
@@ -256,7 +256,7 @@ function SingleTimeline({ card }: { card: LoteCard }) {
       <div className="px-5 py-4">
         {loading ? (
           <div className="flex items-center justify-center py-4">
-            <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#007AFF", borderTopColor: "transparent" }} />
+            <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#5009c4", borderTopColor: "transparent" }} />
           </div>
         ) : (
           <div className="space-y-0">
@@ -279,8 +279,8 @@ function SingleTimeline({ card }: { card: LoteCard }) {
                         </div>
                       ) : current ? (
                         <div className="relative w-8 h-8">
-                          <div className="absolute inset-0 rounded-full animate-ping" style={{ background: isDelivered ? "rgba(52,199,89,0.3)" : "rgba(0,122,255,0.3)" }} />
-                          <div className="relative w-8 h-8 rounded-full flex items-center justify-center shadow-md" style={{ background: isDelivered ? "#34C759" : "#007AFF" }}>
+                          <div className="absolute inset-0 rounded-full animate-ping" style={{ background: isDelivered ? "rgba(52,199,89,0.3)" : "rgba(80,9,196,0.3)" }} />
+                          <div className="relative w-8 h-8 rounded-full flex items-center justify-center shadow-md" style={{ background: isDelivered ? "#34C759" : "#5009c4" }}>
                             <StepIcon icon={etapa.icon} sz="w-4 h-4" />
                           </div>
                         </div>
@@ -293,7 +293,7 @@ function SingleTimeline({ card }: { card: LoteCard }) {
                     </div>
                     {!isLast && (
                       <div className="w-0.5 flex-1 my-1 min-h-[16px] transition-colors rounded-full"
-                        style={{ background: completed ? "rgba(52,199,89,0.5)" : current ? "rgba(0,122,255,0.2)" : "rgba(0,0,0,0.08)" }} />
+                        style={{ background: completed ? "rgba(52,199,89,0.5)" : current ? "rgba(80,9,196,0.2)" : "rgba(0,0,0,0.08)" }} />
                     )}
                   </div>
                   <div className={`flex-1 min-w-0 ${isLast ? "pb-0" : "pb-3.5"} ${current ? "pt-1" : ""}`}>
@@ -304,7 +304,7 @@ function SingleTimeline({ card }: { card: LoteCard }) {
                       {ts && <span className="text-[10px] text-[#8E8E93] tabular-nums shrink-0">{ts}</span>}
                       {current && !ts && (
                         <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                          style={{ background: isDelivered ? "rgba(52,199,89,0.12)" : "rgba(0,122,255,0.12)", color: isDelivered ? "#34C759" : "#007AFF" }}>
+                          style={{ background: isDelivered ? "rgba(52,199,89,0.12)" : "rgba(80,9,196,0.12)", color: isDelivered ? "#34C759" : "#5009c4" }}>
                           {isDelivered ? "Concluído" : "Agora"}
                         </span>
                       )}
@@ -349,7 +349,7 @@ function PartnerCard({ item }: { item: PartnerItem }) {
         <div className="mt-3">
           <div className="w-full h-1 bg-[rgba(116,116,128,0.08)] rounded-full overflow-hidden">
             <div className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${pct}%`, background: isEntregue ? "#34C759" : "#007AFF" }} />
+              style={{ width: `${pct}%`, background: isEntregue ? "#34C759" : "#5009c4" }} />
           </div>
         </div>
       </div>
@@ -377,7 +377,7 @@ function ProductCard({ card, alwaysExpanded = false }: { card: LoteCard; alwaysE
             {card.dimensoes} cm
           </p>
           {card.numero && (
-            <span className="text-[9.5px] font-bold text-[#007AFF] bg-[#007AFF]/10 border border-[#007AFF]/20 px-1.5 py-0.5 rounded-full tabular-nums">
+            <span className="text-[9.5px] font-bold text-[#5009c4] bg-[#5009c4]/10 border border-[#5009c4]/20 px-1.5 py-0.5 rounded-full tabular-nums">
               {card.numero}
             </span>
           )}
@@ -402,7 +402,7 @@ function ProductCard({ card, alwaysExpanded = false }: { card: LoteCard; alwaysE
     <div className="mt-3">
       <div className="w-full h-1 bg-[rgba(116,116,128,0.08)] rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${pct}%`, background: isEntregue ? "#34C759" : "#007AFF" }} />
+          style={{ width: `${pct}%`, background: isEntregue ? "#34C759" : "#5009c4" }} />
       </div>
     </div>
   )
@@ -529,7 +529,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
             className="h-5 w-auto" priority />
         </div>
         <div className="ml-auto">
-          <span className="text-[10px] font-bold text-[#007AFF] bg-[#007AFF]/10 border border-[#007AFF]/20 px-2.5 py-1 rounded-full font-mono">
+          <span className="text-[10px] font-bold text-[#5009c4] bg-[#5009c4]/10 border border-[#5009c4]/20 px-2.5 py-1 rounded-full font-mono">
             {loteNumero}
           </span>
         </div>
@@ -543,7 +543,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
         {refreshing ? "Atualizando…" : `Atualizado há ${lastUpdate}s`}
       </p>
       <button onClick={fetchData}
-        className="text-[11px] font-medium flex items-center gap-1.5 transition-colors" style={{ color: "#007AFF" }}>
+        className="text-[11px] font-medium flex items-center gap-1.5 transition-colors" style={{ color: "#5009c4" }}>
         <svg className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
         </svg>
@@ -689,7 +689,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
 
           {/* Pending */}
           {isPending && !isCancelled && (
-            <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: "#007AFF" }}>
+            <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: "#5009c4" }}>
               <div className="px-5 pt-4 pb-2">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">Orçamento recebido</p>
@@ -726,7 +726,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
             const delivery = calcDelivery(activeEtapasCard, card.coluna, singleEntry?.dataEntregaPrevista)
             return (
               <>
-                <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: isEntregue ? "#34C759" : "#007AFF" }}>
+                <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: isEntregue ? "#34C759" : "#5009c4" }}>
                   {/* Progress bar */}
                   <div className="px-5 pt-4 pb-2">
                     <div className="flex items-center justify-between mb-2">
@@ -813,7 +813,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
         </div>
 
         {/* Summary hero */}
-        <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: allEntregue ? "#34C759" : "#007AFF" }}>
+        <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: allEntregue ? "#34C759" : "#5009c4" }}>
           <div className="px-5 pt-4 pb-2">
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">

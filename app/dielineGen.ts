@@ -53,7 +53,7 @@ export function gerarDielineSVG(p: DielineParams): string {
   const y = (v: number) => oy + v
 
   // Colors
-  const CUT       = "#1e3a8a"
+  const CUT       = "#5009c4"
   const FOLD      = "#dc2626"
   const ANN       = "#64748b"
   const LABEL_CLR = "#334155"
@@ -320,7 +320,7 @@ export function gerarDielineSVG(p: DielineParams): string {
 
   <rect x="${svgW - 55}" y="${svgH - 12}" width="54" height="11" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.3" rx="1"/>
   <text x="${svgW - 28}" y="${svgH - 7.5}" text-anchor="middle" dominant-baseline="central"
-        font-size="3.8" font-weight="700" fill="#1e3a8a" font-family="Arial,sans-serif">${nome}</text>
+        font-size="3.8" font-weight="700" fill="#5009c4" font-family="Arial,sans-serif">${nome}</text>
   <text x="${svgW - 28}" y="${svgH - 4}" text-anchor="middle" dominant-baseline="central"
         font-size="3" fill="${ANN}" font-family="Arial,sans-serif">
     ${tipo} · ${p.largura}×${p.altura}×${p.profundidade} cm · Faca: ${((totalW)/10).toFixed(1)}×${((totalH)/10).toFixed(1)} cm

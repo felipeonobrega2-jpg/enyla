@@ -123,12 +123,12 @@ export function ClientesView({
           </svg>
           <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar cliente…"
-            className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg pl-8 pr-3 py-2 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25 focus:border-[#007AFF]" />
+            className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg pl-8 pr-3 py-2 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4]" />
           {busca && <button onClick={() => setBusca("")}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] text-lg leading-none">×</button>}
         </div>
         <select value={ordem} onChange={e => setOrdem(e.target.value as typeof ordem)}
-          className="border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25 focus:border-[#007AFF]">
+          className="border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4]">
           <option value="valor">Maior valor</option>
           <option value="orcamentos">Mais registros</option>
           <option value="nome">Nome A–Z</option>
@@ -194,7 +194,7 @@ export function ClientesView({
                   </div>
 
                   <button onClick={() => setPerfilAberto(nome)}
-                    className="px-3 h-8 text-[11px] font-semibold text-[#007AFF] bg-[#007AFF]/[0.08] hover:bg-[#007AFF]/[0.14] rounded-lg transition-colors shrink-0">
+                    className="px-3 h-8 text-[11px] font-semibold text-[#5009c4] bg-[#5009c4]/[0.08] hover:bg-[#5009c4]/[0.14] rounded-lg transition-colors shrink-0">
                     Perfil
                   </button>
 
@@ -221,7 +221,7 @@ export function ClientesView({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             {item.numero && (
-                              <span className="text-[10px] font-bold text-[#007AFF] bg-[#007AFF]/[0.08] border border-[#007AFF]/20 px-1.5 py-0.5 rounded-full">
+                              <span className="text-[10px] font-bold text-[#5009c4] bg-[#5009c4]/[0.08] border border-[#5009c4]/20 px-1.5 py-0.5 rounded-full">
                                 {item.numero}
                               </span>
                             )}

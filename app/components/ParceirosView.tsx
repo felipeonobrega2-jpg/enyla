@@ -252,7 +252,7 @@ function ModalNegocio({ inicial, parceiros, lotes, onSave, onClose }: {
                   onClick={() => setTipo(t)}
                   className={`flex-1 py-2 rounded-lg border text-[12px] font-semibold transition-all ${
                     tipo === t
-                      ? "border-blue-400 bg-blue-50/60 text-blue-700"
+                      ? "border-violet-400 bg-violet-50/60 text-violet-700"
                       : "border-[rgba(60,60,67,0.12)] text-[#8E8E93] hover:border-slate-300"
                   }`}
                 >
@@ -281,7 +281,7 @@ function ModalNegocio({ inicial, parceiros, lotes, onSave, onClose }: {
                 </div>
                 {vv > 0 && cp > 0 && (
                   <p className="text-[11px] text-[#8E8E93] mt-1">
-                    = <span className="font-bold text-blue-700">{brl(comissaoCalculada)}</span> a pagar ao parceiro
+                    = <span className="font-bold text-violet-700">{brl(comissaoCalculada)}</span> a pagar ao parceiro
                   </p>
                 )}
               </Field>
@@ -514,7 +514,7 @@ export function ParceirosView({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-[#1C1C1E] text-[13.5px]">{p.nome}</span>
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100">
                             {p.categoria}
                           </span>
                         </div>
@@ -565,14 +565,14 @@ export function ParceirosView({
               <select
                 value={filtroParceiro}
                 onChange={e => setFiltroParceiro(e.target.value)}
-                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[rgba(60,60,67,0.6)] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
+                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[rgba(60,60,67,0.6)] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400">
                 <option value="">Todos os parceiros</option>
                 {parceiros.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
               </select>
               <select
                 value={filtroStatus}
                 onChange={e => setFiltroStatus(e.target.value as StatusNegocio | "")}
-                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[rgba(60,60,67,0.6)] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
+                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[rgba(60,60,67,0.6)] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400">
                 <option value="">Todos os status</option>
                 <option value="pendente">Pendente</option>
                 <option value="pago">Pago</option>
@@ -717,7 +717,7 @@ export function ParceirosView({
 function KpiParceiro({ label, value, sub, color }: {
   label: string; value: string; sub: string; color: "blue" | "green" | "amber"
 }) {
-  const accent = color === "blue" ? "text-blue-700"
+  const accent = color === "blue" ? "text-violet-700"
                : color === "green" ? "text-emerald-700"
                : "text-amber-600"
   return (
@@ -741,7 +741,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function input() {
-  return "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+  return "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"
 }
 
 function formatDate(iso: string) {

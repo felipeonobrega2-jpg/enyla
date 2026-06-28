@@ -2,7 +2,7 @@
 //   Neutral  → orçamento aguardando decisão
 //   Green    → pedido confirmado (fechado)
 //   Orange   → em produção (qualquer etapa)
-//   Blue     → entregue ao cliente
+//   Purple   → entregue ao cliente
 //   Red      → perdido
 
 export const COL_COLORS: { bg: string; border: string; badge: string; dot: string }[] = [
@@ -24,8 +24,8 @@ export const COL_COLORS: { bg: string; border: string; badge: string; dot: strin
   { bg: "bg-[#FF9500]/[0.06]",          border: "border-[#FF9500]/30",           badge: "bg-[#FF9500]/[0.1] text-[#FF9500]",           dot: "bg-[#FF9500]"   },
   // 8 — Expedição (orange — última etapa de produção)
   { bg: "bg-[#FF9500]/[0.06]",          border: "border-[#FF9500]/30",           badge: "bg-[#FF9500]/[0.1] text-[#FF9500]",           dot: "bg-[#FF9500]"   },
-  // 9 — Entregue (blue — concluído)
-  { bg: "bg-[#007AFF]/[0.06]",          border: "border-[#007AFF]/30",           badge: "bg-[#007AFF]/[0.1] text-[#007AFF]",           dot: "bg-[#007AFF]"   },
+  // 9 — Entregue (purple — concluído)
+  { bg: "bg-[#5009c4]/[0.06]",          border: "border-[#5009c4]/30",           badge: "bg-[#5009c4]/[0.1] text-[#5009c4]",           dot: "bg-[#5009c4]"   },
   // 10 — Perdido (red — negativo)
   { bg: "bg-[#FF3B30]/[0.06]",          border: "border-[#FF3B30]/30",           badge: "bg-[#FF3B30]/[0.1] text-[#FF3B30]",           dot: "bg-[#FF3B30]"   },
 ]

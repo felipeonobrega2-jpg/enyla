@@ -77,7 +77,7 @@ function fmtShort(v: number): string {
 
 function colBadge(col: number): string {
   if (col === COL_PERDIDO)  return "bg-[#FF3B30]/10 text-[#FF3B30]"
-  if (col === COL_ENTREGUE) return "bg-[#007AFF]/10 text-[#007AFF]"
+  if (col === COL_ENTREGUE) return "bg-[#5009c4]/10 text-[#5009c4]"
   if (col === COL_FECHADO)  return "bg-[#34C759]/10 text-[#34C759]"
   return "bg-[#FF9500]/10 text-[#FF9500]"
 }
@@ -120,7 +120,7 @@ function MonthlyBars({ data }: { data: { label: string; receita: number }[] }) {
           <div className="w-full flex items-end h-[70px]">
             <div
               className="w-full rounded-md transition-all duration-500"
-              style={{ height: `${Math.max((d.receita / max) * 100, d.receita > 0 ? 4 : 0)}%`, background: i === data.length - 1 ? "#007AFF" : "rgba(0,122,255,0.18)" }}
+              style={{ height: `${Math.max((d.receita / max) * 100, d.receita > 0 ? 4 : 0)}%`, background: i === data.length - 1 ? "#5009c4" : "rgba(80,9,196,0.18)" }}
             />
           </div>
           <p className="text-[9px] text-[#8E8E93]">{d.label}</p>
@@ -235,7 +235,7 @@ export default function MobilePage() {
               key={p.id}
               onClick={() => setPeriodo(p.id)}
               className={`shrink-0 text-[11.5px] font-medium px-3 py-1.5 rounded-lg transition-colors ${
-                periodo === p.id ? "bg-[#007AFF] text-white" : "bg-[rgba(0,0,0,0.04)] text-[#8E8E93]"
+                periodo === p.id ? "bg-[#5009c4] text-white" : "bg-[rgba(0,0,0,0.04)] text-[#8E8E93]"
               }`}
             >
               {p.label}
@@ -279,7 +279,7 @@ export default function MobilePage() {
                 sub={`${brl(data.faturadoMes)} de ${brl(config.metaMensal)}`}
                 extra={data.pctMeta >= 1 ? "Meta batida! 🎉" : data.faturadoMes > 0 ? `Faltam ${brl(config.metaMensal - data.faturadoMes)}` : undefined}
                 pct={data.pctMeta}
-                color={data.pctMeta >= 1 ? "#34C759" : data.pctMeta >= 0.7 ? "#FF9500" : "#007AFF"}
+                color={data.pctMeta >= 1 ? "#34C759" : data.pctMeta >= 0.7 ? "#FF9500" : "#5009c4"}
               />
               {data.proximoMarco && (
                 <ProgressRow

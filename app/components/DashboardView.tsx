@@ -61,12 +61,12 @@ function colColor(col: number): string {
   if (col === COL_PERDIDO) return "bg-[#FF3B30]/10 text-[#FF3B30]"
   if (col === COL_ENTREGUE) return "bg-[#34C759]/10 text-[#34C759]"
   if (col === COL_FECHADO) return "bg-[#34C759]/10 text-[#34C759]"
-  return "bg-[#007AFF]/10 text-[#007AFF]"
+  return "bg-[#5009c4]/10 text-[#5009c4]"
 }
 
 function colBg(col: number): string {
   if (col === COL_PERDIDO)  return "#FF3B30"
-  if (col === COL_ENTREGUE) return "#007AFF"
+  if (col === COL_ENTREGUE) return "#5009c4"
   if (col === COL_FECHADO)  return "#34C759"
   if (col === 0)            return "#C7C7CC"
   return "#FF9500" // cols 2-8: em produção
@@ -158,7 +158,7 @@ function MonthlyChart({ data, onSelectMonth }: { data: MonthlyDatum[]; onSelectM
               {/* Receita bar */}
               {hRec > 0.5 && (
                 <rect x={gx + barW + barGap} y={yRec} width={barW} height={hRec}
-                  rx={2} fill={isHov ? "#007AFF" : "rgba(0,122,255,0.75)"} />
+                  rx={2} fill={isHov ? "#5009c4" : "rgba(80,9,196,0.75)"} />
               )}
               {/* X label */}
               <text x={cx} y={PAD_T + chartH + 16} textAnchor="middle"
@@ -172,7 +172,7 @@ function MonthlyChart({ data, onSelectMonth }: { data: MonthlyDatum[]; onSelectM
         {/* Legend */}
         <rect x={PAD_L} y={H - 9} width={8} height={8} rx={2} fill="rgba(147,197,253,0.6)" />
         <text x={PAD_L + 11} y={H - 2} fontSize={9} fill="#8E8E93" fontFamily="system-ui">Volume orçado</text>
-        <rect x={PAD_L + 93} y={H - 9} width={8} height={8} rx={2} fill="#007AFF" />
+        <rect x={PAD_L + 93} y={H - 9} width={8} height={8} rx={2} fill="#5009c4" />
         <text x={PAD_L + 104} y={H - 2} fontSize={9} fill="#8E8E93" fontFamily="system-ui">Receita confirmada</text>
       </svg>
 
@@ -190,10 +190,10 @@ function MonthlyChart({ data, onSelectMonth }: { data: MonthlyDatum[]; onSelectM
             </div>
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-sm bg-[#007AFF] shrink-0" />
+                <span className="w-2 h-2 rounded-sm bg-[#5009c4] shrink-0" />
                 <span className="text-[10px] text-[#8E8E93]">Receita</span>
               </div>
-              <span className="text-[11px] font-semibold text-[#007AFF] tabular-nums">{brl(hov.receita)}</span>
+              <span className="text-[11px] font-semibold text-[#5009c4] tabular-nums">{brl(hov.receita)}</span>
             </div>
           </div>
         </div>
@@ -255,7 +255,7 @@ function MesDetalheModal({
               {itens.map((item, i) => (
                 <div key={i} className="px-4 py-2.5 flex items-center gap-3">
                   {item.numero && (
-                    <span className="text-[9.5px] font-bold text-[#007AFF] bg-[#007AFF]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">{item.numero}</span>
+                    <span className="text-[9.5px] font-bold text-[#5009c4] bg-[#5009c4]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">{item.numero}</span>
                   )}
                   {item.tipo === "sobra" && (
                     <span className="text-[9.5px] font-semibold text-[#FF9500] bg-[#FF9500]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">Sobra</span>
@@ -800,7 +800,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       .sort((a, b) => b.count - a.count)
       .slice(0, 6)
     const maxCount = Math.max(...arr.map(a => a.count), 1)
-    const colors = ["#007AFF", "#34C759", "#FF3B30", "#AF52DE", "#FF9500", "#5AC8FA"]
+    const colors = ["#5009c4", "#34C759", "#FF3B30", "#AF52DE", "#FF9500", "#5AC8FA"]
     return { materiais: arr.map((m, i) => ({ ...m, color: colors[i % colors.length] })), maxCount }
   }, [filteredCards, historico])
 
@@ -930,7 +930,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
               onClick={() => setShowMenu(m => !m)}
               className={`flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-medium transition-all ${
                 periodo !== "custom"
-                  ? "bg-[#007AFF] text-white shadow-sm"
+                  ? "bg-[#5009c4] text-white shadow-sm"
                   : "bg-white border border-[rgba(0,0,0,0.12)] text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)]"
               }`}
             >
@@ -956,11 +956,11 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                         onClick={() => { setPeriodo(id); setShowMenu(false) }}
                         className={`w-full text-left px-3 py-1.5 text-[12px] flex items-center gap-2 transition-colors ${
                           periodo === id
-                            ? "text-[#007AFF] font-semibold bg-[#007AFF]/5"
+                            ? "text-[#5009c4] font-semibold bg-[#5009c4]/5"
                             : "text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)]"
                         }`}
                       >
-                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${periodo === id ? "bg-[#007AFF]" : "bg-transparent"}`} />
+                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${periodo === id ? "bg-[#5009c4]" : "bg-transparent"}`} />
                         {label}
                       </button>
                     ))}
@@ -976,11 +976,11 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
           <div className="flex items-center gap-1.5">
             <input type="date" value={dataInicio}
               onChange={e => { setDataInicio(e.target.value); setPeriodo("custom") }}
-              className="h-8 border border-[rgba(0,0,0,0.12)] rounded-lg px-2 text-[11.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25 focus:border-[#007AFF]" />
+              className="h-8 border border-[rgba(0,0,0,0.12)] rounded-lg px-2 text-[11.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4]" />
             <span className="text-[#8E8E93] text-xs">→</span>
             <input type="date" value={dataFim}
               onChange={e => { setDataFim(e.target.value); setPeriodo("custom") }}
-              className="h-8 border border-[rgba(0,0,0,0.12)] rounded-lg px-2 text-[11.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/25 focus:border-[#007AFF]" />
+              className="h-8 border border-[rgba(0,0,0,0.12)] rounded-lg px-2 text-[11.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4]" />
           </div>
 
           <button
@@ -1372,7 +1372,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                 <div key={c.nome} className="space-y-1">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-                      style={{ background: "#007AFF" }}>
+                      style={{ background: "#5009c4" }}>
                       {c.nome[0]?.toUpperCase() ?? "?"}
                     </div>
                     <p className="text-[12px] font-medium text-[#1C1C1E] truncate flex-1">{c.nome}</p>
@@ -1381,7 +1381,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                   </div>
                   <div className="ml-8 h-1.5 bg-[rgba(116,116,128,0.08)] rounded-full overflow-hidden">
                     <div className="h-full rounded-full"
-                      style={{ width: `${(c.total / topClientes.maxTotal) * 100}%`, background: "#007AFF" }} />
+                      style={{ width: `${(c.total / topClientes.maxTotal) * 100}%`, background: "#5009c4" }} />
                   </div>
                 </div>
               ))}
@@ -1486,7 +1486,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
                         <div className="w-5 h-5 rounded-full text-white text-[9px] font-bold flex items-center justify-center shrink-0"
-                          style={{ background: "#007AFF" }}>
+                          style={{ background: "#5009c4" }}>
                           {card.nomeCliente[0]?.toUpperCase() ?? "?"}
                         </div>
                         <span className="font-medium text-[#1C1C1E] max-w-[120px] truncate">{card.nomeCliente}</span>
