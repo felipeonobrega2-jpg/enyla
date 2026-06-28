@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import type React from "react"
-import { FormData, Calculo, LinhaTabela, KanbanOpcao, Lote } from "../types"
+import { FormData, Calculo, LinhaTabela, KanbanOpcao, Lote, Cliente } from "../types"
 import { Configuracoes } from "../config"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente } from "../pdf"
 import { brl, num } from "../utils"
@@ -19,6 +19,7 @@ export function ModalPersonalizarProposta({
   cardLoteNumero,
   onLoteCreate,
   onLoteAssign,
+  clientes,
 }: {
   data: { form: FormData; calculo: Calculo; numero: string; data: string; cardId: string }
   config: Configuracoes
@@ -31,9 +32,11 @@ export function ModalPersonalizarProposta({
   cardLoteNumero?: string
   onLoteCreate?: (nomeCliente: string) => Promise<{ id: string; numero: string }>
   onLoteAssign?: (cardId: string, loteId: string, loteNumero: string) => void
+  clientes?: Cliente[]
 }) {
   const { form, calculo, numero, data, cardId } = d
   const comFaca = form.comFaca
+  const telefoneCliente = (clientes ?? []).find(c => c.nome.toLowerCase() === form.nomeCliente.trim().toLowerCase())?.telefone
 
   // Which quantities are shown in the client PDF (initially all)
   const [ativos, setAtivos] = useState<Set<number>>(
@@ -372,7 +375,7 @@ export function ModalPersonalizarProposta({
             </button>
             <button
               disabled={nenhum}
-              onClick={() => { onSyncOpcoes(cardId, buildOpcoes()); onAbrirPdf(gerarHtmlOrcamentoCliente({ form, calculo: buildCustomCalculo(), data, numero })) }}
+              onClick={() => { onSyncOpcoes(cardId, buildOpcoes()); onAbrirPdf(gerarHtmlOrcamentoCliente({ form, calculo: buildCustomCalculo(), data, numero }, telefoneCliente)) }}
               className="flex-1 py-2.5 text-[11.5px] font-semibold bg-[#007AFF] hover:bg-[#0066D6] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
               PDF Cliente ↓
             </button>

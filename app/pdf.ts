@@ -323,7 +323,7 @@ function paginaCondicoesGerais(item: { dataRodape: string }): string {
 </div>`
 }
 
-export function gerarHtmlOrcamentoCliente(item: HistoricoItem): string {
+export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?: string): string {
   const { form, calculo, data, numero } = item
   const validadeDias = form.validadeDias ?? 7
   const dataVencimento = (() => {
@@ -385,7 +385,7 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem): string {
 
   <div class="client-row">
     <div class="bloco">
-      <div><span class="lbl">Para: </span><span class="val">${form.nomeCliente || "Cliente"}</span></div>
+      <div><span class="lbl">Para: </span><span class="val">${form.nomeCliente || "Cliente"}${telefoneCliente ? ` · ${telefoneCliente}` : ""}</span></div>
     </div>
     <div class="bloco">
       <div><span class="lbl">Data: </span><span class="val">${data}</span></div>
@@ -407,7 +407,7 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem): string {
   <div class="section-bar">Acabamentos</div>
   <div class="kv-grid">
     ${form.incluirVerniz ? `<div class="kv"><span class="lbl">Verniz UV:</span><span class="val">Sim</span></div>` : ""}
-    ${form.comFaca ? `<div class="kv"><span class="lbl">Faca de corte:</span><span class="val">Inclusa (investimento único)</span></div>` : ""}
+    ${form.comFaca ? `<div class="kv"><span class="lbl">Faca de corte:</span><span class="val">Inclusa</span></div>` : ""}
   </div>` : ""}
 
   ${linhasHtml ? `
@@ -437,7 +437,7 @@ ${paginaCondicoesGerais({ dataRodape: data })}
 </html>`
 }
 
-export function gerarHtmlPropostaCustom(p: PropostaCustom): string {
+export function gerarHtmlPropostaCustom(p: PropostaCustom, telefoneCliente?: string): string {
   const linhasAtivas = p.linhas.filter(l => l.ativa && l.quantidade > 0 && l.unitario > 0)
   const ideal = linhasAtivas.find(l => l.isIdeal) ?? linhasAtivas[linhasAtivas.length - 1]
   const minLinha = linhasAtivas[0]
@@ -492,7 +492,7 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom): string {
 
   <div class="client-row">
     <div class="bloco">
-      <div><span class="lbl">Para: </span><span class="val">${p.nomeCliente || "Cliente"}</span></div>
+      <div><span class="lbl">Para: </span><span class="val">${p.nomeCliente || "Cliente"}${telefoneCliente ? ` · ${telefoneCliente}` : ""}</span></div>
     </div>
     <div class="bloco">
       <div><span class="lbl">Data: </span><span class="val">${p.data}</span></div>
@@ -513,7 +513,7 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom): string {
   <div class="section-bar">Acabamentos</div>
   <div class="kv-grid">
     ${p.incluirVerniz ? `<div class="kv"><span class="lbl">Verniz UV:</span><span class="val">Sim</span></div>` : ""}
-    ${p.comFaca ? `<div class="kv"><span class="lbl">Faca de corte:</span><span class="val">Inclusa (investimento único)</span></div>` : ""}
+    ${p.comFaca ? `<div class="kv"><span class="lbl">Faca de corte:</span><span class="val">Inclusa</span></div>` : ""}
   </div>` : ""}
 
   ${linhasHtml ? `

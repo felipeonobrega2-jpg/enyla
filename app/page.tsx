@@ -596,7 +596,8 @@ export default function Home() {
   }
 
   function downloadPdfCliente(item: { form: FormData; calculo: Calculo; data: string }) {
-    abrirPdf(gerarHtmlOrcamentoCliente(item))
+    const telefone = clientes.find(c => c.nome.toLowerCase() === item.form.nomeCliente.trim().toLowerCase())?.telefone
+    abrirPdf(gerarHtmlOrcamentoCliente(item, telefone))
   }
 
   function compartilharWhatsApp(form: FormData, calculo: Calculo, numero?: string) {
@@ -1379,7 +1380,7 @@ export default function Home() {
               onDownloadPdfCliente={downloadPdfCliente}
               onExcluir={excluirHistorico}
               onWhatsApp={(item) => compartilharWhatsApp(item.form, item.calculo, item.numero)}
-              onPdfCustom={(p) => abrirPdf(gerarHtmlPropostaCustom(p))}
+              onPdfCustom={(p) => abrirPdf(gerarHtmlPropostaCustom(p, clientes.find(c => c.nome.toLowerCase() === p.nomeCliente.trim().toLowerCase())?.telefone))}
               onWhatsAppCustom={compartilharWhatsAppCustom}
               onExcluirCustom={(id) => {
                 const p = propostasCustom.find(p => p.id === id)
@@ -1670,6 +1671,7 @@ export default function Home() {
           onClose={() => setModalSalvar(null)}
           onAbrirPdf={abrirPdf}
           onWhatsApp={compartilharWhatsApp}
+          clientes={clientes}
           lotes={lotes}
           cardLoteNumero={kanban.find(c => c.id === modalSalvar.cardId)?.loteNumero}
           onLoteCreate={criarLote}
@@ -1754,7 +1756,7 @@ export default function Home() {
             numero: "PRÉVIA",
             data: new Date().toLocaleString("pt-BR"),
             cardId: "preview",
-          }))}
+          }, clientes.find(c => c.nome.toLowerCase() === draft.nomeCliente.trim().toLowerCase())?.telefone))}
           onWhatsApp={(p) => compartilharWhatsAppCustom(p)}
           onUpsertCliente={(nome, updates) => {
             const existing = clientes.find(c => c.nome.toLowerCase() === nome.toLowerCase())
@@ -1811,7 +1813,7 @@ export default function Home() {
             numero: editandoProposta.numero,
             data: editandoProposta.data,
             cardId: editandoProposta.cardId,
-          }))}
+          }, clientes.find(c => c.nome.toLowerCase() === draft.nomeCliente.trim().toLowerCase())?.telefone))}
           onWhatsApp={(p) => compartilharWhatsAppCustom(p)}
           onUpsertCliente={(nome, updates) => {
             const existing = clientes.find(c => c.nome.toLowerCase() === nome.toLowerCase())
