@@ -249,8 +249,8 @@ function estiloPropostaCliente(): string {
   `
 }
 
-function paginaCondicoesGerais(item: { validadeDias: number; comFaca: boolean; valorFaca: number; quantidadeMinima: number; dataRodape: string }): string {
-  const { validadeDias, comFaca, valorFaca, quantidadeMinima, dataRodape } = item
+function paginaCondicoesGerais(item: { prazoEntrega: number; dataRodape: string }): string {
+  const { prazoEntrega, dataRodape } = item
   return `
 <!-- ═══════════════════════════════════════════════════════ PÁGINA 2: CONDIÇÕES -->
 <div class="page-break">
@@ -262,34 +262,53 @@ function paginaCondicoesGerais(item: { validadeDias: number; comFaca: boolean; v
   </div>
 
   <div class="cond-item">
-    <div class="cond-num-titulo">1. Pagamento</div>
-    <div class="cond-texto">Sinal de <strong>50% do valor total</strong> no fechamento do pedido. O restante (50%) é pago somente na entrega.</div>
+    <div class="cond-num-titulo">1. Formalização do Pedido</div>
+    <div class="cond-texto">O pedido é considerado fechado com o pagamento do sinal de 50% ou com o envio de ordem de compra pelo cliente. A partir desse momento, iniciamos o desenvolvimento da arte.</div>
   </div>
 
   <div class="cond-item">
-    <div class="cond-num-titulo">2. Validade da Proposta</div>
-    <div class="cond-texto">Os preços desta proposta são válidos para aprovação em até <strong>${validadeDias} dias corridos</strong> a partir da data de emissão.</div>
+    <div class="cond-num-titulo">2. Pagamento</div>
+    <div class="cond-texto">50% de sinal no fechamento do pedido + 50% na entrega. Pagamento via PIX ou transferência. Havendo pendência no saldo final, a entrega fica retida até a regularização.</div>
   </div>
 
   <div class="cond-item">
     <div class="cond-num-titulo">3. Arte e Aprovação</div>
-    <div class="cond-texto">Contamos com designer próprio — o desenvolvimento de arte está incluso, sem custo adicional. O prazo de produção é contado a partir da <strong>aprovação final da arte</strong> pelo cliente.</div>
+    <div class="cond-texto">Contamos com designer próprio — o desenvolvimento de arte está incluso, sem custo adicional. Você recebe a prova digital para aprovação. O prazo de produção só começa a contar após a aprovação final da arte por você. Alterações solicitadas após a aprovação podem gerar novo prazo.</div>
   </div>
 
   <div class="cond-item">
-    <div class="cond-num-titulo">4. Quantidade do Lote</div>
-    <div class="cond-texto">A quantidade final entregue pode variar <strong>até 10%</strong> para mais ou para menos em relação à quantidade solicitada.</div>
+    <div class="cond-num-titulo">4. Prazo de Produção</div>
+    <div class="cond-texto">${num(prazoEntrega)} dias úteis, contados a partir da aprovação final da arte e da confirmação do sinal.</div>
   </div>
 
-  ${comFaca && valorFaca > 0 ? `
   <div class="cond-item">
-    <div class="cond-num-titulo">5. Faca de Corte</div>
-    <div class="cond-texto">A faca de corte é um <strong>investimento único</strong> — uma vez produzida, é reaproveitada em todos os pedidos futuros do mesmo produto, sem nova cobrança.</div>
-  </div>` : ""}
+    <div class="cond-num-titulo">5. Cancelamento, Troca e Devolução</div>
+    <div class="cond-texto">Por se tratar de produto personalizado sob encomenda, não há cancelamento, troca ou devolução após a aprovação da arte e o início da produção — exceto em caso de não conformidade comprovada com o pedido aprovado.</div>
+  </div>
 
   <div class="cond-item">
-    <div class="cond-num-titulo">${comFaca && valorFaca > 0 ? "6" : "5"}. Pedido Mínimo</div>
-    <div class="cond-texto">O pedido mínimo para esta proposta é de <strong>${num(quantidadeMinima)} unidades</strong>.</div>
+    <div class="cond-num-titulo">6. Quantidade do Lote</div>
+    <div class="cond-texto">A quantidade final entregue pode variar até 10% para mais ou para menos em relação à solicitada, conforme a natureza do processo de impressão. A cobrança é ajustada à quantidade efetivamente entregue.</div>
+  </div>
+
+  <div class="cond-item">
+    <div class="cond-num-titulo">7. Faca de Corte</div>
+    <div class="cond-texto">A faca de corte é um investimento único. Uma vez produzida, é reaproveitada em todos os pedidos futuros do mesmo produto, sem nova cobrança. Mudança de medidas ou formato exige nova faca.</div>
+  </div>
+
+  <div class="cond-item">
+    <div class="cond-num-titulo">8. Frete e Logística</div>
+    <div class="cond-texto">Frete e logística a combinar no fechamento do pedido. A retirada/transporte é de responsabilidade do cliente, salvo condição específica acordada.</div>
+  </div>
+
+  <div class="cond-item">
+    <div class="cond-num-titulo">9. Garantia de Qualidade</div>
+    <div class="cond-texto">Todas as embalagens passam por controle de qualidade. Eventuais divergências devem ser comunicadas em até 7 dias corridos após o recebimento, acompanhadas de fotos.</div>
+  </div>
+
+  <div class="cond-item">
+    <div class="cond-num-titulo">10. Direito de Uso de Imagem</div>
+    <div class="cond-texto">Reservamo-nos o direito de usar imagens das embalagens produzidas para portfólio e divulgação, salvo manifestação contrária formal no momento do pedido.</div>
   </div>
 
   <div class="doc-footer">
@@ -318,14 +337,14 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem): string {
   const sweetMin  = tabela.find(l => l.quantidade === sweetSpotMinimoQtd) ?? tabela[0]
   const precoKey  = form.comFaca ? "precoComFaca"    : "precoSemFaca"
   const unitKey   = form.comFaca ? "unitarioComFaca" : "unitarioSemFaca"
-  const parc12Key = form.comFaca ? "parcela12xComFaca" : "parcela12xSemFaca"
 
-  const linhasHtml = tabela.map(l => {
+  const tabelaValida = tabela.filter(l => l.quantidade > 0 && (l[unitKey as keyof typeof l] as number) > 0)
+
+  const linhasHtml = tabelaValida.map(l => {
     const isIdeal = l.quantidade === sweetSpotIdealQtd
     const isMin   = l.quantidade === sweetSpotMinimoQtd && !isIdeal
     const preco = l[precoKey as keyof typeof l] as number
     const unit  = l[unitKey as keyof typeof l] as number
-    const parc  = l[parc12Key as keyof typeof l] as number
     return `
       <div class="valores-row">
         <span class="lbl">Quant.:</span>
@@ -334,10 +353,12 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem): string {
           ${isMin   ? '<span class="tag" style="background:#f59e0b">MÍNIMO</span>'  : ""}
         </span>
         <span class="lbl">Unit.:</span>
-        <span class="v-unit">${brl(unit)} <span style="color:#94a3b8;font-size:9.5px">· ${brl(parc)}/mês em 12×</span></span>
+        <span class="v-unit">${brl(unit)}</span>
         <span class="v-total">${brl(preco)}</span>
       </div>`
   }).join("")
+
+  const temAcabamento = form.incluirVerniz || form.comFaca
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -374,23 +395,24 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem): string {
     <div class="kv"><span class="lbl">Largura:</span><span class="val">${form.frente} cm</span></div>
     <div class="kv"><span class="lbl">Altura:</span><span class="val">${form.alturaBox} cm</span></div>
     <div class="kv"><span class="lbl">Profundidade:</span><span class="val">${form.lateral} cm</span></div>
-    <div class="kv"><span class="lbl">Modelos (SKUs):</span><span class="val">${form.numSKUs}</span></div>
+    <div class="kv"><span class="lbl">Modelos de arte:</span><span class="val">${form.numSKUs}</span></div>
   </div>
 
+  ${temAcabamento ? `
   <div class="section-bar">Acabamentos</div>
   <div class="kv-grid">
-    <div class="kv"><span class="lbl">Verniz UV:</span><span class="val">${form.incluirVerniz ? "Sim" : "Não"}</span></div>
-    <div class="kv"><span class="lbl">Faca de corte:</span><span class="val">${form.comFaca ? "Inclusa (investimento único)" : "Não"}</span></div>
-  </div>
+    ${form.incluirVerniz ? `<div class="kv"><span class="lbl">Verniz UV:</span><span class="val">Sim</span></div>` : ""}
+    ${form.comFaca ? `<div class="kv"><span class="lbl">Faca de corte:</span><span class="val">Inclusa (investimento único)</span></div>` : ""}
+  </div>` : ""}
 
+  ${linhasHtml ? `
   <div class="section-bar">Valores</div>
-  ${linhasHtml}
+  ${linhasHtml}` : ""}
 
   <div class="section-bar">Condições e Observações</div>
   <div class="obs-bar-list">
-    <div class="item">* Preços válidos para aprovação em até <strong>${validadeDias} dias corridos</strong>${dataVencimento ? ` (até ${dataVencimento})` : ""}.</div>
+    <div class="item">* Prazo de produção: <strong>${num(form.prazoEntrega)} dias úteis</strong> após aprovação da arte.</div>
     <div class="item">* Contamos com designer próprio — desenvolvimento de arte incluso sem custo adicional.</div>
-    <div class="item">* Prazo de entrega contado a partir da <strong>aprovação final da arte</strong>.</div>
     <div class="item">* A quantidade final do lote pode variar <strong>até 10%</strong> para mais ou para menos.</div>
     <div class="item">* Pagamento: <strong>50% de sinal</strong> no fechamento do pedido + 50% na entrega.</div>
     ${form.comFaca && form.valorFaca > 0 ? `<div class="item">* A faca de corte é investimento único — reutilizada em todos os pedidos futuros do mesmo produto.</div>` : ""}
@@ -404,14 +426,14 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem): string {
   </div>
 
 </div>
-${paginaCondicoesGerais({ validadeDias, comFaca: form.comFaca, valorFaca: form.valorFaca, quantidadeMinima: sweetMin.quantidade, dataRodape: data })}
+${paginaCondicoesGerais({ prazoEntrega: form.prazoEntrega, dataRodape: data })}
 
 </body>
 </html>`
 }
 
 export function gerarHtmlPropostaCustom(p: PropostaCustom): string {
-  const linhasAtivas = p.linhas.filter(l => l.ativa && l.quantidade > 0 && l.unitario >= 0)
+  const linhasAtivas = p.linhas.filter(l => l.ativa && l.quantidade > 0 && l.unitario > 0)
   const ideal = linhasAtivas.find(l => l.isIdeal) ?? linhasAtivas[linhasAtivas.length - 1]
   const minLinha = linhasAtivas[0]
 
@@ -429,7 +451,6 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom): string {
     const isIdeal = l.isIdeal
     const isMin   = l === minLinha && !isIdeal
     const total   = l.unitario * l.quantidade
-    const parc    = (total * p.parcFator) / 12
     return `
       <div class="valores-row">
         <span class="lbl">Quant.:</span>
@@ -438,10 +459,13 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom): string {
           ${isMin   ? '<span class="tag" style="background:#f59e0b">MÍNIMO</span>'  : ""}
         </span>
         <span class="lbl">Unit.:</span>
-        <span class="v-unit">${brl(l.unitario)} <span style="color:#94a3b8;font-size:9.5px">· ${brl(parc)}/mês em 12×</span></span>
+        <span class="v-unit">${brl(l.unitario)}</span>
         <span class="v-total">${brl(total)}</span>
       </div>`
   }).join("")
+
+  const temAcabamento = p.incluirVerniz || p.comFaca
+  const temInfoTecnica = p.descricao || p.material || p.dimensoes || p.numSKUs > 0
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -470,28 +494,30 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom): string {
     </div>
   </div>
 
-  ${p.descricao || p.material || p.dimensoes || p.incluirVerniz || p.comFaca || p.numSKUs > 0 ? `
+  ${temInfoTecnica ? `
   <div class="section-bar">Informações Técnicas</div>
   <div class="kv-grid">
     <div class="kv"><span class="lbl">Produto:</span><span class="val">${p.descricao || "Embalagem Personalizada"}</span></div>
     ${p.material   ? `<div class="kv"><span class="lbl">Material:</span><span class="val">${p.material}</span></div>` : ""}
     ${p.dimensoes  ? `<div class="kv"><span class="lbl">Dimensões:</span><span class="val">${p.dimensoes}</span></div>` : ""}
-    ${p.numSKUs > 0 ? `<div class="kv"><span class="lbl">Modelos (SKUs):</span><span class="val">${p.numSKUs}</span></div>` : ""}
-  </div>
-  <div class="section-bar">Acabamentos</div>
-  <div class="kv-grid">
-    <div class="kv"><span class="lbl">Verniz UV:</span><span class="val">${p.incluirVerniz ? "Sim" : "Não"}</span></div>
-    <div class="kv"><span class="lbl">Faca de corte:</span><span class="val">${p.comFaca ? "Inclusa (investimento único)" : "Não"}</span></div>
+    ${p.numSKUs > 0 ? `<div class="kv"><span class="lbl">Modelos de arte:</span><span class="val">${p.numSKUs}</span></div>` : ""}
   </div>` : ""}
 
+  ${temAcabamento ? `
+  <div class="section-bar">Acabamentos</div>
+  <div class="kv-grid">
+    ${p.incluirVerniz ? `<div class="kv"><span class="lbl">Verniz UV:</span><span class="val">Sim</span></div>` : ""}
+    ${p.comFaca ? `<div class="kv"><span class="lbl">Faca de corte:</span><span class="val">Inclusa (investimento único)</span></div>` : ""}
+  </div>` : ""}
+
+  ${linhasHtml ? `
   <div class="section-bar">Valores</div>
-  ${linhasHtml}
+  ${linhasHtml}` : ""}
 
   <div class="section-bar">Condições e Observações</div>
   <div class="obs-bar-list">
-    <div class="item">* Preços válidos para aprovação em até <strong>${p.validadeDias ?? 7} dias corridos</strong>${dataVencimento ? ` (até ${dataVencimento})` : ""}.</div>
+    <div class="item">* Prazo de produção: <strong>${num(p.prazoEntrega)} dias úteis</strong> após aprovação da arte.</div>
     <div class="item">* Contamos com designer próprio — desenvolvimento de arte incluso sem custo adicional.</div>
-    <div class="item">* Prazo de entrega contado a partir da <strong>aprovação final da arte</strong>.</div>
     <div class="item">* A quantidade final do lote pode variar <strong>até 10%</strong> para mais ou para menos.</div>
     <div class="item">* Pagamento: <strong>50% de sinal</strong> no fechamento do pedido + 50% na entrega.</div>
     ${p.comFaca && p.valorFaca > 0 ? `<div class="item">* A faca de corte é investimento único — reutilizada em todos os pedidos futuros do mesmo produto.</div>` : ""}
@@ -505,7 +531,7 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom): string {
   </div>
 
 </div>
-${paginaCondicoesGerais({ validadeDias: p.validadeDias ?? 7, comFaca: p.comFaca, valorFaca: p.valorFaca, quantidadeMinima: minLinha?.quantidade ?? 0, dataRodape: p.data })}
+${paginaCondicoesGerais({ prazoEntrega: p.prazoEntrega, dataRodape: p.data })}
 
 </body>
 </html>`

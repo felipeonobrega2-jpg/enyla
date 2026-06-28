@@ -24,6 +24,7 @@ export type FormData = {
   obsInterna: string
   obsCliente: string
   validadeDias: number
+  prazoEntrega: number // dias úteis, após aprovação da arte
   materialId: string
   materialNome: string
 }
@@ -133,6 +134,7 @@ export type PropostaCustom = {
   valorFaca: number
   numSKUs: number
   validadeDias: number
+  prazoEntrega: number // dias úteis, após aprovação da arte
   obsCliente: string
   data: string
   linhas: LinhaPropostaCustom[]

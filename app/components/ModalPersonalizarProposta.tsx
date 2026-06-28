@@ -339,6 +339,9 @@ export function ModalPersonalizarProposta({
           {nenhum && (
             <p className="text-[11px] text-[#FF3B30] text-center">Selecione ao menos um tier para gerar o PDF.</p>
           )}
+          {!nenhum && !form.prazoEntrega && (
+            <p className="text-[11px] text-[#FF3B30] text-center">Este orçamento não tem prazo de entrega definido — edite-o na mesa de orçamento antes de gerar o PDF do cliente.</p>
+          )}
           <div className="flex gap-2">
             <button onClick={handleClose}
               className="px-3 py-2.5 text-[11.5px] text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors shrink-0">
@@ -371,7 +374,7 @@ export function ModalPersonalizarProposta({
               WhatsApp
             </button>
             <button
-              disabled={nenhum}
+              disabled={nenhum || !form.prazoEntrega}
               onClick={() => { onSyncOpcoes(cardId, buildOpcoes()); onAbrirPdf(gerarHtmlOrcamentoCliente({ form, calculo: buildCustomCalculo(), data, numero })) }}
               className="flex-1 py-2.5 text-[11.5px] font-semibold bg-[#007AFF] hover:bg-[#0066D6] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
               PDF Cliente ↓

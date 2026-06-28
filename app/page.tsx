@@ -40,7 +40,7 @@ const FORM_INICIAL: FormData = {
   nomeCliente: "", frente: 0, lateral: 0, alturaBox: 0, abaColagem: 1,
   incluirVerniz: true, comFaca: true, valorFaca: 0,
   numSKUs: 1, numArtes: 1, quantidades: [...QUANTIDADES_PADRAO], customPecasChapa: null,
-  obsInterna: "", obsCliente: "", validadeDias: 7, materialId: "cartao300", materialNome: "Cartão 300g",
+  obsInterna: "", obsCliente: "", validadeDias: 7, prazoEntrega: 0, materialId: "cartao300", materialNome: "Cartão 300g",
 }
 
 function NavItem({ active, onClick, icon, label, badge, accent }: {
@@ -596,6 +596,10 @@ export default function Home() {
   }
 
   function downloadPdfCliente(item: { form: FormData; calculo: Calculo; data: string }) {
+    if (!item.form.prazoEntrega || item.form.prazoEntrega <= 0) {
+      showToast("Informe o prazo de entrega (dias úteis) antes de gerar o PDF do cliente.")
+      return
+    }
     abrirPdf(gerarHtmlOrcamentoCliente(item))
   }
 
@@ -1115,6 +1119,34 @@ export default function Home() {
                     title="Valor personalizado"
                   />
                 </div>
+              </div>
+              <div>
+                <Label>Prazo de entrega (dias úteis, após aprovação da arte) *</Label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {[15, 20, 30].map(d => (
+                    <button key={d} type="button"
+                      onClick={() => set("prazoEntrega", d)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
+                        form.prazoEntrega === d
+                          ? "bg-[#1C1C1E] text-white border-slate-900"
+                          : "border-[rgba(60,60,67,0.12)] text-[#8E8E93] hover:bg-[rgba(116,116,128,0.04)]"
+                      }`}>
+                      {d} dias
+                    </button>
+                  ))}
+                  <input type="number" min={1} max={365}
+                    value={form.prazoEntrega || ""}
+                    onChange={e => set("prazoEntrega", Math.max(0, Number(e.target.value)))}
+                    placeholder="dias úteis"
+                    className={`w-24 border rounded-lg px-2 py-1.5 text-xs text-slate-900 text-center focus:outline-none focus:ring-2 focus:ring-[#007AFF]/20 focus:border-[#007AFF] ${
+                      form.prazoEntrega > 0 ? "border-[rgba(60,60,67,0.12)]" : "border-rose-300"
+                    }`}
+                    title="Valor personalizado — obrigatório"
+                  />
+                </div>
+                {!form.prazoEntrega && (
+                  <p className="text-[11px] text-rose-500 mt-1">Obrigatório — bloqueia a geração do PDF para o cliente.</p>
+                )}
               </div>
               <div>
                 <Label>Interna (só na gráfica)</Label>
