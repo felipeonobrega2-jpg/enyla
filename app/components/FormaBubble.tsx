@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, Fragment } from "react"
 
-type Msg = { role: "user" | "assistant"; content: string }
+type AcaoPendente = { resumo: string; confirmToken: string; resolvida?: "confirmada" | "cancelada" }
+type Msg = { role: "user" | "assistant"; content: string; acaoPendente?: AcaoPendente }
 
 // Markdown leve só pro que a Forma realmente usa: **negrito**, parágrafos e
 // listas com "-"/"—". Sem dependência externa — não precisamos de markdown
@@ -100,13 +101,51 @@ export default function FormaBubble({ apiKey }: { apiKey: string }) {
       const data = await res.json()
       if (data.error) { setErro(data.error); setLoading(false); return }
       const textBlock = data.content?.find((b: { type: string }) => b.type === "text")
-      const finalMsgs: Msg[] = [...nextMsgs, { role: "assistant", content: textBlock?.text ?? "" }]
+      const finalMsgs: Msg[] = [...nextMsgs, {
+        role: "assistant",
+        content: textBlock?.text ?? "",
+        acaoPendente: data.acaoPendente ?? undefined,
+      }]
       setMsgs(finalMsgs)
       saveMsgs(finalMsgs)
     } catch {
       setErro("Erro de conexão com a API.")
     }
     setLoading(false)
+  }
+
+  async function confirmarAcao(index: number) {
+    const acao = msgs[index]?.acaoPendente
+    if (!acao) return
+    setLoading(true)
+    try {
+      const res = await fetch("/api/assistente", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ confirmarToken: acao.confirmToken }),
+      })
+      const data = await res.json()
+      const resultado: Msg = data.ok
+        ? { role: "assistant", content: `✓ ${data.mensagem}` }
+        : { role: "assistant", content: `Não consegui concluir: ${data.erro ?? "erro desconhecido"}.` }
+      setMsgs(prev => {
+        const next = prev.map((m, i) => i === index && m.acaoPendente ? { ...m, acaoPendente: { ...m.acaoPendente, resolvida: "confirmada" as const } } : m)
+        const final = [...next, resultado]
+        saveMsgs(final)
+        return final
+      })
+    } catch {
+      setErro("Erro de conexão com a API.")
+    }
+    setLoading(false)
+  }
+
+  function cancelarAcao(index: number) {
+    setMsgs(prev => {
+      const next = prev.map((m, i) => i === index && m.acaoPendente ? { ...m, acaoPendente: { ...m.acaoPendente, resolvida: "cancelada" as const } } : m)
+      saveMsgs(next)
+      return next
+    })
   }
 
   function limpar() {
@@ -153,7 +192,7 @@ export default function FormaBubble({ apiKey }: { apiKey: string }) {
               </div>
             )}
             {msgs.map((m, i) => (
-              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
                 <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-[12.5px] leading-relaxed ${
                   m.role === "user"
                     ? "bg-indigo-600 text-white rounded-tr-sm whitespace-pre-wrap"
@@ -161,6 +200,27 @@ export default function FormaBubble({ apiKey }: { apiKey: string }) {
                 }`}>
                   {m.role === "assistant" ? renderMarkdownLite(m.content) : m.content}
                 </div>
+                {m.acaoPendente && !m.acaoPendente.resolvida && (
+                  <div className="mt-1.5 flex gap-2">
+                    <button
+                      onClick={() => confirmarAcao(i)}
+                      disabled={loading}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[11.5px] font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                    >
+                      Confirmar
+                    </button>
+                    <button
+                      onClick={() => cancelarAcao(i)}
+                      disabled={loading}
+                      className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-[11.5px] font-medium hover:bg-slate-200 disabled:opacity-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+                {m.acaoPendente?.resolvida === "cancelada" && (
+                  <p className="mt-1 text-[11px] text-slate-400">Ação cancelada.</p>
+                )}
               </div>
             ))}
             {loading && (
