@@ -209,7 +209,7 @@ function estiloPropostaCliente(): string {
     .page{padding:30px 38px;min-height:100vh}
     .page-break{break-before:page;page-break-before:always}
 
-    .doc-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:10px;border-bottom:2px solid #1e3a8a;margin-bottom:16px}
+    .doc-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:10px;border-bottom:2px solid #5009c4;margin-bottom:16px}
     .doc-header .titulo{font-size:13px;font-weight:800;color:#0f172a;text-align:right}
     .doc-header .titulo span{color:#64748b;font-weight:500}
 
@@ -218,7 +218,7 @@ function estiloPropostaCliente(): string {
     .client-row .lbl{font-weight:700;color:#0f172a}
     .client-row .val{color:#334155}
 
-    .section-bar{background:#1e3a8a;color:#fff;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;text-align:center;padding:5px 0;margin:16px 0 9px}
+    .section-bar{background:#5009c4;color:#fff;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;text-align:center;padding:5px 0;margin:16px 0 9px}
 
     .kv-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 24px;font-size:11.5px;margin-bottom:2px}
     .kv{display:flex;gap:6px}
@@ -229,7 +229,7 @@ function estiloPropostaCliente(): string {
     .valores-row .lbl{font-weight:700;color:#0f172a}
     .valores-row .v-qtd{font-weight:800;min-width:96px;display:flex;align-items:center;gap:6px}
     .valores-row .v-unit{color:#334155;min-width:170px}
-    .valores-row .v-total{font-weight:800;color:#1d4ed8;margin-left:auto}
+    .valores-row .v-total{font-weight:800;color:#5009c4;margin-left:auto}
     .tag{font-size:8px;font-weight:700;padding:1px 6px;border-radius:9999px;color:#fff;white-space:nowrap}
 
     .footnotes{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:10px;color:#64748b;margin-top:8px;font-style:italic}
@@ -354,7 +354,7 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem): string {
       <div class="valores-row">
         <span class="lbl">Quant.:</span>
         <span class="v-qtd">${num(l.quantidade)}
-          ${isIdeal ? '<span class="tag" style="background:#2563eb">RECOMENDADO</span>' : ""}
+          ${isIdeal ? '<span class="tag" style="background:#028959">RECOMENDADO</span>' : ""}
           ${isMin   ? '<span class="tag" style="background:#f59e0b">MÍNIMO</span>'  : ""}
         </span>
         <span class="lbl">Unit.:</span>
@@ -461,7 +461,7 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom): string {
       <div class="valores-row">
         <span class="lbl">Quant.:</span>
         <span class="v-qtd">${num(l.quantidade)}
-          ${isIdeal ? '<span class="tag" style="background:#2563eb">RECOMENDADO</span>' : ""}
+          ${isIdeal ? '<span class="tag" style="background:#028959">RECOMENDADO</span>' : ""}
           ${isMin   ? '<span class="tag" style="background:#f59e0b">MÍNIMO</span>'  : ""}
         </span>
         <span class="lbl">Unit.:</span>
