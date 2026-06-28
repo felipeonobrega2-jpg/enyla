@@ -1,8 +1,48 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, Fragment } from "react"
 
 type Msg = { role: "user" | "assistant"; content: string }
+
+// Markdown leve só pro que a Forma realmente usa: **negrito**, parágrafos e
+// listas com "-"/"—". Sem dependência externa — não precisamos de markdown
+// completo (tabela, código, títulos) numa bolha de chat estreita.
+function renderInline(text: string, keyPrefix: string) {
+  const parts = text.split(/\*\*(.+?)\*\*/g)
+  return parts.map((part, i) =>
+    i % 2 === 1 ? <strong key={`${keyPrefix}-${i}`} className="font-semibold">{part}</strong> : <Fragment key={`${keyPrefix}-${i}`}>{part}</Fragment>
+  )
+}
+
+function renderMarkdownLite(text: string) {
+  const blocks = text.trim().split(/\n{2,}/)
+  return blocks.map((block, bi) => {
+    const lines = block.split("\n").filter(l => l.trim())
+    const isList = lines.length > 0 && lines.every(l => /^[-—*]\s+/.test(l.trim()))
+    if (isList) {
+      return (
+        <ul key={bi} className="space-y-1 my-1.5 list-none">
+          {lines.map((l, li) => (
+            <li key={li} className="flex gap-1.5">
+              <span className="text-slate-400 shrink-0">·</span>
+              <span>{renderInline(l.trim().replace(/^[-—*]\s+/, ""), `${bi}-${li}`)}</span>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+    return (
+      <p key={bi} className={bi > 0 ? "mt-2" : ""}>
+        {lines.map((l, li) => (
+          <Fragment key={li}>
+            {li > 0 && <br />}
+            {renderInline(l, `${bi}-${li}`)}
+          </Fragment>
+        ))}
+      </p>
+    )
+  })
+}
 
 const STORAGE_KEY = "assistente:conversa"
 
@@ -78,7 +118,7 @@ export default function FormaBubble({ apiKey }: { apiKey: string }) {
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3 print:hidden">
       {open && (
-        <div className="w-[360px] h-[480px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+        <div className="w-[380px] h-[520px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
           {/* Header */}
           <div className="shrink-0 px-4 py-3 bg-slate-900 flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
@@ -114,12 +154,12 @@ export default function FormaBubble({ apiKey }: { apiKey: string }) {
             )}
             {msgs.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-[12.5px] leading-relaxed whitespace-pre-wrap ${
+                <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-[12.5px] leading-relaxed ${
                   m.role === "user"
-                    ? "bg-indigo-600 text-white rounded-tr-sm"
+                    ? "bg-indigo-600 text-white rounded-tr-sm whitespace-pre-wrap"
                     : "bg-white border border-slate-200 text-slate-700 rounded-tl-sm"
                 }`}>
-                  {m.content}
+                  {m.role === "assistant" ? renderMarkdownLite(m.content) : m.content}
                 </div>
               </div>
             ))}
