@@ -526,7 +526,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
       <div className="max-w-md mx-auto px-5 h-14 flex items-center gap-3">
         <div>
           <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1335} height={328}
-            className="h-4 w-auto" priority />
+            className="h-5 w-auto" priority />
         </div>
         <div className="ml-auto">
           <span className="text-[10px] font-bold text-[#007AFF] bg-[#007AFF]/10 border border-[#007AFF]/20 px-2.5 py-1 rounded-full font-mono">

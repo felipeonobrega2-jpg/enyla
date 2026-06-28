@@ -841,7 +841,7 @@ export default function Home() {
           <div className="flex items-center">
             <div className="min-w-0 flex-1">
               <Image src="/brand/enyla-wordmark-light.png" alt="Enyla" width={1335} height={328}
-                className="h-4 w-auto" priority />
+                className="h-5 w-auto" priority />
             </div>
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "system" : "dark")}
