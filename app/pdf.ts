@@ -260,7 +260,7 @@ function paginaCondicoesGerais(item: { dataRodape: string }): string {
 <div class="page">
 
   <div class="doc-header">
-    <img src="${LOGO_DARK_B64}" alt="Enyla" style="height:18px;display:block" />
+    <img src="${LOGO_DARK_B64}" alt="Enyla" style="height:26px;display:block" />
     <div class="titulo">Condições Gerais <span>de Contratação</span></div>
   </div>
 
@@ -379,7 +379,7 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem): string {
 <div class="page">
 
   <div class="doc-header">
-    <img src="${LOGO_DARK_B64}" alt="Enyla" style="height:18px;display:block" />
+    <img src="${LOGO_DARK_B64}" alt="Enyla" style="height:26px;display:block" />
     <div class="titulo">Proposta Comercial <span>${numero ?? ""}</span></div>
   </div>
 
@@ -486,7 +486,7 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom): string {
 <div class="page">
 
   <div class="doc-header">
-    <img src="${LOGO_DARK_B64}" alt="Enyla" style="height:18px;display:block" />
+    <img src="${LOGO_DARK_B64}" alt="Enyla" style="height:26px;display:block" />
     <div class="titulo">Proposta Comercial <span>${p.numero}</span></div>
   </div>
 
