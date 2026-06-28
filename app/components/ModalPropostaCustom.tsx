@@ -46,7 +46,6 @@ export function ModalPropostaCustom({
   const [valorFaca, setValorFaca]         = useState(initialData?.valorFaca ?? 0)
   const [numSKUs, setNumSKUs]             = useState(initialData?.numSKUs ?? 1)
   const [validadeDias, setValidadeDias]   = useState(initialData?.validadeDias ?? 7)
-  const [prazoEntrega, setPrazoEntrega]   = useState(initialData?.prazoEntrega ?? 0)
   const [obsCliente, setObsCliente]       = useState(initialData?.obsCliente ?? "")
   const [dataInput, setDataInput]         = useState(() =>
     initialData?.data ? dataToInput(initialData.data) : new Date().toISOString().slice(0, 10)
@@ -115,7 +114,7 @@ export function ModalPropostaCustom({
     const loteSel = lotes?.find(l => l.id === loteIdTerceirizado)
     return {
       nomeCliente, descricao, material, dimensoes, incluirVerniz, comFaca, valorFaca,
-      numSKUs, validadeDias, prazoEntrega, obsCliente, linhas, parcFator, data: dataFormatada,
+      numSKUs, validadeDias, obsCliente, linhas, parcFator, data: dataFormatada,
       terceirizados: terceirizados.filter(t => t.nome.trim()).map(t => ({
         ...t,
         loteId: loteSel?.id,
@@ -129,7 +128,6 @@ export function ModalPropostaCustom({
   const terceirizadosPrecisaLote = terceirizadosValidos.length > 0 && !loteIdTerceirizado
   const podeSalvar =
     nomeCliente.trim().length > 0 &&
-    prazoEntrega > 0 &&
     !terceirizadosPrecisaLote &&
     (linhasAtivas.length > 0 || terceirizadosValidos.length > 0)
   const clienteAtual = nomeCliente.trim()
@@ -487,8 +485,8 @@ export function ModalPropostaCustom({
             <p className="text-[10px] text-[#8E8E93]">Coluna <span className="font-semibold">Ideal</span> marca qual linha é recomendada no PDF.</p>
           </div>
 
-          {/* Validade + Prazo de entrega + Data */}
-          <div className="grid grid-cols-3 gap-3">
+          {/* Validade + Data */}
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Validade (dias)</label>
               <input
@@ -497,19 +495,6 @@ export function ModalPropostaCustom({
                 value={validadeDias}
                 onChange={e => setValidadeDias(parseInt(e.target.value) || 7)}
                 className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Prazo de entrega (dias úteis) *</label>
-              <input
-                type="number"
-                min="1"
-                value={prazoEntrega || ""}
-                onChange={e => setPrazoEntrega(Math.max(0, parseInt(e.target.value) || 0))}
-                placeholder="obrigatório"
-                className={`w-full border rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] placeholder:text-rose-300 focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400 ${
-                  prazoEntrega > 0 ? "border-[rgba(60,60,67,0.12)]" : "border-rose-300"
-                }`}
               />
             </div>
             <div className="space-y-1.5">
@@ -540,9 +525,6 @@ export function ModalPropostaCustom({
         <div className="px-5 pb-5 pt-3 border-t border-[rgba(60,60,67,0.08)] shrink-0 space-y-2">
           {!nomeCliente.trim() && (
             <p className="text-[11px] text-rose-500 text-center">Informe o nome do cliente para continuar.</p>
-          )}
-          {nomeCliente.trim() && !prazoEntrega && (
-            <p className="text-[11px] text-rose-500 text-center">Informe o prazo de entrega (dias úteis) para continuar.</p>
           )}
           {terceirizadosPrecisaLote && (
             <p className="text-[11px] text-[#FF9500] text-center">Selecione um lote para os itens terceirizados.</p>
