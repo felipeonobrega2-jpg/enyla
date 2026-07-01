@@ -33,7 +33,7 @@ export default function LoginPage() {
         <div style={{
           position: "absolute", top: "30%", left: "50%", transform: "translate(-50%, -50%)",
           width: 600, height: 600,
-          background: "radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(80,9,196,0.12) 0%, transparent 70%)",
         }} />
       </div>
 
@@ -76,7 +76,7 @@ export default function LoginPage() {
                   outline: "none",
                   transition: "border-color 0.15s",
                 }}
-                onFocus={e => { e.currentTarget.style.borderColor = "#6366f1" }}
+                onFocus={e => { e.currentTarget.style.borderColor = "#5009c4" }}
                 onBlur={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)" }}
               />
             </div>
@@ -95,12 +95,12 @@ export default function LoginPage() {
               disabled={loading || !password}
               style={{
                 width: "100%", height: 44,
-                background: loading || !password ? "rgba(99,102,241,0.4)" : "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                background: loading || !password ? "rgba(80,9,196,0.4)" : "linear-gradient(135deg, #5009c4 0%, #4307a6 100%)",
                 border: "none", borderRadius: 12,
                 color: "#fff", fontWeight: 700, fontSize: 14,
                 cursor: loading || !password ? "not-allowed" : "pointer",
                 transition: "opacity 0.15s",
-                boxShadow: loading || !password ? "none" : "0 4px 24px rgba(99,102,241,0.35)",
+                boxShadow: loading || !password ? "none" : "0 4px 24px rgba(80,9,196,0.35)",
               }}
             >
               {loading ? "Entrando…" : "Entrar"}
