@@ -20,6 +20,7 @@ export type FormData = {
   numSKUs: number
   numArtes: number
   quantidades: number[]
+  qualidades: Record<number, "Digital" | "Offset">
   customPecasChapa: number | null
   obsInterna: string
   obsCliente: string

@@ -48,6 +48,16 @@ export function ModalPersonalizarProposta({
   const [idealOvr, setIdealOvr] = useState<number | null>(null)
   const effectiveIdealQtd = idealOvr ?? calculo.sweetSpotIdealQtd
 
+  // Qualidade por quantidade
+  const [localQualidades, setLocalQualidades] = useState<Record<number, "Digital" | "Offset">>(form.qualidades ?? {})
+  function qualDe(q: number): "Digital" | "Offset" {
+    return localQualidades[q] ?? (q < 1000 ? "Digital" : "Offset")
+  }
+  function toggleQual(q: number) {
+    const cur = qualDe(q)
+    setLocalQualidades(prev => ({ ...prev, [q]: cur === "Digital" ? "Offset" : "Digital" }))
+  }
+
   // Lote
   const [showLoteSection, setShowLoteSection] = useState(false)
   const [criandoLote, setCriandoLote] = useState(false)
@@ -226,6 +236,15 @@ export function ModalPersonalizarProposta({
                         <span className="font-bold text-[13px] text-[#1C1C1E] tabular-nums">{num(linha.quantidade)}</span>
                         {isIdeal && <span className="text-[8.5px] bg-[#5009c4] text-white px-1.5 py-0.5 rounded-full font-semibold tracking-wide">IDEAL</span>}
                         {isMin && !isIdeal && <span className="text-[8.5px] bg-[#FF9500] text-white px-1.5 py-0.5 rounded-full font-semibold tracking-wide">MÍN</span>}
+                        <button
+                          onClick={() => toggleQual(linha.quantidade)}
+                          title="Clique para alternar Digital / Offset"
+                          className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${
+                            qualDe(linha.quantidade) === "Digital"
+                              ? "bg-[rgba(116,116,128,0.12)] text-[#64748b] hover:bg-[rgba(116,116,128,0.25)]"
+                              : "bg-[#5009c4]/[0.1] text-[#5009c4] hover:bg-[#5009c4]/20"
+                          }`}
+                        >{qualDe(linha.quantidade)}</button>
                       </div>
                     </td>
 
@@ -375,7 +394,7 @@ export function ModalPersonalizarProposta({
             </button>
             <button
               disabled={nenhum}
-              onClick={() => { onSyncOpcoes(cardId, buildOpcoes()); onAbrirPdf(gerarHtmlOrcamentoCliente({ form, calculo: buildCustomCalculo(), data, numero }, telefoneCliente)) }}
+              onClick={() => { onSyncOpcoes(cardId, buildOpcoes()); onAbrirPdf(gerarHtmlOrcamentoCliente({ form: { ...form, qualidades: localQualidades }, calculo: buildCustomCalculo(), data, numero }, telefoneCliente)) }}
               className="flex-1 py-2.5 text-[11.5px] font-semibold bg-[#5009c4] hover:bg-[#4307a6] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
               PDF Cliente ↓
             </button>

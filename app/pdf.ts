@@ -350,12 +350,15 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
     const preco = l[precoKey as keyof typeof l] as number
     const unit  = l[unitKey as keyof typeof l] as number
     const parc  = l[parc12Key as keyof typeof l] as number
+    const qual  = (form.qualidades ?? {})[l.quantidade] ?? (l.quantidade < 1000 ? "Digital" : "Offset")
+    const qualColor = qual === "Digital" ? "#64748b" : "#5009c4"
     return `
       <div class="valores-row">
         <span class="lbl">Quant.:</span>
         <span class="v-qtd">${num(l.quantidade)}
           ${isIdeal ? '<span class="tag" style="background:#028959">RECOMENDADO</span>' : ""}
           ${isMin   ? '<span class="tag" style="background:#f59e0b">MÍNIMO</span>'  : ""}
+          <span class="tag" style="background:${qualColor}">${qual}</span>
         </span>
         <span class="lbl">Unit.:</span>
         <span class="v-unit">${brl(unit)} <span style="color:#94a3b8;font-size:9.5px">· ${brl(parc)}/mês em 12×</span></span>

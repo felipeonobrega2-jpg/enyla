@@ -39,7 +39,7 @@ function unpackTerceirizado(card: KanbanCard): KanbanCard {
 const FORM_INICIAL: FormData = {
   nomeCliente: "", frente: 0, lateral: 0, alturaBox: 0, abaColagem: 1,
   incluirVerniz: true, comFaca: true, valorFaca: 0,
-  numSKUs: 1, numArtes: 1, quantidades: [...QUANTIDADES_PADRAO], customPecasChapa: null,
+  numSKUs: 1, numArtes: 1, quantidades: [...QUANTIDADES_PADRAO], qualidades: {}, customPecasChapa: null,
   obsInterna: "", obsCliente: "", validadeDias: 7, materialId: "cartao300", materialNome: "Cartão 300g",
 }
 
@@ -828,6 +828,14 @@ export default function Home() {
     window.open(`${base}?text=${encodeURIComponent(linhas)}`, "_blank")
   }
 
+  function qualDe(q: number): "Digital" | "Offset" {
+    return (form.qualidades ?? {})[q] ?? (q < 1000 ? "Digital" : "Offset")
+  }
+  function toggleQual(q: number) {
+    const cur = qualDe(q)
+    set("qualidades", { ...(form.qualidades ?? {}), [q]: cur === "Digital" ? "Offset" : "Digital" })
+  }
+
   function addQtd() {
     const v = parseInt(novaQtd)
     if (!v || v <= 0 || form.quantidades.includes(v)) return
@@ -1082,13 +1090,25 @@ export default function Home() {
           {/* Seção: Quantidades */}
           <FormSection label="Quantidades">
             <div className="flex flex-wrap gap-1.5 mb-2">
-              {form.quantidades.map(q => (
-                <span key={q} className="inline-flex items-center gap-1 text-[11.5px] tabular-nums bg-[rgba(116,116,128,0.08)] hover:bg-slate-200 text-[rgba(60,60,67,0.75)] px-2.5 py-1 rounded-full font-medium transition-colors">
-                  {num(q)}
-                  <button onClick={() => set("quantidades", form.quantidades.filter(x => x !== q))}
-                    className="text-[#8E8E93] hover:text-rose-500 leading-none transition-colors ml-0.5">×</button>
-                </span>
-              ))}
+              {form.quantidades.map(q => {
+                const qual = qualDe(q)
+                return (
+                  <span key={q} className="inline-flex items-center gap-1 text-[11.5px] tabular-nums bg-[rgba(116,116,128,0.08)] text-[rgba(60,60,67,0.75)] px-2 py-1 rounded-full font-medium">
+                    {num(q)}
+                    <button
+                      onClick={() => toggleQual(q)}
+                      title="Clique para alternar Digital / Offset"
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${
+                        qual === "Digital"
+                          ? "bg-[rgba(116,116,128,0.18)] text-[#64748b] hover:bg-[rgba(116,116,128,0.3)]"
+                          : "bg-[#5009c4]/[0.12] text-[#5009c4] hover:bg-[#5009c4]/20"
+                      }`}
+                    >{qual}</button>
+                    <button onClick={() => set("quantidades", form.quantidades.filter(x => x !== q))}
+                      className="text-[#8E8E93] hover:text-rose-500 leading-none transition-colors">×</button>
+                  </span>
+                )
+              })}
             </div>
             <div className="flex gap-1.5">
               <input type="number" value={novaQtd}
