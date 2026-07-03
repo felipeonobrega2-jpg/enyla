@@ -184,8 +184,11 @@ export function calcular(form: FormData, config: Configuracoes): Calculo | null 
   const numChapas = Math.max(1, Math.ceil(form.numArtes / layoutChapa.pecasPorChapa))
   const custoImpressaoFixo = numChapas * config.custos.impressaoPorChapa
 
-  const formatoEfetivo = form.customPecasChapa && form.customPecasChapa > 0
-    ? { ...melhorFormato, pecasPorFolha: form.customPecasChapa * 2 }
+  const validCustomPecas = form.customPecasChapa && form.customPecasChapa > 0 && form.customPecasChapa <= layoutChapa.pecasPorChapa
+    ? form.customPecasChapa
+    : null
+  const formatoEfetivo = validCustomPecas !== null
+    ? { ...melhorFormato, pecasPorFolha: validCustomPecas * 2 }
     : melhorFormato
 
   const quantidades = [...form.quantidades].sort((a, b) => a - b)

@@ -231,6 +231,15 @@ export default function Home() {
     })
   }, [config])
 
+  // Campos que afetam a dieline (largura/altura) — resetam customPecasChapa
+  const setDim = useCallback(<K extends "frente" | "alturaBox" | "lateral" | "abaColagem">(campo: K, valor: number) => {
+    setForm(prev => {
+      const next = { ...prev, [campo]: valor, customPecasChapa: null }
+      setResult(calcular(next, config))
+      return next
+    })
+  }, [config])
+
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(""), 2800)
@@ -984,13 +993,13 @@ export default function Home() {
               {(["frente","alturaBox","lateral"] as const).map(c => (
                 <div key={c}>
                   <Label>{c === "frente" ? "Largura" : c === "alturaBox" ? "Altura" : "Profundidade"}</Label>
-                  <NumberInput value={form[c]} onChange={v => set(c, v)} />
+                  <NumberInput value={form[c]} onChange={v => setDim(c, v)} />
                 </div>
               ))}
             </div>
             <div className="mt-2">
               <Label>Aba de colagem (cm)</Label>
-              <NumberInput value={form.abaColagem} onChange={v => set("abaColagem", v)} min={0.5} max={2} />
+              <NumberInput value={form.abaColagem} onChange={v => setDim("abaColagem", v)} min={0.5} max={2} />
             </div>
           </FormSection>
 
@@ -1587,6 +1596,7 @@ export default function Home() {
               <Section title={`Layout da chapa — ${(r.layoutChapa.larguraChapa/10).toFixed(0)}×${(r.layoutChapa.alturaChapa/10).toFixed(0)} cm`}>
                 <div className="bg-white rounded-xl border border-[rgba(60,60,67,0.08)] p-4">
                   <LayoutChapaVisual
+                    key={`${r.dieline.largura}-${r.dieline.altura}`}
                     layout={r.layoutChapa}
                     dieline={r.dieline}
                     formData={r.formData}
