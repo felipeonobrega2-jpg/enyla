@@ -234,8 +234,6 @@ export function ModalPersonalizarProposta({
                           </svg>
                         </button>
                         <span className="font-bold text-[13px] text-[#1C1C1E] tabular-nums">{num(linha.quantidade)}</span>
-                        {isIdeal && <span className="text-[8.5px] bg-[#5009c4] text-white px-1.5 py-0.5 rounded-full font-semibold tracking-wide">IDEAL</span>}
-                        {isMin && !isIdeal && <span className="text-[8.5px] bg-[#FF9500] text-white px-1.5 py-0.5 rounded-full font-semibold tracking-wide">MÍN</span>}
                         <button
                           onClick={() => toggleQual(linha.quantidade)}
                           title="Clique para alternar Digital / Offset"
