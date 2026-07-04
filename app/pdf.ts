@@ -362,8 +362,8 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
           <span class="tag" style="background:${qualColor}">${qual}</span>
         </div></td>
         <td class="v-unit">${brl(unit)}</td>
-        <td class="v-parc">${brl(parc)}/mês</td>
         <td class="v-total">${brl(preco)}</td>
+        <td class="v-parc">${brl(parc)}/mês</td>
       </tr>`
   }).join("")
 
@@ -417,7 +417,7 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
   ${linhasHtml ? `
   <div class="section-bar">Valores</div>
   <table class="valores-table">
-    <thead><tr><th>Quantidade</th><th>Unitário</th><th>12×/mês</th><th>Total</th></tr></thead>
+    <thead><tr><th>Quantidade</th><th>Unitário</th><th>À Vista</th><th>Até 12×</th></tr></thead>
     <tbody>${linhasHtml}</tbody>
   </table>` : ""}
 
@@ -471,8 +471,8 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom, telefoneCliente?: str
           ${isMin   ? '<span class="tag" style="background:#f59e0b">MÍNIMO</span>'  : ""}
         </div></td>
         <td class="v-unit">${brl(l.unitario)}</td>
-        <td class="v-parc">${brl(parc)}/mês</td>
         <td class="v-total">${brl(total)}</td>
+        <td class="v-parc">${brl(parc)}/mês</td>
       </tr>`
   }).join("")
 
@@ -525,7 +525,7 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom, telefoneCliente?: str
   ${linhasHtml ? `
   <div class="section-bar">Valores</div>
   <table class="valores-table">
-    <thead><tr><th>Quantidade</th><th>Unitário</th><th>12×/mês</th><th>Total</th></tr></thead>
+    <thead><tr><th>Quantidade</th><th>Unitário</th><th>À Vista</th><th>Até 12×</th></tr></thead>
     <tbody>${linhasHtml}</tbody>
   </table>` : ""}
 
