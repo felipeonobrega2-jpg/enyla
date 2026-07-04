@@ -225,11 +225,15 @@ function estiloPropostaCliente(): string {
     .kv .lbl{font-weight:700;color:#0f172a;white-space:nowrap}
     .kv .val{color:#334155}
 
-    .valores-row{display:flex;align-items:center;gap:18px;padding:6px 2px;border-bottom:1px solid #f1f5f9;font-size:11.5px}
-    .valores-row .lbl{font-weight:700;color:#0f172a}
-    .valores-row .v-qtd{font-weight:800;min-width:96px;display:flex;align-items:center;gap:6px}
-    .valores-row .v-unit{color:#334155;min-width:170px}
-    .valores-row .v-total{font-weight:800;color:#5009c4;margin-left:auto}
+    .valores-table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:2px}
+    .valores-table th{font-weight:700;color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.06em;padding:5px 8px;border-bottom:2px solid #e2e8f0;text-align:left}
+    .valores-table th:not(:first-child){text-align:right}
+    .valores-table td{padding:7px 8px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+    .valores-table td:not(:first-child){text-align:right;white-space:nowrap}
+    .v-qtd{display:flex;align-items:center;gap:5px;font-weight:800}
+    .v-unit{color:#334155;font-weight:600}
+    .v-parc{color:#94a3b8;font-size:9.5px}
+    .v-total{font-weight:800;color:#5009c4}
     .tag{font-size:8px;font-weight:700;padding:1px 6px;border-radius:9999px;color:#fff;white-space:nowrap}
 
     .footnotes{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:10px;color:#64748b;margin-top:8px;font-style:italic}
@@ -353,17 +357,16 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
     const qual  = (form.qualidades ?? {})[l.quantidade] ?? (l.quantidade < 1000 ? "Digital" : "Offset")
     const qualColor = qual === "Digital" ? "#64748b" : "#5009c4"
     return `
-      <div class="valores-row">
-        <span class="lbl">Quant.:</span>
-        <span class="v-qtd">${num(l.quantidade)}
+      <tr>
+        <td><div class="v-qtd">${num(l.quantidade)}
           ${isIdeal ? '<span class="tag" style="background:#028959">RECOMENDADO</span>' : ""}
           ${isMin   ? '<span class="tag" style="background:#f59e0b">MÍNIMO</span>'  : ""}
           <span class="tag" style="background:${qualColor}">${qual}</span>
-        </span>
-        <span class="lbl">Unit.:</span>
-        <span class="v-unit">${brl(unit)} <span style="color:#94a3b8;font-size:9.5px">· ${brl(parc)}/mês em 12×</span></span>
-        <span class="v-total">${brl(preco)}</span>
-      </div>`
+        </div></td>
+        <td class="v-unit">${brl(unit)}</td>
+        <td class="v-parc">${brl(parc)}/mês</td>
+        <td class="v-total">${brl(preco)}</td>
+      </tr>`
   }).join("")
 
   const temAcabamento = form.incluirVerniz || form.comFaca
@@ -415,7 +418,10 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
 
   ${linhasHtml ? `
   <div class="section-bar">Valores</div>
-  ${linhasHtml}` : ""}
+  <table class="valores-table">
+    <thead><tr><th>Quantidade</th><th>Unitário</th><th>12×/mês</th><th>Total</th></tr></thead>
+    <tbody>${linhasHtml}</tbody>
+  </table>` : ""}
 
   <div class="section-bar">Condições e Observações</div>
   <div class="obs-bar-list">
@@ -461,16 +467,15 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom, telefoneCliente?: str
     const total   = l.unitario * l.quantidade
     const parc    = (total * p.parcFator) / 12
     return `
-      <div class="valores-row">
-        <span class="lbl">Quant.:</span>
-        <span class="v-qtd">${num(l.quantidade)}
+      <tr>
+        <td><div class="v-qtd">${num(l.quantidade)}
           ${isIdeal ? '<span class="tag" style="background:#028959">RECOMENDADO</span>' : ""}
           ${isMin   ? '<span class="tag" style="background:#f59e0b">MÍNIMO</span>'  : ""}
-        </span>
-        <span class="lbl">Unit.:</span>
-        <span class="v-unit">${brl(l.unitario)} <span style="color:#94a3b8;font-size:9.5px">· ${brl(parc)}/mês em 12×</span></span>
-        <span class="v-total">${brl(total)}</span>
-      </div>`
+        </div></td>
+        <td class="v-unit">${brl(l.unitario)}</td>
+        <td class="v-parc">${brl(parc)}/mês</td>
+        <td class="v-total">${brl(total)}</td>
+      </tr>`
   }).join("")
 
   const temAcabamento = p.incluirVerniz || p.comFaca
@@ -521,7 +526,10 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom, telefoneCliente?: str
 
   ${linhasHtml ? `
   <div class="section-bar">Valores</div>
-  ${linhasHtml}` : ""}
+  <table class="valores-table">
+    <thead><tr><th>Quantidade</th><th>Unitário</th><th>12×/mês</th><th>Total</th></tr></thead>
+    <tbody>${linhasHtml}</tbody>
+  </table>` : ""}
 
   <div class="section-bar">Condições e Observações</div>
   <div class="obs-bar-list">
