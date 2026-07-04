@@ -5,6 +5,8 @@ export type TrackingEtapa = {
   coluna: number
   nome: string
   dataHora: string
+  tipo?: "coluna" | "preco" | "criacao"
+  detalhe?: string
 }
 
 export type TrackingEntry = {

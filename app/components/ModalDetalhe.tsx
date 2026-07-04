@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { FormData, Calculo, PropostaCustom, KanbanCard, LancamentoFinanceiro, COLUNAS_KANBAN, COL_FECHADO, COL_EXPEDICAO, COL_PERDIDO } from "../types"
 import { brl, num } from "../utils"
 
@@ -40,8 +40,21 @@ export function ModalDetalhe({
   const [deliveryRealDate,  setDeliveryRealDate]  = useState(card?.dataEntregaReal      ?? "")
   const [fornecedor,        setFornecedor]        = useState(card?.fornecedor            ?? "")
   const [custoTerceiro,     setCustoTerceiro]     = useState(card?.custoTerceiro?.toString() ?? "")
-  const [saving, setSaving] = useState(false)
-  const [pixCopied, setPixCopied] = useState(false)
+  const [saving, setSaving]               = useState(false)
+  const [pixCopied, setPixCopied]         = useState(false)
+  const [historicoOpen, setHistoricoOpen] = useState(false)
+  type Etapa = { coluna: number; nome: string; dataHora: string; tipo?: string; detalhe?: string }
+  const [etapasLog, setEtapasLog]         = useState<Etapa[] | null>(null)
+
+  const fetchHistorico = useCallback(async () => {
+    if (!card?.numero) return
+    try {
+      const res = await fetch(`/api/track/${encodeURIComponent(card.numero)}`)
+      if (res.ok) { const d = await res.json(); setEtapasLog(d.etapas ?? []) }
+    } catch { /* silent */ }
+  }, [card?.numero])
+
+  useEffect(() => { if (historicoOpen && etapasLog === null) fetchHistorico() }, [historicoOpen, etapasLog, fetchHistorico])
 
   const isTerceirizado = card?.materialNome === "Terceirizado"
 
@@ -421,6 +434,55 @@ export function ModalDetalhe({
           )}
 
         </div>
+
+        {/* ── Histórico ───────────────────────────────────────────────────────── */}
+        {card?.numero && (
+          <div className="border-t border-[rgba(60,60,67,0.08)] shrink-0">
+            <button
+              onClick={() => setHistoricoOpen(v => !v)}
+              className="w-full px-5 py-2.5 flex items-center justify-between hover:bg-[rgba(116,116,128,0.04)] transition-colors"
+            >
+              <span className="text-[10.5px] font-semibold text-[#8E8E93] uppercase tracking-wider">Histórico de alterações</span>
+              <svg className={`w-3.5 h-3.5 text-[#8E8E93] transition-transform ${historicoOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+            {historicoOpen && (
+              <div className="px-5 pb-4 space-y-3 max-h-52 overflow-y-auto">
+                {etapasLog === null ? (
+                  <p className="text-[11.5px] text-[#8E8E93]">Carregando…</p>
+                ) : etapasLog.length === 0 ? (
+                  <p className="text-[11.5px] text-[#8E8E93]">Sem histórico registrado.</p>
+                ) : (
+                  [...etapasLog].reverse().map((e, i) => (
+                    <div key={i} className="flex items-start gap-2.5">
+                      <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                        e.tipo === "criacao" ? "bg-[#5009c4]/[0.1]" :
+                        e.tipo === "preco"   ? "bg-[#FF9500]/[0.12]" :
+                        "bg-[rgba(116,116,128,0.08)]"
+                      }`}>
+                        {e.tipo === "criacao" ? (
+                          <svg className="w-2.5 h-2.5 text-[#5009c4]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                        ) : e.tipo === "preco" ? (
+                          <svg className="w-2.5 h-2.5 text-[#FF9500]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+                        ) : (
+                          <svg className="w-2.5 h-2.5 text-[#8E8E93]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2">
+                          <p className="text-[12px] font-semibold text-[#1C1C1E]">{e.nome}</p>
+                          <span className="text-[10px] text-[rgba(60,60,67,0.4)] tabular-nums shrink-0">{e.dataHora}</span>
+                        </div>
+                        {e.detalhe && <p className="text-[11px] text-[#8E8E93] mt-0.5">{e.detalhe}</p>}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Footer ──────────────────────────────────────────────────────────── */}
         <div className="px-5 py-3.5 border-t border-[rgba(60,60,67,0.08)] shrink-0 flex items-center gap-2">

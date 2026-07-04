@@ -87,6 +87,7 @@ export default function Home() {
   const [result, setResult]   = useState<Calculo | null>(null)
   const [novaQtd, setNovaQtd] = useState("")
   const [toast, setToast]     = useState("")
+  const [notifWA, setNotifWA] = useState<{ nomeCliente: string; numero: string; etapa: string; telefone: string } | null>(null)
   const [historico, setHistorico] = useState<Array<{ form: FormData; calculo: Calculo; data: string; numero?: string }>>([])
   const [editandoHistorico, setEditandoHistorico] = useState<string | null>(null)
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
@@ -258,7 +259,7 @@ export default function Home() {
           quantidade: card.quantidade,
           preco: card.preco,
           colunaAtual: 0,
-          etapas: [{ coluna: 0, nome: "Orçamento realizado", dataHora: card.data }],
+          etapas: [{ coluna: 0, nome: "Orçamento criado", dataHora: card.data, tipo: "criacao" }],
           criadoEm: card.data,
         }),
       })
@@ -439,8 +440,13 @@ export default function Home() {
       const entry = await res.json()
       const dataHora = new Date().toLocaleString("pt-BR")
       const colNome = COLUNAS_KANBAN[novaColuna] ?? `Coluna ${novaColuna}`
-      const jatem = entry.etapas.some((e: { coluna: number }) => e.coluna === novaColuna)
-      const etapas = jatem ? entry.etapas : [...entry.etapas, { coluna: novaColuna, nome: colNome, dataHora }]
+      const etapas = [...entry.etapas]
+      const jatem = etapas.some((e: { coluna: number; tipo?: string }) => e.coluna === novaColuna && (!e.tipo || e.tipo === "coluna"))
+      if (!jatem) etapas.push({ coluna: novaColuna, nome: colNome, dataHora, tipo: "coluna" })
+      if (preco !== undefined && entry.preco > 0 && entry.preco !== preco) {
+        const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+        etapas.push({ coluna: novaColuna, nome: "Preço atualizado", dataHora, tipo: "preco", detalhe: `${fmt(entry.preco)} → ${fmt(preco)}` })
+      }
       await fetch(`/api/track/${encodeURIComponent(numero)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -967,6 +973,33 @@ export default function Home() {
         </div>
       )}
 
+      {notifWA && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 bg-white border border-[rgba(0,0,0,0.1)] rounded-2xl shadow-2xl px-4 py-3 w-[340px]">
+          <div className="flex-1 min-w-0">
+            <p className="text-[12.5px] font-semibold text-[#1C1C1E] truncate">Notificar {notifWA.nomeCliente.split(" ")[0]}?</p>
+            <p className="text-[11px] text-[#8E8E93] truncate">{notifWA.etapa} · {notifWA.numero}</p>
+          </div>
+          <a
+            href={(() => {
+              const firstName = notifWA.nomeCliente.split(" ")[0]
+              const url = `${typeof window !== "undefined" ? window.location.origin : ""}/track/${encodeURIComponent(notifWA.numero)}`
+              const msg = `Olá, ${firstName}! 🎉 Seu pedido *${notifWA.numero}* avançou para: *${notifWA.etapa}*.\n\nAcompanhe em tempo real:\n${url}`
+              return `https://wa.me/55${notifWA.telefone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`
+            })()}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => setNotifWA(null)}
+            className="shrink-0 flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white text-[11.5px] font-semibold px-3 py-1.5 rounded-xl transition-colors"
+          >
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current shrink-0"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.526 5.847L0 24l6.335-1.502A11.944 11.944 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.006-1.373l-.36-.214-3.724.882.897-3.63-.235-.374A9.817 9.817 0 0 1 2.182 12c0-5.42 4.398-9.818 9.818-9.818 5.42 0 9.818 4.398 9.818 9.818 0 5.42-4.398 9.818-9.818 9.818z"/></svg>
+            Enviar
+          </a>
+          <button onClick={() => setNotifWA(null)} className="shrink-0 text-[#8E8E93] hover:text-[#1C1C1E] transition-colors p-0.5">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      )}
+
       {/* ── Layout principal ────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
 
@@ -1297,6 +1330,10 @@ export default function Home() {
                   }).catch(() => {})
                 }
                 if (card?.numero) atualizarTracking(card.numero, coluna)
+                if (card?.numero && coluna >= 2 && coluna <= 8) {
+                  const telefone = clientes.find(c => c.nome.toLowerCase() === card.nomeCliente.toLowerCase())?.telefone
+                  if (telefone) setNotifWA({ nomeCliente: card.nomeCliente, numero: card.numero, etapa: COLUNAS_KANBAN[coluna] ?? `Etapa ${coluna}`, telefone })
+                }
                 // Voltar para col 0 → remover lote
                 if (coluna === 0 && card?.loteId) {
                   removeLote(id)
@@ -1726,6 +1763,7 @@ export default function Home() {
             }).catch(() => {})
             const ideal = opcoes.find(o => o.quantidade === customCalculo.sweetSpotIdealQtd) ?? opcoes[opcoes.length - 1]
             const updateData = { opcoes, ...(ideal ? { preco: ideal.preco, quantidade: ideal.quantidade } : {}) }
+            const cardAtual = kanban.find(c => c.id === cid)
             setKanban(prev => prev.map(c =>
               c.id === cid ? { ...c, ...updateData } : c
             ))
@@ -1734,6 +1772,7 @@ export default function Home() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(updateData),
             }).catch(() => {})
+            if (num && ideal && cardAtual) atualizarTracking(num, cardAtual.coluna, ideal.preco, ideal.quantidade)
           }}
         />
       )}
