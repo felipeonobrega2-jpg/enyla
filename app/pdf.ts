@@ -359,8 +359,6 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
     return `
       <tr>
         <td><div class="v-qtd">${num(l.quantidade)}
-          ${isIdeal ? '<span class="tag" style="background:#028959">RECOMENDADO</span>' : ""}
-          ${isMin   ? '<span class="tag" style="background:#f59e0b">MÍNIMO</span>'  : ""}
           <span class="tag" style="background:${qualColor}">${qual}</span>
         </div></td>
         <td class="v-unit">${brl(unit)}</td>
