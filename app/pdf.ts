@@ -427,8 +427,10 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
     <div class="item">* Contamos com designer próprio — desenvolvimento de arte incluso sem custo adicional.</div>
     <div class="item">* A quantidade final do lote pode variar <strong>até 10%</strong> para mais ou para menos.</div>
     <div class="item">* Pagamento: <strong>50% de sinal</strong> no fechamento do pedido + 50% na entrega.</div>
-    ${form.comFaca && form.valorFaca > 0 ? `<div class="item">* A faca de corte é investimento único — reutilizada em todos os pedidos futuros do mesmo produto.</div>` : ""}
     <div class="item">* Pedido mínimo: <strong>${num(sweetMin.quantidade)} unidades</strong>.</div>
+    <div class="item">* Os valores apresentados são válidos até a data de vencimento indicada. Após esse prazo, os preços estão sujeitos a alterações sem aviso prévio.</div>
+    <div class="item">* Recebeu uma proposta mais em conta? Apresente-nos e faremos o possível para cobrir ou superar a oferta.</div>
+    <div class="item">* Após o fechamento do pedido, você receberá um link de rastreamento exclusivo para acompanhar cada etapa da produção da sua embalagem em tempo real.</div>
     ${form.obsCliente ? `<div class="item" style="margin-top:6px">${form.obsCliente.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</div>` : ""}
   </div>
 
@@ -535,8 +537,10 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom, telefoneCliente?: str
     <div class="item">* Contamos com designer próprio — desenvolvimento de arte incluso sem custo adicional.</div>
     <div class="item">* A quantidade final do lote pode variar <strong>até 10%</strong> para mais ou para menos.</div>
     <div class="item">* Pagamento: <strong>50% de sinal</strong> no fechamento do pedido + 50% na entrega.</div>
-    ${p.comFaca && p.valorFaca > 0 ? `<div class="item">* A faca de corte é investimento único — reutilizada em todos os pedidos futuros do mesmo produto.</div>` : ""}
     ${minLinha && ideal && minLinha !== ideal ? `<div class="item">* Pedido mínimo: <strong>${num(minLinha.quantidade)} unidades</strong>.</div>` : ""}
+    <div class="item">* Os valores apresentados são válidos até a data de vencimento indicada. Após esse prazo, os preços estão sujeitos a alterações sem aviso prévio.</div>
+    <div class="item">* Recebeu uma proposta mais em conta? Apresente-nos e faremos o possível para cobrir ou superar a oferta.</div>
+    <div class="item">* Após o fechamento do pedido, você receberá um link de rastreamento exclusivo para acompanhar cada etapa da produção da sua embalagem em tempo real.</div>
     ${p.obsCliente ? `<div class="item" style="margin-top:6px">${p.obsCliente.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</div>` : ""}
   </div>
 
