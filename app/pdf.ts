@@ -236,12 +236,10 @@ function estiloPropostaCliente(): string {
     .v-total{font-weight:800;color:#5009c4}
     .tag{font-size:8px;font-weight:700;padding:1px 6px;border-radius:9999px;color:#fff;white-space:nowrap}
 
-    .promo-box{background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);border-radius:10px;padding:14px 18px;margin:18px 0 4px;color:#fff;border-left:4px solid #92400e}
-    .promo-box .promo-cabecalho{display:flex;align-items:center;gap:8px;margin-bottom:5px}
-    .promo-box .promo-icone{width:22px;height:22px;background:rgba(255,255,255,0.25);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;flex-shrink:0}
-    .promo-box .promo-titulo{font-size:12.5px;font-weight:800;letter-spacing:.01em;text-transform:uppercase}
-    .promo-box .promo-corpo{font-size:11.5px;line-height:1.65}
-    .promo-box .promo-validade{font-size:9.5px;margin-top:7px;opacity:0.8;border-top:1px solid rgba(255,255,255,0.3);padding-top:6px}
+    .promo-box{background:#fffbeb;border:1px solid #fcd34d;border-left:3px solid #f59e0b;border-radius:8px;padding:12px 16px;margin:18px 0 4px}
+    .promo-box .promo-titulo{font-size:11.5px;font-weight:700;color:#92400e;margin-bottom:4px}
+    .promo-box .promo-corpo{font-size:11px;color:#78350f;line-height:1.6}
+    .promo-box .promo-validade{font-size:9.5px;color:#a16207;margin-top:6px}
 
     .footnotes{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:10px;color:#64748b;margin-top:8px;font-style:italic}
 
@@ -430,14 +428,9 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
   </table>` : ""}
 
   <div class="promo-box">
-    <div class="promo-cabecalho">
-      <div class="promo-icone">&#127873;</div>
-      <div class="promo-titulo">Fechando hoje — você ganha um brinde especial!</div>
-    </div>
-    <div class="promo-corpo">
-      Escolha entre <strong>1.000 cartões de visita</strong> ou um <strong>banner personalizado</strong> para a sua empresa — sem nenhum custo adicional.
-    </div>
-    <div class="promo-validade">&#10033; Válido exclusivamente para pedidos acima de 100 unidades (embalagens) com fechamento no dia do envio desta proposta.</div>
+    <div class="promo-titulo">Brinde especial para fechamento hoje</div>
+    <div class="promo-corpo">Feche o pedido hoje e escolha entre <strong>1.000 cartões de visita</strong> ou um <strong>banner personalizado</strong> para a sua empresa, sem custo adicional.</div>
+    <div class="promo-validade">Válido para pedidos acima de 100 unidades com fechamento no dia do envio desta proposta.</div>
   </div>
 
   <div class="section-bar">Condições e Observações</div>
@@ -551,14 +544,9 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom, telefoneCliente?: str
   </table>` : ""}
 
   <div class="promo-box">
-    <div class="promo-cabecalho">
-      <div class="promo-icone">&#127873;</div>
-      <div class="promo-titulo">Fechando hoje — você ganha um brinde especial!</div>
-    </div>
-    <div class="promo-corpo">
-      Escolha entre <strong>1.000 cartões de visita</strong> ou um <strong>banner personalizado</strong> para a sua empresa — sem nenhum custo adicional.
-    </div>
-    <div class="promo-validade">&#10033; Válido exclusivamente para pedidos acima de 100 unidades (embalagens) com fechamento no dia do envio desta proposta.</div>
+    <div class="promo-titulo">Brinde especial para fechamento hoje</div>
+    <div class="promo-corpo">Feche o pedido hoje e escolha entre <strong>1.000 cartões de visita</strong> ou um <strong>banner personalizado</strong> para a sua empresa, sem custo adicional.</div>
+    <div class="promo-validade">Válido para pedidos acima de 100 unidades com fechamento no dia do envio desta proposta.</div>
   </div>
 
   <div class="section-bar">Condições e Observações</div>
