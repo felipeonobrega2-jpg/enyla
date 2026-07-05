@@ -389,7 +389,8 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
 
   <div class="client-row">
     <div class="bloco">
-      <div><span class="lbl">Para: </span><span class="val">${form.nomeCliente || "Cliente"}${telefoneCliente ? ` · ${telefoneCliente}` : ""}</span></div>
+      <div><span class="lbl">Para: </span><span class="val">${form.nomeCliente || "Cliente"}</span></div>
+      ${telefoneCliente ? `<div><span class="lbl">Telefone: </span><span class="val">${telefoneCliente}</span></div>` : ""}
     </div>
     <div class="bloco">
       <div><span class="lbl">Data: </span><span class="val">${data}</span></div>
