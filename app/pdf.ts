@@ -236,10 +236,11 @@ function estiloPropostaCliente(): string {
     .v-total{font-weight:800;color:#5009c4}
     .tag{font-size:8px;font-weight:700;padding:1px 6px;border-radius:9999px;color:#fff;white-space:nowrap}
 
-    .promo-box{background:#fffbeb;border:1px solid #fcd34d;border-left:3px solid #f59e0b;border-radius:8px;padding:12px 16px;margin:18px 0 4px}
-    .promo-box .promo-titulo{font-size:11.5px;font-weight:700;color:#92400e;margin-bottom:4px}
-    .promo-box .promo-corpo{font-size:11px;color:#78350f;line-height:1.6}
-    .promo-box .promo-validade{font-size:9.5px;color:#a16207;margin-top:6px}
+    .promo-box{background:#faf7ff;border:1.5px solid #c4b5fd;border-radius:10px;padding:14px 16px;margin:20px 0 4px}
+    .promo-badge{display:inline-block;background:#22c55e;color:#fff;font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;padding:3px 12px;border-radius:999px;margin-bottom:10px}
+    .promo-corpo{font-size:11.5px;color:#1e293b;line-height:1.65}
+    .promo-corpo strong{color:#5009c4;font-weight:700}
+    .promo-validade{font-size:10px;color:#94a3b8;margin-top:7px}
 
     .footnotes{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:10px;color:#64748b;margin-top:8px;font-style:italic}
 
@@ -428,8 +429,8 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
   </table>` : ""}
 
   <div class="promo-box">
-    <div class="promo-titulo">Brinde especial para fechamento hoje</div>
-    <div class="promo-corpo">Feche o pedido hoje e escolha entre <strong>1.000 cartões de visita</strong> ou um <strong>banner personalizado</strong> para a sua empresa, sem custo adicional.</div>
+    <div class="promo-badge">BÔNUS HOJE</div>
+    <div class="promo-corpo">Feche o pedido hoje e escolha entre <strong>1.000 cartões de visita</strong> ou um <strong>banner personalizado</strong>, sem custo adicional.</div>
     <div class="promo-validade">Válido para pedidos acima de 100 unidades com fechamento no dia do envio desta proposta.</div>
   </div>
 
@@ -544,8 +545,8 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom, telefoneCliente?: str
   </table>` : ""}
 
   <div class="promo-box">
-    <div class="promo-titulo">Brinde especial para fechamento hoje</div>
-    <div class="promo-corpo">Feche o pedido hoje e escolha entre <strong>1.000 cartões de visita</strong> ou um <strong>banner personalizado</strong> para a sua empresa, sem custo adicional.</div>
+    <div class="promo-badge">BÔNUS HOJE</div>
+    <div class="promo-corpo">Feche o pedido hoje e escolha entre <strong>1.000 cartões de visita</strong> ou um <strong>banner personalizado</strong>, sem custo adicional.</div>
     <div class="promo-validade">Válido para pedidos acima de 100 unidades com fechamento no dia do envio desta proposta.</div>
   </div>
 
