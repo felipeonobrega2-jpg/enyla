@@ -236,6 +236,13 @@ function estiloPropostaCliente(): string {
     .v-total{font-weight:800;color:#5009c4}
     .tag{font-size:8px;font-weight:700;padding:1px 6px;border-radius:9999px;color:#fff;white-space:nowrap}
 
+    .promo-box{background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);border-radius:10px;padding:14px 18px;margin:18px 0 4px;color:#fff;border-left:4px solid #92400e}
+    .promo-box .promo-cabecalho{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+    .promo-box .promo-icone{width:22px;height:22px;background:rgba(255,255,255,0.25);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;flex-shrink:0}
+    .promo-box .promo-titulo{font-size:12.5px;font-weight:800;letter-spacing:.01em;text-transform:uppercase}
+    .promo-box .promo-corpo{font-size:11.5px;line-height:1.65}
+    .promo-box .promo-validade{font-size:9.5px;margin-top:7px;opacity:0.8;border-top:1px solid rgba(255,255,255,0.3);padding-top:6px}
+
     .footnotes{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:10px;color:#64748b;margin-top:8px;font-style:italic}
 
     .obs-bar-list{font-size:11px;color:#334155;line-height:1.75}
@@ -422,6 +429,17 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
     <tbody>${linhasHtml}</tbody>
   </table>` : ""}
 
+  <div class="promo-box">
+    <div class="promo-cabecalho">
+      <div class="promo-icone">&#127873;</div>
+      <div class="promo-titulo">Fechando hoje — você ganha um brinde especial!</div>
+    </div>
+    <div class="promo-corpo">
+      Escolha entre <strong>1.000 cartões de visita</strong> ou um <strong>banner personalizado</strong> para a sua empresa — sem nenhum custo adicional.
+    </div>
+    <div class="promo-validade">&#10033; Válido exclusivamente para pedidos acima de 100 unidades (embalagens) com fechamento no dia do envio desta proposta.</div>
+  </div>
+
   <div class="section-bar">Condições e Observações</div>
   <div class="obs-bar-list">
     <div class="item">* Prazo de produção: <strong>${PRAZO_ENTREGA_PADRAO}</strong> após aprovação da arte.</div>
@@ -531,6 +549,17 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom, telefoneCliente?: str
     <thead><tr><th>Quantidade</th><th>Unitário</th><th>À Vista</th><th>Até 12×</th></tr></thead>
     <tbody>${linhasHtml}</tbody>
   </table>` : ""}
+
+  <div class="promo-box">
+    <div class="promo-cabecalho">
+      <div class="promo-icone">&#127873;</div>
+      <div class="promo-titulo">Fechando hoje — você ganha um brinde especial!</div>
+    </div>
+    <div class="promo-corpo">
+      Escolha entre <strong>1.000 cartões de visita</strong> ou um <strong>banner personalizado</strong> para a sua empresa — sem nenhum custo adicional.
+    </div>
+    <div class="promo-validade">&#10033; Válido exclusivamente para pedidos acima de 100 unidades (embalagens) com fechamento no dia do envio desta proposta.</div>
+  </div>
 
   <div class="section-bar">Condições e Observações</div>
   <div class="obs-bar-list">
