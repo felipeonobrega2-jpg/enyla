@@ -1260,6 +1260,7 @@ export default function Home() {
               clientes={clientes}
               config={config}
               lancamentos={lancamentos}
+              isDark={isDark}
             />
           ) : view === "config" ? (
             <ConfigView

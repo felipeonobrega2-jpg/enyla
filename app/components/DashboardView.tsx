@@ -28,6 +28,7 @@ interface Props {
   clientes: Cliente[]
   config: Configuracoes
   lancamentos?: LancamentoFinanceiro[]
+  isDark?: boolean
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -523,7 +524,7 @@ function gerarHtmlRelatorio({
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
-export default function DashboardView({ historico, kanban, propostasCustom: _propostasCustom, clientes: _clientes, config: _config, lancamentos = [] }: Props) {
+export default function DashboardView({ historico, kanban, propostasCustom: _propostasCustom, clientes: _clientes, config: _config, lancamentos = [], isDark = false }: Props) {
   const [periodo, setPeriodo] = useState<Periodo>("mes")
   const [dataInicio, setDataInicio] = useState("")
   const [dataFim, setDataFim]   = useState("")
@@ -921,7 +922,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
     <div className="max-w-[1280px] mx-auto px-6 py-5 space-y-5">
 
       {/* ── Filter bar ─────────────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-10 bg-[#F2F2F7]/95 backdrop-blur-sm py-2 -mx-6 px-6">
+      <div className={`sticky top-0 z-10 backdrop-blur-sm py-2 -mx-6 px-6 ${isDark ? "bg-[#1C1C1E]/95" : "bg-[#F2F2F7]/95"}`}>
         <div className="flex items-center gap-2">
 
           {/* Period dropdown */}
@@ -931,7 +932,9 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
               className={`flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-medium transition-all ${
                 periodo !== "custom"
                   ? "bg-[#5009c4] text-white shadow-sm"
-                  : "bg-white border border-[rgba(0,0,0,0.12)] text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)]"
+                  : isDark
+                    ? "bg-[#2C2C2E] border border-[rgba(255,255,255,0.1)] text-white hover:bg-[rgba(255,255,255,0.08)]"
+                    : "bg-white border border-[rgba(0,0,0,0.12)] text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)]"
               }`}
             >
               <svg className="w-3.5 h-3.5 opacity-70 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -944,10 +947,10 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
             </button>
 
             {showMenu && (
-              <div className="absolute top-full left-0 mt-1.5 w-52 bg-white rounded-xl border border-[rgba(0,0,0,0.12)] shadow-[0_4px_16px_rgba(0,0,0,0.08)] py-1.5 z-50">
+              <div className={`absolute top-full left-0 mt-1.5 w-52 rounded-xl border shadow-[0_4px_16px_rgba(0,0,0,0.12)] py-1.5 z-50 ${isDark ? "bg-[#2C2C2E] border-[rgba(255,255,255,0.1)]" : "bg-white border-[rgba(0,0,0,0.12)]"}`}>
                 {GRUPOS_PERIODO.map((grupo, gi) => (
                   <div key={gi}>
-                    {gi > 0 && <div className="h-px bg-[rgba(60,60,67,0.12)] my-1" />}
+                    {gi > 0 && <div className={`h-px my-1 ${isDark ? "bg-[rgba(255,255,255,0.08)]" : "bg-[rgba(60,60,67,0.12)]"}`} />}
                     <p className="px-3 pt-1.5 pb-0.5 text-[9px] uppercase tracking-wide font-bold text-[#8E8E93]">
                       {grupo.label}
                     </p>
@@ -956,8 +959,8 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                         onClick={() => { setPeriodo(id); setShowMenu(false) }}
                         className={`w-full text-left px-3 py-1.5 text-[12px] flex items-center gap-2 transition-colors ${
                           periodo === id
-                            ? "text-[#5009c4] font-semibold bg-[#5009c4]/5"
-                            : "text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)]"
+                            ? "text-[#5009c4] font-semibold bg-[#5009c4]/10"
+                            : isDark ? "text-white hover:bg-[rgba(255,255,255,0.06)]" : "text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)]"
                         }`}
                       >
                         <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${periodo === id ? "bg-[#5009c4]" : "bg-transparent"}`} />
@@ -976,16 +979,16 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
           <div className="flex items-center gap-1.5">
             <input type="date" value={dataInicio}
               onChange={e => { setDataInicio(e.target.value); setPeriodo("custom") }}
-              className="h-8 border border-[rgba(0,0,0,0.12)] rounded-lg px-2 text-[11.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4]" />
+              className={`h-8 border rounded-lg px-2 text-[11.5px] focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4] ${isDark ? "border-[rgba(255,255,255,0.1)] bg-[#2C2C2E] text-white" : "border-[rgba(0,0,0,0.12)] bg-white text-[#1C1C1E]"}`} />
             <span className="text-[#8E8E93] text-xs">→</span>
             <input type="date" value={dataFim}
               onChange={e => { setDataFim(e.target.value); setPeriodo("custom") }}
-              className="h-8 border border-[rgba(0,0,0,0.12)] rounded-lg px-2 text-[11.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4]" />
+              className={`h-8 border rounded-lg px-2 text-[11.5px] focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4] ${isDark ? "border-[rgba(255,255,255,0.1)] bg-[#2C2C2E] text-white" : "border-[rgba(0,0,0,0.12)] bg-white text-[#1C1C1E]"}`} />
           </div>
 
           <button
             onClick={abrirRelatorio}
-            className="flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-medium bg-white border border-[rgba(0,0,0,0.12)] text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)] transition-colors shadow-[0_1px_2px_rgba(0,0,0,0.04)] shrink-0"
+            className={`flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-medium border transition-colors shrink-0 ${isDark ? "bg-[#2C2C2E] border-[rgba(255,255,255,0.1)] text-white hover:bg-[rgba(255,255,255,0.08)]" : "bg-white border-[rgba(0,0,0,0.12)] text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"}`}
           >
             <svg className="w-3.5 h-3.5 text-[#8E8E93]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -1004,7 +1007,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                 <div className="relative" ref={alertasRef}>
                   <button
                     onClick={() => setShowAlertas(v => !v)}
-                    className="relative w-8 h-8 flex items-center justify-center bg-white border border-[rgba(0,0,0,0.12)] rounded-full hover:bg-[rgba(0,0,0,0.03)] transition-colors shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                    className={`relative w-8 h-8 flex items-center justify-center border rounded-full transition-colors ${isDark ? "bg-[#2C2C2E] border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.08)]" : "bg-white border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"}`}
                   >
                     <svg className="w-4 h-4 text-[#8E8E93]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
@@ -1144,7 +1147,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
               )
             })()}
 
-            <div className="text-[11px] text-[#8E8E93] font-medium tabular-nums bg-white border border-[rgba(0,0,0,0.12)] rounded-full px-3 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+            <div className={`text-[11px] text-[#8E8E93] font-medium tabular-nums border rounded-full px-3 py-1.5 ${isDark ? "bg-[#2C2C2E] border-[rgba(255,255,255,0.1)]" : "bg-white border-[rgba(0,0,0,0.12)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"}`}>
               {filteredCards.length} orçamento{filteredCards.length !== 1 ? "s" : ""} no período
             </div>
           </div>
