@@ -3,8 +3,9 @@ import "./globals.css";
 import { ThemeProvider } from "./components/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "ENYLA — Orçamentos",
-  description: "Sistema de orçamentos para embalagens e caixas",
+  title: "ENYLA — Sistema Interno",
+  description: "Acesso restrito.",
+  robots: { index: false, follow: false },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
