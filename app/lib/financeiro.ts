@@ -5,7 +5,7 @@
 // registrado). Qualquer tela que precise saber "quanto falta receber" ou
 // "isso conta como atrasado" deve importar daqui, não recalcular.
 
-import { LancamentoFinanceiro, KanbanCard, NegocioParceiro, COL_FECHADO, COL_PERDIDO } from "../types"
+import { LancamentoFinanceiro, KanbanCard, NegocioParceiro, COL_FECHADO, COL_PERDIDO, COL_HOT } from "../types"
 
 export const hoje = () => new Date().toISOString().split("T")[0]
 
@@ -31,7 +31,7 @@ export function isAtrasada(l: LancamentoFinanceiro): boolean {
 }
 
 export function pedidosElegiveis(kanban: KanbanCard[]): KanbanCard[] {
-  return kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO)
+  return kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO && c.coluna !== COL_HOT)
 }
 
 function agruparPorChave(
