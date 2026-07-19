@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect, useRef } from "react"
 import Image from "next/image"
 import { useTheme } from "./components/ThemeProvider"
-import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, COL_FECHADO, COL_PERDIDO, COLUNAS_KANBAN, Parceiro, NegocioParceiro, LancamentoFinanceiro, Lote } from "./types"
+import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, COL_FECHADO, COL_PERDIDO, COL_HOT, COLUNAS_KANBAN, Parceiro, NegocioParceiro, LancamentoFinanceiro, Lote } from "./types"
 import DashboardView from "./components/DashboardView"
 import { QUANTIDADES_PADRAO } from "./dados"
 import { calcular } from "./calculos"
@@ -24,6 +24,7 @@ import { ClienteCombobox, ClienteContactCard } from "./components/ClienteFields"
 import { ModalPersonalizarProposta } from "./components/ModalPersonalizarProposta"
 import { ModalPropostaCustom, BoxPreview3D } from "./components/ModalPropostaCustom"
 import { ModalDetalhe, DetalheData } from "./components/ModalDetalhe"
+import { OrcamentoDigitalView } from "./components/OrcamentoDigitalView"
 import { ModalSobra } from "./components/ModalSobra"
 import { GamificacaoView, SidebarGamificacao } from "./components/GamificacaoView"
 import { TerceirizadosView } from "./components/TerceirizadosView"
@@ -111,6 +112,7 @@ export default function Home() {
   } | null>(null)
   const [modalSobra, setModalSobra] = useState<{ card: KanbanCard; loteCards: KanbanCard[] } | null>(null)
   const [buscaAberta, setBuscaAberta] = useState(false)
+  const [orcTab, setOrcTab] = useState<"padrao" | "digital">("padrao")
   const { isDark, setTheme, theme } = useTheme()
   const expirySweepDone = useRef(false)
 
@@ -166,7 +168,7 @@ export default function Home() {
     const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
 
     const vencidos = kanban.filter(card => {
-      if (card.coluna !== 0) return false
+      if (card.coluna !== 0) return false // Hot (COL_HOT ≠ 0) nunca entra aqui
 
       // Busca validadeDias: historico → propostaCustom → default 30 dias
       let dias = 30
@@ -1004,7 +1006,7 @@ export default function Home() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ──── SIDEBAR ──────────────────────────────────────────────────────── */}
-        {view === "orcamento" && (
+        {view === "orcamento" && orcTab === "padrao" && (
         <aside className="w-72 shrink-0 bg-white border-r flex flex-col overflow-y-auto print:hidden" style={{ borderColor: "rgba(60,60,67,0.12)" }}>
 
           {/* Seção: Cliente */}
@@ -1312,6 +1314,7 @@ export default function Home() {
             />
           ) : view === "kanban" ? (
             <KanbanView
+              isDark={isDark}
               cards={kanban}
               onMove={(id, coluna) => {
                 const card = kanban.find(c => c.id === id)
@@ -1400,6 +1403,14 @@ export default function Home() {
                 } else if (card) {
                   setModalSinal({ cardId: id, nomeCliente: card.nomeCliente, cardNumero: card.numero, loteId: card.loteId, loteNumero: card.loteNumero, preco: opcao.preco })
                 }
+              }}
+              onHotOpcao={(id, opcao) => {
+                setKanban(prev => prev.map(c => c.id === id ? { ...c, coluna: COL_HOT, preco: opcao.preco, quantidade: opcao.quantidade } : c))
+                fetch(`/api/kanban/${id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ coluna: COL_HOT, preco: opcao.preco, quantidade: opcao.quantidade }),
+                }).catch(() => {})
               }}
               onDetalhes={(card) => {
                 const histItem = historico.find(h => h.numero === card.numero)
@@ -1558,9 +1569,30 @@ export default function Home() {
                 fetch(`/api/kanban/${id}`, { method: "DELETE" }).catch(() => {})
               }}
             />
-          ) : !r ? (
-            <EmptyState />
           ) : (
+            <>
+              {/* ── Tab bar: Padrão / Digital Rápido ──────────────────────── */}
+              <div className="sticky top-0 z-10 bg-white border-b flex items-center gap-1 px-4 py-2.5 print:hidden" style={{ borderColor: "rgba(60,60,67,0.1)" }}>
+                {(["padrao", "digital"] as const).map(t => (
+                  <button key={t} onClick={() => setOrcTab(t)}
+                    className={`px-3.5 py-1.5 rounded-lg text-[12.5px] font-semibold transition-all ${
+                      orcTab === t
+                        ? "bg-[#5009c4] text-white shadow-sm"
+                        : "text-[#8E8E93] hover:text-[#1C1C1E] hover:bg-[rgba(116,116,128,0.06)]"
+                    }`}>
+                    {t === "padrao" ? "Padrão" : "Digital Rápido"}
+                  </button>
+                ))}
+              </div>
+
+              {orcTab === "digital" ? (
+                <OrcamentoDigitalView
+                  onSalvar={salvarPropostaCustom}
+                  onVerKanban={() => navigate("kanban")}
+                />
+              ) : !r ? (
+                <EmptyState />
+              ) : (
             <div className="max-w-6xl mx-auto px-6 py-5 space-y-5">
 
               {/* Header do orçamento */}
@@ -1727,6 +1759,8 @@ export default function Home() {
               {r.tabela.length > 0 && <AnaliseEstrategica calculo={r} comFaca={form.comFaca} cliente={form.nomeCliente} />}
 
             </div>
+              )}
+            </>
           )}
         </main>
       </div>

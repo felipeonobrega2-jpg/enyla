@@ -185,6 +185,7 @@ export function KanbanView({
   onUpdateNegocio,
   onAddLancamento,
   onHotOpcao,
+  isDark,
 }: {
   cards: KanbanCard[]
   onMove: (id: string, coluna: number) => void
@@ -202,6 +203,7 @@ export function KanbanView({
   negocios?: NegocioParceiro[]
   onUpdateNegocio?: (n: NegocioParceiro) => void
   onAddLancamento?: (l: LancamentoFinanceiro) => void
+  isDark?: boolean
 }) {
   const [dragId, setDragId]       = useState<string | null>(null)
   const [overCol, setOverCol]     = useState<number | null>(null)
@@ -301,7 +303,7 @@ export function KanbanView({
     <div className="flex flex-col h-full overflow-hidden">
 
       {/* ── Dashboard ── */}
-      <div className="shrink-0 border-b border-[rgba(60,60,67,0.12)] bg-white px-5 pt-4 pb-4 space-y-3">
+      <div className={`shrink-0 border-b px-5 pt-4 pb-4 space-y-3 ${isDark ? "bg-[#1C1C1E] border-[rgba(255,255,255,0.08)]" : "bg-white border-[rgba(60,60,67,0.12)]"}`}>
         <div className="flex items-center gap-3">
           <p className="text-[9.5px] uppercase tracking-wide font-semibold text-[#8E8E93]">Visão geral do pipeline</p>
           <div className="flex-1 h-px bg-[rgba(60,60,67,0.12)]" />
@@ -327,7 +329,7 @@ export function KanbanView({
         <div className="grid grid-cols-4 gap-3">
 
           {/* Orçamentos */}
-          <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]">
+          <div className={`rounded-xl p-3.5 ${isDark ? "bg-[#2C2C2E] border border-[rgba(255,255,255,0.06)]" : "bg-white border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]"}`}>
             <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-3">Orçamentos</p>
             <div className="flex gap-3">
               <div>
@@ -346,7 +348,7 @@ export function KanbanView({
           </div>
 
           {/* Conversão */}
-          <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]">
+          <div className={`rounded-xl p-3.5 ${isDark ? "bg-[#2C2C2E] border border-[rgba(255,255,255,0.06)]" : "bg-white border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]"}`}>
             <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-2">Taxa de conversão</p>
             <p className="text-[24px] font-semibold leading-none tabular-nums" style={{
               color: conversao >= 60 ? "#34C759" : conversao >= 35 ? "#FF9500" : decididos === 0 ? "#8E8E93" : "#FF3B30"
@@ -365,7 +367,7 @@ export function KanbanView({
           </div>
 
           {/* Em andamento */}
-          <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]">
+          <div className={`rounded-xl p-3.5 ${isDark ? "bg-[#2C2C2E] border border-[rgba(255,255,255,0.06)]" : "bg-white border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]"}`}>
             <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-3">Em andamento</p>
             <div className="flex gap-3">
               <div>
@@ -468,7 +470,7 @@ export function KanbanView({
       })()}
 
       {/* Board */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden bg-[#F2F2F7]">
+      <div className={`flex-1 overflow-x-auto overflow-y-hidden ${isDark ? "bg-[#0C0C0E]" : "bg-[#F2F2F7]"}`}>
         <div className="flex gap-2.5 h-full px-4 py-3.5" style={{ minWidth: `${BOARD_ORDER.length * 48}px` }}>
           {BOARD_ORDER.map((colIdx, renderPos) => {
             const colNome  = colLabel(colIdx)
@@ -487,7 +489,7 @@ export function KanbanView({
                   className={`flex flex-col shrink-0 rounded-xl transition-all cursor-default ${
                     isOver
                       ? `ring-2 ${colors.border.replace("border-", "ring-")} ${colors.bg}`
-                      : "border border-[rgba(0,0,0,0.06)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+                      : isDark ? "border border-[rgba(255,255,255,0.08)] bg-[#1C1C1E]" : "border border-[rgba(0,0,0,0.06)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
                   }`}
                   style={{ width: 36 }}
                   onDragOver={e => handleDragOver(e, colIdx)}
@@ -515,16 +517,16 @@ export function KanbanView({
                 className={`flex flex-col w-60 shrink-0 rounded-xl transition-all ${
                   isOver
                     ? `ring-2 ${colors.border.replace("border-", "ring-")} ${colors.bg} border border-transparent`
-                    : "border border-[rgba(0,0,0,0.06)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]"
+                    : isDark ? "border border-[rgba(255,255,255,0.08)] bg-[#1C1C1E]" : "border border-[rgba(0,0,0,0.06)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]"
                 }`}
                 onDragOver={e => handleDragOver(e, colIdx)}
                 onDrop={e => handleDrop(e, colIdx)}
                 onDragLeave={() => setOverCol(null)}
               >
                 {/* Cabeçalho da coluna */}
-                <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 border-b border-[rgba(60,60,67,0.12)] shrink-0">
+                <div className={`flex items-center gap-2 px-3 pt-2.5 pb-2 border-b shrink-0 ${isDark ? "border-[rgba(255,255,255,0.08)]" : "border-[rgba(60,60,67,0.12)]"}`}>
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colors.dot}`} />
-                  <p className="text-[11px] font-semibold text-[#1C1C1E] flex-1 leading-tight tracking-tight">{colNome}</p>
+                  <p className={`text-[11px] font-semibold flex-1 leading-tight tracking-tight ${isDark ? "text-[rgba(255,255,255,0.85)]" : "text-[#1C1C1E]"}`}>{colNome}</p>
                   <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center tabular-nums ${
                     colCards.length > 0 ? colors.badge : "bg-[rgba(116,116,128,0.08)] text-[#8E8E93]"
                   }`}>
@@ -566,6 +568,7 @@ export function KanbanView({
                       onUpdateNegocio={onUpdateNegocio}
                       allCards={cards}
                       onAddLancamento={onAddLancamento}
+                      isDark={isDark}
                     />
                   ))}
                 </div>
@@ -746,7 +749,7 @@ export function KanbanView({
 function KanbanCardItem({
   card, colIdx, prevCol, nextCol, isDragging, colors, onDragStart, onDragEnd, onDelete, onMove, onSetMotivo, onDetalhes,
   lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge, onLoteRename, negocios, onUpdateNegocio, allCards,
-  onAddLancamento,
+  onAddLancamento, isDark,
 }: {
   card: KanbanCard
   colIdx: number
@@ -770,6 +773,7 @@ function KanbanCardItem({
   onUpdateNegocio?: (n: NegocioParceiro) => void
   allCards?: KanbanCard[]
   onAddLancamento?: (l: LancamentoFinanceiro) => void
+  isDark?: boolean
 }) {
   const isPerdido = colIdx === COL_PERDIDO
   const [confirmando, setConfirmando] = useState(false)
@@ -865,7 +869,7 @@ function KanbanCardItem({
       className={`flex rounded-xl border overflow-hidden transition-all duration-150 select-none ${
         isPerdido
           ? "bg-[#FF3B30]/5 border-[#FF3B30]/20"
-          : "bg-white border-[rgba(0,0,0,0.06)]"
+          : isDark ? "bg-[#2C2C2E] border-[rgba(255,255,255,0.08)]" : "bg-white border-[rgba(0,0,0,0.06)]"
       } ${isDragging ? "opacity-30 scale-95 shadow-none" : "shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 cursor-grab active:cursor-grabbing"}`}
     >
       {/* Accent bar */}
