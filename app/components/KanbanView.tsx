@@ -1,9 +1,17 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { KanbanCard, KanbanOpcao, Lote, LancamentoFinanceiro, NegocioParceiro, StatusLoteParceiro, COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO } from "../types"
+import { KanbanCard, KanbanOpcao, Lote, LancamentoFinanceiro, NegocioParceiro, StatusLoteParceiro, COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO, COL_HOT } from "../types"
 import { brl, num } from "../utils"
 import { COL_COLORS } from "./kanban-colors"
+
+// HOT é renderizado entre col 0 e col 1, mas usa índice 11 para não deslocar os existentes no DB
+const BOARD_ORDER = [0, COL_HOT, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const
+
+function colLabel(idx: number): string {
+  if (idx === COL_HOT) return "Hot"
+  return COLUNAS_KANBAN[idx] ?? `Col ${idx}`
+}
 
 const PARTNER_STEPS_K: { id: StatusLoteParceiro; label: string }[] = [
   { id: "aguardando",  label: "Aguardando" },
@@ -13,6 +21,7 @@ const PARTNER_STEPS_K: { id: StatusLoteParceiro; label: string }[] = [
 ]
 
 type ModalFechamento = { card: KanbanCard; opcaoIdx: number }
+type ModalHot = { card: KanbanCard; opcaoIdx: number; customQtd: string; customPreco: string }
 
 // ── PIX emit modal ────────────────────────────────────────────────────────────
 function PixEmitModal({ card, loteTotal, onClose, onAddLancamento }: {
@@ -175,12 +184,14 @@ export function KanbanView({
   negocios,
   onUpdateNegocio,
   onAddLancamento,
+  onHotOpcao,
 }: {
   cards: KanbanCard[]
   onMove: (id: string, coluna: number) => void
   onDelete: (id: string) => void
   onSetMotivo: (id: string, motivo: string) => void
   onFechamento: (id: string, opcao: KanbanOpcao) => void
+  onHotOpcao?: (id: string, opcao: KanbanOpcao) => void
   onDetalhes?: (card: KanbanCard) => void
   lotes?: Lote[]
   onLoteCreate?: (nomeCliente: string) => Promise<{ id: string; numero: string }>
@@ -195,18 +206,48 @@ export function KanbanView({
   const [dragId, setDragId]       = useState<string | null>(null)
   const [overCol, setOverCol]     = useState<number | null>(null)
   const [modal, setModal]         = useState<ModalFechamento | null>(null)
+  const [modalHot, setModalHot]   = useState<ModalHot | null>(null)
   const [colapsarVazias, setColapsarVazias] = useState(false)
 
   function tentarMover(id: string, destCol: number) {
     const card = cards.find(c => c.id === id)
     if (!card) return
-    // Intercept: col 0 → col 1 (Fechado) e o card tem opcoes
-    if (card.coluna === 0 && destCol === COL_FECHADO && card.opcoes?.length) {
+
+    // Mover para Hot → abre modal para definir quantidade negociada
+    if (destCol === COL_HOT) {
+      const idealIdx = Math.max(0, (card.opcoes?.findIndex(o => o.preco === card.preco) ?? 0))
+      setModalHot({
+        card,
+        opcaoIdx: idealIdx,
+        customQtd: String(card.quantidade),
+        customPreco: card.preco.toFixed(2).replace(".", ","),
+      })
+      return
+    }
+
+    // Orçamento (col 0) ou Hot → Fechado com opções de quantidade
+    const isPreClose = card.coluna === 0 || card.coluna === COL_HOT
+    if (isPreClose && destCol === COL_FECHADO && card.opcoes?.length) {
       const idealIdx = card.opcoes.findIndex(o => o.preco === card.preco) ?? 0
       setModal({ card, opcaoIdx: Math.max(0, idealIdx) })
       return
     }
+
     onMove(id, destCol)
+  }
+
+  function confirmarHot() {
+    if (!modalHot) return
+    let opcao: KanbanOpcao
+    if (modalHot.card.opcoes?.length) {
+      opcao = modalHot.card.opcoes[modalHot.opcaoIdx]
+    } else {
+      const qtd   = parseInt(modalHot.customQtd.replace(/\D/g, "")) || modalHot.card.quantidade
+      const preco = parseFloat(modalHot.customPreco.replace(/\./g, "").replace(",", ".")) || modalHot.card.preco
+      opcao = { preco, quantidade: qtd, unitario: qtd > 0 ? preco / qtd : 0 }
+    }
+    onHotOpcao?.(modalHot.card.id, opcao)
+    setModalHot(null)
   }
 
   function confirmarFechamento() {
@@ -241,16 +282,18 @@ export function KanbanView({
   }
 
   const total       = cards.length
-  const fechados    = cards.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO).length
+  const isProducao  = (c: { coluna: number }) => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO && c.coluna !== COL_HOT
+  const fechados    = cards.filter(isProducao).length
   const perdidos    = cards.filter(c => c.coluna === COL_PERDIDO).length
   const entregues   = cards.filter(c => c.coluna === COL_ENTREGUE).length
   const emProd      = cards.filter(c => c.coluna >= 5 && c.coluna <= 8).length
   const aguardAprov = cards.filter(c => c.coluna === 3).length
   const decididos   = fechados + perdidos
   const conversao   = decididos > 0 ? (fechados / decididos) * 100 : 0
-  const pipeline    = cards.filter(c => c.coluna >= COL_FECHADO && c.coluna < COL_ENTREGUE && c.coluna !== COL_PERDIDO).reduce((s, c) => s + c.preco, 0)
+  const pipeline    = cards.filter(c => isProducao(c) && c.coluna < COL_ENTREGUE).reduce((s, c) => s + c.preco, 0)
   const faturado    = cards.filter(c => c.coluna === COL_ENTREGUE).reduce((s, c) => s + c.preco, 0)
-  const ticketMed   = fechados > 0 ? cards.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO).reduce((s, c) => s + c.preco, 0) / fechados : 0
+  const ticketMed   = fechados > 0 ? cards.filter(isProducao).reduce((s, c) => s + c.preco, 0) / fechados : 0
+  const hotTotal    = cards.filter(c => c.coluna === COL_HOT).reduce((s, c) => s + c.preco, 0)
 
   void entregues // referenced indirectly via COL_ENTREGUE filter above
 
@@ -348,6 +391,12 @@ export function KanbanView({
                 <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>Faturado</p>
                 <p className="text-[13px] font-bold tabular-nums" style={{ color: "#34C759" }}>{brl(faturado)}</p>
               </div>
+              {hotTotal > 0 && (
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="text-[10px] font-semibold" style={{ color: "#FF6200" }}>🔥 Hot</p>
+                  <p className="text-[13px] font-bold tabular-nums" style={{ color: "#FF6200" }}>{brl(hotTotal)}</p>
+                </div>
+              )}
               <div className="flex items-baseline justify-between gap-2 pt-1.5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
                 <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>Ticket médio</p>
                 <p className="text-[12px] font-semibold tabular-nums" style={{ color: "rgba(255,255,255,0.5)" }}>{brl(ticketMed)}</p>
@@ -361,24 +410,24 @@ export function KanbanView({
         {total > 0 && (
           <div className="space-y-1">
             <div className="flex gap-0.5 h-2 rounded-full overflow-hidden">
-              {COLUNAS_KANBAN.map((_, i) => {
-                const count = cards.filter(c => c.coluna === i).length
+              {BOARD_ORDER.map((colIdx) => {
+                const count = cards.filter(c => c.coluna === colIdx).length
                 if (!count) return null
                 return (
-                  <div key={i} title={`${COLUNAS_KANBAN[i]}: ${count}`}
-                    className={`h-full transition-all ${COL_COLORS[i].dot}`}
+                  <div key={colIdx} title={`${colLabel(colIdx)}: ${count}`}
+                    className={`h-full transition-all ${COL_COLORS[colIdx].dot}`}
                     style={{ width: `${(count / total) * 100}%` }} />
                 )
               })}
             </div>
             <div className="flex gap-3 flex-wrap">
-              {COLUNAS_KANBAN.map((nome, i) => {
-                const count = cards.filter(c => c.coluna === i).length
+              {BOARD_ORDER.map((colIdx) => {
+                const count = cards.filter(c => c.coluna === colIdx).length
                 if (!count) return null
                 return (
-                  <span key={i} className="flex items-center gap-1 text-[9px] text-[#8E8E93]">
-                    <span className={`w-1.5 h-1.5 rounded-full ${COL_COLORS[i].dot}`} />
-                    {nome} ({count})
+                  <span key={colIdx} className="flex items-center gap-1 text-[9px] text-[#8E8E93]">
+                    <span className={`w-1.5 h-1.5 rounded-full ${COL_COLORS[colIdx].dot}`} />
+                    {colLabel(colIdx)} ({count})
                   </span>
                 )
               })}
@@ -419,14 +468,17 @@ export function KanbanView({
       })()}
 
       {/* Board */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden" style={{ background: "#F2F2F7" }}>
-        <div className="flex gap-2.5 h-full px-4 py-3.5" style={{ minWidth: `${COLUNAS_KANBAN.length * 48}px` }}>
-          {COLUNAS_KANBAN.map((colNome, colIdx) => {
+      <div className="flex-1 overflow-x-auto overflow-y-hidden bg-[#F2F2F7]">
+        <div className="flex gap-2.5 h-full px-4 py-3.5" style={{ minWidth: `${BOARD_ORDER.length * 48}px` }}>
+          {BOARD_ORDER.map((colIdx, renderPos) => {
+            const colNome  = colLabel(colIdx)
             const colCards = cards.filter(c => c.coluna === colIdx && c.materialNome !== "Terceirizado")
             const isOver   = overCol === colIdx
             const colors   = COL_COLORS[colIdx]
             const vazia    = colCards.length === 0
             const colapsada = colapsarVazias && vazia
+            const prevCol  = renderPos > 0 ? BOARD_ORDER[renderPos - 1] : null
+            const nextCol  = renderPos < BOARD_ORDER.length - 1 ? BOARD_ORDER[renderPos + 1] : null
 
             if (colapsada) {
               return (
@@ -494,6 +546,8 @@ export function KanbanView({
                       key={card.id}
                       card={card}
                       colIdx={colIdx}
+                      prevCol={prevCol}
+                      nextCol={nextCol}
                       isDragging={dragId === card.id}
                       colors={colors}
                       onDragStart={handleDragStart}
@@ -502,7 +556,6 @@ export function KanbanView({
                       onMove={tentarMover}
                       onSetMotivo={onSetMotivo}
                       onDetalhes={onDetalhes}
-                      totalCols={COLUNAS_KANBAN.length}
                       lotes={lotes}
                       onLoteCreate={onLoteCreate}
                       onLoteAssign={onLoteAssign}
@@ -521,6 +574,102 @@ export function KanbanView({
           })}
         </div>
       </div>
+
+      {/* ── Modal Hot — quantidade negociada ────────────────────────────── */}
+      {modalHot && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={e => { if (e.target === e.currentTarget) setModalHot(null) }}>
+          <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] w-full max-w-sm mx-4 overflow-hidden">
+
+            {/* Header */}
+            <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.12)]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase tracking-wide font-semibold mb-1" style={{ color: "#FF6200" }}>🔥 Quantidade negociada</p>
+                  <p className="font-bold text-[#1C1C1E] text-[15px] leading-snug truncate">{modalHot.card.nomeCliente}</p>
+                  {modalHot.card.numero && (
+                    <span className="text-[10px] font-bold text-[#8E8E93] bg-[rgba(116,116,128,0.08)] border border-[rgba(60,60,67,0.12)] px-1.5 py-0.5 rounded-full mt-1.5 inline-block tabular-nums">
+                      {modalHot.card.numero}
+                    </span>
+                  )}
+                </div>
+                <button onClick={() => setModalHot(null)}
+                  className="text-[#8E8E93] hover:text-[#1C1C1E] transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
+              </div>
+              <p className="text-[12px] text-[#8E8E93] mt-2.5">
+                {modalHot.card.opcoes?.length ? "Qual quantidade está sendo negociada?" : "Ajuste a quantidade e o valor negociado."}
+              </p>
+            </div>
+
+            {/* Opções (card com múltiplas quantidades) */}
+            {modalHot.card.opcoes?.length ? (
+              <div className="px-4 py-3 space-y-1.5 max-h-72 overflow-y-auto">
+                {modalHot.card.opcoes.map((op, i) => {
+                  const selected = i === modalHot.opcaoIdx
+                  return (
+                    <button key={i} onClick={() => setModalHot(m => m ? { ...m, opcaoIdx: i } : m)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${
+                        selected ? "border-[#FF6200] bg-[#FF6200]/5" : "border-[rgba(0,0,0,0.12)] hover:border-[rgba(0,0,0,0.18)] hover:bg-[rgba(0,0,0,0.04)]"
+                      }`}>
+                      <div className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${
+                        selected ? "border-[#FF6200]" : "border-[rgba(60,60,67,0.36)]"
+                      }`}>
+                        {selected && <div className="w-2 h-2 rounded-full bg-[#FF6200]" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`font-bold text-sm leading-none ${selected ? "text-[#FF6200]" : "text-[#1C1C1E]"}`}>
+                          {op.quantidade.toLocaleString("pt-BR")} unidades
+                        </p>
+                        <p className="text-[11px] text-[#8E8E93] mt-0.5">{brl(op.unitario)}/un</p>
+                      </div>
+                      <p className={`font-semibold text-[15px] tabular-nums shrink-0 ${selected ? "text-[#FF6200]" : "text-[#1C1C1E]"}`}>
+                        {brl(op.preco)}
+                      </p>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              /* Formulário simples para cards sem múltiplas opções */
+              <div className="px-5 py-4 space-y-4">
+                <div>
+                  <label className="text-[9.5px] font-bold uppercase tracking-wide text-[#8E8E93] block mb-1.5">Quantidade (unidades)</label>
+                  <input
+                    type="number" min={1} autoFocus
+                    value={modalHot.customQtd}
+                    onChange={e => setModalHot(m => m ? { ...m, customQtd: e.target.value } : m)}
+                    onKeyDown={e => e.key === "Enter" && confirmarHot()}
+                    className="w-full px-3.5 py-2.5 border border-[rgba(0,0,0,0.12)] rounded-xl text-[15px] font-semibold text-[#1C1C1E] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#FF6200]/20 focus:border-[#FF6200] transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9.5px] font-bold uppercase tracking-wide text-[#8E8E93] block mb-1.5">Valor total negociado (R$)</label>
+                  <input
+                    type="text" inputMode="decimal"
+                    value={modalHot.customPreco}
+                    onChange={e => setModalHot(m => m ? { ...m, customPreco: e.target.value } : m)}
+                    onKeyDown={e => e.key === "Enter" && confirmarHot()}
+                    className="w-full px-3.5 py-2.5 border border-[rgba(0,0,0,0.12)] rounded-xl text-[15px] font-semibold text-[#1C1C1E] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#FF6200]/20 focus:border-[#FF6200] transition-colors"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Ações */}
+            <div className="flex gap-2 px-4 pb-4 pt-2 border-t border-[rgba(60,60,67,0.12)]">
+              <button onClick={() => setModalHot(null)}
+                className="flex-1 py-2.5 text-[13px] text-[#8E8E93] hover:text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)] rounded-xl transition-colors font-medium">
+                Cancelar
+              </button>
+              <button onClick={confirmarHot}
+                className="flex-1 py-2.5 text-[13px] font-bold text-white rounded-xl transition-colors"
+                style={{ background: "#FF6200" }}>
+                Confirmar →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal de fechamento ───────────────────────────────────────────── */}
       {modal && (
@@ -595,12 +744,14 @@ export function KanbanView({
 }
 
 function KanbanCardItem({
-  card, colIdx, isDragging, colors, onDragStart, onDragEnd, onDelete, onMove, onSetMotivo, onDetalhes, totalCols,
+  card, colIdx, prevCol, nextCol, isDragging, colors, onDragStart, onDragEnd, onDelete, onMove, onSetMotivo, onDetalhes,
   lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge, onLoteRename, negocios, onUpdateNegocio, allCards,
   onAddLancamento,
 }: {
   card: KanbanCard
   colIdx: number
+  prevCol: number | null
+  nextCol: number | null
   isDragging: boolean
   colors: typeof COL_COLORS[0]
   onDragStart: (e: React.DragEvent, id: string) => void
@@ -609,7 +760,6 @@ function KanbanCardItem({
   onMove: (id: string, col: number) => void
   onSetMotivo: (id: string, motivo: string) => void
   onDetalhes?: (card: KanbanCard) => void
-  totalCols: number
   lotes?: Lote[]
   onLoteCreate?: (nomeCliente: string) => Promise<{ id: string; numero: string }>
   onLoteAssign?: (cardId: string, loteId: string, loteNumero: string) => void
@@ -692,8 +842,6 @@ function KanbanCardItem({
       setSavingRename(false)
     }
   }
-
-  void totalCols
 
   function iniciarPerda() {
     setConfirmando(true)
@@ -812,7 +960,7 @@ function KanbanCardItem({
         {!isPerdido && !confirmando && (
           <div className="flex items-center gap-0.5 px-2.5 pb-2.5 pt-0" onClick={e => e.stopPropagation()}>
 
-            <button disabled={colIdx === 0} onClick={() => onMove(card.id, colIdx - 1)}
+            <button disabled={prevCol === null} onClick={() => prevCol !== null && onMove(card.id, prevCol)}
               className="w-7 h-7 flex items-center justify-center text-[11px] text-[rgba(60,60,67,0.36)] hover:text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)] rounded-lg disabled:opacity-0 transition-all">
               ←
             </button>
@@ -853,14 +1001,14 @@ function KanbanCardItem({
 
             <div className="flex-1" />
 
-            {colIdx < COL_ENTREGUE && (
+            {colIdx !== COL_ENTREGUE && colIdx !== COL_PERDIDO && (
               <button onClick={iniciarPerda} title="Marcar como perdido"
                 className="w-7 h-7 flex items-center justify-center text-[11px] text-[rgba(60,60,67,0.36)] hover:text-[#FF3B30] hover:bg-[#FF3B30]/5 rounded-lg transition-all">
                 ✕
               </button>
             )}
-            {colIdx < COL_ENTREGUE && (
-              <button onClick={() => onMove(card.id, colIdx + 1)}
+            {colIdx !== COL_ENTREGUE && colIdx !== COL_PERDIDO && nextCol !== null && (
+              <button onClick={() => onMove(card.id, nextCol)}
                 className="h-7 px-3 text-[10px] font-bold text-[#1C1C1E] bg-[rgba(116,116,128,0.08)] hover:bg-[rgba(116,116,128,0.14)] active:scale-95 rounded-lg transition-all ml-0.5">
                 →
               </button>

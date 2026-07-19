@@ -74,28 +74,28 @@ code, pre, .font-mono, [class*="tabular-nums"] {
 }
 
 /* ── Dark Mode ── */
-html.dark body { background: #0d1117; color: #e6edf3; }
+html.dark body { background: #1C1C1E; color: rgba(255,255,255,0.85); }
 
-html.dark .bg-white                { background-color: #161b22; }
-html.dark .bg-slate-50             { background-color: #0d1117; }
-html.dark .bg-slate-100            { background-color: #1e2535; }
-html.dark .bg-\[\#F2F2F7\]        { background-color: #0d1117; }
-html.dark .bg-\[\#f8fafc\]        { background-color: #0d1117; }
+html.dark .bg-white                { background-color: #2C2C2E; }
+html.dark .bg-slate-50             { background-color: #1C1C1E; }
+html.dark .bg-slate-100            { background-color: #2C2C2E; }
+html.dark .bg-\[\#F2F2F7\]        { background-color: #1C1C1E; }
+html.dark .bg-\[\#f8fafc\]        { background-color: #1C1C1E; }
 
-html.dark .hover\:bg-white:hover       { background-color: #1e2535; }
-html.dark .hover\:bg-slate-50:hover    { background-color: #161b22; }
-html.dark .hover\:bg-slate-100:hover   { background-color: #1e2535; }
+html.dark .hover\:bg-white:hover       { background-color: #3A3A3C; }
+html.dark .hover\:bg-slate-50:hover    { background-color: #2C2C2E; }
+html.dark .hover\:bg-slate-100:hover   { background-color: #3A3A3C; }
 
-html.dark .border-slate-100  { border-color: #21262d; }
-html.dark .border-slate-200  { border-color: #30363d; }
+html.dark .border-slate-100  { border-color: rgba(255,255,255,0.08); }
+html.dark .border-slate-200  { border-color: rgba(255,255,255,0.12); }
 
-html.dark .text-slate-900 { color: #e6edf3; }
-html.dark .text-slate-800 { color: #cdd9e5; }
-html.dark .text-slate-700 { color: #adbac7; }
-html.dark .text-slate-600 { color: #768390; }
-html.dark .text-\[\#1C1C1E\] { color: #e6edf3; }
-html.dark .text-\[rgba\(60\,60\,67\,0\.6\)\] { color: #768390; }
-html.dark .text-\[rgba\(60\,60\,67\,0\.4\)\] { color: #545d68; }
+html.dark .text-slate-900 { color: rgba(255,255,255,0.85); }
+html.dark .text-slate-800 { color: rgba(255,255,255,0.75); }
+html.dark .text-slate-700 { color: rgba(255,255,255,0.6); }
+html.dark .text-slate-600 { color: rgba(255,255,255,0.45); }
+html.dark .text-\[\#1C1C1E\] { color: rgba(255,255,255,0.85); }
+html.dark .text-\[rgba\(60\,60\,67\,0\.6\)\] { color: rgba(255,255,255,0.45); }
+html.dark .text-\[rgba\(60\,60\,67\,0\.4\)\] { color: rgba(255,255,255,0.3); }
 
 html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
 html.dark textarea,
