@@ -35,7 +35,7 @@ const STAGE_COLOR: Record<number, { color: string; bg: string }> = {
 }
 
 type TabId = "visao" | "cobrancas" | "producao" | "negocios"
-type PeriodoId = "7d" | "30d" | "mes" | "ano" | "tudo"
+type PeriodoId = "mes" | "mes_ant" | "3m" | "ano" | "tudo"
 
 type ClienteDevedor = { nome: string; total: number; vencido: number; items: LancamentoFinanceiro[] }
 type EtapaItem = { col: number; label: string; count: number; valor: number }
@@ -54,11 +54,11 @@ type DashData = {
 }
 
 const PERIODOS: { id: PeriodoId; label: string }[] = [
-  { id: "7d",   label: "7d"     },
-  { id: "30d",  label: "30d"    },
-  { id: "mes",  label: "Mês"    },
-  { id: "ano",  label: "Ano"    },
-  { id: "tudo", label: "Tudo"   },
+  { id: "mes",     label: "Este mês"   },
+  { id: "mes_ant", label: "Mês ant."   },
+  { id: "3m",      label: "3 meses"    },
+  { id: "ano",     label: "Este ano"   },
+  { id: "tudo",    label: "Tudo"       },
 ]
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
@@ -97,22 +97,24 @@ function daysOverdue(dateStr: string): number {
 }
 
 function bounds(periodo: PeriodoId, now: Date): { from: Date | null; to: Date | null } {
+  const y = now.getFullYear(), m = now.getMonth()
   switch (periodo) {
-    case "7d":  return { from: new Date(now.getTime() - 7  * 86_400_000), to: now }
-    case "30d": return { from: new Date(now.getTime() - 30 * 86_400_000), to: now }
-    case "mes": return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now }
-    case "ano": return { from: new Date(now.getFullYear(), 0, 1), to: now }
-    case "tudo": return { from: null, to: null }
+    case "mes":     return { from: new Date(y, m, 1), to: now }
+    case "mes_ant": return { from: new Date(y, m - 1, 1), to: new Date(y, m, 1) }
+    case "3m":      return { from: new Date(y, m - 2, 1), to: now }
+    case "ano":     return { from: new Date(y, 0, 1), to: now }
+    case "tudo":    return { from: null, to: null }
   }
 }
 
 function prevBounds(periodo: PeriodoId, now: Date): { from: Date | null; to: Date | null } | null {
+  const y = now.getFullYear(), m = now.getMonth()
   switch (periodo) {
-    case "7d":  return { from: new Date(now.getTime() - 14 * 86_400_000), to: new Date(now.getTime() - 7 * 86_400_000) }
-    case "30d": return { from: new Date(now.getTime() - 60 * 86_400_000), to: new Date(now.getTime() - 30 * 86_400_000) }
-    case "mes": return { from: new Date(now.getFullYear(), now.getMonth() - 1, 1), to: new Date(now.getFullYear(), now.getMonth(), 1) }
-    case "ano": return { from: new Date(now.getFullYear() - 1, 0, 1), to: new Date(now.getFullYear(), 0, 1) }
-    case "tudo": return null
+    case "mes":     return { from: new Date(y, m - 1, 1), to: new Date(y, m, 1) }
+    case "mes_ant": return { from: new Date(y, m - 2, 1), to: new Date(y, m - 1, 1) }
+    case "3m":      return { from: new Date(y, m - 5, 1), to: new Date(y, m - 2, 1) }
+    case "ano":     return { from: new Date(y - 1, 0, 1), to: new Date(y, 0, 1) }
+    case "tudo":    return null
   }
 }
 
@@ -201,7 +203,7 @@ export default function MobilePage() {
   const [config, setConfig]       = useState<Configuracoes>(CONFIG_PADRAO)
   const [loading, setLoading]     = useState(true)
   const [tab, setTab]             = useState<TabId>("visao")
-  const [periodo, setPeriodo]     = useState<PeriodoId>("30d")
+  const [periodo, setPeriodo]     = useState<PeriodoId>("mes")
   const [expandCli, setExpandCli] = useState<string | null>(null)
 
   useEffect(() => {
@@ -250,12 +252,15 @@ export default function MobilePage() {
     const margemMedia = margens.length ? margens.reduce((s, m) => s + m, 0) / margens.length : null
 
     // ── Lançamentos financeiros ──
+    // Usa dataPagamento se disponível, senão dataVencimento (para lançamentos pagos sem data preenchida)
+    const dataEfetiva = (l: LancamentoFinanceiro) => l.dataPagamento || l.dataVencimento
+
     const recebido = lancs
-      .filter(l => l.tipo === "receita" && l.status === "pago" && l.dataPagamento && inRange(parseIso(l.dataPagamento), from, to))
+      .filter(l => l.tipo === "receita" && l.status === "pago" && inRange(parseIso(dataEfetiva(l)), from, to))
       .reduce((s, l) => s + l.valor, 0)
 
     const despesas = lancs
-      .filter(l => l.tipo === "despesa" && l.status === "pago" && l.dataPagamento && inRange(parseIso(l.dataPagamento), from, to))
+      .filter(l => l.tipo === "despesa" && l.status === "pago" && inRange(parseIso(dataEfetiva(l)), from, to))
       .reduce((s, l) => s + l.valor, 0)
 
     const saldo = recebido - despesas
@@ -456,19 +461,29 @@ function VisaoTab({ data, config, periodo }: {
 
       {/* KPIs 2×2 */}
       <div className="grid grid-cols-2 gap-3">
-        <KpiTile label="Recebido" value={fmtShort(data.recebido)} accent="#009351" sub={`no período`} />
         <KpiTile
-          label="A receber"
+          label="Recebido"
+          value={fmtShort(data.recebido)}
+          accent="#009351"
+          sub={data.receita > 0 ? `${Math.round(data.recebido / data.receita * 100)}% do faturado` : "no período"}
+        />
+        <KpiTile
+          label="A receber (total)"
           value={fmtShort(data.aReceber)}
           accent={data.valorVencido > 0 ? "#d33a3c" : "#191625"}
           sub={data.valorVencido > 0 ? `${fmtShort(data.valorVencido)} vencido` : `${data.clientesDevedores.length} cliente${data.clientesDevedores.length !== 1 ? "s" : ""}`}
         />
-        <KpiTile label="Despesas" value={fmtShort(data.despesas)} accent="#c57800" sub="pagas no período" />
         <KpiTile
-          label="Saldo"
-          value={fmtShort(Math.abs(data.saldo))}
+          label="Despesas"
+          value={data.despesas > 0 ? fmtShort(data.despesas) : "—"}
+          accent={data.despesas > 0 ? "#c57800" : "#8E8E93"}
+          sub="pagas no período"
+        />
+        <KpiTile
+          label="Saldo líquido"
+          value={(data.saldo >= 0 ? "+" : "") + fmtShort(data.saldo)}
           accent={data.saldo >= 0 ? "#009351" : "#d33a3c"}
-          sub={data.saldo >= 0 ? "positivo" : "negativo"}
+          sub="recebido − despesas"
         />
       </div>
 
