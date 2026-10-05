@@ -110,7 +110,7 @@ export default function PixClient({ numero }: { numero: string }) {
       <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-5 text-center gap-4">
         <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1335} height={328}
           className="h-5 w-auto opacity-60" />
-        <p className="text-[18px] font-bold text-[#1C1C1E]">Link inválido</p>
+        <p className="text-[18px] font-bold text-[#191625]">Link inválido</p>
         <p className="text-[13px] text-[#8E8E93]">Solicite um novo link ao vendedor.</p>
       </div>
     )
@@ -119,7 +119,7 @@ export default function PixClient({ numero }: { numero: string }) {
   // ── Urgency ───────────────────────────────────────────────────────────────
   const nearEnd  = msLeft >= 0 && msLeft < 30 * 60 * 1000
   const urgent   = msLeft >= 0 && msLeft < 60 * 60 * 1000
-  const timerBg  = nearEnd ? "#FF3B30" : urgent ? "#FF9500" : "#1C1C1E"
+  const timerBg  = nearEnd ? "#d33a3c" : urgent ? "#c57800" : "#1C1C1E"
 
   // ── Expired ───────────────────────────────────────────────────────────────
   if (expired) {
@@ -127,12 +127,12 @@ export default function PixClient({ numero }: { numero: string }) {
       <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-5 text-center gap-4">
         <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1335} height={328}
           className="h-5 w-auto opacity-60" />
-        <div className="w-14 h-14 rounded-full bg-[#FF3B30]/10 flex items-center justify-center">
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="#FF3B30" strokeWidth={2}>
+        <div className="w-14 h-14 rounded-full bg-[#d33a3c]/10 flex items-center justify-center">
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="#d33a3c" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
           </svg>
         </div>
-        <p className="text-[18px] font-bold text-[#1C1C1E]">Link expirado</p>
+        <p className="text-[18px] font-bold text-[#191625]">Link expirado</p>
         <p className="text-[13px] text-[#8E8E93]">Solicite um novo link ao vendedor.</p>
       </div>
     )
@@ -196,7 +196,7 @@ export default function PixClient({ numero }: { numero: string }) {
           <p className="text-[12px] text-[#8E8E93] mb-1">
             Lote {numero}{cliente ? ` · ${cliente.split(" ")[0]}` : ""}
           </p>
-          <p className="font-bold text-[#1C1C1E] tabular-nums leading-none"
+          <p className="font-bold text-[#191625] tabular-nums leading-none"
             style={{ fontSize: "clamp(32px, 10vw, 46px)", letterSpacing: "-1.5px" }}>
             {valor > 0 ? brl(valor) : "—"}
           </p>
@@ -204,7 +204,7 @@ export default function PixClient({ numero }: { numero: string }) {
 
         <button onClick={copy}
           className="w-full py-4 rounded-2xl text-[15px] font-semibold transition-all duration-200 active:scale-[0.98] mb-8"
-          style={{ background: copied ? "#34C759" : "#1C1C1E", color: "white" }}>
+          style={{ background: copied ? "#009351" : "#1C1C1E", color: "white" }}>
           {copied ? (
             <span className="flex items-center justify-center gap-2">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -224,9 +224,9 @@ export default function PixClient({ numero }: { numero: string }) {
 
         <div className="w-full space-y-3.5">
           {([
-            <>Abra o app do banco e acesse <strong className="text-[#1C1C1E]">PIX → Copia e Cola</strong></>,
-            <>Cole o código e confirme o valor {valor > 0 && <strong className="text-[#1C1C1E]">{brl(valor)}</strong>}</>,
-            <>Envie o comprovante pelo <strong className="text-[#1C1C1E]">WhatsApp</strong></>,
+            <>Abra o app do banco e acesse <strong className="text-[#191625]">PIX → Copia e Cola</strong></>,
+            <>Cole o código e confirme o valor {valor > 0 && <strong className="text-[#191625]">{brl(valor)}</strong>}</>,
+            <>Envie o comprovante pelo <strong className="text-[#191625]">WhatsApp</strong></>,
           ] as React.ReactNode[]).map((text, i) => (
             <div key={i} className="flex gap-3 items-start">
               <span className="shrink-0 w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center mt-0.5"

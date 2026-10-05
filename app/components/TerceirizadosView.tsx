@@ -7,9 +7,9 @@ import { brl, num } from "../utils"
 const CARD = "bg-white border border-[rgba(0,0,0,0.06)] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]"
 
 const S = {
-  aguardando: { label: "Aguardando",  color: "#FF9500", bg: "rgba(255,149,0,0.1)",  coluna: 1 },
-  recebido:   { label: "Recebido",    color: "#5009c4", bg: "rgba(80,9,196,0.1)", coluna: 8 },
-  entregue:   { label: "Entregue",    color: "#34C759", bg: "rgba(52,199,89,0.1)", coluna: 9 },
+  aguardando: { label: "Aguardando",  color: "#c57800", bg: "rgba(255,149,0,0.1)",  coluna: 1 },
+  recebido:   { label: "Recebido",    color: "#8456e8", bg: "rgba(80,9,196,0.1)", coluna: 8 },
+  entregue:   { label: "Entregue",    color: "#009351", bg: "rgba(52,199,89,0.1)", coluna: 9 },
 } as const
 type SK = keyof typeof S
 const STEPS: SK[] = ["aguardando", "recebido", "entregue"]
@@ -33,7 +33,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-const inputCls = "w-full border border-[rgba(0,0,0,0.12)] rounded-xl px-3.5 py-2.5 text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-[#5009c4]/20 focus:border-[#5009c4] transition-colors placeholder:text-[rgba(60,60,67,0.3)] tabular-nums bg-white"
+const inputCls = "w-full border border-[rgba(0,0,0,0.12)] rounded-xl px-3.5 py-2.5 text-[13px] text-[#191625] focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] transition-colors placeholder:text-[#898892] tabular-nums bg-white"
 
 // ── Edit modal ─────────────────────────────────────────────────────────────────
 function EditModal({ card, onSave, onClose }: {
@@ -96,7 +96,7 @@ function EditModal({ card, onSave, onClose }: {
         {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-start justify-between gap-3">
           <div>
-            <p className="font-bold text-[#1C1C1E] text-[15px] leading-snug">Editar item</p>
+            <p className="font-bold text-[#191625] text-[15px] leading-snug">Editar item</p>
             <p className="text-[11px] text-[#8E8E93] mt-0.5 font-mono">{card.numero}</p>
           </div>
           <button onClick={dismiss}
@@ -158,10 +158,10 @@ function EditModal({ card, onSave, onClose }: {
           {precoN > 0 && custoN > 0 && (
             <div className="rounded-xl px-3.5 py-2.5 flex items-center justify-between"
               style={{ background: margem >= 0 ? "rgba(52,199,89,0.07)" : "rgba(255,59,48,0.07)" }}>
-              <span className="text-[11px] font-medium" style={{ color: margem >= 0 ? "#34C759" : "#FF3B30" }}>
+              <span className="text-[11px] font-medium" style={{ color: margem >= 0 ? "#009351" : "#d33a3c" }}>
                 Margem bruta
               </span>
-              <span className="text-[13px] font-bold tabular-nums" style={{ color: margem >= 0 ? "#34C759" : "#FF3B30" }}>
+              <span className="text-[13px] font-bold tabular-nums" style={{ color: margem >= 0 ? "#009351" : "#d33a3c" }}>
                 {brl(margem)}
               </span>
             </div>
@@ -176,7 +176,7 @@ function EditModal({ card, onSave, onClose }: {
             Cancelar
           </button>
           <button onClick={save}
-            className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-white bg-[#5009c4] hover:bg-[#4307a6] active:bg-[#370689] transition-colors">
+            className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold text-white bg-[#8456e8] hover:bg-[#7445d4] active:bg-[#6234bc] transition-colors">
             Salvar
           </button>
         </div>
@@ -281,7 +281,7 @@ function TercCard({ card, onMove, onEdit, onDelete }: {
         <div className="px-4 pt-3.5 pb-3">
           {/* Row 1: title + status badge */}
           <div className="flex items-start justify-between gap-3">
-            <p className="font-semibold text-[13px] leading-snug text-[#1C1C1E] flex-1 min-w-0 pr-2">
+            <p className="font-semibold text-[13px] leading-snug text-[#191625] flex-1 min-w-0 pr-2">
               {card.dimensoes || card.numero}
             </p>
             <span
@@ -298,15 +298,15 @@ function TercCard({ card, onMove, onEdit, onDelete }: {
               <span className="text-[11px] text-[#8E8E93] tabular-nums">{num(card.quantidade)} un</span>
             )}
             {card.fornecedor ? (
-              <span className="text-[11px] text-[#8E8E93]">· via <span className="text-[#1C1C1E] font-medium">{card.fornecedor}</span></span>
+              <span className="text-[11px] text-[#8E8E93]">· via <span className="text-[#191625] font-medium">{card.fornecedor}</span></span>
             ) : (
-              <span className="text-[10.5px] text-[rgba(60,60,67,0.3)] italic">· sem fornecedor</span>
+              <span className="text-[10.5px] text-[#898892] italic">· sem fornecedor</span>
             )}
             {card.dataEntregaPrevista && (
               <span
                 className="text-[10px] font-medium px-1.5 py-[2px] rounded-md tabular-nums"
                 style={isLate
-                  ? { background: "rgba(255,59,48,0.1)", color: "#FF3B30" }
+                  ? { background: "rgba(255,59,48,0.1)", color: "#d33a3c" }
                   : { background: "rgba(0,0,0,0.04)", color: "#8E8E93" }
                 }
               >
@@ -319,7 +319,7 @@ function TercCard({ card, onMove, onEdit, onDelete }: {
           <div className="flex items-end justify-between mt-2.5">
             <div>
               {margin !== null && (
-                <p className="text-[10px] tabular-nums mb-0.5" style={{ color: margin >= 0 ? "#34C759" : "#FF3B30" }}>
+                <p className="text-[10px] tabular-nums mb-0.5" style={{ color: margin >= 0 ? "#009351" : "#d33a3c" }}>
                   Custo {brl(card.custoTerceiro!)} · Margem {brl(margin)}
                 </p>
               )}
@@ -329,7 +329,7 @@ function TercCard({ card, onMove, onEdit, onDelete }: {
                 </p>
               )}
             </div>
-            <p className="text-[17px] font-bold text-[#1C1C1E] tabular-nums leading-none">
+            <p className="text-[17px] font-bold text-[#191625] tabular-nums leading-none">
               {brl(card.preco)}
             </p>
           </div>
@@ -343,7 +343,7 @@ function TercCard({ card, onMove, onEdit, onDelete }: {
           <div className="flex items-center gap-0.5 shrink-0">
             <button
               onClick={() => setEditing(true)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-[#8E8E93] hover:text-[#5009c4] hover:bg-[#5009c4]/[0.08] transition-all"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-[#8E8E93] hover:text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-all"
               title="Editar"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -353,7 +353,7 @@ function TercCard({ card, onMove, onEdit, onDelete }: {
             {!confirming ? (
               <button
                 onClick={() => setConfirming(true)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-[#8E8E93] hover:text-[#FF3B30] hover:bg-[#FF3B30]/[0.08] transition-all"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-[#8E8E93] hover:text-[#d33a3c] hover:bg-[#d33a3c]/[0.08] transition-all"
                 title="Excluir"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -364,13 +364,13 @@ function TercCard({ card, onMove, onEdit, onDelete }: {
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setConfirming(false)}
-                  className="text-[10px] font-medium text-[#8E8E93] hover:text-[#1C1C1E] px-2 py-1 rounded-lg hover:bg-[rgba(0,0,0,0.04)] transition-colors"
+                  className="text-[10px] font-medium text-[#8E8E93] hover:text-[#191625] px-2 py-1 rounded-lg hover:bg-[rgba(0,0,0,0.04)] transition-colors"
                 >
                   não
                 </button>
                 <button
                   onClick={() => onDelete(card.id)}
-                  className="text-[10px] font-semibold text-white bg-[#FF3B30] hover:bg-[#D70015] px-2.5 py-1 rounded-lg transition-colors"
+                  className="text-[10px] font-semibold text-white bg-[#d33a3c] hover:bg-[#D70015] px-2.5 py-1 rounded-lg transition-colors"
                 >
                   excluir
                 </button>
@@ -432,7 +432,7 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
         <div className="flex items-center gap-2.5 mb-3">
           <p className="text-[9.5px] uppercase tracking-[0.08em] font-semibold text-[#8E8E93]">Terceirizados</p>
           {kpis.late > 0 && (
-            <span className="text-[9px] font-bold px-1.5 py-[2px] rounded-full bg-[#FF3B30]/10 text-[#FF3B30]">
+            <span className="text-[9px] font-bold px-1.5 py-[2px] rounded-full bg-[#d33a3c]/10 text-[#d33a3c]">
               {kpis.late} atrasado{kpis.late > 1 ? "s" : ""}
             </span>
           )}
@@ -442,11 +442,11 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
           {/* Aguardando */}
           <div className={`${CARD} px-3.5 py-3`}>
             <div className="flex items-center gap-1.5 mb-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#FF9500]" />
+              <div className="w-1.5 h-1.5 rounded-full bg-[#c57800]" />
               <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold">Aguardando</p>
             </div>
             <p className="text-[22px] font-semibold leading-none tabular-nums"
-              style={{ color: kpis.nAguardando > 0 ? "#FF9500" : "#C7C7CC" }}>
+              style={{ color: kpis.nAguardando > 0 ? "#c57800" : "#C7C7CC" }}>
               {kpis.nAguardando}
             </p>
             <p className="text-[10px] text-[#8E8E93] mt-1 tabular-nums">{brl(kpis.vAberto)}</p>
@@ -455,11 +455,11 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
           {/* Recebido */}
           <div className={`${CARD} px-3.5 py-3`}>
             <div className="flex items-center gap-1.5 mb-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#5009c4]" />
+              <div className="w-1.5 h-1.5 rounded-full bg-[#8456e8]" />
               <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold">Recebido</p>
             </div>
             <p className="text-[22px] font-semibold leading-none tabular-nums"
-              style={{ color: kpis.nRecebido > 0 ? "#5009c4" : "#C7C7CC" }}>
+              style={{ color: kpis.nRecebido > 0 ? "#8456e8" : "#C7C7CC" }}>
               {kpis.nRecebido}
             </p>
             <p className="text-[10px] text-[#8E8E93] mt-1 tabular-nums">&nbsp;</p>
@@ -468,11 +468,11 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
           {/* Entregue */}
           <div className={`${CARD} px-3.5 py-3`}>
             <div className="flex items-center gap-1.5 mb-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#34C759]" />
+              <div className="w-1.5 h-1.5 rounded-full bg-[#009351]" />
               <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold">Entregue</p>
             </div>
             <p className="text-[22px] font-semibold leading-none tabular-nums"
-              style={{ color: kpis.nEntregue > 0 ? "#34C759" : "#C7C7CC" }}>
+              style={{ color: kpis.nEntregue > 0 ? "#009351" : "#C7C7CC" }}>
               {kpis.nEntregue}
             </p>
             <p className="text-[10px] text-[#8E8E93] mt-1 tabular-nums">{brl(kpis.vEntregue)}</p>
@@ -489,7 +489,7 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
               <div className="h-full rounded-full transition-all duration-700"
                 style={{
                   width: kpis.vTotal > 0 ? `${Math.min(kpis.vEntregue / kpis.vTotal * 100, 100)}%` : "0%",
-                  background: "#34C759",
+                  background: "#009351",
                 }} />
             </div>
             <p className="text-[9px] mt-1.5 tabular-nums" style={{ color: "rgba(255,255,255,0.3)" }}>
@@ -510,7 +510,7 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
               </svg>
             </div>
             <div className="text-center">
-              <p className="font-semibold text-[#1C1C1E]">Nenhum pedido terceirizado</p>
+              <p className="font-semibold text-[#191625]">Nenhum pedido terceirizado</p>
               <p className="text-[13px] text-[#8E8E93] mt-1 max-w-[220px] leading-relaxed">
                 Itens adicionais criados via proposta aparecerão aqui.
               </p>
@@ -527,15 +527,15 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
 
               {/* Group header */}
               <div className="flex items-center gap-2 px-0.5">
-                <span className="text-[10px] font-bold font-mono text-[#5009c4] bg-[#5009c4]/[0.08] px-1.5 py-0.5 rounded-md">
+                <span className="text-[10px] font-bold font-mono text-[#8456e8] bg-[#8456e8]/[0.08] px-1.5 py-0.5 rounded-md">
                   {group.loteNumero}
                 </span>
-                <span className="text-[12px] font-semibold text-[#1C1C1E]">{group.nomeCliente}</span>
+                <span className="text-[12px] font-semibold text-[#191625]">{group.nomeCliente}</span>
                 <div className="flex-1 h-px bg-[rgba(60,60,67,0.07)]" />
                 <span className="text-[10px] text-[#8E8E93] tabular-nums">
                   {groupEntregues}/{group.cards.length} entregue{group.cards.length !== 1 ? "s" : ""}
                 </span>
-                <span className="text-[11px] font-bold tabular-nums text-[#1C1C1E]">
+                <span className="text-[11px] font-bold tabular-nums text-[#191625]">
                   {brl(groupTotal)}
                 </span>
               </div>

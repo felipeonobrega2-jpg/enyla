@@ -3,7 +3,7 @@ import "./globals.css";
 import { ThemeProvider } from "./components/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "ENYLA — Sistema Interno",
+  title: "ENYLA",
   description: "Acesso restrito.",
   robots: { index: false, follow: false },
   appleWebApp: {
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#5009c4",
+  themeColor: "#8456e8",
   width: "device-width",
   initialScale: 1,
 };

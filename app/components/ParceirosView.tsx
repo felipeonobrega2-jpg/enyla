@@ -25,9 +25,9 @@ const STATUS_LABEL: Record<StatusNegocio, string> = {
 }
 
 const STATUS_CLS: Record<StatusNegocio, string> = {
-  pendente:  "bg-[#FF9500]/[0.08] text-[#FF9500] border-[#FF9500]/20",
-  pago:      "bg-[#34C759]/[0.08] text-[#34C759] border-[#34C759]/20",
-  cancelado: "bg-[#FF3B30]/[0.08] text-[#FF3B30] border-[#FF3B30]/20",
+  pendente:  "bg-[#c57800]/[0.08] text-[#c57800] border-[#c57800]/20",
+  pago:      "bg-[#009351]/[0.08] text-[#009351] border-[#009351]/20",
+  cancelado: "bg-[#d33a3c]/[0.08] text-[#d33a3c] border-[#d33a3c]/20",
 }
 
 function pill(text: string, cls: string) {
@@ -70,8 +70,8 @@ function ModalParceiro({ inicial, onSave, onClose }: {
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
         <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between">
-          <p className="font-bold text-[#1C1C1E] text-[15px]">{inicial ? "Editar parceiro" : "Novo parceiro"}</p>
-          <button onClick={onClose} className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] text-xl leading-none">×</button>
+          <p className="font-bold text-[#191625] text-[15px]">{inicial ? "Editar parceiro" : "Novo parceiro"}</p>
+          <button onClick={onClose} className="text-[#898892] hover:text-[#8E8E93] text-xl leading-none">×</button>
         </div>
         <div className="px-6 py-5 space-y-4">
           <Field label="Nome *">
@@ -123,13 +123,13 @@ function ModalParceiro({ inicial, onSave, onClose }: {
         </div>
         <div className="px-6 pb-5 flex gap-2">
           <button onClick={onClose}
-            className="flex-1 py-2.5 text-[12.5px] font-medium text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors">
+            className="flex-1 py-2.5 text-[12.5px] font-medium text-[#8E8E93] hover:text-[#5e5c68] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors">
             Cancelar
           </button>
           <button
             disabled={!nome.trim() || !catFinal.trim()}
             onClick={salvar}
-            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#2C2C2E] hover:bg-[#1C1C1E] rounded-xl transition-colors disabled:opacity-40">
+            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#161421] hover:bg-[#0b0914] rounded-xl transition-colors disabled:opacity-40">
             {inicial ? "Salvar" : "Cadastrar"}
           </button>
         </div>
@@ -206,8 +206,8 @@ function ModalNegocio({ inicial, parceiros, lotes, onSave, onClose }: {
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col overflow-hidden" style={{ maxHeight: "92vh" }}>
         <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between shrink-0">
-          <p className="font-bold text-[#1C1C1E] text-[15px]">{inicial ? "Editar negócio" : "Registrar negócio"}</p>
-          <button onClick={onClose} className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] text-xl leading-none">×</button>
+          <p className="font-bold text-[#191625] text-[15px]">{inicial ? "Editar negócio" : "Registrar negócio"}</p>
+          <button onClick={onClose} className="text-[#898892] hover:text-[#8E8E93] text-xl leading-none">×</button>
         </div>
 
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
@@ -374,13 +374,13 @@ function ModalNegocio({ inicial, parceiros, lotes, onSave, onClose }: {
 
         <div className="px-6 pb-5 flex gap-2 shrink-0 border-t border-[rgba(60,60,67,0.08)] pt-4">
           <button onClick={onClose}
-            className="flex-1 py-2.5 text-[12.5px] font-medium text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors">
+            className="flex-1 py-2.5 text-[12.5px] font-medium text-[#8E8E93] hover:text-[#5e5c68] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors">
             Cancelar
           </button>
           <button
             disabled={!parceiroId || !descricao.trim() || vv <= 0}
             onClick={salvar}
-            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#2C2C2E] hover:bg-[#1C1C1E] rounded-xl transition-colors disabled:opacity-40">
+            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#161421] hover:bg-[#0b0914] rounded-xl transition-colors disabled:opacity-40">
             {inicial ? "Salvar" : "Registrar"}
           </button>
         </div>
@@ -450,12 +450,12 @@ export function ParceirosView({
       <div className="px-8 pt-6 pb-0 shrink-0">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-[18px] font-semibold text-[#1C1C1E]">Parceiros comerciais</h1>
+            <h1 className="text-[18px] font-semibold text-[#191625]">Parceiros comerciais</h1>
             <p className="text-[12px] text-[#8E8E93] mt-0.5">Gestão de parceiros e negócios gerados</p>
           </div>
           <button
             onClick={() => tab === "parceiros" ? setModalParceiro(true) : setModalNegocio(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#2C2C2E] hover:bg-[#1C1C1E] text-white text-[12.5px] font-semibold rounded-xl transition-colors">
+            className="flex items-center gap-2 px-4 py-2 bg-[#161421] hover:bg-[#0b0914] text-white text-[12.5px] font-semibold rounded-xl transition-colors">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
@@ -476,8 +476,8 @@ export function ParceirosView({
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2.5 text-[12.5px] font-semibold border-b-2 transition-colors -mb-px ${
                 tab === t
-                  ? "border-slate-800 text-[#1C1C1E]"
-                  : "border-transparent text-[#8E8E93] hover:text-[rgba(60,60,67,0.6)]"
+                  ? "border-slate-800 text-[#191625]"
+                  : "border-transparent text-[#8E8E93] hover:text-[#72707d]"
               }`}>
               {t === "parceiros" ? `Parceiros (${parceiros.length})` : `Negócios (${negocios.length})`}
             </button>
@@ -508,12 +508,12 @@ export function ParceirosView({
                   return (
                     <div key={p.id}
                       className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-5 py-4 flex items-center gap-4 hover:border-[rgba(60,60,67,0.12)] transition-colors group">
-                      <div className="w-9 h-9 rounded-xl bg-[rgba(116,116,128,0.08)] flex items-center justify-center shrink-0 text-[rgba(60,60,67,0.6)] font-semibold text-[15px]">
+                      <div className="w-9 h-9 rounded-xl bg-[rgba(116,116,128,0.08)] flex items-center justify-center shrink-0 text-[#72707d] font-semibold text-[15px]">
                         {p.nome[0].toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-[#1C1C1E] text-[13.5px]">{p.nome}</span>
+                          <span className="font-bold text-[#191625] text-[13.5px]">{p.nome}</span>
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100">
                             {p.categoria}
                           </span>
@@ -529,14 +529,14 @@ export function ParceirosView({
                       </div>
                       {/* Stats */}
                       <div className="text-right shrink-0 hidden sm:block">
-                        <p className="font-bold text-[#1C1C1E] text-[13px]">{brl(st?.total ?? 0)}</p>
+                        <p className="font-bold text-[#191625] text-[13px]">{brl(st?.total ?? 0)}</p>
                         <p className="text-[10.5px] text-[#8E8E93]">{st?.deals ?? 0} negócio{(st?.deals ?? 0) !== 1 ? "s" : ""}</p>
                       </div>
                       {/* Actions */}
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => setModalParceiro(p)}
-                          className="p-1.5 rounded-lg text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.08)] transition-colors">
+                          className="p-1.5 rounded-lg text-[#8E8E93] hover:text-[#5e5c68] hover:bg-[rgba(116,116,128,0.08)] transition-colors">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
                           </svg>
@@ -565,14 +565,14 @@ export function ParceirosView({
               <select
                 value={filtroParceiro}
                 onChange={e => setFiltroParceiro(e.target.value)}
-                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[rgba(60,60,67,0.6)] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400">
+                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[#72707d] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400">
                 <option value="">Todos os parceiros</option>
                 {parceiros.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
               </select>
               <select
                 value={filtroStatus}
                 onChange={e => setFiltroStatus(e.target.value as StatusNegocio | "")}
-                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[rgba(60,60,67,0.6)] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400">
+                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[#72707d] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400">
                 <option value="">Todos os status</option>
                 <option value="pendente">Pendente</option>
                 <option value="pago">Pago</option>
@@ -593,11 +593,11 @@ export function ParceirosView({
                     <div className="flex items-start gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-[#1C1C1E] text-[13px]">{n.descricao}</span>
-                          {pill(n.tipo === "comissao" ? "Comissão" : "Ganho", "bg-violet-50 text-[#AF52DE] border-violet-200")}
+                          <span className="font-bold text-[#191625] text-[13px]">{n.descricao}</span>
+                          {pill(n.tipo === "comissao" ? "Comissão" : "Ganho", "bg-violet-50 text-[#a582ff] border-violet-200")}
                           {pill(STATUS_LABEL[n.status], STATUS_CLS[n.status])}
                           {n.loteNumero && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-[#AF52DE]/10 text-[#AF52DE] border-violet-200">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-[#a582ff]/10 text-[#a582ff] border-violet-200">
                               {n.loteNumero}
                             </span>
                           )}
@@ -632,7 +632,7 @@ export function ParceirosView({
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-semibold text-[#1C1C1E] text-[14px] tabular-nums">
+                        <p className="font-semibold text-[#191625] text-[14px] tabular-nums">
                           {brl(n.comissaoValor)}
                         </p>
                         <p className="text-[10.5px] text-[#8E8E93] tabular-nums">
@@ -644,7 +644,7 @@ export function ParceirosView({
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => setModalNegocio(n)}
-                          className="p-1.5 rounded-lg text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.08)] transition-colors">
+                          className="p-1.5 rounded-lg text-[#8E8E93] hover:text-[#5e5c68] hover:bg-[rgba(116,116,128,0.08)] transition-colors">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
                           </svg>
@@ -689,7 +689,7 @@ export function ParceirosView({
       {confirmarExcluir && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mx-4 p-6 text-center">
-            <p className="font-bold text-[#1C1C1E] text-[14px] mb-1">Confirmar exclusão</p>
+            <p className="font-bold text-[#191625] text-[14px] mb-1">Confirmar exclusão</p>
             <p className="text-[12px] text-[#8E8E93] mb-5">Esta ação não pode ser desfeita.</p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmarExcluir(null)}
@@ -741,7 +741,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function input() {
-  return "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[rgba(60,60,67,0.75)] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"
+  return "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[#5e5c68] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"
 }
 
 function formatDate(iso: string) {

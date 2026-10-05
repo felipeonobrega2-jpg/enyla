@@ -1,4 +1,4 @@
-import { FormData, Calculo, PropostaCustom } from "./types"
+import { FormData, Calculo, PropostaCustom, KanbanCard, COLUNAS_KANBAN } from "./types"
 
 type HistoricoItem = { form: FormData; calculo: Calculo; data: string; numero?: string }
 
@@ -101,9 +101,10 @@ export function gerarHtmlOrcamento(item: HistoricoItem): string {
 
   <h2>Dimensões da Caixa</h2>
   <div class="kpis">
-    <div class="kpi"><div class="kpi-label">Largura</div><div class="kpi-value">${form.frente} cm</div></div>
-    <div class="kpi"><div class="kpi-label">Altura</div><div class="kpi-value">${form.alturaBox} cm</div></div>
-    <div class="kpi"><div class="kpi-label">Profundidade</div><div class="kpi-value">${form.lateral} cm</div></div>
+    ${form.frente > 0 ? `<div class="kpi"><div class="kpi-label">Largura</div><div class="kpi-value">${form.frente} cm</div></div>` : ""}
+    ${form.alturaBox > 0 ? `<div class="kpi"><div class="kpi-label">Altura</div><div class="kpi-value">${form.alturaBox} cm</div></div>` : ""}
+    ${form.lateral > 0 ? `<div class="kpi"><div class="kpi-label">Profundidade</div><div class="kpi-value">${form.lateral} cm</div></div>` : ""}
+    ${!(form.frente > 0 || form.alturaBox > 0 || form.lateral > 0) ? `<div class="kpi"><div class="kpi-label">Blank aberto</div><div class="kpi-value" style="font-size:13px">${(dieline.largura/10).toFixed(1)} × ${(dieline.altura/10).toFixed(1)} cm</div><div class="kpi-sub">DXF Pacdora</div></div>` : ""}
     <div class="kpi"><div class="kpi-label">Aba de Colagem</div><div class="kpi-value">${form.abaColagem} cm</div></div>
     ${form.materialNome ? `<div class="kpi"><div class="kpi-label">Material</div><div class="kpi-value" style="font-size:13px">${form.materialNome}</div></div>` : ""}
     <div class="kpi"><div class="kpi-label">Verniz UV</div><div class="kpi-value">${form.incluirVerniz ? "Sim" : "Não"}</div></div>
@@ -236,14 +237,8 @@ function estiloPropostaCliente(): string {
     .v-total{font-weight:800;color:#5009c4}
     .tag{font-size:8px;font-weight:700;padding:1px 6px;border-radius:9999px;color:#fff;white-space:nowrap}
 
-    .promo-wrap{position:relative;margin:22px 0 16px}
-    .promo-box{background:rgba(80,9,196,.03);border:1px solid rgba(80,9,196,.25);border-radius:4px;padding:18px 20px 16px}
-    .promo-badge{position:absolute;top:-9px;left:20px;background:#04D186;color:#fff;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:20px}
-    .promo-corpo{font-size:13px;color:#1a1a1a;line-height:1.6;margin-top:8px}
-    .promo-corpo strong{color:#5009c4;font-weight:700}
-    .promo-validade{font-size:11.5px;color:rgba(0,0,0,.45);margin-top:6px}
 
-    .footnotes{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:10px;color:#64748b;margin-top:8px;font-style:italic}
+.footnotes{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:10px;color:#64748b;margin-top:8px;font-style:italic}
 
     .obs-bar-list{font-size:11px;color:#334155;line-height:1.75}
     .obs-bar-list .item{margin-bottom:2px}
@@ -263,10 +258,136 @@ function estiloPropostaCliente(): string {
   `
 }
 
+function buildBox3D(
+  largura: number, altura: number, profundidade: number,
+  incluirVerniz: boolean, targetH: number, perspective: number, rotX: number, rotY: number
+): string {
+  const maxDim = Math.max(largura, altura, profundidade, 0.01)
+  const S = Math.min(targetH / maxDim, targetH / 4)
+  const W = Math.max(largura    * S, 8)
+  const H = Math.max(altura     * S, 8)
+  const D = Math.max(profundidade * S, 8)
+
+  const edge   = "rgba(100,116,139,0.20)"
+  const cFront = incluirVerniz ? "linear-gradient(150deg,#f8f5fc,#eae1f7)" : "linear-gradient(150deg,#f8fafc,#eef2f7)"
+  const cSideR = incluirVerniz ? "linear-gradient(160deg,#eae1f7,#dccdf3)" : "linear-gradient(160deg,#e4eaf2,#d8e0ea)"
+  const cSideL = incluirVerniz ? "linear-gradient(160deg,#d3c1f0,#c1a8ea)" : "linear-gradient(160deg,#d8e0ea,#cdd5df)"
+  const cTop   = incluirVerniz ? "linear-gradient(145deg,#f0f9ff,#e0f2fe)" : "linear-gradient(145deg,#f8fafc,#ecf1f7)"
+  const cDark  = incluirVerniz ? "#b090e4" : "#c8d3de"
+
+  function face(bg: string, tf: string, w: number, h: number, l: number, t: number) {
+    return `<div style="position:absolute;left:${Math.round(l)}px;top:${Math.round(t)}px;width:${Math.round(w)}px;height:${Math.round(h)}px;background:${bg};border:1px solid ${edge};backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:${tf};box-sizing:border-box"></div>`
+  }
+
+  const sceneW = Math.ceil(W + D + 64)
+  const sceneH = Math.ceil(H + D + 64)
+
+  return `<div style="width:${sceneW}px;height:${sceneH}px;display:flex;align-items:center;justify-content:center;perspective:${perspective}px;-webkit-perspective:${perspective}px">
+    <div style="width:${Math.round(W)}px;height:${Math.round(H)}px;position:relative;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;transform:rotateX(${rotX}deg) rotateY(${rotY}deg)">
+      ${face(cFront,  `translateZ(${D/2}px)`,                   W, H,      0,      0)}
+      ${face(cDark,   `rotateY(180deg) translateZ(${D/2}px)`,   W, H,      0,      0)}
+      ${face(cSideR,  `rotateY(90deg) translateZ(${W/2}px)`,    D, H, (W-D)/2,    0)}
+      ${face(cSideL,  `rotateY(-90deg) translateZ(${W/2}px)`,   D, H, (W-D)/2,    0)}
+      ${face(cTop,    `rotateX(90deg) translateZ(${H/2}px)`,    W, D,      0, (H-D)/2)}
+      ${face(cDark,   `rotateX(-90deg) translateZ(${H/2}px)`,   W, D,      0, (H-D)/2)}
+    </div>
+  </div>`
+}
+
+function paginaVisualizacao3D(
+  largura: number, altura: number, profundidade: number,
+  incluirVerniz: boolean, qrDataUrl?: string, previewUrl?: string, dataRodape?: string
+): string {
+
+  // ── ângulos ──────────────────────────────────────────────────────────────────
+  // Hero: 3 frames grandes, perspectiva dramática
+  const hero = (rotX: number, rotY: number, label: string) => `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:1">
+      <div style="background:#f8f9fb;border-radius:14px;border:1px solid rgba(80,9,196,0.08);padding:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(80,9,196,0.06),0 1px 3px rgba(0,0,0,0.05)">
+        ${buildBox3D(largura, altura, profundidade, incluirVerniz, 110, 900, rotX, rotY)}
+      </div>
+      <span style="font-size:8.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">${label}</span>
+    </div>`
+
+  // Thumb: 5 frames menores, abaixo
+  const thumb = (rotX: number, rotY: number, label: string) => `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1">
+      <div style="background:#f8f9fb;border-radius:10px;border:1px solid rgba(80,9,196,0.07);padding:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 6px rgba(0,0,0,0.05)">
+        ${buildBox3D(largura, altura, profundidade, incluirVerniz, 58, 700, rotX, rotY)}
+      </div>
+      <span style="font-size:7.5px;font-weight:600;color:#b0b8c8;text-transform:uppercase;letter-spacing:.09em">${label}</span>
+    </div>`
+
+  return `
+<!-- ═══════════════════════════════════════════════════════ PÁGINA 2: VISUALIZAÇÃO 3D -->
+<div class="page-break">
+<div class="page" style="padding:28px 36px">
+
+  <!-- Cabeçalho -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:2px solid #5009c4;margin-bottom:24px">
+    <img src="${LOGO_DARK_B64}" alt="Enyla" style="height:24px;display:block" />
+    <div style="text-align:right">
+      <div style="font-size:13px;font-weight:800;color:#0f172a">Visualização 3D</div>
+      <div style="font-size:10px;font-weight:500;color:#64748b;margin-top:1px">Prévia estrutural da embalagem</div>
+    </div>
+  </div>
+
+  <!-- Hero: 3 ângulos principais -->
+  <div style="display:flex;gap:14px;margin-bottom:18px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+    ${hero(-22, 28,  "Vista frontal")}
+    ${hero(-38, 28,  "Ângulo superior")}
+    ${hero(-22, 78,  "Vista lateral")}
+  </div>
+
+  <!-- Divisor -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    <div style="flex:1;height:1px;background:rgba(0,0,0,0.06)"></div>
+    <span style="font-size:8px;font-weight:700;color:#b0b8c8;text-transform:uppercase;letter-spacing:.12em;white-space:nowrap">Mais ângulos</span>
+    <div style="flex:1;height:1px;background:rgba(0,0,0,0.06)"></div>
+  </div>
+
+  <!-- Thumbs: 5 ângulos secundários -->
+  <div style="display:flex;gap:12px;margin-bottom:28px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+    ${thumb(-22, 158, "Traseiro")}
+    ${thumb(-22, -52, "Lateral E.")}
+    ${thumb(-58,  28, "Topo")}
+    ${thumb( 20,  28, "Base")}
+    ${thumb(-22, 118, "3/4 traseiro")}
+  </div>
+
+  <!-- QR + Link -->
+  ${qrDataUrl && previewUrl ? `
+  <div style="display:flex;align-items:center;gap:20px;background:#fff;border-radius:14px;border:1.5px solid rgba(80,9,196,0.14);padding:18px 22px">
+    <div style="flex-shrink:0;background:rgba(80,9,196,0.04);border-radius:10px;padding:8px;border:1px solid rgba(80,9,196,0.10)">
+      <img src="${qrDataUrl}" alt="QR Code" style="width:82px;height:82px;display:block;border-radius:5px" />
+    </div>
+    <div style="flex:1">
+      <p style="font-size:8px;font-weight:700;color:#8456e8;text-transform:uppercase;letter-spacing:.12em;margin:0 0 4px">Experiência interativa</p>
+      <p style="font-size:13.5px;font-weight:800;color:#0f172a;margin:0 0 4px;letter-spacing:-.01em;line-height:1.3">Gire a sua caixa em 3D</p>
+      <p style="font-size:10px;color:#64748b;margin:0 0 8px;line-height:1.55">Aponte a câmera do celular para o QR code e explore a embalagem em todos os ângulos, de forma interativa.</p>
+      <div style="background:rgba(80,9,196,0.04);border-radius:6px;padding:5px 10px;display:inline-block;border:1px solid rgba(80,9,196,0.08)">
+        <span style="font-size:8.5px;color:#5009c4;font-weight:500;word-break:break-all">${previewUrl}</span>
+      </div>
+    </div>
+  </div>` : ""}
+
+  <!-- Disclaimer -->
+  <p style="font-size:8.5px;color:#b0b8c8;text-align:center;margin-top:14px;margin-bottom:0;font-style:italic">
+    Imagem meramente ilustrativa. As proporções são baseadas nas medidas informadas.
+  </p>
+
+  <div style="margin-top:12px;padding-top:9px;border-top:1px solid #e2e8f0;font-size:9.5px;color:#94a3b8;text-align:center;line-height:1.5">
+    Enyla · Jerograf Embalagens Personalizadas · CNPJ 03.999.896/0001-52 · Barueri – SP${dataRodape ? ` · ${dataRodape}` : ""}
+  </div>
+
+</div>
+</div>`
+}
+
 function paginaCondicoesGerais(item: { dataRodape: string }): string {
   const { dataRodape } = item
   return `
-<!-- ═══════════════════════════════════════════════════════ PÁGINA 2: CONDIÇÕES -->
+<!-- ═══════════════════════════════════════════════════════ PÁGINA 3: CONDIÇÕES -->
 <div class="page-break">
 <div class="page">
 
@@ -334,7 +455,7 @@ function paginaCondicoesGerais(item: { dataRodape: string }): string {
 </div>`
 }
 
-export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?: string): string {
+export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?: string, previewQrDataUrl?: string, previewUrl?: string): string {
   const { form, calculo, data, numero } = item
   const validadeDias = form.validadeDias ?? 7
   const dataVencimento = (() => {
@@ -346,7 +467,8 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
       return dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })
     } catch { return "" }
   })()
-  const { tabela, sweetSpotIdealQtd, sweetSpotMinimoQtd } = calculo
+  const { tabela, sweetSpotIdealQtd, sweetSpotMinimoQtd, dieline } = calculo
+  const temDims3D = form.frente > 0 && form.alturaBox > 0 && form.lateral > 0
 
   const sweetMin  = tabela.find(l => l.quantidade === sweetSpotMinimoQtd) ?? tabela[0]
   const precoKey  = form.comFaca ? "precoComFaca"    : "precoSemFaca"
@@ -374,7 +496,13 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
       </tr>`
   }).join("")
 
-  const temAcabamento = form.incluirVerniz || form.comFaca
+  const acabamentosPdf: string[] = []
+  if (form.incluirVerniz && form.vernizTipo)  acabamentosPdf.push(`Verniz ${form.vernizTipo}`)
+  if (form.laminacao && form.laminacaoTipo)   acabamentosPdf.push(`Laminação ${form.laminacaoTipo}`)
+  if (form.comFaca)                           acabamentosPdf.push("Faca de corte inclusa")
+  ;(form.outrosAcabamentos ?? []).forEach(a => acabamentosPdf.push(a))
+  const acompPdf = form.acompanhamentos ?? []
+  const temAcabamento = acabamentosPdf.length > 0 || acompPdf.length > 0
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -409,18 +537,25 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
   <div class="kv-grid">
     <div class="kv"><span class="lbl">Produto:</span><span class="val">Embalagem Personalizada</span></div>
     <div class="kv"><span class="lbl">Material:</span><span class="val">${form.materialNome || "—"}</span></div>
-    <div class="kv"><span class="lbl">Largura:</span><span class="val">${form.frente} cm</span></div>
+    ${temDims3D
+      ? `<div class="kv"><span class="lbl">Largura:</span><span class="val">${form.frente} cm</span></div>
     <div class="kv"><span class="lbl">Altura:</span><span class="val">${form.alturaBox} cm</span></div>
-    <div class="kv"><span class="lbl">Profundidade:</span><span class="val">${form.lateral} cm</span></div>
+    <div class="kv"><span class="lbl">Profundidade:</span><span class="val">${form.lateral} cm</span></div>`
+      : `<div class="kv"><span class="lbl">Blank aberto (L × A):</span><span class="val">${(dieline.largura / 10).toFixed(1)} × ${(dieline.altura / 10).toFixed(1)} cm</span></div>`
+    }
     <div class="kv"><span class="lbl">Modelos de arte:</span><span class="val">${form.numSKUs}</span></div>
   </div>
 
   ${temAcabamento ? `
   <div class="section-bar">Acabamentos</div>
   <div class="kv-grid">
-    ${form.incluirVerniz ? `<div class="kv"><span class="lbl">Verniz UV:</span><span class="val">Sim</span></div>` : ""}
-    ${form.comFaca ? `<div class="kv"><span class="lbl">Faca de corte:</span><span class="val">Inclusa</span></div>` : ""}
+    <div class="kv" style="grid-column:1/-1"><span class="lbl">Acabamentos:</span><span class="val">${[...acabamentosPdf, ...acompPdf].join(", ")}</span></div>
   </div>` : ""}
+
+  <div class="section-bar">Pagamento</div>
+  <div class="kv-grid">
+    <div class="kv" style="grid-column:1/-1"><span class="lbl">Condições:</span><span class="val">50% de sinal no fechamento do pedido + 50% na entrega</span></div>
+  </div>
 
   ${linhasHtml ? `
   <div class="section-bar">Valores</div>
@@ -429,20 +564,11 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
     <tbody>${linhasHtml}</tbody>
   </table>` : ""}
 
-  <div class="promo-wrap">
-    <div class="promo-badge">BÔNUS HOJE</div>
-    <div class="promo-box">
-      <div class="promo-corpo">Feche o pedido hoje e escolha entre <strong>1.000 cartões de visita</strong> ou um <strong>banner personalizado</strong>, sem custo adicional.</div>
-      <div class="promo-validade">Válido para pedidos acima de 100 unidades com fechamento no dia do envio desta proposta.</div>
-    </div>
-  </div>
-
   <div class="section-bar">Condições e Observações</div>
   <div class="obs-bar-list">
     <div class="item">* Prazo de produção: <strong>${PRAZO_ENTREGA_PADRAO}</strong> após aprovação da arte.</div>
     <div class="item">* Contamos com designer próprio — desenvolvimento de arte incluso sem custo adicional.</div>
     <div class="item">* A quantidade final do lote pode variar <strong>até 10%</strong> para mais ou para menos.</div>
-    <div class="item">* Pagamento: <strong>50% de sinal</strong> no fechamento do pedido + 50% na entrega.</div>
     <div class="item">* Pedido mínimo: <strong>${num(sweetMin.quantidade)} unidades</strong>.</div>
     <div class="item">* Os valores desta proposta são válidos <strong>até a data de vencimento</strong> indicada. Após esse prazo, os preços poderão ser reajustados sem aviso prévio.</div>
     <div class="item">* Recebeu uma proposta mais em conta? Apresente-nos — <strong>cobrimos qualquer oferta</strong> do mercado.</div>
@@ -456,6 +582,7 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
   </div>
 
 </div>
+${temDims3D ? paginaVisualizacao3D(form.frente, form.alturaBox, form.lateral, !!form.incluirVerniz, previewQrDataUrl, previewUrl, data) : ""}
 ${paginaCondicoesGerais({ dataRodape: data })}
 
 </body>
@@ -477,25 +604,22 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom, telefoneCliente?: str
     } catch { return "" }
   })()
 
+  const temParc = (p.parcFator ?? 0) > 0
+
   const linhasHtml = linhasAtivas.map(l => {
-    const isIdeal = l.isIdeal
-    const isMin   = l === minLinha && !isIdeal
-    const total   = l.unitario * l.quantidade
-    const parc    = (total * p.parcFator) / 12
+    const total = l.unitario * l.quantidade
+    const parc  = (total * (p.parcFator ?? 0)) / 12
     return `
       <tr>
-        <td><div class="v-qtd">${num(l.quantidade)}
-          ${isIdeal ? '<span class="tag" style="background:#028959">RECOMENDADO</span>' : ""}
-          ${isMin   ? '<span class="tag" style="background:#f59e0b">MÍNIMO</span>'  : ""}
-        </div></td>
+        <td><div class="v-qtd">${num(l.quantidade)}</div></td>
         <td class="v-unit">${brl(l.unitario)}</td>
         <td class="v-total">${brl(total)}</td>
-        <td class="v-parc">${brl(parc)}/mês</td>
+        ${temParc ? `<td class="v-parc">${brl(parc)}/mês</td>` : ""}
       </tr>`
   }).join("")
 
-  const temAcabamento = p.incluirVerniz || p.comFaca
   const temInfoTecnica = p.descricao || p.material || p.dimensoes || p.numSKUs > 0
+  const temAcabamento  = p.incluirVerniz || p.comFaca
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -540,27 +664,23 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom, telefoneCliente?: str
     ${p.comFaca ? `<div class="kv"><span class="lbl">Faca de corte:</span><span class="val">Inclusa</span></div>` : ""}
   </div>` : ""}
 
+  <div class="section-bar">Pagamento</div>
+  <div class="kv-grid">
+    <div class="kv" style="grid-column:1/-1"><span class="lbl">Condições:</span><span class="val">50% de sinal no fechamento do pedido + 50% na entrega</span></div>
+  </div>
+
   ${linhasHtml ? `
   <div class="section-bar">Valores</div>
   <table class="valores-table">
-    <thead><tr><th>Quantidade</th><th>Unitário</th><th>À Vista</th><th>Até 12×</th></tr></thead>
+    <thead><tr><th>Quantidade</th><th>Unitário</th><th>À Vista</th>${temParc ? "<th>Até 12×</th>" : ""}</tr></thead>
     <tbody>${linhasHtml}</tbody>
   </table>` : ""}
-
-  <div class="promo-wrap">
-    <div class="promo-badge">BÔNUS HOJE</div>
-    <div class="promo-box">
-      <div class="promo-corpo">Feche o pedido hoje e escolha entre <strong>1.000 cartões de visita</strong> ou um <strong>banner personalizado</strong>, sem custo adicional.</div>
-      <div class="promo-validade">Válido para pedidos acima de 100 unidades com fechamento no dia do envio desta proposta.</div>
-    </div>
-  </div>
 
   <div class="section-bar">Condições e Observações</div>
   <div class="obs-bar-list">
     <div class="item">* Prazo de produção: <strong>${PRAZO_ENTREGA_PADRAO}</strong> após aprovação da arte.</div>
     <div class="item">* Contamos com designer próprio — desenvolvimento de arte incluso sem custo adicional.</div>
     <div class="item">* A quantidade final do lote pode variar <strong>até 10%</strong> para mais ou para menos.</div>
-    <div class="item">* Pagamento: <strong>50% de sinal</strong> no fechamento do pedido + 50% na entrega.</div>
     ${minLinha && ideal && minLinha !== ideal ? `<div class="item">* Pedido mínimo: <strong>${num(minLinha.quantidade)} unidades</strong>.</div>` : ""}
     <div class="item">* Os valores desta proposta são válidos <strong>até a data de vencimento</strong> indicada. Após esse prazo, os preços poderão ser reajustados sem aviso prévio.</div>
     <div class="item">* Recebeu uma proposta mais em conta? Apresente-nos — <strong>cobrimos qualquer oferta</strong> do mercado.</div>
@@ -576,6 +696,155 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom, telefoneCliente?: str
 </div>
 ${paginaCondicoesGerais({ dataRodape: p.data })}
 
+</body>
+</html>`
+}
+
+export function gerarHtmlOS(card: KanbanCard, form: FormData | null, refAnterior: string | null, qrDataUrl?: string, arquivos?: { nome: string; url: string; tipo: string }[]): string {
+  function fmtDate(iso?: string) {
+    if (!iso) return "—"
+    return new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+  }
+
+  const qualidade = form?.qualidades?.[card.quantidade] ?? (form ? Object.values(form.qualidades ?? {})[0] : null)
+  const isTerceirizado = card.materialNome === "Terceirizado"
+  const etapaNome = COLUNAS_KANBAN[card.coluna] ?? "—"
+  const today = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })
+
+  const specs: [string, string][] = [
+    ...(card.loteNumero ? [["Lote", card.loteNumero] as [string, string]] : []),
+    ["Material / Gramatura", form?.materialNome || card.materialNome || "—"],
+    ...(qualidade ? [["Qualidade de impressão", qualidade] as [string, string]] : []),
+    ...(form?.incluirVerniz ? [["Verniz UV", "Sim"] as [string, string]] : [["Verniz UV", "Não"] as [string, string]]),
+    ...(form?.comFaca
+      ? [["Faca de corte", `Sim${form.valorFaca > 0 ? ` — R$ ${brl(form.valorFaca)}` : ""}`] as [string, string]]
+      : [["Faca de corte", "Não"] as [string, string]]),
+    ...(form && form.numSKUs > 0 ? [["Modelos de arte (SKUs)", `${form.numSKUs}`] as [string, string]] : []),
+    ...(form && form.numArtes > 1 ? [["Artes diferentes", `${form.numArtes}`] as [string, string]] : []),
+    ...(card.cores ? [["Cores", card.cores] as [string, string]] : []),
+    ...(card.acabamentos?.length ? [["Acabamentos", card.acabamentos.join(", ")] as [string, string]] : []),
+    ["Quantidade fechada", `${num(card.quantidade)} un`],
+    ...(card.dataFechamento ? [["Data de fechamento", fmtDate(card.dataFechamento)] as [string, string]] : []),
+    ...(card.dataEntregaPrevista ? [["Entrega prevista", fmtDate(card.dataEntregaPrevista)] as [string, string]] : []),
+    ...(isTerceirizado && card.fornecedor ? [["Fornecedor", card.fornecedor] as [string, string]] : []),
+    ...(refAnterior ? [["Referência anterior", refAnterior] as [string, string]] : []),
+  ]
+
+  const specsHtml = specs.map(([l, v]) =>
+    `<div class="kv"><span class="lbl">${l}:</span><span class="val">${v}</span></div>`
+  ).join("")
+
+  const obsGrafica = card.observacoesOS?.trim()
+  const obsInterna = form?.obsInterna?.trim()
+  const obsCliente = form?.obsCliente?.trim()
+  const publicUrl = typeof window !== "undefined" ? `${window.location.origin}/pedido/${encodeURIComponent(card.numero)}` : ""
+
+  const osStyles = `
+    .os-badge{display:inline-flex;align-items:center;background:rgba(80,9,196,.08);color:#5009c4;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid rgba(80,9,196,.2)}
+    .obs-box{background:#fffbf0;border:1px solid rgba(255,149,0,.25);border-radius:5px;padding:11px 14px;margin-bottom:2px}
+    .obs-box .obs-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#b45309;font-weight:700;margin-bottom:4px}
+    .obs-box .obs-text{font-size:11.5px;color:#333;line-height:1.65;white-space:pre-wrap}
+    .obs-neutral{background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:11px 14px;margin-bottom:2px}
+    .obs-neutral .obs-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#64748b;font-weight:700;margin-bottom:4px}
+    .obs-neutral .obs-text{font-size:11.5px;color:#334155;line-height:1.65;white-space:pre-wrap}
+    .file-list{list-style:none}
+    .file-list li{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:11.5px;color:#334155}
+    .file-list li:last-child{border-bottom:none}
+    .file-icon{font-size:15px;flex-shrink:0}
+    .checklist{list-style:none}
+    .checklist li{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:11.5px;color:#334155}
+    .checklist li:last-child{border-bottom:none}
+    .check-box{width:15px;height:15px;border:1.5px solid #cbd5e1;border-radius:3px;flex-shrink:0}
+    .qr-block{display:flex;align-items:center;gap:16px;padding:10px 0}
+    .qr-block img{width:80px;height:80px;border:1px solid #e2e8f0;border-radius:6px;flex-shrink:0}
+    .qr-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;font-weight:700;margin-bottom:5px}
+    .qr-url{font-size:10px;color:#5009c4;word-break:break-all}
+    .sign-area{display:flex;gap:32px;margin-top:32px}
+    .sign-block{flex:1;border-top:1.5px solid #cbd5e1;padding-top:7px;font-size:10px;color:#94a3b8;text-align:center}
+  `
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pedido ${card.numero} — ${card.nomeCliente}</title>
+  <style>${estiloPropostaCliente()}</style>
+  <style>${osStyles}</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="doc-header">
+    <img src="${LOGO_DARK_B64}" alt="Enyla" style="height:26px;display:block" />
+    <div class="titulo">Pedido <span>${card.numero}</span></div>
+  </div>
+
+  <div class="client-row">
+    <div class="bloco">
+      <div><span class="lbl">Cliente: </span><span class="val">${card.nomeCliente || "—"}</span></div>
+      <div><span class="lbl">Etapa: </span><span class="val"><span class="os-badge">${etapaNome}</span></span></div>
+    </div>
+    <div class="bloco" style="text-align:right">
+      <div><span class="lbl">Emitido em: </span><span class="val">${today}</span></div>
+      ${card.dataEntregaPrevista ? `<div><span class="lbl">Entrega prevista: </span><span class="val">${fmtDate(card.dataEntregaPrevista)}</span></div>` : ""}
+    </div>
+  </div>
+
+  <div class="section-bar">Especificações Técnicas</div>
+  <div class="kv-grid">${specsHtml}</div>
+
+  ${obsGrafica ? `
+  <div class="section-bar">Observações para a Gráfica</div>
+  <div class="obs-box">
+    <div class="obs-lbl">Instruções de produção</div>
+    <div class="obs-text">${obsGrafica.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</div>
+  </div>` : ""}
+
+  ${obsInterna ? `
+  <div class="section-bar">Observações Internas</div>
+  <div class="obs-neutral">
+    <div class="obs-lbl">Apenas para a equipe</div>
+    <div class="obs-text">${obsInterna.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</div>
+  </div>` : ""}
+
+  ${obsCliente ? `
+  <div class="section-bar">Observação do Cliente</div>
+  <div class="obs-neutral">
+    <div class="obs-lbl">Anotação registrada</div>
+    <div class="obs-text">${obsCliente.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</div>
+  </div>` : ""}
+
+  ${arquivos && arquivos.length > 0 ? `
+  <div class="section-bar">Arquivos Anexados</div>
+  <ul class="file-list">
+    ${arquivos.map(a => {
+      const icon = a.tipo === "arte" ? "🎨" : a.tipo === "faca" ? "✂️" : a.tipo === "mockup" ? "📦" : a.tipo === "referencia" ? "📎" : "📄"
+      return `<li><span class="file-icon">${icon}</span><span>${a.nome}</span></li>`
+    }).join("")}
+  </ul>` : ""}
+
+  ${qrDataUrl && publicUrl ? `
+  <div class="section-bar">Acesso Online</div>
+  <div class="qr-block">
+    <img src="${qrDataUrl}" alt="QR Code" />
+    <div class="qr-info">
+      <div class="qr-lbl">Escaneie para ver o pedido online com arquivos para download</div>
+      <div class="qr-url">${publicUrl}</div>
+    </div>
+  </div>` : ""}
+
+  <div class="sign-area">
+    <div class="sign-block">Responsável pela produção</div>
+    <div class="sign-block">Conferência final</div>
+    <div class="sign-block">Data de entrega</div>
+  </div>
+
+  <div class="doc-footer">
+    Enyla · Pedido ${card.numero}
+  </div>
+
+</div>
 </body>
 </html>`
 }

@@ -34,7 +34,7 @@ const LABEL_TIPO: Record<string, string> = {
 }
 
 function Icone({ tipo, selected }: { tipo: string; selected: boolean }) {
-  const cls = `w-3.5 h-3.5 ${selected ? "text-[#5009c4]" : "text-[#8E8E93]"}`
+  const cls = `w-3.5 h-3.5 ${selected ? "text-[#8456e8]" : "text-[#8E8E93]"}`
   if (tipo === "orcamento") return (
     <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -186,7 +186,7 @@ export default function BuscaGlobal({
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Buscar orçamentos, pedidos, clientes, lançamentos…"
-            className="flex-1 text-[15px] text-[#1C1C1E] placeholder:text-[#C7C7CC] focus:outline-none bg-transparent"
+            className="flex-1 text-[15px] text-[#191625] placeholder:text-[#C7C7CC] focus:outline-none bg-transparent"
           />
           {query && (
             <button onClick={() => setQuery("")}
@@ -204,7 +204,7 @@ export default function BuscaGlobal({
           </div>
         ) : noResults ? (
           <div className="px-4 py-8 text-center">
-            <p className="text-[13px] font-medium text-[#1C1C1E] mb-1">Nenhum resultado</p>
+            <p className="text-[13px] font-medium text-[#191625] mb-1">Nenhum resultado</p>
             <p className="text-[12px] text-[#8E8E93]">Nada encontrado para "{query}"</p>
           </div>
         ) : (
@@ -226,23 +226,23 @@ export default function BuscaGlobal({
                         onClick={() => { onNavigate(r.view); onClose() }}
                         onMouseEnter={() => setSel(idx)}
                         className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                          isSelected ? "bg-[#5009c4]/[0.06]" : "hover:bg-[rgba(0,0,0,0.02)]"
+                          isSelected ? "bg-[#8456e8]/[0.06]" : "hover:bg-[rgba(0,0,0,0.02)]"
                         }`}
                       >
                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-                          isSelected ? "bg-[#5009c4]/10" : "bg-[rgba(116,116,128,0.08)]"
+                          isSelected ? "bg-[#8456e8]/10" : "bg-[rgba(116,116,128,0.08)]"
                         }`}>
                           <Icone tipo={tipo} selected={isSelected} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[12.5px] font-medium text-[#1C1C1E] truncate">{r.titulo}</p>
+                          <p className="text-[12.5px] font-medium text-[#191625] truncate">{r.titulo}</p>
                           <p className="text-[10.5px] text-[#8E8E93] truncate mt-0.5">{r.subtitulo}</p>
                         </div>
                         {r.valor !== undefined && (
-                          <p className="text-[12px] font-semibold text-[#1C1C1E] tabular-nums shrink-0">{brl(r.valor)}</p>
+                          <p className="text-[12px] font-semibold text-[#191625] tabular-nums shrink-0">{brl(r.valor)}</p>
                         )}
                         {isSelected && (
-                          <svg className="w-3.5 h-3.5 text-[#5009c4] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <svg className="w-3.5 h-3.5 text-[#8456e8] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                           </svg>
                         )}

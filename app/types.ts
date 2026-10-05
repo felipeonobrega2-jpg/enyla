@@ -1,3 +1,5 @@
+export type TipoCaixa = "simples" | "aviao" | "fundo-automatico" | "americano"
+
 export type FormatoPapel = {
   id: string
   nome: string
@@ -10,11 +12,17 @@ export type FormatoPapel = {
 
 export type FormData = {
   nomeCliente: string
+  tipoCaixa: TipoCaixa
   frente: number // cm
   lateral: number // cm
   alturaBox: number // cm
   abaColagem: number // cm
-  incluirVerniz: boolean
+  incluirVerniz: boolean       // derivado de vernizTipo !== ""
+  vernizTipo: string           // "UV Total" | "UV Localizado" | "Resinado" | "Holográfico" | ""
+  laminacao: boolean
+  laminacaoTipo: string        // "Fosca" | "Brilhante" | "Soft Touch" | "Holográfica" | ""
+  acompanhamentos: string[]    // ["Berço interno", "Divisória", …]
+  outrosAcabamentos: string[]  // ["Hot Stamping", "Alto Relevo", …]
   comFaca: boolean
   valorFaca: number
   numSKUs: number
@@ -22,6 +30,7 @@ export type FormData = {
   quantidades: number[]
   qualidades: Record<number, "Digital" | "Offset">
   customPecasChapa: number | null
+  blankOverride: { largura: number; altura: number } | null  // mm — importado do DXF Pacdora
   obsInterna: string
   obsCliente: string
   validadeDias: number
@@ -86,6 +95,7 @@ export type Calculo = {
     abaColagem: number
     abaSuperior: number
     abaInferior: number
+    tipoCaixa: TipoCaixa
   }
   formData: {
     frente: number
@@ -150,12 +160,55 @@ export type Cliente = {
   cnpj?: string
   notas?: string
   criadoEm: string
+  origemCampanhaId?: string | null
+  origemCampanhaNome?: string | null
 }
 
 export type KanbanOpcao = {
   quantidade: number
   preco: number
   unitario: number
+}
+
+export type CustoSnapshot = {
+  quantidade: number
+  papel: number
+  impressao: number
+  corte: number
+  verniz: number
+  colagem: number
+  arte: number
+  total: number
+  preco: number
+  margem: number
+}
+
+export type ProjecaoCustos = {
+  papel?: number
+  impressao?: number
+  corte?: number
+  verniz?: number
+  colagem?: number
+  arte?: number
+  faca?: number
+  hotstamping?: number
+  corteVinco?: number
+  outros?: number
+  obs?: string
+}
+
+export type PrazoEtapas = {
+  pedido_enviado?: string
+  inicio_arte?: string
+  arte_enviada?: string
+  arte_aprovada?: string
+  inicio_impressao?: string
+  fim_impressao?: string
+  inicio_verniz?: string
+  fim_verniz?: string
+  inicio_acabamento?: string
+  fim_acabamento?: string
+  expedicao?: string
 }
 
 export type KanbanCard = {
@@ -170,14 +223,32 @@ export type KanbanCard = {
   coluna: number
   motivoPerdido?: string
   opcoes?: KanbanOpcao[]
+  custosSnapshot?: CustoSnapshot[]
   dataEntregaPrevista?: string
-  dataEntregaReal?: string     // ISO YYYY-MM-DD — actual delivery date recorded manually
-  dataFechamento?: string  // ISO YYYY-MM-DD — set when card first reaches COL_FECHADO
-  fornecedor?: string          // nome do fornecedor externo (item terceirizado)
-  custoTerceiro?: number       // custo pago ao fornecedor (informativo)
-  isTerceirizado?: boolean     // oculto no kanban; vinculado a lote desde criação
+  dataEntregaReal?: string
+  dataFechamento?: string
+  prazoRecebimentoInterno?: string
+  fornecedor?: string
+  custoTerceiro?: number
+  isTerceirizado?: boolean
   loteId?: string
   loteNumero?: string
+  cores?: string
+  acabamentos?: string[]
+  observacoesOS?: string
+  projecaoCustos?: ProjecaoCustos
+  prazos?: PrazoEtapas
+}
+
+export type PedidoArquivo = {
+  id: string
+  card_id: string
+  card_numero: string
+  nome: string
+  url: string
+  tipo: "arte" | "faca" | "mockup" | "referencia" | "outro"
+  tamanho?: number
+  created_at: string
 }
 
 export type Lote = {
@@ -206,6 +277,7 @@ export const COL_FECHADO   = 1
 export const COL_EXPEDICAO = 8
 export const COL_ENTREGUE  = 9
 export const COL_PERDIDO   = 10
+export const COL_HOT       = 11
 
 export type Parceiro = {
   id: string
@@ -221,7 +293,7 @@ export type StatusNegocio = "pendente" | "pago" | "cancelado"
 
 export type TipoLancamento = "receita" | "despesa"
 export type StatusLancamento = "pendente" | "pago" | "atrasado"
-export type FormaPagamento = "pix" | "boleto" | "cartao_credito" | "cartao_debito" | "dinheiro" | "transferencia" | "outro"
+export type FormaPagamento = "pix" | "boleto" | "cartao_credito" | "cartao_debito" | "dinheiro" | "transferencia" | "outro" | "conta"
 
 export type CategoriaDesp =
   | "aluguel" | "fornecedor" | "materiais" | "salarios"
@@ -241,6 +313,9 @@ export type LancamentoFinanceiro = {
   loteId?: string
   loteNumero?: string
   categoria?: string
+  subcategoria?: string
+  contaId?: string
+  fornecedorId?: string
   formaPagamento?: FormaPagamento
   obs?: string
   criadoEm: string

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { Flame } from "lucide-react"
 import { KanbanCard, KanbanOpcao, Lote, LancamentoFinanceiro, NegocioParceiro, StatusLoteParceiro, COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO, COL_HOT } from "../types"
 import { brl, num } from "../utils"
 import { COL_COLORS } from "./kanban-colors"
@@ -21,7 +22,6 @@ const PARTNER_STEPS_K: { id: StatusLoteParceiro; label: string }[] = [
 ]
 
 type ModalFechamento = { card: KanbanCard; opcaoIdx: number }
-type ModalHot = { card: KanbanCard; opcaoIdx: number; customQtd: string; customPreco: string }
 
 // ── PIX emit modal ────────────────────────────────────────────────────────────
 function PixEmitModal({ card, loteTotal, onClose, onAddLancamento }: {
@@ -186,6 +186,9 @@ export function KanbanView({
   onAddLancamento,
   onHotOpcao,
   isDark,
+  hideDashboard,
+  selectedCardIds,
+  onSelectCard,
 }: {
   cards: KanbanCard[]
   onMove: (id: string, coluna: number) => void
@@ -203,29 +206,20 @@ export function KanbanView({
   negocios?: NegocioParceiro[]
   onUpdateNegocio?: (n: NegocioParceiro) => void
   onAddLancamento?: (l: LancamentoFinanceiro) => void
+  lancamentos?: LancamentoFinanceiro[]
   isDark?: boolean
+  hideDashboard?: boolean
+  selectedCardIds?: Set<string>
+  onSelectCard?: (cardId: string) => void
 }) {
   const [dragId, setDragId]       = useState<string | null>(null)
   const [overCol, setOverCol]     = useState<number | null>(null)
   const [modal, setModal]         = useState<ModalFechamento | null>(null)
-  const [modalHot, setModalHot]   = useState<ModalHot | null>(null)
   const [colapsarVazias, setColapsarVazias] = useState(false)
 
   function tentarMover(id: string, destCol: number) {
     const card = cards.find(c => c.id === id)
     if (!card) return
-
-    // Mover para Hot → abre modal para definir quantidade negociada
-    if (destCol === COL_HOT) {
-      const idealIdx = Math.max(0, (card.opcoes?.findIndex(o => o.preco === card.preco) ?? 0))
-      setModalHot({
-        card,
-        opcaoIdx: idealIdx,
-        customQtd: String(card.quantidade),
-        customPreco: card.preco.toFixed(2).replace(".", ","),
-      })
-      return
-    }
 
     // Orçamento (col 0) ou Hot → Fechado com opções de quantidade
     const isPreClose = card.coluna === 0 || card.coluna === COL_HOT
@@ -236,20 +230,6 @@ export function KanbanView({
     }
 
     onMove(id, destCol)
-  }
-
-  function confirmarHot() {
-    if (!modalHot) return
-    let opcao: KanbanOpcao
-    if (modalHot.card.opcoes?.length) {
-      opcao = modalHot.card.opcoes[modalHot.opcaoIdx]
-    } else {
-      const qtd   = parseInt(modalHot.customQtd.replace(/\D/g, "")) || modalHot.card.quantidade
-      const preco = parseFloat(modalHot.customPreco.replace(/\./g, "").replace(",", ".")) || modalHot.card.preco
-      opcao = { preco, quantidade: qtd, unitario: qtd > 0 ? preco / qtd : 0 }
-    }
-    onHotOpcao?.(modalHot.card.id, opcao)
-    setModalHot(null)
   }
 
   function confirmarFechamento() {
@@ -303,7 +283,7 @@ export function KanbanView({
     <div className="flex flex-col h-full overflow-hidden">
 
       {/* ── Dashboard ── */}
-      <div className={`shrink-0 border-b px-5 pt-4 pb-4 space-y-3 ${isDark ? "bg-[#1C1C1E] border-[rgba(255,255,255,0.08)]" : "bg-white border-[rgba(60,60,67,0.12)]"}`}>
+      {!hideDashboard && <div className={`shrink-0 border-b px-5 pt-4 pb-4 space-y-3 ${isDark ? "bg-[#1C1C1E] border-[rgba(255,255,255,0.08)]" : "bg-white border-[rgba(60,60,67,0.12)]"}`}>
         <div className="flex items-center gap-3">
           <p className="text-[9.5px] uppercase tracking-wide font-semibold text-[#8E8E93]">Visão geral do pipeline</p>
           <div className="flex-1 h-px bg-[rgba(60,60,67,0.12)]" />
@@ -395,7 +375,7 @@ export function KanbanView({
               </div>
               {hotTotal > 0 && (
                 <div className="flex items-baseline justify-between gap-2">
-                  <p className="text-[10px] font-semibold" style={{ color: "#FF6200" }}>🔥 Hot</p>
+                  <p className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: "#FF6200" }}><Flame className="w-3 h-3" /> Hot</p>
                   <p className="text-[13px] font-bold tabular-nums" style={{ color: "#FF6200" }}>{brl(hotTotal)}</p>
                 </div>
               )}
@@ -436,7 +416,7 @@ export function KanbanView({
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Entregas atrasadas */}
       {(() => {
@@ -514,7 +494,7 @@ export function KanbanView({
             return (
               <div
                 key={colIdx}
-                className={`flex flex-col w-60 shrink-0 rounded-xl transition-all ${
+                className={`flex flex-col w-72 shrink-0 rounded-xl transition-all ${
                   isOver
                     ? `ring-2 ${colors.border.replace("border-", "ring-")} ${colors.bg} border border-transparent`
                     : isDark ? "border border-[rgba(255,255,255,0.08)] bg-[#1C1C1E]" : "border border-[rgba(0,0,0,0.06)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]"
@@ -569,6 +549,8 @@ export function KanbanView({
                       allCards={cards}
                       onAddLancamento={onAddLancamento}
                       isDark={isDark}
+                      isSelected={selectedCardIds?.has(card.id)}
+                      onSelectCard={onSelectCard}
                     />
                   ))}
                 </div>
@@ -577,102 +559,6 @@ export function KanbanView({
           })}
         </div>
       </div>
-
-      {/* ── Modal Hot — quantidade negociada ────────────────────────────── */}
-      {modalHot && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          onClick={e => { if (e.target === e.currentTarget) setModalHot(null) }}>
-          <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] w-full max-w-sm mx-4 overflow-hidden">
-
-            {/* Header */}
-            <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.12)]">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] uppercase tracking-wide font-semibold mb-1" style={{ color: "#FF6200" }}>🔥 Quantidade negociada</p>
-                  <p className="font-bold text-[#1C1C1E] text-[15px] leading-snug truncate">{modalHot.card.nomeCliente}</p>
-                  {modalHot.card.numero && (
-                    <span className="text-[10px] font-bold text-[#8E8E93] bg-[rgba(116,116,128,0.08)] border border-[rgba(60,60,67,0.12)] px-1.5 py-0.5 rounded-full mt-1.5 inline-block tabular-nums">
-                      {modalHot.card.numero}
-                    </span>
-                  )}
-                </div>
-                <button onClick={() => setModalHot(null)}
-                  className="text-[#8E8E93] hover:text-[#1C1C1E] transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
-              </div>
-              <p className="text-[12px] text-[#8E8E93] mt-2.5">
-                {modalHot.card.opcoes?.length ? "Qual quantidade está sendo negociada?" : "Ajuste a quantidade e o valor negociado."}
-              </p>
-            </div>
-
-            {/* Opções (card com múltiplas quantidades) */}
-            {modalHot.card.opcoes?.length ? (
-              <div className="px-4 py-3 space-y-1.5 max-h-72 overflow-y-auto">
-                {modalHot.card.opcoes.map((op, i) => {
-                  const selected = i === modalHot.opcaoIdx
-                  return (
-                    <button key={i} onClick={() => setModalHot(m => m ? { ...m, opcaoIdx: i } : m)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${
-                        selected ? "border-[#FF6200] bg-[#FF6200]/5" : "border-[rgba(0,0,0,0.12)] hover:border-[rgba(0,0,0,0.18)] hover:bg-[rgba(0,0,0,0.04)]"
-                      }`}>
-                      <div className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${
-                        selected ? "border-[#FF6200]" : "border-[rgba(60,60,67,0.36)]"
-                      }`}>
-                        {selected && <div className="w-2 h-2 rounded-full bg-[#FF6200]" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-bold text-sm leading-none ${selected ? "text-[#FF6200]" : "text-[#1C1C1E]"}`}>
-                          {op.quantidade.toLocaleString("pt-BR")} unidades
-                        </p>
-                        <p className="text-[11px] text-[#8E8E93] mt-0.5">{brl(op.unitario)}/un</p>
-                      </div>
-                      <p className={`font-semibold text-[15px] tabular-nums shrink-0 ${selected ? "text-[#FF6200]" : "text-[#1C1C1E]"}`}>
-                        {brl(op.preco)}
-                      </p>
-                    </button>
-                  )
-                })}
-              </div>
-            ) : (
-              /* Formulário simples para cards sem múltiplas opções */
-              <div className="px-5 py-4 space-y-4">
-                <div>
-                  <label className="text-[9.5px] font-bold uppercase tracking-wide text-[#8E8E93] block mb-1.5">Quantidade (unidades)</label>
-                  <input
-                    type="number" min={1} autoFocus
-                    value={modalHot.customQtd}
-                    onChange={e => setModalHot(m => m ? { ...m, customQtd: e.target.value } : m)}
-                    onKeyDown={e => e.key === "Enter" && confirmarHot()}
-                    className="w-full px-3.5 py-2.5 border border-[rgba(0,0,0,0.12)] rounded-xl text-[15px] font-semibold text-[#1C1C1E] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#FF6200]/20 focus:border-[#FF6200] transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-[9.5px] font-bold uppercase tracking-wide text-[#8E8E93] block mb-1.5">Valor total negociado (R$)</label>
-                  <input
-                    type="text" inputMode="decimal"
-                    value={modalHot.customPreco}
-                    onChange={e => setModalHot(m => m ? { ...m, customPreco: e.target.value } : m)}
-                    onKeyDown={e => e.key === "Enter" && confirmarHot()}
-                    className="w-full px-3.5 py-2.5 border border-[rgba(0,0,0,0.12)] rounded-xl text-[15px] font-semibold text-[#1C1C1E] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#FF6200]/20 focus:border-[#FF6200] transition-colors"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Ações */}
-            <div className="flex gap-2 px-4 pb-4 pt-2 border-t border-[rgba(60,60,67,0.12)]">
-              <button onClick={() => setModalHot(null)}
-                className="flex-1 py-2.5 text-[13px] text-[#8E8E93] hover:text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)] rounded-xl transition-colors font-medium">
-                Cancelar
-              </button>
-              <button onClick={confirmarHot}
-                className="flex-1 py-2.5 text-[13px] font-bold text-white rounded-xl transition-colors"
-                style={{ background: "#FF6200" }}>
-                Confirmar →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Modal de fechamento ───────────────────────────────────────────── */}
       {modal && (
@@ -746,10 +632,29 @@ export function KanbanView({
   )
 }
 
+const STAGE: Record<number, { color: string; bg: string; label: string }> = {
+  0:  { color: "#8E8E93", bg: "rgba(142,142,147,0.1)",   label: "Orçamento" },
+  1:  { color: "#009351", bg: "rgba(52,199,89,0.12)",    label: "Fechado" },
+  2:  { color: "#3a84ca", bg: "rgba(0,122,255,0.1)",     label: "Arte / Dieline" },
+  3:  { color: "#c57800", bg: "rgba(255,149,0,0.12)",    label: "Aprovação" },
+  4:  { color: "#FF6200", bg: "rgba(255,98,0,0.12)",     label: "Fila de impressão" },
+  5:  { color: "#8456e8", bg: "rgba(80,9,196,0.1)",      label: "Impressão" },
+  6:  { color: "#a582ff", bg: "rgba(175,82,222,0.12)",   label: "Verniz" },
+  7:  { color: "#FF2D55", bg: "rgba(255,45,85,0.1)",     label: "Acabamento" },
+  8:  { color: "#5AC8FA", bg: "rgba(90,200,250,0.15)",   label: "Expedição" },
+  9:  { color: "#30D158", bg: "rgba(48,209,88,0.12)",    label: "Entregue" },
+  11: { color: "#FF6200", bg: "rgba(255,98,0,0.15)",     label: "Hot" },
+}
+
+function fmt(iso?: string) {
+  if (!iso) return "—"
+  return new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
+}
+
 function KanbanCardItem({
   card, colIdx, prevCol, nextCol, isDragging, colors, onDragStart, onDragEnd, onDelete, onMove, onSetMotivo, onDetalhes,
   lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge, onLoteRename, negocios, onUpdateNegocio, allCards,
-  onAddLancamento, isDark,
+  onAddLancamento, isDark, isSelected, onSelectCard,
 }: {
   card: KanbanCard
   colIdx: number
@@ -774,9 +679,12 @@ function KanbanCardItem({
   allCards?: KanbanCard[]
   onAddLancamento?: (l: LancamentoFinanceiro) => void
   isDark?: boolean
+  isSelected?: boolean
+  onSelectCard?: (cardId: string) => void
 }) {
   const isPerdido = colIdx === COL_PERDIDO
-  const [confirmando, setConfirmando] = useState(false)
+  const [isOpen,        setIsOpen]        = useState(false)
+  const [confirmando,   setConfirmando]   = useState(false)
   const [motivoRascunho, setMotivoRascunho] = useState("")
   const [copiedId,       setCopiedId]       = useState(false)
   const [copiedLoteLink, setCopiedLoteLink] = useState<"track" | null>(null)
@@ -859,108 +767,106 @@ function KanbanCardItem({
     setConfirmando(false)
   }
 
+  // Delivery
+  const entregaDate = card.dataEntregaPrevista
+  const diasEnt = entregaDate && !isPerdido && colIdx < COL_ENTREGUE
+    ? Math.round((new Date(entregaDate + "T12:00:00").getTime() - Date.now()) / 86_400_000)
+    : null
+  const emAtraso  = diasEnt !== null && diasEnt < 0
+  const quaseVenc = diasEnt !== null && diasEnt >= 0 && diasEnt <= 3
+  const stage = STAGE[colIdx] ?? { color: "#8E8E93", bg: "rgba(142,142,147,0.1)", label: COLUNAS_KANBAN[colIdx] ?? "—" }
+  const cardBg  = isDark ? "#2C2C2E" : "#fff"
+  const border  = isPerdido ? "rgba(255,59,48,0.2)" : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"
+  const txt     = isDark ? "rgba(255,255,255,0.85)" : "#1C1C1E"
+  const sub     = isDark ? "rgba(255,255,255,0.4)"  : "rgba(60,60,67,0.5)"
+  const divider = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"
+
   return (
     <>
     <div
       draggable={!confirmando}
       onDragStart={e => !confirmando && onDragStart(e, card.id)}
       onDragEnd={onDragEnd}
-      onClick={() => onDetalhes?.(card)}
-      className={`flex rounded-xl border overflow-hidden transition-all duration-150 select-none ${
-        isPerdido
-          ? "bg-[#FF3B30]/5 border-[#FF3B30]/20"
-          : isDark ? "bg-[#2C2C2E] border-[rgba(255,255,255,0.08)]" : "bg-white border-[rgba(0,0,0,0.06)]"
-      } ${isDragging ? "opacity-30 scale-95 shadow-none" : "shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 cursor-grab active:cursor-grabbing"}`}
+      className={`rounded-2xl overflow-hidden transition-all duration-150 select-none ${
+        isDragging ? "opacity-30 scale-95" : "shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
+      }`}
+      style={{ background: isSelected ? "rgba(132,86,232,0.08)" : cardBg, border: `1px solid ${isSelected ? "#8456e8" : border}` }}
     >
-      {/* Accent bar */}
-      <div className={`w-[3px] shrink-0 ${isPerdido ? "bg-rose-300" : colors.dot}`} />
-
-      <div className="flex-1 min-w-0">
-
-        {/* ── Card body ── */}
-        <div className="px-3 pt-3 pb-2.5">
-
-          {/* Name + close */}
-          <div className="flex items-start gap-1.5 mb-1">
-            <p className={`flex-1 font-bold text-[12.5px] leading-snug ${
-              isPerdido ? "line-through text-[#FF3B30]/60" : "text-[#1C1C1E]"
-            }`}>{card.nomeCliente}</p>
-            <button
-              onClick={e => { e.stopPropagation(); if (confirm(`Remover "${card.nomeCliente}" do kanban?`)) onDelete(card.id) }}
-              className="w-5 h-5 flex items-center justify-center text-[rgba(60,60,67,0.36)] hover:text-[#FF3B30] hover:bg-[#FF3B30]/5 rounded-lg transition-colors text-[13px] leading-none shrink-0 mt-px"
-            >×</button>
+      {/* ── Collapsed row ── */}
+      <div className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer" onClick={e => {
+        if (e.metaKey || e.ctrlKey) { e.preventDefault(); onSelectCard?.(card.id) }
+        else onDetalhes?.(card)
+      }}>
+        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: isPerdido ? "#FF3B30" : stage.color }} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className={`text-[12.5px] font-semibold leading-snug truncate ${isPerdido ? "line-through" : ""}`}
+              style={{ color: isPerdido ? "rgba(255,59,48,0.7)" : card.loteNumero ? "#5009c4" : txt }}>
+              {card.loteNumero ?? card.nomeCliente}
+            </span>
+            {card.numero && (
+              <span className="text-[8.5px] font-bold px-1.5 py-[2px] rounded-md tabular-nums shrink-0"
+                style={{ background: "rgba(80,9,196,0.1)", color: "#8456e8" }}>{card.numero}</span>
+            )}
+            {card.loteNumero && (
+              <span className="text-[8.5px] font-semibold px-1.5 py-[2px] rounded-md shrink-0"
+                style={{ background: "rgba(90,200,250,0.15)", color: "#0099cc" }}>Lote</span>
+            )}
+            {!isPerdido && (
+              <span className="text-[8.5px] font-semibold px-1.5 py-[2px] rounded-md shrink-0"
+                style={{ background: stage.bg, color: stage.color }}>{stage.label}</span>
+            )}
           </div>
-
-          {/* Identifiers — order number and lote, subtle */}
-          {(card.numero || card.loteNumero) && (
-            <div className="flex items-center gap-1 mb-2">
-              {card.numero && (
-                <span className={`text-[8px] font-semibold px-1.5 py-[2px] rounded-md tabular-nums ${
-                  isPerdido
-                    ? "text-[#FF3B30]/70 bg-[#FF3B30]/5 border border-[#FF3B30]/20"
-                    : "text-[#8E8E93] bg-[rgba(116,116,128,0.08)] border border-[rgba(60,60,67,0.12)]"
-                }`}>{card.numero}</span>
-              )}
-              {card.loteNumero && (
-                <span className="text-[8px] font-semibold px-1.5 py-[2px] rounded-md border text-[#5009c4] bg-[#5009c4]/10 border-[#5009c4]/20 tabular-nums">
-                  {card.loteNumero}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Description */}
-          <p className="text-[10.5px] text-[#8E8E93] leading-snug truncate mb-3">
-            {card.dimensoes} cm · {card.materialNome}
+          <p className={`text-[9.5px] mt-0.5 truncate ${isPerdido ? "line-through" : ""}`} style={{ color: sub }}>
+            {card.loteNumero ? `${card.nomeCliente} · ` : ""}{card.data.split(",")[0]}{card.dimensoes ? ` · ${card.dimensoes} cm` : ""}{card.quantidade > 0 ? ` · ${num(card.quantidade)} un` : ""}
           </p>
-
-          {/* Loss motivo */}
-          {isPerdido && (
-            <div className="mb-2.5" onClick={e => e.stopPropagation()}>
-              <input
-                type="text"
-                value={card.motivoPerdido ?? ""}
-                onChange={e => onSetMotivo(card.id, e.target.value)}
-                placeholder="Motivo da perda…"
-                className="w-full text-[10px] text-[#FF3B30] bg-[#FF3B30]/5 border border-[#FF3B30]/20 rounded-xl px-2.5 py-1.5 placeholder:text-[#FF3B30]/40 focus:outline-none focus:ring-2 focus:ring-[#FF3B30]/20"
-              />
-            </div>
-          )}
-
-          {/* Price row */}
-          <div className="flex items-baseline gap-2">
-            <span className={`font-semibold text-[16px] leading-none tabular-nums tracking-tight ${
-              isPerdido ? "text-[#FF3B30]/60 line-through" : "text-[#1C1C1E]"
-            }`}>{brl(card.preco)}</span>
-            <span className="text-[10px] text-[#8E8E93] tabular-nums">{num(card.quantidade)} un</span>
-            <span className="text-[9px] text-[rgba(60,60,67,0.36)] ml-auto tabular-nums">{card.data.split(",")[0]}</span>
-          </div>
-
-          {/* Fornecedor externo */}
-          {card.fornecedor && (
-            <p className="mt-1 text-[9px] text-[#FF9500] font-medium truncate">
-              ↗ {card.fornecedor}{card.custoTerceiro ? ` · R$ ${card.custoTerceiro.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : ""}
-            </p>
-          )}
-
-          {/* Delivery date / overdue badge */}
-          {card.dataEntregaPrevista && !isPerdido && colIdx < COL_ENTREGUE && (() => {
-            const hj = new Date().toISOString().slice(0, 10)
-            const dias = Math.floor((Date.now() - new Date(card.dataEntregaPrevista + "T12:00:00").getTime()) / 86_400_000)
-            if (dias > 0) return (
-              <span className="mt-1.5 inline-flex items-center gap-1 text-[9px] font-semibold text-[#FF3B30] bg-[#FF3B30]/[0.08] border border-[#FF3B30]/20 px-1.5 py-0.5 rounded-md">
-                <span className="w-1 h-1 rounded-full bg-[#FF3B30] inline-block" />{dias}d atrasado
+        </div>
+        <div className="text-right shrink-0 space-y-0.5">
+          <p className={`text-[12.5px] font-bold tabular-nums ${isPerdido ? "line-through" : ""}`}
+            style={{ color: isPerdido ? "rgba(255,59,48,0.6)" : txt }}>{brl(card.preco)}</p>
+          {(() => {
+            const p = card.projecaoCustos
+            if (!p) return null
+            const tot = (p.papel ?? 0) + (p.impressao ?? 0) + (p.corte ?? 0) + (p.verniz ?? 0) +
+              (p.colagem ?? 0) + (p.arte ?? 0) + (p.faca ?? 0) + (p.hotstamping ?? 0) + (p.corteVinco ?? 0) + (p.outros ?? 0)
+            if (tot <= 0) return null
+            const mg = card.preco > 0 ? ((card.preco - tot) / card.preco) * 100 : 0
+            const ok = mg >= 40; const mid = mg >= 20
+            return (
+              <span className="text-[8.5px] font-bold px-1.5 py-[2px] rounded-md tabular-nums"
+                style={{ background: ok ? "rgba(22,163,74,0.12)" : mid ? "rgba(197,120,0,0.12)" : "rgba(220,38,38,0.12)", color: ok ? "#15803d" : mid ? "#c57800" : "#b91c1c" }}>
+                M {num(mg, 0)}%
               </span>
             )
-            return (
-              <p className="mt-1 text-[9px] text-[#8E8E93]">
-                Entrega: {new Date(card.dataEntregaPrevista + "T12:00:00").toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}
-              </p>
-            )
           })()}
+          {colIdx === COL_ENTREGUE ? (
+            <p className="text-[9px] font-semibold" style={{ color: "#30D158" }}>
+              {card.dataEntregaReal ? `Entregue ${fmt(card.dataEntregaReal)}` : "Entregue"}
+            </p>
+          ) : diasEnt !== null ? (
+            <p className="text-[9px] font-semibold tabular-nums"
+              style={{ color: emAtraso ? "#d33a3c" : quaseVenc ? "#c57800" : sub }}>
+              {emAtraso ? `${Math.abs(diasEnt)}d atraso` : diasEnt === 0 ? "Hoje" : `${diasEnt}d`}
+            </p>
+          ) : null}
         </div>
+        <button onClick={e => { e.stopPropagation(); if (confirm(`Remover "${card.nomeCliente}" do kanban?`)) onDelete(card.id) }}
+          className="w-5 h-5 flex items-center justify-center text-[rgba(60,60,67,0.36)] hover:text-[#FF3B30] hover:bg-[#FF3B30]/5 rounded-lg transition-colors text-[12px] leading-none shrink-0">
+          ×
+        </button>
+        <button onClick={e => { e.stopPropagation(); setIsOpen(v => !v) }}
+          className="w-5 h-5 flex items-center justify-center rounded-lg hover:bg-[rgba(0,0,0,0.04)] transition-colors shrink-0">
+          <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+            style={{ color: sub }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+      </div>
 
-        {/* ── Action bar ── */}
+      {isOpen && (
+      <div style={{ borderTop: `1px solid ${divider}` }}>
+
+          {/* ── Action bar ── */}
         {!isPerdido && !confirmando && (
           <div className="flex items-center gap-0.5 px-2.5 pb-2.5 pt-0" onClick={e => e.stopPropagation()}>
 
@@ -1314,7 +1220,7 @@ function KanbanCardItem({
           </div>
         )}
       </div>
-
+    )}
     </div>
 
     {showPixModal && card.loteNumero && (

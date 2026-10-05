@@ -119,12 +119,12 @@ export function ModalSobra({
         <div className="px-5 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] shrink-0">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="font-bold text-[#1C1C1E] text-[15px]">Registrar sobras</p>
+              <p className="font-bold text-[#191625] text-[15px]">Registrar sobras</p>
               <p className="text-[11.5px] text-[#8E8E93] mt-0.5">
                 {card.nomeCliente}{card.loteNumero ? ` · ${card.loteNumero}` : ` · ${card.numero}`}
               </p>
             </div>
-            <button onClick={onClose} className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
+            <button onClick={onClose} className="text-[#898892] hover:text-[#8E8E93] transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
           </div>
         </div>
 
@@ -142,7 +142,7 @@ export function ModalSobra({
                     onClick={() => setModo(m)}
                     className={`py-2.5 rounded-xl border text-[12px] font-semibold transition-colors ${
                       modo === m
-                        ? "border-[#5009c4] bg-[#5009c4]/[0.07] text-[#5009c4]"
+                        ? "border-[#8456e8] bg-[#8456e8]/[0.07] text-[#8456e8]"
                         : "border-[rgba(60,60,67,0.12)] text-[#8E8E93] hover:border-[rgba(60,60,67,0.25)]"
                     }`}
                   >
@@ -175,7 +175,7 @@ export function ModalSobra({
                     value={qtdLote}
                     onChange={e => setQtdLote(e.target.value)}
                     placeholder="ex: 3.000"
-                    className="flex-1 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] bg-transparent focus:outline-none"
+                    className="flex-1 text-[13px] text-[#191625] placeholder:text-[#898892] bg-transparent focus:outline-none"
                   />
                   <span className="text-[11px] text-[#8E8E93] shrink-0">unidades</span>
                 </div>
@@ -190,7 +190,7 @@ export function ModalSobra({
                     value={valorLote}
                     onChange={e => setValorLote(e.target.value)}
                     placeholder="0,00"
-                    className="flex-1 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] bg-transparent focus:outline-none"
+                    className="flex-1 text-[13px] text-[#191625] placeholder:text-[#898892] bg-transparent focus:outline-none"
                   />
                 </div>
               </div>
@@ -203,8 +203,8 @@ export function ModalSobra({
               {itens.map((it, idx) => (
                 <div key={it.cardId} className="rounded-xl border border-[rgba(60,60,67,0.1)] overflow-hidden">
                   <div className="px-3 py-2 bg-[rgba(60,60,67,0.02)] border-b border-[rgba(60,60,67,0.06)] flex items-center gap-2">
-                    <span className="text-[9.5px] font-bold text-[#5009c4] bg-[#5009c4]/[0.08] border border-[#5009c4]/20 px-1.5 py-0.5 rounded-full">{it.cardNumero}</span>
-                    <span className="text-[11px] text-[rgba(60,60,67,0.6)] truncate flex-1">{it.descricao}</span>
+                    <span className="text-[9.5px] font-bold text-[#8456e8] bg-[#8456e8]/[0.08] border border-[#8456e8]/20 px-1.5 py-0.5 rounded-full">{it.cardNumero}</span>
+                    <span className="text-[11px] text-[#72707d] truncate flex-1">{it.descricao}</span>
                   </div>
                   <div className="p-3 grid grid-cols-2 gap-2">
                     <div className="space-y-1">
@@ -215,7 +215,7 @@ export function ModalSobra({
                         value={it.quantidade}
                         onChange={e => updateItem(idx, "quantidade", e.target.value)}
                         placeholder="ex: 1.500"
-                        className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-2.5 py-1.5 text-[12px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-1 focus:ring-[#5009c4]/30"
+                        className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-2.5 py-1.5 text-[12px] text-[#191625] placeholder:text-[#898892] focus:outline-none focus:ring-1 focus:ring-[#8456e8]/30"
                       />
                     </div>
                     <div className="space-y-1">
@@ -226,7 +226,7 @@ export function ModalSobra({
                         value={it.valor}
                         onChange={e => updateItem(idx, "valor", e.target.value)}
                         placeholder="0,00"
-                        className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-2.5 py-1.5 text-[12px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-1 focus:ring-[#5009c4]/30"
+                        className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-2.5 py-1.5 text-[12px] text-[#191625] placeholder:text-[#898892] focus:outline-none focus:ring-1 focus:ring-[#8456e8]/30"
                       />
                     </div>
                   </div>
@@ -243,7 +243,7 @@ export function ModalSobra({
                 type="date"
                 value={data}
                 onChange={e => setData(e.target.value)}
-                className="w-full border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-2 text-[12.5px] text-[#1C1C1E] focus:outline-none focus:ring-1 focus:ring-[#5009c4]/30"
+                className="w-full border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-2 text-[12.5px] text-[#191625] focus:outline-none focus:ring-1 focus:ring-[#8456e8]/30"
               />
             </div>
             <div className="space-y-1.5">
@@ -251,7 +251,7 @@ export function ModalSobra({
               <select
                 value={status}
                 onChange={e => setStatus(e.target.value as "pago" | "pendente")}
-                className="w-full border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-2 text-[12.5px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-1 focus:ring-[#5009c4]/30"
+                className="w-full border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-2 text-[12.5px] text-[#191625] bg-white focus:outline-none focus:ring-1 focus:ring-[#8456e8]/30"
               >
                 <option value="pendente">A receber</option>
                 <option value="pago">Recebido</option>
@@ -261,9 +261,9 @@ export function ModalSobra({
 
           {/* Total preview */}
           {total > 0 && (
-            <div className="flex items-center justify-between rounded-xl bg-[#34C759]/[0.06] border border-[#34C759]/20 px-4 py-3">
-              <p className="text-[12px] font-semibold text-[rgba(60,60,67,0.6)]">Total sobras</p>
-              <p className="text-[15px] font-bold text-[#34C759]">{brl(total)}</p>
+            <div className="flex items-center justify-between rounded-xl bg-[#009351]/[0.06] border border-[#009351]/20 px-4 py-3">
+              <p className="text-[12px] font-semibold text-[#72707d]">Total sobras</p>
+              <p className="text-[15px] font-bold text-[#009351]">{brl(total)}</p>
             </div>
           )}
         </div>
@@ -276,7 +276,7 @@ export function ModalSobra({
           <button
             onClick={salvar}
             disabled={!podeSalvar || saving}
-            className="flex-1 h-10 rounded-xl bg-[#1C1C1E] hover:bg-[#2C2C2E] text-white text-[13px] font-semibold transition-colors disabled:opacity-40"
+            className="flex-1 h-10 rounded-xl bg-[#0b0914] hover:bg-[#161421] text-white text-[13px] font-semibold transition-colors disabled:opacity-40"
           >
             {saving ? "Salvando…" : "Registrar"}
           </button>

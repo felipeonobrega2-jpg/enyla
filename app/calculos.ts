@@ -1,28 +1,55 @@
-import { FormData, Calculo, ResultadoFormato, LinhaTabela, FormatoPapel, LayoutChapa } from "./types"
+import { FormData, Calculo, ResultadoFormato, LinhaTabela, FormatoPapel, LayoutChapa, TipoCaixa } from "./types"
 import { FORMATOS_PAPEL } from "./dados"
 import { Configuracoes } from "./config"
 
-function calcularDieline(frente: number, lateral: number, alturaBox: number, abaColagem: number) {
-  const abaSuperior = Math.round(lateral * 0.9) + 3
-  const abaInferior = Math.round(lateral * 0.6) + 3
+function calcularDieline(frente: number, lateral: number, alturaBox: number, abaColagem: number, tipoCaixa: TipoCaixa = "simples") {
+  let abaSuperior: number
+  let abaInferior: number
+
+  switch (tipoCaixa) {
+    case "aviao":
+      // Tampa avião: aba profunda com formato especial (superior = lateral + folga asa)
+      abaSuperior = Math.round(lateral * 1.1) + 8
+      abaInferior = Math.round(lateral * 0.55) + 3
+      break
+    case "fundo-automatico":
+      // Fundo automático: base com gussets laterais (inferior maior)
+      abaSuperior = Math.round(lateral * 0.9) + 3
+      abaInferior = Math.round(lateral * 1.2) + 5
+      break
+    case "americano":
+      // American lock: 4 abas independentes — profundidade = frente/2
+      abaSuperior = Math.round(lateral * 0.9) + 3
+      abaInferior = Math.round(frente * 0.5) + 6
+      break
+    case "simples":
+    default:
+      abaSuperior = Math.round(lateral * 0.9) + 3
+      abaInferior = Math.round(lateral * 0.6) + 3
+  }
+
   const largura = 2 * frente + 2 * lateral + abaColagem
   const altura = alturaBox + abaSuperior + abaInferior + 5
-  return { largura, altura, abaColagem, abaSuperior, abaInferior }
+  return { largura, altura, abaColagem, abaSuperior, abaInferior, tipoCaixa }
 }
 
 function testarFolhaInteira(
   dieline: { largura: number; altura: number },
   formato: FormatoPapel
 ): ResultadoFormato[] {
+  // Usa dimensões da CHAPA (meia folha) — cada peça precisa caber numa única chapa
+  // peças/folha = 2 × peças/chapa, consistente com o canvas
   const area = formato.largura * formato.altura
+  const cW   = formato.larguraChapa
+  const cH   = formato.alturaChapa
 
-  const colN = Math.floor(formato.largura / dieline.largura)
-  const linN = Math.floor(formato.altura / dieline.altura)
-  const pecasN = colN * linN
+  const colN = Math.floor(cW / dieline.largura)
+  const linN = Math.floor(cH / dieline.altura)
+  const pecasN = colN * linN * 2
 
-  const colR = Math.floor(formato.largura / dieline.altura)
-  const linR = Math.floor(formato.altura / dieline.largura)
-  const pecasR = colR * linR
+  const colR = Math.floor(cW / dieline.altura)
+  const linR = Math.floor(cH / dieline.largura)
+  const pecasR = colR * linR * 2
 
   return [
     {
@@ -153,14 +180,26 @@ function calcularLinha(
 }
 
 export function calcular(form: FormData, config: Configuracoes): Calculo | null {
-  if (!form.frente || !form.lateral || !form.alturaBox) return null
+  // Permite calcular com só o DXF importado (sem L/A/P)
+  const temDim = form.frente > 0 && form.lateral > 0 && form.alturaBox > 0
+  if (!temDim && !form.blankOverride) return null
 
-  const dieline = calcularDieline(form.frente * 10, form.lateral * 10, form.alturaBox * 10, form.abaColagem * 10)
+  const dielineCalc = calcularDieline(
+    (form.frente  || 1) * 10,
+    (form.lateral || 1) * 10,
+    (form.alturaBox || 1) * 10,
+    form.abaColagem * 10,
+    form.tipoCaixa,
+  )
+  // Se o usuário importou um DXF real (Pacdora), usa as dimensões reais do blank
+  const dieline = form.blankOverride
+    ? { ...dielineCalc, largura: form.blankOverride.largura, altura: form.blankOverride.altura }
+    : dielineCalc
 
   // Override precoPor100 from selected material (or fall back to format default)
   const material = config.materiais.find(m => m.id === form.materialId)
   const formatosComConfig = FORMATOS_PAPEL.map(fmt => {
-    const precoPorMaterial = material?.precos[fmt.id]
+    const precoPorMaterial = material?.precos?.[fmt.id]
     return precoPorMaterial != null ? { ...fmt, precoPor100: precoPorMaterial } : fmt
   })
 
@@ -168,6 +207,8 @@ export function calcular(form: FormData, config: Configuracoes): Calculo | null 
   for (const fmt of formatosComConfig) {
     todosFormatos.push(...testarFolhaInteira(dieline, fmt))
   }
+
+  if (todosFormatos.length === 0) return null
 
   const melhorFormato = todosFormatos.reduce((best, curr) =>
     curr.pecasPorFolha > best.pecasPorFolha ? curr : best

@@ -310,17 +310,12 @@ export default function FormaView({
     <div className="flex flex-col h-full overflow-hidden bg-slate-50">
 
       {/* Header */}
-      <div className="shrink-0 px-6 py-3 bg-white border-b border-slate-100 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center">
+      <div className="shrink-0 px-4 py-3 bg-white border-b border-slate-100 flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center shrink-0">
           <span className="text-white text-xs font-black">F</span>
-        </div>
-        <div>
-          <p className="font-bold text-slate-800 text-sm leading-tight">Forma</p>
-          <p className="text-[10px] text-slate-400">IA de design de embalagens</p>
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          {/* Histórico */}
           <div className="relative" ref={historyRef}>
             <button
               onClick={() => setShowHistory(v => !v)}

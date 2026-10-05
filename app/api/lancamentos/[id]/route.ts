@@ -7,8 +7,19 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const body = await req.json()
-    await supabase.from("LancamentoFinanceiro").update(body).eq("id", id)
+    const raw = await req.json()
+    // Strip columns that don't exist yet (see POST route for migration SQL)
+    const KNOWN = new Set(["tipo","descricao","valor","dataVencimento","dataPagamento",
+      "status","cardId","cardNumero","nomeCliente","loteId","loteNumero",
+      "categoria","formaPagamento","obs",
+      "subcategoria","contaId","fornecedorId",
+    ])
+    const body = Object.fromEntries(Object.entries(raw).filter(([k]) => KNOWN.has(k)))
+    const { error } = await supabase.from("LancamentoFinanceiro").update(body).eq("id", id)
+    if (error) {
+      console.error("LancamentoFinanceiro PATCH error:", error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)

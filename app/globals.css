@@ -1,37 +1,87 @@
 @import "tailwindcss";
 
+/* ── Fontes fintech ── */
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+
 @custom-variant dark (&:is(.dark *));
 
 :root  { color-scheme: light; }
 html.dark { color-scheme: dark; }
 
+/* ── Tokens de design ── */
+:root {
+  /* purple */
+  --purple:      #8456e8;
+  --purple-hover: #7445d4;
+  --purple-active: #6234bc;
+  --purple-soft:  #e8e2ff;
+  --purple-light: #a582ff;
+
+  /* semantic */
+  --success:     #009351;
+  --success-soft: #c9f4d7;
+  --error:       #d33a3c;
+  --error-soft:  #ffd9d4;
+  --warning:     #c57800;
+  --warning-soft: #ffe1b6;
+  --info:        #3a84ca;
+  --info-soft:   #d4ebff;
+  --neutral:     #7a7983;
+
+  /* surfaces — light */
+  --bg-page:    #f6f5fc;
+  --bg-surface: #fcfbfe;
+  --bg-alt:     #ebe9f5;
+  --border:     #dedde5;
+  --text-main:  #191625;
+  --text-sub:   #5e5c68;
+  --text-faint: #898892;
+}
+
+html.dark {
+  --purple-soft:  #312256;
+  --success-soft: #003416;
+  --error-soft:   #4f1313;
+  --warning-soft: #462400;
+  --info-soft:    #072a4a;
+
+  --bg-page:    #0b0914;
+  --bg-surface: #161421;
+  --bg-alt:     #272434;
+  --border:     #312e3e;
+  --text-main:  #eeedf5;
+  --text-sub:   #a5a2b0;
+  --text-faint: #72707d;
+}
+
 body {
-  background: #F2F2F7;
-  color: #1C1C1E;
-  /* SF Pro — fonte padrão Apple */
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
-               system-ui, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg-page);
+  color: var(--text-main);
+  font-family: "Manrope", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.01em;
 }
 
-/* ── Apple: sem highlight de tap ── */
+/* ── Números e valores → IBM Plex Mono ── */
+.tabular-nums,
+[class*="tabular-nums"],
+code, pre {
+  font-family: "IBM Plex Mono", "SF Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Sem highlight de tap ── */
 * { -webkit-tap-highlight-color: transparent; }
 
-/* ── Apple: press state em todos os botões ── */
+/* ── Press state em botões ── */
 button:active:not(:disabled),
 [role="button"]:active:not([aria-disabled="true"]) {
   transform: scale(0.97);
   transition: transform 80ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-/* ── Apple: font mono ── */
-code, pre, .font-mono, [class*="tabular-nums"] {
-  font-family: "SF Mono", ui-monospace, "Cascadia Code", "Fira Code", monospace;
-}
-
-/* ── Apple: Animações de entrada ── */
+/* ── Animações de entrada ── */
 @keyframes apple-modal-in {
   from { opacity: 0; transform: scale(0.94) translateY(4px); }
   to   { opacity: 1; transform: scale(1)    translateY(0);   }
@@ -63,7 +113,7 @@ code, pre, .font-mono, [class*="tabular-nums"] {
   animation: apple-pop 0.25s cubic-bezier(0.34, 1.4, 0.64, 1) both;
 }
 
-/* ── Transição suave para cards e elementos interativos ── */
+/* ── Transição suave para cards interativos ── */
 .apple-card {
   transition: box-shadow 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
               transform   0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -73,52 +123,55 @@ code, pre, .font-mono, [class*="tabular-nums"] {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
-/* ── Dark Mode ── */
-html.dark body { background: #1C1C1E; color: rgba(255,255,255,0.85); }
+/* ── Dark mode overrides de classes Tailwind ── */
+html.dark body { background: #0b0914; color: #eeedf5; }
 
-html.dark .bg-white                { background-color: #2C2C2E; }
-html.dark .bg-slate-50             { background-color: #1C1C1E; }
-html.dark .bg-slate-100            { background-color: #2C2C2E; }
-html.dark .bg-\[\#F2F2F7\]        { background-color: #1C1C1E; }
-html.dark .bg-\[\#f8fafc\]        { background-color: #1C1C1E; }
+html.dark .bg-white               { background-color: #161421; }
+html.dark .bg-slate-50            { background-color: #0b0914; }
+html.dark .bg-slate-100           { background-color: #161421; }
+html.dark .bg-\[\#F2F2F7\]       { background-color: #0b0914; }
+html.dark .bg-\[\#f6f5fc\]       { background-color: #0b0914; }
+html.dark .bg-\[\#fcfbfe\]       { background-color: #161421; }
+html.dark .bg-\[\#f8fafc\]       { background-color: #0b0914; }
 
-html.dark .hover\:bg-white:hover       { background-color: #3A3A3C; }
-html.dark .hover\:bg-slate-50:hover    { background-color: #2C2C2E; }
-html.dark .hover\:bg-slate-100:hover   { background-color: #3A3A3C; }
+html.dark .hover\:bg-white:hover       { background-color: #272434; }
+html.dark .hover\:bg-slate-50:hover    { background-color: #161421; }
+html.dark .hover\:bg-slate-100:hover   { background-color: #272434; }
 
-html.dark .border-slate-100  { border-color: rgba(255,255,255,0.08); }
-html.dark .border-slate-200  { border-color: rgba(255,255,255,0.12); }
+html.dark .border-slate-100  { border-color: #312e3e; }
+html.dark .border-slate-200  { border-color: #312e3e; }
 
-html.dark .text-slate-900 { color: rgba(255,255,255,0.85); }
-html.dark .text-slate-800 { color: rgba(255,255,255,0.75); }
-html.dark .text-slate-700 { color: rgba(255,255,255,0.6); }
-html.dark .text-slate-600 { color: rgba(255,255,255,0.45); }
-html.dark .text-\[\#1C1C1E\] { color: rgba(255,255,255,0.85); }
-html.dark .text-\[rgba\(60\,60\,67\,0\.6\)\] { color: rgba(255,255,255,0.45); }
-html.dark .text-\[rgba\(60\,60\,67\,0\.4\)\] { color: rgba(255,255,255,0.3); }
+html.dark .text-slate-900 { color: #eeedf5; }
+html.dark .text-slate-800 { color: #a5a2b0; }
+html.dark .text-slate-700 { color: #a5a2b0; }
+html.dark .text-slate-600 { color: #72707d; }
+html.dark .text-\[\#191625\] { color: #eeedf5; }
+html.dark .text-\[\#1C1C1E\] { color: #eeedf5; }
+html.dark .text-\[rgba\(60\,60\,67\,0\.6\)\] { color: #a5a2b0; }
+html.dark .text-\[rgba\(60\,60\,67\,0\.4\)\] { color: #72707d; }
 
 html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
 html.dark textarea,
 html.dark select {
-  background-color: #0d1117;
-  border-color: #30363d;
-  color: #e6edf3;
+  background-color: #161421;
+  border-color: #312e3e;
+  color: #eeedf5;
 }
 html.dark input::placeholder,
-html.dark textarea::placeholder { color: #545d68; }
+html.dark textarea::placeholder { color: #72707d; }
 html.dark input:focus,
-html.dark textarea:focus { border-color: #007AFF; }
+html.dark textarea:focus { border-color: #8456e8; }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(60,60,67,0.2); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(60,60,67,0.35); }
-html.dark ::-webkit-scrollbar-thumb       { background: #30363d; }
-html.dark ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+::-webkit-scrollbar-thumb { background: rgba(132,86,232,0.2); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(132,86,232,0.35); }
+html.dark ::-webkit-scrollbar-thumb       { background: #312e3e; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #4a4560; }
 
-/* ── Selection — Apple Blue ── */
-::selection { background: rgba(0, 122, 255, 0.18); color: #007AFF; }
+/* ── Selection ── */
+::selection { background: rgba(132,86,232,0.18); color: #8456e8; }
 
 /* ── Spin buttons ── */
 input[type="number"]::-webkit-inner-spin-button,

@@ -161,7 +161,7 @@ export default function FormaBubble({ apiKey }: { apiKey: string }) {
           {/* Header */}
           <div className="shrink-0 px-4 py-3 bg-slate-900 flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
-              style={{ background: "linear-gradient(135deg, #5009c4 0%, #4307a6 100%)" }}>
+              style={{ background: "linear-gradient(135deg, #8456e8 0%, #7445d4 100%)" }}>
               <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
               </svg>
@@ -195,7 +195,7 @@ export default function FormaBubble({ apiKey }: { apiKey: string }) {
               <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
                 <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-[12.5px] leading-relaxed ${
                   m.role === "user"
-                    ? "bg-[#5009c4] text-white rounded-tr-sm whitespace-pre-wrap"
+                    ? "bg-[#8456e8] text-white rounded-tr-sm whitespace-pre-wrap"
                     : "bg-white border border-slate-200 text-slate-700 rounded-tl-sm"
                 }`}>
                   {m.role === "assistant" ? renderMarkdownLite(m.content) : m.content}
@@ -205,7 +205,7 @@ export default function FormaBubble({ apiKey }: { apiKey: string }) {
                     <button
                       onClick={() => confirmarAcao(i)}
                       disabled={loading}
-                      className="px-3 py-1.5 rounded-lg bg-[#5009c4] text-white text-[11.5px] font-medium hover:bg-[#4307a6] disabled:opacity-50 transition-colors"
+                      className="px-3 py-1.5 rounded-lg bg-[#8456e8] text-white text-[11.5px] font-medium hover:bg-[#7445d4] disabled:opacity-50 transition-colors"
                     >
                       Confirmar
                     </button>
@@ -244,13 +244,13 @@ export default function FormaBubble({ apiKey }: { apiKey: string }) {
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send() } }}
               placeholder="Pergunte algo..."
               disabled={loading}
-              className="flex-1 h-9 px-3 rounded-xl border border-slate-200 text-[12.5px] outline-none focus:border-[#5009c4] transition-colors disabled:bg-slate-50"
+              className="flex-1 h-9 px-3 rounded-xl border border-slate-200 text-[12.5px] outline-none focus:border-[#8456e8] transition-colors disabled:bg-slate-50"
             />
             <button
               onClick={send}
               disabled={loading || !input.trim()}
               className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-white disabled:opacity-40 transition-opacity"
-              style={{ background: "linear-gradient(135deg, #5009c4 0%, #4307a6 100%)" }}
+              style={{ background: "linear-gradient(135deg, #8456e8 0%, #7445d4 100%)" }}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.269 20.875L5.999 12Zm0 0h7.5" />
@@ -265,7 +265,7 @@ export default function FormaBubble({ apiKey }: { apiKey: string }) {
         onClick={() => setOpen(v => !v)}
         title="Forma — assistente do sistema"
         className="w-14 h-14 rounded-full flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-transform"
-        style={{ background: "linear-gradient(135deg, #5009c4 0%, #4307a6 100%)" }}
+        style={{ background: "linear-gradient(135deg, #8456e8 0%, #7445d4 100%)" }}
       >
         {open ? (
           <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

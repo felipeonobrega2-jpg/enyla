@@ -28,4 +28,6 @@ export const COL_COLORS: { bg: string; border: string; badge: string; dot: strin
   { bg: "bg-[#5009c4]/[0.06]",          border: "border-[#5009c4]/30",           badge: "bg-[#5009c4]/[0.1] text-[#5009c4]",           dot: "bg-[#5009c4]"   },
   // 10 — Perdido (red — negativo)
   { bg: "bg-[#FF3B30]/[0.06]",          border: "border-[#FF3B30]/30",           badge: "bg-[#FF3B30]/[0.1] text-[#FF3B30]",           dot: "bg-[#FF3B30]"   },
+  // 11 — Hot (flame — lead quente, não expira automaticamente)
+  { bg: "bg-[#FF6200]/[0.07]",          border: "border-[#FF6200]/35",           badge: "bg-[#FF6200]/[0.14] text-[#FF6200]",          dot: "bg-[#FF6200]"   },
 ]

@@ -43,7 +43,12 @@ export function ModalPersonalizarProposta({
     () => new Set(calculo.tabela.map(l => l.quantidade))
   )
   // Overridden unit price per quantity (stored as string to allow mid-typing)
-  const [unitOvr, setUnitOvr] = useState<Record<number, string>>({})
+  const [unitOvr,   setUnitOvr]   = useState<Record<number, string>>({})
+  // Overridden total per quantity — independent from unit override
+  const [totalOvr,  setTotalOvr]  = useState<Record<number, number>>({})
+  // Tracking which row's TOTAL is being edited inline
+  const [editingTotal, setEditingTotal] = useState<number | null>(null)
+  const [tempTotal, setTempTotal]       = useState("")
   // Overridden ideal quantity (null = use calculated default)
   const [idealOvr, setIdealOvr] = useState<number | null>(null)
   const effectiveIdealQtd = idealOvr ?? calculo.sweetSpotIdealQtd
@@ -94,7 +99,11 @@ export function ModalPersonalizarProposta({
     return comFaca ? linha.unitarioComFaca : linha.unitarioSemFaca
   }
 
-  function getTotal(linha: LinhaTabela) { return getUnit(linha) * linha.quantidade }
+  function getTotal(linha: LinhaTabela): number {
+    const ov = totalOvr[linha.quantidade]
+    if (ov !== undefined) return ov
+    return getUnit(linha) * linha.quantidade
+  }
 
   // Build a modified Calculo with filtered rows and overridden prices
   function buildCustomCalculo(): Calculo {
@@ -102,8 +111,8 @@ export function ModalPersonalizarProposta({
     const customTabela = calculo.tabela
       .filter(l => ativos.has(l.quantidade))
       .map(l => {
-        const unit  = getUnit(l)
-        const total = unit * l.quantidade
+        const total = getTotal(l)
+        const unit  = total / l.quantidade
         const parc  = (total * parcFator) / 12
         return comFaca
           ? { ...l, unitarioComFaca: unit, precoComFaca: total, parcela12xComFaca: parc }
@@ -129,6 +138,18 @@ export function ModalPersonalizarProposta({
 
   const nenhum = [...ativos].filter(q => calculo.tabela.some(l => l.quantidade === q)).length === 0
 
+  // Aplica custo × 2 como unitário sugerido para todas as linhas ativas
+  function aplicarCusto2x() {
+    const novosUnit: Record<number, string> = {}
+    calculo.tabela.forEach(linha => {
+      const custo = comFaca ? linha.custoTotalComFaca : linha.custoTotalSemFaca
+      const unitCusto = custo / linha.quantidade
+      novosUnit[linha.quantidade] = (unitCusto * 2).toFixed(4)
+    })
+    setUnitOvr(novosUnit)
+    setTotalOvr({})
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
@@ -141,18 +162,18 @@ export function ModalPersonalizarProposta({
         <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] shrink-0">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-[#1C1C1E] text-[15px] leading-snug truncate">
+              <p className="font-bold text-[#191625] text-[15px] leading-snug truncate">
                 {form.nomeCliente || "Sem nome"}
               </p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className="text-[10px] font-bold text-[#5009c4] bg-[#5009c4]/[0.08] border border-[#5009c4]/20 px-1.5 py-0.5 rounded-full tabular-nums shrink-0">
+                <span className="text-[10px] font-bold text-[#8456e8] bg-[#8456e8]/[0.08] border border-[#8456e8]/20 px-1.5 py-0.5 rounded-full tabular-nums shrink-0">
                   {numero}
                 </span>
                 <span className="text-[11px] text-[#8E8E93]">{data}</span>
               </div>
             </div>
             <button onClick={handleClose}
-              className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
+              className="text-[#898892] hover:text-[#8E8E93] transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
           </div>
           {/* Specs pills */}
           <div className="flex flex-wrap gap-1.5 mt-3">
@@ -189,13 +210,13 @@ export function ModalPersonalizarProposta({
                 const unit     = getUnit(linha)
                 const total    = getTotal(linha)
                 const parcela  = (total * config.multiplicadores.parcelamento12x) / 12
-                const modified = unitOvr[linha.quantidade] !== undefined
+                const modified = unitOvr[linha.quantidade] !== undefined || totalOvr[linha.quantidade] !== undefined
 
                 return (
                   <tr key={linha.quantidade}
                     className={`transition-all ${
                       !ativo ? "opacity-35" :
-                      isIdeal ? "bg-[#5009c4]/[0.03]" : ""
+                      isIdeal ? "bg-[#8456e8]/[0.03]" : ""
                     }`}
                   >
                     {/* Checkbox */}
@@ -209,7 +230,7 @@ export function ModalPersonalizarProposta({
                         }}
                         className={`w-[18px] h-[18px] rounded-[5px] border-2 flex items-center justify-center transition-all shrink-0 ${
                           ativo
-                            ? "border-[#5009c4] bg-[#5009c4]"
+                            ? "border-[#8456e8] bg-[#8456e8]"
                             : "border-[rgba(60,60,67,0.2)] bg-white hover:border-[rgba(60,60,67,0.35)]"
                         }`}
                       >
@@ -227,20 +248,20 @@ export function ModalPersonalizarProposta({
                         <button
                           title={isIdeal ? "Ideal atual" : "Definir como ideal"}
                           onClick={() => setIdealOvr(isIdeal ? null : linha.quantidade)}
-                          className={`transition-colors shrink-0 ${isIdeal ? "text-[#5009c4]" : "text-[rgba(60,60,67,0.15)] hover:text-[#5009c4]/60"}`}
+                          className={`transition-colors shrink-0 ${isIdeal ? "text-[#8456e8]" : "text-[rgba(60,60,67,0.15)] hover:text-[#8456e8]/60"}`}
                         >
                           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                           </svg>
                         </button>
-                        <span className="font-bold text-[13px] text-[#1C1C1E] tabular-nums">{num(linha.quantidade)}</span>
+                        <span className="font-bold text-[13px] text-[#191625] tabular-nums">{num(linha.quantidade)}</span>
                         <button
                           onClick={() => toggleQual(linha.quantidade)}
                           title="Clique para alternar Digital / Offset"
                           className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${
                             qualDe(linha.quantidade) === "Digital"
                               ? "bg-[rgba(116,116,128,0.12)] text-[#64748b] hover:bg-[rgba(116,116,128,0.25)]"
-                              : "bg-[#5009c4]/[0.1] text-[#5009c4] hover:bg-[#5009c4]/20"
+                              : "bg-[#8456e8]/[0.1] text-[#8456e8] hover:bg-[#8456e8]/20"
                           }`}
                         >{qualDe(linha.quantidade)}</button>
                       </div>
@@ -260,23 +281,60 @@ export function ModalPersonalizarProposta({
                           onFocus={e => e.target.select()}
                           className={`w-[72px] text-right text-[12.5px] font-semibold tabular-nums border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                             modified
-                              ? "border-[#FF9500]/50 bg-[#FF9500]/[0.06] text-[#1C1C1E] focus:ring-[#FF9500]/20 focus:border-[#FF9500]"
-                              : "border-[rgba(60,60,67,0.12)] text-[#1C1C1E] focus:ring-[#5009c4]/20 focus:border-[#5009c4]"
+                              ? "border-[#c57800]/50 bg-[#c57800]/[0.06] text-[#191625] focus:ring-[#c57800]/20 focus:border-[#c57800]"
+                              : "border-[rgba(60,60,67,0.12)] text-[#191625] focus:ring-[#8456e8]/20 focus:border-[#8456e8]"
                           }`}
                         />
                       </div>
                     </td>
 
-                    {/* Total */}
+                    {/* Total — editável */}
                     <td className="py-3 px-2 text-right">
-                      <span className={`font-semibold text-[13.5px] tabular-nums ${
-                        ativo ? (modified ? "text-[#FF9500]" : "text-[#5009c4]") : "text-[#8E8E93]"
-                      }`}>
-                        {brl(total)}
-                      </span>
-                      {modified && ativo && (
-                        <p className="text-[9px] text-[#8E8E93] line-through tabular-nums">
-                          {brl((comFaca ? linha.unitarioComFaca : linha.unitarioSemFaca) * linha.quantidade)}
+                      {editingTotal === linha.quantidade ? (
+                        <input
+                          autoFocus
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={tempTotal}
+                          onChange={e => setTempTotal(e.target.value)}
+                          onFocus={e => e.target.select()}
+                          onBlur={() => {
+                            const v = parseFloat(tempTotal.replace(",", "."))
+                            if (!isNaN(v) && v > 0)
+                              setTotalOvr(prev => ({ ...prev, [linha.quantidade]: v }))
+                            setEditingTotal(null)
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") {
+                              const v = parseFloat(tempTotal.replace(",", "."))
+                              if (!isNaN(v) && v > 0)
+                                setTotalOvr(prev => ({ ...prev, [linha.quantidade]: v }))
+                              setEditingTotal(null)
+                            }
+                            if (e.key === "Escape") setEditingTotal(null)
+                          }}
+                          className={`w-[100px] text-right text-[12.5px] font-semibold tabular-nums border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-all ${
+                            modified
+                              ? "border-[#c57800]/50 bg-[#c57800]/[0.06] focus:ring-[#c57800]/20 focus:border-[#c57800]"
+                              : "border-[#8456e8]/40 bg-[#8456e8]/[0.04] focus:ring-[#8456e8]/20 focus:border-[#8456e8]"
+                          }`}
+                        />
+                      ) : (
+                        <button
+                          disabled={!ativo}
+                          onClick={() => { setTempTotal(total.toFixed(2)); setEditingTotal(linha.quantidade) }}
+                          className={`font-semibold text-[13.5px] tabular-nums text-right w-full transition-colors disabled:cursor-not-allowed ${
+                            ativo ? (modified ? "text-[#c57800] hover:opacity-70" : "text-[#8456e8] hover:opacity-70") : "text-[#8E8E93]"
+                          }`}
+                          title="Clique para editar o total"
+                        >
+                          {brl(total)}
+                        </button>
+                      )}
+                      {totalOvr[linha.quantidade] !== undefined && ativo && editingTotal !== linha.quantidade && (
+                        <p className="text-[9px] text-[#8E8E93] line-through tabular-nums text-right">
+                          {brl(getUnit(linha) * linha.quantidade)}
                         </p>
                       )}
                     </td>
@@ -292,18 +350,31 @@ export function ModalPersonalizarProposta({
           </table>
         </div>
 
-        {/* Resumo + reset */}
-        <div className="px-5 py-2.5 bg-[rgba(116,116,128,0.04)] border-t border-[rgba(60,60,67,0.08)] flex items-center justify-between shrink-0">
+        {/* Resumo + ações rápidas */}
+        <div className="px-5 py-2.5 bg-[rgba(116,116,128,0.04)] border-t border-[rgba(60,60,67,0.08)] flex items-center justify-between gap-3 shrink-0">
           <p className="text-[11px] text-[#8E8E93]">
             <span className="font-semibold tabular-nums">{ativos.size}</span> de{" "}
             <span className="tabular-nums">{calculo.tabela.length}</span> tiers selecionados
           </p>
-          {Object.keys(unitOvr).length > 0 && (
-            <button onClick={() => setUnitOvr({})}
-              className="text-[10.5px] text-[#FF9500] hover:text-[#E08500] font-medium transition-colors">
-              ↺ Restaurar preços
+          <div className="flex items-center gap-3">
+            {/* Custo × 2 */}
+            <button
+              onClick={aplicarCusto2x}
+              title={`Preenche unitário = (custo ${comFaca ? "c/ faca" : "s/ faca"} ÷ qtd) × 2`}
+              className="flex items-center gap-1.5 text-[10.5px] font-semibold text-[#8456e8] hover:text-[#6e3fd4] transition-colors whitespace-nowrap"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75l-2.489-2.489m0 0a3.375 3.375 0 1 0-4.773-4.773 3.375 3.375 0 0 0 4.774 4.774ZM21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+              Custo × 2
             </button>
-          )}
+            {(Object.keys(unitOvr).length > 0 || Object.keys(totalOvr).length > 0) && (
+              <button onClick={() => { setUnitOvr({}); setTotalOvr({}) }}
+                className="text-[10.5px] text-[#c57800] hover:text-[#E08500] font-medium transition-colors whitespace-nowrap">
+                ↺ Restaurar
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Lote section */}
@@ -312,21 +383,21 @@ export function ModalPersonalizarProposta({
             <div className={`rounded-xl p-3 ${loteAtribuido ? "bg-violet-50 border border-violet-200" : "border border-dashed border-[rgba(60,60,67,0.12)]"}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <svg className={`w-3.5 h-3.5 shrink-0 ${loteAtribuido ? "text-[#AF52DE]" : "text-[#8E8E93]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className={`w-3.5 h-3.5 shrink-0 ${loteAtribuido ? "text-[#a582ff]" : "text-[#8E8E93]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z" />
                   </svg>
-                  <p className={`text-[11.5px] font-semibold ${loteAtribuido ? "text-[#AF52DE]" : "text-[#8E8E93]"}`}>
+                  <p className={`text-[11.5px] font-semibold ${loteAtribuido ? "text-[#a582ff]" : "text-[#8E8E93]"}`}>
                     {loteAtribuido ? loteAtribuido : "Lote"}
                   </p>
                 </div>
                 {!loteAtribuido && (
                   <button onClick={() => setShowLoteSection(v => !v)}
-                    className="text-[11px] font-semibold text-[#AF52DE] hover:text-violet-800 transition-colors">
+                    className="text-[11px] font-semibold text-[#a582ff] hover:text-violet-800 transition-colors">
                     + Agrupar
                   </button>
                 )}
                 {loteAtribuido && (
-                  <span className="text-[10px] text-[#AF52DE]">Associado</span>
+                  <span className="text-[10px] text-[#a582ff]">Associado</span>
                 )}
               </div>
               {showLoteSection && !loteAtribuido && (
@@ -336,16 +407,16 @@ export function ModalPersonalizarProposta({
                       <p className="text-[10px] text-[#8E8E93] font-medium">Lotes de {form.nomeCliente}:</p>
                       {clientLotes.map(l => (
                         <button key={l.id} onClick={() => handleAssignLote(l.id, l.numero)}
-                          className="w-full flex items-center gap-2 py-1.5 px-2.5 text-[11px] text-[#AF52DE] bg-white hover:bg-violet-50 rounded-lg border border-violet-200 transition-colors text-left">
+                          className="w-full flex items-center gap-2 py-1.5 px-2.5 text-[11px] text-[#a582ff] bg-white hover:bg-violet-50 rounded-lg border border-violet-200 transition-colors text-left">
                           <span className="font-bold">{l.numero}</span>
                           <span className="text-violet-300">·</span>
-                          <span className="truncate text-[#AF52DE]">{l.nomeCliente}</span>
+                          <span className="truncate text-[#a582ff]">{l.nomeCliente}</span>
                         </button>
                       ))}
                     </>
                   )}
                   <button onClick={handleCriarLote} disabled={criandoLote}
-                    className="w-full py-1.5 text-[11px] font-semibold text-white bg-[#AF52DE] hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors">
+                    className="w-full py-1.5 text-[11px] font-semibold text-white bg-[#a582ff] hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors">
                     {criandoLote ? "Criando…" : clientLotes.length > 0 ? "Criar novo lote" : "+ Criar lote para este pedido"}
                   </button>
                 </div>
@@ -357,16 +428,16 @@ export function ModalPersonalizarProposta({
         {/* Footer actions */}
         <div className="px-4 pb-4 pt-3 border-t border-[rgba(60,60,67,0.08)] shrink-0 space-y-2">
           {nenhum && (
-            <p className="text-[11px] text-[#FF3B30] text-center">Selecione ao menos um tier para gerar o PDF.</p>
+            <p className="text-[11px] text-[#d33a3c] text-center">Selecione ao menos um tier para gerar o PDF.</p>
           )}
           <div className="flex gap-2">
             <button onClick={handleClose}
-              className="px-3 py-2.5 text-[11.5px] text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors shrink-0">
+              className="px-3 py-2.5 text-[11.5px] text-[#8E8E93] hover:text-[#5e5c68] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors shrink-0">
               Fechar
             </button>
             <button
               onClick={() => onAbrirPdf(gerarHtmlOrcamento({ form, calculo, data, numero }))}
-              className="flex-1 py-2.5 text-[11.5px] font-medium border border-[rgba(60,60,67,0.12)] hover:border-[rgba(60,60,67,0.25)] hover:bg-[rgba(116,116,128,0.04)] text-[rgba(60,60,67,0.6)] rounded-xl transition-colors">
+              className="flex-1 py-2.5 text-[11.5px] font-medium border border-[rgba(60,60,67,0.12)] hover:border-[rgba(60,60,67,0.25)] hover:bg-[rgba(116,116,128,0.04)] text-[#72707d] rounded-xl transition-colors">
               PDF Gráfica
             </button>
             {onSalvar && (
@@ -379,7 +450,7 @@ export function ModalPersonalizarProposta({
                   onSalvar(custom, opcoes)
                   onClose()
                 }}
-                className="flex-1 py-2.5 text-[11.5px] font-semibold bg-[#2C2C2E] hover:bg-[#1C1C1E] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
+                className="flex-1 py-2.5 text-[11.5px] font-semibold bg-[#161421] hover:bg-[#0b0914] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
                 Salvar
               </button>
             )}
@@ -393,7 +464,7 @@ export function ModalPersonalizarProposta({
             <button
               disabled={nenhum}
               onClick={() => { onSyncOpcoes(cardId, buildOpcoes()); onAbrirPdf(gerarHtmlOrcamentoCliente({ form: { ...form, qualidades: localQualidades }, calculo: buildCustomCalculo(), data, numero }, telefoneCliente)) }}
-              className="flex-1 py-2.5 text-[11.5px] font-semibold bg-[#5009c4] hover:bg-[#4307a6] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
+              className="flex-1 py-2.5 text-[11.5px] font-semibold bg-[#8456e8] hover:bg-[#7445d4] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
               PDF Cliente ↓
             </button>
           </div>
@@ -406,7 +477,7 @@ export function ModalPersonalizarProposta({
 function SpecPill({ children, blue }: { children: React.ReactNode; blue?: boolean }) {
   return (
     <span className={`text-[10.5px] px-2 py-0.5 rounded-full font-medium ${
-      blue ? "bg-[#5009c4]/[0.08] text-[#5009c4] border border-[#5009c4]/15" : "bg-[rgba(116,116,128,0.08)] text-[rgba(60,60,67,0.6)]"
+      blue ? "bg-[#8456e8]/[0.08] text-[#8456e8] border border-[#8456e8]/15" : "bg-[rgba(116,116,128,0.08)] text-[#72707d]"
     }`}>{children}</span>
   )
 }

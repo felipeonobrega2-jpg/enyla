@@ -76,7 +76,7 @@ export default function LoginPage() {
                   outline: "none",
                   transition: "border-color 0.15s",
                 }}
-                onFocus={e => { e.currentTarget.style.borderColor = "#5009c4" }}
+                onFocus={e => { e.currentTarget.style.borderColor = "#8456e8" }}
                 onBlur={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)" }}
               />
             </div>
@@ -95,7 +95,7 @@ export default function LoginPage() {
               disabled={loading || !password}
               style={{
                 width: "100%", height: 44,
-                background: loading || !password ? "rgba(80,9,196,0.4)" : "linear-gradient(135deg, #5009c4 0%, #4307a6 100%)",
+                background: loading || !password ? "rgba(80,9,196,0.4)" : "linear-gradient(135deg, #8456e8 0%, #7445d4 100%)",
                 border: "none", borderRadius: 12,
                 color: "#fff", fontWeight: 700, fontSize: 14,
                 cursor: loading || !password ? "not-allowed" : "pointer",

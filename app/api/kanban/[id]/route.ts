@@ -8,21 +8,54 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await req.json()
-    // fornecedor/custoTerceiro have no columns yet — pack into opcoes._x instead.
-    const { fornecedor: pFornecedor, custoTerceiro: pCustoTerceiro, dataEntregaReal: _d, ...baseBody } = body
+    // fornecedor/custoTerceiro/projecaoCustos have no columns — pack into opcoes._x.
+    // Normal cards keep their pricing array in opcoes._items; _x carries metadata.
+    const { fornecedor: pFornecedor, custoTerceiro: pCustoTerceiro, dataEntregaReal: _d,
+      cores: pCores, acabamentos: pAcabamentos, observacoesOS: pObsOS,
+      projecaoCustos: pProjecao, prazos: pPrazos,
+      prazoRecebimentoInterno: pPrazoRec,
+      ...baseBody } = body
     void _d
     const safeBody: Record<string, unknown> = { ...baseBody }
+    if (pCores !== undefined)      safeBody.cores = pCores ?? null
+    if (pAcabamentos !== undefined) safeBody.acabamentos = pAcabamentos ?? null
+    if (pObsOS !== undefined)      safeBody.observacoes_os = pObsOS ?? null
 
-    if (pFornecedor !== undefined || pCustoTerceiro !== undefined) {
+    if (pFornecedor !== undefined || pCustoTerceiro !== undefined || pProjecao !== undefined || pPrazos !== undefined || pPrazoRec !== undefined) {
       const { data: current } = await supabase.from("KanbanCard").select("opcoes").eq("id", id).single()
-      const currentX = (current?.opcoes as { _x?: Record<string, unknown> } | null)?._x ?? {}
+      const raw = current?.opcoes
+      // Support both formats: plain array and wrapped { _items, _x }
+      const isWrapped = raw && !Array.isArray(raw) && typeof raw === "object"
+      const currentItems = isWrapped
+        ? ((raw as { _items?: unknown[] })._items ?? null)
+        : (Array.isArray(raw) ? raw : null)
+      const currentX = (isWrapped
+        ? (raw as { _x?: Record<string, unknown> })._x
+        : undefined) ?? {}
       const newX: Record<string, unknown> = { ...currentX }
       if (pFornecedor !== undefined) {
         if (pFornecedor) newX.fornecedor = pFornecedor
         else delete newX.fornecedor
       }
       if (pCustoTerceiro !== undefined) newX.custoTerceiro = pCustoTerceiro
-      safeBody.opcoes = Object.keys(newX).length ? { _x: newX } : null
+      if (pProjecao !== undefined) {
+        if (pProjecao) newX.projecaoCustos = pProjecao
+        else delete newX.projecaoCustos
+      }
+      if (pPrazos !== undefined) {
+        if (pPrazos && Object.keys(pPrazos).length > 0) newX.prazos = pPrazos
+        else delete newX.prazos
+      }
+      if (pPrazoRec !== undefined) {
+        if (pPrazoRec) newX.prazoRecebimentoInterno = pPrazoRec
+        else delete newX.prazoRecebimentoInterno
+      }
+      const hasX = Object.keys(newX).length > 0
+      if (currentItems) {
+        safeBody.opcoes = hasX ? { _items: currentItems, _x: newX } : currentItems
+      } else {
+        safeBody.opcoes = hasX ? { _x: newX } : null
+      }
     }
 
     if (Object.keys(safeBody).length === 0) return NextResponse.json({ ok: true })

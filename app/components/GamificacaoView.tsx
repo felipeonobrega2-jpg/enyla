@@ -1,6 +1,6 @@
 "use client"
 import { useState, useMemo } from "react"
-import { KanbanCard, COL_FECHADO, COL_PERDIDO } from "../types"
+import { KanbanCard, COL_FECHADO, COL_PERDIDO, COL_HOT, LancamentoFinanceiro } from "../types"
 import { brl } from "../utils"
 
 const CARD = "bg-white border border-[rgba(0,0,0,0.06)] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]"
@@ -34,11 +34,13 @@ function calcularStreak(kanban: KanbanCard[]): number {
 
 export function GamificacaoView({
   kanban,
+  lancamentos,
   metaMensal,
   baselineFaturamento,
   onSaveConfig,
 }: {
   kanban: KanbanCard[]
+  lancamentos: LancamentoFinanceiro[]
   metaMensal: number
   baselineFaturamento: number
   onSaveConfig: (updates: { metaMensal?: number; baselineFaturamento?: number }) => void
@@ -49,14 +51,16 @@ export function GamificacaoView({
   const [draftBaseline, setDraftBaseline] = useState("")
 
   const fechados = useMemo(
-    () => kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO),
+    () => kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO && c.coluna !== COL_HOT && !c.isTerceirizado),
     [kanban]
   )
 
-  const totalFaturado = useMemo(
-    () => baselineFaturamento + fechados.reduce((s, c) => s + c.preco, 0),
-    [fechados, baselineFaturamento]
-  )
+  const totalFaturado = useMemo(() => {
+    const sobras = lancamentos
+      .filter(l => l.categoria === "sobra" && l.tipo === "receita")
+      .reduce((s, l) => s + l.valor, 0)
+    return baselineFaturamento + fechados.reduce((s, c) => s + c.preco, 0) + sobras
+  }, [fechados, baselineFaturamento, lancamentos])
 
   const faturadoMes = useMemo(() => {
     const hoje = new Date()
@@ -77,18 +81,18 @@ export function GamificacaoView({
     : 1
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-5 space-y-5">
+    <div className="h-full overflow-y-auto px-6 py-5 space-y-5" style={{ background: "var(--bg-page)" }}>
 
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-[18px] font-semibold text-[#1C1C1E]">Conquistas</h1>
+        <h1 className="text-[18px] font-semibold text-[#191625]">Conquistas</h1>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-3">
         <div className={`${CARD} p-5`}>
           <p className="text-[10.5px] font-medium text-[#8E8E93] mb-3">Faturamento total</p>
-          <p className="text-[22px] font-semibold tabular-nums leading-none text-[#1C1C1E] tracking-[-0.01em]">{brl(totalFaturado)}</p>
+          <p className="text-[22px] font-semibold tabular-nums leading-none text-[#191625] tracking-[-0.01em]">{brl(totalFaturado)}</p>
           {proximoMarco ? (
             <>
               <div className="flex items-center justify-between mt-3 mb-1">
@@ -96,23 +100,23 @@ export function GamificacaoView({
                 <p className="text-[10px] text-[#8E8E93] tabular-nums">{Math.round(pctProximo * 100)}%</p>
               </div>
               <div className="h-1 rounded-full bg-[rgba(0,0,0,0.06)] overflow-hidden">
-                <div className="h-full rounded-full bg-[#5009c4] transition-all duration-500"
+                <div className="h-full rounded-full bg-[#8456e8] transition-all duration-500"
                   style={{ width: `${pctProximo * 100}%` }} />
               </div>
             </>
           ) : (
-            <p className="text-[10px] mt-2" style={{ color: "#34C759" }}>Todos os marcos desbloqueados</p>
+            <p className="text-[10px] mt-2" style={{ color: "#009351" }}>Todos os marcos desbloqueados</p>
           )}
           <button
             onClick={() => { setEditandoBaseline(true); setDraftBaseline(String(baselineFaturamento)) }}
-            className="mt-3 text-[9.5px] text-[#5009c4] hover:underline">
+            className="mt-3 text-[9.5px] text-[#8456e8] hover:underline">
             {baselineFaturamento > 0 ? `Inclui ${brl(baselineFaturamento)} anterior ao sistema` : "+ Adicionar faturamento anterior"}
           </button>
         </div>
 
         <div className={`${CARD} p-5`}>
           <p className="text-[10.5px] font-medium text-[#8E8E93] mb-3">Meta de {mesNome}</p>
-          <p className="text-[22px] font-semibold tabular-nums leading-none text-[#1C1C1E] tracking-[-0.01em]">
+          <p className="text-[22px] font-semibold tabular-nums leading-none text-[#191625] tracking-[-0.01em]">
             {Math.round(pctMes * 100)}%
           </p>
           <p className="text-[10px] text-[#8E8E93] mt-1.5 tabular-nums">
@@ -122,7 +126,7 @@ export function GamificacaoView({
             <div className="h-full rounded-full transition-all duration-500"
               style={{
                 width: `${pctMes * 100}%`,
-                background: pctMes >= 1 ? "#34C759" : pctMes >= 0.7 ? "#FF9500" : "#5009c4",
+                background: pctMes >= 1 ? "#009351" : pctMes >= 0.7 ? "#c57800" : "#8456e8",
               }} />
           </div>
           {pctMes < 1 && faturadoMes > 0 && (
@@ -131,24 +135,24 @@ export function GamificacaoView({
             </p>
           )}
           {pctMes >= 1 && (
-            <p className="text-[10px] mt-1.5 font-medium" style={{ color: "#34C759" }}>Meta batida!</p>
+            <p className="text-[10px] mt-1.5 font-medium" style={{ color: "#009351" }}>Meta batida!</p>
           )}
           <button
             onClick={() => { setEditandoMeta(true); setDraftMeta(String(metaMensal)) }}
-            className="mt-2 text-[9.5px] text-[#5009c4] hover:underline">
+            className="mt-2 text-[9.5px] text-[#8456e8] hover:underline">
             Alterar meta
           </button>
         </div>
 
         <div className={`${CARD} p-5`}>
           <p className="text-[10.5px] font-medium text-[#8E8E93] mb-3">Streak</p>
-          <p className="text-[22px] font-semibold tabular-nums leading-none text-[#1C1C1E] tracking-[-0.01em]">
+          <p className="text-[22px] font-semibold tabular-nums leading-none text-[#191625] tracking-[-0.01em]">
             {streak}
             <span className="text-[14px] font-medium text-[#8E8E93] ml-1">{streak === 1 ? "dia" : "dias"}</span>
           </p>
-          <p className="text-[10px] text-[#8E8E93] mt-1.5">fechamentos consecutivos</p>
+          <p className="text-[10px] text-[#8E8E93] mt-1.5">vendas consecutivas</p>
           {streak >= 3 && (
-            <p className="text-[10px] mt-2 font-medium" style={{ color: "#FF9500" }}>
+            <p className="text-[10px] mt-2 font-medium" style={{ color: "#c57800" }}>
               {streak >= 7 ? "Sequência incrível!" : "Boa sequência!"}
             </p>
           )}
@@ -169,15 +173,15 @@ export function GamificacaoView({
               <div key={marco.threshold} className={`${CARD} p-4`}>
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div>
-                    <p className="text-[12.5px] font-semibold text-[#1C1C1E] leading-snug">{marco.label}</p>
+                    <p className="text-[12.5px] font-semibold text-[#191625] leading-snug">{marco.label}</p>
                     <p className="text-[10.5px] tabular-nums font-medium mt-0.5"
-                      style={{ color: desbloqueado ? "#FF9500" : "#8E8E93" }}>
+                      style={{ color: desbloqueado ? "#c57800" : "#8E8E93" }}>
                       {marco.sub}
                     </p>
                   </div>
                   <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full"
                     style={desbloqueado
-                      ? { background: "rgba(52,199,89,0.1)", color: "#34C759" }
+                      ? { background: "rgba(52,199,89,0.1)", color: "#009351" }
                       : { background: "rgba(0,0,0,0.04)", color: "#8E8E93" }}>
                     {desbloqueado ? "Conquistado" : `${Math.round(pct * 100)}%`}
                   </span>
@@ -186,7 +190,7 @@ export function GamificacaoView({
                   <div className="h-full rounded-full transition-all duration-500"
                     style={{
                       width: `${pct * 100}%`,
-                      background: desbloqueado ? "#34C759" : "#5009c4",
+                      background: desbloqueado ? "#009351" : "#8456e8",
                     }} />
                 </div>
               </div>
@@ -201,8 +205,8 @@ export function GamificacaoView({
           onClick={e => { if (e.target === e.currentTarget) setEditandoMeta(false) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mx-4">
             <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between">
-              <p className="font-bold text-[#1C1C1E] text-[15px]">Meta mensal</p>
-              <button onClick={() => setEditandoMeta(false)} className="text-[#8E8E93] hover:text-[#1C1C1E] text-xl leading-none">×</button>
+              <p className="font-bold text-[#191625] text-[15px]">Meta mensal</p>
+              <button onClick={() => setEditandoMeta(false)} className="text-[#8E8E93] hover:text-[#191625] text-xl leading-none">×</button>
             </div>
             <div className="px-6 py-5 space-y-4">
               <p className="text-[12px] text-[#8E8E93]">Faturamento alvo para {mesNome}</p>
@@ -214,7 +218,7 @@ export function GamificacaoView({
                     if (e.key === "Enter") { onSaveConfig({ metaMensal: Number(draftMeta) || metaMensal }); setEditandoMeta(false) }
                     if (e.key === "Escape") setEditandoMeta(false)
                   }}
-                  className="w-full border border-[rgba(0,0,0,0.12)] rounded-xl pl-9 pr-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4]"
+                  className="w-full border border-[rgba(0,0,0,0.12)] rounded-xl pl-9 pr-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25 focus:border-[#8456e8]"
                 />
               </div>
               <div className="flex gap-2">
@@ -223,7 +227,7 @@ export function GamificacaoView({
                   Cancelar
                 </button>
                 <button onClick={() => { onSaveConfig({ metaMensal: Number(draftMeta) || metaMensal }); setEditandoMeta(false) }}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#5009c4] hover:bg-[#4307a6] transition-colors">
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#8456e8] hover:bg-[#7445d4] transition-colors">
                   Salvar
                 </button>
               </div>
@@ -238,8 +242,8 @@ export function GamificacaoView({
           onClick={e => { if (e.target === e.currentTarget) setEditandoBaseline(false) }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mx-4">
             <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between">
-              <p className="font-bold text-[#1C1C1E] text-[15px]">Faturamento anterior</p>
-              <button onClick={() => setEditandoBaseline(false)} className="text-[#8E8E93] hover:text-[#1C1C1E] text-xl leading-none">×</button>
+              <p className="font-bold text-[#191625] text-[15px]">Faturamento anterior</p>
+              <button onClick={() => setEditandoBaseline(false)} className="text-[#8E8E93] hover:text-[#191625] text-xl leading-none">×</button>
             </div>
             <div className="px-6 py-5 space-y-4">
               <p className="text-[12px] text-[#8E8E93]">Faturamento total antes de usar o sistema Enyla</p>
@@ -251,7 +255,7 @@ export function GamificacaoView({
                     if (e.key === "Enter") { onSaveConfig({ baselineFaturamento: Number(draftBaseline) || 0 }); setEditandoBaseline(false) }
                     if (e.key === "Escape") setEditandoBaseline(false)
                   }}
-                  className="w-full border border-[rgba(0,0,0,0.12)] rounded-xl pl-9 pr-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4]"
+                  className="w-full border border-[rgba(0,0,0,0.12)] rounded-xl pl-9 pr-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25 focus:border-[#8456e8]"
                 />
               </div>
               <div className="flex gap-2">
@@ -260,7 +264,7 @@ export function GamificacaoView({
                   Cancelar
                 </button>
                 <button onClick={() => { onSaveConfig({ baselineFaturamento: Number(draftBaseline) || 0 }); setEditandoBaseline(false) }}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#5009c4] hover:bg-[#4307a6] transition-colors">
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#8456e8] hover:bg-[#7445d4] transition-colors">
                   Salvar
                 </button>
               </div>
@@ -276,18 +280,23 @@ export function GamificacaoView({
 
 export function SidebarGamificacao({
   kanban,
+  lancamentos,
   baselineFaturamento,
   onClick,
 }: {
   kanban: KanbanCard[]
+  lancamentos: LancamentoFinanceiro[]
   metaMensal: number
   baselineFaturamento: number
   onClick: () => void
 }) {
   const totalFaturado = useMemo(() => {
-    const fechados = kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO)
-    return baselineFaturamento + fechados.reduce((s, c) => s + c.preco, 0)
-  }, [kanban, baselineFaturamento])
+    const fechados = kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO && c.coluna !== COL_HOT && !c.isTerceirizado)
+    const sobras = lancamentos
+      .filter(l => l.categoria === "sobra" && l.tipo === "receita")
+      .reduce((s, l) => s + l.valor, 0)
+    return baselineFaturamento + fechados.reduce((s, c) => s + c.preco, 0) + sobras
+  }, [kanban, baselineFaturamento, lancamentos])
 
   const proximoMarco = MARCOS.find(m => m.threshold > totalFaturado) ?? null
   const pct = proximoMarco ? Math.min(totalFaturado / proximoMarco.threshold, 1) : 1
@@ -305,16 +314,16 @@ export function SidebarGamificacao({
       style={{ margin: "0 8px", width: "calc(100% - 16px)" }}>
       <div className="flex items-center justify-between mb-1">
         <span className="text-[10px] text-zinc-500 uppercase tracking-wide font-semibold">Próximo marco</span>
-        <span className="text-[10.5px] font-bold tabular-nums" style={{ color: "#FF9500" }}>
+        <span className="text-[10.5px] font-bold tabular-nums" style={{ color: "#c57800" }}>
           {Math.round(pct * 100)}%
         </span>
       </div>
-      <p className="text-[11px] font-semibold leading-snug mb-1.5 truncate" style={{ color: proximoMarco ? "rgba(255,255,255,0.75)" : "#34C759" }}>
+      <p className="text-[11px] font-semibold leading-snug mb-1.5 truncate" style={{ color: proximoMarco ? "rgba(255,255,255,0.75)" : "#009351" }}>
         {proximoMarco ? `${proximoMarco.label} · ${proximoMarco.sub}` : "Todos conquistados!"}
       </p>
       <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
         <div className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${pct * 100}%`, background: proximoMarco ? "#FF9500" : "#34C759" }} />
+          style={{ width: `${pct * 100}%`, background: proximoMarco ? "#c57800" : "#009351" }} />
       </div>
       {proximoMarco && falta > 0 && (
         <p className="text-[9px] mt-1 tabular-nums" style={{ color: "rgba(255,255,255,0.3)" }}>

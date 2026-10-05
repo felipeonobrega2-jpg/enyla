@@ -4,17 +4,19 @@ import { supabase } from "@/app/lib/supabase"
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    // fornecedor/custoTerceiro columns don't exist yet. For terceirizado cards,
-    // pack them into opcoes as { _x: { fornecedor, custoTerceiro } } instead.
+    // Extra metadata (fornecedor, custoTerceiro, projecaoCustos) has no dedicated column.
+    // Pack into opcoes: terceirizado → { _x }, normal cards → { _items: [...opcoes], _x }
     let packedOpcoes = body.opcoes ?? null
-    if (
-      body.materialNome === "Terceirizado" &&
-      (body.fornecedor || body.custoTerceiro != null)
-    ) {
-      const x: Record<string, unknown> = {}
-      if (body.fornecedor) x.fornecedor = body.fornecedor
-      if (body.custoTerceiro != null) x.custoTerceiro = body.custoTerceiro
-      packedOpcoes = { _x: x }
+    const xMeta: Record<string, unknown> = {}
+    if (body.fornecedor)           xMeta.fornecedor      = body.fornecedor
+    if (body.custoTerceiro != null) xMeta.custoTerceiro  = body.custoTerceiro
+    if (body.projecaoCustos)       xMeta.projecaoCustos  = body.projecaoCustos
+    if (Object.keys(xMeta).length > 0) {
+      if (Array.isArray(packedOpcoes)) {
+        packedOpcoes = { _items: packedOpcoes, _x: xMeta }
+      } else if (body.materialNome === "Terceirizado") {
+        packedOpcoes = { _x: xMeta }
+      }
     }
     const payload: Record<string, unknown> = {
       id:                  body.id,

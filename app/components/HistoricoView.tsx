@@ -40,39 +40,79 @@ export function HistoricoView({
   const [busca, setBusca] = useState("")
   const [ordem, setOrdem] = useState<OrdemHistorico>("recente")
 
+  function parseBRDate(d: string): number {
+    const [day, mon, year] = d.split("/").map(Number)
+    return isNaN(year) ? 0 : new Date(year, mon - 1, day).getTime()
+  }
+
+  function parseNumero(n?: string): number {
+    return parseInt(n?.replace(/\D/g, "") ?? "0", 10)
+  }
+
   const precoItem = (item: HistItem) => {
     const ideal = item.calculo.tabela.find(l => l.quantidade === item.calculo.sweetSpotIdealQtd) ?? item.calculo.tabela[0]
     return item.form.comFaca ? (ideal?.precoComFaca ?? 0) : (ideal?.precoSemFaca ?? 0)
   }
 
-  const filtrado = historico
-    .map((item, originalIndex) => ({ item, originalIndex }))
-    .filter(({ item }) => {
-      if (!busca.trim()) return true
-      const q = busca.toLowerCase()
-      return (
-        item.form.nomeCliente.toLowerCase().includes(q) ||
-        item.data.toLowerCase().includes(q) ||
-        (item.numero?.toLowerCase().includes(q) ?? false)
-      )
-    })
-    .sort((a, b) => {
-      if (ordem === "recente") return a.originalIndex - b.originalIndex
-      if (ordem === "antigo")  return b.originalIndex - a.originalIndex
-      if (ordem === "maior")   return precoItem(b.item) - precoItem(a.item)
-      if (ordem === "menor")   return precoItem(a.item) - precoItem(b.item)
-      if (ordem === "nome")    return (a.item.form.nomeCliente || "").localeCompare(b.item.form.nomeCliente || "", "pt-BR")
-      return 0
-    })
+  type ListItem =
+    | { tipo: "hist";     item: HistItem;      originalIndex: number; data: string; numero: string; preco: number; nome: string }
+    | { tipo: "proposta"; item: PropostaCustom; data: string; numero: string; preco: number; nome: string }
 
-  const filtradoPropostas = propostasCustom.filter(p =>
-    !busca.trim() ||
-    p.nomeCliente.toLowerCase().includes(busca.toLowerCase()) ||
-    p.data.toLowerCase().includes(busca.toLowerCase()) ||
-    p.numero.toLowerCase().includes(busca.toLowerCase())
-  )
+  const precoPropostaCustom = (p: PropostaCustom) => {
+    const linhasAtivas = p.linhas.filter(l => l.ativa && l.quantidade > 0)
+    const ideal = linhasAtivas.find(l => l.isIdeal) ?? linhasAtivas[linhasAtivas.length - 1]
+    return ideal ? ideal.unitario * ideal.quantidade : 0
+  }
 
-  const temResultados = filtrado.length > 0 || filtradoPropostas.length > 0
+  const q = busca.trim().toLowerCase()
+
+  const histItems: ListItem[] = historico
+    .map((item, idx) => ({
+      tipo: "hist" as const,
+      item,
+      originalIndex: idx,
+      data: item.data,
+      numero: item.numero ?? "",
+      preco: precoItem(item),
+      nome: item.form.nomeCliente || "",
+    }))
+    .filter(e => !q ||
+      e.nome.toLowerCase().includes(q) ||
+      e.data.toLowerCase().includes(q) ||
+      e.numero.toLowerCase().includes(q)
+    )
+
+  const propostaItems: ListItem[] = propostasCustom
+    .map(p => ({
+      tipo: "proposta" as const,
+      item: p,
+      data: p.data,
+      numero: p.numero,
+      preco: precoPropostaCustom(p),
+      nome: p.nomeCliente || "",
+    }))
+    .filter(e => !q ||
+      e.nome.toLowerCase().includes(q) ||
+      e.data.toLowerCase().includes(q) ||
+      e.numero.toLowerCase().includes(q)
+    )
+
+  const lista = [...histItems, ...propostaItems].sort((a, b) => {
+    if (ordem === "recente") {
+      const dt = parseBRDate(b.data) - parseBRDate(a.data)
+      return dt !== 0 ? dt : parseNumero(b.numero) - parseNumero(a.numero)
+    }
+    if (ordem === "antigo") {
+      const dt = parseBRDate(a.data) - parseBRDate(b.data)
+      return dt !== 0 ? dt : parseNumero(a.numero) - parseNumero(b.numero)
+    }
+    if (ordem === "maior") return b.preco - a.preco
+    if (ordem === "menor") return a.preco - b.preco
+    if (ordem === "nome")  return a.nome.localeCompare(b.nome, "pt-BR")
+    return 0
+  })
+
+  const temResultados = lista.length > 0
 
   if (!historico.length && !propostasCustom.length) return (
     <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-6">
@@ -81,7 +121,7 @@ export function HistoricoView({
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
         </svg>
       </div>
-      <p className="text-[14px] font-semibold text-[#1C1C1E]">Nenhum registro ainda</p>
+      <p className="text-[14px] font-semibold text-[#191625]">Nenhum registro ainda</p>
       <p className="text-[12px] text-[#8E8E93] max-w-[260px] leading-relaxed">
         Orçamentos calculados e propostas personalizadas aparecerão aqui.
       </p>
@@ -89,7 +129,7 @@ export function HistoricoView({
   )
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8 flex flex-col gap-5">
+    <div className="h-full overflow-y-auto px-6 py-6 flex flex-col gap-5" style={{ background: "var(--bg-page)" }}>
 
       {/* Barra de busca + ordenação */}
       <div className="flex gap-2 items-center">
@@ -102,17 +142,17 @@ export function HistoricoView({
             value={busca}
             onChange={e => setBusca(e.target.value)}
             placeholder="Buscar por cliente, número ou data…"
-            className="w-full border border-[rgba(0,0,0,0.12)] rounded-xl pl-9 pr-9 py-2.5 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.36)] focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4] bg-white transition-all"
+            className="w-full border border-[rgba(0,0,0,0.12)] rounded-xl pl-9 pr-9 py-2.5 text-[13px] text-[#191625] placeholder:text-[rgba(60,60,67,0.36)] focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25 focus:border-[#8456e8] bg-white transition-all"
           />
           {busca && (
             <button onClick={() => setBusca("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[rgba(60,60,67,0.36)] hover:text-[#1C1C1E] text-lg leading-none transition-colors">×</button>
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[rgba(60,60,67,0.36)] hover:text-[#191625] text-lg leading-none transition-colors">×</button>
           )}
         </div>
         <select
           value={ordem}
           onChange={e => setOrdem(e.target.value as OrdemHistorico)}
-          className="border border-[rgba(0,0,0,0.12)] rounded-xl px-3 py-2.5 text-[13px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4] cursor-pointer transition-all"
+          className="border border-[rgba(0,0,0,0.12)] rounded-xl px-3 py-2.5 text-[13px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25 focus:border-[#8456e8] cursor-pointer transition-all"
         >
           <option value="recente">Mais recentes</option>
           <option value="antigo">Mais antigos</option>
@@ -125,169 +165,95 @@ export function HistoricoView({
       {/* Sem resultados */}
       {!temResultados && busca && (
         <div className="text-center py-16">
-          <p className="text-[13px] text-[#8E8E93]">Nenhum resultado para <span className="font-medium text-[#1C1C1E]">"{busca}"</span>.</p>
+          <p className="text-[13px] text-[#8E8E93]">Nenhum resultado para <span className="font-medium text-[#191625]">"{busca}"</span>.</p>
         </div>
       )}
 
-      {/* Orçamentos calculados */}
-      {filtrado.length > 0 && (
+      {/* Lista unificada */}
+      {lista.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          {(historico.length > 0 && propostasCustom.length > 0) && (
-            <SectionLabel>Orçamentos calculados · {filtrado.length}</SectionLabel>
-          )}
-          {historico.length > 0 && propostasCustom.length === 0 && (
-            <p className="text-[10px] uppercase tracking-wide font-semibold text-[#8E8E93] mb-1">
-              {filtrado.length} de {historico.length} orçamento{historico.length !== 1 ? "s" : ""}
-            </p>
-          )}
+          <p className="text-[10px] uppercase tracking-wide font-semibold text-[#8E8E93] mb-1">
+            {lista.length} registro{lista.length !== 1 ? "s" : ""}
+            {busca ? ` para "${busca}"` : ""}
+          </p>
 
-          {filtrado.map(({ item, originalIndex }) => {
-            const ideal = item.calculo.tabela.find(l => l.quantidade === item.calculo.sweetSpotIdealQtd) ?? item.calculo.tabela[0]
-            const preco = precoItem(item)
-            const initial = item.form.nomeCliente?.[0]?.toUpperCase() ?? "#"
-            return (
-              <div
-                key={originalIndex}
-                className="group relative bg-white border border-[rgba(0,0,0,0.06)] rounded-xl overflow-hidden hover:border-[rgba(0,0,0,0.10)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-px transition-all duration-200"
-              >
-                <div className="flex items-center gap-4 px-5 py-4">
-                  {/* Avatar */}
-                  <button
-                    onClick={() => onDetalhes?.(item)}
-                    className="w-10 h-10 rounded-full text-white text-[13px] font-bold flex items-center justify-center shrink-0 transition-colors"
-                    style={{ background: "#5009c4" }}
-                    tabIndex={-1}
-                  >
-                    {initial}
-                  </button>
-
-                  {/* Info */}
-                  <button
-                    onClick={() => onDetalhes?.(item)}
-                    className="flex-1 min-w-0 text-left"
-                  >
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-[14px] text-[#1C1C1E] leading-snug">
-                        {item.form.nomeCliente || "Sem nome"}
-                      </span>
-                      {item.numero && (
-                        <span className="shrink-0 text-[10px] font-bold text-[#5009c4] bg-[#5009c4]/10 border border-[#5009c4]/20 px-1.5 py-0.5 rounded-full tabular-nums">
-                          {item.numero}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11.5px] text-[#8E8E93] mt-0.5">
-                      {item.form.frente}×{item.form.alturaBox}×{item.form.lateral} cm
-                      {item.form.materialNome && ` · ${item.form.materialNome}`}
-                      {` · ${item.data}`}
-                    </p>
-                  </button>
-
-                  {/* Right: price fades → actions appear on hover */}
-                  <div className="relative shrink-0 flex items-center justify-end" style={{ minWidth: 196 }}>
-                    <div className="text-right transition-opacity duration-150 group-hover:opacity-0 group-hover:pointer-events-none">
-                      <p className="font-bold text-[15px] text-[#1C1C1E] tabular-nums">{brl(preco)}</p>
-                      <p className="text-[11px] text-[#8E8E93] tabular-nums">{num(ideal?.quantidade ?? 0)} un</p>
-                    </div>
-                    <div className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                      <IconBtn title="Replicar" onClick={() => onReplicar(item)}>
-                        <CopyIcon />
-                      </IconBtn>
-                      {onPersonalizar && (
-                        <IconBtn title="Personalizar proposta" onClick={() => onPersonalizar(item)} color="blue">
-                          <SparkleIcon />
-                        </IconBtn>
-                      )}
-                      <IconBtn title="WhatsApp" onClick={() => onWhatsApp(item)} color="green">
-                        <WhatsAppIcon />
-                      </IconBtn>
-                      <IconBtn title="PDF Cliente" onClick={() => onDownloadPdfCliente(item)} color="blue">
-                        <PdfClienteIcon />
-                      </IconBtn>
-                      <IconBtn title="PDF Gráfica" onClick={() => onDownloadPdf(item)}>
-                        <PdfGraficaIcon />
-                      </IconBtn>
-                      <IconBtn title="Excluir" onClick={() => { if (confirm("Excluir este orçamento?")) onExcluir(originalIndex) }} color="red">
-                        <TrashIcon />
-                      </IconBtn>
+          {lista.map(entry => {
+            if (entry.tipo === "hist") {
+              const { item, originalIndex, preco } = entry
+              const ideal = item.calculo.tabela.find(l => l.quantidade === item.calculo.sweetSpotIdealQtd) ?? item.calculo.tabela[0]
+              return (
+                <div key={`h-${originalIndex}`}
+                  className="group relative bg-white border border-[rgba(0,0,0,0.06)] rounded-xl overflow-hidden hover:border-[rgba(0,0,0,0.10)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-px transition-all duration-200"
+                >
+                  <div className="flex items-center gap-4 px-5 py-3.5">
+                    <button onClick={() => onDetalhes?.(item)} className="flex-1 min-w-0 text-left">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-[14px] text-[#191625] leading-snug">{item.form.nomeCliente || "Sem nome"}</span>
+                        {item.numero && (
+                          <span className="shrink-0 text-[10px] font-bold text-[#8456e8] bg-[#8456e8]/10 border border-[#8456e8]/20 px-1.5 py-0.5 rounded-full tabular-nums">{item.numero}</span>
+                        )}
+                      </div>
+                      <p className="text-[11.5px] text-[#8E8E93] mt-0.5">
+                        {item.form.frente}×{item.form.alturaBox}×{item.form.lateral} cm
+                        {item.form.materialNome && ` · ${item.form.materialNome}`}
+                        {` · ${item.data}`}
+                      </p>
+                    </button>
+                    <div className="relative shrink-0 flex items-center justify-end" style={{ minWidth: 196 }}>
+                      <div className="text-right transition-opacity duration-150 group-hover:opacity-0 group-hover:pointer-events-none">
+                        <p className="font-bold text-[15px] text-[#191625] tabular-nums">{brl(preco)}</p>
+                        <p className="text-[11px] text-[#8E8E93] tabular-nums">{num(ideal?.quantidade ?? 0)} un</p>
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                        <IconBtn title="Replicar" onClick={() => onReplicar(item)}><CopyIcon /></IconBtn>
+                        {onPersonalizar && (
+                          <IconBtn title="Personalizar proposta" onClick={() => onPersonalizar(item)} color="blue"><SparkleIcon /></IconBtn>
+                        )}
+                        <IconBtn title="WhatsApp" onClick={() => onWhatsApp(item)} color="green"><WhatsAppIcon /></IconBtn>
+                        <IconBtn title="PDF Cliente" onClick={() => onDownloadPdfCliente(item)} color="blue"><PdfClienteIcon /></IconBtn>
+                        <IconBtn title="PDF Gráfica" onClick={() => onDownloadPdf(item)}><PdfGraficaIcon /></IconBtn>
+                        <IconBtn title="Excluir" onClick={() => { if (confirm("Excluir este orçamento?")) onExcluir(originalIndex) }} color="red"><TrashIcon /></IconBtn>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+              )
+            }
 
-      {/* Propostas personalizadas */}
-      {filtradoPropostas.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <SectionLabel>Propostas personalizadas · {filtradoPropostas.length}</SectionLabel>
-
-          {filtradoPropostas.map(p => {
+            // tipo === "proposta"
+            const { item: p, preco } = entry
             const linhasAtivas = p.linhas.filter(l => l.ativa && l.quantidade > 0)
             const ideal = linhasAtivas.find(l => l.isIdeal) ?? linhasAtivas[linhasAtivas.length - 1]
-            const preco = ideal ? ideal.unitario * ideal.quantidade : null
-            const initial = p.nomeCliente?.[0]?.toUpperCase() ?? "#"
             return (
-              <div
-                key={p.id}
+              <div key={`p-${p.id}`}
                 className="group relative bg-white border border-[rgba(0,0,0,0.06)] rounded-xl overflow-hidden hover:border-[rgba(0,0,0,0.10)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-px transition-all duration-200"
               >
-                <div className="flex items-center gap-4 px-5 py-4">
-                  {/* Avatar */}
-                  <button
-                    onClick={() => onDetalhes?.(p)}
-                    className="w-10 h-10 rounded-full text-white text-[13px] font-bold flex items-center justify-center shrink-0 transition-colors"
-                    style={{ background: "#5009c4" }}
-                    tabIndex={-1}
-                  >
-                    {initial}
-                  </button>
-
-                  {/* Info */}
-                  <button
-                    onClick={() => onDetalhes?.(p)}
-                    className="flex-1 min-w-0 text-left"
-                  >
+                <div className="flex items-center gap-4 px-5 py-3.5">
+                  <button onClick={() => onDetalhes?.(p)} className="flex-1 min-w-0 text-left">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-[14px] text-[#1C1C1E] leading-snug">
-                        {p.nomeCliente || "Sem nome"}
-                      </span>
-                      <span className="shrink-0 text-[10px] font-bold text-[#5009c4] bg-[#5009c4]/10 border border-[#5009c4]/20 px-1.5 py-0.5 rounded-full tabular-nums">
-                        {p.numero}
-                      </span>
+                      <span className="font-semibold text-[14px] text-[#191625] leading-snug">{p.nomeCliente || "Sem nome"}</span>
+                      <span className="shrink-0 text-[10px] font-bold text-[#a582ff] bg-[#a582ff]/10 border border-[#a582ff]/20 px-1.5 py-0.5 rounded-full tabular-nums">{p.numero}</span>
                     </div>
                     <p className="text-[11.5px] text-[#8E8E93] mt-0.5">
                       {[p.descricao, p.dimensoes, p.material].filter(Boolean).join(" · ") || "—"}
                       {` · ${p.data}`}
                     </p>
                   </button>
-
-                  {/* Right: price → actions */}
                   <div className="relative shrink-0 flex items-center justify-end" style={{ minWidth: 164 }}>
                     <div className="text-right transition-opacity duration-150 group-hover:opacity-0 group-hover:pointer-events-none">
-                      {preco != null
+                      {preco > 0
                         ? <>
-                            <p className="font-bold text-[15px] text-[#1C1C1E] tabular-nums">{brl(preco)}</p>
-                            <p className="text-[11px] text-[#8E8E93] tabular-nums">{num(ideal!.quantidade)} un</p>
+                            <p className="font-bold text-[15px] text-[#191625] tabular-nums">{brl(preco)}</p>
+                            <p className="text-[11px] text-[#8E8E93] tabular-nums">{num(ideal?.quantidade ?? 0)} un</p>
                           </>
                         : <p className="text-[13px] text-[rgba(60,60,67,0.36)] font-medium">—</p>
                       }
                     </div>
                     <div className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                      <IconBtn title="Editar proposta" onClick={() => onEditarCustom(p)} color="violet">
-                        <EditIcon />
-                      </IconBtn>
-                      <IconBtn title="WhatsApp" onClick={() => onWhatsAppCustom(p)} color="green">
-                        <WhatsAppIcon />
-                      </IconBtn>
-                      <IconBtn title="PDF Cliente" onClick={() => onPdfCustom(p)} color="blue">
-                        <PdfClienteIcon />
-                      </IconBtn>
-                      <IconBtn title="Excluir" onClick={() => { if (confirm("Excluir esta proposta?")) onExcluirCustom(p.id) }} color="red">
-                        <TrashIcon />
-                      </IconBtn>
+                      <IconBtn title="Editar proposta" onClick={() => onEditarCustom(p)} color="violet"><EditIcon /></IconBtn>
+                      <IconBtn title="WhatsApp" onClick={() => onWhatsAppCustom(p)} color="green"><WhatsAppIcon /></IconBtn>
+                      <IconBtn title="PDF Cliente" onClick={() => onPdfCustom(p)} color="blue"><PdfClienteIcon /></IconBtn>
+                      <IconBtn title="Excluir" onClick={() => { if (confirm("Excluir esta proposta?")) onExcluirCustom(p.id) }} color="red"><TrashIcon /></IconBtn>
                     </div>
                   </div>
                 </div>
@@ -319,11 +285,11 @@ function IconBtn({
   color?: "slate" | "blue" | "green" | "red" | "violet"
 }) {
   const colors = {
-    slate:  "text-[#8E8E93] hover:bg-[rgba(0,0,0,0.04)] hover:text-[#1C1C1E]",
-    blue:   "text-[#5009c4] hover:bg-[#5009c4]/5 hover:text-[#4307a6]",
-    green:  "text-[#34C759] hover:bg-[#34C759]/5 hover:text-[#248A3D]",
-    red:    "text-[#FF3B30] hover:bg-[#FF3B30]/5 hover:text-[#D70015]",
-    violet: "text-[#5009c4] hover:bg-[#5009c4]/5 hover:text-[#4307a6]",
+    slate:  "text-[#8E8E93] hover:bg-[rgba(0,0,0,0.04)] hover:text-[#191625]",
+    blue:   "text-[#8456e8] hover:bg-[#8456e8]/5 hover:text-[#7445d4]",
+    green:  "text-[#009351] hover:bg-[#009351]/5 hover:text-[#248A3D]",
+    red:    "text-[#d33a3c] hover:bg-[#d33a3c]/5 hover:text-[#D70015]",
+    violet: "text-[#8456e8] hover:bg-[#8456e8]/5 hover:text-[#7445d4]",
   }
   return (
     <button

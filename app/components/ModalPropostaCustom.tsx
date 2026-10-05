@@ -146,17 +146,17 @@ export function ModalPropostaCustom({
         <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] shrink-0">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div>
-              <p className="text-[9.5px] uppercase tracking-wide font-bold text-[#AF52DE] mb-1">Nova Proposta Personalizada</p>
-              <p className="font-bold text-[#1C1C1E] text-[15px] leading-snug">Defina as quantidades e preços manualmente</p>
+              <p className="text-[9.5px] uppercase tracking-wide font-bold text-[#a582ff] mb-1">Nova Proposta Personalizada</p>
+              <p className="font-bold text-[#191625] text-[15px] leading-snug">Defina as quantidades e preços manualmente</p>
             </div>
             <button onClick={onClose}
-              className="text-[rgba(60,60,67,0.3)] hover:text-[#8E8E93] transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
+              className="text-[#898892] hover:text-[#8E8E93] transition-colors text-xl leading-none mt-0.5 shrink-0">×</button>
           </div>
           <div className="flex gap-1 bg-[rgba(116,116,128,0.08)] p-0.5 rounded-xl w-fit">
             {(["producao", "terceirizado"] as const).map(aba => (
               <button key={aba} onClick={() => setAbaModal(aba)}
                 className={`px-4 py-1.5 rounded-[10px] text-[11.5px] font-semibold transition-all ${
-                  abaModal === aba ? "bg-white text-[#1C1C1E] shadow-sm" : "text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)]"
+                  abaModal === aba ? "bg-white text-[#191625] shadow-sm" : "text-[#8E8E93] hover:text-[#5e5c68]"
                 }`}>
                 {aba === "producao" ? "Produção" : `Terceirizado${terceirizados.filter(t => t.nome.trim()).length > 0 ? ` (${terceirizados.filter(t => t.nome.trim()).length})` : ""}`}
               </button>
@@ -187,24 +187,24 @@ export function ModalPropostaCustom({
 
             {/* Seletor de lote */}
             <div className="space-y-1.5">
-              <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Lote de destino <span className="text-[#FF3B30]">*</span></label>
+              <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Lote de destino <span className="text-[#d33a3c]">*</span></label>
               {(() => {
                 const lotesCliente = (lotes ?? []).filter(l =>
                   l.nomeCliente.toLowerCase() === nomeCliente.trim().toLowerCase()
                 )
                 if (!nomeCliente.trim()) return (
-                  <p className="text-[11.5px] text-[rgba(60,60,67,0.4)] bg-[rgba(116,116,128,0.04)] rounded-xl px-3 py-2.5">
+                  <p className="text-[11.5px] text-[#898892] bg-[rgba(116,116,128,0.04)] rounded-xl px-3 py-2.5">
                     Selecione um cliente acima para ver os lotes disponíveis.
                   </p>
                 )
                 if (lotesCliente.length === 0) return (
-                  <p className="text-[11.5px] text-[rgba(60,60,67,0.4)] bg-[rgba(116,116,128,0.04)] rounded-xl px-3 py-2.5">
+                  <p className="text-[11.5px] text-[#898892] bg-[rgba(116,116,128,0.04)] rounded-xl px-3 py-2.5">
                     Nenhum lote encontrado para "{nomeCliente}". Crie o lote no kanban primeiro.
                   </p>
                 )
                 return (
                   <select value={loteIdTerceirizado} onChange={e => setLoteIdTerceirizado(e.target.value)}
-                    className="w-full border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-2.5 text-[13px] text-[#1C1C1E] bg-white focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]">
+                    className="w-full border border-[rgba(60,60,67,0.12)] rounded-xl px-3 py-2.5 text-[13px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#c57800]/30 focus:border-[#c57800]">
                     <option value="">— Selecionar lote —</option>
                     {lotesCliente.map(l => (
                       <option key={l.id} value={l.id}>{l.numero}</option>
@@ -214,26 +214,26 @@ export function ModalPropostaCustom({
               })()}
             </div>
             {terceirizados.length === 0 && (
-              <div className="text-center py-8 text-[12px] text-[rgba(60,60,67,0.3)]">Nenhum item terceirizado ainda.</div>
+              <div className="text-center py-8 text-[12px] text-[#898892]">Nenhum item terceirizado ainda.</div>
             )}
             {terceirizados.map((t, i) => (
               <div key={t.id} className="border border-[rgba(60,60,67,0.10)] rounded-2xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-bold text-[#8E8E93] uppercase tracking-wide">Item {i + 1}</p>
-                  <button onClick={() => removeTerceirizado(t.id)} className="text-[rgba(60,60,67,0.25)] hover:text-[#FF3B30] transition-colors text-lg leading-none">×</button>
+                  <button onClick={() => removeTerceirizado(t.id)} className="text-[rgba(60,60,67,0.25)] hover:text-[#d33a3c] transition-colors text-lg leading-none">×</button>
                 </div>
                 <input type="text" value={t.nome} onChange={e => updateTerceirizado(t.id, "nome", e.target.value)}
                   placeholder="Nome do produto (ex: Sacola BellaLiz)"
-                  className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
+                  className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] placeholder:text-[#898892] focus:outline-none focus:ring-2 focus:ring-[#c57800]/30 focus:border-[#c57800]" />
                 <input type="text" value={t.descricao ?? ""} onChange={e => updateTerceirizado(t.id, "descricao", e.target.value)}
                   placeholder="Descrição (ex: Adesivo vinil 10×10cm)"
-                  className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[12.5px] text-[rgba(60,60,67,0.75)] placeholder:text-[rgba(60,60,67,0.25)] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
+                  className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[12.5px] text-[#5e5c68] placeholder:text-[rgba(60,60,67,0.25)] focus:outline-none focus:ring-2 focus:ring-[#c57800]/30 focus:border-[#c57800]" />
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Fornecedor</label>
                     {parceiros && parceiros.length > 0 ? (
                       <select value={t.fornecedor} onChange={e => updateTerceirizado(t.id, "fornecedor", e.target.value)}
-                        className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]">
+                        className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[#c57800]/30 focus:border-[#c57800]">
                         <option value="">— Selecionar —</option>
                         {parceiros.map(p => (
                           <option key={p.id} value={p.nome}>{p.nome}</option>
@@ -242,36 +242,36 @@ export function ModalPropostaCustom({
                     ) : (
                       <input type="text" value={t.fornecedor} onChange={e => updateTerceirizado(t.id, "fornecedor", e.target.value)}
                         placeholder="ex: Marcelino"
-                        className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
+                        className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] placeholder:text-[#898892] focus:outline-none focus:ring-2 focus:ring-[#c57800]/30 focus:border-[#c57800]" />
                     )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Quantidade</label>
                     <input type="number" min={0} value={t.quantidade === 0 ? "" : t.quantidade} onChange={e => updateTerceirizado(t.id, "quantidade", e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
-                      className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
+                      className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#c57800]/30 focus:border-[#c57800]" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Custo ao fornecedor (R$)</label>
                     <input type="number" min={0} step="0.01" value={t.custoTotal || ""} onChange={e => updateTerceirizado(t.id, "custoTotal", parseFloat(e.target.value) || 0)}
                       placeholder="0,00"
-                      className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
+                      className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#c57800]/30 focus:border-[#c57800]" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Preço ao cliente (R$)</label>
                     <input type="number" min={0} step="0.01" value={t.precoTotal || ""} onChange={e => updateTerceirizado(t.id, "precoTotal", parseFloat(e.target.value) || 0)}
                       placeholder="0,00"
-                      className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#FF9500]/30 focus:border-[#FF9500]" />
+                      className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#c57800]/30 focus:border-[#c57800]" />
                   </div>
                 </div>
                 {t.custoTotal > 0 && t.precoTotal > 0 && (
-                  <p className="text-[10.5px] text-[#34C759] font-medium">
+                  <p className="text-[10.5px] text-[#009351] font-medium">
                     Margem: {brl(t.precoTotal - t.custoTotal)} ({Math.round(((t.precoTotal - t.custoTotal) / t.precoTotal) * 100)}%)
                   </p>
                 )}
               </div>
             ))}
             <button onClick={addTerceirizado}
-              className="flex items-center gap-1.5 text-[12px] text-[#FF9500] hover:text-[#E68600] font-semibold transition-colors">
+              className="flex items-center gap-1.5 text-[12px] text-[#c57800] hover:text-[#E68600] font-semibold transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
               </svg>
@@ -284,13 +284,13 @@ export function ModalPropostaCustom({
 
           {/* Especificações opcionais */}
           <div className="space-y-2">
-            <p className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Especificações <span className="normal-case font-normal text-[rgba(60,60,67,0.3)]">(opcional)</span></p>
+            <p className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Especificações <span className="normal-case font-normal text-[#898892]">(opcional)</span></p>
             <input
               type="text"
               value={descricao}
               onChange={e => setDescricao(e.target.value)}
               placeholder="Produto (ex: Caixa perfume)"
-              className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
+              className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#191625] placeholder:text-[#898892] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
             />
             <div className="grid grid-cols-2 gap-2">
               <input
@@ -298,13 +298,13 @@ export function ModalPropostaCustom({
                 value={dimensoes}
                 onChange={e => setDimensoes(e.target.value)}
                 placeholder="Dimensões (ex: 8×10×4 cm)"
-                className="border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
+                className="border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#191625] placeholder:text-[#898892] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
               />
               {materiais && materiais.length > 0 ? (
                 <select
                   value={material}
                   onChange={e => setMaterial(e.target.value)}
-                  className="border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400 bg-white"
+                  className="border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#191625] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400 bg-white"
                 >
                   <option value="">— Material —</option>
                   {materiais.map(m => (
@@ -317,7 +317,7 @@ export function ModalPropostaCustom({
                   value={material}
                   onChange={e => setMaterial(e.target.value)}
                   placeholder="Material (ex: Cartão 300g)"
-                  className="border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
+                  className="border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#191625] placeholder:text-[#898892] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
                 />
               )}
             </div>
@@ -369,7 +369,7 @@ export function ModalPropostaCustom({
                     step="0.01"
                     value={valorFaca || ""}
                     onChange={e => setValorFaca(parseFloat(e.target.value) || 0)}
-                    className="w-full border border-amber-200 rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
+                    className="w-full border border-amber-200 rounded-lg px-3 py-2 text-[13px] text-[#191625] focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400"
                   />
                 </div>
               )}
@@ -380,7 +380,7 @@ export function ModalPropostaCustom({
                   min="1"
                   value={numSKUs}
                   onChange={e => setNumSKUs(parseInt(e.target.value) || 1)}
-                  className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
+                  className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#191625] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
                 />
               </div>
             </div>
@@ -411,7 +411,7 @@ export function ModalPropostaCustom({
                           <button
                             onClick={() => updateLinha(l.id, "ativa", !l.ativa)}
                             className={`w-[16px] h-[16px] rounded-[4px] border-2 flex items-center justify-center transition-all ${
-                              l.ativa ? "border-[#AF52DE] bg-[#AF52DE]" : "border-[rgba(60,60,67,0.2)] bg-white"
+                              l.ativa ? "border-[#a582ff] bg-[#a582ff]" : "border-[rgba(60,60,67,0.2)] bg-white"
                             }`}
                           >
                             {l.ativa && (
@@ -428,7 +428,7 @@ export function ModalPropostaCustom({
                             min="1"
                             value={l.quantidade || ""}
                             onChange={e => updateLinha(l.id, "quantidade", parseInt(e.target.value) || 0)}
-                            className="w-full text-[12.5px] font-semibold tabular-nums border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#AF52DE]/20 focus:border-[#AF52DE]"
+                            className="w-full text-[12.5px] font-semibold tabular-nums border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#a582ff]/20 focus:border-[#a582ff]"
                           />
                         </td>
                         {/* Unitário */}
@@ -440,12 +440,12 @@ export function ModalPropostaCustom({
                             value={l.unitario || ""}
                             onChange={e => updateLinha(l.id, "unitario", parseFloat(e.target.value) || 0)}
                             onFocus={e => e.target.select()}
-                            className="w-full text-right text-[12.5px] font-semibold tabular-nums border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#AF52DE]/20 focus:border-[#AF52DE]"
+                            className="w-full text-right text-[12.5px] font-semibold tabular-nums border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#a582ff]/20 focus:border-[#a582ff]"
                           />
                         </td>
                         {/* Total */}
                         <td className="py-2.5 px-2 text-right">
-                          <span className="text-[13px] font-semibold tabular-nums text-[#1C1C1E]">
+                          <span className="text-[13px] font-semibold tabular-nums text-[#191625]">
                             {total > 0 ? brl(total) : "—"}
                           </span>
                         </td>
@@ -454,7 +454,7 @@ export function ModalPropostaCustom({
                           <button
                             onClick={() => updateLinha(l.id, "isIdeal", true)}
                             className={`w-[16px] h-[16px] rounded-full border-2 flex items-center justify-center mx-auto transition-all ${
-                              l.isIdeal ? "border-[#5009c4] bg-[#5009c4]" : "border-[rgba(60,60,67,0.2)] bg-white hover:border-[#5009c4]/60"
+                              l.isIdeal ? "border-[#8456e8] bg-[#8456e8]" : "border-[rgba(60,60,67,0.2)] bg-white hover:border-[#8456e8]/60"
                             }`}
                           >
                             {l.isIdeal && <span className="w-1.5 h-1.5 rounded-full bg-white block" />}
@@ -464,7 +464,7 @@ export function ModalPropostaCustom({
                         <td className="py-2.5 px-2">
                           {linhas.length > 1 && (
                             <button onClick={() => removeLinha(l.id)}
-                              className="text-[rgba(60,60,67,0.2)] hover:text-[#FF3B30] transition-colors text-lg leading-none">×</button>
+                              className="text-[rgba(60,60,67,0.2)] hover:text-[#d33a3c] transition-colors text-lg leading-none">×</button>
                           )}
                         </td>
                       </tr>
@@ -474,7 +474,7 @@ export function ModalPropostaCustom({
               </table>
               <div className="px-4 py-2.5 border-t border-[rgba(60,60,67,0.06)] bg-[rgba(116,116,128,0.04)]/50">
                 <button onClick={addLinha}
-                  className="flex items-center gap-1 text-[11.5px] text-[#AF52DE] hover:text-violet-800 font-medium transition-colors">
+                  className="flex items-center gap-1 text-[11.5px] text-[#a582ff] hover:text-violet-800 font-medium transition-colors">
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                   </svg>
@@ -494,7 +494,7 @@ export function ModalPropostaCustom({
                 min="1"
                 value={validadeDias}
                 onChange={e => setValidadeDias(parseInt(e.target.value) || 7)}
-                className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
+                className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#191625] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
               />
             </div>
             <div className="space-y-1.5">
@@ -503,18 +503,18 @@ export function ModalPropostaCustom({
                 type="date"
                 value={dataInput}
                 onChange={e => setDataInput(e.target.value)}
-                className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
+                className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#191625] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400"
               />
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Observações para o cliente <span className="normal-case font-normal text-[rgba(60,60,67,0.3)]">(opcional)</span></label>
+            <label className="text-[9.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Observações para o cliente <span className="normal-case font-normal text-[#898892]">(opcional)</span></label>
             <textarea
               value={obsCliente}
               onChange={e => setObsCliente(e.target.value)}
               rows={3}
               placeholder="Detalhes adicionais, condições especiais…"
-              className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#1C1C1E] placeholder:text-[rgba(60,60,67,0.3)] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400 resize-none"
+              className="w-full border border-[rgba(60,60,67,0.12)] rounded-lg px-3 py-2 text-[13px] text-[#191625] placeholder:text-[#898892] focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-400 resize-none"
             />
           </div>
 
@@ -527,20 +527,20 @@ export function ModalPropostaCustom({
             <p className="text-[11px] text-rose-500 text-center">Informe o nome do cliente para continuar.</p>
           )}
           {terceirizadosPrecisaLote && (
-            <p className="text-[11px] text-[#FF9500] text-center">Selecione um lote para os itens terceirizados.</p>
+            <p className="text-[11px] text-[#c57800] text-center">Selecione um lote para os itens terceirizados.</p>
           )}
           {linhasAtivas.length === 0 && terceirizadosValidos.length === 0 && nomeCliente.trim() && (
             <p className="text-[11px] text-rose-500 text-center">Preencha ao menos uma linha de produção com preço, ou adicione um item terceirizado.</p>
           )}
           <div className="flex gap-2">
             <button onClick={onClose}
-              className="px-3 py-2.5 text-[11.5px] text-[#8E8E93] hover:text-[rgba(60,60,67,0.75)] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors">
+              className="px-3 py-2.5 text-[11.5px] text-[#8E8E93] hover:text-[#5e5c68] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors">
               Cancelar
             </button>
             <button
               disabled={!podeSalvar}
               onClick={() => onPdf(buildDraft())}
-              className="flex-1 py-2.5 text-[11.5px] font-medium border border-[rgba(60,60,67,0.12)] hover:border-slate-300 hover:bg-[rgba(116,116,128,0.04)] text-[rgba(60,60,67,0.6)] rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              className="flex-1 py-2.5 text-[11.5px] font-medium border border-[rgba(60,60,67,0.12)] hover:border-slate-300 hover:bg-[rgba(116,116,128,0.04)] text-[#72707d] rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               Pré-visualizar PDF
             </button>
             <button
@@ -563,7 +563,7 @@ export function ModalPropostaCustom({
             <button
               disabled={!podeSalvar}
               onClick={() => onSalvar(buildDraft())}
-              className="flex-1 py-2.5 text-[11.5px] font-bold bg-[#AF52DE] hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
+              className="flex-1 py-2.5 text-[11.5px] font-bold bg-[#a582ff] hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
               Salvar Proposta
             </button>
           </div>
@@ -690,16 +690,16 @@ export function BoxPreview3D({
       {/* Dimension chips */}
       <div className="flex items-center gap-1.5">
         {([ ["L", largura], ["A", altura], ["P", profundidade] ] as [string, number][]).map(([label, val]) => (
-          <span key={label} className="bg-[rgba(116,116,128,0.08)] rounded-md px-2 py-0.5 text-[11px] font-semibold text-[rgba(60,60,67,0.75)] tabular-nums">
+          <span key={label} className="bg-[rgba(116,116,128,0.08)] rounded-md px-2 py-0.5 text-[11px] font-semibold text-[#5e5c68] tabular-nums">
             <span className="text-[#8E8E93] text-[9px] font-normal">{label} </span>{val}
           </span>
         ))}
         <span className="text-[#8E8E93] text-[11px]">cm</span>
-        {materialNome && <span className="text-[rgba(60,60,67,0.3)] text-[10px] ml-1">{materialNome}</span>}
+        {materialNome && <span className="text-[#898892] text-[10px] ml-1">{materialNome}</span>}
         {incluirVerniz && <span className="text-violet-500 text-[9px] font-bold bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full ml-1">UV</span>}
       </div>
 
-      <p className="text-[9px] text-[rgba(60,60,67,0.3)] tracking-wide uppercase">arraste para girar</p>
+      <p className="text-[9px] text-[#898892] tracking-wide uppercase">arraste para girar</p>
     </div>
   )
 }

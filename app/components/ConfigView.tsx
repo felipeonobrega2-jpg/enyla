@@ -71,7 +71,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
   ]
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-6 space-y-6">
+    <div className="h-full overflow-y-auto px-6 py-6 space-y-6" style={{ background: "var(--bg-page)" }}>
       <div className="flex items-center justify-between">
         <p className="text-[10px] uppercase tracking-wide font-semibold text-slate-400">Configurações de custos</p>
         <div className="flex gap-2">

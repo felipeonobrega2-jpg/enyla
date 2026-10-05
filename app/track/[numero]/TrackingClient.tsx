@@ -125,7 +125,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
           </svg>
         </div>
-        <p className="font-bold text-[#1C1C1E] text-lg">Pedido não encontrado</p>
+        <p className="font-bold text-[#191625] text-lg">Pedido não encontrado</p>
         <p className="text-[#8E8E93] text-sm">Verifique o link enviado pela gráfica.</p>
         <p className="text-xs text-[rgba(60,60,67,0.36)] font-mono bg-[rgba(116,116,128,0.08)] px-3 py-1.5 rounded-lg inline-block">{numero}</p>
       </div>
@@ -171,7 +171,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
               className="h-5 w-auto" priority />
           </div>
           <div className="ml-auto">
-            <span className="text-[10px] font-bold text-[#5009c4] bg-[#5009c4]/10 border border-[#5009c4]/20 px-2.5 py-1 rounded-full font-mono">{numero}</span>
+            <span className="text-[10px] font-bold text-[#8456e8] bg-[#8456e8]/10 border border-[#8456e8]/20 px-2.5 py-1 rounded-full font-mono">{numero}</span>
           </div>
         </div>
       </div>
@@ -180,7 +180,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
 
         {/* ── Greeting ───────────────────────────────────────────────── */}
         <div className="pt-1">
-          <p className="text-[22px] font-bold text-[#1C1C1E] leading-snug tracking-[-0.01em]">
+          <p className="text-[22px] font-bold text-[#191625] leading-snug tracking-[-0.01em]">
             Olá, {data.nomeCliente.split(" ")[0]}!
           </p>
           <p className="text-sm text-[#8E8E93] mt-0.5">Acompanhe o andamento do seu pedido abaixo.</p>
@@ -189,20 +189,20 @@ export default function TrackingClient({ initialData, numero }: Props) {
         {/* ── Order summary card ─────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] overflow-hidden flex">
           {/* Accent bar */}
-          <div className="w-1 shrink-0" style={{ background: "#5009c4" }} />
+          <div className="w-1 shrink-0" style={{ background: "#8456e8" }} />
           <div className="flex-1 min-w-0">
             <div className="px-4 pt-4 pb-3">
-              <p className="font-bold text-[#1C1C1E] text-[15px] leading-snug">{data.descricao || "Embalagem personalizada"}</p>
+              <p className="font-bold text-[#191625] text-[15px] leading-snug">{data.descricao || "Embalagem personalizada"}</p>
               <p className="text-[#8E8E93] text-[12px] mt-0.5">{data.materialNome || "Material não especificado"}</p>
             </div>
             <div className="grid grid-cols-2 border-t border-[rgba(60,60,67,0.06)] divide-x divide-[rgba(60,60,67,0.06)]">
               <div className="px-4 py-3">
                 <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold">Quantidade</p>
-                <p className="text-[15px] font-semibold text-[#1C1C1E] tabular-nums mt-1">{num(data.quantidade)} un</p>
+                <p className="text-[15px] font-semibold text-[#191625] tabular-nums mt-1">{num(data.quantidade)} un</p>
               </div>
               <div className="px-4 py-3">
                 <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold">Valor</p>
-                <p className="text-[15px] font-semibold text-[#1C1C1E] tabular-nums mt-1">{brl(data.preco)}</p>
+                <p className="text-[15px] font-semibold text-[#191625] tabular-nums mt-1">{brl(data.preco)}</p>
               </div>
             </div>
           </div>
@@ -216,14 +216,14 @@ export default function TrackingClient({ initialData, numero }: Props) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
               </svg>
             </div>
-            <p className="font-bold text-[#1C1C1E]">Pedido encerrado</p>
+            <p className="font-bold text-[#191625]">Pedido encerrado</p>
             <p className="text-sm text-[#8E8E93]">Entre em contato com a gráfica para mais informações.</p>
           </div>
         )}
 
         {/* ── Pending (col 0) — Orçamento realizado ──────────────────── */}
         {isPending && !isCancelled && (
-          <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: "#5009c4" }}>
+          <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: "#8456e8" }}>
             {/* Top bar */}
             <div className="px-5 pt-4 pb-2">
               <div className="flex items-center justify-between mb-2">
@@ -271,7 +271,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
           <>
             {/* Status hero card */}
             <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
-              style={{ background: isDelivered ? "#34C759" : "#5009c4" }}>
+              style={{ background: isDelivered ? "#009351" : "#8456e8" }}>
 
               {/* Progress bar + label */}
               <div className="px-5 pt-4 pb-2">
@@ -362,7 +362,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
                     </div>
                   </div>
                   <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pagoPct}%`, background: "#34C759" }} />
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pagoPct}%`, background: "#009351" }} />
                   </div>
                   <p className="text-[9px] text-white/40 mt-1.5 text-center">
                     {saldo <= 0 ? "Pagamento completo ✓" : `${Math.round(pagoPct)}% quitado`}
@@ -398,7 +398,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
                             current ? "w-8 h-8 -mx-1" : "w-6 h-6"
                           }`}>
                             {completed ? (
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center shadow-sm" style={{ background: "#34C759" }}>
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center shadow-sm" style={{ background: "#009351" }}>
                                 <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                                 </svg>
@@ -407,7 +407,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
                               <div className="relative w-8 h-8">
                                 {/* Outer pulse ring */}
                                 <div className="absolute inset-0 rounded-full animate-ping" style={{ background: isDelivered ? "rgba(52,199,89,0.3)" : "rgba(80,9,196,0.3)" }} />
-                                <div className="relative w-8 h-8 rounded-full flex items-center justify-center shadow-md" style={{ background: isDelivered ? "#34C759" : "#5009c4" }}>
+                                <div className="relative w-8 h-8 rounded-full flex items-center justify-center shadow-md" style={{ background: isDelivered ? "#009351" : "#8456e8" }}>
                                   <StepIcon icon={etapa.icon} active />
                                 </div>
                               </div>
@@ -431,7 +431,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
                         }`}>
                           <div className="flex items-center justify-between gap-2 min-h-[24px]">
                             <p className="text-[13px] font-semibold leading-tight" style={{
-                              color: completed ? "#34C759" : current ? (isDelivered ? "#34C759" : "#1C1C1E") : isNext ? "#8E8E93" : "rgba(60,60,67,0.36)"
+                              color: completed ? "#009351" : current ? (isDelivered ? "#009351" : "#1C1C1E") : isNext ? "#8E8E93" : "rgba(60,60,67,0.36)"
                             }}>
                               {etapa.label}
                             </p>
@@ -440,7 +440,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
                             )}
                             {current && !ts && (
                               <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                                style={{ background: isDelivered ? "rgba(52,199,89,0.12)" : "rgba(80,9,196,0.12)", color: isDelivered ? "#34C759" : "#5009c4" }}>
+                                style={{ background: isDelivered ? "rgba(52,199,89,0.12)" : "rgba(80,9,196,0.12)", color: isDelivered ? "#009351" : "#8456e8" }}>
                                 {isDelivered ? "Concluído" : "Agora"}
                               </span>
                             )}
@@ -470,7 +470,7 @@ export default function TrackingClient({ initialData, numero }: Props) {
           <button
             onClick={fetchData}
             className="text-[11px] font-medium flex items-center gap-1.5 transition-colors hover:opacity-80"
-            style={{ color: "#5009c4" }}
+            style={{ color: "#8456e8" }}
           >
             <svg className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />

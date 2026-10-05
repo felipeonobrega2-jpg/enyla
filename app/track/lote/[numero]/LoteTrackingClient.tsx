@@ -84,10 +84,10 @@ function etapaLabel(coluna: number): string {
 }
 
 function etapaColorCls(coluna: number): string {
-  if (coluna === 0) return "bg-[#5009c4]/10 text-[#5009c4]"
-  if (coluna === 9) return "bg-[#34C759]/10 text-[#34C759]"
+  if (coluna === 0) return "bg-[#8456e8]/10 text-[#8456e8]"
+  if (coluna === 9) return "bg-[#009351]/10 text-[#009351]"
   if (coluna === 10) return "bg-[rgba(116,116,128,0.08)] text-[#8E8E93]"
-  return "bg-[#5009c4]/10 text-[#5009c4]"
+  return "bg-[#8456e8]/10 text-[#8456e8]"
 }
 
 function progressPct(coluna: number) {
@@ -158,7 +158,7 @@ function ExpandedTimeline({ numero }: { numero: string }) {
 
   if (loading) return (
     <div className="px-4 py-4 flex items-center justify-center">
-      <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#5009c4", borderTopColor: "transparent" }} />
+      <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#8456e8", borderTopColor: "transparent" }} />
     </div>
   )
 
@@ -188,13 +188,13 @@ function ExpandedTimeline({ numero }: { numero: string }) {
               <div className="flex flex-col items-center">
                 <div className={`relative flex items-center justify-center shrink-0 ${current ? "w-7 h-7 -mx-1" : "w-5 h-5"}`}>
                   {completed ? (
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center shadow-sm" style={{ background: "#34C759" }}>
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center shadow-sm" style={{ background: "#009351" }}>
                       <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                     </div>
                   ) : current ? (
                     <div className="relative w-7 h-7">
                       <div className="absolute inset-0 rounded-full animate-ping" style={{ background: isDelivered ? "rgba(52,199,89,0.3)" : "rgba(80,9,196,0.3)" }} />
-                      <div className="relative w-7 h-7 rounded-full flex items-center justify-center shadow-md" style={{ background: isDelivered ? "#34C759" : "#5009c4" }}>
+                      <div className="relative w-7 h-7 rounded-full flex items-center justify-center shadow-md" style={{ background: isDelivered ? "#009351" : "#8456e8" }}>
                         <div className="w-2 h-2 rounded-full bg-white" />
                       </div>
                     </div>
@@ -213,12 +213,12 @@ function ExpandedTimeline({ numero }: { numero: string }) {
               <div className={`flex-1 min-w-0 ${isLast ? "pb-0" : "pb-2.5"}`}>
                 <div className="flex items-center justify-between gap-2 min-h-[20px]">
                   <p className="text-[11.5px] font-semibold leading-tight" style={{
-                    color: completed ? "#34C759" : current ? "#1C1C1E" : isFuture && currentIdx >= 0 && i === currentIdx + 1 ? "#8E8E93" : "rgba(60,60,67,0.36)"
+                    color: completed ? "#009351" : current ? "#1C1C1E" : isFuture && currentIdx >= 0 && i === currentIdx + 1 ? "#8E8E93" : "rgba(60,60,67,0.36)"
                   }}>{etapa.label}</p>
                   {ts && <span className="text-[9.5px] text-[#8E8E93] tabular-nums shrink-0">{ts}</span>}
                   {current && !ts && (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
-                      style={{ background: isDelivered ? "rgba(52,199,89,0.12)" : "rgba(80,9,196,0.12)", color: isDelivered ? "#34C759" : "#5009c4" }}>
+                      style={{ background: isDelivered ? "rgba(52,199,89,0.12)" : "rgba(80,9,196,0.12)", color: isDelivered ? "#009351" : "#8456e8" }}>
                       {isDelivered ? "Entregue" : "Agora"}
                     </span>
                   )}
@@ -256,7 +256,7 @@ function SingleTimeline({ card }: { card: LoteCard }) {
       <div className="px-5 py-4">
         {loading ? (
           <div className="flex items-center justify-center py-4">
-            <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#5009c4", borderTopColor: "transparent" }} />
+            <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#8456e8", borderTopColor: "transparent" }} />
           </div>
         ) : (
           <div className="space-y-0">
@@ -274,13 +274,13 @@ function SingleTimeline({ card }: { card: LoteCard }) {
                   <div className="flex flex-col items-center">
                     <div className={`relative flex items-center justify-center shrink-0 ${current ? "w-8 h-8 -mx-1" : "w-6 h-6"}`}>
                       {completed ? (
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center shadow-sm" style={{ background: "#34C759" }}>
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center shadow-sm" style={{ background: "#009351" }}>
                           <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                         </div>
                       ) : current ? (
                         <div className="relative w-8 h-8">
                           <div className="absolute inset-0 rounded-full animate-ping" style={{ background: isDelivered ? "rgba(52,199,89,0.3)" : "rgba(80,9,196,0.3)" }} />
-                          <div className="relative w-8 h-8 rounded-full flex items-center justify-center shadow-md" style={{ background: isDelivered ? "#34C759" : "#5009c4" }}>
+                          <div className="relative w-8 h-8 rounded-full flex items-center justify-center shadow-md" style={{ background: isDelivered ? "#009351" : "#8456e8" }}>
                             <StepIcon icon={etapa.icon} sz="w-4 h-4" />
                           </div>
                         </div>
@@ -299,12 +299,12 @@ function SingleTimeline({ card }: { card: LoteCard }) {
                   <div className={`flex-1 min-w-0 ${isLast ? "pb-0" : "pb-3.5"} ${current ? "pt-1" : ""}`}>
                     <div className="flex items-center justify-between gap-2 min-h-[24px]">
                       <p className="text-[13px] font-semibold leading-tight" style={{
-                        color: completed ? "#34C759" : current ? (isDelivered ? "#34C759" : "#1C1C1E") : isNext ? "#8E8E93" : "rgba(60,60,67,0.36)"
+                        color: completed ? "#009351" : current ? (isDelivered ? "#009351" : "#1C1C1E") : isNext ? "#8E8E93" : "rgba(60,60,67,0.36)"
                       }}>{etapa.label}</p>
                       {ts && <span className="text-[10px] text-[#8E8E93] tabular-nums shrink-0">{ts}</span>}
                       {current && !ts && (
                         <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                          style={{ background: isDelivered ? "rgba(52,199,89,0.12)" : "rgba(80,9,196,0.12)", color: isDelivered ? "#34C759" : "#5009c4" }}>
+                          style={{ background: isDelivered ? "rgba(52,199,89,0.12)" : "rgba(80,9,196,0.12)", color: isDelivered ? "#009351" : "#8456e8" }}>
                           {isDelivered ? "Concluído" : "Agora"}
                         </span>
                       )}
@@ -340,7 +340,7 @@ function PartnerCard({ item }: { item: PartnerItem }) {
       <div className="px-4 py-3.5">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-[#1C1C1E] text-sm leading-tight truncate">{item.descricao}</p>
+            <p className="font-semibold text-[#191625] text-sm leading-tight truncate">{item.descricao}</p>
           </div>
           <span className={`text-[9.5px] font-bold px-2 py-1 rounded-full shrink-0 ${etapaColorCls(coluna)}`}>
             {etapaLabel(coluna)}
@@ -349,14 +349,14 @@ function PartnerCard({ item }: { item: PartnerItem }) {
         <div className="mt-3">
           <div className="w-full h-1 bg-[rgba(116,116,128,0.08)] rounded-full overflow-hidden">
             <div className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${pct}%`, background: isEntregue ? "#34C759" : "#5009c4" }} />
+              style={{ width: `${pct}%`, background: isEntregue ? "#009351" : "#8456e8" }} />
           </div>
         </div>
       </div>
       {item.valorVenda != null && (
         <div className="border-t border-[rgba(60,60,67,0.06)] px-4 py-2.5">
           <p className="text-[9.5px] uppercase tracking-wider text-[#8E8E93] font-semibold">Valor</p>
-          <p className="text-sm font-bold text-[#1C1C1E] tabular-nums mt-0.5">{brl(item.valorVenda)}</p>
+          <p className="text-sm font-bold text-[#191625] tabular-nums mt-0.5">{brl(item.valorVenda)}</p>
         </div>
       )}
     </div>
@@ -373,11 +373,11 @@ function ProductCard({ card, alwaysExpanded = false }: { card: LoteCard; alwaysE
     <div className="flex items-start gap-3">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="font-semibold text-[#1C1C1E] text-sm leading-tight truncate">
+          <p className="font-semibold text-[#191625] text-sm leading-tight truncate">
             {card.dimensoes} cm
           </p>
           {card.numero && (
-            <span className="text-[9.5px] font-bold text-[#5009c4] bg-[#5009c4]/10 border border-[#5009c4]/20 px-1.5 py-0.5 rounded-full tabular-nums">
+            <span className="text-[9.5px] font-bold text-[#8456e8] bg-[#8456e8]/10 border border-[#8456e8]/20 px-1.5 py-0.5 rounded-full tabular-nums">
               {card.numero}
             </span>
           )}
@@ -402,7 +402,7 @@ function ProductCard({ card, alwaysExpanded = false }: { card: LoteCard; alwaysE
     <div className="mt-3">
       <div className="w-full h-1 bg-[rgba(116,116,128,0.08)] rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${pct}%`, background: isEntregue ? "#34C759" : "#5009c4" }} />
+          style={{ width: `${pct}%`, background: isEntregue ? "#009351" : "#8456e8" }} />
       </div>
     </div>
   )
@@ -423,11 +423,11 @@ function ProductCard({ card, alwaysExpanded = false }: { card: LoteCard; alwaysE
       <div className="grid grid-cols-2 border-t border-[rgba(60,60,67,0.06)] divide-x divide-[rgba(60,60,67,0.06)]">
         <div className="px-4 py-2.5">
           <p className="text-[9.5px] uppercase tracking-wider text-[#8E8E93] font-semibold">Quantidade</p>
-          <p className="text-sm font-bold text-[#1C1C1E] tabular-nums mt-0.5">{num(card.quantidade)} un</p>
+          <p className="text-sm font-bold text-[#191625] tabular-nums mt-0.5">{num(card.quantidade)} un</p>
         </div>
         <div className="px-4 py-2.5">
           <p className="text-[9.5px] uppercase tracking-wider text-[#8E8E93] font-semibold">Valor</p>
-          <p className="text-sm font-bold text-[#1C1C1E] tabular-nums mt-0.5">{brl(card.preco)}</p>
+          <p className="text-sm font-bold text-[#191625] tabular-nums mt-0.5">{brl(card.preco)}</p>
         </div>
       </div>
 
@@ -493,7 +493,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
             </svg>
           </div>
-          <p className="font-bold text-[#1C1C1E] text-lg">Lote não encontrado</p>
+          <p className="font-bold text-[#191625] text-lg">Lote não encontrado</p>
           <p className="text-[#8E8E93] text-sm">Verifique o link enviado pela gráfica.</p>
           <p className="text-xs font-mono bg-[rgba(116,116,128,0.08)] px-3 py-1.5 rounded-lg inline-block" style={{ color: "rgba(60,60,67,0.36)" }}>{loteNumero}</p>
         </div>
@@ -529,7 +529,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
             className="h-5 w-auto" priority />
         </div>
         <div className="ml-auto">
-          <span className="text-[10px] font-bold text-[#5009c4] bg-[#5009c4]/10 border border-[#5009c4]/20 px-2.5 py-1 rounded-full font-mono">
+          <span className="text-[10px] font-bold text-[#8456e8] bg-[#8456e8]/10 border border-[#8456e8]/20 px-2.5 py-1 rounded-full font-mono">
             {loteNumero}
           </span>
         </div>
@@ -543,7 +543,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
         {refreshing ? "Atualizando…" : `Atualizado há ${lastUpdate}s`}
       </p>
       <button onClick={fetchData}
-        className="text-[11px] font-medium flex items-center gap-1.5 transition-colors" style={{ color: "#5009c4" }}>
+        className="text-[11px] font-medium flex items-center gap-1.5 transition-colors" style={{ color: "#8456e8" }}>
         <svg className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
         </svg>
@@ -568,15 +568,15 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
       <div className="grid grid-cols-3 divide-x divide-[rgba(60,60,67,0.06)] border-b border-[rgba(60,60,67,0.06)]">
         <div className="px-4 py-3">
           <p className="text-[9px] uppercase tracking-wider text-[#8E8E93] font-semibold mb-1">Total</p>
-          <p className="text-[13px] font-semibold text-[#1C1C1E] tabular-nums">{brl(totalValor)}</p>
+          <p className="text-[13px] font-semibold text-[#191625] tabular-nums">{brl(totalValor)}</p>
         </div>
         <div className="px-4 py-3">
           <p className="text-[9px] uppercase tracking-wider text-[#8E8E93] font-semibold mb-1">Pago</p>
-          <p className="text-[13px] font-semibold tabular-nums" style={{ color: "#34C759" }}>{brl(totalPago)}</p>
+          <p className="text-[13px] font-semibold tabular-nums" style={{ color: "#009351" }}>{brl(totalPago)}</p>
         </div>
         <div className="px-4 py-3">
           <p className="text-[9px] uppercase tracking-wider text-[#8E8E93] font-semibold mb-1">Restante</p>
-          <p className="text-[13px] font-semibold tabular-nums" style={{ color: saldo > 0 ? "#FF9500" : "#34C759" }}>{brl(saldo)}</p>
+          <p className="text-[13px] font-semibold tabular-nums" style={{ color: saldo > 0 ? "#c57800" : "#009351" }}>{brl(saldo)}</p>
         </div>
       </div>
 
@@ -585,12 +585,12 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
         <div className="flex items-center justify-between mb-1.5">
           <p className="text-[10px] text-[#8E8E93]">{saldo <= 0 ? "Pagamento completo" : `${Math.round(pagoPct)}% pago`}</p>
           {saldo <= 0 && (
-            <span className="text-[9px] font-bold text-[#34C759] bg-[#34C759]/10 border border-[#34C759]/20 px-1.5 py-0.5 rounded-full">Quitado</span>
+            <span className="text-[9px] font-bold text-[#009351] bg-[#009351]/10 border border-[#009351]/20 px-1.5 py-0.5 rounded-full">Quitado</span>
           )}
         </div>
         <div className="w-full h-1.5 bg-[rgba(116,116,128,0.08)] rounded-full overflow-hidden">
           <div className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${pagoPct}%`, background: "#34C759" }} />
+            style={{ width: `${pagoPct}%`, background: "#009351" }} />
         </div>
       </div>
 
@@ -605,16 +605,16 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
           return (
             <div key={p.id} className="flex items-center gap-3 px-5 py-3">
               <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
-                isPago ? "bg-[#34C759]/10" : isAtrasado ? "bg-[#FF3B30]/10" : "bg-[rgba(116,116,128,0.08)]"
+                isPago ? "bg-[#009351]/10" : isAtrasado ? "bg-[#d33a3c]/10" : "bg-[rgba(116,116,128,0.08)]"
               }`}>
                 {isPago ? (
-                  <svg className="w-3.5 h-3.5" style={{ color: "#34C759" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                  <svg className="w-3.5 h-3.5" style={{ color: "#009351" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                 ) : (
                   <svg className="w-3.5 h-3.5 text-[rgba(60,60,67,0.36)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-semibold text-[#1C1C1E]">
+                <p className="text-[12px] font-semibold text-[#191625]">
                   {isPago ? "Pagamento recebido" : isAtrasado ? "Pagamento em atraso" : `Parcela ${i + 1}`}
                 </p>
                 <p className="text-[10px] text-[#8E8E93] mt-0.5">
@@ -622,7 +622,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
                 </p>
               </div>
               <p className="text-[13px] font-bold tabular-nums shrink-0" style={{
-                color: isPago ? "#34C759" : isAtrasado ? "#FF3B30" : "#8E8E93"
+                color: isPago ? "#009351" : isAtrasado ? "#d33a3c" : "#8E8E93"
               }}>{brl(p.valor)}</p>
             </div>
           )
@@ -650,7 +650,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
 
           {/* Greeting */}
           <div className="pt-1">
-            <p className="text-[22px] font-bold text-[#1C1C1E] leading-snug">
+            <p className="text-[22px] font-bold text-[#191625] leading-snug">
               Olá, {lote.nomeCliente.split(" ")[0]}!
             </p>
             <p className="text-sm text-[#8E8E93] mt-0.5">Acompanhe o andamento do seu pedido abaixo.</p>
@@ -660,18 +660,18 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
           <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] overflow-hidden">
             <div className="px-4 py-3.5 flex items-center gap-3">
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-[#1C1C1E] text-sm truncate">{card.dimensoes} cm</p>
+                <p className="font-semibold text-[#191625] text-sm truncate">{card.dimensoes} cm</p>
                 <p className="text-[#8E8E93] text-xs mt-0.5">{card.materialNome}</p>
               </div>
             </div>
             <div className="grid grid-cols-2 border-t border-[rgba(60,60,67,0.06)] divide-x divide-[rgba(60,60,67,0.06)]">
               <div className="px-4 py-2.5">
                 <p className="text-[9.5px] uppercase tracking-wider text-[#8E8E93] font-semibold">Quantidade</p>
-                <p className="text-sm font-bold text-[#1C1C1E] tabular-nums mt-0.5">{num(card.quantidade)} un</p>
+                <p className="text-sm font-bold text-[#191625] tabular-nums mt-0.5">{num(card.quantidade)} un</p>
               </div>
               <div className="px-4 py-2.5">
                 <p className="text-[9.5px] uppercase tracking-wider text-[#8E8E93] font-semibold">Valor</p>
-                <p className="text-sm font-bold text-[#1C1C1E] tabular-nums mt-0.5">{brl(card.preco)}</p>
+                <p className="text-sm font-bold text-[#191625] tabular-nums mt-0.5">{brl(card.preco)}</p>
               </div>
             </div>
           </div>
@@ -682,14 +682,14 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
               <div className="w-12 h-12 rounded-2xl bg-[rgba(116,116,128,0.08)] flex items-center justify-center mx-auto">
                 <svg className="w-6 h-6 text-[#8E8E93]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
               </div>
-              <p className="font-bold text-[#1C1C1E]">Pedido encerrado</p>
+              <p className="font-bold text-[#191625]">Pedido encerrado</p>
               <p className="text-sm text-[#8E8E93]">Entre em contato com a gráfica para mais informações.</p>
             </div>
           )}
 
           {/* Pending */}
           {isPending && !isCancelled && (
-            <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: "#5009c4" }}>
+            <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: "#8456e8" }}>
               <div className="px-5 pt-4 pb-2">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">Orçamento recebido</p>
@@ -726,7 +726,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
             const delivery = calcDelivery(activeEtapasCard, card.coluna, singleEntry?.dataEntregaPrevista)
             return (
               <>
-                <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: isEntregue ? "#34C759" : "#5009c4" }}>
+                <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: isEntregue ? "#009351" : "#8456e8" }}>
                   {/* Progress bar */}
                   <div className="px-5 pt-4 pb-2">
                     <div className="flex items-center justify-between mb-2">
@@ -804,7 +804,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
 
         {/* Greeting */}
         <div className="pt-1">
-          <p className="text-[22px] font-bold text-[#1C1C1E] leading-snug">
+          <p className="text-[22px] font-bold text-[#191625] leading-snug">
             Olá, {lote.nomeCliente.split(" ")[0]}!
           </p>
           <p className="text-sm text-[#8E8E93] mt-0.5">
@@ -813,7 +813,7 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
         </div>
 
         {/* Summary hero */}
-        <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: allEntregue ? "#34C759" : "#5009c4" }}>
+        <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: allEntregue ? "#009351" : "#8456e8" }}>
           <div className="px-5 pt-4 pb-2">
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">
@@ -885,15 +885,15 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
             {tercsCards.map(t => (
               <div key={t.id} className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04)] px-4 py-3.5 flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-[#1C1C1E] text-sm truncate">{t.dimensoes || t.numero}</p>
+                  <p className="font-semibold text-[#191625] text-sm truncate">{t.dimensoes || t.numero}</p>
                   {t.quantidade > 0 && (
                     <p className="text-[#8E8E93] text-xs mt-0.5">{num(t.quantidade)} un</p>
                   )}
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-sm font-bold text-[#1C1C1E] tabular-nums">{brl(t.preco)}</p>
+                  <p className="text-sm font-bold text-[#191625] tabular-nums">{brl(t.preco)}</p>
                   <span className="text-[9.5px] font-semibold px-2 py-0.5 rounded-full mt-1 inline-block"
-                    style={{ background: "rgba(52,199,89,0.1)", color: "#34C759" }}>
+                    style={{ background: "rgba(52,199,89,0.1)", color: "#009351" }}>
                     Confirmado
                   </span>
                 </div>

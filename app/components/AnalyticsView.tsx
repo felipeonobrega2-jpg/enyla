@@ -9,7 +9,7 @@ import { brl } from "../utils"
 function BarChart({
   data,
   height = 120,
-  color = "#34C759",
+  color = "#009351",
   secondaryColor,
 }: {
   data: { label: string; value: number; secondary?: number }[]
@@ -37,11 +37,11 @@ function BarChart({
           <span className="text-[9px] text-[#8E8E93] whitespace-nowrap leading-none">{d.label}</span>
           {/* Tooltip */}
           <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-20 pointer-events-none">
-            <div className="bg-[#1C1C1E] text-white text-[10px] rounded-lg px-2.5 py-1.5 whitespace-nowrap shadow-lg">
+            <div className="bg-[#0b0914] text-white text-[10px] rounded-lg px-2.5 py-1.5 whitespace-nowrap shadow-lg">
               <p className="font-semibold">{brl(d.value)}</p>
               {d.secondary !== undefined && <p className="text-[rgba(255,255,255,0.6)] text-[9.5px]">Desp: {brl(d.secondary)}</p>}
             </div>
-            <div className="w-1.5 h-1.5 bg-[#1C1C1E] rotate-45 -mt-1" />
+            <div className="w-1.5 h-1.5 bg-[#0b0914] rotate-45 -mt-1" />
           </div>
         </div>
       ))}
@@ -136,10 +136,10 @@ export function AnalyticsView({
       {/* KPI row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Faturamento 12m", value: brl(kpis.total12m), color: "#34C759" },
-          { label: "Ticket médio", value: brl(kpis.ticketMedio), color: "#5009c4" },
-          { label: "Melhor mês", value: `${kpis.melhorMes?.label ?? "—"} · ${brl(kpis.melhorMes?.receita ?? 0)}`, color: "#AF52DE" },
-          { label: "Despesas 12m", value: brl(kpis.totalDespesas12m), color: "#FF3B30" },
+          { label: "Faturamento 12m", value: brl(kpis.total12m), color: "#009351" },
+          { label: "Ticket médio", value: brl(kpis.ticketMedio), color: "#8456e8" },
+          { label: "Melhor mês", value: `${kpis.melhorMes?.label ?? "—"} · ${brl(kpis.melhorMes?.receita ?? 0)}`, color: "#a582ff" },
+          { label: "Despesas 12m", value: brl(kpis.totalDespesas12m), color: "#d33a3c" },
         ].map(k => (
           <div key={k.label} className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-4 py-4">
             <p className="text-[10.5px] text-[#8E8E93] font-medium mb-1">{k.label}</p>
@@ -151,21 +151,21 @@ export function AnalyticsView({
       {/* Receita + Despesas por mês */}
       <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-5 py-4">
         <div className="flex items-center justify-between mb-4">
-          <p className="text-[12px] font-semibold text-[#1C1C1E]">Receita e despesas — últimos 12 meses</p>
+          <p className="text-[12px] font-semibold text-[#191625]">Receita e despesas — últimos 12 meses</p>
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1 text-[10.5px] text-[#8E8E93]">
-              <span className="w-2.5 h-2.5 rounded-sm inline-block bg-[#34C759]/85" />Receita
+              <span className="w-2.5 h-2.5 rounded-sm inline-block bg-[#009351]/85" />Receita
             </span>
             <span className="flex items-center gap-1 text-[10.5px] text-[#8E8E93]">
-              <span className="w-2.5 h-2.5 rounded-sm inline-block bg-[#FF3B30]/75" />Despesas
+              <span className="w-2.5 h-2.5 rounded-sm inline-block bg-[#d33a3c]/75" />Despesas
             </span>
           </div>
         </div>
         <BarChart
           data={monthlyData.map(m => ({ label: m.label, value: m.receita, secondary: m.despesas }))}
           height={140}
-          color="#34C759"
-          secondaryColor="#FF3B30"
+          color="#009351"
+          secondaryColor="#d33a3c"
         />
       </div>
 
@@ -174,7 +174,7 @@ export function AnalyticsView({
 
         {/* Top clientes */}
         <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-5 py-4">
-          <p className="text-[12px] font-semibold text-[#1C1C1E] mb-4">Top clientes</p>
+          <p className="text-[12px] font-semibold text-[#191625] mb-4">Top clientes</p>
           {topClientes.length === 0 ? (
             <p className="text-[12px] text-[#8E8E93]">Sem dados ainda.</p>
           ) : (
@@ -182,14 +182,14 @@ export function AnalyticsView({
               {topClientes.map(([name, value], i) => (
                 <div key={name} className="flex items-center gap-3">
                   <span className="text-[10px] font-bold text-[#8E8E93] w-4 shrink-0">{i + 1}</span>
-                  <span className="text-[11.5px] text-[#1C1C1E] w-28 truncate shrink-0">{name}</span>
+                  <span className="text-[11.5px] text-[#191625] w-28 truncate shrink-0">{name}</span>
                   <div className="flex-1 h-1.5 bg-[rgba(60,60,67,0.06)] rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-[#5009c4] rounded-full transition-all"
+                      className="h-full bg-[#8456e8] rounded-full transition-all"
                       style={{ width: `${(value / clienteMax) * 100}%`, opacity: 0.7 + (0.3 * (1 - i / 6)) }}
                     />
                   </div>
-                  <span className="text-[11px] font-semibold text-[rgba(60,60,67,0.75)] tabular-nums shrink-0 w-20 text-right">{brl(value)}</span>
+                  <span className="text-[11px] font-semibold text-[#5e5c68] tabular-nums shrink-0 w-20 text-right">{brl(value)}</span>
                 </div>
               ))}
             </div>
@@ -198,11 +198,11 @@ export function AnalyticsView({
 
         {/* Pedidos por mês */}
         <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-5 py-4">
-          <p className="text-[12px] font-semibold text-[#1C1C1E] mb-4">Pedidos fechados por mês</p>
+          <p className="text-[12px] font-semibold text-[#191625] mb-4">Pedidos fechados por mês</p>
           <BarChart
             data={monthlyData.map(m => ({ label: m.label, value: m.pedidos }))}
             height={140}
-            color="#5009c4"
+            color="#8456e8"
           />
         </div>
       </div>

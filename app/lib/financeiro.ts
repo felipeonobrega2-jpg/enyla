@@ -96,14 +96,14 @@ export function calcularPedidosFechados(kanban: KanbanCard[], lancamentos: Lanca
     if (c.loteId) {
       if (lotesSeen.has(c.loteId)) continue
       lotesSeen.add(c.loteId)
-      const pago = somaPago(porLote[c.loteId] ?? [])
-      const loteCards = elegiveis.filter(cc => cc.loteId === c.loteId)
       const sobras = sobLote[c.loteId] ?? []
+      const pago = somaPago(porLote[c.loteId] ?? []) + somaPago(sobras)
+      const loteCards = elegiveis.filter(cc => cc.loteId === c.loteId)
       const total = loteCards.reduce((s, cc) => s + cc.preco, 0) + sobras.reduce((s, l) => s + l.valor, 0)
       itens.push({ key: `lote-${c.loteId}`, loteId: c.loteId, cliente: c.nomeCliente, label: c.loteNumero ?? "Lote", total, pago, restante: total - pago })
     } else {
-      const pago = somaPago(porCard[c.id] ?? [])
       const sobras = sobCard[c.id] ?? []
+      const pago = somaPago(porCard[c.id] ?? []) + somaPago(sobras)
       const total = c.preco + sobras.reduce((s, l) => s + l.valor, 0)
       itens.push({ key: `card-${c.id}`, cardId: c.id, cliente: c.nomeCliente, label: c.numero || "Pedido", total, pago, restante: total - pago })
     }
