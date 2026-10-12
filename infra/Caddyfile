@@ -1,0 +1,24 @@
+# Caddyfile — ENYLA Evolution API
+# Caddy obtém e renova o certificado Let's Encrypt automaticamente.
+# Pré-requisito: registro DNS A para evo.enyla.com.br apontando para o IP da VPS.
+
+evo.enyla.com.br {
+    # Só a UI/API do Evolution fica neste domínio.
+    # O webhook vai direto para o Vercel — não passa por aqui.
+    reverse_proxy evolution:8080
+
+    # Cabeçalhos de segurança básicos
+    header {
+        X-Frame-Options DENY
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+        -Server
+    }
+
+    # Log compacto
+    log {
+        output stderr
+        format console
+        level ERROR
+    }
+}
