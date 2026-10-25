@@ -318,6 +318,7 @@ export type LancamentoFinanceiro = {
   fornecedorId?: string
   formaPagamento?: FormaPagamento
   obs?: string
+  revisarDepois?: boolean
   criadoEm: string
 }
 

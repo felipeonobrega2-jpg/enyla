@@ -335,6 +335,7 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
   const [fornecedorId, setFornecedorId] = useState(inicial?.fornecedorId ?? "")
   const [forma, setForma]             = useState<FormaPagamento | "">(inicial?.formaPagamento ?? "")
   const [obs, setObs]                 = useState(inicial?.obs ?? "")
+  const [revisarDepois, setRevisarDepois] = useState(inicial?.revisarDepois ?? false)
 
   // Modo Custo — aba separada para registrar na conta do fornecedor
   const [modoCusto, setModoCusto]         = useState(false)
@@ -443,6 +444,7 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
       fornecedorId:   fornecedorId || undefined,
       formaPagamento: forma || undefined,
       obs:            obs.trim() || undefined,
+      revisarDepois:  revisarDepois || undefined,
     }
     const activeKeys = vinculoKeys.filter(k => k)
     if (activeKeys.length <= 1) {
@@ -684,6 +686,32 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
             <textarea value={obs} onChange={e => setObs(e.target.value)}
               rows={2} placeholder="Notas internas…" className={`${inp()} resize-none`} />
           </Field>
+
+          {/* Revisar depois */}
+          <button type="button" onClick={() => setRevisarDepois(v => !v)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
+              revisarDepois
+                ? "border-amber-300 bg-amber-50"
+                : "border-[rgba(60,60,67,0.12)] bg-transparent hover:border-amber-200 hover:bg-amber-50/40"
+            }`}>
+            <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
+              revisarDepois ? "border-amber-400 bg-amber-400" : "border-[rgba(60,60,67,0.2)]"
+            }`}>
+              {revisarDepois && (
+                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </span>
+            <span className={`text-[12.5px] font-semibold ${revisarDepois ? "text-amber-700" : "text-[#8E8E93]"}`}>
+              Revisar depois
+            </span>
+            {revisarDepois && (
+              <span className="ml-auto text-[10px] font-bold tracking-wide text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">
+                🔍 PENDENTE
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="px-6 pb-5 flex gap-2 shrink-0 border-t border-[rgba(60,60,67,0.08)] pt-4">
@@ -1118,6 +1146,7 @@ export function FinanceiroView({
   const [bulkCategoria, setBulkCategoria]     = useState("")
   const [bulkFornecedor, setBulkFornecedor]   = useState("")
   const [filtroCategoria, setFiltroCategoria] = useState("")
+  const [filtroRevisar, setFiltroRevisar]     = useState(false)
   const [buscaLanc, setBuscaLanc]             = useState("")
   const [buscaReceber, setBuscaReceber]       = useState("")
   const [filtroReceber, setFiltroReceber] = useState<"aberto" | "pendente" | "parcial" | "todos">("aberto")
@@ -1169,6 +1198,7 @@ export function FinanceiroView({
       .filter(l => !filtroTipo     || l.tipo === filtroTipo)
       .filter(l => !filtroStatus   || statusEfetivo(l) === filtroStatus)
       .filter(l => !filtroCategoria || (l.categoria ?? "") === filtroCategoria)
+      .filter(l => !filtroRevisar || l.revisarDepois === true)
       .filter(l => {
         if (!buscaLanc) return true
         const q = buscaLanc.toLowerCase()
@@ -1178,7 +1208,7 @@ export function FinanceiroView({
       })
       .sort((a, b) => ref(b).localeCompare(ref(a)))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lancamentos, periodo, mesOffset, fromStr, toStr, filtroTipo, filtroStatus, filtroCategoria, buscaLanc])
+  }, [lancamentos, periodo, mesOffset, fromStr, toStr, filtroTipo, filtroStatus, filtroCategoria, filtroRevisar, buscaLanc])
 
   // Parcerias — comissão e ganho são AMBOS receita do usuário
   const negociosInPeriodo = (n: NegocioParceiro) => {
@@ -2375,6 +2405,14 @@ export function FinanceiroView({
                   <option key={c.id} value={c.id}>{c.nome}</option>
                 ))}
               </select>
+              <button onClick={() => setFiltroRevisar(v => !v)}
+                className={`h-8 px-3 text-[11.5px] font-semibold rounded-lg border transition-colors flex items-center gap-1.5 shrink-0 ${
+                  filtroRevisar
+                    ? "bg-amber-50 border-amber-300 text-amber-700"
+                    : "bg-white border-[rgba(60,60,67,0.12)] text-[#8E8E93] hover:border-amber-200 hover:text-amber-600"
+                }`}>
+                🔍 Revisar
+              </button>
               <input value={buscaLanc} onChange={e => setBuscaLanc(e.target.value)}
                 placeholder="Buscar lançamento…"
                 className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[#72707d] bg-white focus:outline-none flex-1 min-w-[160px]" />
@@ -2493,6 +2531,11 @@ export function FinanceiroView({
                                     {l.loteNumero && (
                                       <span className="text-[9.5px] font-semibold px-1.5 py-px rounded-full bg-[#8456e8]/10 text-[#8456e8] border border-[#8456e8]/20 shrink-0">
                                         #{l.loteNumero}
+                                      </span>
+                                    )}
+                                    {l.revisarDepois && (
+                                      <span className="text-[9.5px] font-bold px-1.5 py-px rounded-full bg-amber-50 text-amber-600 border border-amber-200 shrink-0 flex items-center gap-1">
+                                        🔍 Revisar
                                       </span>
                                     )}
                                   </div>
