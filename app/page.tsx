@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
-import { Ruler, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Trophy } from "lucide-react"
+import { Ruler, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box } from "lucide-react"
 import { signOut } from "next-auth/react"
 import WhatsAppView from "./components/WhatsAppView"
 import Image from "next/image"
@@ -30,7 +30,6 @@ function autoSetPrazos(card: KanbanCard, novaColuna: number): PrazoEtapas | null
   if (Object.keys(novos).length === 0) return null
   return { ...prazosAtuais, ...novos }
 }
-import DashboardView from "./components/DashboardView"
 import { QUANTIDADES_PADRAO } from "./dados"
 import { calcular, compactarCalculo } from "./calculos"
 import { Configuracoes, CONFIG_PADRAO } from "./config"
@@ -39,6 +38,7 @@ import { RotasProducao } from "./components/RotasProducao"
 import { FornecedoresView } from "./components/FornecedoresView"
 import { PainelView } from "./components/PainelView"
 import { ParceriasView } from "./components/ParceriasView"
+import { RelatoriosView } from "./components/RelatoriosView"
 import { normalizarProducao, movimentosPorEtapa } from "./lib/producao"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
 import FormaView from "./FormaView"
@@ -272,7 +272,9 @@ export default function Home() {
   useEffect(() => {
     const saved = sessionStorage.getItem("app:view")
     const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel"]
-    if (saved && valid.includes(saved)) setView(saved as typeof view)
+    // Conquistas virou o cartão "Meta do mês" do Painel
+    if (saved === "conquistas") setView("painel")
+    else if (saved && valid.includes(saved)) setView(saved as typeof view)
   }, [])
 
   function navigate(v: typeof view) {
@@ -1334,7 +1336,7 @@ export default function Home() {
           <NavGroup label="Gestão" />
           <NavItem active={view === "financeiro"} onClick={() => navigate("financeiro")} label="Financeiro"
             icon={<Wallet className="w-4 h-4" strokeWidth={1.8} />} />
-          <NavItem active={view === "dashboard"} onClick={() => navigate("dashboard")} label="Análises"
+          <NavItem active={view === "dashboard"} onClick={() => navigate("dashboard")} label="Relatórios"
             icon={<BarChart3 className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "parceiros" || view === "terceirizados"} onClick={() => navigate("parceiros")} label="Parceiros"
             icon={<Handshake className="w-4 h-4" strokeWidth={1.8} />} />
@@ -1346,8 +1348,6 @@ export default function Home() {
             icon={<MessageCircle className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "forma"} onClick={() => navigate("forma")} label="Forma IA"
             icon={<Box className="w-4 h-4" strokeWidth={1.8} />} />
-          <NavItem active={view === "conquistas"} onClick={() => navigate("conquistas")} label="Conquistas"
-            icon={<Trophy className="w-4 h-4" strokeWidth={1.8} />} />
         </div>
 
         {/* Sidebar gamificação widgets */}
@@ -1357,7 +1357,7 @@ export default function Home() {
             lancamentos={lancamentos}
             metaMensal={config.metaMensal}
             baselineFaturamento={config.baselineFaturamento}
-            onClick={() => navigate("conquistas")}
+            onClick={() => navigate("painel")}
           />
         </div>
 
@@ -1913,17 +1913,11 @@ export default function Home() {
               onNavegar={v => navigate(v)}
               onNovoOrcamento={() => navigate("orcamento")}
               onLancarCobranca={prefill => setModalLancPedidos(prefill)}
+              onSalvarMeta={metaMensal => salvarConfigTudo({ ...configAtual.current, metaMensal })}
             />
           ) : view === "dashboard" ? (
-            <DashboardView
-              historico={historico}
-              kanban={kanban}
-              propostasCustom={propostasCustom}
-              clientes={clientes}
-              config={config}
-              lancamentos={lancamentos}
-              isDark={isDark}
-            />
+            <RelatoriosView kanban={kanban} lancamentos={lancamentos} clientes={clientes}
+              onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }} />
           ) : view === "config" ? (
             <ConfigView
               config={config}

@@ -5,7 +5,7 @@ import { brl } from "../utils"
 
 const CARD = "bg-white border border-[rgba(0,0,0,0.06)] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]"
 
-const MARCOS = [
+export const MARCOS = [
   { threshold: 10_000,     label: "Primeiro Salto",    sub: "R$10 mil"     },
   { threshold: 50_000,     label: "Tração Real",        sub: "R$50 mil"     },
   { threshold: 100_000,    label: "6 Dígitos",          sub: "R$100 mil"    },

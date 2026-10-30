@@ -3,7 +3,7 @@
 import React from "react"
 import {
   AlertTriangle, CalendarClock, CalendarX2, CircleDollarSign, Clock, Factory, FileText, Hourglass,
-  MessageCircle, Percent, Plus, Receipt, TrendingUp, Truck, Users, Wallet, CheckCircle2, ArrowRight,
+  MessageCircle, Percent, Plus, Receipt, TrendingUp, Truck, Users, Wallet, CheckCircle2, ArrowRight, Target, Trophy,
 } from "lucide-react"
 import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COL_HOT } from "../types"
 import { Configuracoes } from "../config"
@@ -13,6 +13,7 @@ import {
   parseData, diasAte, nomeChave, noPeriodo, Pedido, recebiveis, pedidoEntregue,
 } from "../lib/negocio"
 import { normalizarProducao } from "../lib/producao"
+import { MARCOS } from "./GamificacaoView"
 import { brl, num } from "../utils"
 import {
   Pagina, CabecalhoPagina, Cartao, TituloCartao, Kpi, GradeKpis, Segmentado, Botao, LinhaLista,
@@ -63,7 +64,7 @@ type Detalhe = { titulo: string; sub?: string; linhas: React.ReactNode; destino?
 
 export function PainelView({
   kanban, lancamentos, historico, propostasCustom, clientes, config,
-  onAbrirCard, onAbrirCliente, onNavegar, onNovoOrcamento, onLancarCobranca,
+  onAbrirCard, onAbrirCliente, onNavegar, onNovoOrcamento, onLancarCobranca, onSalvarMeta,
 }: {
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
@@ -76,6 +77,7 @@ export function PainelView({
   onNavegar: (view: "orcamentos" | "pedidos" | "financeiro" | "fornecedores" | "clientes") => void
   onNovoOrcamento: () => void
   onLancarCobranca?: (prefill: Partial<LancamentoFinanceiro>) => void
+  onSalvarMeta?: (metaMensal: number) => void
 }) {
   const [periodoId, setPeriodoId] = React.useState<PeriodoId>("mes")
   const [detalhe, setDetalhe] = React.useState<Detalhe | null>(null)
@@ -302,6 +304,27 @@ export function PainelView({
   const dataLonga = hoje.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })
   const saudacao = dataLonga.charAt(0).toUpperCase() + dataLonga.slice(1)
 
+  // ── Meta do mês e marcos de faturamento ────────────────────────────────────
+  const meta = config.metaMensal || 0
+  const vendidoMes = vendasDoPeriodo(pedidos, lancamentos, periodoDe("mes", hoje)).receita
+  const diasMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate()
+  const diasUteisRestantes = (() => {
+    let n = 0
+    for (let d = hoje.getDate() + 1; d <= diasMes; d++) {
+      const dia = new Date(hoje.getFullYear(), hoje.getMonth(), d).getDay()
+      if (dia !== 0 && dia !== 6) n++
+    }
+    return n
+  })()
+  const projecao = vendidoMes / hoje.getDate() * diasMes
+  const faltaMeta = Math.max(0, meta - vendidoMes)
+  const faturamentoTotal = (config.baselineFaturamento || 0) + pedidos.reduce((s, p) => s + p.valor, 0)
+    + vendasDoPeriodo(pedidos, lancamentos, { from: null, to: null }).sobras
+  const proximoMarco = MARCOS.find(m => m.threshold > faturamentoTotal) ?? null
+  const marcoAnterior = [...MARCOS].reverse().find(m => m.threshold <= faturamentoTotal)
+  const [editandoMeta, setEditandoMeta] = React.useState(false)
+  const [rascunhoMeta, setRascunhoMeta] = React.useState("")
+
   return (
     <Pagina>
       <CabecalhoPagina
@@ -319,7 +342,7 @@ export function PainelView({
           sub={`${vendas.pedidos.length} ${vendas.pedidos.length === 1 ? "pedido" : "pedidos"} · ticket ${brlCurto(vendas.ticketMedio)}`} />
         <Kpi rotulo="Recebido" icone={<Wallet className="w-3.5 h-3.5" />} tom="sucesso"
           valor={caixa.recebido} formato={brlCurto} onClick={abrirCaixa}
-          sub={<>{brlCurto(rec.aReceber)} a receber{rec.vencido > 0.5 && <span className="text-[#d33a3c]"> · {brlCurto(rec.vencido)} venc.</span>}</>} />
+          sub={<>{brlCurto(rec.aReceber)} a receber{rec.vencido > 0.5 && <span className="text-[#d33a3c]"> · {`R$ ${num(rec.vencido, 0)}`} vencido</span>}</>} />
         <Kpi rotulo="Conversão" icone={<Percent className="w-3.5 h-3.5" />}
           valor={conv.decididos > 0 ? conv.taxa : null} formato={pct} onClick={abrirConversao}
           sub={conv.decididos > 0 ? `${conv.ganhos} de ${conv.decididos} decididos` : `${conv.total} orçamentos, nenhum decidido`} />
@@ -366,6 +389,58 @@ export function PainelView({
           )}
         </Cartao>
 
+        <div className="space-y-4">
+        <Cartao className="ds-entrada">
+          <TituloCartao titulo={`Meta de ${hoje.toLocaleDateString("pt-BR", { month: "long" })}`} icone={<Target className="w-4 h-4" />}
+            sub={meta > 0 ? `${brl(vendidoMes)} de ${brl(meta)}` : "Defina uma meta mensal de vendas"}
+            acao={onSalvarMeta && !editandoMeta ? (
+              <Botao variante="fantasma" className="h-7 px-2 text-[11.5px]" onClick={() => { setRascunhoMeta(String(meta || "")); setEditandoMeta(true) }}>Ajustar meta</Botao>
+            ) : undefined} />
+          {editandoMeta && onSalvarMeta && (
+            <div className="flex items-center gap-2 mb-4 apple-slide-up">
+              <span className="text-[12px] text-[#898892]">R$</span>
+              <input autoFocus type="number" min={0} value={rascunhoMeta} onChange={e => setRascunhoMeta(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { onSalvarMeta(Math.max(0, Number(rascunhoMeta) || 0)); setEditandoMeta(false) } if (e.key === "Escape") setEditandoMeta(false) }}
+                className="flex-1 h-9 rounded-lg px-3 text-[13px] ds-num bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 ds-borda" />
+              <Botao variante="primario" className="h-9" onClick={() => { onSalvarMeta(Math.max(0, Number(rascunhoMeta) || 0)); setEditandoMeta(false) }}>Salvar</Botao>
+            </div>
+          )}
+          {meta > 0 && (
+            <>
+              <div className="flex items-end justify-between mb-2">
+                <p className={`text-[26px] font-semibold ds-num leading-none ${vendidoMes >= meta ? "text-[#009351]" : "text-[#191625]"}`}>{num(vendidoMes / meta * 100, 0)}%</p>
+                <p className="text-[11.5px] text-[#898892] text-right">
+                  {vendidoMes >= meta
+                    ? <>meta batida · <span className="text-[#009351] font-semibold">+{brl(vendidoMes - meta)}</span></>
+                    : diasUteisRestantes > 0 ? <>faltam {brl(faltaMeta)} · <span className="font-semibold text-[#191625]">{brl(faltaMeta / diasUteisRestantes)}</span> por dia útil</> : <>faltam {brl(faltaMeta)}</>}
+                </p>
+              </div>
+              <div className="h-2 rounded-full bg-[rgba(116,116,128,0.1)] overflow-hidden relative">
+                <div className="h-full rounded-full ds-cresce-x" style={{ width: `${Math.min(100, vendidoMes / meta * 100)}%`, background: vendidoMes >= meta ? "#009351" : "#8456e8" }} />
+                {projecao > vendidoMes && projecao < meta * 1.5 && (
+                  <div className="absolute top-0 bottom-0 w-0.5 bg-[#191625]/30" style={{ left: `${Math.min(100, projecao / meta * 100)}%` }} title="Projeção no ritmo atual" />
+                )}
+              </div>
+              <p className="text-[11.5px] text-[#898892] mt-2">
+                No ritmo atual, o mês fecha em <span className={`font-semibold ds-num ${projecao >= meta ? "text-[#009351]" : "text-[#c57800]"}`}>{brl(projecao)}</span>
+                {vendidoMes >= meta * 2 && <> · a meta está baixa para o seu ritmo; vale subir</>}
+              </p>
+            </>
+          )}
+          <div className="mt-4 pt-4" style={{ borderTop: "1px solid rgba(60,60,67,0.06)" }}>
+            <div className="flex items-center justify-between text-[11.5px] mb-1.5">
+              <span className="text-[#5e5c68]"><Trophy className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-[#c57800]" />{brlCurto(faturamentoTotal)} faturados desde o início</span>
+              {proximoMarco && <span className="text-[#898892]">próximo: {proximoMarco.label} ({proximoMarco.sub})</span>}
+            </div>
+            {proximoMarco && (
+              <div className="h-1.5 rounded-full bg-[rgba(116,116,128,0.1)] overflow-hidden">
+                <div className="h-full rounded-full bg-[#c57800] ds-cresce-x"
+                  style={{ width: `${Math.min(100, (faturamentoTotal - (marcoAnterior?.threshold ?? 0)) / (proximoMarco.threshold - (marcoAnterior?.threshold ?? 0)) * 100)}%` }} />
+              </div>
+            )}
+          </div>
+        </Cartao>
+
         <Cartao className="ds-entrada">
           <TituloCartao titulo="Produção agora" icone={<Truck className="w-4 h-4" />}
             sub={`${prod.emProducao.length} pedidos · ${brl(prod.valorEmProducao)}`}
@@ -382,6 +457,7 @@ export function PainelView({
               </div>
             </>}
         </Cartao>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-4 items-start">

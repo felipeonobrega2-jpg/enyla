@@ -383,7 +383,7 @@ const GRUPOS_PERIODO: { label: string; items: { id: Periodo; label: string }[] }
 
 // ─── Gerador de relatório mensal ─────────────────────────────────────────────
 
-function gerarHtmlRelatorio({
+export function gerarHtmlRelatorio({
   periodoLabel, dreRec, dreDesp,
   kpisData, topClientesData, materiaisData,
   aReceber, aReceberCount, vencidos, vencidosCount,
