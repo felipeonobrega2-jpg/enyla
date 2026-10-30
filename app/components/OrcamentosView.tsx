@@ -1,16 +1,16 @@
 "use client"
 
-import { useState, useMemo, useRef } from "react"
+import { useState, useMemo } from "react"
 import {
-  FileText, CheckCircle2, XCircle,
-  Target, Clock, BarChart3, Plus, Users,
+  FileText, CheckCircle2, XCircle, Target, Clock, BarChart3, Plus, Users, Search, X, Hourglass, MessageSquareX,
 } from "lucide-react"
 import { KanbanCard, PropostaCustom } from "../types"
-import { conversao, orcamentosDoPeriodo, nomeChave, isTerceirizado, SEM_PERIODO } from "../lib/negocio"
+import { conversao, orcamentosDoPeriodo, nomeChave, isAberto, isGanho, isPerdido, isExpirado, parseData, SEM_PERIODO } from "../lib/negocio"
 import { brl, num } from "../utils"
-import { HistoricoView, HistItem } from "./HistoricoView"
+import { HistoricoView, HistItem, OrdemHistorico, SituacaoOrc, situacaoDoCard } from "./HistoricoView"
+import { CabecalhoPagina, Kpi, GradeKpis, Segmentado, Botao, Cartao, TituloCartao, Colunas, ListaBarras, Gaveta, LinhaLista, Vazio, Selo } from "./ds"
 
-type OrcTab = "dashboard" | "historico"
+type OrcTab = "lista" | "visao"
 
 type Props = {
   historico: HistItem[]
@@ -31,459 +31,196 @@ type Props = {
   onDetalhes?: (item: HistItem | PropostaCustom) => void
 }
 
-function num2(n: number, d = 1) { return num(n, d) }
+const inteiro = (n: number) => num(Math.round(n))
 
 export function OrcamentosView(props: Props) {
-  const {
-    historico, propostasCustom, kanban, onNovoOrcamento,
-    onReplicar, onDownloadPdf, onDownloadPdfCliente, onExcluir,
-    onWhatsApp, onPdfCustom, onWhatsAppCustom, onExcluirCustom,
-    onEditarCustom, onPersonalizar, onDetalhes,
-  } = props
+  const { historico, propostasCustom, kanban, onNovoOrcamento, onDetalhes } = props
 
-  const [tab, setTab] = useState<OrcTab>("dashboard")
+  const [tab, setTab] = useState<OrcTab>("lista")
+  const [situacao, setSituacao] = useState<SituacaoOrc>("todos")
+  const [busca, setBusca] = useState("")
+  const [ordem, setOrdem] = useState<OrdemHistorico>("recente")
+  const [gaveta, setGaveta] = useState<{ titulo: string; sub: string; cards: KanbanCard[] } | null>(null)
 
-  // ── Métricas ────────────────────────────────────────────────────────────
-  const metrics = useMemo(() => {
-    // Definições canônicas (lib/negocio): unidade = orçamento (card), exclui terceirizados
-    const base = orcamentosDoPeriodo(kanban, SEM_PERIODO)
-    const conv = conversao(base)
-    const ticketMedioOrc = base.length > 0 ? base.reduce((s, c) => s + c.preco, 0) / base.length : 0
+  // Definições canônicas (lib/negocio): unidade = orçamento (card), exclui terceirizados
+  const base = useMemo(() => orcamentosDoPeriodo(kanban, SEM_PERIODO), [kanban])
+  const conv = conversao(base)
+  const soma = (cs: KanbanCard[]) => cs.reduce((s, c) => s + c.preco, 0)
+  const abertos = base.filter(isAberto)
+  const fechados = base.filter(isGanho)
+  const recusados = base.filter(isPerdido)
+  const semResposta = base.filter(isExpirado)
 
-    const mesesSet = new Set<string>()
-    base.forEach(c => { if (c.data) mesesSet.add(c.data.slice(3, 10)) })
-    const mediaOrcMes = base.length / (mesesSet.size || 1)
+  const filtrar = (s: SituacaoOrc) => {
+    setSituacao(atual => atual === s ? "todos" : s)
+    setTab("lista")
+  }
 
-    const clientesUnicos = new Set(base.map(c => nomeChave(c.nomeCliente)).filter(Boolean)).size
-    const orcPorCliente = clientesUnicos > 0 ? base.length / clientesUnicos : 0
-
-    return {
-      totalRealizados: conv.total,
-      totalFechados: conv.ganhos,
-      totalPerdidos: conv.perdidos,
-      totalExpirados: conv.expirados,
-      totalAbertos: conv.abertos,
-      taxaConversao: conv.taxa,
-      ticketMedioOrc,
-      mediaOrcMes,
-      orcPorCliente,
-    }
-  }, [kanban])
-
-  const TAB_STYLE = (active: boolean) =>
-    `px-4 py-2 text-[12.5px] font-semibold rounded-lg transition-colors ${
-      active
-        ? "bg-white text-[#191625] shadow-sm"
-        : "text-[#8E8E93] hover:text-[#5e5c68]"
-    }`
+  // Abre o orçamento salvo (ou a proposta personalizada) de um card
+  const abrirCard = (c: KanbanCard) => {
+    const h = historico.find(x => x.numero === c.numero)
+    const p = propostasCustom.find(x => x.cardId === c.id)
+    const alvo = h ?? p
+    if (alvo) { setGaveta(null); onDetalhes?.(alvo) }
+  }
+  const abrir = (titulo: string, cards: KanbanCard[]) =>
+    setGaveta({ titulo, sub: `${cards.length} ${cards.length === 1 ? "orçamento" : "orçamentos"} · ${brl(soma(cards))}`, cards })
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-8 pt-7 pb-5 shrink-0">
-        <div>
-          <h1 className="text-[20px] font-bold text-[#1C1C1E] tracking-tight">Orçamentos</h1>
-          <p className="text-[12px] text-[#8E8E93] mt-0.5">
-            {metrics.totalRealizados} orçamentos · {metrics.totalFechados} fechados · {num2(metrics.taxaConversao, 0)}% de conversão desde o início
-          </p>
-        </div>
-        <button
-          onClick={onNovoOrcamento}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold text-white bg-[#161421] hover:bg-[#0b0914] active:scale-[0.98] transition-all shrink-0">
-          <Plus className="w-3.5 h-3.5" />
-          Novo orçamento
-        </button>
-      </div>
-
-      {/* Tab bar */}
-      <div className="px-8 pb-4 shrink-0">
-        <div className="inline-flex bg-[#F2F2F7] rounded-xl p-1 gap-0.5">
-          <button className={TAB_STYLE(tab === "dashboard")} onClick={() => setTab("dashboard")}>
-            Dashboard
-          </button>
-          <button className={TAB_STYLE(tab === "historico")} onClick={() => setTab("historico")}>
-            Histórico
-            {(historico.length + propostasCustom.length) > 0 && (
-              <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-[rgba(116,116,128,0.12)] text-[#8E8E93] font-semibold">
-                {historico.length + propostasCustom.length}
-              </span>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Content */}
+    <div className="flex flex-col h-full" style={{ background: "var(--bg-page)" }}>
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {tab === "dashboard" ? (
-          <DashboardTab metrics={metrics} kanban={kanban} />
-        ) : (
-          <div className="px-6 pb-8">
-            <HistoricoView
-              historico={historico}
-              propostasCustom={propostasCustom}
-              onReplicar={onReplicar}
-              onDownloadPdf={onDownloadPdf}
-              onDownloadPdfCliente={onDownloadPdfCliente}
-              onExcluir={onExcluir}
-              onWhatsApp={onWhatsApp}
-              onPdfCustom={onPdfCustom}
-              onWhatsAppCustom={onWhatsAppCustom}
-              onExcluirCustom={onExcluirCustom}
-              onEditarCustom={onEditarCustom}
-              onPersonalizar={onPersonalizar}
-              onDetalhes={onDetalhes}
-            />
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ── Dashboard Tab ────────────────────────────────────────────────────────────
-
-type Metrics = ReturnType<typeof useDummyMetrics>
-function useDummyMetrics() { return {} as ReturnType<Parameters<typeof DashboardTab>[0]["metrics"] extends infer M ? () => M : never> }
-
-function DashboardTab({ metrics, kanban }: {
-  metrics: {
-    totalRealizados: number
-    totalFechados: number
-    totalPerdidos: number
-    totalExpirados: number
-    totalAbertos: number
-    taxaConversao: number
-    ticketMedioOrc: number
-    mediaOrcMes: number
-    orcPorCliente: number
-  }
-  kanban: KanbanCard[]
-}) {
-  const {
-    totalRealizados, totalFechados, totalPerdidos, totalExpirados, totalAbertos, taxaConversao,
-    ticketMedioOrc, mediaOrcMes, orcPorCliente,
-  } = metrics
-
-  const convColor = "#8456e8"
-  const convBg    = "rgba(132,86,232,0.08)"
-
-  return (
-    <div className="px-8 pb-10 space-y-6">
-
-      {/* KPIs — linha 1 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard
-          icon={<CheckCircle2 className="w-4 h-4" />}
-          iconColor="#15803d" iconBg="rgba(22,163,74,0.08)"
-          label="Fechados"
-          value={String(totalFechados)}
-          sub={`de ${totalRealizados} orçamentos${totalAbertos > 0 ? ` · ${totalAbertos} em aberto` : ""}`}
-          subColor="#15803d"
-        />
-        <KpiCard
-          icon={<XCircle className="w-4 h-4" />}
-          iconColor="#b91c1c" iconBg="rgba(185,28,28,0.08)"
-          label="Recusados"
-          value={String(totalPerdidos)}
-          sub="cliente disse não"
-          subColor="#b91c1c"
-        />
-        <KpiCard
-          icon={<Clock className="w-4 h-4" />}
-          iconColor="#c57800" iconBg="rgba(197,120,0,0.08)"
-          label="Sem resposta"
-          value={String(totalExpirados)}
-          sub="venceram sem decisão"
-          subColor="#c57800"
-        />
-        <KpiCard
-          icon={<Target className="w-4 h-4" />}
-          iconColor={convColor} iconBg={convBg}
-          label="Taxa de conversão"
-          value={`${num(taxaConversao, 1)}%`}
-          sub="fechados ÷ decididos"
-          subColor={convColor}
-          highlight
-        />
-      </div>
-
-      {/* KPIs de volume — linha 2 */}
-      <div>
-        <SectionLabel>Volume</SectionLabel>
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
-          <KpiCard
-            icon={<BarChart3 className="w-4 h-4" />}
-            iconColor="#7c3aed" iconBg="rgba(124,58,237,0.08)"
-            label="Valor médio orçado"
-            value={ticketMedioOrc > 0 ? brl(ticketMedioOrc) : "—"}
-            sub="por orçamento enviado"
+        <div className="max-w-[1320px] mx-auto px-6 pt-6 pb-10 space-y-4">
+          <CabecalhoPagina
+            titulo="Orçamentos"
+            sub={`${conv.total} orçamentos · ${conv.ganhos} fechados · ${num(conv.taxa, 0)}% de conversão desde o início`}
+            acoes={<>
+              <Segmentado<OrcTab> valor={tab} onChange={setTab} opcoes={[{ v: "lista", nome: "Lista" }, { v: "visao", nome: "Visão geral" }]} />
+              <Botao variante="primario" icone={<Plus className="w-4 h-4" />} onClick={onNovoOrcamento}>Novo orçamento</Botao>
+            </>}
           />
-          <KpiCard
-            icon={<Clock className="w-4 h-4" />}
-            iconColor="#f59e0b" iconBg="rgba(245,158,11,0.08)"
-            label="Orçamentos por mês"
-            value={num(mediaOrcMes, 1)}
-            sub="média histórica"
-          />
-          <KpiCard
-            icon={<Users className="w-4 h-4" />}
-            iconColor="#0ea5e9" iconBg="rgba(14,165,233,0.08)"
-            label="Orç. por cliente"
-            value={num(orcPorCliente, 1)}
-            sub="média por cliente"
-          />
-        </div>
-      </div>
 
-      {/* Gráfico histórico */}
-      <div>
-        <SectionLabel>Histórico mensal</SectionLabel>
-        <div className="mt-3">
-          <OrcLineChart kanban={kanban} />
-        </div>
-      </div>
+          <GradeKpis>
+            <Kpi rotulo="Em aberto" icone={<Hourglass className="w-3.5 h-3.5" />} tom="info" destaque={situacao === "aberto"}
+              valor={abertos.length} formato={inteiro} onClick={() => filtrar("aberto")}
+              sub={abertos.length ? `${brl(soma(abertos))} em negociação` : "nenhum aguardando resposta"} />
+            <Kpi rotulo="Fechados" icone={<CheckCircle2 className="w-3.5 h-3.5" />} tom="sucesso" destaque={situacao === "fechado"}
+              valor={fechados.length} formato={inteiro} onClick={() => filtrar("fechado")} sub={brl(soma(fechados))} />
+            <Kpi rotulo="Recusados" icone={<XCircle className="w-3.5 h-3.5" />} tom="perigo" destaque={situacao === "recusado"}
+              valor={recusados.length} formato={inteiro} onClick={() => filtrar("recusado")} sub="o cliente disse não" />
+            <Kpi rotulo="Sem resposta" icone={<Clock className="w-3.5 h-3.5" />} tom="alerta" destaque={situacao === "semResposta"}
+              valor={semResposta.length} formato={inteiro} onClick={() => filtrar("semResposta")} sub="venceram sem decisão" />
+            <Kpi rotulo="Conversão" icone={<Target className="w-3.5 h-3.5" />} tom="acento"
+              valor={conv.decididos > 0 ? conv.taxa : null} formato={n => `${num(n, 1)}%`}
+              sub={`${conv.ganhos} de ${conv.decididos} decididos`} onClick={() => setTab("visao")} />
+          </GradeKpis>
 
-      {/* Barra de conversão visual */}
-      {(totalFechados + totalPerdidos + totalExpirados) > 0 && (
-        <div>
-          <SectionLabel>Conversão</SectionLabel>
-          <div className="mt-3 rounded-2xl p-5" style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" }}>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[12px] font-semibold" style={{ color: "var(--text-faint)" }}>Fechados · recusados · sem resposta</span>
-              <span className="text-[12px] font-bold" style={{ color: convColor }}>{num(taxaConversao, 1)}% conversão</span>
+          {tab === "lista" ? <>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Segmentado<SituacaoOrc> valor={situacao} onChange={setSituacao} opcoes={[
+                { v: "todos", nome: "Todos" },
+                { v: "aberto", nome: `Em aberto ${abertos.length}` },
+                { v: "fechado", nome: `Fechados ${fechados.length}` },
+                { v: "recusado", nome: `Recusados ${recusados.length}` },
+                { v: "semResposta", nome: `Sem resposta ${semResposta.length}` },
+              ]} />
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#898892] pointer-events-none" />
+                <input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar cliente, número ou data"
+                  className="w-full h-9 rounded-lg pl-9 pr-8 text-[12.5px] text-[#191625] placeholder:text-[#898892] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] transition-all ds-borda" />
+                {busca && (
+                  <button onClick={() => setBusca("")} className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded flex items-center justify-center text-[#898892] hover:text-[#191625]">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <select value={ordem} onChange={e => setOrdem(e.target.value as OrdemHistorico)}
+                className="h-9 rounded-lg px-3 text-[12.5px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 cursor-pointer ds-borda">
+                <option value="recente">Mais recentes</option>
+                <option value="antigo">Mais antigos</option>
+                <option value="maior">Maior valor</option>
+                <option value="menor">Menor valor</option>
+                <option value="nome">Cliente A–Z</option>
+              </select>
             </div>
-            {(() => {
-              const dec = totalFechados + totalPerdidos + totalExpirados
-              return (
-                <div className="h-2.5 rounded-full overflow-hidden flex gap-0.5">
-                  <div className="h-full transition-all duration-700" style={{ width: `${(totalFechados / dec) * 100}%`, background: convColor }} />
-                  <div className="h-full transition-all duration-700" style={{ width: `${(totalPerdidos / dec) * 100}%`, background: "#d33a3c" }} />
-                  <div className="h-full transition-all duration-700" style={{ width: `${(totalExpirados / dec) * 100}%`, background: "rgba(197,120,0,0.45)" }} />
-                </div>
-              )
-            })()}
-            <div className="flex justify-between mt-2.5 text-[11px] text-[#8E8E93]">
-              <span className="flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                {totalFechados} fechados
-              </span>
-              <span className="flex items-center gap-1">
-                <XCircle className="w-3 h-3 text-red-500" />
-                {totalPerdidos} recusados · {totalExpirados} sem resposta
-              </span>
-            </div>
-          </div>
+            <HistoricoView {...props} busca={busca} ordem={ordem} situacao={situacao} />
+          </> : (
+            <VisaoGeral base={base} abrir={abrir} />
+          )}
         </div>
-      )}
-
-      {/* Empty state */}
-      {totalRealizados === 0 && (
-        <div className="py-20 text-center">
-          <div className="flex justify-center mb-3"><FileText className="w-10 h-10 text-[#c7c7cc]" /></div>
-          <p className="text-[14px] font-semibold" style={{ color: "var(--text-faint)" }}>Nenhum orçamento ainda</p>
-          <p className="text-[12px] text-[#8E8E93] mt-1">Clique em "Novo orçamento" para começar</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function OrcLineChart({ kanban }: { kanban: KanbanCard[] }) {
-  const [hovIdx, setHovIdx] = useState<number | null>(null)
-  const svgRef = useRef<SVGSVGElement>(null)
-
-  const meses = useMemo(() => {
-    const map = new Map<string, number>()
-    kanban.filter(c => !isTerceirizado(c)).forEach(c => {
-      if (!c.data) return
-      // c.data pode ser "dd/mm/yyyy, HH:MM:SS" ou "dd/mm/yyyy"
-      try {
-        const [d, m, y] = c.data.split(",")[0].trim().split("/")
-        if (!d || !m || !y) return
-        const key = `${y.trim()}-${m.padStart(2, "0")}`
-        map.set(key, (map.get(key) ?? 0) + 1)
-      } catch { /* skip */ }
-    })
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-18)
-  }, [kanban])
-
-  if (meses.length < 2) return null
-
-  const VW = 800, VH = 180
-  const PL = 28, PR = 16, PT = 20, PB = 32
-  const CW = VW - PL - PR
-  const CH = VH - PT - PB
-
-  const maxVal = Math.max(...meses.map(([, v]) => v), 1)
-  const d = new Date()
-  const currentMesKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-  const currentIdx = meses.findIndex(([ym]) => ym === currentMesKey)
-  const totalMeses = meses.length
-
-  const pts = meses.map(([ym, v], i) => ({
-    x: PL + (totalMeses > 1 ? (i / (totalMeses - 1)) : 0.5) * CW,
-    y: PT + CH - (v / maxVal) * CH,
-    v, ym,
-  }))
-
-  function smoothPath(points: { x: number; y: number }[]) {
-    if (points.length < 2) return ""
-    let path = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`
-    for (let i = 0; i < points.length - 1; i++) {
-      const dx = points[i + 1].x - points[i].x
-      const t = 0.35
-      path += ` C ${(points[i].x + dx * t).toFixed(1)} ${points[i].y.toFixed(1)}, ${(points[i + 1].x - dx * t).toFixed(1)} ${points[i + 1].y.toFixed(1)}, ${points[i + 1].x.toFixed(1)} ${points[i + 1].y.toFixed(1)}`
-    }
-    return path
-  }
-
-  const linePath = smoothPath(pts)
-  const areaPath = linePath + ` L ${pts[pts.length - 1].x.toFixed(1)} ${(PT + CH).toFixed(1)} L ${pts[0].x.toFixed(1)} ${(PT + CH).toFixed(1)} Z`
-
-  function onMouseMove(e: React.MouseEvent<SVGSVGElement>) {
-    const rect = svgRef.current?.getBoundingClientRect()
-    if (!rect) return
-    const svgX = ((e.clientX - rect.left) / rect.width) * VW
-    let closest = 0, minDist = Infinity
-    pts.forEach((p, i) => { const dist = Math.abs(p.x - svgX); if (dist < minDist) { minDist = dist; closest = i } })
-    setHovIdx(closest)
-  }
-
-  const hov = hovIdx !== null ? pts[hovIdx] : null
-  const gridVals = Array.from({ length: 4 }, (_, i) => Math.round((maxVal / 3) * i))
-  const stepLabel = Math.ceil(totalMeses / 7)
-  const mesAtual = currentIdx >= 0 ? meses[currentIdx][1] : 0
-  const mediaVal = kanban.filter(c => !isTerceirizado(c)).length / totalMeses
-
-  function fmtMes(ym: string) {
-    const [y, m] = ym.split("-")
-    const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
-    return `${MESES[parseInt(m) - 1]} ${y.slice(2)}`
-  }
-
-  return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" }}>
-      <div className="px-6 pt-5 pb-4 flex items-start gap-10" style={{ borderBottom: "1px solid var(--border)" }}>
-        <div>
-          <p className="text-[10.5px] uppercase tracking-wider font-bold text-[#8E8E93] mb-1">Este mês</p>
-          <p className="text-[32px] font-bold tabular-nums leading-none" style={{ color: "var(--text-main)" }}>{mesAtual}</p>
-          <p className="text-[11px] text-[#8E8E93] mt-1">orçamentos</p>
-        </div>
-        <div>
-          <p className="text-[10.5px] uppercase tracking-wider font-bold text-[#8E8E93] mb-1">Média mensal</p>
-          <p className="text-[32px] font-bold text-[#8456e8] tabular-nums leading-none">{num(mediaVal, 1)}</p>
-          <p className="text-[11px] text-[#8E8E93] mt-1">nos últimos {totalMeses} meses</p>
-        </div>
-        {hovIdx !== null && hovIdx !== currentIdx && (
-          <div>
-            <p className="text-[10.5px] uppercase tracking-wider font-bold text-[#8E8E93] mb-1">{fmtMes(meses[hovIdx][0])}</p>
-            <p className="text-[32px] font-bold tabular-nums leading-none" style={{ color: "var(--text-main)" }}>{meses[hovIdx][1]}</p>
-            <p className="text-[11px] text-[#8E8E93] mt-1">orçamentos</p>
-          </div>
-        )}
       </div>
 
-      <svg ref={svgRef} viewBox={`0 0 ${VW} ${VH}`}
-        style={{ width: "100%", display: "block", cursor: "crosshair" }}
-        onMouseMove={onMouseMove} onMouseLeave={() => setHovIdx(null)}>
-        <defs>
-          <linearGradient id="orc-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#8456e8" stopOpacity="0.14" />
-            <stop offset="85%" stopColor="#8456e8" stopOpacity="0.01" />
-          </linearGradient>
-        </defs>
-
-        {gridVals.map(v => {
-          const gy = PT + CH - (v / maxVal) * CH
+      <Gaveta aberta={!!gaveta} titulo={gaveta?.titulo ?? ""} sub={gaveta?.sub} onFechar={() => setGaveta(null)}>
+        {gaveta?.cards.length === 0 && <Vazio icone={<FileText className="w-8 h-8" />} titulo="Nenhum orçamento" />}
+        {gaveta?.cards.map(c => {
+          const sit = situacaoDoCard(c)
           return (
-            <g key={v}>
-              <line x1={PL} y1={gy} x2={VW - PR} y2={gy}
-                stroke={v === 0 ? "rgba(0,0,0,0.1)" : "rgba(0,0,0,0.05)"}
-                strokeWidth={1} strokeDasharray={v === 0 ? "" : "4 4"} />
-              {v > 0 && <text x={PL - 5} y={gy + 3.5} textAnchor="end" fontSize={9} fill="#c7c7cc"
-                fontFamily="-apple-system,sans-serif">{v}</text>}
-            </g>
+            <LinhaLista key={c.id} titulo={`${c.numero} · ${c.nomeCliente}`}
+              sub={`${parseData(c.data)?.toLocaleDateString("pt-BR") ?? ""}${c.motivoPerdido && isPerdido(c) ? ` · ${c.motivoPerdido}` : ""}`}
+              valor={brl(c.preco)} valorSub={<Selo tom={sit.tom}>{sit.nome}</Selo>}
+              onClick={historico.some(h => h.numero === c.numero) || propostasCustom.some(p => p.cardId === c.id) ? () => abrirCard(c) : undefined} />
           )
         })}
-
-        <path d={areaPath} fill="url(#orc-grad)" />
-        <path d={linePath} fill="none" stroke="#8456e8" strokeWidth={2.5}
-          strokeLinecap="round" strokeLinejoin="round" />
-
-        {currentIdx >= 0 && hovIdx !== currentIdx && (
-          <circle cx={pts[currentIdx].x} cy={pts[currentIdx].y} r={4.5}
-            fill="#8456e8" stroke="white" strokeWidth={2} />
-        )}
-
-        {pts.map((p, i) => {
-          if (i % stepLabel !== 0 && i !== totalMeses - 1) return null
-          return (
-            <text key={i} x={p.x} y={VH - 6} textAnchor="middle" fontSize={9} fill="#c7c7cc"
-              fontFamily="-apple-system,sans-serif">{fmtMes(meses[i][0])}</text>
-          )
-        })}
-
-        {hov && (() => {
-          const TW = 100, TH = 44, TR = 8
-          const tx = Math.min(Math.max(hov.x - TW / 2, PL), VW - PR - TW)
-          const ty = Math.max(PT + 4, hov.y - TH - 12)
-          return (
-            <>
-              <line x1={hov.x} y1={PT} x2={hov.x} y2={PT + CH}
-                stroke="#8456e8" strokeWidth={1} strokeDasharray="4 3" strokeOpacity={0.35} />
-              <circle cx={hov.x} cy={hov.y} r={5.5} fill="white" stroke="#8456e8" strokeWidth={2.5} />
-              <g>
-                <rect x={tx} y={ty} width={TW} height={TH} rx={TR} fill="#1C1C1E" />
-                <text x={tx + TW / 2} y={ty + 15} textAnchor="middle" fontSize={9.5}
-                  fill="rgba(255,255,255,0.55)" fontFamily="-apple-system,sans-serif">
-                  {fmtMes(hov.ym)}
-                </text>
-                <text x={tx + TW / 2} y={ty + 32} textAnchor="middle" fontSize={14}
-                  fontWeight="700" fill="white" fontFamily="-apple-system,sans-serif">
-                  {hov.v} orç.
-                </text>
-              </g>
-            </>
-          )
-        })()}
-      </svg>
+      </Gaveta>
     </div>
   )
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+function VisaoGeral({ base, abrir }: { base: KanbanCard[]; abrir: (titulo: string, cards: KanbanCard[]) => void }) {
+  const conv = conversao(base)
+  const hoje = new Date()
+  const meses = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - 11 + i, 1)
+    const doMes = base.filter(c => { const x = parseData(c.data); return !!x && x.getFullYear() === d.getFullYear() && x.getMonth() === d.getMonth() })
+    return { chave: String(i), rotulo: d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""), valor: doMes.length, destaque: i === 11, cards: doMes, nome: d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }) }
+  })
+  const comOrc = meses.filter(m => m.valor > 0)
+  const mediaMes = comOrc.length ? comOrc.reduce((s, m) => s + m.valor, 0) / comOrc.length : 0
+  const valorMedio = base.length ? base.reduce((s, c) => s + c.preco, 0) / base.length : 0
+  const clientes = new Set(base.map(c => nomeChave(c.nomeCliente)).filter(Boolean)).size
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[10.5px] uppercase tracking-wider font-bold text-[#8E8E93]">{children}</p>
-  )
-}
+  // Motivos de recusa (só quem disse não; vencidos ficam de fora)
+  const motivos = new Map<string, KanbanCard[]>()
+  for (const c of base.filter(isPerdido)) {
+    const m = (c.motivoPerdido || "Sem motivo informado").trim()
+    motivos.set(m, [...(motivos.get(m) ?? []), c])
+  }
+  const listaMotivos = [...motivos.entries()].sort((a, b) => b[1].length - a[1].length)
 
-function KpiCard({
-  icon, iconColor, iconBg, label, value, sub, subColor, highlight,
-}: {
-  icon: React.ReactNode
-  iconColor: string
-  iconBg: string
-  label: string
-  value: string
-  sub?: string
-  subColor?: string
-  highlight?: boolean
-}) {
+  if (!base.length) return <Vazio icone={<FileText className="w-9 h-9" />} titulo="Nenhum orçamento ainda" sub='Clique em "Novo orçamento" para começar.' />
+
+  const pct = (n: number) => conv.decididos > 0 ? (n / conv.decididos) * 100 : 0
   return (
-    <div className={`bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-5 py-4 ${highlight ? "ring-1 ring-[rgba(124,58,237,0.1)]" : ""}`}>
-      <div className="flex items-center gap-2.5 mb-3">
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-          style={{ background: iconBg, color: iconColor }}>
-          {icon}
-        </div>
-        <p className="text-[10.5px] uppercase tracking-wider font-semibold text-[#8E8E93] leading-tight">{label}</p>
+    <div className="space-y-4 ds-escalonado">
+      <Cartao>
+        <TituloCartao titulo="Orçamentos enviados por mês" icone={<BarChart3 className="w-4 h-4" />}
+          sub={`${meses[11].valor} neste mês · média de ${num(mediaMes, 1)} por mês · clique num mês para ver a lista`} />
+        <Colunas itens={meses} formato={n => `${Math.round(n)} ${Math.round(n) === 1 ? "orçamento" : "orçamentos"}`}
+          onClick={k => { const m = meses[Number(k)]; abrir(`Orçamentos de ${m.nome}`, m.cards) }} />
+      </Cartao>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-4 items-start">
+        <Cartao>
+          <TituloCartao titulo="Para onde vão os orçamentos" icone={<Target className="w-4 h-4" />}
+            sub={`${conv.decididos} decididos · ${conv.abertos} ainda em aberto`} />
+          <div className="h-3 rounded-full overflow-hidden flex gap-0.5 bg-[rgba(116,116,128,0.08)]">
+            <div className="h-full ds-cresce-x bg-[#009351]" style={{ width: `${pct(conv.ganhos)}%` }} />
+            <div className="h-full ds-cresce-x bg-[#d33a3c]" style={{ width: `${pct(conv.perdidos)}%`, animationDelay: "80ms" }} />
+            <div className="h-full ds-cresce-x bg-[#c57800]/60" style={{ width: `${pct(conv.expirados)}%`, animationDelay: "160ms" }} />
+          </div>
+          <div className="grid grid-cols-3 gap-2 mt-4">
+            {[
+              { nome: "Fechados", n: conv.ganhos, cor: "#009351", lista: base.filter(isGanho) },
+              { nome: "Recusados", n: conv.perdidos, cor: "#d33a3c", lista: base.filter(isPerdido) },
+              { nome: "Sem resposta", n: conv.expirados, cor: "#c57800", lista: base.filter(isExpirado) },
+            ].map(x => (
+              <button key={x.nome} onClick={() => abrir(x.nome, x.lista)}
+                className="text-left rounded-lg px-3 py-2.5 hover:bg-[rgba(116,116,128,0.06)] transition-colors">
+                <p className="text-[11px] text-[#898892] flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: x.cor }} />{x.nome}</p>
+                <p className="text-[18px] font-semibold text-[#191625] ds-num mt-1">{x.n} <span className="text-[12px] font-medium text-[#898892]">{num(pct(x.n), 0)}%</span></p>
+              </button>
+            ))}
+          </div>
+          <p className="text-[11.5px] text-[#898892] mt-3 leading-relaxed">
+            {conv.expirados > conv.perdidos
+              ? `A maior perda não é recusa: ${conv.expirados} orçamentos venceram sem resposta. Um retorno antes do vencimento recupera parte deles.`
+              : `Conversão de ${num(conv.taxa, 1)}% sobre os orçamentos decididos.`}
+          </p>
+        </Cartao>
+
+        <Cartao>
+          <TituloCartao titulo="Por que recusaram" icone={<MessageSquareX className="w-4 h-4" />} sub={`${conv.perdidos} recusas com motivo informado`} />
+          {listaMotivos.length === 0
+            ? <Vazio icone={<CheckCircle2 className="w-8 h-8" />} titulo="Nenhuma recusa registrada" />
+            : <ListaBarras onClick={k => { const m = listaMotivos[Number(k)]; abrir(`Recusados: ${m[0]}`, m[1]) }}
+                itens={listaMotivos.slice(0, 6).map(([nome, cs], i) => ({ chave: i, rotulo: nome, qtd: cs.length, tom: "perigo" as const }))} />}
+        </Cartao>
       </div>
-      <p className="text-[22px] font-bold tabular-nums text-[#1C1C1E] tracking-tight leading-none">{value}</p>
-      {sub && (
-        <p className="text-[11px] mt-1.5" style={{ color: subColor ?? "#8E8E93" }}>{sub}</p>
-      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Kpi rotulo="Valor médio orçado" icone={<BarChart3 className="w-3.5 h-3.5" />} valor={valorMedio} formato={brl} sub="por orçamento enviado" />
+        <Kpi rotulo="Orçamentos por mês" icone={<Clock className="w-3.5 h-3.5" />} valor={mediaMes} formato={n => num(n, 1)} sub="nos meses com envio" />
+        <Kpi rotulo="Por cliente" icone={<Users className="w-3.5 h-3.5" />} valor={clientes ? base.length / clientes : 0} formato={n => num(n, 1)} sub={`${clientes} clientes diferentes`} />
+      </div>
     </div>
   )
 }

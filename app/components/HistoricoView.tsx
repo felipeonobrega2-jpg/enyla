@@ -1,30 +1,41 @@
 "use client"
 
-import { useState } from "react"
-import { FormData, Calculo, PropostaCustom } from "../types"
+import { FormData, Calculo, PropostaCustom, KanbanCard, COL_HOT } from "../types"
 import { brl, num } from "../utils"
+import { isGanho, isPerdido, isExpirado, parseData } from "../lib/negocio"
+import { Copy, Sparkles, MessageCircle, FileDown, FileText, Trash2, PencilLine, Search } from "lucide-react"
+import { Selo, Tom, Vazio } from "./ds"
 
-type OrdemHistorico = "recente" | "antigo" | "maior" | "menor" | "nome"
+export type OrdemHistorico = "recente" | "antigo" | "maior" | "menor" | "nome"
+export type SituacaoOrc = "todos" | "aberto" | "fechado" | "recusado" | "semResposta"
 
 export type HistItem = { form: FormData; calculo: Calculo; data: string; numero?: string }
 
+// Situação de um orçamento pelo card do quadro (mesmas regras de lib/negocio)
+export function situacaoDoCard(card?: KanbanCard): { id: Exclude<SituacaoOrc, "todos">; nome: string; tom: Tom } {
+  if (!card) return { id: "aberto", nome: "Sem card", tom: "neutro" }
+  if (isGanho(card)) return { id: "fechado", nome: "Fechado", tom: "sucesso" }
+  if (isPerdido(card)) return { id: "recusado", nome: "Recusado", tom: "perigo" }
+  if (isExpirado(card)) return { id: "semResposta", nome: "Sem resposta", tom: "alerta" }
+  if (card.coluna === COL_HOT) return { id: "aberto", nome: "Lead quente", tom: "acento" }
+  return { id: "aberto", nome: "Em aberto", tom: "info" }
+}
+
+type ListItem =
+  | { tipo: "hist"; item: HistItem; originalIndex: number; data: string; numero: string; preco: number; qtd: number; nome: string; card?: KanbanCard }
+  | { tipo: "proposta"; item: PropostaCustom; data: string; numero: string; preco: number; qtd: number; nome: string; card?: KanbanCard }
+
 export function HistoricoView({
-  historico,
-  propostasCustom,
-  onReplicar,
-  onDownloadPdf,
-  onDownloadPdfCliente,
-  onExcluir,
-  onWhatsApp,
-  onPdfCustom,
-  onWhatsAppCustom,
-  onExcluirCustom,
-  onEditarCustom,
-  onPersonalizar,
-  onDetalhes,
+  historico, propostasCustom, kanban, busca, ordem, situacao,
+  onReplicar, onDownloadPdf, onDownloadPdfCliente, onExcluir, onWhatsApp,
+  onPdfCustom, onWhatsAppCustom, onExcluirCustom, onEditarCustom, onPersonalizar, onDetalhes,
 }: {
   historico: HistItem[]
   propostasCustom: PropostaCustom[]
+  kanban: KanbanCard[]
+  busca: string
+  ordem: OrdemHistorico
+  situacao: SituacaoOrc
   onReplicar: (item: HistItem) => void
   onDownloadPdf: (item: HistItem) => void
   onDownloadPdfCliente: (item: HistItem) => void
@@ -37,326 +48,119 @@ export function HistoricoView({
   onPersonalizar?: (item: HistItem) => void
   onDetalhes?: (item: HistItem | PropostaCustom) => void
 }) {
-  const [busca, setBusca] = useState("")
-  const [ordem, setOrdem] = useState<OrdemHistorico>("recente")
-
-  function parseBRDate(d: string): number {
-    const [day, mon, year] = d.split("/").map(Number)
-    return isNaN(year) ? 0 : new Date(year, mon - 1, day).getTime()
-  }
-
-  function parseNumero(n?: string): number {
-    return parseInt(n?.replace(/\D/g, "") ?? "0", 10)
-  }
+  const porNumero = new Map(kanban.map(c => [c.numero, c]))
+  const porId = new Map(kanban.map(c => [c.id, c]))
+  const tempo = (d: string) => parseData(d)?.getTime() ?? 0
+  const numeroInt = (n?: string) => parseInt(n?.replace(/\D/g, "") ?? "0", 10)
 
   const precoItem = (item: HistItem) => {
     const ideal = item.calculo.tabela.find(l => l.quantidade === item.calculo.sweetSpotIdealQtd) ?? item.calculo.tabela[0]
-    return item.form.comFaca ? (ideal?.precoComFaca ?? 0) : (ideal?.precoSemFaca ?? 0)
+    return { preco: item.form.comFaca ? (ideal?.precoComFaca ?? 0) : (ideal?.precoSemFaca ?? 0), qtd: ideal?.quantidade ?? 0 }
   }
-
-  type ListItem =
-    | { tipo: "hist";     item: HistItem;      originalIndex: number; data: string; numero: string; preco: number; nome: string }
-    | { tipo: "proposta"; item: PropostaCustom; data: string; numero: string; preco: number; nome: string }
-
-  const precoPropostaCustom = (p: PropostaCustom) => {
-    const linhasAtivas = p.linhas.filter(l => l.ativa && l.quantidade > 0)
-    const ideal = linhasAtivas.find(l => l.isIdeal) ?? linhasAtivas[linhasAtivas.length - 1]
-    return ideal ? ideal.unitario * ideal.quantidade : 0
+  const precoProposta = (p: PropostaCustom) => {
+    const ativas = p.linhas.filter(l => l.ativa && l.quantidade > 0)
+    const ideal = ativas.find(l => l.isIdeal) ?? ativas[ativas.length - 1]
+    return { preco: ideal ? ideal.unitario * ideal.quantidade : 0, qtd: ideal?.quantidade ?? 0 }
   }
 
   const q = busca.trim().toLowerCase()
+  const todos: ListItem[] = [
+    ...historico.map((item, idx) => ({
+      tipo: "hist" as const, item, originalIndex: idx, data: item.data, numero: item.numero ?? "",
+      ...precoItem(item), nome: item.form.nomeCliente || "", card: porNumero.get(item.numero ?? ""),
+    })),
+    ...propostasCustom.map(p => ({
+      tipo: "proposta" as const, item: p, data: p.data, numero: p.numero,
+      ...precoProposta(p), nome: p.nomeCliente || "", card: porId.get(p.cardId) ?? porNumero.get(p.numero),
+    })),
+  ]
 
-  const histItems: ListItem[] = historico
-    .map((item, idx) => ({
-      tipo: "hist" as const,
-      item,
-      originalIndex: idx,
-      data: item.data,
-      numero: item.numero ?? "",
-      preco: precoItem(item),
-      nome: item.form.nomeCliente || "",
-    }))
-    .filter(e => !q ||
-      e.nome.toLowerCase().includes(q) ||
-      e.data.toLowerCase().includes(q) ||
-      e.numero.toLowerCase().includes(q)
-    )
-
-  const propostaItems: ListItem[] = propostasCustom
-    .map(p => ({
-      tipo: "proposta" as const,
-      item: p,
-      data: p.data,
-      numero: p.numero,
-      preco: precoPropostaCustom(p),
-      nome: p.nomeCliente || "",
-    }))
-    .filter(e => !q ||
-      e.nome.toLowerCase().includes(q) ||
-      e.data.toLowerCase().includes(q) ||
-      e.numero.toLowerCase().includes(q)
-    )
-
-  const lista = [...histItems, ...propostaItems].sort((a, b) => {
-    if (ordem === "recente") {
-      const dt = parseBRDate(b.data) - parseBRDate(a.data)
-      return dt !== 0 ? dt : parseNumero(b.numero) - parseNumero(a.numero)
-    }
-    if (ordem === "antigo") {
-      const dt = parseBRDate(a.data) - parseBRDate(b.data)
-      return dt !== 0 ? dt : parseNumero(a.numero) - parseNumero(b.numero)
-    }
-    if (ordem === "maior") return b.preco - a.preco
-    if (ordem === "menor") return a.preco - b.preco
-    if (ordem === "nome")  return a.nome.localeCompare(b.nome, "pt-BR")
-    return 0
-  })
-
-  const temResultados = lista.length > 0
+  const lista = todos
+    .filter(e => !q || e.nome.toLowerCase().includes(q) || e.numero.toLowerCase().includes(q) || e.data.includes(q))
+    .filter(e => situacao === "todos" || situacaoDoCard(e.card).id === situacao)
+    .sort((a, b) => {
+      if (ordem === "recente") return (tempo(b.data) - tempo(a.data)) || (numeroInt(b.numero) - numeroInt(a.numero))
+      if (ordem === "antigo")  return (tempo(a.data) - tempo(b.data)) || (numeroInt(a.numero) - numeroInt(b.numero))
+      if (ordem === "maior")   return b.preco - a.preco
+      if (ordem === "menor")   return a.preco - b.preco
+      return a.nome.localeCompare(b.nome, "pt-BR")
+    })
 
   if (!historico.length && !propostasCustom.length) return (
-    <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-6">
-      <div className="w-12 h-12 rounded-2xl bg-[rgba(116,116,128,0.08)] flex items-center justify-center mb-1">
-        <svg className="w-6 h-6 text-[#8E8E93]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-        </svg>
-      </div>
-      <p className="text-[14px] font-semibold text-[#191625]">Nenhum registro ainda</p>
-      <p className="text-[12px] text-[#8E8E93] max-w-[260px] leading-relaxed">
-        Orçamentos calculados e propostas personalizadas aparecerão aqui.
-      </p>
-    </div>
+    <Vazio icone={<FileText className="w-9 h-9" />} titulo="Nenhum orçamento ainda" sub="Os orçamentos calculados e as propostas personalizadas aparecem aqui." />
+  )
+  if (!lista.length) return (
+    <Vazio icone={<Search className="w-8 h-8" />} titulo={busca ? `Nenhum resultado para "${busca}"` : "Nenhum orçamento nesta situação"}
+      sub={busca ? undefined : "Clique de novo no número do topo para ver todos."} />
   )
 
   return (
-    <div className="h-full overflow-y-auto px-6 py-6 flex flex-col gap-5" style={{ background: "var(--bg-page)" }}>
-
-      {/* Barra de busca + ordenação */}
-      <div className="flex gap-2 items-center">
-        <div className="relative flex-1">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8E8E93]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-          </svg>
-          <input
-            type="text"
-            value={busca}
-            onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar por cliente, número ou data…"
-            className="w-full border border-[rgba(0,0,0,0.12)] rounded-xl pl-9 pr-9 py-2.5 text-[13px] text-[#191625] placeholder:text-[rgba(60,60,67,0.36)] focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25 focus:border-[#8456e8] bg-white transition-all"
-          />
-          {busca && (
-            <button onClick={() => setBusca("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[rgba(60,60,67,0.36)] hover:text-[#191625] text-lg leading-none transition-colors">×</button>
-          )}
-        </div>
-        <select
-          value={ordem}
-          onChange={e => setOrdem(e.target.value as OrdemHistorico)}
-          className="border border-[rgba(0,0,0,0.12)] rounded-xl px-3 py-2.5 text-[13px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25 focus:border-[#8456e8] cursor-pointer transition-all"
-        >
-          <option value="recente">Mais recentes</option>
-          <option value="antigo">Mais antigos</option>
-          <option value="maior">Maior valor</option>
-          <option value="menor">Menor valor</option>
-          <option value="nome">Nome A–Z</option>
-        </select>
-      </div>
-
-      {/* Sem resultados */}
-      {!temResultados && busca && (
-        <div className="text-center py-16">
-          <p className="text-[13px] text-[#8E8E93]">Nenhum resultado para <span className="font-medium text-[#191625]">"{busca}"</span>.</p>
-        </div>
-      )}
-
-      {/* Lista unificada */}
-      {lista.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <p className="text-[10px] uppercase tracking-wide font-semibold text-[#8E8E93] mb-1">
-            {lista.length} registro{lista.length !== 1 ? "s" : ""}
-            {busca ? ` para "${busca}"` : ""}
-          </p>
-
-          {lista.map(entry => {
-            if (entry.tipo === "hist") {
-              const { item, originalIndex, preco } = entry
-              const ideal = item.calculo.tabela.find(l => l.quantidade === item.calculo.sweetSpotIdealQtd) ?? item.calculo.tabela[0]
-              return (
-                <div key={`h-${originalIndex}`}
-                  className="group relative bg-white border border-[rgba(0,0,0,0.06)] rounded-xl overflow-hidden hover:border-[rgba(0,0,0,0.10)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-px transition-all duration-200"
-                >
-                  <div className="flex items-center gap-4 px-5 py-3.5">
-                    <button onClick={() => onDetalhes?.(item)} className="flex-1 min-w-0 text-left">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-[14px] text-[#191625] leading-snug">{item.form.nomeCliente || "Sem nome"}</span>
-                        {item.numero && (
-                          <span className="shrink-0 text-[10px] font-bold text-[#8456e8] bg-[#8456e8]/10 border border-[#8456e8]/20 px-1.5 py-0.5 rounded-full tabular-nums">{item.numero}</span>
-                        )}
-                      </div>
-                      <p className="text-[11.5px] text-[#8E8E93] mt-0.5">
-                        {item.form.frente}×{item.form.alturaBox}×{item.form.lateral} cm
-                        {item.form.materialNome && ` · ${item.form.materialNome}`}
-                        {` · ${item.data}`}
-                      </p>
-                    </button>
-                    <div className="relative shrink-0 flex items-center justify-end" style={{ minWidth: 196 }}>
-                      <div className="text-right transition-opacity duration-150 group-hover:opacity-0 group-hover:pointer-events-none">
-                        <p className="font-bold text-[15px] text-[#191625] tabular-nums">{brl(preco)}</p>
-                        <p className="text-[11px] text-[#8E8E93] tabular-nums">{num(ideal?.quantidade ?? 0)} un</p>
-                      </div>
-                      <div className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                        <IconBtn title="Replicar" onClick={() => onReplicar(item)}><CopyIcon /></IconBtn>
-                        {onPersonalizar && (
-                          <IconBtn title="Personalizar proposta" onClick={() => onPersonalizar(item)} color="blue"><SparkleIcon /></IconBtn>
-                        )}
-                        <IconBtn title="WhatsApp" onClick={() => onWhatsApp(item)} color="green"><WhatsAppIcon /></IconBtn>
-                        <IconBtn title="PDF Cliente" onClick={() => onDownloadPdfCliente(item)} color="blue"><PdfClienteIcon /></IconBtn>
-                        <IconBtn title="PDF Gráfica" onClick={() => onDownloadPdf(item)}><PdfGraficaIcon /></IconBtn>
-                        <IconBtn title="Excluir" onClick={() => { if (confirm("Excluir este orçamento?")) onExcluir(originalIndex) }} color="red"><TrashIcon /></IconBtn>
-                      </div>
-                    </div>
+    <div className="space-y-2">
+      <p className="text-[11px] font-medium text-[#898892] px-1 pb-1">
+        {lista.length} {lista.length === 1 ? "orçamento salvo" : "orçamentos salvos"}
+        {(() => { const sem = lista.filter(e => !e.card).length; return sem > 0 ? ` · ${sem} sem card no quadro (não entram na conversão)` : "" })()}
+      </p>
+      <div className="space-y-2 ds-escalonado">
+        {lista.map(entry => {
+          const sit = situacaoDoCard(entry.card)
+          const sub = entry.tipo === "hist"
+            ? [entry.item.form.frente > 0 ? `${entry.item.form.frente}×${entry.item.form.alturaBox}×${entry.item.form.lateral} cm` : "Dieline importado", entry.item.form.materialNome]
+            : [entry.item.descricao, entry.item.dimensoes, entry.item.material]
+          const data = parseData(entry.data)?.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).replace(".", "")
+          return (
+            <div key={entry.tipo === "hist" ? `h-${entry.originalIndex}` : `p-${entry.item.id}`}
+              className="group bg-white rounded-xl ds-cartao hover:shadow-[0_4px_14px_rgba(25,22,37,0.06)]">
+              <div className="flex items-center gap-4 px-5 py-3.5">
+                <button onClick={() => onDetalhes?.(entry.item)} className="flex-1 min-w-0 text-left">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-[13.5px] text-[#191625] leading-snug">{entry.nome || "Sem nome"}</span>
+                    {entry.numero && <Selo tom="acento">{entry.numero}</Selo>}
+                    {entry.tipo === "proposta" && <Selo tom="neutro">Personalizada</Selo>}
+                    <Selo tom={sit.tom}>{sit.nome}</Selo>
                   </div>
-                </div>
-              )
-            }
-
-            // tipo === "proposta"
-            const { item: p, preco } = entry
-            const linhasAtivas = p.linhas.filter(l => l.ativa && l.quantidade > 0)
-            const ideal = linhasAtivas.find(l => l.isIdeal) ?? linhasAtivas[linhasAtivas.length - 1]
-            return (
-              <div key={`p-${p.id}`}
-                className="group relative bg-white border border-[rgba(0,0,0,0.06)] rounded-xl overflow-hidden hover:border-[rgba(0,0,0,0.10)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-px transition-all duration-200"
-              >
-                <div className="flex items-center gap-4 px-5 py-3.5">
-                  <button onClick={() => onDetalhes?.(p)} className="flex-1 min-w-0 text-left">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-[14px] text-[#191625] leading-snug">{p.nomeCliente || "Sem nome"}</span>
-                      <span className="shrink-0 text-[10px] font-bold text-[#a582ff] bg-[#a582ff]/10 border border-[#a582ff]/20 px-1.5 py-0.5 rounded-full tabular-nums">{p.numero}</span>
-                    </div>
-                    <p className="text-[11.5px] text-[#8E8E93] mt-0.5">
-                      {[p.descricao, p.dimensoes, p.material].filter(Boolean).join(" · ") || "—"}
-                      {` · ${p.data}`}
-                    </p>
-                  </button>
-                  <div className="relative shrink-0 flex items-center justify-end" style={{ minWidth: 164 }}>
-                    <div className="text-right transition-opacity duration-150 group-hover:opacity-0 group-hover:pointer-events-none">
-                      {preco > 0
-                        ? <>
-                            <p className="font-bold text-[15px] text-[#191625] tabular-nums">{brl(preco)}</p>
-                            <p className="text-[11px] text-[#8E8E93] tabular-nums">{num(ideal?.quantidade ?? 0)} un</p>
-                          </>
-                        : <p className="text-[13px] text-[rgba(60,60,67,0.36)] font-medium">—</p>
-                      }
-                    </div>
-                    <div className="absolute inset-0 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                      <IconBtn title="Editar proposta" onClick={() => onEditarCustom(p)} color="violet"><EditIcon /></IconBtn>
-                      <IconBtn title="WhatsApp" onClick={() => onWhatsAppCustom(p)} color="green"><WhatsAppIcon /></IconBtn>
-                      <IconBtn title="PDF Cliente" onClick={() => onPdfCustom(p)} color="blue"><PdfClienteIcon /></IconBtn>
-                      <IconBtn title="Excluir" onClick={() => { if (confirm("Excluir esta proposta?")) onExcluirCustom(p.id) }} color="red"><TrashIcon /></IconBtn>
-                    </div>
+                  <p className="text-[11px] text-[#898892] mt-1 truncate">
+                    {[...sub.filter(Boolean), data].join(" · ")}
+                  </p>
+                </button>
+                <div className="relative shrink-0 flex items-center justify-end" style={{ minWidth: 210 }}>
+                  <div className="text-right transition-opacity duration-150 group-hover:opacity-0 group-hover:pointer-events-none">
+                    <p className="font-semibold text-[13.5px] text-[#191625] ds-num">{entry.preco > 0 ? brl(entry.preco) : entry.card?.preco ? brl(entry.card.preco) : "—"}</p>
+                    {entry.qtd > 0 && <p className="text-[10.5px] text-[#898892] ds-num mt-0.5">{num(entry.qtd)} un</p>}
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                    {entry.tipo === "hist" ? <>
+                      <Acao titulo="Replicar" onClick={() => onReplicar(entry.item)}><Copy className="w-3.5 h-3.5" /></Acao>
+                      {onPersonalizar && <Acao titulo="Personalizar proposta" onClick={() => onPersonalizar(entry.item)} tom="acento"><Sparkles className="w-3.5 h-3.5" /></Acao>}
+                      <Acao titulo="Enviar no WhatsApp" onClick={() => onWhatsApp(entry.item)} tom="sucesso"><MessageCircle className="w-3.5 h-3.5" /></Acao>
+                      <Acao titulo="PDF para o cliente" onClick={() => onDownloadPdfCliente(entry.item)} tom="acento"><FileDown className="w-3.5 h-3.5" /></Acao>
+                      <Acao titulo="PDF interno (gráfica)" onClick={() => onDownloadPdf(entry.item)}><FileText className="w-3.5 h-3.5" /></Acao>
+                      <Acao titulo="Excluir" onClick={() => { if (confirm("Excluir este orçamento?")) onExcluir(entry.originalIndex) }} tom="perigo"><Trash2 className="w-3.5 h-3.5" /></Acao>
+                    </> : <>
+                      <Acao titulo="Editar proposta" onClick={() => onEditarCustom(entry.item)} tom="acento"><PencilLine className="w-3.5 h-3.5" /></Acao>
+                      <Acao titulo="Enviar no WhatsApp" onClick={() => onWhatsAppCustom(entry.item)} tom="sucesso"><MessageCircle className="w-3.5 h-3.5" /></Acao>
+                      <Acao titulo="PDF para o cliente" onClick={() => onPdfCustom(entry.item)} tom="acento"><FileDown className="w-3.5 h-3.5" /></Acao>
+                      <Acao titulo="Excluir" onClick={() => { if (confirm("Excluir esta proposta?")) onExcluirCustom(entry.item.id) }} tom="perigo"><Trash2 className="w-3.5 h-3.5" /></Acao>
+                    </>}
                   </div>
                 </div>
               </div>
-            )
-          })}
-        </div>
-      )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function SectionLabel({ children }: { children: React.ReactNode; violet?: boolean }) {
+function Acao({ titulo, onClick, children, tom }: { titulo: string; onClick: () => void; children: React.ReactNode; tom?: "acento" | "sucesso" | "perigo" }) {
+  const cor = tom === "acento" ? "text-[#8456e8] hover:bg-[#8456e8]/[0.08]"
+    : tom === "sucesso" ? "text-[#009351] hover:bg-[#009351]/[0.08]"
+    : tom === "perigo" ? "text-[#d33a3c] hover:bg-[#d33a3c]/[0.08]"
+    : "text-[#5e5c68] hover:bg-[rgba(116,116,128,0.1)]"
   return (
-    <p className="text-[10px] uppercase tracking-wide font-bold mb-1 text-[#8E8E93]">
-      {children}
-    </p>
-  )
-}
-
-function IconBtn({
-  title, onClick, children, color = "slate",
-}: {
-  title: string
-  onClick: () => void
-  children: React.ReactNode
-  color?: "slate" | "blue" | "green" | "red" | "violet"
-}) {
-  const colors = {
-    slate:  "text-[#8E8E93] hover:bg-[rgba(0,0,0,0.04)] hover:text-[#191625]",
-    blue:   "text-[#8456e8] hover:bg-[#8456e8]/5 hover:text-[#7445d4]",
-    green:  "text-[#009351] hover:bg-[#009351]/5 hover:text-[#248A3D]",
-    red:    "text-[#d33a3c] hover:bg-[#d33a3c]/5 hover:text-[#D70015]",
-    violet: "text-[#8456e8] hover:bg-[#8456e8]/5 hover:text-[#7445d4]",
-  }
-  return (
-    <button
-      title={title}
-      onClick={e => { e.stopPropagation(); onClick() }}
-      className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${colors[color]}`}
-    >
+    <button title={titulo} onClick={e => { e.stopPropagation(); onClick() }}
+      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${cor}`}>
       {children}
     </button>
-  )
-}
-
-// ─── Icons ────────────────────────────────────────────────────────────────────
-
-function CopyIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
-    </svg>
-  )
-}
-
-function SparkleIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
-    </svg>
-  )
-}
-
-function EditIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
-    </svg>
-  )
-}
-
-function WhatsAppIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-      <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.526 5.847L0 24l6.335-1.502A11.944 11.944 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.006-1.373l-.36-.214-3.724.882.897-3.63-.235-.374A9.817 9.817 0 0 1 2.182 12c0-5.42 4.398-9.818 9.818-9.818 5.42 0 9.818 4.398 9.818 9.818 0 5.42-4.398 9.818-9.818 9.818z"/>
-    </svg>
-  )
-}
-
-function PdfClienteIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-    </svg>
-  )
-}
-
-function PdfGraficaIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-    </svg>
-  )
-}
-
-function TrashIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-    </svg>
   )
 }
