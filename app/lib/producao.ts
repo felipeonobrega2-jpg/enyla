@@ -120,6 +120,9 @@ export type ConfigProducao = {
   ferramentais: Ferramental[]
   movimentos: MovimentoFornecedor[]
   ocorrencias: Ocorrencia[]
+  // Automações ao mover o pedido no quadro
+  automacoes: { prazoEntrega: boolean; fornecedores: boolean }
+  prazoEntregaPadraoDias: number
 }
 
 export const PRODUCAO_PADRAO: ConfigProducao = {
@@ -157,6 +160,8 @@ export const PRODUCAO_PADRAO: ConfigProducao = {
   ferramentais: [],
   movimentos: [],
   ocorrencias: [],
+  automacoes: { prazoEntrega: true, fornecedores: true },
+  prazoEntregaPadraoDias: 15,
 }
 
 // Completa um cadastro salvo antes de existir algum campo novo
@@ -168,6 +173,7 @@ export function normalizarProducao(p?: Partial<ConfigProducao> | null): ConfigPr
     fornecedores: p.fornecedores ?? d.fornecedores,
     padroes: { ...d.padroes, ...p.padroes },
     ferramentalPadrao: { ...d.ferramentalPadrao, ...p.ferramentalPadrao },
+    automacoes: { ...d.automacoes, ...p.automacoes },
     ferramentais: p.ferramentais ?? [],
     movimentos: p.movimentos ?? [],
     ocorrencias: p.ocorrencias ?? [],
@@ -642,4 +648,43 @@ export function calcularRotas(e: EntradaRotas): ResultadoRotas {
     }
   }
   return { porQuantidade, alertas, facaRegistrada }
+}
+
+// ── Automação: envio e retorno de fornecedor a partir da etapa do pedido ──────
+//   Impressão (5)          → abre envio ao impressor
+//   Verniz/Acabamento (6,7) → recebe a impressão e abre envio ao acabamento
+//   Expedição/Entregue (8,9) → recebe tudo que estiver aberto
+export function movimentosPorEtapa(
+  p: ConfigProducao, pedidoKey: string, pedidoLabel: string, coluna: number, impressorId: string | null, hojeIso: string,
+): MovimentoFornecedor[] | null {
+  const forn = (id?: string | null) => p.fornecedores.find(f => f.id === id && f.ativo)
+  const prazo = (fornecedorId: string) => {
+    const f = forn(fornecedorId)
+    if (!f?.prazoDias) return undefined
+    const d = new Date(hojeIso + "T12:00:00"); d.setDate(d.getDate() + f.prazoDias)
+    return d.toLocaleDateString("sv-SE")
+  }
+  let movs = p.movimentos
+  const aberto = (etapa: EtapaPedido) => movs.find(m => m.pedidoKey === pedidoKey && m.etapa === etapa && !m.recebidoEm)
+  const receber = (etapa?: EtapaPedido) => {
+    movs = movs.map(m => m.pedidoKey === pedidoKey && !m.recebidoEm && (!etapa || m.etapa === etapa) ? { ...m, recebidoEm: hojeIso } : m)
+  }
+  const enviar = (etapa: EtapaPedido, fornecedorId: string | undefined) => {
+    if (!fornecedorId || !forn(fornecedorId) || aberto(etapa) || movs.some(m => m.pedidoKey === pedidoKey && m.etapa === etapa)) return
+    movs = [...movs, {
+      id: `auto-${pedidoKey}-${etapa}-${hojeIso}`, pedidoKey, pedidoLabel, fornecedorId, etapa,
+      enviadoEm: hojeIso, prazoPrevisto: prazo(fornecedorId),
+    }]
+  }
+  if (coluna === 5) {
+    const imp = impressorId && forn(impressorId)?.servicos.impressao ? impressorId
+      : p.fornecedores.find(f => f.ativo && f.maquina && f.servicos.impressao)?.id
+    enviar("impressao", imp)
+  } else if (coluna === 6 || coluna === 7) {
+    receber("impressao")
+    enviar("acabamento", p.padroes.acabamento ?? p.padroes.corteVinco)
+  } else if (coluna === 8 || coluna === 9) {
+    receber()
+  }
+  return movs === p.movimentos ? null : movs
 }

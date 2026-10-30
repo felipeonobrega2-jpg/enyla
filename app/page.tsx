@@ -39,7 +39,7 @@ import { RotasProducao } from "./components/RotasProducao"
 import { FornecedoresView } from "./components/FornecedoresView"
 import { PainelView } from "./components/PainelView"
 import { ParceriasView } from "./components/ParceriasView"
-import { normalizarProducao } from "./lib/producao"
+import { normalizarProducao, movimentosPorEtapa } from "./lib/producao"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
 import FormaView from "./FormaView"
 import FormaBubble from "./components/FormaBubble"
@@ -173,6 +173,8 @@ export default function Home() {
   const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel">("painel")
   const [perfilClienteExterno, setPerfilClienteExterno] = useState<string | null>(null)
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
+  const configAtual = useRef<Configuracoes>(CONFIG_PADRAO)
+  useEffect(() => { configAtual.current = config }, [config])
   const [modalSalvar, setModalSalvar] = useState<{ form: FormData; calculo: Calculo; numero: string; data: string; cardId: string } | null>(null)
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [propostasCustom, setPropostasCustom] = useState<PropostaCustom[]>([])
@@ -452,6 +454,7 @@ export default function Home() {
   }, [config])
 
   function salvarConfigTudo(cfg: Configuracoes) {
+    configAtual.current = cfg
     setConfig(cfg)
     setResult(calcular(form, cfg))
     fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg) }).catch(() => {})
@@ -482,6 +485,38 @@ export default function Home() {
     const proposta = propostasCustom.find(p => p.cardId === card.id)
     if (proposta) { setDetalheModal({ tipo: "proposta", proposta, card }); return }
     setDetalheModal({ tipo: "kanban", card })
+  }
+
+  // Automações ao mudar a etapa de um pedido (data de entrega e prazo de fornecedores).
+  // Lê configAtual para que várias chamadas seguidas (mudança em lote) acumulem.
+  function automacoesDeEtapa(card: KanbanCard, coluna: number) {
+    const config = configAtual.current
+    const prod = normalizarProducao(config.producao)
+    const hojeIso = new Date().toLocaleDateString("sv-SE")
+    const avisos: string[] = []
+
+    if (prod.automacoes.prazoEntrega && coluna >= COL_FECHADO && coluna < COL_ENTREGUE && !card.dataEntregaPrevista) {
+      const base = new Date((card.dataFechamento ?? hojeIso) + "T12:00:00")
+      base.setDate(base.getDate() + prod.prazoEntregaPadraoDias)
+      const dataEntregaPrevista = base.toLocaleDateString("sv-SE")
+      setKanban(prev => prev.map(c => c.id === card.id ? { ...c, dataEntregaPrevista } : c))
+      fetch(`/api/kanban/${card.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataEntregaPrevista }) }).catch(() => {})
+      avisos.push(`entrega prevista para ${base.toLocaleDateString("pt-BR")}`)
+    }
+
+    if (prod.automacoes.fornecedores && coluna >= 5 && coluna <= 9) {
+      const hist = historico.find(h => h.numero === card.numero)
+      const rotas = hist?.calculo?.rotas
+      const rota = rotas?.find(q => q.quantidade === card.quantidade)?.melhor ?? rotas?.[rotas.length - 1]?.melhor
+      const pedidoKey = card.loteId ? `lote-${card.loteId}` : `card-${card.id}`
+      const label = `${card.loteNumero ?? card.numero} · ${card.nomeCliente}`
+      const movs = movimentosPorEtapa(prod, pedidoKey, label, coluna, rota?.impressorId ?? null, hojeIso)
+      if (movs) {
+        salvarConfigTudo({ ...config, producao: { ...prod, movimentos: movs } })
+        avisos.push(coluna === 5 ? "envio ao impressor registrado" : coluna <= 7 ? "impressão recebida e envio ao acabamento registrados" : "retorno dos fornecedores registrado")
+      }
+    }
+    if (avisos.length) showToast(`${card.loteNumero ?? card.numero}: ${avisos.join(" · ")}`)
   }
 
   function showToast(msg: string) {
@@ -1877,6 +1912,7 @@ export default function Home() {
               onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }}
               onNavegar={v => navigate(v)}
               onNovoOrcamento={() => navigate("orcamento")}
+              onLancarCobranca={prefill => setModalLancPedidos(prefill)}
             />
           ) : view === "dashboard" ? (
             <DashboardView
@@ -1963,6 +1999,8 @@ export default function Home() {
                   if (updates.dataFechamento !== undefined) patch.dataFechamento = updates.dataFechamento
                   if (updates.coluna !== undefined) patch.coluna = updates.coluna
                   setKanban(prev => prev.map(c => c.id === cardId ? { ...c, ...patch } : c))
+                  const cardAlvo = kanban.find(c => c.id === cardId)
+                  if (cardAlvo && updates.coluna !== undefined) automacoesDeEtapa(cardAlvo, updates.coluna)
                   fetch(`/api/kanban/${cardId}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -1989,6 +2027,7 @@ export default function Home() {
                   }).catch(() => {})
                 }
                 if (card?.numero) atualizarTracking(card.numero, coluna)
+                if (card) automacoesDeEtapa({ ...card, ...(dataFechamento ? { dataFechamento } : {}) }, coluna)
                 if (card?.numero && coluna >= 2 && coluna <= 8) {
                   const telefone = clientes.find(c => c.nome.toLowerCase() === card.nomeCliente.toLowerCase())?.telefone
                   if (telefone) setNotifWA({ nomeCliente: card.nomeCliente, numero: card.numero, etapa: COLUNAS_KANBAN[coluna] ?? `Etapa ${coluna}`, telefone })
@@ -2055,6 +2094,7 @@ export default function Home() {
                   body: JSON.stringify({ dataFechamento }),
                 }).catch(() => {})
                 if (card?.numero) atualizarTracking(card.numero, COL_FECHADO, opcao.preco, opcao.quantidade)
+                if (card) automacoesDeEtapa({ ...card, dataFechamento, quantidade: opcao.quantidade }, COL_FECHADO)
                 // Auto-assign lote + mostrar modal sinal
                 if (card && !card.loteId) {
                   criarLote(card.nomeCliente).then(lote => {
@@ -2577,6 +2617,7 @@ export default function Home() {
             fetch(`/api/kanban/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ coluna }) }).catch(() => {})
             if (dataFechamento) fetch(`/api/kanban/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataFechamento }) }).catch(() => {})
             if (card?.numero) atualizarTracking(card.numero, coluna)
+            if (card) automacoesDeEtapa({ ...card, ...(dataFechamento ? { dataFechamento } : {}) }, coluna)
           } : undefined}
           onSavePreco={"card" in detalheModal && detalheModal.card ? (cardId, preco) => {
             setKanban(prev => prev.map(c => c.id === cardId ? { ...c, preco } : c))

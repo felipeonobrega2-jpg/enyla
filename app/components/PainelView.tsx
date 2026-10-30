@@ -63,7 +63,7 @@ type Detalhe = { titulo: string; sub?: string; linhas: React.ReactNode; destino?
 
 export function PainelView({
   kanban, lancamentos, historico, propostasCustom, clientes, config,
-  onAbrirCard, onAbrirCliente, onNavegar, onNovoOrcamento,
+  onAbrirCard, onAbrirCliente, onNavegar, onNovoOrcamento, onLancarCobranca,
 }: {
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
@@ -75,6 +75,7 @@ export function PainelView({
   onAbrirCliente: (nome: string) => void
   onNavegar: (view: "orcamentos" | "pedidos" | "financeiro" | "fornecedores" | "clientes") => void
   onNovoOrcamento: () => void
+  onLancarCobranca?: (prefill: Partial<LancamentoFinanceiro>) => void
 }) {
   const [periodoId, setPeriodoId] = React.useState<PeriodoId>("mes")
   const [detalhe, setDetalhe] = React.useState<Detalhe | null>(null)
@@ -122,7 +123,7 @@ export function PainelView({
   const fornecedorAtrasado = prodCfg.movimentos.filter(m => !m.recebidoEm && m.prazoPrevisto && m.prazoPrevisto < hojeIso)
   const leadsQuentes = kanban.filter(c => c.coluna === COL_HOT)
 
-  type Acao = { id: string; tom: Tom; icone: React.ReactNode; titulo: string; sub: string; valor?: string; ir: () => void; whatsapp?: string }
+  type Acao = { id: string; tom: Tom; icone: React.ReactNode; titulo: string; sub: string; valor?: string; ir: () => void; whatsapp?: string; cobrar?: Partial<LancamentoFinanceiro> }
   const acoes: Acao[] = [
     ...prod.atrasados.map(p => ({
       id: `atr-${p.key}`, tom: "perigo" as Tom, icone: <CalendarX2 className="w-4 h-4" />,
@@ -144,6 +145,14 @@ export function PainelView({
       id: `sc-${p.key}`, tom: "alerta" as Tom, icone: <Receipt className="w-4 h-4" />,
       titulo: `${p.numero} · ${p.nomeCliente}`, sub: "entregue e sem cobrança lançada",
       valor: brl(p.semCobranca), ir: () => onAbrirCard(cardDoPedido(p)),
+      cobrar: (() => {
+        const c = cardDoPedido(p)
+        return {
+          tipo: "receita" as const, valor: Math.round(p.semCobranca * 100) / 100, descricao: `Saldo ${p.numero} — ${p.nomeCliente}`,
+          categoria: "saldo-final", nomeCliente: p.nomeCliente, dataVencimento: hoje.toLocaleDateString("sv-SE"),
+          ...(c.loteId ? { loteId: c.loteId, loteNumero: c.loteNumero } : { cardId: c.id, cardNumero: c.numero }),
+        }
+      })(),
     })),
     ...(rec.aConferir.length ? [{
       id: "conferir", tom: "info" as Tom, icone: <Receipt className="w-4 h-4" />,
@@ -335,7 +344,12 @@ export function PainelView({
               ? <Vazio icone={<CheckCircle2 className="w-9 h-9" />} titulo="Nada pendente" sub="Entregas no prazo, recebimentos em dia e nenhum orçamento vencendo." />
               : acoesVisiveis.map(a => (
                 <LinhaLista key={a.id} titulo={a.titulo} sub={a.sub} valor={a.valor} tom={a.tom} icone={a.icone} onClick={a.ir}
-                  acao={a.whatsapp ? (
+                  acao={a.cobrar && onLancarCobranca ? (
+                    <button onClick={() => onLancarCobranca(a.cobrar!)} title="Lançar a cobrança deste saldo"
+                      className="h-8 px-2.5 mr-1 rounded-lg text-[11.5px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors shrink-0 whitespace-nowrap">
+                      Lançar cobrança
+                    </button>
+                  ) : a.whatsapp ? (
                     <a href={a.whatsapp} target="_blank" rel="noreferrer" title="Mandar mensagem no WhatsApp"
                       className="w-8 h-8 rounded-lg flex items-center justify-center text-[#25a35a] hover:bg-[#25a35a]/10 transition-colors shrink-0 mr-1">
                       <MessageCircle className="w-4 h-4" />

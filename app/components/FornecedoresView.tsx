@@ -635,6 +635,24 @@ function Parametros({ draft, setDraft }: { draft: ConfigProducao; setDraft: (p: 
         <p className="text-[11px] text-[#898892]">Preço = custo total × multiplicador (em Configurações). O imposto só entra na margem líquida.</p>
       </div>
       <div className="bg-white rounded-xl p-5 space-y-3 lg:col-span-2" style={border}>
+        <p className="text-[13px] font-semibold text-[#191625]">Automações ao mover o pedido no quadro</p>
+        <label className="flex items-start gap-2.5 text-[12.5px] text-[#191625] cursor-pointer">
+          <input type="checkbox" className="mt-0.5" checked={draft.automacoes.prazoEntrega}
+            onChange={e => setDraft({ ...draft, automacoes: { ...draft.automacoes, prazoEntrega: e.target.checked } })} />
+          <span>Preencher a data de entrega ao fechar um pedido sem data
+            <span className="block text-[11.5px] text-[#898892]">Usa a data de fechamento + o prazo padrão abaixo. Você pode ajustar no pedido.</span></span>
+        </label>
+        <div className="w-48 pl-6">
+          <Campo label="Prazo padrão de entrega (dias)"><Num value={draft.prazoEntregaPadraoDias} onChange={v => setDraft({ ...draft, prazoEntregaPadraoDias: Math.max(1, v) })} /></Campo>
+        </div>
+        <label className="flex items-start gap-2.5 text-[12.5px] text-[#191625] cursor-pointer">
+          <input type="checkbox" className="mt-0.5" checked={draft.automacoes.fornecedores}
+            onChange={e => setDraft({ ...draft, automacoes: { ...draft.automacoes, fornecedores: e.target.checked } })} />
+          <span>Registrar envio e retorno de fornecedores pela etapa
+            <span className="block text-[11.5px] text-[#898892]">Impressão: envia ao impressor da rota do orçamento. Verniz ou Acabamento: recebe a impressão e envia ao acabamento. Expedição: recebe tudo. Os prazos de cada fornecedor passam a ser medidos sozinhos.</span></span>
+        </label>
+      </div>
+      <div className="bg-white rounded-xl p-5 space-y-3 lg:col-span-2" style={border}>
         <p className="text-[13px] font-semibold text-[#191625]">Ferramental — valores de referência</p>
         <p className="text-[11.5px] text-[#898892]">Usados quando o orçamento não tem o valor do faquista. Aparecem como “estimado”.</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
