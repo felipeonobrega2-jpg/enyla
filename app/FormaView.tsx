@@ -112,7 +112,7 @@ function LayoutCard({ layout, onUsar }: LayoutCardProps) {
 
   return (
     <div className="bg-violet-50 border border-violet-200 rounded-2xl rounded-tl-sm p-4 space-y-3 max-w-[75vw]">
-      <p className="text-[10px] uppercase tracking-wide font-bold text-violet-500">Layout sugerido — faca aberta</p>
+      <p className="text-[10px] font-bold text-violet-500">Layout sugerido — faca aberta</p>
 
       <div className="bg-white rounded-xl border border-violet-100 overflow-auto p-2">
         <div
@@ -131,7 +131,7 @@ function LayoutCard({ layout, onUsar }: LayoutCardProps) {
           ["Tipo",         layout.tipo],
         ].map(([l, v]) => (
           <div key={l} className="bg-white rounded-lg px-2.5 py-2 border border-violet-100">
-            <p className="text-[9px] text-violet-400 uppercase tracking-wide font-semibold">{l}</p>
+            <p className="text-[9px] text-violet-400 font-semibold">{l}</p>
             <p className="text-xs font-bold text-slate-800 mt-0.5 leading-tight">{v}</p>
           </div>
         ))}

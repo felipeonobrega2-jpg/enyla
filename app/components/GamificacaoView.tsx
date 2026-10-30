@@ -92,12 +92,12 @@ export function GamificacaoView({
       <div className="grid grid-cols-3 gap-3">
         <div className={`${CARD} p-5`}>
           <p className="text-[10.5px] font-medium text-[#8E8E93] mb-3">Faturamento total</p>
-          <p className="text-[22px] font-semibold tabular-nums leading-none text-[#191625] tracking-[-0.01em]">{brl(totalFaturado)}</p>
+          <p className="text-[22px] font-semibold ds-num leading-none text-[#191625] tracking-[-0.01em]">{brl(totalFaturado)}</p>
           {proximoMarco ? (
             <>
               <div className="flex items-center justify-between mt-3 mb-1">
                 <p className="text-[10px] text-[#8E8E93]">Próximo: {proximoMarco.sub}</p>
-                <p className="text-[10px] text-[#8E8E93] tabular-nums">{Math.round(pctProximo * 100)}%</p>
+                <p className="text-[10px] text-[#8E8E93] ds-num">{Math.round(pctProximo * 100)}%</p>
               </div>
               <div className="h-1 rounded-full bg-[rgba(0,0,0,0.06)] overflow-hidden">
                 <div className="h-full rounded-full bg-[#8456e8] transition-all duration-500"
@@ -116,10 +116,10 @@ export function GamificacaoView({
 
         <div className={`${CARD} p-5`}>
           <p className="text-[10.5px] font-medium text-[#8E8E93] mb-3">Meta de {mesNome}</p>
-          <p className="text-[22px] font-semibold tabular-nums leading-none text-[#191625] tracking-[-0.01em]">
+          <p className="text-[22px] font-semibold ds-num leading-none text-[#191625] tracking-[-0.01em]">
             {Math.round(pctMes * 100)}%
           </p>
-          <p className="text-[10px] text-[#8E8E93] mt-1.5 tabular-nums">
+          <p className="text-[10px] text-[#8E8E93] mt-1.5 ds-num">
             {brl(faturadoMes)} de {brl(metaMensal)}
           </p>
           <div className="mt-3 h-1 rounded-full bg-[rgba(0,0,0,0.06)] overflow-hidden">
@@ -130,7 +130,7 @@ export function GamificacaoView({
               }} />
           </div>
           {pctMes < 1 && faturadoMes > 0 && (
-            <p className="text-[10px] text-[#8E8E93] mt-1.5 tabular-nums">
+            <p className="text-[10px] text-[#8E8E93] mt-1.5 ds-num">
               Faltam {brl(metaMensal - faturadoMes)}
             </p>
           )}
@@ -146,7 +146,7 @@ export function GamificacaoView({
 
         <div className={`${CARD} p-5`}>
           <p className="text-[10.5px] font-medium text-[#8E8E93] mb-3">Streak</p>
-          <p className="text-[22px] font-semibold tabular-nums leading-none text-[#191625] tracking-[-0.01em]">
+          <p className="text-[22px] font-semibold ds-num leading-none text-[#191625] tracking-[-0.01em]">
             {streak}
             <span className="text-[14px] font-medium text-[#8E8E93] ml-1">{streak === 1 ? "dia" : "dias"}</span>
           </p>
@@ -164,7 +164,7 @@ export function GamificacaoView({
 
       {/* Marcos */}
       <div>
-        <p className="text-[10.5px] uppercase tracking-wide font-bold text-[#8E8E93] mb-3">Marcos de faturamento</p>
+        <p className="text-[10.5px] font-bold text-[#8E8E93] mb-3">Marcos de faturamento</p>
         <div className="grid grid-cols-3 gap-3">
           {MARCOS.map(marco => {
             const desbloqueado = totalFaturado >= marco.threshold
@@ -174,7 +174,7 @@ export function GamificacaoView({
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div>
                     <p className="text-[12.5px] font-semibold text-[#191625] leading-snug">{marco.label}</p>
-                    <p className="text-[10.5px] tabular-nums font-medium mt-0.5"
+                    <p className="text-[10.5px] ds-num font-medium mt-0.5"
                       style={{ color: desbloqueado ? "#c57800" : "#8E8E93" }}>
                       {marco.sub}
                     </p>
@@ -313,8 +313,8 @@ export function SidebarGamificacao({
       className="w-full px-3 py-2.5 text-left transition-colors hover:bg-white/[0.04] rounded-xl"
       style={{ margin: "0 8px", width: "calc(100% - 16px)" }}>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] text-zinc-500 uppercase tracking-wide font-semibold">Próximo marco</span>
-        <span className="text-[10.5px] font-bold tabular-nums" style={{ color: "#c57800" }}>
+        <span className="text-[10px] text-zinc-500 font-semibold">Próximo marco</span>
+        <span className="text-[10.5px] font-bold ds-num" style={{ color: "#c57800" }}>
           {Math.round(pct * 100)}%
         </span>
       </div>
@@ -326,7 +326,7 @@ export function SidebarGamificacao({
           style={{ width: `${pct * 100}%`, background: proximoMarco ? "#c57800" : "#009351" }} />
       </div>
       {proximoMarco && falta > 0 && (
-        <p className="text-[9px] mt-1 tabular-nums" style={{ color: "rgba(255,255,255,0.3)" }}>
+        <p className="text-[9px] mt-1 ds-num" style={{ color: "rgba(255,255,255,0.3)" }}>
           Faltam R${fmtShort(falta)}
         </p>
       )}

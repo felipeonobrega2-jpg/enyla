@@ -212,14 +212,14 @@ function MonthlyChart({ data, onSelectMonth }: { data: MonthlyDatum[]; onSelectM
                     <span style={{ width: 8, height: 8, borderRadius: 2, background: "#e3d9ff", display: "inline-block", flexShrink: 0 }} />
                     <span style={{ fontSize: 10, color: "var(--text-faint)" }}>Volume</span>
                   </div>
-                  <span className="tabular-nums" style={{ fontSize: 11, fontWeight: 500, color: "var(--text-main)" }}>{brl(hov.volume)}</span>
+                  <span className="ds-num" style={{ fontSize: 11, fontWeight: 500, color: "var(--text-main)" }}>{brl(hov.volume)}</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ width: 8, height: 8, borderRadius: 2, background: "#8456e8", display: "inline-block", flexShrink: 0 }} />
                     <span style={{ fontSize: 10, color: "var(--text-faint)" }}>Receita</span>
                   </div>
-                  <span className="tabular-nums" style={{ fontSize: 11, fontWeight: 600, color: "#8456e8" }}>{brl(hov.receita)}</span>
+                  <span className="ds-num" style={{ fontSize: 11, fontWeight: 600, color: "#8456e8" }}>{brl(hov.receita)}</span>
                 </div>
               </div>
             </div>
@@ -301,8 +301,8 @@ function MesDetalheModal({
                     <span className="text-[9.5px] font-semibold text-[#c57800] bg-[#c57800]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">Sobra</span>
                   )}
                   <p className="flex-1 text-[12px] text-[#5e5c68] truncate">{item.nomeCliente}</p>
-                  <p className="text-[10.5px] text-[#8E8E93] shrink-0 tabular-nums">{fmtItemData(item.data)}</p>
-                  <p className="font-semibold text-[#191625] text-[12.5px] tabular-nums shrink-0">{brl(item.valor)}</p>
+                  <p className="text-[10.5px] text-[#8E8E93] shrink-0 ds-num">{fmtItemData(item.data)}</p>
+                  <p className="font-semibold text-[#191625] text-[12.5px] ds-num shrink-0">{brl(item.valor)}</p>
                 </div>
               ))}
             </div>
@@ -452,19 +452,19 @@ function gerarHtmlRelatorio({
   .dre-total { display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; }
   .green { color: #166534; }
   .red   { color: #991b1b; }
-  .tn    { font-variant-numeric: tabular-nums; }
+  .tn    { font-variant-numeric: ds-num; }
 
   .kpi-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; }
   .kpi-box  { border: 1px solid #e5e5e5; border-radius: 6px; padding: 8px 10px; }
   .kpi-label { font-size: 7.5px; color: #888; text-transform: uppercase; letter-spacing: 0.06em; }
-  .kpi-val  { font-size: 16px; font-weight: 700; margin: 3px 0 2px; font-variant-numeric: tabular-nums; }
+  .kpi-val  { font-size: 16px; font-weight: 700; margin: 3px 0 2px; font-variant-numeric: ds-num; }
   .kpi-sub  { font-size: 7.5px; color: #aaa; }
 
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   table { width: 100%; border-collapse: collapse; font-size: 10px; }
   th { text-align: left; padding: 4px 8px; background: #f3f3f3; font-size: 7.5px; text-transform: uppercase; letter-spacing: 0.06em; color: #888; font-weight: 700; }
   td { padding: 5px 8px; border-bottom: 1px solid #f0f0f0; }
-  td.right { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  td.right { text-align: right; font-variant-numeric: ds-num; font-weight: 600; }
   td.muted { color: #888; }
 
   .fin-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
@@ -473,7 +473,7 @@ function gerarHtmlRelatorio({
   .fin-amber { background: #fffbeb; border: 1px solid #fde68a; }
   .fin-red   { background: #fef2f2; border: 1px solid #fecaca; }
   .fin-label { font-size: 7.5px; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
-  .fin-val   { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .fin-val   { font-size: 16px; font-weight: 700; font-variant-numeric: ds-num; }
   .fin-green .fin-val { color: #166534; }
   .fin-amber .fin-val { color: #92400e; }
   .fin-red   .fin-val { color: #991b1b; }
@@ -706,9 +706,9 @@ function KpiCard({ icon, iconBg, iconColor, label, value, sub, subColor, valueCo
           style={{ background: iconBg, color: iconColor }}>
           {icon}
         </div>
-        <p className="text-[10.5px] uppercase tracking-wider font-semibold leading-tight" style={{ color: "var(--text-faint)" }}>{label}</p>
+        <p className="text-[10.5px] font-semibold leading-tight" style={{ color: "var(--text-faint)" }}>{label}</p>
       </div>
-      <p className="text-[22px] font-bold tabular-nums tracking-tight leading-none" style={{ color: valueColor ?? "var(--text-main)" }}>{value}</p>
+      <p className="text-[22px] font-bold ds-num tracking-tight leading-none" style={{ color: valueColor ?? "var(--text-main)" }}>{value}</p>
       {sub && <p className="text-[11px] mt-1.5" style={{ color: subColor ?? "var(--text-faint)" }}>{sub}</p>}
     </div>
   )
@@ -1254,7 +1254,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                 {GRUPOS_PERIODO.map((grupo, gi) => (
                   <div key={gi}>
                     {gi > 0 && <div className={`h-px my-1 ${isDark ? "bg-[rgba(255,255,255,0.08)]" : "bg-[rgba(60,60,67,0.12)]"}`} />}
-                    <p className="px-3 pt-1.5 pb-0.5 text-[9px] uppercase tracking-wide font-bold text-[#8E8E93]">
+                    <p className="px-3 pt-1.5 pb-0.5 text-[9px] font-bold text-[#8E8E93]">
                       {grupo.label}
                     </p>
                     {grupo.items.map(({ id, label }) => (
@@ -1342,8 +1342,8 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                           <div>
                             <div className="px-4 pt-3 pb-1.5 flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-[#d33a3c] shrink-0" />
-                              <p className="text-[9.5px] font-bold uppercase tracking-wide text-[#d33a3c] flex-1">Vencidos</p>
-                              <p className="text-[9.5px] font-semibold text-[#d33a3c] tabular-nums">
+                              <p className="text-[9.5px] font-bold text-[#d33a3c] flex-1">Vencidos</p>
+                              <p className="text-[9.5px] font-semibold text-[#d33a3c] ds-num">
                                 {brl(alertas.vencidos.reduce((s, l) => s + l.valor, 0))}
                               </p>
                             </div>
@@ -1353,7 +1353,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                                   <p className="text-[11.5px] font-medium text-[#191625] truncate">{l.descricao}</p>
                                   <p className="text-[10px] text-[#8E8E93]">{l.nomeCliente ?? "—"} · venceu {l.dataVencimento}</p>
                                 </div>
-                                <p className="text-[11px] font-bold text-[#d33a3c] tabular-nums shrink-0">{brl(l.valor)}</p>
+                                <p className="text-[11px] font-bold text-[#d33a3c] ds-num shrink-0">{brl(l.valor)}</p>
                               </div>
                             ))}
                             {alertas.vencidos.length > 5 && (
@@ -1367,8 +1367,8 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                           <div>
                             <div className="px-4 pt-3 pb-1.5 flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-[#c57800] shrink-0" />
-                              <p className="text-[9.5px] font-bold uppercase tracking-wide text-[#c57800] flex-1">Vencem hoje ou amanhã</p>
-                              <p className="text-[9.5px] font-semibold text-[#c57800] tabular-nums">
+                              <p className="text-[9.5px] font-bold text-[#c57800] flex-1">Vencem hoje ou amanhã</p>
+                              <p className="text-[9.5px] font-semibold text-[#c57800] ds-num">
                                 {brl(alertas.vencendoHoje.reduce((s, l) => s + l.valor, 0))}
                               </p>
                             </div>
@@ -1380,7 +1380,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                                     {l.nomeCliente ?? "—"} · {l.dataVencimento === hj ? "vence hoje" : "vence amanhã"}
                                   </p>
                                 </div>
-                                <p className="text-[11px] font-bold text-[#c57800] tabular-nums shrink-0">{brl(l.valor)}</p>
+                                <p className="text-[11px] font-bold text-[#c57800] ds-num shrink-0">{brl(l.valor)}</p>
                               </div>
                             ))}
                             {alertas.vencendoHoje.length > 5 && (
@@ -1394,7 +1394,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                           <div>
                             <div className="px-4 pt-3 pb-1.5 flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-[#c57800] shrink-0" />
-                              <p className="text-[9.5px] font-bold uppercase tracking-wide text-[#c57800] flex-1">Parados em produção</p>
+                              <p className="text-[9.5px] font-bold text-[#c57800] flex-1">Parados em produção</p>
                             </div>
                             {alertas.parados.slice(0, 5).map(c => {
                               const dias = Math.floor((Date.now() - new Date(c.dataFechamento! + "T00:00:00").getTime()) / 86_400_000)
@@ -1406,7 +1406,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                                     </p>
                                     <p className="text-[10px] text-[#8E8E93]">{COLUNAS_KANBAN[c.coluna]} · {dias} dias</p>
                                   </div>
-                                  <p className="text-[11px] font-semibold text-[#8E8E93] tabular-nums shrink-0">{brl(c.preco)}</p>
+                                  <p className="text-[11px] font-semibold text-[#8E8E93] ds-num shrink-0">{brl(c.preco)}</p>
                                 </div>
                               )
                             })}
@@ -1421,8 +1421,8 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                           <div>
                             <div className="px-4 pt-3 pb-1.5 flex items-center gap-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-[#8E8E93] shrink-0" />
-                              <p className="text-[9.5px] font-bold uppercase tracking-wide text-[#8E8E93] flex-1">Sem lançamento financeiro</p>
-                              <p className="text-[9.5px] font-semibold text-[#8E8E93] tabular-nums">
+                              <p className="text-[9.5px] font-bold text-[#8E8E93] flex-1">Sem lançamento financeiro</p>
+                              <p className="text-[9.5px] font-semibold text-[#8E8E93] ds-num">
                                 {brl(alertas.semRegistro.reduce((s, c) => s + c.preco, 0))}
                               </p>
                             </div>
@@ -1434,7 +1434,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                                   </p>
                                   <p className="text-[10px] text-[#8E8E93]">Venda {c.dataFechamento} · {COLUNAS_KANBAN[c.coluna]}</p>
                                 </div>
-                                <p className="text-[11px] font-semibold text-[#8E8E93] tabular-nums shrink-0">{brl(c.preco)}</p>
+                                <p className="text-[11px] font-semibold text-[#8E8E93] ds-num shrink-0">{brl(c.preco)}</p>
                               </div>
                             ))}
                             {alertas.semRegistro.length > 5 && (
@@ -1450,7 +1450,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
               )
             })()}
 
-            <div className={`text-[11px] text-[#8E8E93] font-medium tabular-nums border rounded-full px-3 py-1.5 ${isDark ? "bg-[#161421] border-[rgba(255,255,255,0.1)]" : "bg-white border-[rgba(0,0,0,0.12)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"}`}>
+            <div className={`text-[11px] text-[#8E8E93] font-medium ds-num border rounded-full px-3 py-1.5 ${isDark ? "bg-[#161421] border-[rgba(255,255,255,0.1)]" : "bg-white border-[rgba(0,0,0,0.12)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"}`}>
               {kpis.total} orçamento{kpis.total !== 1 ? "s" : ""} no período
             </div>
           </div>
@@ -1525,9 +1525,9 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
               style={{ background: "rgba(197,120,0,0.14)", color: "#c57800" }}>
               <AlertTriangle className="w-4 h-4" />
             </div>
-            <p className="text-[10.5px] uppercase tracking-wider font-semibold leading-tight" style={{ color: "#c57800" }}>Lead Quente</p>
+            <p className="text-[10.5px] font-semibold leading-tight" style={{ color: "#c57800" }}>Lead Quente</p>
           </div>
-          <p className="text-[22px] font-bold tabular-nums tracking-tight leading-none" style={{ color: "var(--text-main)" }}>
+          <p className="text-[22px] font-bold ds-num tracking-tight leading-none" style={{ color: "var(--text-main)" }}>
             {hotKpi.total > 0 ? brl(hotKpi.total) : "—"}
           </p>
           <div className="flex items-center justify-between mt-1.5">
@@ -1614,7 +1614,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                 <div key={s.col}>
                   <div className="flex items-center justify-between text-[13px] mb-1.5">
                     <span style={{ color: "var(--text-main)" }}>{s.colNome}</span>
-                    <span className="tabular-nums font-medium" style={{ color: "var(--text-sub)" }}>
+                    <span className="ds-num font-medium" style={{ color: "var(--text-sub)" }}>
                       {s.count} · {brl(s.value)}
                     </span>
                   </div>
@@ -1652,8 +1652,8 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                       {c.nome[0]?.toUpperCase() ?? "?"}
                     </div>
                     <p className="text-[12px] font-medium text-[#191625] truncate flex-1">{c.nome}</p>
-                    <p className="text-[11px] font-bold text-[#191625] tabular-nums">{brl(c.total)}</p>
-                    <p className="text-[10px] text-[#8E8E93] tabular-nums shrink-0">{c.count}×</p>
+                    <p className="text-[11px] font-bold text-[#191625] ds-num">{brl(c.total)}</p>
+                    <p className="text-[10px] text-[#8E8E93] ds-num shrink-0">{c.count}×</p>
                   </div>
                   <div className="ml-8 h-1.5 bg-[rgba(116,116,128,0.08)] rounded-full overflow-hidden">
                     <div className="h-full rounded-full"
@@ -1677,8 +1677,8 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
                     <p className="text-[12px] font-medium text-[#191625] truncate flex-1">{m.nome}</p>
-                    <p className="text-[11px] font-bold text-[#191625] tabular-nums">{num(m.count)}</p>
-                    <p className="text-[10px] text-[#8E8E93] tabular-nums shrink-0">{brl(m.value)}</p>
+                    <p className="text-[11px] font-bold text-[#191625] ds-num">{num(m.count)}</p>
+                    <p className="text-[10px] text-[#8E8E93] ds-num shrink-0">{brl(m.value)}</p>
                   </div>
                   <div className="ml-4 h-1.5 bg-[rgba(116,116,128,0.08)] rounded-full overflow-hidden">
                     <div className="h-full rounded-full"
@@ -1704,7 +1704,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                 <div key={m.motivo} className="space-y-1">
                   <div className="flex items-center gap-2">
                     <p className="text-[12px] font-medium text-[#191625] truncate flex-1">{m.motivo}</p>
-                    <p className="text-[11px] font-bold tabular-nums" style={{ color: "#d33a3c" }}>{m.count}×</p>
+                    <p className="text-[11px] font-bold ds-num" style={{ color: "#d33a3c" }}>{m.count}×</p>
                   </div>
                   <div className="h-1.5 bg-[rgba(116,116,128,0.08)] rounded-full overflow-hidden">
                     <div className="h-full rounded-full"
@@ -1729,13 +1729,13 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
           <table className="w-full text-[12px]">
             <thead>
               <tr className="bg-[rgba(116,116,128,0.04)] border-b border-[rgba(60,60,67,0.12)]">
-                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Nº</th>
-                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Cliente</th>
-                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Material</th>
-                <th className="px-4 py-2.5 text-right text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Valor</th>
-                <th className="px-4 py-2.5 text-right text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Qtd</th>
-                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Estágio</th>
-                <th className="px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Data</th>
+                <th className="px-4 py-2.5 text-left text-[10px] text-[#8E8E93] font-semibold">Nº</th>
+                <th className="px-4 py-2.5 text-left text-[10px] text-[#8E8E93] font-semibold">Cliente</th>
+                <th className="px-4 py-2.5 text-left text-[10px] text-[#8E8E93] font-semibold">Material</th>
+                <th className="px-4 py-2.5 text-right text-[10px] text-[#8E8E93] font-semibold">Valor</th>
+                <th className="px-4 py-2.5 text-right text-[10px] text-[#8E8E93] font-semibold">Qtd</th>
+                <th className="px-4 py-2.5 text-left text-[10px] text-[#8E8E93] font-semibold">Estágio</th>
+                <th className="px-4 py-2.5 text-left text-[10px] text-[#8E8E93] font-semibold">Data</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[rgba(60,60,67,0.06)]">
@@ -1745,7 +1745,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                   <tr key={card.id} className="hover:bg-[rgba(0,0,0,0.02)] transition-colors">
                     {/* Nº */}
                     <td className="px-4 py-2.5">
-                      <span className="bg-[rgba(116,116,128,0.08)] text-[#8E8E93] text-[10px] font-bold px-1.5 py-0.5 rounded-md tabular-nums whitespace-nowrap">
+                      <span className="bg-[rgba(116,116,128,0.08)] text-[#8E8E93] text-[10px] font-bold px-1.5 py-0.5 rounded-md ds-num whitespace-nowrap">
                         {card.numero || "—"}
                       </span>
                     </td>
@@ -1764,11 +1764,11 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                       <span className="truncate block">{card.materialNome || "—"}</span>
                     </td>
                     {/* Valor */}
-                    <td className="px-4 py-2.5 text-right font-bold text-[#191625] tabular-nums">
+                    <td className="px-4 py-2.5 text-right font-bold text-[#191625] ds-num">
                       {brl(card.preco)}
                     </td>
                     {/* Qtd */}
-                    <td className="px-4 py-2.5 text-right text-[#8E8E93] tabular-nums">
+                    <td className="px-4 py-2.5 text-right text-[#8E8E93] ds-num">
                       {num(card.quantidade)}
                     </td>
                     {/* Estágio */}
@@ -1778,7 +1778,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                       </span>
                     </td>
                     {/* Data */}
-                    <td className="px-4 py-2.5 text-[#8E8E93] tabular-nums text-[11px]">
+                    <td className="px-4 py-2.5 text-[#8E8E93] ds-num text-[11px]">
                       {dataFmt}
                     </td>
                   </tr>
@@ -1797,7 +1797,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
             <div className="flex-1 h-px bg-[rgba(60,60,67,0.12)]" />
             <div className="flex items-center gap-3 text-[10.5px]">
               <span className="text-[#8E8E93]">{margemData.cards.length} pedido{margemData.cards.length !== 1 ? "s" : ""} com custo registrado</span>
-              <span className="font-bold tabular-nums" style={{ color: margemColor(margemData.avgPct!) }}>
+              <span className="font-bold ds-num" style={{ color: margemColor(margemData.avgPct!) }}>
                 {num(margemData.avgPct!, 1)}% média
               </span>
             </div>
@@ -1816,16 +1816,16 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
                       <div className="h-full rounded-full transition-all"
                         style={{ width: `${Math.max(2, Math.min(100, c.pct))}%`, backgroundColor: margemColor(c.pct) }} />
                     </div>
-                    <span className="text-[10px] text-[#8E8E93] tabular-nums">
+                    <span className="text-[10px] text-[#8E8E93] ds-num">
                       {brl(c.custo)} custo · {brl(c.preco)} venda
                     </span>
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-[14px] font-bold tabular-nums leading-none" style={{ color: margemColor(c.pct) }}>
+                  <p className="text-[14px] font-bold ds-num leading-none" style={{ color: margemColor(c.pct) }}>
                     {num(c.pct, 1)}%
                   </p>
-                  <p className="text-[10px] text-[#8E8E93] mt-0.5 tabular-nums">{brl(c.margem)}</p>
+                  <p className="text-[10px] text-[#8E8E93] mt-0.5 ds-num">{brl(c.margem)}</p>
                 </div>
               </div>
             ))}

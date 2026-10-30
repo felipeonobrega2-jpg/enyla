@@ -445,9 +445,9 @@ export default function MetaAdsView({ isDark = false, faturamentoPorCampanha = {
                   style={{ background: k.iconBg, color: k.accent ?? "#8E8E93" }}>
                   <Icon size={15} strokeWidth={2} />
                 </div>
-                <p className="text-[10.5px] uppercase tracking-wider font-semibold leading-tight" style={{ color: "var(--text-faint)" }}>{k.label}</p>
+                <p className="text-[10.5px] font-semibold leading-tight" style={{ color: "var(--text-faint)" }}>{k.label}</p>
               </div>
-              <p className="text-[22px] font-bold tabular-nums tracking-tight leading-none"
+              <p className="text-[22px] font-bold ds-num tracking-tight leading-none"
                 style={{ color: k.accent ?? "var(--text-main)" }}>
                 {loading ? "—" : k.value}
               </p>
@@ -541,7 +541,7 @@ function CampaignRows({ campaigns, isDark, hiddenIds, onToggleHide, visibleCols,
       <table className="w-full" style={{ minWidth: 600 }}>
         <thead>
           <tr style={{ borderBottom: "1px solid var(--border)" }}>
-            <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.5px]"
+            <th className="px-4 py-3 text-left text-[10.5px] font-semibold"
               style={{ color: "var(--text-faint)" }}>Campanha</th>
             {col("status")     && <Th>Status</Th>}
             {col("impressoes") && <Th>Impressões</Th>}
@@ -598,21 +598,21 @@ function CampaignRows({ campaigns, isDark, hiddenIds, onToggleHide, visibleCols,
                 {col("cpm")        && <Td>{Number(c.cpm) > 0 ? brl(Number(c.cpm)) : "—"}</Td>}
                 {col("gasto")      && (
                   <td className="px-4 py-3">
-                    <span className="tabular-nums text-[12.5px] font-semibold" style={{ color: "#8456e8" }}>
+                    <span className="ds-num text-[12.5px] font-semibold" style={{ color: "#8456e8" }}>
                       {Number(c.spend) > 0 ? brl(Number(c.spend)) : "—"}
                     </span>
                   </td>
                 )}
                 {col("conversas") && (
                   <td className="px-4 py-3">
-                    <span className="tabular-nums text-[12.5px]" style={{ color: leads > 0 ? "#009351" : "var(--text-faint)" }}>
+                    <span className="ds-num text-[12.5px]" style={{ color: leads > 0 ? "#009351" : "var(--text-faint)" }}>
                       {leads > 0 ? num(leads) : "—"}
                     </span>
                   </td>
                 )}
                 {col("custo_conv") && (
                   <td className="px-4 py-3">
-                    <span className="tabular-nums text-[12.5px]" style={{ color: custoPorConv > 0 ? "var(--text-main)" : "var(--text-faint)" }}>
+                    <span className="ds-num text-[12.5px]" style={{ color: custoPorConv > 0 ? "var(--text-main)" : "var(--text-faint)" }}>
                       {custoPorConv > 0 ? brl(custoPorConv) : "—"}
                     </span>
                   </td>
@@ -622,7 +622,7 @@ function CampaignRows({ campaigns, isDark, hiddenIds, onToggleHide, visibleCols,
                 )}
                 {col("conversoes") && (
                   <td className="px-4 py-3">
-                    <span className="tabular-nums text-[12.5px]" style={{ color: conv > 0 ? "#009351" : "var(--text-faint)" }}>
+                    <span className="ds-num text-[12.5px]" style={{ color: conv > 0 ? "#009351" : "var(--text-faint)" }}>
                       {conv > 0 ? num(conv) : "—"}
                     </span>
                   </td>
@@ -631,7 +631,7 @@ function CampaignRows({ campaigns, isDark, hiddenIds, onToggleHide, visibleCols,
                   const fat = faturamentoPorCampanha[c.campaign_id] ?? 0
                   return (
                     <td className="px-4 py-3">
-                      <span className="tabular-nums text-[12.5px] font-semibold" style={{ color: fat > 0 ? "#009351" : "var(--text-faint)" }}>
+                      <span className="ds-num text-[12.5px] font-semibold" style={{ color: fat > 0 ? "#009351" : "var(--text-faint)" }}>
                         {fat > 0 ? brl(fat) : "—"}
                       </span>
                     </td>
@@ -643,7 +643,7 @@ function CampaignRows({ campaigns, isDark, hiddenIds, onToggleHide, visibleCols,
                   const roas  = fat > 0 && spend > 0 ? fat / spend : 0
                   return (
                     <td className="px-4 py-3">
-                      <span className="tabular-nums text-[12.5px] font-semibold"
+                      <span className="ds-num text-[12.5px] font-semibold"
                         style={{ color: roas >= 1 ? "#009351" : roas > 0 ? "#c57800" : "var(--text-faint)" }}>
                         {roas > 0 ? `${num(roas, 2)}x` : "—"}
                       </span>
@@ -656,7 +656,7 @@ function CampaignRows({ campaigns, isDark, hiddenIds, onToggleHide, visibleCols,
                   const roi   = fat > 0 && spend > 0 ? ((fat - spend) / spend) * 100 : null
                   return (
                     <td className="px-4 py-3">
-                      <span className="tabular-nums text-[12.5px] font-semibold"
+                      <span className="ds-num text-[12.5px] font-semibold"
                         style={{ color: roi == null ? "var(--text-faint)" : roi >= 0 ? "#009351" : "#d33a3c" }}>
                         {roi != null ? `${num(roi, 0)}%` : "—"}
                       </span>
@@ -667,7 +667,7 @@ function CampaignRows({ campaigns, isDark, hiddenIds, onToggleHide, visibleCols,
                   const cnt = clientesPorCampanha[c.campaign_id] ?? 0
                   return (
                     <td className="px-4 py-3">
-                      <span className="tabular-nums text-[12.5px]"
+                      <span className="ds-num text-[12.5px]"
                         style={{ color: cnt > 0 ? "#009351" : "var(--text-faint)" }}>
                         {cnt > 0 ? num(cnt) : "—"}
                       </span>
@@ -680,7 +680,7 @@ function CampaignRows({ campaigns, isDark, hiddenIds, onToggleHide, visibleCols,
                   const cac   = cnt > 0 && spend > 0 ? spend / cnt : null
                   return (
                     <td className="px-4 py-3">
-                      <span className="tabular-nums text-[12.5px] font-semibold"
+                      <span className="ds-num text-[12.5px] font-semibold"
                         style={{ color: cac == null ? "var(--text-faint)" : "#c57800" }}>
                         {cac != null ? brl(cac) : "—"}
                       </span>
@@ -696,7 +696,7 @@ function CampaignRows({ campaigns, isDark, hiddenIds, onToggleHide, visibleCols,
                   const ratio = cac > 0 && ltvMed > 0 ? ltvMed / cac : null
                   return (
                     <td className="px-4 py-3">
-                      <span className="tabular-nums text-[12.5px] font-semibold"
+                      <span className="ds-num text-[12.5px] font-semibold"
                         style={{ color: ratio == null ? "var(--text-faint)" : ratio >= 3 ? "#009351" : ratio >= 1 ? "#c57800" : "#d33a3c" }}>
                         {ratio != null ? `${num(ratio, 2)}x` : "—"}
                       </span>
@@ -730,7 +730,7 @@ function CampaignRows({ campaigns, isDark, hiddenIds, onToggleHide, visibleCols,
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.5px] whitespace-nowrap"
+    <th className="px-4 py-3 text-left text-[10.5px] font-semibold whitespace-nowrap"
       style={{ color: "var(--text-faint)" }}>
       {children}
     </th>
@@ -740,7 +740,7 @@ function Th({ children }: { children: React.ReactNode }) {
 function Td({ children }: { children: React.ReactNode }) {
   return (
     <td className="px-4 py-3">
-      <span className="tabular-nums text-[12.5px]" style={{ color: "var(--text-main)" }}>{children}</span>
+      <span className="ds-num text-[12.5px]" style={{ color: "var(--text-main)" }}>{children}</span>
     </td>
   )
 }

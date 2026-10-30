@@ -1,35 +1,37 @@
+import type Anthropic from "@anthropic-ai/sdk"
+import { clienteClaude, erroClaude, FALLBACK, MODELO, MSG_RECUSA } from "@/app/lib/claude"
+
 type MaterialInput = { id: string; nome: string }
 
 export async function POST(request: Request) {
-  const { messages, apiKey, materiais } = await request.json()
+  const { messages, apiKey, materiais } = await request.json() as {
+    messages: Anthropic.Beta.BetaMessageParam[]
+    apiKey?: string
+    materiais?: MaterialInput[]
+  }
 
   if (!apiKey) {
     return Response.json({ error: "API key não configurada." }, { status: 400 })
   }
 
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 8000,
-      thinking: { type: "enabled", budget_tokens: 3000 },
+  try {
+    const resposta = await clienteClaude(apiKey).beta.messages.create({
+      model: MODELO,
+      max_tokens: 16000,
+      ...FALLBACK,
+      // Consultoria de design: raciocínio moderado basta e mantém a conversa ágil
+      output_config: { effort: "medium" },
       system: buildSystemPrompt(materiais),
       messages,
-    }),
-  })
-
-  const data = await resp.json()
-
-  if (!resp.ok) {
-    return Response.json({ error: data?.error?.message ?? "Erro na API." }, { status: resp.status })
+    })
+    if (resposta.stop_reason === "refusal") {
+      return Response.json({ error: MSG_RECUSA }, { status: 422 })
+    }
+    return Response.json(resposta)
+  } catch (e) {
+    const { error, status } = erroClaude(e)
+    return Response.json({ error }, { status })
   }
-
-  return Response.json(data)
 }
 
 function buildSystemPrompt(materiais?: MaterialInput[]): string {

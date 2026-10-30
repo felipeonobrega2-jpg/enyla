@@ -1,4 +1,6 @@
+import type Anthropic from "@anthropic-ai/sdk"
 import { supabase } from "@/app/lib/supabase"
+import { clienteClaude, erroClaude, FALLBACK, MODELO, MSG_RECUSA } from "@/app/lib/claude"
 import { calcularResumoFinanceiro } from "@/app/lib/financeiro"
 import type { KanbanCard, LancamentoFinanceiro, NegocioParceiro } from "@/app/types"
 import { COLUNAS_KANBAN, COL_FECHADO } from "@/app/types"
@@ -8,7 +10,7 @@ type ChatMsg = { role: "user" | "assistant"; content: string }
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 const hoje = () => new Date().toISOString().slice(0, 10)
 
-const TOOLS = [
+const TOOLS: Anthropic.Beta.BetaTool[] = [
   {
     name: "consultar_dados",
     description:
@@ -270,9 +272,9 @@ brutos, mas aplicando a mesma lógica (exclui categoria="sobra" e PIX vencido de
 
 ## SOBRE O SISTEMA (para perguntas de "como eu faço")
 
-Módulos do menu: Dashboard (KPIs gerais), Novo orçamento (calculadora de preço de embalagens), Histórico (orçamentos e propostas salvos), Forma IA (consultoria de design de embalagem com sugestão de layout/faca), Kanban (funil de produção, colunas acima), Clientes, Parceiros (comissões), Terceirizados, Financeiro (lançamentos, recebíveis, PIX), Conquistas (metas). Pedidos têm página pública de rastreio (/track) que o cliente final recebe por link.
+Menu: Painel (o que precisa de ação hoje e os números do período), Orçamentos (lista com a situação de cada orçamento e o botão Novo orçamento), Pedidos (lista, quadro de produção e visão geral), Clientes (clientes, leads e quem reativar), Fornecedores (máquinas, preços por serviço, ferramental, prazo e ocorrências), Financeiro (a receber, lançamentos, DRE, Pix e cadastros), Análises (gráficos históricos), Parceiros (comissões e revendas — itens comprados prontos e revendidos ficam em Revendas), Campanhas, WhatsApp, Forma IA (consultoria de embalagem) e Conquistas. Pedidos têm página pública de rastreio (/track) enviada ao cliente por link.
 
-A precificação usa: papel por 100 folhas/formato, impressão R$350/chapa, corte R$50 setup + R$50/1000 folhas, verniz UV R$55/2000un (opcional), colagem R$39/1000un, arte R$200 fixo. Multiplicador sem faca: custo×2.0; com faca: (custo+faca)×1.8; 12×: ×1.2. Margem saudável: verde ≥48%, âmbar 35-47%, vermelho <35%.`
+Orçamento: o motor testa rotas de produção (impressor e sua máquina × papel 66×96 ou 77×113 × folha inteira/meia/quarto × tamanho de faca) e usa a mais barata em cada tiragem. Cada serviço é cobrado pela regra cadastrada do fornecedor (acerto + milheiro, fixo por chapa, por folha, por m² ou por unidade). Preço = custo total × 2; a margem líquida desconta impostos. Valores sem tabela de preço aparecem como "estimado". "A receber" = valor dos pedidos + sobras − o que já foi pago.`
 }
 
 export async function POST(request: Request) {
@@ -290,40 +292,37 @@ export async function POST(request: Request) {
     return Response.json({ error: "API key não configurada." }, { status: 400 })
   }
 
-  type AnthropicMsg = { role: "user" | "assistant"; content: unknown }
-  const convo: AnthropicMsg[] = messages.map(m => ({ role: m.role, content: m.content }))
+  const convo: Anthropic.Beta.BetaMessageParam[] = messages.map(m => ({ role: m.role, content: m.content }))
+  const claude = clienteClaude(apiKey)
   let acaoPendente: { resumo: string; confirmToken: string } | null = null
 
   for (let turno = 0; turno < 4; turno++) {
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 2000,
+    let data: Anthropic.Beta.BetaMessage
+    try {
+      data = await claude.beta.messages.create({
+        model: MODELO,
+        max_tokens: 16000,
+        ...FALLBACK,
+        // Perguntas do dia a dia e ações simples: raciocínio moderado
+        output_config: { effort: "medium" },
         system: buildSystemPrompt(),
         messages: convo,
         tools: TOOLS,
-      }),
-    })
+      })
+    } catch (e) {
+      const { error, status } = erroClaude(e)
+      return Response.json({ error }, { status })
+    }
 
-    const data = await resp.json()
-
-    if (!resp.ok) {
-      return Response.json({ error: data?.error?.message ?? "Erro na API." }, { status: resp.status })
+    if (data.stop_reason === "refusal") {
+      return Response.json({ error: MSG_RECUSA }, { status: 422 })
     }
 
     if (data.stop_reason !== "tool_use") {
       return Response.json({ ...data, acaoPendente })
     }
 
-    const toolUseBlocks = (data.content as Array<{ type: string; id: string; name: string; input: Record<string, unknown> }>).filter(
-      b => b.type === "tool_use"
-    )
+    const toolUseBlocks = data.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use")
 
     convo.push({ role: "assistant", content: data.content })
 
@@ -341,7 +340,7 @@ export async function POST(request: Request) {
         }
 
         return {
-          type: "tool_result",
+          type: "tool_result" as const,
           tool_use_id: block.id,
           content: JSON.stringify(resultado),
         }
