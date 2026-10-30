@@ -13,7 +13,7 @@ import {
   parseData, diasAte, nomeChave, noPeriodo, Pedido, recebiveis, pedidoEntregue,
 } from "../lib/negocio"
 import { normalizarProducao } from "../lib/producao"
-import { MARCOS } from "./GamificacaoView"
+import { normalizarMetas, sugerirMeta, conquistasDeSaude } from "../lib/metas"
 import { brl, num } from "../utils"
 import {
   Pagina, CabecalhoPagina, Cartao, TituloCartao, Kpi, GradeKpis, Segmentado, Botao, LinhaLista,
@@ -320,8 +320,12 @@ export function PainelView({
   const faltaMeta = Math.max(0, meta - vendidoMes)
   const faturamentoTotal = (config.baselineFaturamento || 0) + pedidos.reduce((s, p) => s + p.valor, 0)
     + vendasDoPeriodo(pedidos, lancamentos, { from: null, to: null }).sobras
-  const proximoMarco = MARCOS.find(m => m.threshold > faturamentoTotal) ?? null
-  const marcoAnterior = [...MARCOS].reverse().find(m => m.threshold <= faturamentoTotal)
+  const metasCfg = normalizarMetas(config.metas)
+  const proximoMarco = metasCfg.marcos.find(m => m.valor > faturamentoTotal) ?? null
+  const marcoAnterior = [...metasCfg.marcos].reverse().find(m => m.valor <= faturamentoTotal)
+  const sugestao = sugerirMeta(pedidos, lancamentos, hoje, metasCfg.crescimentoPct)
+  const conquistas = conquistasDeSaude(pedidos, lancamentos, kanban, meta, hoje)
+  const atingidas = conquistas.filter(c => c.atingida).length
   const [editandoMeta, setEditandoMeta] = React.useState(false)
   const [rascunhoMeta, setRascunhoMeta] = React.useState("")
 
@@ -421,21 +425,29 @@ export function PainelView({
                   <div className="absolute top-0 bottom-0 w-0.5 bg-[#191625]/30" style={{ left: `${Math.min(100, projecao / meta * 100)}%` }} title="Projeção no ritmo atual" />
                 )}
               </div>
+              {onSalvarMeta && Math.abs(sugestao.meta - meta) / Math.max(meta, 1) > 0.15 && (
+                <div className="flex items-center gap-2 mt-3 px-3 py-2 rounded-lg bg-[#8456e8]/[0.05]">
+                  <p className="flex-1 text-[11.5px] text-[#5e5c68]">
+                    Meta sugerida: <span className="font-semibold text-[#191625] ds-num">{brl(sugestao.meta)}</span>
+                    <span className="text-[#898892]"> · média dos últimos 3 meses ({brlCurto(sugestao.media)}) + {metasCfg.crescimentoPct}%</span>
+                  </p>
+                  <Botao variante="fantasma" className="h-7 px-2 text-[11.5px] text-[#8456e8]" onClick={() => onSalvarMeta(sugestao.meta)}>Usar sugestão</Botao>
+                </div>
+              )}
               <p className="text-[11.5px] text-[#898892] mt-2">
                 No ritmo atual, o mês fecha em <span className={`font-semibold ds-num ${projecao >= meta ? "text-[#009351]" : "text-[#c57800]"}`}>{brl(projecao)}</span>
-                {vendidoMes >= meta * 2 && <> · a meta está baixa para o seu ritmo; vale subir</>}
               </p>
             </>
           )}
           <div className="mt-4 pt-4" style={{ borderTop: "1px solid rgba(60,60,67,0.06)" }}>
             <div className="flex items-center justify-between text-[11.5px] mb-1.5">
               <span className="text-[#5e5c68]"><Trophy className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-[#c57800]" />{brlCurto(faturamentoTotal)} faturados desde o início</span>
-              {proximoMarco && <span className="text-[#898892]">próximo: {proximoMarco.label} ({proximoMarco.sub})</span>}
+              {proximoMarco && <span className="text-[#898892]">próximo: {proximoMarco.nome} ({brlCurto(proximoMarco.valor)})</span>}
             </div>
             {proximoMarco && (
               <div className="h-1.5 rounded-full bg-[rgba(116,116,128,0.1)] overflow-hidden">
                 <div className="h-full rounded-full bg-[#c57800] ds-cresce-x"
-                  style={{ width: `${Math.min(100, (faturamentoTotal - (marcoAnterior?.threshold ?? 0)) / (proximoMarco.threshold - (marcoAnterior?.threshold ?? 0)) * 100)}%` }} />
+                  style={{ width: `${Math.min(100, (faturamentoTotal - (marcoAnterior?.valor ?? 0)) / (proximoMarco.valor - (marcoAnterior?.valor ?? 0)) * 100)}%` }} />
               </div>
             )}
           </div>
@@ -480,6 +492,27 @@ export function PainelView({
           </div>
         </Cartao>
       </div>
+
+      <Cartao className="ds-entrada">
+        <TituloCartao titulo="Conquistas" icone={<Trophy className="w-4 h-4" />}
+          sub={`${atingidas} de ${conquistas.length} alcançadas · medem a saúde da empresa, não só o volume`} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 ds-escalonado">
+          {conquistas.map(c => (
+            <div key={c.id} className={`rounded-lg px-3.5 py-3 ${c.atingida ? "bg-[#009351]/[0.06]" : "bg-[rgba(116,116,128,0.05)]"}`} title={c.descricao}>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[12.5px] font-semibold text-[#191625] truncate">{c.nome}</p>
+                {c.atingida ? <Selo tom="sucesso">alcançada</Selo> : <span className="text-[11px] ds-num text-[#898892]">{num(c.progresso * 100, 0)}%</span>}
+              </div>
+              <p className="text-[11px] text-[#898892] mt-1 truncate">{c.detalhe}</p>
+              {!c.atingida && (
+                <div className="h-1 rounded-full bg-[rgba(116,116,128,0.12)] overflow-hidden mt-2">
+                  <div className="h-full rounded-full bg-[#8456e8] ds-cresce-x" style={{ width: `${c.progresso * 100}%` }} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </Cartao>
 
       <Gaveta aberta={!!detalhe} titulo={detalhe?.titulo ?? ""} sub={detalhe?.sub} onFechar={fechar}
         rodape={detalhe?.destino ? <Botao variante="secundario" onClick={() => { const ir = detalhe.destino!.ir; fechar(); ir() }}>{detalhe.destino.nome} <ArrowRight className="w-3.5 h-3.5" /></Botao> : undefined}>

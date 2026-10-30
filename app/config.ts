@@ -1,4 +1,5 @@
 import { ConfigProducao, PRODUCAO_PADRAO, normalizarProducao } from "./lib/producao"
+import { ConfigMetas, METAS_PADRAO, normalizarMetas } from "./lib/metas"
 
 export type Custos = {
   impressaoPorChapa: number
@@ -75,6 +76,7 @@ export type Configuracoes = {
   gastosFixos: GastoFixo[]
   fornecedores: Fornecedor[]
   producao: ConfigProducao
+  metas: ConfigMetas
 }
 
 const CATS_RECEITA_PADRAO: CategoriaFinanceira[] = [
@@ -125,6 +127,7 @@ export const CONFIG_PADRAO: Configuracoes = {
   gastosFixos: [],
   fornecedores: [],
   producao: PRODUCAO_PADRAO,
+  metas: METAS_PADRAO,
 }
 
 export const defaultConfig = CONFIG_PADRAO
@@ -147,6 +150,7 @@ export function carregarConfig(): Configuracoes {
       gastosFixos: saved.gastosFixos ?? [],
       fornecedores: saved.fornecedores ?? [],
       producao: normalizarProducao(saved.producao),
+      metas: normalizarMetas(saved.metas),
     }
   } catch {
     return CONFIG_PADRAO

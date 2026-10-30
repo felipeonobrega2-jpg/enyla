@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react"
 import { Configuracoes, Material, CONFIG_PADRAO } from "../config"
+import { normalizarMetas } from "../lib/metas"
 import { useTheme, ThemeChoice } from "./ThemeProvider"
 
 export function ConfigView({ config, onSave, onExportar, onImportar }: {
@@ -174,6 +175,57 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
                 className="w-32 border border-slate-200 rounded-lg px-3 py-2 text-sm text-right text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent" />
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Metas e marcos */}
+      <div className="bg-white border border-slate-100 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
+          <p className="text-xs font-semibold text-slate-600">Metas e marcos</p>
+        </div>
+        <div className="px-4 py-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label className="block">
+              <span className="text-[11px] text-slate-500">Meta mensal (R$)</span>
+              <input type="number" min={0} value={draft.metaMensal}
+                onChange={e => setDraft(d => ({ ...d, metaMensal: Number(e.target.value) }))}
+                className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-right ds-num focus:outline-none focus:ring-2 focus:ring-[#8456e8]/30" />
+            </label>
+            <label className="block">
+              <span className="text-[11px] text-slate-500">Crescimento para sugerir a meta (%)</span>
+              <input type="number" min={0} value={normalizarMetas(draft.metas).crescimentoPct}
+                onChange={e => setDraft(d => ({ ...d, metas: { ...normalizarMetas(d.metas), crescimentoPct: Number(e.target.value) } }))}
+                className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-right ds-num focus:outline-none focus:ring-2 focus:ring-[#8456e8]/30" />
+            </label>
+            <label className="block">
+              <span className="text-[11px] text-slate-500">Faturamento anterior ao sistema (R$)</span>
+              <input type="number" min={0} value={draft.baselineFaturamento}
+                onChange={e => setDraft(d => ({ ...d, baselineFaturamento: Number(e.target.value) }))}
+                className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-right ds-num focus:outline-none focus:ring-2 focus:ring-[#8456e8]/30" />
+            </label>
+          </div>
+          <div>
+            <p className="text-[11px] text-slate-500 mb-2">Marcos de faturamento acumulado (aparecem no Painel)</p>
+            <div className="space-y-2">
+              {normalizarMetas(draft.metas).marcos.map((m, i, lista) => (
+                <div key={m.id} className="flex items-center gap-2">
+                  <input value={m.nome}
+                    onChange={e => setDraft(d => ({ ...d, metas: { ...normalizarMetas(d.metas), marcos: lista.map((x, j) => j === i ? { ...x, nome: e.target.value } : x) } }))}
+                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8456e8]/30" />
+                  <div className="relative w-40">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">R$</span>
+                    <input type="number" min={0} value={m.valor}
+                      onChange={e => setDraft(d => ({ ...d, metas: { ...normalizarMetas(d.metas), marcos: lista.map((x, j) => j === i ? { ...x, valor: Number(e.target.value) } : x) } }))}
+                      className="w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm text-right ds-num focus:outline-none focus:ring-2 focus:ring-[#8456e8]/30" />
+                  </div>
+                  <button onClick={() => setDraft(d => ({ ...d, metas: { ...normalizarMetas(d.metas), marcos: lista.filter((_, j) => j !== i) } }))}
+                    className="w-8 h-8 rounded-lg text-slate-400 hover:text-[#d33a3c] hover:bg-[#d33a3c]/[0.06] transition-colors" title="Remover marco">×</button>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setDraft(d => { const m = normalizarMetas(d.metas); const ultimo = m.marcos[m.marcos.length - 1]?.valor ?? 0; return { ...d, metas: { ...m, marcos: [...m.marcos, { id: Date.now().toString(36), nome: "Novo marco", valor: ultimo ? ultimo * 2 : 10_000 }] } } })}
+              className="mt-2 text-[12px] font-semibold text-[#8456e8] hover:underline">+ Adicionar marco</button>
+          </div>
         </div>
       </div>
 

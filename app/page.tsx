@@ -40,6 +40,7 @@ import { PainelView } from "./components/PainelView"
 import { ParceriasView } from "./components/ParceriasView"
 import { RelatoriosView } from "./components/RelatoriosView"
 import { normalizarProducao, movimentosPorEtapa } from "./lib/producao"
+import { normalizarMetas } from "./lib/metas"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
 import FormaView from "./FormaView"
 import FormaBubble from "./components/FormaBubble"
@@ -1357,6 +1358,7 @@ export default function Home() {
             lancamentos={lancamentos}
             metaMensal={config.metaMensal}
             baselineFaturamento={config.baselineFaturamento}
+            marcos={normalizarMetas(config.metas).marcos}
             onClick={() => navigate("painel")}
           />
         </div>

@@ -1,4 +1,6 @@
 "use client"
+import { montarPedidos, vendasDoPeriodo, SEM_PERIODO } from "../lib/negocio"
+import type { Marco } from "../lib/metas"
 import { useState, useMemo } from "react"
 import { KanbanCard, COL_FECHADO, COL_PERDIDO, COL_HOT, LancamentoFinanceiro } from "../types"
 import { brl } from "../utils"
@@ -282,25 +284,25 @@ export function SidebarGamificacao({
   kanban,
   lancamentos,
   baselineFaturamento,
+  marcos,
   onClick,
 }: {
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
   metaMensal: number
   baselineFaturamento: number
+  marcos: Marco[]
   onClick: () => void
 }) {
+  // Mesma conta do cartão de meta do Painel: pedidos (lib/negocio) + sobras + faturamento anterior
   const totalFaturado = useMemo(() => {
-    const fechados = kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO && c.coluna !== COL_HOT && !c.isTerceirizado)
-    const sobras = lancamentos
-      .filter(l => l.categoria === "sobra" && l.tipo === "receita")
-      .reduce((s, l) => s + l.valor, 0)
-    return baselineFaturamento + fechados.reduce((s, c) => s + c.preco, 0) + sobras
+    const pedidos = montarPedidos(kanban, lancamentos)
+    return baselineFaturamento + pedidos.reduce((s, p) => s + p.valor, 0) + vendasDoPeriodo(pedidos, lancamentos, SEM_PERIODO).sobras
   }, [kanban, baselineFaturamento, lancamentos])
 
-  const proximoMarco = MARCOS.find(m => m.threshold > totalFaturado) ?? null
-  const pct = proximoMarco ? Math.min(totalFaturado / proximoMarco.threshold, 1) : 1
-  const falta = proximoMarco ? proximoMarco.threshold - totalFaturado : 0
+  const proximoMarco = marcos.find(m => m.valor > totalFaturado) ?? null
+  const pct = proximoMarco ? Math.min(totalFaturado / proximoMarco.valor, 1) : 1
+  const falta = proximoMarco ? proximoMarco.valor - totalFaturado : 0
 
   function fmtShort(v: number) {
     if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1).replace(".", ",")}M`
@@ -319,7 +321,7 @@ export function SidebarGamificacao({
         </span>
       </div>
       <p className="text-[11px] font-semibold leading-snug mb-1.5 truncate" style={{ color: proximoMarco ? "rgba(255,255,255,0.75)" : "#009351" }}>
-        {proximoMarco ? `${proximoMarco.label} · ${proximoMarco.sub}` : "Todos conquistados!"}
+        {proximoMarco ? `${proximoMarco.nome} · R$ ${fmtShort(proximoMarco.valor)}` : "Todos os marcos alcançados"}
       </p>
       <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
         <div className="h-full rounded-full transition-all duration-500"
