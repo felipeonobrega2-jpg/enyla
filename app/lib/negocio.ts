@@ -117,7 +117,16 @@ export type Pedido = {
   receitas: LancamentoFinanceiro[]
   despesas: LancamentoFinanceiro[]
   recebido: number
+  /** Sobras vendidas ao cliente neste pedido (somam ao que ele deve). */
+  sobras: number
+  /** Saldo devedor: valor + sobras − recebido. É o "a receber" em todas as telas. */
   aReceber: number
+  /** Parte do saldo com cobrança lançada (pendente). */
+  cobrado: number
+  /** Parte do saldo cuja cobrança já venceu. */
+  vencido: number
+  /** Parte do saldo sem nenhuma cobrança lançada. */
+  semCobranca: number
   /** Custos diretos lançados (pagos ou na conta do fornecedor). */
   custoDireto: number
 }
@@ -138,6 +147,7 @@ export function montarPedidos(kanban: KanbanCard[], lancamentos: LancamentoFinan
     else if (l.loteId) recPorLote.set(l.loteId, [...(recPorLote.get(l.loteId) ?? []), l])
   }
 
+  const hojeIso = new Date().toLocaleDateString("sv-SE")
   const pedidos: Pedido[] = []
   for (const [key, cards] of grupos) {
     const loteId = cards[0].loteId
@@ -158,7 +168,12 @@ export function montarPedidos(kanban: KanbanCard[], lancamentos: LancamentoFinan
     const reais       = base.map(c => c.dataEntregaReal).filter(Boolean).sort() as string[]
 
     const recebido = receitas.filter(l => l.status === "pago").reduce((s, l) => s + l.valor, 0)
-    const aReceber = receitas.filter(l => l.status !== "pago").reduce((s, l) => s + l.valor, 0)
+    const sobras   = receitas.filter(l => l.categoria === "sobra").reduce((s, l) => s + l.valor, 0)
+    const valor    = cards.reduce((s, c) => s + c.preco, 0)
+    const saldo    = Math.max(0, valor + sobras - recebido)
+    const pendentes = receitas.filter(l => l.status !== "pago")
+    const cobrado  = Math.min(saldo, pendentes.reduce((s, l) => s + l.valor, 0))
+    const vencido  = Math.min(saldo, pendentes.filter(l => l.dataVencimento < hojeIso).reduce((s, l) => s + l.valor, 0))
 
     pedidos.push({
       key,
@@ -171,9 +186,10 @@ export function montarPedidos(kanban: KanbanCard[], lancamentos: LancamentoFinan
       dataFechamento: fechamentos[0],
       dataEntregaPrevista: previstas[previstas.length - 1],
       dataEntregaReal: reais[reais.length - 1],
-      valor: cards.reduce((s, c) => s + c.preco, 0),
+      valor,
       quantidade: base.reduce((s, c) => s + c.quantidade, 0),
-      receitas, despesas, recebido, aReceber,
+      receitas, despesas, recebido, sobras,
+      aReceber: saldo, cobrado, vencido, semCobranca: saldo - cobrado,
       custoDireto: despesas
         .filter(l => l.status === "pago" || l.formaPagamento === "conta")
         .reduce((s, l) => s + l.valor, 0),
@@ -232,6 +248,39 @@ export function caixaDoPeriodo(lancamentos: LancamentoFinanceiro[], p: Periodo, 
     recebido: rec.filter(l => l.status === "pago" && noPeriodo(l.dataPagamento ?? l.dataVencimento, p)).reduce((s, l) => s + l.valor, 0),
     aReceber: pendentes.reduce((s, l) => s + l.valor, 0),
     vencido:  pendentes.filter(l => diasAte(l.dataVencimento, hoje) < 0).reduce((s, l) => s + l.valor, 0),
+  }
+}
+
+/**
+ * Recebíveis — o que os clientes ainda devem, em uma conta só.
+ *   aReceber    = Σ saldo devedor dos pedidos
+ *   vencido     = parte com cobrança vencida
+ *   semCobranca = parte sem cobrança lançada
+ *   aConferir   = cobranças pendentes que não batem com saldo nenhum: de pedidos já
+ *                 quitados (provável baixa esquecida) ou de pedidos que não estão no quadro
+ */
+export type Recebiveis = {
+  aReceber: number
+  cobrado: number
+  vencido: number
+  semCobranca: number
+  comSaldo: Pedido[]
+  aConferir: LancamentoFinanceiro[]
+}
+
+export function recebiveis(pedidos: Pedido[], lancamentos: LancamentoFinanceiro[]): Recebiveis {
+  const comSaldo = pedidos.filter(p => p.aReceber > 0.5)
+  const ligados = new Set(pedidos.flatMap(p => p.receitas.map(l => l.id)))
+  const quitados = pedidos.filter(p => p.aReceber <= 0.5).flatMap(p => p.receitas.filter(l => l.status !== "pago"))
+  const soltos = lancamentos.filter(l => l.tipo === "receita" && l.status !== "pago" && !ligados.has(l.id) && l.formaPagamento !== "conta")
+  const soma = (f: (p: Pedido) => number) => comSaldo.reduce((s, p) => s + f(p), 0)
+  return {
+    aReceber: soma(p => p.aReceber),
+    cobrado: soma(p => p.cobrado),
+    vencido: soma(p => p.vencido),
+    semCobranca: soma(p => p.semCobranca),
+    comSaldo,
+    aConferir: [...quitados, ...soltos].sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento)),
   }
 }
 

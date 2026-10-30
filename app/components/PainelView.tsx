@@ -10,7 +10,7 @@ import { Configuracoes } from "../config"
 import {
   Periodo, montarPedidos, vendasDoPeriodo, caixaDoPeriodo, conversao, orcamentosDoPeriodo, producao,
   pipelineComercial, margemContribuicao, isTerceirizado, isAberto, isGanho, isPerdido, isExpirado,
-  parseData, diasAte, nomeChave, noPeriodo, Pedido,
+  parseData, diasAte, nomeChave, noPeriodo, Pedido, recebiveis, pedidoEntregue,
 } from "../lib/negocio"
 import { normalizarProducao } from "../lib/producao"
 import { brl, num } from "../utils"
@@ -92,6 +92,7 @@ export function PainelView({
   const pipe = pipelineComercial(kanban)
   const margem = margemContribuicao(vendas.pedidos)
   const prod = producao(pedidos, hoje)
+  const rec = recebiveis(pedidos, lancamentos)
 
   const cardDoPedido = (p: Pedido) => p.cards.find(c => !isTerceirizado(c)) ?? p.cards[0]
   const telefoneDe = (nome: string) => clientes.find(c => nomeChave(c.nome) === nomeChave(nome))?.telefone
@@ -113,9 +114,8 @@ export function PainelView({
     .filter((x): x is { card: KanbanCard; dias: number } => !!x && x.dias >= 0 && x.dias <= 3)
     .sort((a, b) => a.dias - b.dias)
 
-  const recebiveisVencidos = lancamentos
-    .filter(l => l.tipo === "receita" && l.status !== "pago" && diasAte(l.dataVencimento, hoje) < 0)
-    .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))
+  const cobrancaVencida = rec.comSaldo.filter(p => p.vencido > 0.5)
+  const entregueSemCobranca = rec.comSaldo.filter(p => pedidoEntregue(p) && p.semCobranca > 0.5)
 
   const prodCfg = normalizarProducao(config.producao)
   const hojeIso = hoje.toLocaleDateString("sv-SE")
@@ -134,11 +134,23 @@ export function PainelView({
       titulo: `${m.pedidoLabel}`, sub: `fornecedor passou do prazo (${dataCurta(m.prazoPrevisto)})`,
       ir: () => onNavegar("fornecedores"),
     })),
-    ...recebiveisVencidos.map(l => ({
-      id: `rec-${l.id}`, tom: "perigo" as Tom, icone: <Receipt className="w-4 h-4" />,
-      titulo: l.nomeCliente ? `${l.nomeCliente}${l.loteNumero || l.cardNumero ? ` · ${l.loteNumero ?? l.cardNumero}` : ""}` : l.descricao,
-      sub: `recebimento venceu em ${dataCurta(l.dataVencimento)}`, valor: brl(l.valor), ir: () => onNavegar("financeiro"),
+    ...cobrancaVencida.map(p => ({
+      id: `rec-${p.key}`, tom: "perigo" as Tom, icone: <Receipt className="w-4 h-4" />,
+      titulo: `${p.numero} · ${p.nomeCliente}`,
+      sub: `cobrança vencida${p.semCobranca > 0.5 ? ` · mais ${brl(p.semCobranca)} sem cobrança` : ""}`,
+      valor: brl(p.vencido), ir: () => onAbrirCard(cardDoPedido(p)),
     })),
+    ...entregueSemCobranca.map(p => ({
+      id: `sc-${p.key}`, tom: "alerta" as Tom, icone: <Receipt className="w-4 h-4" />,
+      titulo: `${p.numero} · ${p.nomeCliente}`, sub: "entregue e sem cobrança lançada",
+      valor: brl(p.semCobranca), ir: () => onAbrirCard(cardDoPedido(p)),
+    })),
+    ...(rec.aConferir.length ? [{
+      id: "conferir", tom: "info" as Tom, icone: <Receipt className="w-4 h-4" />,
+      titulo: `${rec.aConferir.length} ${rec.aConferir.length === 1 ? "cobrança para conferir" : "cobranças para conferir"}`,
+      sub: "pendentes em pedidos já quitados ou fora do quadro: confira e dê baixa",
+      valor: brl(rec.aConferir.reduce((s, l) => s + l.valor, 0)), ir: () => abrirCaixa(),
+    }] : []),
     ...prod.vencendo3d.map(p => ({
       id: `ven-${p.key}`, tom: "alerta" as Tom, icone: <CalendarClock className="w-4 h-4" />,
       titulo: `${p.numero} · ${p.nomeCliente}`, sub: `${prazoTexto(p.dataEntregaPrevista)} · ${p.etapa}`,
@@ -188,7 +200,7 @@ export function PainelView({
   const linhaPedido = (p: Pedido) => (
     <LinhaLista key={p.key} titulo={`${p.numero} · ${p.nomeCliente}`}
       sub={`${p.etapa}${p.dataFechamento ? ` · fechado ${dataCurta(p.dataFechamento)}` : ""}`}
-      valor={brl(p.valor)} valorSub={p.aReceber > 0 ? `falta ${brl(p.aReceber)}` : "pago"}
+      valor={brl(p.valor)} valorSub={p.aReceber > 0.5 ? `falta ${brl(p.aReceber)}` : "pago"}
       onClick={() => { fechar(); onAbrirCard(cardDoPedido(p)) }} />
   )
   const linhaOrcamento = (c: KanbanCard) => (
@@ -207,20 +219,26 @@ export function PainelView({
       : <Vazio icone={<TrendingUp className="w-8 h-8" />} titulo="Nenhum pedido fechado no período" />,
     destino: { nome: "Abrir Pedidos", ir: () => onNavegar("pedidos") },
   })
-  const abrirCaixa = () => {
+  function abrirCaixa() {
     const recebidos = lancamentos.filter(l => l.tipo === "receita" && l.status === "pago" && noPeriodo(l.dataPagamento ?? l.dataVencimento, periodo))
-    const pendentes = lancamentos.filter(l => l.tipo === "receita" && l.status !== "pago").sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))
+    const titulo = (t: string) => <p className="px-3 pt-3 pb-1 text-[11px] font-semibold text-[#898892]">{t}</p>
     setDetalhe({
       titulo: "Dinheiro",
-      sub: `${brl(caixa.recebido)} recebidos ${nomePeriodo} · ${brl(caixa.aReceber)} a receber`,
+      sub: `${brl(caixa.recebido)} recebidos ${nomePeriodo} · clientes devem ${brl(rec.aReceber)}`,
       linhas: <>
-        {pendentes.length > 0 && <p className="px-3 pt-2 pb-1 text-[10.5px] uppercase tracking-wide font-bold text-[#898892]">A receber</p>}
-        {pendentes.map(l => {
-          const atrasado = diasAte(l.dataVencimento, hoje) < 0
-          return <LinhaLista key={l.id} titulo={l.nomeCliente || l.descricao} sub={`${l.loteNumero ?? l.cardNumero ?? l.descricao} · vence ${dataCurta(l.dataVencimento)}`}
-            valor={brl(l.valor)} tom={atrasado ? "perigo" : undefined} valorSub={atrasado ? "vencido" : undefined} />
-        })}
-        <p className="px-3 pt-3 pb-1 text-[10.5px] uppercase tracking-wide font-bold text-[#898892]">Recebido {nomePeriodo}</p>
+        {rec.comSaldo.length > 0 && titulo(`Clientes devem ${brl(rec.aReceber)}`)}
+        {[...rec.comSaldo].sort((a, b) => b.vencido - a.vencido || b.aReceber - a.aReceber).map(p => (
+          <LinhaLista key={p.key} titulo={`${p.numero} · ${p.nomeCliente}`}
+            sub={p.vencido > 0.5 ? `${brl(p.vencido)} com cobrança vencida` : p.semCobranca > 0.5 ? `${brl(p.semCobranca)} sem cobrança lançada · ${p.etapa}` : `cobrança lançada · ${p.etapa}`}
+            valor={brl(p.aReceber)} tom={p.vencido > 0.5 ? "perigo" : p.semCobranca > 0.5 ? "alerta" : undefined}
+            onClick={() => { fechar(); onAbrirCard(cardDoPedido(p)) }} />
+        ))}
+        {rec.aConferir.length > 0 && titulo("Cobranças para conferir (pedido já quitado ou fora do quadro)")}
+        {rec.aConferir.map(l => (
+          <LinhaLista key={l.id} titulo={l.nomeCliente || l.descricao} sub={`${l.descricao} · venc. ${dataCurta(l.dataVencimento)}`}
+            valor={brl(l.valor)} valorSub="conferir" tom="info" />
+        ))}
+        {titulo(`Recebido ${nomePeriodo}`)}
         {recebidos.length === 0 && <Vazio icone={<Wallet className="w-8 h-8" />} titulo="Nada recebido no período" />}
         {[...recebidos].sort((a, b) => (b.dataPagamento ?? "").localeCompare(a.dataPagamento ?? "")).map(l => (
           <LinhaLista key={l.id} titulo={l.nomeCliente || l.descricao} sub={`${l.loteNumero ?? l.cardNumero ?? l.descricao} · ${dataCurta(l.dataPagamento ?? l.dataVencimento)}`}
@@ -292,7 +310,7 @@ export function PainelView({
           sub={`${vendas.pedidos.length} ${vendas.pedidos.length === 1 ? "pedido" : "pedidos"} · ticket ${brlCurto(vendas.ticketMedio)}`} />
         <Kpi rotulo="Recebido" icone={<Wallet className="w-3.5 h-3.5" />} tom="sucesso"
           valor={caixa.recebido} formato={brlCurto} onClick={abrirCaixa}
-          sub={caixa.vencido > 0 ? <span className="text-[#d33a3c]">{brlCurto(caixa.vencido)} vencido</span> : `${brlCurto(caixa.aReceber)} a receber`} />
+          sub={<>{brlCurto(rec.aReceber)} a receber{rec.vencido > 0.5 && <span className="text-[#d33a3c]"> · {brlCurto(rec.vencido)} venc.</span>}</>} />
         <Kpi rotulo="Conversão" icone={<Percent className="w-3.5 h-3.5" />}
           valor={conv.decididos > 0 ? conv.taxa : null} formato={pct} onClick={abrirConversao}
           sub={conv.decididos > 0 ? `${conv.ganhos} de ${conv.decididos} decididos` : `${conv.total} orçamentos, nenhum decidido`} />

@@ -1,12 +1,14 @@
 "use client"
 
 import React, { useState, useMemo, useEffect, useRef } from "react"
-import { CheckCircle2, Factory, TrendingUp, TrendingDown, DollarSign, Clock, AlertTriangle, Landmark } from "lucide-react"
+import { CheckCircle2, Factory, TrendingUp, TrendingDown, DollarSign, Clock, AlertTriangle, Landmark, Plus } from "lucide-react"
+import { montarPedidos, recebiveis } from "../lib/negocio"
+import { CabecalhoPagina, Segmentado, Botao, Cartao, TituloCartao, Kpi, GradeKpis, LinhaLista, Vazio, ColunasDuplas } from "./ds"
 import {
   LancamentoFinanceiro, TipoLancamento, StatusLancamento,
   FormaPagamento, KanbanCard, COL_EXPEDICAO, COL_PERDIDO, NegocioParceiro, Lote,
 } from "../types"
-import { brl } from "../utils"
+import { brl, num } from "../utils"
 import { CategoriaFinanceira, ContaBancaria, Configuracoes } from "../config"
 import { ContasTab } from "./financeiro/ContasTab"
 import { FixasTab } from "./financeiro/FixasTab"
@@ -17,86 +19,6 @@ import {
   sobrasPorLote as calcSobrasPorLote, sobrasPorCard as calcSobrasPorCard,
   calcularPedidosFechados, pedidosAbertos, contarNaoRegistrados, calcularVencidos,
 } from "../lib/financeiro"
-
-// ─── FinLineChart ─────────────────────────────────────────────────────────────
-
-function FinLineChart({ data }: { data: { label: string; receita: number; despesas: number }[] }) {
-  const [hover, setHover] = useState<number | null>(null)
-  const W = 600, H = 150
-  const PAD = { top: 10, right: 12, bottom: 22, left: 8 }
-  const gW = W - PAD.left - PAD.right
-  const gH = H - PAD.top - PAD.bottom
-  const n = data.length
-  const maxVal = Math.max(...data.flatMap(d => [d.receita, d.despesas]), 1)
-  const xOf = (i: number) => PAD.left + (n > 1 ? (i / (n - 1)) * gW : gW / 2)
-  const yOf = (v: number) => PAD.top + gH - (v / maxVal) * gH
-  const cubicPath = (key: "receita" | "despesas") => {
-    if (n < 2) return ""
-    const pts = data.map((d, i) => ({ x: xOf(i), y: yOf(d[key]) }))
-    let p = `M ${pts[0].x} ${pts[0].y}`
-    for (let i = 1; i < pts.length; i++) {
-      const c1x = pts[i - 1].x + (pts[i].x - pts[i - 1].x) / 3
-      const c2x = pts[i - 1].x + (2 * (pts[i].x - pts[i - 1].x)) / 3
-      p += ` C ${c1x} ${pts[i - 1].y} ${c2x} ${pts[i].y} ${pts[i].x} ${pts[i].y}`
-    }
-    return p
-  }
-  const areaPath = (key: "receita" | "despesas") => {
-    const line = cubicPath(key)
-    if (!line) return ""
-    return `${line} L ${xOf(n - 1)} ${PAD.top + gH} L ${xOf(0)} ${PAD.top + gH} Z`
-  }
-  return (
-    <div className="relative select-none" style={{ height: H }}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="100%" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="fin-g-rec" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#009351" stopOpacity="0.16" />
-            <stop offset="100%" stopColor="#009351" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="fin-g-desp" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#d33a3c" stopOpacity="0.10" />
-            <stop offset="100%" stopColor="#d33a3c" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <path d={areaPath("despesas")} fill="url(#fin-g-desp)" />
-        <path d={areaPath("receita")} fill="url(#fin-g-rec)" />
-        <path d={cubicPath("despesas")} fill="none" stroke="#d33a3c" strokeWidth="1.5" strokeOpacity="0.65" />
-        <path d={cubicPath("receita")} fill="none" stroke="#009351" strokeWidth="2" />
-        {hover !== null && (
-          <>
-            <line x1={xOf(hover)} y1={PAD.top} x2={xOf(hover)} y2={PAD.top + gH}
-              stroke="rgba(100,100,110,0.2)" strokeWidth="1" />
-            <circle cx={xOf(hover)} cy={yOf(data[hover].receita)} r="3.5" fill="#009351" />
-            <circle cx={xOf(hover)} cy={yOf(data[hover].despesas)} r="3" fill="#d33a3c" />
-          </>
-        )}
-        {data.map((d, i) => (
-          <text key={i} x={xOf(i)} y={H - 3} textAnchor="middle" fontSize="8.5" fill="rgba(142,142,147,0.9)">{d.label}</text>
-        ))}
-        {data.map((_, i) => {
-          const x0 = i === 0 ? 0 : (xOf(i - 1) + xOf(i)) / 2
-          const x1 = i === n - 1 ? W : (xOf(i) + xOf(i + 1)) / 2
-          return <rect key={i} x={x0} y={0} width={x1 - x0} height={H} fill="transparent"
-            onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} />
-        })}
-      </svg>
-      {hover !== null && (() => {
-        const d = data[hover]
-        const net = d.receita - d.despesas
-        return (
-          <div className="absolute top-1 right-2 rounded-xl px-3 py-2 text-[11px] shadow-lg z-10 pointer-events-none"
-            style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
-            <p className="font-semibold mb-1" style={{ color: "var(--text-main)" }}>{d.label}</p>
-            <p style={{ color: "#009351" }}>↑ {brl(d.receita)}</p>
-            <p style={{ color: "#d33a3c" }}>↓ {brl(d.despesas)}</p>
-            <p className="mt-1 font-bold tabular-nums" style={{ color: net >= 0 ? "#009351" : "#d33a3c" }}>= {brl(net)}</p>
-          </div>
-        )
-      })()}
-    </div>
-  )
-}
 
 
 // ─── CaixaProjetadoChart ──────────────────────────────────────────────────────
@@ -144,7 +66,7 @@ function CaixaProjetadoChart({ data, saldoAtual }: {
     <div className="relative select-none" style={{ height: H }}>
       {/* Y-axis labels — HTML overlay avoids SVG text distortion */}
       {gridVals.map((v, i) => (
-        <span key={i} className="absolute right-1 text-[9px] tabular-nums pointer-events-none"
+        <span key={i} className="absolute right-1 text-[9px] ds-num pointer-events-none"
           style={{ top: yOf(v) - 6, color: "rgba(142,142,147,0.55)", lineHeight: 1 }}>
           {brlK(v)}
         </span>
@@ -214,11 +136,11 @@ function CaixaProjetadoChart({ data, saldoAtual }: {
             style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
             <p className="font-bold text-[12px] mb-1" style={{ color: "var(--text-main)" }}>{p.label}</p>
             {hover === 0
-              ? <p className="tabular-nums" style={{ color: "#8456e8" }}>Caixa atual · {brl(saldoAtual)}</p>
+              ? <p className="ds-num" style={{ color: "#8456e8" }}>Caixa atual · {brl(saldoAtual)}</p>
               : <div className="flex items-center gap-3">
-                  <span className="tabular-nums font-semibold" style={{ color: "#30D158" }}>+{brl(entrada!)}</span>
+                  <span className="ds-num font-semibold" style={{ color: "#30D158" }}>+{brl(entrada!)}</span>
                   <span className="text-[10px]" style={{ color: "var(--text-faint)" }}>→</span>
-                  <span className="tabular-nums font-bold" style={{ color: "#8456e8" }}>{brl(p.value)}</span>
+                  <span className="ds-num font-bold" style={{ color: "#8456e8" }}>{brl(p.value)}</span>
                 </div>
             }
           </div>
@@ -481,7 +403,7 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col overflow-hidden" style={{ maxHeight: "92vh" }}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 flex flex-col overflow-hidden" style={{ maxHeight: "92vh" }}>
         <div className="px-6 pt-5 pb-0 border-b border-[rgba(60,60,67,0.08)] flex flex-col gap-3 shrink-0">
           <div className="flex items-center justify-between">
             <p className="font-bold text-[#191625] text-[15px]">
@@ -826,7 +748,7 @@ function ModalPagamento({ lancamento, onSave, onClose }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
         <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between">
           <div>
             <p className="font-bold text-[#191625] text-[14px]">Registrar pagamento</p>
@@ -837,7 +759,7 @@ function ModalPagamento({ lancamento, onSave, onClose }: {
         <div className="px-6 py-5 space-y-4">
           <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 text-center">
             <p className="text-[11px] text-emerald-600 font-medium">Valor recebido</p>
-            <p className="font-semibold text-[22px] text-emerald-700 tabular-nums">{brl(lancamento.valor)}</p>
+            <p className="font-semibold text-[22px] text-emerald-700 ds-num">{brl(lancamento.valor)}</p>
           </div>
           <Field label="Data do recebimento">
             <input type="date" value={dataPag} onChange={e => setDataPag(e.target.value)} className={inp()} />
@@ -898,7 +820,7 @@ function gerarPdfAReceber(grupos: Array<{ cliente: string; pedidos: Array<{ key:
     .meta { font-size: 12px; color: #8E8E93; margin-top: 4px; }
     .total-box { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px; padding: 12px 20px; text-align: right; }
     .total-label { font-size: 11px; color: #b45309; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
-    .total-value { font-size: 26px; font-weight: 800; color: #b45309; font-variant-numeric: tabular-nums; }
+    .total-value { font-size: 26px; font-weight: 800; color: #b45309; font-variant-numeric: ds-num; }
     table { width: 100%; border-collapse: collapse; margin-top: 8px; }
     .group-row { background: #f8f7ff; }
     .grupo-row td { padding: 10px 12px; }
@@ -908,7 +830,7 @@ function gerarPdfAReceber(grupos: Array<{ cliente: string; pedidos: Array<{ key:
     .badge { font-size: 9.5px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: #ede9fe; color: #6d28d9; }
     .sub-text { font-size: 10.5px; color: #8E8E93; }
     .label-cell { padding-left: 48px !important; }
-    .value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+    .value { text-align: right; font-variant-numeric: ds-num; font-weight: 700; white-space: nowrap; }
     .value.amber { color: #b45309; font-size: 14px; }
     .value.sub { color: #5e5c68; font-size: 12px; font-weight: 600; }
     .group-row td { border-top: 1px solid #ddd6fe; }
@@ -960,7 +882,7 @@ function ModalReceberDetalhe({ itens, total, onClose, onVerTudo, onClienteClick 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden max-h-[85vh] flex flex-col"
+      <div className="rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden max-h-[85vh] flex flex-col"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
 
         {/* Header */}
@@ -992,7 +914,7 @@ function ModalReceberDetalhe({ itens, total, onClose, onVerTudo, onClienteClick 
         {/* Total */}
         <div className="px-6 py-4 shrink-0" style={{ borderBottom: "1px solid var(--border)", background: "rgba(251,191,36,0.06)" }}>
           <p className="text-[11px] font-medium" style={{ color: "#f59e0b" }}>Total a receber</p>
-          <p className="font-bold text-[26px] tabular-nums" style={{ color: "#f59e0b" }}>{brl(total)}</p>
+          <p className="font-bold text-[26px] ds-num" style={{ color: "#f59e0b" }}>{brl(total)}</p>
         </div>
 
         {/* Lista agrupada por cliente */}
@@ -1027,7 +949,7 @@ function ModalReceberDetalhe({ itens, total, onClose, onVerTudo, onClienteClick 
                     </svg>
                   )}
                 </div>
-                <p className="font-bold text-[14px] tabular-nums shrink-0" style={{ color: "#f59e0b" }}>
+                <p className="font-bold text-[14px] ds-num shrink-0" style={{ color: "#f59e0b" }}>
                   {brl(g.totalRestante)}
                 </p>
               </div>
@@ -1047,7 +969,7 @@ function ModalReceberDetalhe({ itens, total, onClose, onVerTudo, onClienteClick 
                         </span>
                       )}
                     </div>
-                    <span className="text-[11px] font-semibold tabular-nums shrink-0" style={{ color: "var(--text-sub)" }}>
+                    <span className="text-[11px] font-semibold ds-num shrink-0" style={{ color: "var(--text-sub)" }}>
                       {brl(item.restante)}
                     </span>
                   </div>
@@ -1096,6 +1018,8 @@ function periodoRange(p: Periodo, mesOffset = 0): { from: Date | null; to: Date 
 
 const MESES_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]
 
+type FinTab = "dash" | "dre" | "receber" | "lancamentos" | "pix" | "contas" | "fixas" | "fornecedores" | "config"
+
 const PERIODO_LABEL: Record<Periodo, string> = {
   mes: "Este mês", trimestre: "Este trimestre", semestre: "Este semestre", ano: "Este ano", tudo: "Tudo"
 }
@@ -1134,7 +1058,8 @@ export function FinanceiroView({
   const catsRec  = config?.categoriasReceita ?? DEFAULT_CATS_REC
   const catsDesp = config?.categoriasDespesa ?? DEFAULT_CATS_DESP
 
-  const [tab, setTab] = useState<"dash" | "dre" | "receber" | "lancamentos" | "pix" | "contas" | "fixas" | "fornecedores" | "config">("dash")
+  const [tab, setTab] = useState<FinTab>("dash")
+  const irAba = (t: FinTab) => { setTab(t); sessionStorage.setItem("fin:tab", t) }
   const [periodo, setPeriodo] = useState<Periodo>("mes")
   const [mesOffset, setMesOffset] = useState(0)
   const [modalLanc, setModalLanc]         = useState<Partial<LancamentoFinanceiro> | true | null>(null)
@@ -1230,6 +1155,9 @@ export function FinanceiroView({
   // do contador de não-registrados. Uma única passada, em vez de recalcular o mesmo loop 3x.
   const pedidosFechadosTotais = useMemo(() => calcularPedidosFechados(kanban, lancamentos), [kanban, lancamentos])
   const pedidosEmAberto = useMemo(() => pedidosAbertos(pedidosFechadosTotais), [pedidosFechadosTotais])
+
+  // Recebíveis canônicos (mesma conta do Painel e de Pedidos)
+  const rec = useMemo(() => recebiveis(montarPedidos(kanban, lancamentos), lancamentos), [kanban, lancamentos])
 
   const kpis = useMemo(() => {
     const semConta = (l: LancamentoFinanceiro) => l.formaPagamento !== "conta"
@@ -1446,377 +1374,211 @@ export function FinanceiroView({
 
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-8 pt-7 pb-5 shrink-0">
-        <div>
-          <h1 className="text-[20px] font-bold text-[#1C1C1E] tracking-tight">Financeiro</h1>
-          <p className="text-[12px] text-[#8E8E93] mt-0.5">
-            {brl(kpis.recebido)} recebido · {brl(kpis.aReceber)} a receber · {brl(kpis.resultado >= 0 ? kpis.resultado : -kpis.resultado)} resultado
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <select value={periodo} onChange={e => {
-            const v = e.target.value as Periodo
-            setPeriodo(v)
-            setMesOffset(0)
-            sessionStorage.setItem("fin:periodo", v)
-          }}
-            className="h-9 border border-[rgba(0,0,0,0.12)] rounded-xl px-3 text-[12.5px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25 focus:border-[#8456e8] cursor-pointer transition-all">
-            {(Object.entries(PERIODO_LABEL) as [Periodo, string][]).map(([v, l]) => (
-              <option key={v} value={v}>{l}</option>
-            ))}
-          </select>
-          <button onClick={() => setModalLanc(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#161421] hover:bg-[#0b0914] text-white text-[13px] font-semibold rounded-xl transition-colors active:scale-[0.98]">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            Novo lançamento
-          </button>
-        </div>
-      </div>
-
-      {/* Tab bar */}
-      <div className="px-8 pb-4 shrink-0 overflow-x-auto">
-        <div className="inline-flex bg-[#F2F2F7] rounded-xl p-1 gap-0.5">
-          {(["dash", "dre", "receber", "lancamentos", "contas", "fixas", "fornecedores", "pix", "config"] as const).map(t => (
-            <button key={t} onClick={() => { setTab(t); sessionStorage.setItem("fin:tab", t) }}
-              className={`px-3.5 py-2 text-[12px] font-semibold rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                tab === t ? "bg-white text-[#191625] shadow-sm" : "text-[#8E8E93] hover:text-[#5e5c68]"
-              }`}>
-              {t === "dash"         ? "Dashboard"
-               : t === "dre"         ? "DRE"
-               : t === "lancamentos" ? "Lançamentos"
-               : t === "contas"      ? "Contas"
-               : t === "fixas"       ? "Fixas"
-               : t === "fornecedores"? "Fornecedores"
-               : t === "config"      ? (
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                </svg>
-               )
-               : t === "pix" ? (
-                <>
-                  PIX
-                  {pixPendentes.length > 0 && (
-                    <span className="text-[10px] font-bold bg-[#8456e8]/10 text-[#8456e8] rounded-full px-1.5 py-0.5 leading-none">{pixPendentes.length}</span>
-                  )}
-                </>
-               ) : (
-                <>
-                  A receber
-                  {kpis.naoRegistrados > 0 && (
-                    <span className="text-[10px] font-bold bg-[rgba(116,116,128,0.12)] text-[#8E8E93] rounded-full px-1.5 py-0.5 leading-none">{kpis.naoRegistrados}</span>
-                  )}
-                  {vencidos.length > 0 && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#d33a3c] shrink-0" />
-                  )}
-                </>
-               )}
-            </button>
-          ))}
+    <div className="flex flex-col h-full overflow-hidden" style={{ background: "var(--bg-page)" }}>
+      <div className="shrink-0 max-w-[1320px] w-full mx-auto px-6 pt-6 pb-4 space-y-4">
+        <CabecalhoPagina
+          titulo="Financeiro"
+          sub={`${brl(kpis.recebido)} recebido · ${brl(kpis.aReceber)} a receber · ${kpis.resultado >= 0 ? "" : "−"}${brl(Math.abs(kpis.resultado))} de geração de caixa (${PERIODO_LABEL[periodo].toLowerCase()})`}
+          acoes={<>
+            <Segmentado<Periodo> valor={periodo}
+              onChange={v => { setPeriodo(v); setMesOffset(0); sessionStorage.setItem("fin:periodo", v) }}
+              opcoes={(Object.entries(PERIODO_LABEL) as [Periodo, string][]).map(([v, l]) => ({ v, nome: l }))} />
+            <Botao variante="primario" icone={<Plus className="w-4 h-4" />} onClick={() => setModalLanc(true)}>Novo lançamento</Botao>
+          </>}
+        />
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <Segmentado<FinTab> valor={tab} onChange={irAba} opcoes={[
+            { v: "dash", nome: "Visão geral" },
+            { v: "receber", nome: vencidos.length ? `A receber · ${vencidos.length} vencidos` : "A receber" },
+            { v: "lancamentos", nome: "Lançamentos" },
+            { v: "dre", nome: "DRE" },
+            { v: "pix", nome: pixPendentes.length ? `Pix · ${pixPendentes.length}` : "Pix" },
+          ]} />
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-[#898892] hidden md:inline">Cadastros</span>
+            <Segmentado<FinTab> valor={tab} onChange={irAba} opcoes={[
+              { v: "contas", nome: "Contas" },
+              { v: "fixas", nome: "Gastos fixos" },
+              { v: "fornecedores", nome: "Fornecedores" },
+              { v: "config", nome: "Categorias" },
+            ]} />
+          </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-8 py-5">
+      <div key={tab} className="flex-1 overflow-y-auto"><div className="max-w-[1320px] mx-auto px-6 pb-10 ds-entrada">
 
         {/* ── DASHBOARD ── */}
-        {tab === "dash" && (
-          <div className="space-y-5">
-            {/* KPI Caixa — saldo real das contas */}
-            {(() => {
-              const contas = (config?.contas ?? []).filter(c => c.ativa && c.tipo !== "credito")
-              const comSaldo = contas.filter(c => c.saldo != null)
-              if (comSaldo.length === 0) return null
-              const totalCaixa = comSaldo.reduce((s, c) => s + (c.saldo ?? 0), 0)
-              return (
-                <div className="rounded-2xl px-5 py-4 flex items-center gap-4"
-                  style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" }}>
-                  <div className="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center"
-                    style={{ background: totalCaixa >= 0 ? "rgba(0,147,81,0.10)" : "rgba(211,58,60,0.08)" }}>
-                    <Landmark className="w-5 h-5" style={{ color: totalCaixa >= 0 ? "#009351" : "#d33a3c" }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10.5px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-faint)" }}>Caixa disponível</p>
-                    <p className="text-[22px] font-bold tabular-nums tracking-tight mt-0.5"
-                      style={{ color: totalCaixa >= 0 ? "#009351" : "#d33a3c" }}>
-                      {brl(totalCaixa)}
-                    </p>
-                  </div>
-                  <div className="flex gap-3 shrink-0">
-                    {comSaldo.map(c => (
-                      <div key={c.id} className="text-right">
-                        <p className="text-[9.5px] font-semibold truncate max-w-[80px]" style={{ color: "var(--text-faint)" }}>{c.nome}</p>
-                        <p className="text-[12px] font-bold tabular-nums" style={{ color: (c.saldo ?? 0) >= 0 ? "var(--text-main)" : "#d33a3c" }}>{brl(c.saldo ?? 0)}</p>
-                      </div>
-                    ))}
-                  </div>
+        {tab === "dash" && (() => {
+          const contasSaldo = (config?.contas ?? []).filter(c => c.ativa && c.tipo !== "credito" && c.saldo != null)
+          const totalCaixa = contasSaldo.reduce((s, c) => s + (c.saldo ?? 0), 0)
+          const pedidosVencidos = rec.comSaldo.filter(p => p.vencido > 0.5).length
+          const verLanc = (tipo: TipoLancamento | "", status: StatusLancamento | "") => {
+            setFiltroTipo(tipo); setFiltroStatus(status); setFiltroCategoria(""); setFiltroRevisar(false); irAba("lancamentos")
+          }
+          const proximos = lancamentos.filter(l => isReceitaPendenteValida(l)).sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento)).slice(0, 8)
+          const mesAtual = monthlyData12m[11]?.receita ?? 0
+          const mesAnterior = monthlyData12m[10]?.receita ?? 0
+          const variacao = mesAnterior > 0 ? (mesAtual - mesAnterior) / mesAnterior * 100 : null
+          const saldoAtual = totalCaixa
+          return (
+          <div className="space-y-4">
+            {contasSaldo.length > 0 && (
+              <Cartao className="flex items-center gap-4">
+                <span className="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center"
+                  style={{ background: totalCaixa >= 0 ? "rgba(0,147,81,0.10)" : "rgba(211,58,60,0.08)", color: totalCaixa >= 0 ? "#009351" : "#d33a3c" }}>
+                  <Landmark className="w-5 h-5" />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-medium text-[#898892]">Caixa disponível agora</p>
+                  <p className="text-[22px] font-semibold ds-num tracking-[-0.02em]" style={{ color: totalCaixa >= 0 ? "#009351" : "#d33a3c" }}>{brl(totalCaixa)}</p>
                 </div>
-              )
-            })()}
-
-            {/* KPIs — 2 linhas de 3 */}
-            <div className="grid grid-cols-3 gap-3.5">
-              <KpiCard label="Recebido" value={brl(kpis.recebido)}
-                icon={<TrendingUp className="w-4 h-4" />} iconBg="rgba(52,199,89,0.10)" iconColor="#16a34a"
-                sub={PERIODO_LABEL[periodo].toLowerCase()} subColor="#16a34a" />
-              <KpiCard label="Despesas pagas" value={brl(kpis.despesasPg)}
-                icon={<TrendingDown className="w-4 h-4" />} iconBg="rgba(220,38,38,0.08)" iconColor="#b91c1c"
-                sub={PERIODO_LABEL[periodo].toLowerCase()} subColor="#b91c1c" />
-              <KpiCard label="Geração de Caixa" value={brl(kpis.resultado)}
-                icon={<DollarSign className="w-4 h-4" />}
-                iconBg={kpis.resultado >= 0 ? "rgba(52,199,89,0.10)" : "rgba(220,38,38,0.08)"}
-                iconColor={kpis.resultado >= 0 ? "#16a34a" : "#b91c1c"}
-                sub="entrou − saiu (caixa)"
-                subColor={kpis.resultado >= 0 ? "#16a34a" : "#b91c1c"}
-                highlight />
-              <KpiCard label="A receber" value={brl(kpis.aReceber)}
-                icon={<Clock className="w-4 h-4" />} iconBg="rgba(217,119,6,0.10)" iconColor="#d97706"
-                sub={`${kpis.naoRegistrados} pedido${kpis.naoRegistrados !== 1 ? "s" : ""} incompleto${kpis.naoRegistrados !== 1 ? "s" : ""}`}
-                onClick={() => setModalReceber(true)} />
-              <KpiCard label="Em atraso" value={brl(kpis.emAtraso)}
-                icon={<AlertTriangle className="w-4 h-4" />} iconBg="rgba(220,38,38,0.08)" iconColor="#b91c1c"
-                sub={`${lancamentos.filter(l => l.tipo === "receita" && statusEfetivo(l) === "atrasado").length} títulos em atraso`}
-                subColor={kpis.emAtraso > 0 ? "#b91c1c" : "var(--text-faint)"} />
-              <KpiCard label="Margem terceirizados" value={brl(margemTerceiros.totalMargem)}
-                icon={<Factory className="w-4 h-4" />}
-                iconBg={margemTerceiros.totalMargem >= 0 ? "rgba(132,86,232,0.10)" : "rgba(220,38,38,0.08)"}
-                iconColor={margemTerceiros.totalMargem >= 0 ? "#8456e8" : "#b91c1c"}
-                sub={margemTerceiros.itens.length > 0 ? `${margemTerceiros.pct.toFixed(0)}% sobre ${brl(margemTerceiros.totalPreco)}` : "sem terceirizados"} />
-            </div>
-
-            {/* Charts row */}
-            <div>
-              {/* Receita & Despesas — 12m line chart */}
-              <div className="rounded-2xl px-5 py-4"
-                style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" }}>
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="text-[10.5px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-faint)" }}>Receita & Despesas</p>
-                    <div className="flex items-baseline gap-3 mt-1">
-                      <p className="text-[22px] font-bold tabular-nums tracking-tight" style={{ color: "var(--text-main)" }}>
-                        {brl(monthlyData12m[11]?.receita ?? 0)}
-                      </p>
-                      {(() => {
-                        const prev = monthlyData12m[10]?.receita ?? 0
-                        const cur  = monthlyData12m[11]?.receita ?? 0
-                        if (prev === 0) return null
-                        const pct = ((cur - prev) / prev) * 100
-                        return (
-                          <span className="text-[11px] font-semibold tabular-nums"
-                            style={{ color: pct >= 0 ? "#009351" : "#d33a3c" }}>
-                            {pct >= 0 ? "+" : ""}{pct.toFixed(0)}%
-                          </span>
-                        )
-                      })()}
-                      <p className="text-[11px]" style={{ color: "var(--text-faint)" }}>este mês</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1.5 text-[10.5px]" style={{ color: "var(--text-faint)" }}>
-                      <span className="w-2.5 h-1.5 rounded-sm inline-block" style={{ background: "#009351", opacity: 0.85 }} />Receita
-                    </span>
-                    <span className="flex items-center gap-1.5 text-[10.5px]" style={{ color: "var(--text-faint)" }}>
-                      <span className="w-2.5 h-1.5 rounded-sm inline-block" style={{ background: "#d33a3c", opacity: 0.65 }} />Despesas
-                    </span>
-                  </div>
-                </div>
-                <FinLineChart data={monthlyData12m} />
-              </div>
-            </div>
-
-            {/* Caixa projetado */}
-            {caixaProjetado.length > 0 && (() => {
-              const saldoAtual = (config?.contas ?? [])
-                .filter(c => c.ativa && c.tipo !== "credito" && c.saldo != null)
-                .reduce((s, c) => s + (c.saldo ?? 0), 0)
-              const totalEntradas = caixaProjetado.reduce((s, d) => s + d.valor, 0)
-              const caixaFinal = caixaProjetado[caixaProjetado.length - 1]?.cumulo ?? saldoAtual
-              const maxValorMes = Math.max(...caixaProjetado.map(d => d.valor), 1)
-              return (
-                <div className="rounded-2xl overflow-hidden"
-                  style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" }}>
-                  <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border)" }}>
-                    <div>
-                      <p className="text-[10.5px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-faint)" }}>Caixa projetado</p>
-                      <p className="text-[11px] mt-0.5" style={{ color: "var(--text-faint)" }}>
-                        {saldoAtual > 0 ? `${brl(saldoAtual)} agora · ` : ""}{brl(totalEntradas)} de entradas previstas
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[14px] font-bold tabular-nums" style={{ color: "#8456e8" }}>{brl(caixaFinal)}</p>
-                      <p className="text-[10px] mt-0.5 font-semibold" style={{ color: "var(--text-faint)" }}>caixa final projetado</p>
-                    </div>
-                  </div>
-                  <div className="px-5 pt-3 pb-1">
-                    <CaixaProjetadoChart data={caixaProjetado} saldoAtual={saldoAtual} />
-                  </div>
-                  {/* Linha do tempo por dia */}
-                  <div style={{ borderTop: "1px solid var(--border)" }}>
-                    {/* Hoje */}
-                    <div className="px-5 py-3 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border)" }}>
-                      <div className="flex flex-col items-center gap-0.5 w-10 shrink-0">
-                        <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "#8456e8" }}>hoje</span>
-                      </div>
-                      <div className="flex-1">
-                        <span className="text-[12px] font-bold" style={{ color: "#8456e8" }}>Saldo atual</span>
-                      </div>
-                      <span className="text-[13px] font-bold tabular-nums" style={{ color: "#8456e8" }}>{brl(saldoAtual)}</span>
-                    </div>
-                    {caixaProjetado.map((d, i) => (
-                      <div key={i} className="px-5 py-3 flex items-start gap-3"
-                        style={{ borderBottom: i < caixaProjetado.length - 1 ? "1px solid var(--border)" : undefined }}>
-                        <div className="flex flex-col items-center w-10 shrink-0 pt-0.5">
-                          <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>{d.diaSemana}</span>
-                          <span className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text-main)" }}>{d.label}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          {d.pedidos.map((p, j) => (
-                            <div key={j} className="flex items-center justify-between gap-2 py-0.5">
-                              <span className="text-[11px] truncate" style={{ color: "var(--text-faint)" }}>
-                                {p.numero ? `#${p.numero} · ` : ""}{p.cliente}
-                              </span>
-                              <span className="text-[11px] font-semibold tabular-nums shrink-0" style={{ color: "#30D158" }}>+{brl(p.valor)}</span>
-                            </div>
-                          ))}
-                          {d.pedidos.length > 1 && (
-                            <div className="flex items-center justify-end mt-0.5">
-                              <span className="text-[10px] font-semibold tabular-nums" style={{ color: "#30D158" }}>
-                                total +{brl(d.valor)}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <span className="text-[13px] font-bold tabular-nums shrink-0 pt-0.5" style={{ color: "#8456e8" }}>{brl(d.cumulo)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })()}
-
-            {/* Fluxo de caixa 60 dias */}
-            {fluxo60.semanas.some(s => s.rec > 0 || s.desp > 0) ? (
-                <div className="rounded-2xl overflow-hidden"
-                  style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" }}>
-                  <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border)" }}>
-                    <div>
-                      <p className="text-[10.5px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-faint)" }}>Fluxo 60 dias</p>
-                      <p className="text-[11px] mt-0.5" style={{ color: "var(--text-faint)" }}>Lançamentos por semana</p>
-                    </div>
-                    <span className="text-[14px] font-bold tabular-nums"
-                      style={{ color: fluxo60.netFinal >= 0 ? "#009351" : "#d33a3c" }}>
-                      {fluxo60.netFinal >= 0 ? "+" : "−"}{brl(Math.abs(fluxo60.netFinal))}
-                    </span>
-                  </div>
-                  {(fluxo60.atrasadoRec > 0 || fluxo60.atrasadoDesp > 0) && (
-                    <div className="px-5 py-2.5 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border)", background: "rgba(211,58,60,0.04)" }}>
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#d33a3c] shrink-0" />
-                      <span className="text-[11px] font-semibold text-[#d33a3c] flex-1">Atrasados</span>
-                      {fluxo60.atrasadoRec > 0 && <span className="text-[10.5px] font-semibold text-emerald-700 tabular-nums">+{brl(fluxo60.atrasadoRec)}</span>}
-                      {fluxo60.atrasadoDesp > 0 && <span className="text-[10.5px] font-semibold text-rose-600 tabular-nums">−{brl(fluxo60.atrasadoDesp)}</span>}
-                    </div>
-                  )}
-                  <div>
-                    {fluxo60.semanas.filter(s => s.rec > 0 || s.desp > 0).slice(0, 6).map((s, i) => (
-                      <div key={i} className="px-5 py-2.5 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border)" }}>
-                        <div className="w-20 shrink-0">
-                          <p className="text-[10.5px] font-semibold" style={{ color: "var(--text-main)" }}>{fmtSemana(s.from, s.to)}</p>
-                          <p className="text-[9.5px] font-semibold tabular-nums mt-0.5"
-                            style={{ color: s.running >= 0 ? "#009351" : "#d33a3c" }}>
-                            {s.running >= 0 ? "+" : ""}{brl(s.running)}
-                          </p>
-                        </div>
-                        <div className="flex-1 flex flex-col gap-1">
-                          {s.rec > 0 && (
-                            <div className="flex items-center gap-1.5">
-                              <div className="flex-1 h-1 bg-emerald-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(s.rec / fluxo60.maxVal) * 100}%` }} />
-                              </div>
-                              <span className="text-[9.5px] text-emerald-700 font-semibold tabular-nums w-16 text-right">+{brl(s.rec)}</span>
-                            </div>
-                          )}
-                          {s.desp > 0 && (
-                            <div className="flex items-center gap-1.5">
-                              <div className="flex-1 h-1 bg-rose-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-rose-500 rounded-full" style={{ width: `${(s.desp / fluxo60.maxVal) * 100}%` }} />
-                              </div>
-                              <span className="text-[9.5px] text-rose-600 font-semibold tabular-nums w-16 text-right">−{brl(s.desp)}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-2xl px-5 py-8 flex items-center justify-center"
-                  style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-                  <p className="text-[12px]" style={{ color: "var(--text-faint)" }}>Nenhum lançamento nos próximos 60 dias</p>
-                </div>
-              )}
-
-            {/* Próximos recebimentos */}
-            {(lancamentos.filter(l => isReceitaPendenteValida(l)).length > 0 || negociosPendentes.length > 0) && (
-              <div className="rounded-2xl overflow-hidden"
-                style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" }}>
-                <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
-                  <p className="text-[10.5px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-faint)" }}>Próximos recebimentos</p>
-                </div>
-                <div>
-                  {negociosPendentes.map(n => (
-                    <div key={`neg-${n.id}`} className="px-5 py-3.5 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border)" }}>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-[12.5px] font-semibold truncate" style={{ color: "var(--text-main)" }}>{n.descricao}</p>
-                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-[#a582ff]/10 text-[#a582ff] shrink-0">PARCERIA</span>
-                        </div>
-                        <p className="text-[11px] mt-0.5" style={{ color: "var(--text-faint)" }}>
-                          {n.parceiroNome} · {fmtDate(n.dataOrcamento)}{n.tipo === "comissao" ? " · Comissão" : " · Ganho"}
-                        </p>
-                      </div>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700">Pendente</span>
-                      <p className="font-bold text-[13px] tabular-nums shrink-0" style={{ color: "var(--text-main)" }}>{brl(n.comissaoValor)}</p>
+                <div className="flex gap-5 shrink-0">
+                  {contasSaldo.map(c => (
+                    <div key={c.id} className="text-right">
+                      <p className="text-[11px] text-[#898892] truncate max-w-[110px]">{c.nome}</p>
+                      <p className="text-[13px] font-semibold ds-num" style={{ color: (c.saldo ?? 0) >= 0 ? "#191625" : "#d33a3c" }}>{brl(c.saldo ?? 0)}</p>
                     </div>
                   ))}
-                  {lancamentos
-                    .filter(l => isReceitaPendenteValida(l))
-                    .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))
-                    .slice(0, 8)
-                    .map(l => {
+                </div>
+              </Cartao>
+            )}
+
+            <GradeKpis>
+              <Kpi rotulo="Recebido" icone={<TrendingUp className="w-3.5 h-3.5" />} tom="sucesso" valor={kpis.recebido} formato={brl}
+                sub={PERIODO_LABEL[periodo].toLowerCase()} onClick={() => verLanc("receita", "pago")} />
+              <Kpi rotulo="Despesas pagas" icone={<TrendingDown className="w-3.5 h-3.5" />} valor={kpis.despesasPg} formato={brl}
+                sub={PERIODO_LABEL[periodo].toLowerCase()} onClick={() => verLanc("despesa", "pago")} />
+              <Kpi rotulo="Geração de caixa" icone={<DollarSign className="w-3.5 h-3.5" />} tom={kpis.resultado >= 0 ? "sucesso" : "perigo"} destaque
+                valor={kpis.resultado} formato={brl} sub="o que entrou menos o que saiu" onClick={() => irAba("dre")} />
+              <Kpi rotulo="A receber" icone={<Clock className="w-3.5 h-3.5" />} tom="alerta" valor={kpis.aReceber} formato={brl}
+                sub={rec.semCobranca > 0.5 ? `sem cobrança: ${brl(rec.semCobranca)}` : "tudo com cobrança lançada"} onClick={() => irAba("receber")} />
+              <Kpi rotulo="Cobrança vencida" icone={<AlertTriangle className="w-3.5 h-3.5" />} tom={rec.vencido > 0.5 ? "perigo" : "sucesso"} valor={rec.vencido} formato={brl}
+                sub={pedidosVencidos ? `${pedidosVencidos} ${pedidosVencidos === 1 ? "pedido" : "pedidos"} com cobrança vencida` : "nada vencido"} onClick={() => irAba("receber")} />
+            </GradeKpis>
+
+            {rec.aConferir.length > 0 && (
+              <Cartao padding={false}>
+                <div className="px-5 pt-5">
+                  <TituloCartao titulo={`${rec.aConferir.length} cobranças para conferir`} icone={<AlertTriangle className="w-4 h-4" />}
+                    sub="Estão pendentes, mas o pedido já foi quitado ou não está mais no quadro. Provavelmente já entraram: confira e dê baixa." />
+                </div>
+                <div className="px-2 pb-2 -mt-1">
+                  {rec.aConferir.map(l => (
+                    <LinhaLista key={l.id} titulo={l.nomeCliente || l.descricao} sub={`${l.descricao} · venceu ${fmtDate(l.dataVencimento)}`}
+                      valor={brl(l.valor)} tom="info"
+                      acao={<button onClick={() => setModalPag(l)} title="Dar baixa"
+                        className="h-8 px-2.5 mr-1 rounded-lg text-[11.5px] font-semibold text-[#009351] hover:bg-[#009351]/[0.08] transition-colors flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Dar baixa</button>} />
+                  ))}
+                </div>
+              </Cartao>
+            )}
+
+            <div className="grid grid-cols-1 xl:grid-cols-[1.5fr_1fr] gap-4 items-start">
+              <div className="space-y-4">
+                <Cartao>
+                  <TituloCartao titulo="Entradas e saídas por mês" icone={<TrendingUp className="w-4 h-4" />}
+                    sub={<>{brl(mesAtual)} recebidos neste mês{variacao != null && <span className={variacao >= 0 ? "text-[#009351]" : "text-[#d33a3c]"}> · {variacao >= 0 ? "+" : ""}{num(variacao, 0)}% sobre o mês anterior</span>}</>} />
+                  <ColunasDuplas formato={v => brl(v)} nomes={["Recebido", "Pago"]}
+                    itens={monthlyData12m.map((m, i) => ({ rotulo: m.label, a: m.receita, b: m.despesas, destaque: i === 11 }))} />
+                </Cartao>
+
+                {caixaProjetado.length > 0 && (() => {
+                  const totalEntradas = caixaProjetado.reduce((s, d) => s + d.valor, 0)
+                  const caixaFinal = caixaProjetado[caixaProjetado.length - 1]?.cumulo ?? saldoAtual
+                  return (
+                    <Cartao padding={false}>
+                      <div className="px-5 pt-5">
+                        <TituloCartao titulo="Caixa projetado" icone={<Landmark className="w-4 h-4" />}
+                          sub={`${saldoAtual > 0 ? `${brl(saldoAtual)} agora · ` : ""}${brl(totalEntradas)} de entradas previstas pelos prazos internos`}
+                          acao={<div className="text-right"><p className="text-[15px] font-semibold ds-num text-[#8456e8]">{brl(caixaFinal)}</p><p className="text-[10.5px] text-[#898892]">ao final</p></div>} />
+                        <CaixaProjetadoChart data={caixaProjetado} saldoAtual={saldoAtual} />
+                      </div>
+                      <div className="mt-2 px-2 pb-2" style={{ borderTop: "1px solid rgba(60,60,67,0.06)" }}>
+                        {caixaProjetado.map((d, i) => (
+                          <LinhaLista key={i} titulo={`${d.diaSemana}, ${d.label}`}
+                            sub={d.pedidos.map(p => `${p.numero ? p.numero + " · " : ""}${p.cliente}`).join(" · ")}
+                            valor={`+${brl(d.valor)}`} tom="sucesso" valorSub={`saldo ${brl(d.cumulo)}`} />
+                        ))}
+                      </div>
+                    </Cartao>
+                  )
+                })()}
+              </div>
+
+              <div className="space-y-4">
+                <Cartao padding={false}>
+                  <div className="px-5 pt-5">
+                    <TituloCartao titulo="Próximos recebimentos" icone={<Clock className="w-4 h-4" />}
+                      sub={`${lancamentos.filter(l => isReceitaPendenteValida(l)).length + negociosPendentes.length} cobranças pendentes`}
+                      acao={<Botao variante="fantasma" className="h-7 px-2 text-[11.5px]" onClick={() => irAba("receber")}>Ver tudo</Botao>} />
+                  </div>
+                  <div className="px-2 pb-2 -mt-1">
+                    {proximos.length === 0 && negociosPendentes.length === 0 && <Vazio icone={<CheckCircle2 className="w-8 h-8" />} titulo="Nada pendente" />}
+                    {negociosPendentes.map(n => (
+                      <LinhaLista key={`neg-${n.id}`} titulo={n.descricao} sub={`${n.parceiroNome} · parceria · ${fmtDate(n.dataOrcamento)}`} valor={brl(n.comissaoValor)} />
+                    ))}
+                    {proximos.map(l => {
                       const st = statusEfetivo(l)
                       return (
-                        <div key={l.id} className="px-5 py-3.5 flex items-center gap-3 group" style={{ borderBottom: "1px solid var(--border)" }}>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[12.5px] font-semibold truncate" style={{ color: "var(--text-main)" }}>{l.descricao}</p>
-                            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-faint)" }}>
-                              Vence {fmtDate(l.dataVencimento)}{l.nomeCliente && ` · ${l.nomeCliente}`}
-                            </p>
-                          </div>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_CLS[st]}`}>{STATUS_LABEL[st]}</span>
-                          <p className="font-bold text-[13px] tabular-nums" style={{ color: "var(--text-main)" }}>{brl(l.valor)}</p>
-                          <button onClick={() => setModalPag(l)}
-                            className="opacity-0 group-hover:opacity-100 px-2.5 py-1 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-all">
-                            Pago
-                          </button>
-                        </div>
+                        <LinhaLista key={l.id} titulo={l.nomeCliente || l.descricao}
+                          sub={`${l.loteNumero ?? l.cardNumero ?? l.descricao} · vence ${fmtDate(l.dataVencimento)}`}
+                          valor={brl(l.valor)} tom={st === "atrasado" ? "perigo" : undefined} valorSub={STATUS_LABEL[st]}
+                          acao={<button onClick={() => setModalPag(l)} title="Marcar como recebido"
+                            className="h-8 px-2.5 mr-1 rounded-lg text-[11.5px] font-semibold text-[#009351] hover:bg-[#009351]/[0.08] transition-colors flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Recebi</button>} />
                       )
                     })}
-                </div>
+                  </div>
+                </Cartao>
+
+                <Cartao>
+                  <TituloCartao titulo="Próximos 60 dias" icone={<TrendingUp className="w-4 h-4" />} sub="Cobranças e contas lançadas, por semana"
+                    acao={<span className={`text-[14px] font-semibold ds-num ${fluxo60.netFinal >= 0 ? "text-[#009351]" : "text-[#d33a3c]"}`}>{fluxo60.netFinal >= 0 ? "+" : "−"}{brl(Math.abs(fluxo60.netFinal))}</span>} />
+                  {(fluxo60.atrasadoRec > 0 || fluxo60.atrasadoDesp > 0) && (
+                    <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-[#d33a3c]/[0.05]">
+                      <AlertTriangle className="w-3.5 h-3.5 text-[#d33a3c]" />
+                      <span className="text-[11.5px] font-medium text-[#d33a3c] flex-1">Já vencido</span>
+                      {fluxo60.atrasadoRec > 0 && <span className="text-[11.5px] font-semibold ds-num text-[#009351]">+{brl(fluxo60.atrasadoRec)}</span>}
+                      {fluxo60.atrasadoDesp > 0 && <span className="text-[11.5px] font-semibold ds-num text-[#d33a3c]">−{brl(fluxo60.atrasadoDesp)}</span>}
+                    </div>
+                  )}
+                  {fluxo60.semanas.some(s => s.rec > 0 || s.desp > 0) ? (
+                    <div className="space-y-2.5">
+                      {fluxo60.semanas.filter(s => s.rec > 0 || s.desp > 0).slice(0, 6).map((s, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <div className="w-[92px] shrink-0">
+                            <p className="text-[11.5px] font-medium text-[#191625]">{fmtSemana(s.from, s.to)}</p>
+                            <p className={`text-[10.5px] ds-num ${s.running >= 0 ? "text-[#009351]" : "text-[#d33a3c]"}`}>{s.running >= 0 ? "+" : "−"}{brl(Math.abs(s.running))}</p>
+                          </div>
+                          <div className="flex-1 space-y-1">
+                            {s.rec > 0 && <div className="flex items-center gap-2"><div className="flex-1 h-1.5 rounded-full bg-[rgba(116,116,128,0.1)] overflow-hidden"><div className="h-full rounded-full bg-[#009351] ds-cresce-x" style={{ width: `${s.rec / fluxo60.maxVal * 100}%` }} /></div><span className="text-[10.5px] ds-num text-[#009351] w-[78px] text-right">+{brl(s.rec)}</span></div>}
+                            {s.desp > 0 && <div className="flex items-center gap-2"><div className="flex-1 h-1.5 rounded-full bg-[rgba(116,116,128,0.1)] overflow-hidden"><div className="h-full rounded-full bg-[#d33a3c]/80 ds-cresce-x" style={{ width: `${s.desp / fluxo60.maxVal * 100}%` }} /></div><span className="text-[10.5px] ds-num text-[#d33a3c] w-[78px] text-right">−{brl(s.desp)}</span></div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <Vazio icone={<Clock className="w-8 h-8" />} titulo="Nada lançado para os próximos 60 dias" />}
+                </Cartao>
+
+                {margemTerceiros.itens.length > 0 && (
+                  <Kpi rotulo="Margem em terceirizados" icone={<Factory className="w-3.5 h-3.5" />} tom={margemTerceiros.totalMargem >= 0 ? "acento" : "perigo"}
+                    valor={margemTerceiros.totalMargem} formato={brl} sub={`${num(margemTerceiros.pct, 0)}% sobre ${brl(margemTerceiros.totalPreco)} vendidos`} />
+                )}
               </div>
-            )}
+            </div>
           </div>
-        )}
+          )
+        })()}
 
         {/* ── DRE ── */}
         {tab === "dre" && (
           <div className="space-y-5 max-w-2xl">
             {/* DRE table */}
-            <div className="rounded-2xl overflow-hidden"
-              style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" }}>
+            <div className="rounded-xl overflow-hidden"
+              style={{ background: "var(--bg-surface)", border: "1px solid rgba(60,60,67,0.08)" }}>
               <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
                 <p className="font-bold text-[13px]" style={{ color: "var(--text-main)" }}>DRE — {PERIODO_LABEL[periodo]}</p>
                 <p className="text-[11px] mt-0.5" style={{ color: "var(--text-faint)" }}>Demonstrativo do Resultado do Exercício</p>
@@ -1827,7 +1589,7 @@ export function FinanceiroView({
                   <DreRow label="Receitas de parcerias" value={negociosPagos.reduce((s, n) => s + n.comissaoValor, 0)} accent="green" />
                 )}
                 {dreDesp.map(([cat, val]) => (
-                  <DreRow key={cat} label={`Despesas — ${capitalize(cat)}`} value={-val} />
+                  <DreRow key={cat} label={nomeCategoria(cat, catsDesp)} value={-val} />
                 ))}
                 {dreDesp.length === 0 && <DreRow label="Despesas" value={0} />}
                 <DreRow label="Resultado líquido" value={kpis.resultado}
@@ -1837,11 +1599,11 @@ export function FinanceiroView({
 
             {/* Margem de terceirizados */}
             {margemTerceiros.itens.length > 0 && (
-              <div className="rounded-2xl overflow-hidden"
+              <div className="rounded-xl overflow-hidden"
                 style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid rgba(197,120,0,0.18)" }}>
                 <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(197,120,0,0.12)" }}>
                   <p className="font-bold text-[13px]" style={{ color: "var(--text-main)" }}>Margem — Terceirizados</p>
-                  <p className="font-semibold text-[13px] tabular-nums"
+                  <p className="font-semibold text-[13px] ds-num"
                     style={{ color: margemTerceiros.totalMargem >= 0 ? "#009351" : "#d33a3c" }}>
                     {brl(margemTerceiros.totalMargem)} · {margemTerceiros.pct.toFixed(0)}%
                   </p>
@@ -1861,8 +1623,8 @@ export function FinanceiroView({
                         </p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-[13px] font-bold tabular-nums" style={{ color: c.margem >= 0 ? "#009351" : "#d33a3c" }}>{brl(c.margem)}</p>
-                        <p className="text-[10px] tabular-nums" style={{ color: "var(--text-faint)" }}>{brl(c.preco)} − {brl(c.custoTerceiro ?? 0)}</p>
+                        <p className="text-[13px] font-bold ds-num" style={{ color: c.margem >= 0 ? "#009351" : "#d33a3c" }}>{brl(c.margem)}</p>
+                        <p className="text-[10px] ds-num" style={{ color: "var(--text-faint)" }}>{brl(c.preco)} − {brl(c.custoTerceiro ?? 0)}</p>
                       </div>
                     </div>
                   ))}
@@ -1872,11 +1634,11 @@ export function FinanceiroView({
 
             {/* Parcerias pagas */}
             {negociosPagosTodos.length > 0 && (
-              <div className="rounded-2xl overflow-hidden"
+              <div className="rounded-xl overflow-hidden"
                 style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid rgba(165,130,255,0.15)" }}>
                 <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(165,130,255,0.12)" }}>
                   <p className="font-bold text-[13px]" style={{ color: "var(--text-main)" }}>Receitas de parcerias</p>
-                  <p className="font-semibold text-[#a582ff] text-[13px] tabular-nums">
+                  <p className="font-semibold text-[#a582ff] text-[13px] ds-num">
                     {brl(negociosPagosTodos.reduce((s, n) => s + n.comissaoValor, 0))} total
                   </p>
                 </div>
@@ -1892,7 +1654,7 @@ export function FinanceiroView({
                         </div>
                         <p className="text-[11px] mt-0.5" style={{ color: "var(--text-faint)" }}>{n.parceiroNome} · {fmtDate(n.dataOrcamento)}</p>
                       </div>
-                      <p className="font-bold text-[#a582ff] text-[13px] tabular-nums shrink-0">{brl(n.comissaoValor)}</p>
+                      <p className="font-bold text-[#a582ff] text-[13px] ds-num shrink-0">{brl(n.comissaoValor)}</p>
                     </div>
                   ))}
                 </div>
@@ -1942,7 +1704,7 @@ export function FinanceiroView({
 
             {/* Vencidos — pagamentos registrados com data no passado */}
             {vencidos.length > 0 && (
-              <div className="rounded-2xl border border-[#d33a3c]/20 bg-[#d33a3c]/[0.03] overflow-hidden mb-4">
+              <div className="rounded-xl border border-[#d33a3c]/20 bg-[#d33a3c]/[0.03] overflow-hidden mb-4">
                 <div className="px-5 py-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-[#d33a3c] shrink-0" />
@@ -1950,7 +1712,7 @@ export function FinanceiroView({
                       {vencidos.length} vencido{vencidos.length > 1 ? "s" : ""}
                     </span>
                   </div>
-                  <span className="text-[13px] font-semibold text-[#d33a3c] tabular-nums">
+                  <span className="text-[13px] font-semibold text-[#d33a3c] ds-num">
                     {brl(vencidos.reduce((s, v) => s + v.total, 0))}
                   </span>
                 </div>
@@ -1964,7 +1726,7 @@ export function FinanceiroView({
                         )}
                       </div>
                       <span className="text-[10.5px] text-[#d33a3c]/70 shrink-0">{v.diasAtraso}d em atraso</span>
-                      <span className="text-[12px] font-semibold text-[#d33a3c] tabular-nums">{brl(v.total)}</span>
+                      <span className="text-[12px] font-semibold text-[#d33a3c] ds-num">{brl(v.total)}</span>
                       <button
                         onClick={() => setModalPag(v.lancamentos[0])}
                         className="h-6 px-2.5 text-[10.5px] font-semibold text-white bg-[#009351] hover:bg-[#2DB84D] rounded-lg transition-colors shrink-0">
@@ -1981,7 +1743,7 @@ export function FinanceiroView({
               <div className="mb-4">
                 <p className="text-[10.5px] uppercase tracking-wider text-[#8E8E93] font-semibold mb-2">Receitas de parcerias</p>
                 {negociosPendentes.map(n => (
-                  <div key={n.id} className="bg-white border border-violet-100 rounded-2xl px-5 py-4 flex items-center gap-4 mb-2">
+                  <div key={n.id} className="bg-white border border-violet-100 rounded-xl px-5 py-4 flex items-center gap-4 mb-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-[#191625] text-[13px]">{n.descricao}</span>
@@ -1997,7 +1759,7 @@ export function FinanceiroView({
                       </div>
                       <p className="text-[11px] text-[#8E8E93] mt-1">{fmtDate(n.dataOrcamento)}</p>
                     </div>
-                    <p className="font-semibold text-[#a582ff] text-[15px] tabular-nums shrink-0">{brl(n.comissaoValor)}</p>
+                    <p className="font-semibold text-[#a582ff] text-[15px] ds-num shrink-0">{brl(n.comissaoValor)}</p>
                   </div>
                 ))}
               </div>
@@ -2083,7 +1845,7 @@ export function FinanceiroView({
                     const podeSobra = cards.some(c => c.coluna >= COL_EXPEDICAO && c.coluna !== COL_PERDIDO)
 
                     return (
-                      <div key={loteId} className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl overflow-hidden mb-2">
+                      <div key={loteId} className="bg-white border border-[rgba(60,60,67,0.08)] rounded-xl overflow-hidden mb-2">
                         {/* Header */}
                         <div className="px-5 pt-4 pb-3 flex items-start gap-3">
                           <div className="flex-1 min-w-0">
@@ -2104,7 +1866,7 @@ export function FinanceiroView({
                             </p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            <span className="font-semibold text-[#191625] text-[15px] tabular-nums">{brl(total)}</span>
+                            <span className="font-semibold text-[#191625] text-[15px] ds-num">{brl(total)}</span>
                             {onRegistrarSobra && podeSobra && (
                               <button onClick={() => onRegistrarSobra(cards[0])}
                                 className="h-7 px-2.5 text-[11px] font-medium text-[#c57800] bg-[#c57800]/[0.08] hover:bg-[#c57800]/[0.14] rounded-lg transition-colors shrink-0">
@@ -2140,14 +1902,14 @@ export function FinanceiroView({
                             <div key={card.id} className="px-5 py-2.5 flex items-center gap-3">
                               <span className="text-[9.5px] font-bold text-[#8456e8] bg-[#8456e8]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">{card.numero}</span>
                               <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.55)] truncate">{card.dimensoes}{card.materialNome ? ` · ${card.materialNome}` : ""}</p>
-                              <p className="text-[12px] font-medium text-[#5e5c68] tabular-nums">{brl(card.preco)}</p>
+                              <p className="text-[12px] font-medium text-[#5e5c68] ds-num">{brl(card.preco)}</p>
                             </div>
                           ))}
                           {sobrasLote.map(s => (
                             <div key={s.id} className="px-5 py-2.5 flex items-center gap-3">
                               <div className="w-1.5 h-1.5 rounded-full bg-[#c57800] shrink-0 ml-0.5" />
                               <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.5)] truncate">{s.descricao}</p>
-                              <p className="text-[12px] font-medium text-[#c57800] tabular-nums">+{brl(s.valor)}</p>
+                              <p className="text-[12px] font-medium text-[#c57800] ds-num">+{brl(s.valor)}</p>
                             </div>
                           ))}
                           {pagamentosLote.map(p => (
@@ -2165,7 +1927,7 @@ export function FinanceiroView({
                                 {p.dataPagamento ? fmtDate(p.dataPagamento) : `vence ${fmtDate(p.dataVencimento)}`}
                                 {p.formaPagamento ? ` · ${p.formaPagamento}` : ""}
                               </p>
-                              <p className={`text-[12px] font-semibold tabular-nums ${p.status === "pago" ? "text-[#009351]" : "text-amber-600"}`}>{brl(p.valor)}</p>
+                              <p className={`text-[12px] font-semibold ds-num ${p.status === "pago" ? "text-[#009351]" : "text-amber-600"}`}>{brl(p.valor)}</p>
                               {p.status !== "pago" && (
                                 <button
                                   onClick={() => setModalPag(p)}
@@ -2191,7 +1953,7 @@ export function FinanceiroView({
                     const completoCard = totalPagoCard >= totalCard && totalCard > 0
                     const restanteCard = Math.max(0, totalCard - totalPagoCard)
                     return (
-                      <div key={card.id} className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl overflow-hidden mb-2">
+                      <div key={card.id} className="bg-white border border-[rgba(60,60,67,0.08)] rounded-xl overflow-hidden mb-2">
                         {/* Header */}
                         <div className="px-5 pt-4 pb-3 flex items-start gap-3">
                           <div className="flex-1 min-w-0">
@@ -2212,7 +1974,7 @@ export function FinanceiroView({
                             </p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            <span className="font-semibold text-[#191625] text-[15px] tabular-nums">{brl(totalCard)}</span>
+                            <span className="font-semibold text-[#191625] text-[15px] ds-num">{brl(totalCard)}</span>
                             {onRegistrarSobra && card.coluna >= COL_EXPEDICAO && card.coluna !== COL_PERDIDO && (
                               <button onClick={() => onRegistrarSobra(card)}
                                 className="h-7 px-2.5 text-[11px] font-medium text-[#c57800] bg-[#c57800]/[0.08] hover:bg-[#c57800]/[0.14] rounded-lg transition-colors shrink-0">
@@ -2249,7 +2011,7 @@ export function FinanceiroView({
                               <div key={s.id} className="px-5 py-2.5 flex items-center gap-3">
                                 <div className="w-1.5 h-1.5 rounded-full bg-[#c57800] shrink-0 ml-0.5" />
                                 <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.5)] truncate">{s.descricao}</p>
-                                <p className="text-[12px] font-medium text-[#c57800] tabular-nums">+{brl(s.valor)}</p>
+                                <p className="text-[12px] font-medium text-[#c57800] ds-num">+{brl(s.valor)}</p>
                               </div>
                             ))}
                             {pagamentosCard.map(p => (
@@ -2267,7 +2029,7 @@ export function FinanceiroView({
                                   {p.dataPagamento ? fmtDate(p.dataPagamento) : `vence ${fmtDate(p.dataVencimento)}`}
                                   {p.formaPagamento ? ` · ${p.formaPagamento}` : ""}
                                 </p>
-                                <p className={`text-[12px] font-semibold tabular-nums ${p.status === "pago" ? "text-[#009351]" : "text-amber-600"}`}>{brl(p.valor)}</p>
+                                <p className={`text-[12px] font-semibold ds-num ${p.status === "pago" ? "text-[#009351]" : "text-amber-600"}`}>{brl(p.valor)}</p>
                                 {p.status !== "pago" && (
                                   <button
                                     onClick={() => setModalPag(p)}
@@ -2299,7 +2061,7 @@ export function FinanceiroView({
                 </div>
                 {tercs.map(t => (
                   <div key={t.id}
-                    className="rounded-2xl border px-4 py-3 flex items-start justify-between gap-3"
+                    className="rounded-xl border px-4 py-3 flex items-start justify-between gap-3"
                     style={{ background: "rgba(255,149,0,0.04)", borderColor: "rgba(255,149,0,0.15)" }}>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap mb-0.5">
@@ -2322,7 +2084,7 @@ export function FinanceiroView({
                       )}
                     </div>
                     <div className="text-right shrink-0 flex flex-col items-end gap-2">
-                      <p className="text-[13px] font-bold tabular-nums" style={{ color: "var(--text-main)" }}>{brl(t.preco)}</p>
+                      <p className="text-[13px] font-bold ds-num" style={{ color: "var(--text-main)" }}>{brl(t.preco)}</p>
                       <div className="flex gap-1.5">
                         {onDetalhesCard && (
                           <button onClick={() => onDetalhesCard(t)}
@@ -2359,7 +2121,7 @@ export function FinanceiroView({
               const isTudo = periodo !== "mes"
               return (
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="flex items-center gap-2 flex-1 bg-white border border-[rgba(60,60,67,0.10)] rounded-2xl px-4 py-3">
+                  <div className="flex items-center gap-2 flex-1 bg-white border border-[rgba(60,60,67,0.10)] rounded-xl px-4 py-3">
                     <button onClick={() => { if (isTudo) { setPeriodo("mes"); setMesOffset(-1) } else setMesOffset(o => o - 1) }}
                       className="w-9 h-9 flex items-center justify-center rounded-xl bg-[rgba(60,60,67,0.06)] hover:bg-[rgba(60,60,67,0.12)] text-[#191625] transition-colors">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
@@ -2375,7 +2137,7 @@ export function FinanceiroView({
                   </div>
                   <button
                     onClick={() => { if (isTudo) { setPeriodo("mes"); setMesOffset(0) } else { setPeriodo("tudo") } }}
-                    className="h-[52px] px-4 text-[12px] font-semibold rounded-2xl border transition-colors whitespace-nowrap"
+                    className="h-[52px] px-4 text-[12px] font-semibold rounded-xl border transition-colors whitespace-nowrap"
                     style={isTudo
                       ? { background: "#191625", color: "#fff", borderColor: "#191625" }
                       : { background: "white", color: "#8E8E93", borderColor: "rgba(60,60,67,0.10)" }}>
@@ -2421,7 +2183,7 @@ export function FinanceiroView({
             {/* Negócios de parcerias concretizados, respeitando o período selecionado */}
             {negocios.filter(n => n.status === "pago" && (!filtroTipo || filtroTipo === "receita") && negociosInPeriodo(n)).map(n => (
               <div key={`neg-${n.id}`}
-                className="bg-white border border-violet-100 rounded-2xl px-5 py-4 flex items-center gap-3 hover:border-violet-200 transition-colors">
+                className="bg-white border border-violet-100 rounded-xl px-5 py-4 flex items-center gap-3 hover:border-violet-200 transition-colors">
                 <div className="w-1.5 h-10 rounded-full shrink-0 bg-violet-400" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -2439,7 +2201,7 @@ export function FinanceiroView({
                     <span className="text-[11px] text-[#8E8E93]">{fmtDate(n.dataOrcamento)}</span>
                   </div>
                 </div>
-                <p className="font-semibold text-[14px] tabular-nums shrink-0 text-[#a582ff]">{brl(n.comissaoValor)}</p>
+                <p className="font-semibold text-[14px] ds-num shrink-0 text-[#a582ff]">{brl(n.comissaoValor)}</p>
               </div>
             ))}
 
@@ -2467,7 +2229,7 @@ export function FinanceiroView({
                     {groups.map(({ date, items }) => {
                       const dayTotal = items.reduce((s, l) => s + (l.tipo === "receita" ? l.valor : -l.valor), 0)
                       return (
-                        <div key={date} className="rounded-2xl overflow-hidden"
+                        <div key={date} className="rounded-xl overflow-hidden"
                           style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04)" }}>
                           {/* Cabeçalho do dia */}
                           <div className="px-4 py-2 flex items-center justify-between"
@@ -2475,7 +2237,7 @@ export function FinanceiroView({
                             <span className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
                               {fmtDate(date)}
                             </span>
-                            <span className={`text-[11px] font-bold tabular-nums ${dayTotal >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                            <span className={`text-[11px] font-bold ds-num ${dayTotal >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                               {dayTotal >= 0 ? "+" : "−"}{brl(Math.abs(dayTotal))}
                             </span>
                           </div>
@@ -2555,7 +2317,7 @@ export function FinanceiroView({
                                   </div>
                                 </div>
                                 {/* Valor */}
-                                <span className={`text-[13.5px] font-bold tabular-nums shrink-0 ${isRec ? "text-emerald-700" : "text-rose-600"}`}>
+                                <span className={`text-[13.5px] font-bold ds-num shrink-0 ${isRec ? "text-emerald-700" : "text-rose-600"}`}>
                                   {isRec ? "+" : "−"}{brl(l.valor)}
                                 </span>
                                 {/* Ações no hover */}
@@ -2594,7 +2356,7 @@ export function FinanceiroView({
 
             {/* ── Barra de edição em massa ── */}
             {selectedIds.size > 0 && (
-              <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl shadow-2xl"
+              <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl"
                 style={{ background: "#161421", minWidth: 480, maxWidth: "calc(100vw - 48px)" }}>
                 {/* Contador */}
                 <span className="text-[12px] font-bold text-white shrink-0 mr-1">
@@ -2737,7 +2499,7 @@ export function FinanceiroView({
               ) : (
                 <div className="space-y-2">
                   {pixPendentes.map(p => (
-                    <div key={p.id} className="bg-white rounded-2xl border border-[rgba(0,0,0,0.08)] p-4 flex items-center gap-4">
+                    <div key={p.id} className="bg-white rounded-xl border border-[rgba(0,0,0,0.08)] p-4 flex items-center gap-4">
                       <div className="w-8 h-8 rounded-full bg-[#8456e8]/10 flex items-center justify-center shrink-0">
                         <svg className="w-4 h-4 text-[#8456e8]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -2751,7 +2513,7 @@ export function FinanceiroView({
                           Vence {new Date(p.dataVencimento + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
                         </p>
                       </div>
-                      <p className="text-[15px] font-bold text-[#191625] tabular-nums shrink-0">{brl(p.valor)}</p>
+                      <p className="text-[15px] font-bold text-[#191625] ds-num shrink-0">{brl(p.valor)}</p>
                       <button
                         onClick={() => onUpdate(p.id, { status: "pago", dataPagamento: hoje() })}
                         className="shrink-0 px-3 py-1.5 rounded-xl text-[12px] font-semibold text-white bg-[#009351] hover:bg-[#2fb350] transition-colors active:scale-95"
@@ -2770,7 +2532,7 @@ export function FinanceiroView({
                 <p className="text-[11px] font-bold uppercase tracking-wide text-[#8E8E93] mb-3">Recebidos</p>
                 <div className="space-y-2">
                   {pixRecebidos.map(p => (
-                    <div key={p.id} className="bg-[#F2F2F7] rounded-2xl p-4 flex items-center gap-4">
+                    <div key={p.id} className="bg-[#F2F2F7] rounded-xl p-4 flex items-center gap-4">
                       <div className="w-8 h-8 rounded-full bg-[#009351]/15 flex items-center justify-center shrink-0">
                         <svg className="w-4 h-4 text-[#009351]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -2784,7 +2546,7 @@ export function FinanceiroView({
                           Recebido {p.dataPagamento ? new Date(p.dataPagamento + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—"}
                         </p>
                       </div>
-                      <p className="text-[15px] font-bold text-[#009351] tabular-nums shrink-0">{brl(p.valor)}</p>
+                      <p className="text-[15px] font-bold text-[#009351] ds-num shrink-0">{brl(p.valor)}</p>
                     </div>
                   ))}
                 </div>
@@ -2806,7 +2568,7 @@ export function FinanceiroView({
                 {showPixHist && (
                   <div className="space-y-2">
                     {pixExpirados.map(p => (
-                      <div key={p.id} className="bg-[#F2F2F7] rounded-2xl p-4 flex items-center gap-4 opacity-60">
+                      <div key={p.id} className="bg-[#F2F2F7] rounded-xl p-4 flex items-center gap-4 opacity-60">
                         <div className="w-8 h-8 rounded-full bg-[rgba(0,0,0,0.06)] flex items-center justify-center shrink-0">
                           <svg className="w-4 h-4 text-[#8E8E93]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
@@ -2820,7 +2582,7 @@ export function FinanceiroView({
                             Expirou {new Date(p.dataVencimento + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
                           </p>
                         </div>
-                        <p className="text-[15px] font-bold text-[#8E8E93] tabular-nums shrink-0">{brl(p.valor)}</p>
+                        <p className="text-[15px] font-bold text-[#8E8E93] ds-num shrink-0">{brl(p.valor)}</p>
                       </div>
                     ))}
                   </div>
@@ -2829,7 +2591,7 @@ export function FinanceiroView({
             )}
           </div>
         )}
-      </div>
+      </div></div>
 
       {/* Modals */}
       {modalLanc && (
@@ -2868,7 +2630,7 @@ export function FinanceiroView({
 
       {confirmarDel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mx-4 p-6 text-center">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xs mx-4 p-6 text-center">
             <p className="font-bold text-[#191625] text-[14px] mb-1">Excluir lançamento?</p>
             <p className="text-[12px] text-[#8E8E93] mb-5">Esta ação não pode ser desfeita.</p>
             <div className="flex gap-2">
@@ -2890,7 +2652,7 @@ export function FinanceiroView({
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function KpiCard({ label, value, sub, icon, iconBg, iconColor, subColor, highlight, onClick }: {
+function KpiCard({ label, value, sub, icon, iconColor, subColor, highlight, onClick }: {
   label: string; value: string; sub?: string
   icon: React.ReactNode
   iconBg: string
@@ -2899,22 +2661,15 @@ function KpiCard({ label, value, sub, icon, iconBg, iconColor, subColor, highlig
   highlight?: boolean
   onClick?: () => void
 }) {
-  const Tag = onClick ? "button" : "div"
+  // Mesma aparência do Kpi de ds.tsx (aqui o valor já vem formatado)
   return (
-    <Tag onClick={onClick} className={`rounded-2xl px-5 py-4 text-left w-full transition-all duration-200 ${highlight ? "ring-2 ring-[rgba(132,86,232,0.18)]" : ""} ${onClick ? "hover:-translate-y-px hover:shadow-md cursor-pointer" : ""}`}
-      style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" }}>
-      <div className="flex items-center gap-2.5 mb-3">
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-          style={{ background: iconBg, color: iconColor }}>
-          {icon}
-        </div>
-        <p className="text-[10.5px] uppercase tracking-wider font-semibold text-[#8E8E93] leading-tight">{label}</p>
-      </div>
-      <p className="text-[22px] font-bold tabular-nums text-[#1C1C1E] tracking-tight leading-none">{value}</p>
-      {sub && (
-        <p className="text-[11px] mt-1.5" style={{ color: subColor ?? "#8E8E93" }}>{sub}</p>
-      )}
-    </Tag>
+    <Cartao onClick={onClick} className={`group min-w-0 ${highlight ? "ring-1 ring-[#8456e8]/20" : ""}`}>
+      <p className="text-[11px] font-medium text-[#898892] flex items-center gap-1.5 mb-3 truncate">
+        <span style={{ color: iconColor }} className="shrink-0 [&>svg]:w-3.5 [&>svg]:h-3.5">{icon}</span>{label}
+      </p>
+      <p className="text-[22px] font-semibold ds-num text-[#191625] tracking-[-0.02em] leading-none truncate">{value}</p>
+      {sub && <p className="text-[11px] mt-2 truncate" style={{ color: subColor ?? "#898892" }}>{sub}</p>}
+    </Cartao>
   )
 }
 
@@ -2927,9 +2682,9 @@ function DreRow({ label, value, bold, accent, separator }: {
                : value < 0          ? "text-rose-600"
                :                      "text-[#5e5c68]"
   return (
-    <div className={`px-5 py-3 flex items-center justify-between ${separator ? "border-t border-[rgba(60,60,67,0.12)] bg-[rgba(116,116,128,0.04)]/50" : ""}`}>
+    <div className={`px-5 py-3 flex items-center justify-between ${separator ? "border-t border-[rgba(60,60,67,0.1)] bg-[rgba(116,116,128,0.04)]" : ""}`}>
       <span className={`text-[12.5px] ${bold ? "font-bold text-[#191625]" : "text-[#72707d]"}`}>{label}</span>
-      <span className={`text-[13px] tabular-nums ${bold ? "font-semibold" : "font-semibold"} ${valCls}`}>
+      <span className={`text-[13px] ds-num ${bold ? "font-semibold" : "font-semibold"} ${valCls}`}>
         {value < 0 ? `−${brl(Math.abs(value))}` : brl(value)}
       </span>
     </div>
@@ -2939,7 +2694,7 @@ function DreRow({ label, value, bold, accent, separator }: {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-[10.5px] uppercase  text-[#8E8E93] font-semibold mb-1.5">{label}</label>
+      <label className="block text-[11px] text-[#898892] font-medium mb-1.5">{label}</label>
       {children}
     </div>
   )
@@ -2948,22 +2703,26 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function CustoField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-[10.5px] uppercase text-[#8E8E93] font-semibold mb-1.5">{label}</label>
+      <label className="block text-[11px] text-[#898892] font-medium mb-1.5">{label}</label>
       {children}
     </div>
   )
 }
 
 function Empty({ msg }: { msg: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <p className="text-[13px] font-semibold text-[#8E8E93]">{msg}</p>
-    </div>
-  )
+  return <Vazio icone={<CheckCircle2 className="w-8 h-8" />} titulo={msg} />
 }
 
 function inp() {
   return "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[#5e5c68] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"
+}
+
+// Nome cadastrado da categoria; se não houver, transforma o identificador em texto legível
+function nomeCategoria(id: string, cats: CategoriaFinanceira[]) {
+  const c = cats.find(x => x.id === id)
+  if (c) return c.nome
+  const t = id.replace(/[-_]+/g, " ").trim()
+  return t.charAt(0).toUpperCase() + t.slice(1)
 }
 
 function capitalize(s: string) {
@@ -3035,7 +2794,7 @@ function CategoriaSection({
   }
 
   return (
-    <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl overflow-hidden">
+    <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-xl overflow-hidden">
       <div className="px-5 py-4 border-b border-[rgba(60,60,67,0.06)] flex items-center justify-between">
         <p className="font-bold text-[#191625] text-[13px]">{titulo}</p>
         <span className="text-[10px] text-[#8E8E93] font-medium">{categorias.length} categorias</span>

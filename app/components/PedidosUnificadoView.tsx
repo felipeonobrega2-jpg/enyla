@@ -68,7 +68,7 @@ export type OrderEntry = {
   dataFechamento?: string; dataEntregaPrevista?: string; dataEntregaReal?: string; prazoRecebimentoInterno?: string
   receitas: LancamentoFinanceiro[]; despesas: LancamentoFinanceiro[]
   precoTotal: number; totalPago: number; totalDespesa: number
-  aReceber: number; vencido: number
+  aReceber: number; cobrado: number; vencido: number; semCobranca: number
   specs: string; qtdTotal: number
 }
 
@@ -164,7 +164,6 @@ export function PedidosUnificadoView(props: Props) {
     }
 
     // Agrupamento, etapa e valores vêm da camada canônica (lib/negocio)
-    const hojeIso = new Date().toLocaleDateString("sv-SE")
     return montarPedidos(kanban, lancamentos).map(p => ({
       key: p.key, tipo: p.tipo, numero: p.numero, nomeCliente: p.nomeCliente, cards: p.cards, coluna: p.coluna,
       dataPedido: p.dataFechamento ?? "",
@@ -175,8 +174,7 @@ export function PedidosUnificadoView(props: Props) {
       receitas: p.receitas, despesas: p.despesas,
       precoTotal: p.valor, qtdTotal: p.quantidade,
       totalPago: p.recebido, totalDespesa: p.custoDireto,
-      aReceber: p.aReceber,
-      vencido: p.receitas.filter(l => l.status !== "pago" && l.dataVencimento < hojeIso).reduce((s, l) => s + l.valor, 0),
+      aReceber: p.aReceber, cobrado: p.cobrado, vencido: p.vencido, semCobranca: p.semCobranca,
       specs: buildSpecs(p.cards),
     }))
   }, [kanban, lancamentos, histMap])
@@ -238,6 +236,7 @@ export function PedidosUnificadoView(props: Props) {
   const prazo3 = allEntries.filter(e => passaFiltro(e, "prazo", hoje))
   const aReceber = allEntries.reduce((s, e) => s + e.aReceber, 0)
   const vencido = allEntries.reduce((s, e) => s + e.vencido, 0)
+  const semCobrancaTotal = allEntries.reduce((s, e) => s + e.semCobranca, 0)
   const entregues = allEntries.filter(e => e.coluna === COL_ENTREGUE)
 
   // Clicar num KPI filtra a lista (clicar de novo volta para todos)
@@ -276,7 +275,7 @@ export function PedidosUnificadoView(props: Props) {
             sub={`${allEntries.filter(e => e.coluna !== COL_ENTREGUE && !e.dataEntregaPrevista).length} sem data de entrega`} />
           <Kpi rotulo="A receber" icone={<Wallet className="w-3.5 h-3.5" />} tom={vencido > 0 ? "perigo" : "neutro"} destaque={filtro === "receber"}
             valor={aReceber} formato={brl} onClick={() => filtrar("receber")}
-            sub={vencido <= 0 ? "nada vencido" : vencido >= aReceber - 0.5 ? "tudo já venceu" : `${brl(vencido)} vencido`} />
+            sub={vencido > 0 ? `${brl(vencido)} vencido · ${brl(semCobrancaTotal)} sem cobrança` : semCobrancaTotal > 0.5 ? `${brl(semCobrancaTotal)} ainda sem cobrança lançada` : "tudo cobrado"} />
           <Kpi rotulo="Entregues" icone={<CheckCircle2 className="w-3.5 h-3.5" />} tom="sucesso" destaque={filtro === "entregue"}
             valor={entregues.length} formato={n => num(Math.round(n))} onClick={() => filtrar("entregue")}
             sub={brl(entregues.reduce((s, e) => s + e.precoTotal, 0))} />
@@ -596,7 +595,7 @@ function DashboardTab({ entries, onDetalhes }: {
   const contratado     = entries.reduce((s, e) => s + e.precoTotal, 0)
   const totalRecebido  = entries.reduce((s, e) => s + e.totalPago, 0)
   const aReceber       = entries.reduce((s, e) => s + e.aReceber, 0)
-  const semCobranca    = Math.max(0, contratado - totalRecebido - aReceber)
+  const semCobranca    = entries.reduce((s, e) => s + e.semCobranca, 0)
   const ticketMedio    = entries.length > 0 ? contratado / entries.length : 0
 
   const margem = margemContribuicao(entries.map(e => ({ valor: e.precoTotal, custoDireto: e.totalDespesa } as Pedido)))
@@ -645,7 +644,7 @@ function DashboardTab({ entries, onDetalhes }: {
         <Kpi rotulo="Recebido" icone={<DollarSign className="w-3.5 h-3.5" />} tom="sucesso"
           valor={totalRecebido} formato={brl}
           sub={semCobranca > 0 ? `${brl(semCobranca)} ainda sem cobrança lançada` : `${num(contratado > 0 ? totalRecebido / contratado * 100 : 0, 0)}% do contratado`}
-          onClick={semCobranca > 0 ? () => abrir("Sem cobrança lançada", entries.filter(e => e.precoTotal - e.totalPago - e.aReceber > 0.5)) : undefined} />
+          onClick={semCobranca > 0 ? () => abrir("Sem cobrança lançada", entries.filter(e => e.semCobranca > 0.5)) : undefined} />
         <Kpi rotulo="Ticket médio" icone={<BarChart3 className="w-3.5 h-3.5" />} valor={ticketMedio} formato={brl} sub="por pedido" />
         <Kpi rotulo="Margem de contribuição" icone={<TrendingUp className="w-3.5 h-3.5" />}
           tom={margem.pct == null ? "neutro" : margem.pct < 30 ? "perigo" : margem.pct < 45 ? "alerta" : "sucesso"}
@@ -785,11 +784,12 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
               </div>
               <div className="text-right shrink-0 w-[150px] whitespace-nowrap">
                 <p className="text-[13.5px] font-semibold ds-num" style={{ color: txt }}>{brl(entry.precoTotal)}</p>
-                <p className={`text-[10.5px] mt-0.5 ds-num ${entry.vencido > 0 ? "text-[#d33a3c] font-semibold" : entry.aReceber > 0 || entry.totalPago < entry.precoTotal - 0.5 ? "text-[#c57800]" : "text-[#009351]"}`}>
+                <p className={`text-[10.5px] mt-0.5 ds-num ${entry.vencido > 0 ? "text-[#d33a3c] font-semibold" : entry.aReceber > 0 ? "text-[#c57800]" : "text-[#009351]"}`}
+                  title={entry.aReceber > 0 ? `Deve ${brl(entry.aReceber)}: ${brl(entry.cobrado)} com cobrança lançada, ${brl(entry.semCobranca)} sem cobrança` : undefined}>
                   {entry.vencido > 0 ? `${brl(entry.vencido)} vencido`
-                    : entry.aReceber > 0 ? `falta ${brl(entry.aReceber)}`
-                    : entry.totalPago >= entry.precoTotal - 0.5 ? "pago"
-                    : entry.totalPago > 0 ? `a cobrar ${brl(entry.precoTotal - entry.totalPago)}` : "sem cobrança lançada"}
+                    : entry.aReceber <= 0 ? "pago"
+                    : entry.semCobranca > 0.5 ? `${brl(entry.aReceber)} sem cobrança`
+                    : `falta ${brl(entry.aReceber)}`}
                 </p>
               </div>
               {entry.coluna === COL_ENTREGUE && (() => {

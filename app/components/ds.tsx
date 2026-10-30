@@ -190,12 +190,13 @@ export function Botao({ children, onClick, variante = "secundario", icone, disab
 export function Segmentado<T extends string>({ valor, opcoes, onChange }: {
   valor: T; opcoes: { v: T; nome: string }[]; onChange: (v: T) => void
 }) {
-  const i = Math.max(0, opcoes.findIndex(o => o.v === valor))
+  const achado = opcoes.findIndex(o => o.v === valor)
+  const i = Math.max(0, achado)
   return (
     <div className="relative inline-grid p-1 rounded-lg bg-[rgba(116,116,128,0.1)]"
       style={{ gridTemplateColumns: `repeat(${opcoes.length}, minmax(0, 1fr))` }}>
-      <span aria-hidden className="absolute top-1 bottom-1 left-1 rounded-md bg-white shadow-sm transition-transform duration-300 ease-[cubic-bezier(.3,.9,.3,1)]"
-        style={{ width: `calc((100% - 8px) / ${opcoes.length})`, transform: `translateX(${i * 100}%)` }} />
+      <span aria-hidden className="absolute top-1 bottom-1 left-1 rounded-md bg-white shadow-sm transition-all duration-300 ease-[cubic-bezier(.3,.9,.3,1)]"
+        style={{ width: `calc((100% - 8px) / ${opcoes.length})`, transform: `translateX(${i * 100}%)`, opacity: achado < 0 ? 0 : 1 }} />
       {opcoes.map(o => (
         <button key={o.v} onClick={() => onChange(o.v)}
           className={cx("relative z-10 h-7 px-3 rounded-md text-[12px] font-medium transition-colors duration-200 whitespace-nowrap",
@@ -306,6 +307,41 @@ export function Colunas({ itens, formato, altura = 140, onClick }: {
           <span className={cx("text-[10.5px] mt-1.5 capitalize", it.destaque ? "text-[#191625] font-semibold" : "text-[#898892]")}>{it.rotulo}</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+// ── Colunas duplas (entradas × saídas) ────────────────────────────────────────
+
+export function ColunasDuplas({ itens, formato, altura = 130, nomes = ["Entradas", "Saídas"] }: {
+  itens: { rotulo: string; a: number; b: number; destaque?: boolean }[]
+  formato: (n: number) => string
+  altura?: number
+  nomes?: [string, string]
+}) {
+  const max = Math.max(1, ...itens.flatMap(i => [i.a, i.b]))
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-3 text-[11px] text-[#898892]">
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#009351]" />{nomes[0]}</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#d33a3c]/70" />{nomes[1]}</span>
+      </div>
+      <div className="flex items-end gap-1.5" style={{ height: altura + 22 }}>
+        {itens.map((it, idx) => (
+          <div key={it.rotulo + idx} className="group relative flex-1 min-w-0 flex flex-col items-center justify-end h-full">
+            <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 z-10 hidden group-hover:block whitespace-nowrap rounded-lg bg-[#191625] text-white text-[10.5px] px-2.5 py-1.5 shadow-lg">
+              <p className="capitalize text-white/60">{it.rotulo}</p>
+              <p className="ds-num">+{formato(it.a)} · −{formato(it.b)}</p>
+              <p className={`ds-num font-semibold ${it.a - it.b >= 0 ? "text-[#4ade80]" : "text-[#fca5a5]"}`}>{it.a - it.b >= 0 ? "+" : "−"}{formato(Math.abs(it.a - it.b))}</p>
+            </div>
+            <div className="w-full flex items-end justify-center gap-[3px]" style={{ height: altura }}>
+              <div className="w-[42%] max-w-[18px] rounded-t-[3px] bg-[#009351] ds-cresce-y" style={{ height: Math.max(2, it.a / max * altura), animationDelay: `${idx * 40}ms`, opacity: it.destaque ? 1 : 0.8 }} />
+              <div className="w-[42%] max-w-[18px] rounded-t-[3px] bg-[#d33a3c] ds-cresce-y" style={{ height: Math.max(2, it.b / max * altura), animationDelay: `${idx * 40 + 20}ms`, opacity: it.destaque ? 0.85 : 0.55 }} />
+            </div>
+            <span className={cx("text-[10.5px] mt-1.5 capitalize", it.destaque ? "text-[#191625] font-semibold" : "text-[#898892]")}>{it.rotulo}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
