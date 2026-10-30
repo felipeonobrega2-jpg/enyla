@@ -249,11 +249,13 @@ export function LinhaLista({ titulo, sub, valor, valorSub, tom, icone, onClick, 
 // ── Barras horizontais (distribuição) ─────────────────────────────────────────
 
 export function ListaBarras({ itens, formatoValor, onClick }: {
-  itens: { chave: string | number; rotulo: string; qtd: number; valor?: number; tom?: Tom }[]
+  itens: { chave: string | number; rotulo: string; qtd: number; valor?: number; tom?: Tom; peso?: number }[]
   formatoValor?: (n: number) => string
   onClick?: (chave: string | number) => void
 }) {
-  const max = Math.max(1, ...itens.map(i => i.qtd))
+  // A barra mede `peso` quando informado (ex.: valor em R$); senão, a quantidade
+  const medida = (i: { qtd: number; peso?: number }) => i.peso ?? i.qtd
+  const max = Math.max(1, ...itens.map(medida))
   return (
     <div className="space-y-1">
       {itens.map((it, idx) => {
@@ -269,7 +271,7 @@ export function ListaBarras({ itens, formatoValor, onClick }: {
             </div>
             <div className="h-1.5 rounded-full bg-[rgba(116,116,128,0.1)] overflow-hidden">
               <div className="h-full rounded-full ds-cresce-x"
-                style={{ width: `${(it.qtd / max) * 100}%`, background: COR[it.tom ?? "acento"], animationDelay: `${idx * 50}ms` }} />
+                style={{ width: `${(medida(it) / max) * 100}%`, background: COR[it.tom ?? "acento"], animationDelay: `${idx * 50}ms` }} />
             </div>
           </Comp>
         )
