@@ -400,6 +400,7 @@ export function ParceirosView({
   onAddNegocio,
   onUpdateNegocio,
   onDeleteNegocio,
+  embutido,
 }: {
   parceiros: Parceiro[]
   negocios: NegocioParceiro[]
@@ -410,6 +411,7 @@ export function ParceirosView({
   onAddNegocio: (n: NegocioParceiro) => void
   onUpdateNegocio: (n: NegocioParceiro) => void
   onDeleteNegocio: (id: string) => void
+  embutido?: boolean  // dentro da tela Parceiros: sem título, sem KPIs e sem rolagem própria
 }) {
   const [tab, setTab]                       = useState<"parceiros" | "negocios">("parceiros")
   const [modalParceiro, setModalParceiro]   = useState<Parceiro | true | null>(null)
@@ -445,13 +447,13 @@ export function ParceirosView({
   }, [negocios, filtroParceiro, filtroStatus])
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className={embutido ? "flex flex-col bg-white rounded-xl ds-cartao" : "flex flex-col h-full overflow-hidden"}>
       {/* Header */}
-      <div className="px-8 pt-6 pb-0 shrink-0">
+      <div className={embutido ? "px-5 pt-5 pb-0 shrink-0" : "px-8 pt-6 pb-0 shrink-0"}>
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-[18px] font-semibold text-[#191625]">Parceiros comerciais</h1>
-            <p className="text-[12px] text-[#8E8E93] mt-0.5">Gestão de parceiros e negócios gerados</p>
+            <h1 className={embutido ? "text-[13.5px] font-semibold text-[#191625]" : "text-[18px] font-semibold text-[#191625]"}>{embutido ? "Parceiros e negócios" : "Parceiros comerciais"}</h1>
+            <p className="text-[12px] text-[#8E8E93] mt-0.5">{embutido ? "Cadastre parceiros e registre comissões e revendas" : "Gestão de parceiros e negócios gerados"}</p>
           </div>
           <button
             onClick={() => tab === "parceiros" ? setModalParceiro(true) : setModalNegocio(true)}
@@ -464,11 +466,11 @@ export function ParceirosView({
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-3 gap-3 mb-5">
+        {!embutido && <div className="grid grid-cols-3 gap-3 mb-5">
           <KpiParceiro label="Total gerado" value={brl(totalComissao)} sub={`${negocios.filter(n => n.status !== "cancelado").length} negócios`} color="blue" />
           <KpiParceiro label="Recebido / Pago" value={brl(comissaoPaga)} sub={`${negocios.filter(n => n.status === "pago").length} pagos`} color="green" />
           <KpiParceiro label="Pendente" value={brl(comissaoPendente)} sub={`${negocios.filter(n => n.status === "pendente").length} aguardando`} color="amber" />
-        </div>
+        </div>}
 
         {/* Tabs */}
         <div className="flex gap-1 border-b border-[rgba(60,60,67,0.08)]">
@@ -486,7 +488,7 @@ export function ParceirosView({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-8 py-5">
+      <div className={embutido ? "px-5 py-5" : "flex-1 overflow-y-auto px-8 py-5"}>
 
         {/* ── Tab: Parceiros ── */}
         {tab === "parceiros" && (

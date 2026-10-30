@@ -388,11 +388,12 @@ function TercCard({ card, onMove, onEdit, onDelete }: {
 }
 
 // ── Main view ──────────────────────────────────────────────────────────────────
-export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
+export function TerceirizadosView({ kanban, onMove, onEdit, onDelete, embutido }: {
   kanban: KanbanCard[]
   onMove: (id: string, coluna: number) => void
   onEdit: (id: string, fields: Partial<KanbanCard>) => void
   onDelete: (id: string) => void
+  embutido?: boolean
 }) {
   const tercs = useMemo(
     () => kanban.filter(c => c.materialNome === "Terceirizado" && c.coluna !== 10),
@@ -425,10 +426,10 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
   }, [tercs])
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className={embutido ? "flex flex-col" : "flex flex-col h-full overflow-hidden"}>
 
       {/* ── KPI Header ──────────────────────────────────────────────────────── */}
-      <div className="shrink-0 border-b border-[rgba(60,60,67,0.1)] bg-[#F9F9F9] px-5 pt-4 pb-4">
+      <div className={embutido ? "hidden" : "shrink-0 border-b border-[rgba(60,60,67,0.1)] bg-[#F9F9F9] px-5 pt-4 pb-4"}>
         <div className="flex items-center gap-2.5 mb-3">
           <p className="text-[9.5px] uppercase tracking-[0.08em] font-semibold text-[#8E8E93]">Terceirizados</p>
           {kpis.late > 0 && (
@@ -500,7 +501,7 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
       </div>
 
       {/* ── List ────────────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
+      <div className={embutido ? "space-y-6" : "flex-1 overflow-y-auto px-5 py-5 space-y-6"}>
 
         {tercs.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 gap-4">

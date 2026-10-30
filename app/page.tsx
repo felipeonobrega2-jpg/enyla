@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
-import { Ruler, Check, Factory, LayoutDashboard, FileText, Package, Users, Truck, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Trophy } from "lucide-react"
+import { Ruler, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Trophy } from "lucide-react"
 import { signOut } from "next-auth/react"
 import WhatsAppView from "./components/WhatsAppView"
 import Image from "next/image"
@@ -38,6 +38,7 @@ import LayoutChapaVisual from "./LayoutChapaVisual"
 import { RotasProducao } from "./components/RotasProducao"
 import { FornecedoresView } from "./components/FornecedoresView"
 import { PainelView } from "./components/PainelView"
+import { ParceriasView } from "./components/ParceriasView"
 import { normalizarProducao } from "./lib/producao"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
 import FormaView from "./FormaView"
@@ -1294,15 +1295,13 @@ export default function Home() {
           <NavGroup label="Produção" />
           <NavItem active={view === "fornecedores"} onClick={() => navigate("fornecedores")} label="Fornecedores"
             icon={<Factory className="w-4 h-4" strokeWidth={1.8} />} />
-          <NavItem active={view === "terceirizados"} onClick={() => navigate("terceirizados")} label="Terceirizados"
-            icon={<Truck className="w-4 h-4" strokeWidth={1.8} />} />
 
           <NavGroup label="Gestão" />
           <NavItem active={view === "financeiro"} onClick={() => navigate("financeiro")} label="Financeiro"
             icon={<Wallet className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "dashboard"} onClick={() => navigate("dashboard")} label="Análises"
             icon={<BarChart3 className="w-4 h-4" strokeWidth={1.8} />} />
-          <NavItem active={view === "parceiros"} onClick={() => navigate("parceiros")} label="Parceiros"
+          <NavItem active={view === "parceiros" || view === "terceirizados"} onClick={() => navigate("parceiros")} label="Parceiros"
             icon={<Handshake className="w-4 h-4" strokeWidth={1.8} />} />
 
           <NavGroup label="Ferramentas" />
@@ -2188,8 +2187,18 @@ export default function Home() {
               onDetalhesCard={card => setDetalheModal({ tipo: "kanban", card })}
               onAbrirPerfil={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }}
             />
-          ) : view === "parceiros" ? (
+          ) : view === "parceiros" || view === "terceirizados" ? (
+            <ParceriasView
+              parceiros={parceiros}
+              negocios={negocios}
+              kanban={kanban}
+              lancamentos={lancamentos}
+              clientes={clientes}
+              abaInicial={view === "terceirizados" ? "revendas" : "visao"}
+              onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }}
+              cadastro={
             <ParceirosView
+              embutido
               parceiros={parceiros}
               negocios={negocios}
               lotes={lotes}
@@ -2217,6 +2226,37 @@ export default function Home() {
                 setNegocios(prev => prev.filter(x => x.id !== id))
                 fetch(`/api/negocios/${id}`, { method: "DELETE" }).catch(() => {})
               }}
+            />
+              }
+              itensRevenda={<TerceirizadosView
+                embutido
+              kanban={kanban}
+              onMove={(id, coluna) => {
+                setKanban(prev => prev.map(c => c.id === id ? { ...c, coluna } : c))
+                fetch(`/api/kanban/${id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ coluna }),
+                }).catch(() => {})
+              }}
+              onEdit={(id, fields) => {
+                setKanban(prev => prev.map(c => c.id === id ? { ...c, ...fields } : c))
+                fetch(`/api/kanban/${id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(fields),
+                }).catch(() => {})
+              }}
+              onDelete={id => {
+                const card = kanban.find(c => c.id === id)
+                setKanban(prev => prev.filter(c => c.id !== id))
+                fetch(`/api/kanban/${id}`, { method: "DELETE" }).catch(() => {})
+                if (card?.numero) {
+                  setHistorico(prev => prev.filter(h => h.numero !== card.numero))
+                  fetch(`/api/historico/${encodeURIComponent(card.numero)}`, { method: "DELETE" }).catch(() => {})
+                }
+              }}
+            />}
             />
           ) : view === "meta" ? (
             <MetaAdsView
@@ -2247,35 +2287,7 @@ export default function Home() {
             />
           ) : view === "fornecedores" ? (
             <FornecedoresView config={config} kanban={kanban} lancamentos={lancamentos} onSave={salvarConfigTudo} />
-          ) : view === "terceirizados" ? (
-            <TerceirizadosView
-              kanban={kanban}
-              onMove={(id, coluna) => {
-                setKanban(prev => prev.map(c => c.id === id ? { ...c, coluna } : c))
-                fetch(`/api/kanban/${id}`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ coluna }),
-                }).catch(() => {})
-              }}
-              onEdit={(id, fields) => {
-                setKanban(prev => prev.map(c => c.id === id ? { ...c, ...fields } : c))
-                fetch(`/api/kanban/${id}`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(fields),
-                }).catch(() => {})
-              }}
-              onDelete={id => {
-                const card = kanban.find(c => c.id === id)
-                setKanban(prev => prev.filter(c => c.id !== id))
-                fetch(`/api/kanban/${id}`, { method: "DELETE" }).catch(() => {})
-                if (card?.numero) {
-                  setHistorico(prev => prev.filter(h => h.numero !== card.numero))
-                  fetch(`/api/historico/${encodeURIComponent(card.numero)}`, { method: "DELETE" }).catch(() => {})
-                }
-              }}
-            />
+
           ) : (
             <>
               {/* ── Tab bar: Padrão / Digital Rápido ──────────────────────── */}
