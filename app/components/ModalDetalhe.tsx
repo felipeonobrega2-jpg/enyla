@@ -196,11 +196,12 @@ export function ModalDetalhe({
   const finDespesasPagas = useMemo(() => finDespesasCard.filter(l => l.status === "pago" || l.formaPagamento === "conta"), [finDespesasCard])
   const finTotalRecebido = useMemo(() => finReceitasPagas.reduce((s, l) => s + l.valor, 0), [finReceitasPagas])
   const finTotalDesp     = useMemo(() => finDespesasCard.reduce((s, l) => s + l.valor, 0), [finDespesasCard])
-  const finResultado     = finTotalRecebido - finTotalDesp
+  const finResultado     = (card?.preco ?? 0) - finTotalDesp
   const finSemDados      = finReceitasCard.length === 0 && finDespesasCard.length === 0
   const finMargemPct     = !finSemDados && (card?.preco ?? 0) > 0 ? (((card?.preco ?? 0) - finTotalDesp) / (card?.preco ?? 0)) * 100 : null
   const finMarkup        = !finSemDados && finTotalDesp > 0 ? (card?.preco ?? 0) / finTotalDesp : null
-  const finPercPago      = (card?.preco ?? 0) > 0 ? Math.min(100, (finTotalRecebido / (card?.preco ?? 0)) * 100) : 0
+  const finPercPagoBruto = (card?.preco ?? 0) > 0 ? (finTotalRecebido / (card?.preco ?? 0)) * 100 : 0
+  const finPercPago      = Math.min(100, finPercPagoBruto)
   const finCmvUnit       = finTotalDesp > 0 && (card?.quantidade ?? 0) > 0 ? finTotalDesp / (card?.quantidade ?? 1) : null
 
   // Dirty check — only relevant fields
@@ -551,7 +552,7 @@ export function ModalDetalhe({
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 7, marginBottom: 10 }}>
                       <KpiCard label="Valor" value={brl(card.preco)} color="#111827" bg="rgba(116,116,128,0.05)" />
                       <KpiCard label="Recebido" value={brl(finTotalRecebido)} color="#16a34a"
-                        sub={`${num(finPercPago, 0)}% pago`} bg="rgba(116,116,128,0.05)" />
+                        sub={`${num(finPercPagoBruto, 0)}% pago`} bg="rgba(116,116,128,0.05)" />
                       <KpiCard label="Custos" value={brl(finTotalDesp)}
                         color={finTotalDesp > 0 ? '#dc2626' : '#9ca3af'}
                         sub={finDespesasPagas.length > 0 ? `${finDespesasPagas.length} lanç.` : "Sem despesas"}
