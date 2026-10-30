@@ -235,12 +235,15 @@ export function calcular(form: FormData, config: Configuracoes): Calculo | null 
   const quantidades = [...form.quantidades].sort((a, b) => a - b)
   const tabela = quantidades.map((q) => calcularLinha(q, formatoEfetivo, form, custoImpressaoFixo, config))
 
-  const sweetMin = tabela.find((l) => l.margemComFaca >= 40) ?? tabela[0]
+  // Usa as colunas que valem para este orçamento (com ou sem faca)
+  const margemDe   = (l: LinhaTabela) => form.comFaca ? l.margemComFaca : l.margemSemFaca
+  const unitarioDe = (l: LinhaTabela) => form.comFaca ? l.unitarioComFaca : l.unitarioSemFaca
+  const sweetMin = tabela.find((l) => margemDe(l) >= 40) ?? tabela[0]
   // Elbow: primeira quantidade onde passar para o próximo tier melhora menos de 15% no preço unitário
   const sweetIdeal = (() => {
     for (let i = 0; i < tabela.length - 1; i++) {
-      const curr = tabela[i].unitarioSemFaca
-      const next = tabela[i + 1].unitarioSemFaca
+      const curr = unitarioDe(tabela[i])
+      const next = unitarioDe(tabela[i + 1])
       if (curr <= 0) continue
       if ((curr - next) / curr < 0.15) return tabela[i]
     }

@@ -303,15 +303,17 @@ export function AnaliseEstrategica({ calculo, comFaca, cliente }: { calculo: Cal
   const { tabela, sweetSpotMinimoQtd, sweetSpotIdealQtd } = calculo
   if (!tabela.length) return null
 
-  const melhorMargem = tabela.reduce((b, c) => c.margemSemFaca > b.margemSemFaca ? c : b, tabela[0])
-  const menorUnit    = tabela.reduce((b, c) => c.unitarioSemFaca < b.unitarioSemFaca ? c : b, tabela[0])
-  const sweetMin     = tabela.find(l => l.quantidade === sweetSpotMinimoQtd) ?? tabela[0]
-  const sweetIdeal   = tabela.find(l => l.quantidade === sweetSpotIdealQtd)  ?? tabela[tabela.length - 1]
-
   const precoKey = comFaca ? "precoComFaca" : "precoSemFaca"
   const unitKey  = comFaca ? "unitarioComFaca" : "unitarioSemFaca"
   const margKey  = comFaca ? "margemComFaca" : "margemSemFaca"
   const lucroKey = comFaca ? "lucroComFaca" : "lucroSemFaca"
+  const val = (l: LinhaTabela, k: string) => l[k as keyof LinhaTabela] as number
+
+  // Empate de margem: prefere a maior quantidade (mais lucro), não a primeira linha
+  const melhorMargem = tabela.reduce((b, c) => val(c, margKey) >= val(b, margKey) - 0.05 ? c : b, tabela[0])
+  const menorUnit    = tabela.reduce((b, c) => val(c, unitKey) < val(b, unitKey) ? c : b, tabela[0])
+  const sweetMin     = tabela.find(l => l.quantidade === sweetSpotMinimoQtd) ?? tabela[0]
+  const sweetIdeal   = tabela.find(l => l.quantidade === sweetSpotIdealQtd)  ?? tabela[tabela.length - 1]
 
   const cards = [
     { tag: "Para o cliente",       desc: "Menor custo por unidade",      linha: menorUnit,    cor: "border-[#8456e8]/15 bg-[#8456e8]/[0.03]", tagCor: "bg-[#8456e8]/10 text-[#8456e8]" },
