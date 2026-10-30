@@ -5,7 +5,8 @@ import {
   FileText, CheckCircle2, XCircle,
   Target, Clock, BarChart3, Plus, Users,
 } from "lucide-react"
-import { KanbanCard, PropostaCustom, COL_FECHADO, COL_PERDIDO, COL_ENTREGUE } from "../types"
+import { KanbanCard, PropostaCustom } from "../types"
+import { conversao, orcamentosDoPeriodo, nomeChave, isTerceirizado, SEM_PERIODO } from "../lib/negocio"
 import { brl, num } from "../utils"
 import { HistoricoView, HistItem } from "./HistoricoView"
 
@@ -44,50 +45,30 @@ export function OrcamentosView(props: Props) {
 
   // ── Métricas ────────────────────────────────────────────────────────────
   const metrics = useMemo(() => {
-    // kanban é a fonte única de verdade; exclui sub-entradas de terceirização
-    const base = kanban.filter(c => !c.isTerceirizado)
+    // Definições canônicas (lib/negocio): unidade = orçamento (card), exclui terceirizados
+    const base = orcamentosDoPeriodo(kanban, SEM_PERIODO)
+    const conv = conversao(base)
+    const ticketMedioOrc = base.length > 0 ? base.reduce((s, c) => s + c.preco, 0) / base.length : 0
 
-    const totalRealizados = base.length
-
-    const fechados    = base.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO)
-    const perdidos    = base.filter(c => c.coluna === COL_PERDIDO)
-    const entregues   = base.filter(c => c.coluna === COL_ENTREGUE)
-    const emAndamento = base.filter(c => c.coluna >= COL_FECHADO && c.coluna < COL_ENTREGUE && c.coluna !== COL_PERDIDO)
-
-    const totalFechados = fechados.length
-    const totalPerdidos = perdidos.length
-    // taxa = ganhos ÷ (ganhos + perdidos) — ignora abertos ainda sem decisão
-    const resolvidosBase = totalFechados + totalPerdidos
-    const taxaConversao  = resolvidosBase > 0 ? (totalFechados / resolvidosBase) * 100 : 0
-
-    // Ticket médio dos orçamentos gerados (histórico calculado)
-    const precoIdealItem = (item: HistItem) => {
-      const ideal = item.calculo.tabela.find(l => l.quantidade === item.calculo.sweetSpotIdealQtd) ?? item.calculo.tabela[0]
-      return item.form.comFaca ? (ideal?.precoComFaca ?? 0) : (ideal?.precoSemFaca ?? 0)
-    }
-    const ticketMedioOrc = historico.length > 0
-      ? historico.reduce((s, i) => s + precoIdealItem(i), 0) / historico.length
-      : 0
-
-    // Meses ativos (meses distintos no kanban)
     const mesesSet = new Set<string>()
     base.forEach(c => { if (c.data) mesesSet.add(c.data.slice(3, 10)) })
-    const mesesAtivos = mesesSet.size || 1
-    const mediaOrcMes = totalRealizados / mesesAtivos
+    const mediaOrcMes = base.length / (mesesSet.size || 1)
 
-    const clientesUnicos = new Set(base.map(c => c.nomeCliente?.trim().toLowerCase()).filter(Boolean)).size
-    const orcPorCliente = clientesUnicos > 0 ? totalRealizados / clientesUnicos : 0
+    const clientesUnicos = new Set(base.map(c => nomeChave(c.nomeCliente)).filter(Boolean)).size
+    const orcPorCliente = clientesUnicos > 0 ? base.length / clientesUnicos : 0
 
     return {
-      totalRealizados,
-      totalFechados,
-      totalPerdidos,
-      taxaConversao,
+      totalRealizados: conv.total,
+      totalFechados: conv.ganhos,
+      totalPerdidos: conv.perdidos,
+      totalExpirados: conv.expirados,
+      totalAbertos: conv.abertos,
+      taxaConversao: conv.taxa,
       ticketMedioOrc,
       mediaOrcMes,
       orcPorCliente,
     }
-  }, [historico, propostasCustom, kanban])
+  }, [kanban])
 
   const TAB_STYLE = (active: boolean) =>
     `px-4 py-2 text-[12.5px] font-semibold rounded-lg transition-colors ${
@@ -103,7 +84,7 @@ export function OrcamentosView(props: Props) {
         <div>
           <h1 className="text-[20px] font-bold text-[#1C1C1E] tracking-tight">Orçamentos</h1>
           <p className="text-[12px] text-[#8E8E93] mt-0.5">
-            {metrics.totalRealizados} realizados · {metrics.totalFechados} fechados · taxa {num2(metrics.taxaConversao, 0)}%
+            {metrics.totalRealizados} orçamentos · {metrics.totalFechados} fechados · {num2(metrics.taxaConversao, 0)}% de conversão desde o início
           </p>
         </div>
         <button
@@ -169,6 +150,8 @@ function DashboardTab({ metrics, kanban }: {
     totalRealizados: number
     totalFechados: number
     totalPerdidos: number
+    totalExpirados: number
+    totalAbertos: number
     taxaConversao: number
     ticketMedioOrc: number
     mediaOrcMes: number
@@ -177,7 +160,7 @@ function DashboardTab({ metrics, kanban }: {
   kanban: KanbanCard[]
 }) {
   const {
-    totalRealizados, totalFechados, totalPerdidos, taxaConversao,
+    totalRealizados, totalFechados, totalPerdidos, totalExpirados, totalAbertos, taxaConversao,
     ticketMedioOrc, mediaOrcMes, orcPorCliente,
   } = metrics
 
@@ -190,27 +173,28 @@ function DashboardTab({ metrics, kanban }: {
       {/* KPIs — linha 1 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
-          icon={<FileText className="w-4 h-4" />}
-          iconColor="#7c3aed" iconBg="rgba(124,58,237,0.08)"
-          label="Total realizados"
-          value={String(totalRealizados)}
-          sub="orçamentos gerados"
-        />
-        <KpiCard
           icon={<CheckCircle2 className="w-4 h-4" />}
           iconColor="#15803d" iconBg="rgba(22,163,74,0.08)"
           label="Fechados"
           value={String(totalFechados)}
-          sub="pedidos confirmados"
+          sub={`de ${totalRealizados} orçamentos${totalAbertos > 0 ? ` · ${totalAbertos} em aberto` : ""}`}
           subColor="#15803d"
         />
         <KpiCard
           icon={<XCircle className="w-4 h-4" />}
           iconColor="#b91c1c" iconBg="rgba(185,28,28,0.08)"
-          label="Perdidos"
+          label="Recusados"
           value={String(totalPerdidos)}
-          sub="negócios encerrados"
+          sub="cliente disse não"
           subColor="#b91c1c"
+        />
+        <KpiCard
+          icon={<Clock className="w-4 h-4" />}
+          iconColor="#c57800" iconBg="rgba(197,120,0,0.08)"
+          label="Sem resposta"
+          value={String(totalExpirados)}
+          sub="venceram sem decisão"
+          subColor="#c57800"
         />
         <KpiCard
           icon={<Target className="w-4 h-4" />}
@@ -230,9 +214,9 @@ function DashboardTab({ metrics, kanban }: {
           <KpiCard
             icon={<BarChart3 className="w-4 h-4" />}
             iconColor="#7c3aed" iconBg="rgba(124,58,237,0.08)"
-            label="Ticket médio orçado"
+            label="Valor médio orçado"
             value={ticketMedioOrc > 0 ? brl(ticketMedioOrc) : "—"}
-            sub="valor médio dos orçamentos"
+            sub="por orçamento enviado"
           />
           <KpiCard
             icon={<Clock className="w-4 h-4" />}
@@ -260,18 +244,24 @@ function DashboardTab({ metrics, kanban }: {
       </div>
 
       {/* Barra de conversão visual */}
-      {(totalFechados + totalPerdidos) > 0 && (
+      {(totalFechados + totalPerdidos + totalExpirados) > 0 && (
         <div>
           <SectionLabel>Conversão</SectionLabel>
           <div className="mt-3 rounded-2xl p-5" style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" }}>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[12px] font-semibold" style={{ color: "var(--text-faint)" }}>Fechados vs. Perdidos</span>
+              <span className="text-[12px] font-semibold" style={{ color: "var(--text-faint)" }}>Fechados · recusados · sem resposta</span>
               <span className="text-[12px] font-bold" style={{ color: convColor }}>{num(taxaConversao, 1)}% conversão</span>
             </div>
-            <div className="h-2.5 rounded-full bg-[rgba(185,28,28,0.12)] overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${taxaConversao}%`, background: convColor }} />
-            </div>
+            {(() => {
+              const dec = totalFechados + totalPerdidos + totalExpirados
+              return (
+                <div className="h-2.5 rounded-full overflow-hidden flex gap-0.5">
+                  <div className="h-full transition-all duration-700" style={{ width: `${(totalFechados / dec) * 100}%`, background: convColor }} />
+                  <div className="h-full transition-all duration-700" style={{ width: `${(totalPerdidos / dec) * 100}%`, background: "#d33a3c" }} />
+                  <div className="h-full transition-all duration-700" style={{ width: `${(totalExpirados / dec) * 100}%`, background: "rgba(197,120,0,0.45)" }} />
+                </div>
+              )
+            })()}
             <div className="flex justify-between mt-2.5 text-[11px] text-[#8E8E93]">
               <span className="flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
@@ -279,7 +269,7 @@ function DashboardTab({ metrics, kanban }: {
               </span>
               <span className="flex items-center gap-1">
                 <XCircle className="w-3 h-3 text-red-500" />
-                {totalPerdidos} perdidos
+                {totalPerdidos} recusados · {totalExpirados} sem resposta
               </span>
             </div>
           </div>
@@ -304,7 +294,7 @@ function OrcLineChart({ kanban }: { kanban: KanbanCard[] }) {
 
   const meses = useMemo(() => {
     const map = new Map<string, number>()
-    kanban.filter(c => !c.isTerceirizado).forEach(c => {
+    kanban.filter(c => !isTerceirizado(c)).forEach(c => {
       if (!c.data) return
       // c.data pode ser "dd/mm/yyyy, HH:MM:SS" ou "dd/mm/yyyy"
       try {
@@ -363,7 +353,7 @@ function OrcLineChart({ kanban }: { kanban: KanbanCard[] }) {
   const gridVals = Array.from({ length: 4 }, (_, i) => Math.round((maxVal / 3) * i))
   const stepLabel = Math.ceil(totalMeses / 7)
   const mesAtual = currentIdx >= 0 ? meses[currentIdx][1] : 0
-  const mediaVal = kanban.filter(c => !c.isTerceirizado).length / totalMeses
+  const mediaVal = kanban.filter(c => !isTerceirizado(c)).length / totalMeses
 
   function fmtMes(ym: string) {
     const [y, m] = ym.split("-")

@@ -65,6 +65,8 @@ function unpackTerceirizado(card: KanbanCard): KanbanCard {
   const raw = card as KanbanCard & { observacoes_os?: string }
   const unpacked: KanbanCard = {
     ...card,
+    // Não existe coluna no banco — a flag só vivia em memória e se perdia ao recarregar
+    isTerceirizado: card.isTerceirizado || card.materialNome === "Terceirizado",
     cores: card.cores,
     acabamentos: card.acabamentos,
     observacoesOS: card.observacoesOS ?? raw.observacoes_os,
@@ -299,10 +301,8 @@ export default function Home() {
             if (propostaCardIds.has(c.id)) return false
             return !historicoNums.has(c.numero)
           })
-          if (orfaos.length > 0) {
-            setKanban(prev => prev.filter(c => !orfaos.some(o => o.id === c.id)))
-            orfaos.forEach(c => fetch(`/api/kanban/${c.id}`, { method: "DELETE" }).catch(() => {}))
-          }
+          // Só registra — apagar pedidos do banco automaticamente ao abrir a página é arriscado demais
+          if (orfaos.length > 0) console.warn("Cards sem histórico correspondente:", orfaos.map(o => o.numero))
         }
       })
       .catch(() => {})

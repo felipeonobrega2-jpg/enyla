@@ -5,7 +5,8 @@ import {
   Users, TrendingUp, DollarSign, Target, Star,
   CheckCircle2, XCircle, BarChart3, UserCheck, UserPlus,
 } from "lucide-react"
-import { KanbanCard, COLUNAS_KANBAN, COL_FECHADO, COL_PERDIDO, PropostaCustom, Cliente, LancamentoFinanceiro } from "../types"
+import { KanbanCard, COLUNAS_KANBAN, PropostaCustom, Cliente, LancamentoFinanceiro } from "../types"
+import { montarPedidos, resumoClientes, conversao, orcamentosDoPeriodo, nomeChave, SEM_PERIODO } from "../lib/negocio"
 import { brl, num } from "../utils"
 import { HistItem } from "./HistoricoView"
 import { COL_COLORS } from "./kanban-colors"
@@ -59,73 +60,64 @@ export function ClientesView({
     if (initialPerfil) setPerfilAberto(initialPerfil)
   }, [initialPerfil])
 
-  const precoIdeal = (item: HistItem) => {
-    const ideal = item.calculo.tabela.find(l => l.quantidade === item.calculo.sweetSpotIdealQtd) ?? item.calculo.tabela[0]
-    return item.form.comFaca ? (ideal?.precoComFaca ?? 0) : (ideal?.precoSemFaca ?? 0)
-  }
-  const precoPropostaIdeal = (p: PropostaCustom) => {
-    const ativas = p.linhas.filter(l => l.ativa && l.quantidade > 0)
-    const ideal = ativas.find(l => l.isIdeal) ?? ativas[ativas.length - 1]
-    return ideal ? ideal.unitario * ideal.quantidade : 0
-  }
+  const pedidos = useMemo(() => montarPedidos(kanban, lancamentos), [kanban, lancamentos])
 
   const { clientes, listaClientes, listaLeads } = useMemo(() => {
-    const porCliente: Record<string, { itens: HistItem[]; propostas: PropostaCustom[]; firstIdx: number }> = {}
-    historico.forEach((item, idx) => {
-      const nome = item.form.nomeCliente?.trim() || "Sem nome"
-      if (!porCliente[nome]) porCliente[nome] = { itens: [], propostas: [], firstIdx: idx }
-      porCliente[nome].itens.push(item)
+    // Contagens vêm da camada canônica (kanban); histórico/propostas só alimentam ações e o perfil
+    const itensPorNome = new Map<string, HistItem[]>()
+    historico.forEach(item => {
+      const k = nomeChave(item.form.nomeCliente) || "sem nome"
+      itensPorNome.set(k, [...(itensPorNome.get(k) ?? []), item])
     })
+    const propsPorNome = new Map<string, PropostaCustom[]>()
     propostasCustom.forEach(p => {
-      const nome = p.nomeCliente?.trim() || "Sem nome"
-      if (!porCliente[nome]) porCliente[nome] = { itens: [], propostas: [], firstIdx: historico.length }
-      porCliente[nome].propostas.push(p)
+      const k = nomeChave(p.nomeCliente) || "sem nome"
+      propsPorNome.set(k, [...(propsPorNome.get(k) ?? []), p])
     })
 
-    const all = Object.entries(porCliente).map(([nome, { itens, propostas, firstIdx }]) => {
-      const cardsCliente = kanban.filter(c =>
-        itens.some(i => i.numero && i.numero === c.numero) ||
-        propostas.some(p => p.cardId && p.cardId === c.id)
-      )
-      const cardsAtivos = cardsCliente.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO)
-      // lote-deduped: cada lote conta como 1 pedido, independente do número de cards
-      const loteIdsAtivos = new Set(cardsAtivos.filter(c => c.loteId).map(c => c.loteId!))
-      const fechados   = loteIdsAtivos.size + cardsAtivos.filter(c => !c.loteId).length
-      const perdidos   = cardsCliente.filter(c => c.coluna === COL_PERDIDO).length
-      const decididos  = fechados + perdidos
-      const valorFechado = cardsAtivos.reduce((s, c) => s + c.preco, 0)
-      // LTV = valor total dos pedidos fechados (preço contratado, mesma fonte do modal)
-      const ltv        = valorFechado
-      const totalValor = itens.reduce((s, i) => s + precoIdeal(i), 0) + propostas.reduce((s, p) => s + precoPropostaIdeal(p), 0)
-      const datas      = [...itens.map(i => i.data), ...propostas.map(p => p.data)].filter(Boolean)
-      const ultimaData = datas[0] ?? ""
-      return { nome, itens, propostas, firstIdx, fechados, perdidos, decididos, totalValor, valorFechado, ultimaData, ltv }
-    })
+    const all = resumoClientes(kanban, pedidos).map((r, firstIdx) => ({
+      nome: r.nome,
+      itens: itensPorNome.get(r.chave) ?? [],
+      propostas: propsPorNome.get(r.chave) ?? [],
+      firstIdx,
+      numOrcamentos: r.orcamentos.length,
+      numPedidos: r.pedidos.length,
+      fechados: r.conversao.ganhos,
+      perdidos: r.conversao.perdidos,
+      expirados: r.conversao.expirados,
+      decididos: r.conversao.decididos,
+      taxa: r.conversao.taxa,
+      totalValor: r.orcamentos.reduce((s, c) => s + c.preco, 0),
+      valorFechado: r.ltv,
+      ultimaData: r.ultimaData,
+      ltv: r.ltv,
+      ehCliente: r.ehCliente,
+    }))
 
     return {
       clientes: all,
-      listaClientes: all.filter(c => c.fechados > 0),
-      listaLeads: all.filter(c => c.fechados === 0),
+      listaClientes: all.filter(c => c.ehCliente),
+      listaLeads: all.filter(c => !c.ehCliente),
     }
-  }, [historico, propostasCustom, kanban, lancamentos])
+  }, [historico, propostasCustom, kanban, pedidos])
 
   const metrics = useMemo(() => {
     const totalLtv       = listaClientes.reduce((s, c) => s + c.ltv, 0)
     const ltvMedio       = listaClientes.length > 0 ? totalLtv / listaClientes.length : 0
-    const totalFechados  = listaClientes.reduce((s, c) => s + c.fechados, 0)
-    const totalPerdidos  = listaClientes.reduce((s, c) => s + c.perdidos, 0) +
-                           listaLeads.reduce((s, c) => s + c.perdidos, 0)
-    const decididos      = totalFechados + totalPerdidos
-    const taxaConv       = decididos > 0 ? (totalFechados / decididos) * 100 : 0
-    const ticketMedio    = totalFechados > 0 ? listaClientes.reduce((s, c) => s + c.valorFechado, 0) / totalFechados : 0
+    const conv           = conversao(orcamentosDoPeriodo(kanban, SEM_PERIODO))
+    const totalPedidos   = pedidos.length
+    const ticketMedio    = totalPedidos > 0 ? pedidos.reduce((s, p) => s + p.valor, 0) / totalPedidos : 0
     const topClientes    = [...listaClientes].sort((a, b) => b.ltv - a.ltv).slice(0, 5)
-    const totalOrcamentos = clientes.reduce((s, c) => s + c.itens.length + c.propostas.length, 0)
+    const totalOrcamentos = conv.total
     const leadParaCliente = clientes.length > 0 ? (listaClientes.length / clientes.length) * 100 : 0
     const concentracao = topClientes[0] && totalLtv > 0
       ? { topNome: topClientes[0].nome, pct: (topClientes[0].ltv / totalLtv) * 100 }
       : null
-    return { totalLtv, ltvMedio, totalFechados, totalPerdidos, taxaConv, ticketMedio, topClientes, totalOrcamentos, leadParaCliente, concentracao }
-  }, [clientes, listaClientes, listaLeads])
+    return {
+      totalLtv, ltvMedio, totalFechados: conv.ganhos, totalPerdidos: conv.perdidos, totalExpirados: conv.expirados,
+      totalPedidos, taxaConv: conv.taxa, ticketMedio, topClientes, totalOrcamentos, leadParaCliente, concentracao,
+    }
+  }, [clientes, listaClientes, kanban, pedidos])
 
   const sortList = (list: typeof clientes) =>
     [...list]
@@ -133,7 +125,7 @@ export function ClientesView({
       .sort((a, b) => {
         if (ordem === "ltv")        return b.ltv - a.ltv
         if (ordem === "valor")      return b.totalValor - a.totalValor
-        if (ordem === "orcamentos") return (b.itens.length + b.propostas.length) - (a.itens.length + a.propostas.length)
+        if (ordem === "orcamentos") return b.numOrcamentos - a.numOrcamentos
         if (ordem === "nome")       return a.nome.localeCompare(b.nome, "pt-BR")
         if (ordem === "recente")    return a.firstIdx - b.firstIdx
         return 0
@@ -259,19 +251,20 @@ export function ClientesView({
 
 type ClienteItem = {
   nome: string; itens: unknown[]; propostas: unknown[]
-  fechados: number; perdidos: number; decididos: number
+  numOrcamentos: number; numPedidos: number
+  fechados: number; perdidos: number; expirados: number; decididos: number; taxa: number
   totalValor: number; valorFechado: number; ultimaData: string; ltv: number
 }
 
 function DashboardTab({ metrics, listaClientes }: {
   metrics: {
-    totalLtv: number; ltvMedio: number; totalFechados: number; totalPerdidos: number
+    totalLtv: number; ltvMedio: number; totalFechados: number; totalPerdidos: number; totalExpirados: number; totalPedidos: number
     taxaConv: number; ticketMedio: number; topClientes: ClienteItem[]; totalOrcamentos: number; leadParaCliente: number
     concentracao: { topNome: string; pct: number } | null
   }
   listaClientes: ClienteItem[]
 }) {
-  const { totalLtv, ltvMedio, totalFechados, totalPerdidos, taxaConv, ticketMedio, topClientes, totalOrcamentos, leadParaCliente, concentracao } = metrics
+  const { totalLtv, ltvMedio, totalFechados, totalPerdidos, totalExpirados, totalPedidos, taxaConv, ticketMedio, topClientes, totalOrcamentos, leadParaCliente, concentracao } = metrics
   const convColor = "#8456e8"
   const convBg    = "rgba(132,86,232,0.08)"
 
@@ -286,7 +279,7 @@ function DashboardTab({ metrics, listaClientes }: {
           label="LTV médio" value={ltvMedio > 0 ? brl(ltvMedio) : "—"} sub="receita média por cliente"
           subColor="#f59e0b" highlight />
         <KpiCard icon={<DollarSign className="w-4 h-4" />} iconColor="#15803d" iconBg="rgba(22,163,74,0.08)"
-          label="LTV total" value={totalLtv > 0 ? brl(totalLtv) : "—"} sub="total recebido de clientes" subColor="#15803d" />
+          label="LTV total" value={totalLtv > 0 ? brl(totalLtv) : "—"} sub="valor contratado em pedidos" subColor="#15803d" />
         <KpiCard icon={<Target className="w-4 h-4" />} iconColor={convColor} iconBg={convBg}
           label="Taxa de conversão" value={`${num(taxaConv, 1)}%`}
           sub="fechados ÷ decididos" subColor={convColor} />
@@ -311,7 +304,7 @@ function DashboardTab({ metrics, listaClientes }: {
         <SectionLabel>Vendas</SectionLabel>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
           <KpiCard icon={<CheckCircle2 className="w-4 h-4" />} iconColor="#15803d" iconBg="rgba(22,163,74,0.08)"
-            label="Pedidos fechados" value={String(totalFechados)} sub="de clientes ativos" />
+            label="Pedidos fechados" value={String(totalPedidos)} sub={`de ${listaClientes.length} clientes`} />
           <KpiCard icon={<TrendingUp className="w-4 h-4" />} iconColor="#0ea5e9" iconBg="rgba(14,165,233,0.08)"
             label="Ticket médio" value={ticketMedio > 0 ? brl(ticketMedio) : "—"} sub="por pedido fechado" />
           <KpiCard icon={<BarChart3 className="w-4 h-4" />} iconColor="#7c3aed" iconBg="rgba(124,58,237,0.08)"
@@ -327,24 +320,30 @@ function DashboardTab({ metrics, listaClientes }: {
       </div>
 
       {/* Conversão visual */}
-      {(totalFechados + totalPerdidos) > 0 && (
+      {(totalFechados + totalPerdidos + totalExpirados) > 0 && (
         <div>
           <SectionLabel>Conversão</SectionLabel>
           <div className="mt-3 bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl p-5">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[12px] font-semibold text-[#5e5c68]">Fechados vs. Perdidos</span>
+              <span className="text-[12px] font-semibold text-[#5e5c68]">Orçamentos: fechados · recusados · sem resposta</span>
               <span className="text-[12px] font-bold" style={{ color: convColor }}>{num(taxaConv, 1)}% conversão</span>
             </div>
-            <div className="h-2.5 rounded-full bg-[rgba(185,28,28,0.12)] overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${taxaConv}%`, background: convColor }} />
-            </div>
+            {(() => {
+              const dec = totalFechados + totalPerdidos + totalExpirados
+              return (
+                <div className="h-2.5 rounded-full overflow-hidden flex gap-0.5">
+                  <div className="h-full transition-all duration-700" style={{ width: `${(totalFechados / dec) * 100}%`, background: convColor }} />
+                  <div className="h-full transition-all duration-700" style={{ width: `${(totalPerdidos / dec) * 100}%`, background: "#d33a3c" }} />
+                  <div className="h-full transition-all duration-700" style={{ width: `${(totalExpirados / dec) * 100}%`, background: "rgba(197,120,0,0.45)" }} />
+                </div>
+              )
+            })()}
             <div className="flex justify-between mt-2.5 text-[11px] text-[#8E8E93]">
               <span className="flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />{totalFechados} fechados
               </span>
               <span className="flex items-center gap-1">
-                <XCircle className="w-3 h-3 text-red-500" />{totalPerdidos} perdidos
+                <XCircle className="w-3 h-3 text-red-500" />{totalPerdidos} recusados · {totalExpirados} sem resposta
               </span>
             </div>
           </div>
@@ -419,10 +418,10 @@ function ListaTab({ lista, busca, isLeads, expandido, setExpandido, setPerfilAbe
         {lista.length} {isLeads ? "lead" : "cliente"}{lista.length !== 1 ? "s" : ""}
       </p>
 
-      {lista.map(({ nome, itens, propostas, fechados, perdidos, decididos, totalValor, valorFechado, ultimaData, ltv }) => {
-        const conversao  = decididos > 0 ? Math.round(fechados / decididos * 100) : null
+      {lista.map(({ nome, itens, propostas, numOrcamentos, numPedidos, fechados, perdidos, expirados, decididos, taxa, totalValor, valorFechado, ultimaData, ltv }) => {
+        const conversao  = decididos > 0 ? Math.round(taxa) : null
         const aberto     = expandido === nome
-        const totalItens = itens.length + propostas.length
+        const totalItens = numOrcamentos
         const cad        = cadastro.find(cl => cl.nome.trim().toLowerCase() === nome.toLowerCase())
 
         return (
@@ -433,11 +432,11 @@ function ListaTab({ lista, busca, isLeads, expandido, setExpandido, setPerfilAbe
             <div className="flex items-center gap-3 px-5 py-3.5">
               <button className="flex items-center gap-3 flex-1 min-w-0 text-left" onClick={() => setExpandido(aberto ? null : nome)}>
                 <div className="w-2 h-2 rounded-full shrink-0"
-                  style={{ background: fechados > 0 ? "#30D158" : "#f59e0b" }} />
+                  style={{ background: numPedidos > 0 ? "#30D158" : "#f59e0b" }} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[13px] font-semibold text-[#1C1C1E] leading-snug">{nome}</span>
-                    {fechados > 0
+                    {numPedidos > 0
                       ? <span className="text-[9px] font-bold px-1.5 py-[2px] rounded-md bg-emerald-50 text-emerald-700">CLIENTE</span>
                       : <span className="text-[9px] font-bold px-1.5 py-[2px] rounded-md bg-amber-50 text-amber-700">LEAD</span>
                     }
@@ -449,7 +448,7 @@ function ListaTab({ lista, busca, isLeads, expandido, setExpandido, setPerfilAbe
                     )}
                   </div>
                   <p className="text-[10px] text-[#8E8E93] mt-0.5">
-                    {totalItens} registro{totalItens !== 1 ? "s" : ""}
+                    {numPedidos > 0 ? `${numPedidos} pedido${numPedidos !== 1 ? "s" : ""}` : `${totalItens} orçamento${totalItens !== 1 ? "s" : ""}`}
                     {ultimaData ? ` · ${ultimaData}` : ""}
                   </p>
                 </div>
@@ -465,7 +464,11 @@ function ListaTab({ lista, busca, isLeads, expandido, setExpandido, setPerfilAbe
                   )}
                   {perdidos > 0 && (
                     <><span className="text-[#c7c7cc]">·</span>
-                    <span className="text-[#d33a3c]">{perdidos} perdido{perdidos !== 1 ? "s" : ""}</span></>
+                    <span className="text-[#d33a3c]">{perdidos} recusado{perdidos !== 1 ? "s" : ""}</span></>
+                  )}
+                  {expirados > 0 && (
+                    <><span className="text-[#c7c7cc]">·</span>
+                    <span className="text-[#c57800]">{expirados} sem resposta</span></>
                   )}
                 </div>
 

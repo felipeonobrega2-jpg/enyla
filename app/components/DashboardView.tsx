@@ -12,6 +12,9 @@ import {
 import { Configuracoes } from "../config"
 import { brl, num } from "../utils"
 import { dreGerencial } from "../lib/metrics"
+import {
+  montarPedidos, conversao, orcamentosDoPeriodo, vendasDoPeriodo, pipelineComercial, producao, nomeChave,
+} from "../lib/negocio"
 
 const MARCOS = [
   { threshold: 10_000,     label: "Primeiro Salto",    sub: "R$10 mil"     },
@@ -837,8 +840,8 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
   const confirmedByCloseDate = useMemo(() => {
     const { from, to } = periodBounds
     return kanban.filter(c => {
+      // Mesma base da receita canônica: inclui itens terceirizados vendidos ao cliente
       if (c.coluna === 0 || c.coluna === COL_PERDIDO || c.coluna === COL_HOT) return false
-      if (c.isTerceirizado) return false
       const d = parseDataBr(c.dataFechamento ?? c.data)
       if (from && d < from) return false
       if (to   && d > to)   return false
@@ -846,52 +849,27 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
     })
   }, [kanban, periodBounds])
 
-  // ── KPIs ────────────────────────────────────────────────────────────────────
+  // ── KPIs (definições canônicas em lib/negocio) ──────────────────────────────
+  const pedidos = useMemo(() => montarPedidos(kanban, lancamentos), [kanban, lancamentos])
+
   const kpis = useMemo(() => {
-    // Exclui sub-entradas de terceirização (mesma regra que OrcamentosView)
-    const basePeriod = filteredCards.filter(c => !c.isTerceirizado)
-    const total = basePeriod.length
-
-    // Sobras no período (lancamentos categoria="sobra" tipo="receita")
-    const { from, to } = periodBounds
-    const sobrasReceita = lancamentos
-      .filter(l => l.categoria === "sobra" && l.tipo === "receita")
-      .filter(l => {
-        const ref = l.dataPagamento || l.dataVencimento
-        if (!ref) return false
-        const d = new Date(ref + "T12:00:00")
-        if (from && d < from) return false
-        if (to   && d > to)   return false
-        return true
-      })
-      .reduce((s, l) => s + l.valor, 0)
-
-    // Revenue/closings by CLOSE date (cross-period, e.g. May quote closed in June)
-    const receita   = confirmedByCloseDate.reduce((s, c) => s + c.preco, 0) + sobrasReceita
-    const vendas    = countVendas(confirmedByCloseDate)
-    const entregues = confirmedByCloseDate.filter(c => c.coluna === COL_ENTREGUE).length
-    const ticket    = vendas > 0 ? receita / vendas : 0
-
-    // Conversão: ganhos ÷ (ganhos + perdidos) — mesma fórmula que OrcamentosView
-    const ganhos   = basePeriod.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO).length
-    const perdidos = basePeriod.filter(c => c.coluna === COL_PERDIDO).length
-    const resolvidosConv = ganhos + perdidos
-    const conversao = resolvidosConv > 0 ? (ganhos / resolvidosConv) * 100 : 0
-
-    // Unique clients in period
-    const clientesUnicos = new Set(basePeriod.map(c => c.nomeCliente)).size
-
-    // Pipeline: only unconfirmed quotes (col 0) — once confirmed it moves to production
-    const pipelineGlobal = kanban
-      .filter(c => c.coluna === 0)
-      .reduce((s, c) => s + c.preco, 0)
-
+    const conv   = conversao(orcamentosDoPeriodo(kanban, periodBounds))
+    const vendas = vendasDoPeriodo(pedidos, lancamentos, periodBounds)
+    const pipe   = pipelineComercial(kanban)
     return {
-      total, receita, vendas, entregues, ticket,
-      conversao, clientesUnicos,
-      pipelineGlobal,
+      total: conv.total,
+      conv,
+      receita: vendas.receita,
+      vendas: vendas.pedidos.length,
+      entregues: vendas.pedidos.filter(p => p.coluna === COL_ENTREGUE).length,
+      ticket: vendas.ticketMedio,
+      conversao: conv.taxa,
+      clientesUnicos: new Set(orcamentosDoPeriodo(kanban, periodBounds).map(c => nomeChave(c.nomeCliente))).size,
+      pipelineGlobal: pipe.valor,
+      pipelineCount: pipe.count,
+      pedidosVendidos: vendas.pedidos,
     }
-  }, [filteredCards, confirmedByCloseDate, kanban])
+  }, [kanban, lancamentos, pedidos, periodBounds])
 
   const hotKpi = useMemo(() => {
     const cards = kanban.filter(c => c.coluna === COL_HOT)
@@ -1087,39 +1065,25 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
     return { orcamentos, vendas: primeirasVendas }
   }, [filteredCards, confirmedByCloseDate, periodBounds, kanban])
 
-  // ── Funil ───────────────────────────────────────────────────────────────────
+  // ── Funil de produção — foto atual, por pedido (não por card) ────────────────
   const funil = useMemo(() => {
-    const map = new Map<number, { count: number; value: number }>()
-    filteredCards
-      .filter(c => c.coluna !== COL_PERDIDO && c.coluna !== COL_HOT)
-      .forEach(c => {
-        const cur = map.get(c.coluna) ?? { count: 0, value: 0 }
-        map.set(c.coluna, { count: cur.count + 1, value: cur.value + c.preco })
-      })
-    const arr = Array.from(map.entries())
-      .map(([col, v]) => ({ col, colNome: COLUNAS_KANBAN[col] ?? `Col ${col}`, count: v.count, value: v.value }))
-      .sort((a, b) => a.col - b.col)
-    const maxCount = Math.max(...arr.map(a => a.count), 1)
-    return { stages: arr, maxCount }
-  }, [filteredCards])
+    const stages = producao(pedidos).porEtapa.map(e => ({ col: e.coluna, colNome: e.etapa, count: e.count, value: e.valor }))
+    const maxCount = Math.max(...stages.map(a => a.count), 1)
+    return { stages, maxCount }
+  }, [pedidos])
 
-  // ── Top clientes ────────────────────────────────────────────────────────────
+  // ── Top clientes — pedidos fechados no período ──────────────────────────────
   const topClientes = useMemo(() => {
-    const map = new Map<string, { total: number; count: number }>()
-    filteredCards
-      .filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO && c.coluna !== COL_HOT)
-      .forEach(c => {
-        const k = c.nomeCliente || "Sem nome"
-        const cur = map.get(k) ?? { total: 0, count: 0 }
-        map.set(k, { total: cur.total + c.preco, count: cur.count + 1 })
-      })
-    const arr = Array.from(map.entries())
-      .map(([nome, v]) => ({ nome, total: v.total, count: v.count }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 6)
+    const map = new Map<string, { nome: string; total: number; count: number }>()
+    kpis.pedidosVendidos.forEach(p => {
+      const k = nomeChave(p.nomeCliente)
+      const cur = map.get(k) ?? { nome: p.nomeCliente || "Sem nome", total: 0, count: 0 }
+      map.set(k, { ...cur, total: cur.total + p.valor, count: cur.count + 1 })
+    })
+    const arr = [...map.values()].sort((a, b) => b.total - a.total).slice(0, 6)
     const maxTotal = Math.max(...arr.map(a => a.total), 1)
     return { clientes: arr, maxTotal }
-  }, [filteredCards])
+  }, [kpis.pedidosVendidos])
 
   // ── Materiais ───────────────────────────────────────────────────────────────
   const materiais = useMemo(() => {
@@ -1545,7 +1509,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
           iconBg="rgba(132,86,232,0.10)" iconColor="#8456e8"
           label="Pipeline"
           value={brl(kpis.pipelineGlobal)}
-          sub="aguardando confirmação"
+          sub={kpis.pipelineCount > 0 ? `${kpis.pipelineCount} orçamento${kpis.pipelineCount !== 1 ? "s" : ""} em aberto` : "nenhum orçamento em aberto"}
         />
       </div>
 
@@ -1582,7 +1546,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
           iconBg="rgba(0,147,81,0.10)" iconColor="#009351"
           label="Vendas"
           value={String(num(kpis.vendas))}
-          sub={`${kpis.entregues} entregues no período`}
+          sub={`pedidos fechados · ${kpis.entregues} já entregue${kpis.entregues !== 1 ? "s" : ""}`}
         />
       </div>
 
@@ -1593,7 +1557,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
           iconBg="rgba(14,165,233,0.10)" iconColor="#0ea5e9"
           label="Ticket médio"
           value={brl(kpis.ticket)}
-          sub="por venda"
+          sub="por pedido fechado"
         />
         <KpiCard
           icon={<BarChart2 className="w-4 h-4" />}
@@ -1607,8 +1571,8 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
           iconBg="rgba(132,86,232,0.10)"
           iconColor="#8456e8"
           label="Conversão"
-          value={`${num(kpis.conversao, 1)}%`}
-          sub="dos orçamentos do período"
+          value={kpis.conv.decididos > 0 ? `${num(kpis.conversao, 1)}%` : "—"}
+          sub={`${kpis.conv.ganhos} fechado${kpis.conv.ganhos !== 1 ? "s" : ""} · ${kpis.conv.perdidos} recusado${kpis.conv.perdidos !== 1 ? "s" : ""} · ${kpis.conv.expirados} sem resposta`}
         />
       </div>
 
@@ -1643,7 +1607,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
         <div className="col-span-2 rounded-[18px] p-[22px]" style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" }}>
           <p className="text-[15px] font-bold mb-[18px]" style={{ color: "var(--text-main)" }}>Funil de produção</p>
           {funil.stages.length === 0 ? (
-            <p className="text-[12px] text-center py-8" style={{ color: "var(--text-faint)" }}>Sem dados no período</p>
+            <p className="text-[12px] text-center py-8" style={{ color: "var(--text-faint)" }}>Nenhum pedido em produção</p>
           ) : (
             <div className="space-y-4">
               {funil.stages.map(s => (

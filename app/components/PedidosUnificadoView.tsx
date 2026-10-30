@@ -13,6 +13,7 @@ import {
 } from "../types"
 import { brl, num } from "../utils"
 import { custoFixoPeriodo, rateioPorPedido } from "../lib/metrics"
+import { montarPedidos, margemContribuicao, producao as resumoProducao, Pedido } from "../lib/negocio"
 import { KanbanView } from "./KanbanView"
 
 type Tab = "dashboard" | "lista" | "kanban"
@@ -148,18 +149,6 @@ export function PedidosUnificadoView(props: Props) {
   const histMap = useMemo(() => new Map(historico.map(h => [h.numero ?? "", h])), [historico])
 
   const allEntries = useMemo<OrderEntry[]>(() => {
-    const eligible = kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO && c.coluna !== COL_HOT)
-    const loteGroups = new Map<string, KanbanCard[]>()
-    const soloCards: KanbanCard[] = []
-    for (const card of eligible) {
-      if (card.loteId) {
-        if (!loteGroups.has(card.loteId)) loteGroups.set(card.loteId, [])
-        loteGroups.get(card.loteId)!.push(card)
-      } else {
-        soloCards.push(card)
-      }
-    }
-
     function buildSpecs(cards: KanbanCard[]) {
       const card = cards[0]; const hist = histMap.get(card.numero ?? ""); const form = hist?.form
       const parts: string[] = []
@@ -172,40 +161,19 @@ export function PedidosUnificadoView(props: Props) {
       return parts.join(" · ")
     }
 
-    function buildEntry(key: string, tipo: "lote"|"card", numero: string, cards: KanbanCard[], recs: LancamentoFinanceiro[], desps: LancamentoFinanceiro[]): OrderEntry {
-      const coluna   = cards.reduce((mx, c) => Math.max(mx, c.coluna), 0)
-      const pago     = recs.filter(l => l.status === "pago").reduce((s, l) => s + l.valor, 0)
-      const despPago = desps.filter(l => l.status === "pago" || l.formaPagamento === "conta").reduce((s, l) => s + l.valor, 0)
-      return {
-        key, tipo, numero, nomeCliente: cards[0].nomeCliente, cards, coluna,
-        dataPedido: cards.reduce((earliest, c) => {
-          const d = c.dataFechamento ?? ""; return (d && (!earliest || d < earliest)) ? d : earliest
-        }, cards.find(c => c.dataFechamento)?.dataFechamento ?? ""),
-        dataFechamento: cards.find(c => c.dataFechamento)?.dataFechamento,
-        dataEntregaPrevista: cards.find(c => c.dataEntregaPrevista)?.dataEntregaPrevista,
-        dataEntregaReal: cards.find(c => c.dataEntregaReal)?.dataEntregaReal,
-        prazoRecebimentoInterno: cards.find(c => c.prazoRecebimentoInterno)?.prazoRecebimentoInterno,
-        receitas: recs, despesas: desps,
-        precoTotal: cards.reduce((s, c) => s + c.preco, 0),
-        qtdTotal:   cards.reduce((s, c) => s + c.quantidade, 0),
-        totalPago: pago, totalDespesa: despPago,
-        specs: buildSpecs(cards),
-      }
-    }
-
-    const result: OrderEntry[] = []
-    for (const [loteId, cards] of loteGroups) {
-      const ids = new Set(cards.map(c => c.id))
-      const recs  = lancamentos.filter(l => l.tipo === "receita" && (l.loteId === loteId || (l.cardId && ids.has(l.cardId))))
-      const desps = lancamentos.filter(l => l.tipo === "despesa" && (l.loteId === loteId || (l.cardId && ids.has(l.cardId))))
-      result.push(buildEntry(`lote-${loteId}`, "lote", cards[0].loteNumero ?? "Lote", cards, recs, desps))
-    }
-    for (const card of soloCards) {
-      const recs  = lancamentos.filter(l => l.tipo === "receita" && l.cardId === card.id)
-      const desps = lancamentos.filter(l => l.tipo === "despesa" && l.cardId === card.id)
-      result.push(buildEntry(`card-${card.id}`, "card", card.numero ?? "—", [card], recs, desps))
-    }
-    return result
+    // Agrupamento, etapa e valores vêm da camada canônica (lib/negocio)
+    return montarPedidos(kanban, lancamentos).map(p => ({
+      key: p.key, tipo: p.tipo, numero: p.numero, nomeCliente: p.nomeCliente, cards: p.cards, coluna: p.coluna,
+      dataPedido: p.dataFechamento ?? "",
+      dataFechamento: p.dataFechamento,
+      dataEntregaPrevista: p.dataEntregaPrevista,
+      dataEntregaReal: p.dataEntregaReal,
+      prazoRecebimentoInterno: p.cards.find(c => c.prazoRecebimentoInterno)?.prazoRecebimentoInterno,
+      receitas: p.receitas, despesas: p.despesas,
+      precoTotal: p.valor, qtdTotal: p.quantidade,
+      totalPago: p.recebido, totalDespesa: p.custoDireto,
+      specs: buildSpecs(p.cards),
+    }))
   }, [kanban, lancamentos, histMap])
 
   const { custoFixoTotal, receitaTotal } = useMemo(() => ({
@@ -599,30 +567,23 @@ function DashboardTab({ entries, lancamentos, kanban }: {
   const hoje = new Date()
   const [modalMes, setModalMes] = useState<{ key: string; label: string; items: OrderEntry[] } | null>(null)
 
+  // Definições canônicas: pedido = lote (ou card avulso); etapa = item menos avançado
   const emAndamento    = entries.filter(e => e.coluna !== COL_ENTREGUE)
   const entregues      = entries.filter(e => e.coluna === COL_ENTREGUE)
-  const pipeline       = emAndamento.reduce((s, e) => s + e.precoTotal, 0)
-  const faturado       = entregues.reduce((s, e) => s + e.precoTotal, 0)
-  const totalRecebido  = lancamentos.filter(l => l.tipo === "receita" && l.status === "pago").reduce((s, l) => s + l.valor, 0)
-  const ticketMedio    = entries.length > 0 ? entries.reduce((s, e) => s + e.precoTotal, 0) / entries.length : 0
+  const emProducao     = emAndamento.reduce((s, e) => s + e.precoTotal, 0)
+  const valorEntregue  = entregues.reduce((s, e) => s + e.precoTotal, 0)
+  const contratado     = entries.reduce((s, e) => s + e.precoTotal, 0)
+  const totalRecebido  = entries.reduce((s, e) => s + e.totalPago, 0)
+  const aReceber       = Math.max(0, contratado - totalRecebido)
+  const ticketMedio    = entries.length > 0 ? contratado / entries.length : 0
 
-  const emAtraso = emAndamento.filter(e => {
-    if (!e.dataEntregaPrevista) return false
-    const d = new Date(e.dataEntregaPrevista + "T12:00:00")
-    return d < hoje
-  }).length
+  const prod = resumoProducao(entries.map(e => ({ ...e, valor: e.precoTotal } as unknown as Pedido)), hoje)
+  const emAtraso    = prod.atrasados.length
+  const vencendoEm3 = prod.vencendo3d.length
+  const semData     = prod.semPrazo.length
 
-  const vencendoEm3 = emAndamento.filter(e => {
-    if (!e.dataEntregaPrevista) return false
-    const d = new Date(e.dataEntregaPrevista + "T12:00:00")
-    const diff = Math.round((d.getTime() - hoje.getTime()) / 86_400_000)
-    return diff >= 0 && diff <= 3
-  }).length
-
-  const semData = emAndamento.filter(e => !e.dataEntregaPrevista).length
-
-  const margens = entries.filter(e => e.precoTotal > 0 && e.totalDespesa > 0).map(e => (e.precoTotal - e.totalDespesa) / e.precoTotal * 100)
-  const margemMedia = margens.length ? margens.reduce((s, m) => s + m, 0) / margens.length : null
+  const margem = margemContribuicao(entries.map(e => ({ valor: e.precoTotal, custoDireto: e.totalDespesa } as Pedido)))
+  const margemMedia = margem.pct
 
   const mesesSet = new Set<string>()
   entries.forEach(e => { if (e.dataFechamento) mesesSet.add(e.dataFechamento.slice(0, 7)) })
@@ -633,10 +594,9 @@ function DashboardTab({ entries, lancamentos, kanban }: {
   const pedidosPorCliente = clientesUnicos > 0 ? entries.length / clientesUnicos : 0
 
   // Distribuição por etapa
+  // Conta PEDIDOS por etapa (não cards) — mesma unidade do "Em andamento"
   const etapaCount: Record<number, number> = {}
-  kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO && c.coluna !== COL_HOT).forEach(c => {
-    etapaCount[c.coluna] = (etapaCount[c.coluna] ?? 0) + 1
-  })
+  entries.forEach(e => { etapaCount[e.coluna] = (etapaCount[e.coluna] ?? 0) + 1 })
   const etapas = Object.entries(etapaCount)
     .map(([col, cnt]) => ({ col: Number(col), cnt, ...STAGE[Number(col)] ?? { color: "#8E8E93", bg: "rgba(142,142,147,0.1)", label: COLUNAS_KANBAN[Number(col)] ?? "—" } }))
     .sort((a, b) => a.col - b.col)
@@ -716,13 +676,13 @@ function DashboardTab({ entries, lancamentos, kanban }: {
       {/* KPIs principais */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard icon={<Package className="w-4 h-4" />} iconColor="#7c3aed" iconBg="rgba(124,58,237,0.08)"
-          label="Em andamento" value={String(emAndamento.length)} sub="pedidos ativos" />
+          label="Em produção" value={String(emAndamento.length)} sub={emProducao > 0 ? `${brl(emProducao)} em pedidos` : "nenhum pedido ativo"} />
         <KpiCard icon={<CheckCircle2 className="w-4 h-4" />} iconColor="#15803d" iconBg="rgba(22,163,74,0.08)"
-          label="Entregues" value={String(entregues.length)} sub={faturado > 0 ? brl(faturado) : "pedidos concluídos"} subColor="#15803d" />
-        <KpiCard icon={<DollarSign className="w-4 h-4" />} iconColor="#0ea5e9" iconBg="rgba(14,165,233,0.08)"
-          label="Pipeline" value={brl(pipeline)} sub="em produção" />
+          label="Entregues" value={String(entregues.length)} sub={valorEntregue > 0 ? `${brl(valorEntregue)} entregue` : "pedidos concluídos"} subColor="#15803d" />
         <KpiCard icon={<TrendingUp className="w-4 h-4" />} iconColor="#15803d" iconBg="rgba(22,163,74,0.08)"
-          label="Faturado total" value={faturado > 0 ? brl(faturado) : "—"} sub={totalRecebido > 0 ? `${brl(totalRecebido)} recebido` : "pedidos entregues"} subColor="#15803d" highlight />
+          label="Total contratado" value={contratado > 0 ? brl(contratado) : "—"} sub={`${entries.length} pedidos desde o início`} highlight />
+        <KpiCard icon={<DollarSign className="w-4 h-4" />} iconColor="#0ea5e9" iconBg="rgba(14,165,233,0.08)"
+          label="Recebido" value={brl(totalRecebido)} sub={aReceber > 0 ? `faltam ${brl(aReceber)}` : "tudo recebido"} subColor={aReceber > 0 ? "#c57800" : "#15803d"} />
       </div>
 
       {/* Alertas de prazo */}
@@ -745,11 +705,9 @@ function DashboardTab({ entries, lancamentos, kanban }: {
           <KpiCard icon={<TrendingUp className="w-4 h-4" />} iconColor="#0ea5e9" iconBg="rgba(14,165,233,0.08)"
             label="Ticket médio" value={ticketMedio > 0 ? brl(ticketMedio) : "—"} sub="por pedido" />
           <KpiCard icon={<TrendingUp className="w-4 h-4" />} iconColor={convColor} iconBg={`${convColor}15`}
-            label="Margem média" value={margemMedia != null ? `${num(margemMedia, 1)}%` : "—"}
-            sub={margemMedia != null ? (margemMedia >= 40 ? "Boa" : margemMedia >= 20 ? "Razoável" : "Baixa") : "Sem custos lançados"}
+            label="Margem de contribuição" value={margemMedia != null ? `${num(margemMedia, 1)}%` : "—"}
+            sub={margemMedia != null ? `${margem.comCusto} de ${margem.total} pedidos com custo lançado` : "Sem custos lançados"}
             subColor={margemMedia != null ? convColor : undefined} />
-          <KpiCard icon={<CheckCircle2 className="w-4 h-4" />} iconColor="#15803d" iconBg="rgba(22,163,74,0.08)"
-            label="Total recebido" value={totalRecebido > 0 ? brl(totalRecebido) : "—"} sub="lançamentos pagos" subColor="#15803d" />
           <KpiCard icon={<BarChart3 className="w-4 h-4" />} iconColor="#7c3aed" iconBg="rgba(124,58,237,0.08)"
             label="Pedidos por mês" value={num(pedidosPorMes, 1)} sub="média histórica" />
           <KpiCard icon={<Users className="w-4 h-4" />} iconColor="#0ea5e9" iconBg="rgba(14,165,233,0.08)"
@@ -832,7 +790,7 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
           <div className="flex items-center gap-2 mb-3">
             <CheckCircle2 className="w-3.5 h-3.5 text-[#30D158]" />
             <p className="text-[11px] font-bold text-[#30D158]">
-              {kpiConcluidos.cnt} {kpiConcluidos.cnt === 1 ? "pedido concluído" : "pedidos concluídos"}
+              {kpiConcluidos.cnt} {kpiConcluidos.cnt === 1 ? "pedido marcado como concluído" : "pedidos marcados como concluídos"}
             </p>
           </div>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
