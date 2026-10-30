@@ -65,8 +65,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
   ]
 
   const multLabels: [keyof Configuracoes["multiplicadores"], string, string][] = [
-    ["semFaca",       "Multiplicador sem faca",  "×custo"],
-    ["comFaca",       "Multiplicador com faca",  "×custo"],
+    ["semFaca",       "Multiplicador de preço",  "×custo"],
     ["parcelamento12x","Fator parcelamento 12×", "×preço"],
   ]
 

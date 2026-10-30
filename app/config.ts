@@ -1,3 +1,5 @@
+import { ConfigProducao, PRODUCAO_PADRAO, normalizarProducao } from "./lib/producao"
+
 export type Custos = {
   impressaoPorChapa: number
   corteAcerto: number
@@ -72,6 +74,7 @@ export type Configuracoes = {
   contas: ContaBancaria[]
   gastosFixos: GastoFixo[]
   fornecedores: Fornecedor[]
+  producao: ConfigProducao
 }
 
 const CATS_RECEITA_PADRAO: CategoriaFinanceira[] = [
@@ -104,7 +107,7 @@ export const CONFIG_PADRAO: Configuracoes = {
   },
   multiplicadores: {
     semFaca: 2.0,
-    comFaca: 1.8,
+    comFaca: 2.0,
     parcelamento12x: 1.2,
   },
   materiais: [
@@ -121,6 +124,7 @@ export const CONFIG_PADRAO: Configuracoes = {
   contas: [],
   gastosFixos: [],
   fornecedores: [],
+  producao: PRODUCAO_PADRAO,
 }
 
 export const defaultConfig = CONFIG_PADRAO
@@ -142,6 +146,7 @@ export function carregarConfig(): Configuracoes {
       contas: saved.contas ?? [],
       gastosFixos: saved.gastosFixos ?? [],
       fornecedores: saved.fornecedores ?? [],
+      producao: normalizarProducao(saved.producao),
     }
   } catch {
     return CONFIG_PADRAO

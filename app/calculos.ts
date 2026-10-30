@@ -1,4 +1,5 @@
 import { FormData, Calculo, ResultadoFormato, LinhaTabela, FormatoPapel, LayoutChapa, TipoCaixa } from "./types"
+import { calcularRotas, normalizarProducao, Rota } from "./lib/producao"
 import { FORMATOS_PAPEL } from "./dados"
 import { Configuracoes } from "./config"
 
@@ -115,68 +116,67 @@ export function calcularLayoutChapa(
   }
 }
 
-function calcularLinha(
-  quantidade: number,
-  melhorFormato: ResultadoFormato,
-  form: FormData,
-  custoImpressaoFixo: number,
-  config: Configuracoes
-): LinhaTabela {
-  const { custos, multiplicadores } = config
-  const folhasReais = Math.ceil(quantidade / melhorFormato.pecasPorFolha)
-  const folhasComAcrescimo = Math.ceil(folhasReais * 1.1)
-  const folhasPacote = Math.ceil(folhasComAcrescimo / 100) * 100
-  const milheiroCorte = folhasPacote / 1000
-
-  const custoPapel = (folhasPacote / 100) * melhorFormato.precoPor100
-  const custoImpressao = custoImpressaoFixo
-  const custoCorte = custos.corteAcerto + milheiroCorte * custos.corteMilheiro
-  const custoVerniz = form.incluirVerniz
-    ? Math.max(1, Math.ceil(quantidade / 2000)) * custos.vernizPor2000
-    : 0
-  const custoColagem = (quantidade / 1000) * custos.colagemMilheiro
-  const custoArte = custos.arte
-  const custoFaca = form.comFaca ? form.valorFaca : 0
-
-  const custoTotalSemFaca = custoPapel + custoImpressao + custoCorte + custoVerniz + custoColagem + custoArte
-  const custoTotalComFaca = custoTotalSemFaca + custoFaca
-
-  const precoSemFaca = custoTotalSemFaca * multiplicadores.semFaca
-  const precoComFaca = form.comFaca
-    ? custoTotalComFaca * multiplicadores.comFaca
-    : precoSemFaca
-  const unitarioSemFaca = precoSemFaca / quantidade
-  const unitarioComFaca = precoComFaca / quantidade
-  const lucroSemFaca = precoSemFaca - custoTotalSemFaca
-  const lucroComFaca = precoComFaca - custoTotalComFaca
-  const margemSemFaca = (lucroSemFaca / precoSemFaca) * 100
-  const margemComFaca = (lucroComFaca / precoComFaca) * 100
-
+// Converte a rota mais barata de uma quantidade na linha da tabela de orçamento
+function linhaDaRota(rota: Rota, multiplicador: number, parcelamento12x: number): LinhaTabela {
+  const v = (etapa: string) => rota.itens.filter(i => i.etapa === etapa).reduce((s, i) => s + i.valor, 0)
+  const qtd = rota.quantidade
+  const custoTotalComFaca = rota.custoTotal
+  const custoTotalSemFaca = rota.custoTotal - v("faca")
+  const precoComFaca = custoTotalComFaca * multiplicador
+  const precoSemFaca = custoTotalSemFaca * multiplicador
   return {
-    quantidade,
-    folhasReais,
-    folhasComAcrescimo,
-    folhasPacote,
-    milheiroCorte,
-    custoPapel,
-    custoImpressao,
-    custoCorte,
-    custoVerniz,
-    custoColagem,
-    custoArte,
+    quantidade: qtd,
+    folhasReais: Math.ceil(qtd / rota.pecasPorPeca) * rota.passadas.reduce((s, p) => s + p.porPeca, 0),
+    folhasComAcrescimo: rota.folhasImpressas,
+    folhasPacote: rota.folhasPapel,
+    milheiroCorte: rota.batidas / 1000,
+    custoPapel: v("papel"),
+    custoImpressao: v("impressao"),
+    custoCorte: v("corteVinco"),
+    custoVerniz: v("verniz") + v("laminacao"),
+    custoColagem: v("colagem"),
+    custoArte: v("arte"),
     custoTotalSemFaca,
     custoTotalComFaca,
     precoSemFaca,
     precoComFaca,
-    unitarioSemFaca,
-    unitarioComFaca,
-    lucroSemFaca,
-    lucroComFaca,
-    margemSemFaca,
-    margemComFaca,
-    parcela12xSemFaca: (precoSemFaca * multiplicadores.parcelamento12x) / 12,
-    parcela12xComFaca: (precoComFaca * multiplicadores.parcelamento12x) / 12,
+    unitarioSemFaca: precoSemFaca / qtd,
+    unitarioComFaca: precoComFaca / qtd,
+    lucroSemFaca: precoSemFaca - custoTotalSemFaca,
+    lucroComFaca: precoComFaca - custoTotalComFaca,
+    margemSemFaca: precoSemFaca > 0 ? (precoSemFaca - custoTotalSemFaca) / precoSemFaca * 100 : 0,
+    margemComFaca: precoComFaca > 0 ? (precoComFaca - custoTotalComFaca) / precoComFaca * 100 : 0,
+    parcela12xSemFaca: (precoSemFaca * parcelamento12x) / 12,
+    parcela12xComFaca: (precoComFaca * parcelamento12x) / 12,
+    precoPor100Papel: rota.folhasPapel > 0 ? v("papel") / rota.folhasPapel * 100 : 0,
+    custoLaminacao: v("laminacao"),
+    custoHotStamping: v("hotStamping") + v("cliche") + v("fotolito"),
+    custoFrete: v("frete"),
+    custoFerramental: rota.custoFerramental,
+    imposto: rota.imposto,
+    lucroLiquido: rota.lucroLiquido,
+    margemLiquida: rota.margemLiquidaPct,
+    estimado: rota.estimado,
+    rotaId: rota.id,
+    rotaResumo: `${rota.impressorNome} · ${rota.divisaoNome} ${rota.formatoNome} · ${rota.passadas.map(p => p.cavidades).join(" + ")} cav.`,
   }
+}
+
+// Guarda só a melhor rota de cada combinação impressor × papel × divisão (com a faca mais barata)
+function alternativasCompactas(todas: Rota[], melhor: Rota): Rota[] {
+  const vistos = new Set<string>([`${melhor.impressorId}|${melhor.formatoId}|${melhor.divisao}`])
+  const out: Rota[] = [melhor]
+  for (const r of todas) {
+    const k = `${r.impressorId}|${r.formatoId}|${r.divisao}`
+    if (vistos.has(k)) continue
+    vistos.add(k)
+    out.push(r)
+  }
+  // Mantém também as opções de faca da combinação em uso, para comparar
+  for (const r of todas) {
+    if (r.id !== melhor.id && r.impressorId === melhor.impressorId && r.formatoId === melhor.formatoId && r.divisao === melhor.divisao) out.push(r)
+  }
+  return out.slice(0, 14)
 }
 
 export function calcular(form: FormData, config: Configuracoes): Calculo | null {
@@ -196,7 +196,7 @@ export function calcular(form: FormData, config: Configuracoes): Calculo | null 
     ? { ...dielineCalc, largura: form.blankOverride.largura, altura: form.blankOverride.altura }
     : dielineCalc
 
-  // Override precoPor100 from selected material (or fall back to format default)
+  // Preço do papel por material (ou o padrão do formato)
   const material = config.materiais.find(m => m.id === form.materialId)
   const formatosComConfig = FORMATOS_PAPEL.map(fmt => {
     const precoPorMaterial = material?.precos?.[fmt.id]
@@ -204,42 +204,57 @@ export function calcular(form: FormData, config: Configuracoes): Calculo | null 
   })
 
   const todosFormatos: ResultadoFormato[] = []
-  for (const fmt of formatosComConfig) {
-    todosFormatos.push(...testarFolhaInteira(dieline, fmt))
+  for (const fmt of formatosComConfig) todosFormatos.push(...testarFolhaInteira(dieline, fmt))
+
+  const producao = normalizarProducao(config.producao)
+  const multiplicador = config.multiplicadores.semFaca || 2
+  const quantidades = [...form.quantidades].filter(q => q > 0).sort((a, b) => a - b)
+
+  const rotas = calcularRotas({
+    blank: { largura: dieline.largura, altura: dieline.altura },
+    quantidades,
+    numArtes: Math.max(1, form.numArtes),
+    tipoCaixa: form.tipoCaixa,
+    cliente: form.nomeCliente,
+    comFaca: form.comFaca,
+    valorFaca: form.comFaca ? form.valorFaca : 0,
+    laminacaoTipo: form.laminacao ? (form.laminacaoTipo || "Fosca") : null,
+    vernizTipo: form.incluirVerniz ? (form.vernizTipo || "UV Total") : null,
+    hotStamping: (form.outrosAcabamentos ?? []).includes("Hot Stamping"),
+    limitePecasMeiaFolha: form.customPecasChapa,
+    formatos: formatosComConfig.map(f => ({ id: f.id, nome: f.nome, largura: f.largura, altura: f.altura, precoPor100: f.precoPor100 })),
+    arte: config.custos.arte,
+    multiplicador,
+    vernizPor2000Legado: config.custos.vernizPor2000,
+    opcoes: form.rota ?? {},
+    producao,
+  })
+  if (!rotas.porQuantidade.length) return null
+
+  const tabela = rotas.porQuantidade.map(q => linhaDaRota(q.melhor, multiplicador, config.multiplicadores.parcelamento12x))
+
+  // Rota de referência (maior quantidade) para os indicadores de layout
+  const ref = rotas.porQuantidade[rotas.porQuantidade.length - 1].melhor
+  const formatoRef = formatosComConfig.find(f => f.id === ref.formatoId) ?? formatosComConfig[0]
+  const melhorFormato: ResultadoFormato = {
+    formatoId: formatoRef.id,
+    formatoNome: formatoRef.nome,
+    larguraMM: formatoRef.largura,
+    alturaMM: formatoRef.altura,
+    precoPor100: formatoRef.precoPor100,
+    orientacao: "normal",
+    colunas: 0,
+    linhas: 0,
+    pecasPorFolha: ref.pecasPorFolhaPapel,
+    aproveitamentoPct: ref.pecasPorFolhaPapel * dieline.largura * dieline.altura / (formatoRef.largura * formatoRef.altura) * 100,
   }
+  const layoutChapa = calcularLayoutChapa(dieline, formatoRef)
+  const numChapas = ref.passadas.length * ref.jogos
+  const custoImpressaoFixo = ref.itens.filter(i => i.etapa === "impressao").reduce((s, i) => s + i.valor, 0)
 
-  if (todosFormatos.length === 0) return null
-
-  const melhorFormato = todosFormatos.reduce((best, curr) =>
-    curr.pecasPorFolha > best.pecasPorFolha ? curr : best
-  )
-
-  if (melhorFormato.pecasPorFolha === 0) return null
-
-  const formatoPapel = formatosComConfig.find((f) => f.id === melhorFormato.formatoId)!
-
-  const layoutChapa = calcularLayoutChapa(dieline, formatoPapel)
-
-  if (layoutChapa.pecasPorChapa === 0) return null
-
-  const numChapas = Math.max(1, Math.ceil(form.numArtes / layoutChapa.pecasPorChapa))
-  const custoImpressaoFixo = numChapas * config.custos.impressaoPorChapa
-
-  const validCustomPecas = form.customPecasChapa && form.customPecasChapa > 0 && form.customPecasChapa <= layoutChapa.pecasPorChapa
-    ? form.customPecasChapa
-    : null
-  const formatoEfetivo = validCustomPecas !== null
-    ? { ...melhorFormato, pecasPorFolha: validCustomPecas * 2 }
-    : melhorFormato
-
-  const quantidades = [...form.quantidades].sort((a, b) => a - b)
-  const tabela = quantidades.map((q) => calcularLinha(q, formatoEfetivo, form, custoImpressaoFixo, config))
-
-  // Usa as colunas que valem para este orçamento (com ou sem faca)
-  const margemDe   = (l: LinhaTabela) => form.comFaca ? l.margemComFaca : l.margemSemFaca
+  // Mínimo: menor tiragem; ideal: primeira tiragem em que subir de faixa melhora menos de 15% no unitário
   const unitarioDe = (l: LinhaTabela) => form.comFaca ? l.unitarioComFaca : l.unitarioSemFaca
-  const sweetMin = tabela.find((l) => margemDe(l) >= 40) ?? tabela[0]
-  // Elbow: primeira quantidade onde passar para o próximo tier melhora menos de 15% no preço unitário
+  const sweetMin = tabela[0]
   const sweetIdeal = (() => {
     for (let i = 0; i < tabela.length - 1; i++) {
       const curr = unitarioDe(tabela[i])
@@ -261,5 +276,13 @@ export function calcular(form: FormData, config: Configuracoes): Calculo | null 
     tabela,
     sweetSpotMinimoQtd: sweetMin?.quantidade ?? 0,
     sweetSpotIdealQtd: sweetIdeal?.quantidade ?? 0,
+    rotas: rotas.porQuantidade.map(q => ({ quantidade: q.quantidade, melhor: q.melhor, alternativas: alternativasCompactas(q.alternativas, q.melhor).sort((a, b) => a.custoTotal - b.custoTotal) })),
+    alertas: rotas.alertas,
+    facaRegistrada: rotas.facaRegistrada,
   }
+}
+
+// Para salvar no histórico: só a rota usada em cada tiragem (as alternativas são recalculáveis)
+export function compactarCalculo(c: Calculo): Calculo {
+  return { ...c, rotas: c.rotas?.map(q => ({ quantidade: q.quantidade, melhor: q.melhor, alternativas: [] })) }
 }

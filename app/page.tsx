@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
-import { Ruler } from "lucide-react"
+import { Ruler, Factory } from "lucide-react"
 import { signOut } from "next-auth/react"
 import WhatsAppView from "./components/WhatsAppView"
 import Image from "next/image"
@@ -32,9 +32,12 @@ function autoSetPrazos(card: KanbanCard, novaColuna: number): PrazoEtapas | null
 }
 import DashboardView from "./components/DashboardView"
 import { QUANTIDADES_PADRAO } from "./dados"
-import { calcular } from "./calculos"
+import { calcular, compactarCalculo } from "./calculos"
 import { Configuracoes, CONFIG_PADRAO } from "./config"
 import LayoutChapaVisual from "./LayoutChapaVisual"
+import { RotasProducao } from "./components/RotasProducao"
+import { FornecedoresView } from "./components/FornecedoresView"
+import { normalizarProducao } from "./lib/producao"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
 import FormaView from "./FormaView"
 import FormaBubble from "./components/FormaBubble"
@@ -164,7 +167,7 @@ export default function Home() {
   const [editandoHistorico, setEditandoHistorico] = useState<string | null>(null)
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
   const [contador, setContador] = useState<number>(0)
-  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp">("dashboard")
+  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores">("dashboard")
   const [perfilClienteExterno, setPerfilClienteExterno] = useState<string | null>(null)
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
   const [modalSalvar, setModalSalvar] = useState<{ form: FormData; calculo: Calculo; numero: string; data: string; cardId: string } | null>(null)
@@ -224,13 +227,10 @@ export default function Home() {
     setCustomPacotesMap(prev => ({ ...prev, [qtd]: numPacotes }))
     const r = result
     if (!r) return
-    const folhasPacote   = numPacotes * 100
-    const precoPor100    = r.melhorFormato.precoPor100
-    const newCustoPapel  = (folhasPacote / 100) * precoPor100
-    const milheiroCorte  = folhasPacote / 1000
-    const newCustoCorte  = config.custos.corteAcerto + milheiroCorte * config.custos.corteMilheiro
-    handleCustoEdit(qtd, "custoPapel", newCustoPapel)
-    handleCustoEdit(qtd, "custoCorte",  newCustoCorte)
+    // Batidas de corte não dependem do papel comprado; só o papel muda
+    const linha          = r.tabela.find(l => l.quantidade === qtd)
+    const precoPor100    = linha?.precoPor100Papel ?? r.melhorFormato.precoPor100
+    handleCustoEdit(qtd, "custoPapel", numPacotes * precoPor100)
   }
 
   function handleAcabamentoCustoEdit(nome: string, qtd: number, val: number | null) {
@@ -266,7 +266,7 @@ export default function Home() {
   // Persist main view across F5 — read on mount, write in navigate()
   useEffect(() => {
     const saved = sessionStorage.getItem("app:view")
-    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp"]
+    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores"]
     if (saved && valid.includes(saved)) setView(saved as typeof view)
   }, [])
 
@@ -438,6 +438,39 @@ export default function Home() {
       return next
     })
   }, [config])
+
+  // Atualiza o formulário e recalcula na mesma passada
+  const mudarForm = useCallback((fn: (p: FormData) => FormData) => {
+    setForm(prev => {
+      const next = fn(prev)
+      setResult(calcular(next, config))
+      return next
+    })
+  }, [config])
+
+  function salvarConfigTudo(cfg: Configuracoes) {
+    setConfig(cfg)
+    setResult(calcular(form, cfg))
+    fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg) }).catch(() => {})
+  }
+
+  function registrarFaca(rota: import("./lib/producao").Rota) {
+    if (!result) return
+    const prod = normalizarProducao(config.producao)
+    const faca: import("./lib/producao").Ferramental = {
+      id: Date.now().toString(),
+      tipo: "faca",
+      cliente: form.nomeCliente.trim(),
+      produto: `${form.frente}×${form.alturaBox}×${form.lateral}`,
+      blankLargura: result.dieline.largura,
+      blankAltura: result.dieline.altura,
+      cavidades: rota.facaCavidades,
+      custo: rota.itens.find(i => i.etapa === "faca")?.valor ?? form.valorFaca,
+      data: new Date().toISOString().slice(0, 10),
+    }
+    salvarConfigTudo({ ...config, producao: { ...prod, ferramentais: [...prod.ferramentais, faca] } })
+    showToast(`Faca de ${faca.cavidades} registrada para ${faca.cliente}`)
+  }
 
   function showToast(msg: string) {
     setToast(msg)
@@ -739,7 +772,7 @@ export default function Home() {
     const novoContador = contador + 1
     const numero = `ORC-${ano}-${String(novoContador).padStart(3, "0")}`
     setContador(novoContador)
-    const historicoItem = { form: { ...form }, calculo: result, data, numero }
+    const historicoItem = { form: { ...form }, calculo: compactarCalculo(result), data, numero }
     setHistorico(prev => [historicoItem, ...prev])
     fetch("/api/historico", {
       method: "POST",
@@ -756,12 +789,14 @@ export default function Home() {
       const verniz  = cc.custoVerniz    ?? l.custoVerniz
       const colagem = cc.custoColagem   ?? l.custoColagem
       const arte    = cc.custoArte      ?? l.custoArte
-      const total   = papel + impr + corte + (form.incluirVerniz ? verniz : 0) + colagem + arte
+      const temAcab = form.incluirVerniz || form.laminacao
+      const extras  = (l.custoFrete ?? 0) + (l.custoHotStamping ?? 0) + (form.comFaca ? (l.custoTotalComFaca - l.custoTotalSemFaca) : 0)
+      const total   = papel + impr + corte + (temAcab ? verniz : 0) + colagem + arte + extras
       const preco   = form.comFaca ? l.precoComFaca : l.precoSemFaca
       return {
         quantidade: l.quantidade,
         papel, impressao: impr, corte,
-        verniz: form.incluirVerniz ? verniz : 0,
+        verniz: temAcab ? verniz : 0,
         colagem, arte, total, preco,
         margem: preco > 0 ? (preco - total) / preco * 100 : 0,
       }
@@ -775,7 +810,7 @@ export default function Home() {
       verniz:    idealSnap.verniz   > 0 ? idealSnap.verniz   : undefined,
       colagem:   idealSnap.colagem  > 0 ? idealSnap.colagem  : undefined,
       arte:      idealSnap.arte     > 0 ? idealSnap.arte     : undefined,
-      faca:      form.comFaca && form.valorFaca > 0 ? form.valorFaca : undefined,
+      faca:      form.comFaca && ideal.custoTotalComFaca - ideal.custoTotalSemFaca > 0 ? ideal.custoTotalComFaca - ideal.custoTotalSemFaca : undefined,
     } : undefined
 
     const card: KanbanCard = {
@@ -862,7 +897,7 @@ export default function Home() {
     const numero = editandoHistorico
     const original = historico.find(h => h.numero === numero)
     const data = original?.data ?? new Date().toLocaleString("pt-BR")
-    const historicoItem = { form: { ...form }, calculo: result, data, numero }
+    const historicoItem = { form: { ...form }, calculo: compactarCalculo(result), data, numero }
     setHistorico(prev => prev.map(h => h.numero === numero ? historicoItem : h))
     fetch("/api/historico", {
       method: "POST",
@@ -1251,6 +1286,9 @@ export default function Home() {
           <NavItem active={view === "parceiros"} onClick={() => navigate("parceiros")} label="Parceiros"
             icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z" /></svg>}
           />
+          <NavItem active={view === "fornecedores"} onClick={() => navigate("fornecedores")} label="Fornecedores"
+            icon={<Factory className="w-4 h-4" strokeWidth={1.8} />}
+          />
           <NavItem active={view === "terceirizados"} onClick={() => navigate("terceirizados")} label="Terceirizados"
             icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" /></svg>}
           />
@@ -1596,7 +1634,7 @@ export default function Home() {
               <label className="flex items-center gap-2 cursor-pointer select-none shrink-0"
                 onClick={() => {
                   const on = !form.incluirVerniz
-                  setForm(p => ({ ...p, incluirVerniz: on, vernizTipo: on ? (p.vernizTipo || "UV Total") : "" }))
+                  mudarForm(p => ({ ...p, incluirVerniz: on, vernizTipo: on ? (p.vernizTipo || "UV Total") : "" }))
                 }}>
                 <div className={`w-7 h-4 rounded-full transition-colors relative flex-shrink-0 ${form.incluirVerniz ? "bg-[#8456e8]" : "bg-slate-200"}`}>
                   <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${form.incluirVerniz ? "translate-x-3" : "translate-x-0.5"}`} />
@@ -1606,7 +1644,7 @@ export default function Home() {
               {form.incluirVerniz ? (
                 <div className="flex gap-1 flex-wrap">
                   {TIPOS_VERNIZ.map(t => (
-                    <button key={t} type="button" onClick={() => setForm(p => ({ ...p, vernizTipo: t }))}
+                    <button key={t} type="button" onClick={() => mudarForm(p => ({ ...p, vernizTipo: t }))}
                       className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border transition-all ${
                         form.vernizTipo === t ? "bg-[#8456e8] text-white border-[#8456e8]" : "border-[rgba(60,60,67,0.14)] text-[#8E8E93] hover:border-[#8456e8] hover:text-[#8456e8]"
                       }`}>{t}</button>
@@ -1622,7 +1660,7 @@ export default function Home() {
               <label className="flex items-center gap-2 cursor-pointer select-none shrink-0"
                 onClick={() => {
                   const on = !form.laminacao
-                  setForm(p => ({ ...p, laminacao: on, laminacaoTipo: on ? (p.laminacaoTipo || "Fosca") : "" }))
+                  mudarForm(p => ({ ...p, laminacao: on, laminacaoTipo: on ? (p.laminacaoTipo || "Fosca") : "" }))
                 }}>
                 <div className={`w-7 h-4 rounded-full transition-colors relative flex-shrink-0 ${form.laminacao ? "bg-[#8456e8]" : "bg-slate-200"}`}>
                   <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${form.laminacao ? "translate-x-3" : "translate-x-0.5"}`} />
@@ -1632,7 +1670,7 @@ export default function Home() {
               {form.laminacao && (
                 <div className="flex gap-1 flex-wrap">
                   {TIPOS_LAMINACAO.map(t => (
-                    <button key={t} type="button" onClick={() => setForm(p => ({ ...p, laminacaoTipo: t }))}
+                    <button key={t} type="button" onClick={() => mudarForm(p => ({ ...p, laminacaoTipo: t }))}
                       className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border transition-all ${
                         form.laminacaoTipo === t ? "bg-[#8456e8] text-white border-[#8456e8]" : "border-[rgba(60,60,67,0.14)] text-[#8E8E93] hover:border-[#8456e8] hover:text-[#8456e8]"
                       }`}>{t}</button>
@@ -1651,7 +1689,7 @@ export default function Home() {
                   <button key={a} type="button"
                     onClick={() => {
                       const field = isAcomp ? "acompanhamentos" : "outrosAcabamentos"
-                      setForm(p => ({ ...p, [field]: on ? p[field].filter((x: string) => x !== a) : [...p[field], a] }))
+                      mudarForm(p => ({ ...p, [field]: on ? p[field].filter((x: string) => x !== a) : [...p[field], a] }))
                     }}
                     className={`px-3 py-1 rounded-full text-[11.5px] font-medium border transition-all ${
                       on ? "bg-[#0b0914] text-white border-[#0b0914]" : "border-[rgba(60,60,67,0.14)] text-[#72707d] hover:border-slate-400 hover:text-slate-700"
@@ -2187,6 +2225,8 @@ export default function Home() {
                 fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) }).catch(() => {})
               }}
             />
+          ) : view === "fornecedores" ? (
+            <FornecedoresView config={config} kanban={kanban} lancamentos={lancamentos} onSave={salvarConfigTudo} />
           ) : view === "terceirizados" ? (
             <TerceirizadosView
               kanban={kanban}
@@ -2312,42 +2352,18 @@ export default function Home() {
                 </div>
               </Section>
 
-              {/* ── Comparação formatos ── */}
-              <Section title="Comparação de formatos — 4 testes">
-                <div className="rounded-xl overflow-hidden border border-[rgba(60,60,67,0.08)]">
-                  <table className="w-full text-xs">
-                    <thead className="bg-[rgba(116,116,128,0.04)]">
-                      <tr>
-                        {["Formato","Orient.","Col.","Lin.","Peças/folha","Aproveito.","R$/100 fls"].map(h => (
-                          <th key={h} className="px-3 py-2 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-[rgba(0,0,0,0.04)]">
-                      {r.formatos.map((f, i) => {
-                        const best = f.formatoId === r.melhorFormato.formatoId && f.orientacao === r.melhorFormato.orientacao
-                        return (
-                          <tr key={i} className={best ? "bg-[#009351]/[0.05]" : "hover:bg-[rgba(116,116,128,0.04)]"}>
-                            <td className="px-3 py-2 font-medium text-[#5e5c68]">
-                              {f.formatoNome}
-                              {best && <span className="ml-2 text-[10px] bg-[#009351]/[0.1] text-[#009351] px-1.5 py-0.5 rounded-full font-semibold">✓ selecionado</span>}
-                            </td>
-                            <td className="px-3 py-2 text-[#8E8E93] capitalize">{f.orientacao}</td>
-                            <td className="px-3 py-2 text-[#72707d]">{f.colunas}</td>
-                            <td className="px-3 py-2 text-[#72707d]">{f.linhas}</td>
-                            <td className={`px-3 py-2 font-bold ${best ? "text-[#009351]" : "text-[#5e5c68]"}`}>{f.pecasPorFolha}</td>
-                            <td className="px-3 py-2 text-[#8E8E93]">{num(f.aproveitamentoPct, 1)}%</td>
-                            <td className="px-3 py-2 text-[#8E8E93]">{brl(f.precoPor100)}</td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </Section>
+              {/* ── Rotas de produção ── */}
+              <RotasProducao
+                calculo={r}
+                form={form}
+                producao={normalizarProducao(config.producao)}
+                comFaca={form.comFaca}
+                onOpcoes={o => mudarForm(p => ({ ...p, rota: o }))}
+                onRegistrarFaca={registrarFaca}
+              />
 
               {/* ── Layout da chapa ── */}
-              <Section title={`Layout da chapa — ${(r.layoutChapa.larguraChapa/10).toFixed(0)}×${(r.layoutChapa.alturaChapa/10).toFixed(0)} cm`}>
+              <Section title={`Layout na meia folha — ${(r.layoutChapa.larguraChapa/10).toFixed(0)}×${(r.layoutChapa.alturaChapa/10).toFixed(0)} cm`}>
                 <div className="bg-white rounded-xl border border-[rgba(60,60,67,0.08)] p-4">
                   <LayoutChapaVisual
                     key={`${r.dieline.largura}-${r.dieline.altura}`}
@@ -2383,7 +2399,9 @@ export default function Home() {
                             ...(form.acompanhamentos ?? []),
                           ]
                           const nAcab = acabamentos.length
-                          const custosColSpan = (form.incluirVerniz ? 6 : 5) + nAcab
+                          const temAcab = form.incluirVerniz || form.laminacao
+                          const temFrete = r.tabela.some(l => (l.custoFrete ?? 0) > 0)
+                          const custosColSpan = (temAcab ? 6 : 5) + (temFrete ? 1 : 0) + nAcab
                           return (
                       <table className="w-full text-xs whitespace-nowrap">
                         <thead>
@@ -2397,8 +2415,8 @@ export default function Home() {
                             <th className="sticky left-0 bg-[rgba(116,116,128,0.04)] px-4 py-2.5 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold border-r border-[rgba(60,60,67,0.08)]" />
                             <TH>Folhas</TH><TH>+10%</TH><TH br>Pacote</TH>
                             <TH>Papel</TH><TH>Impressão</TH><TH>Corte</TH>
-                            {form.incluirVerniz && <TH>Verniz</TH>}
-                            <TH>Colagem</TH><TH>Arte</TH>
+                            {temAcab && <TH>Lamin./verniz</TH>}
+                            <TH>Colagem</TH>{temFrete && <TH>Frete</TH>}<TH>Arte</TH>
                             {acabamentos.map((a, i) => (
                               <TH key={a} br={i === nAcab - 1}>{a}</TH>
                             ))}
@@ -2407,8 +2425,8 @@ export default function Home() {
                             {form.comFaca && <><TH blue>Custo c/faca</TH><TH blue>Preço c/faca</TH></>}
                             <TH>Unit. s/f</TH>
                             {form.comFaca && <TH>Unit. c/f</TH>}
-                            <TH>Margem s/f</TH>
-                            {form.comFaca && <TH>Margem c/f</TH>}
+                            <TH>Margem líq. s/f</TH>
+                            {form.comFaca && <TH>Margem líq. c/f</TH>}
                             <TH>12× s/faca</TH>
                             {form.comFaca && <TH>12× c/faca</TH>}
                           </tr>
@@ -2419,7 +2437,9 @@ export default function Home() {
                               key={l.quantidade}
                               linha={l}
                               comFaca={form.comFaca}
-                              incluirVerniz={form.incluirVerniz}
+                              incluirVerniz={temAcab}
+                              mostrarFrete={temFrete}
+                              impostoPct={normalizarProducao(config.producao).impostoPct}
                               isMin={l.quantidade === r.sweetSpotMinimoQtd}
                               isIdeal={l.quantidade === r.sweetSpotIdealQtd}
                               custosCustom={customCustos[l.quantidade]}
@@ -2428,7 +2448,7 @@ export default function Home() {
                               onPacoteEdit={handlePacoteEdit}
                               acabamentos={acabamentos}
                               acabamentoCustos={Object.fromEntries(
-                                acabamentos.map(a => [a, customAcabamentoCustos[a]?.[l.quantidade] ?? 0])
+                                acabamentos.map(a => [a, customAcabamentoCustos[a]?.[l.quantidade] ?? (a === "Hot Stamping" ? l.custoHotStamping ?? 0 : 0)])
                               )}
                               onAcabamentoCustoEdit={handleAcabamentoCustoEdit}
                             />

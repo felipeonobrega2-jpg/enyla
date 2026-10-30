@@ -36,6 +36,7 @@ export type FormData = {
   validadeDias: number
   materialId: string
   materialNome: string
+  rota?: import("./lib/producao").OpcoesRota
 }
 
 export type ResultadoFormato = {
@@ -86,6 +87,18 @@ export type LinhaTabela = {
   margemComFaca: number
   parcela12xSemFaca: number
   parcela12xComFaca: number
+  // Motor de rotas (ausente em orçamentos antigos)
+  precoPor100Papel?: number
+  custoLaminacao?: number
+  custoHotStamping?: number
+  custoFrete?: number
+  custoFerramental?: number
+  imposto?: number
+  lucroLiquido?: number
+  margemLiquida?: number
+  estimado?: boolean
+  rotaId?: string
+  rotaResumo?: string
 }
 
 export type Calculo = {
@@ -110,6 +123,9 @@ export type Calculo = {
   tabela: LinhaTabela[]
   sweetSpotMinimoQtd: number
   sweetSpotIdealQtd: number
+  rotas?: { quantidade: number; melhor: import("./lib/producao").Rota; alternativas: import("./lib/producao").Rota[] }[]
+  alertas?: string[]
+  facaRegistrada?: import("./lib/producao").Ferramental | null
 }
 
 export type LinhaPropostaCustom = {

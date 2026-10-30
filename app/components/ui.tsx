@@ -1,8 +1,15 @@
 "use client"
 
 import React from "react"
-import { brl, num, margemCls } from "../utils"
+import { brl, num } from "../utils"
 import { LinhaTabela, Calculo } from "../types"
+
+// Margem líquida (após impostos) com preço = custo × 2 fica perto de 44%
+function margemLiqCls(m: number) {
+  if (m >= 40) return "text-[#009351] font-semibold"
+  if (m >= 30) return "text-[#c57800] font-semibold"
+  return "text-[#e5484d] font-semibold"
+}
 
 export function FormSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -89,8 +96,8 @@ export function TD({ children, bold, muted, blue, green, mono, br }: {
 type CampoCusto = "custoPapel" | "custoImpressao" | "custoCorte" | "custoVerniz" | "custoColagem" | "custoArte" | "custoUnitSF" | "custoUnitCF"
 type CustosCustomRow = Partial<Record<CampoCusto, number>>
 
-export function TabelaRow({ linha, comFaca, incluirVerniz, isMin, isIdeal, custosCustom, onCustoEdit, customPacotes, onPacoteEdit, acabamentos, acabamentoCustos, onAcabamentoCustoEdit }: {
-  linha: LinhaTabela; comFaca: boolean; incluirVerniz: boolean; isMin: boolean; isIdeal: boolean
+export function TabelaRow({ linha, comFaca, incluirVerniz, mostrarFrete, impostoPct = 0, isMin, isIdeal, custosCustom, onCustoEdit, customPacotes, onPacoteEdit, acabamentos, acabamentoCustos, onAcabamentoCustoEdit }: {
+  linha: LinhaTabela; comFaca: boolean; incluirVerniz: boolean; mostrarFrete?: boolean; impostoPct?: number; isMin: boolean; isIdeal: boolean
   custosCustom?: CustosCustomRow
   onCustoEdit?: (qtd: number, campo: CampoCusto, val: number | null) => void
   customPacotes?: number
@@ -115,15 +122,18 @@ export function TabelaRow({ linha, comFaca, incluirVerniz, isMin, isIdeal, custo
   const arte       = cc.custoArte       ?? linha.custoArte
 
   const totalAcabamentos = (acabamentos ?? []).reduce((s, n) => s + (acabamentoCustos?.[n] ?? 0), 0)
-  const componenteSF = papel + impressao + corte + (incluirVerniz ? verniz : 0) + colagem + arte + totalAcabamentos
+  const frete        = linha.custoFrete ?? 0
+  const componenteSF = papel + impressao + corte + (incluirVerniz ? verniz : 0) + colagem + frete + arte + totalAcabamentos
   const diffFaca     = linha.custoTotalComFaca - linha.custoTotalSemFaca
   // totalSF e totalCF são sempre baseados nos componentes (custoUnitSF só existe como campo legado)
   const totalSF  = componenteSF
   const totalCF  = totalSF + diffFaca
   const unitSF   = linha.quantidade > 0 ? totalSF / linha.quantidade : 0
   const unitCF   = linha.quantidade > 0 ? totalCF / linha.quantidade : 0
-  const margemSF = linha.precoSemFaca > 0 ? (linha.precoSemFaca - totalSF) / linha.precoSemFaca * 100 : linha.margemSemFaca
-  const margemCF = linha.precoComFaca > 0 ? (linha.precoComFaca - totalCF) / linha.precoComFaca * 100 : linha.margemComFaca
+  // Margem líquida: desconta impostos sobre o preço
+  const liq = 1 - impostoPct / 100
+  const margemSF = linha.precoSemFaca > 0 ? (linha.precoSemFaca * liq - totalSF) / linha.precoSemFaca * 100 : linha.margemSemFaca
+  const margemCF = linha.precoComFaca > 0 ? (linha.precoComFaca * liq - totalCF) / linha.precoComFaca * 100 : linha.margemComFaca
 
   const rowCls = isIdeal ? "bg-[#8456e8]/[0.04] hover:bg-[#8456e8]/[0.07]" : isMin ? "bg-[#c57800]/[0.04] hover:bg-[#c57800]/[0.07]" : "hover:bg-[rgba(0,0,0,0.02)]"
   const stickyBg = isIdeal ? "bg-[#EEF5FF]" : isMin ? "bg-[#FFF8EE]" : "bg-white"
@@ -237,6 +247,7 @@ export function TabelaRow({ linha, comFaca, incluirVerniz, isMin, isIdeal, custo
       <EditCell campo="custoCorte"     val={corte}     muted />
       {incluirVerniz && <EditCell campo="custoVerniz" val={verniz} muted />}
       <EditCell campo="custoColagem" val={colagem} muted />
+      {mostrarFrete && <TD muted mono>{brl(frete)}</TD>}
       <EditCell campo="custoArte"    val={arte}    muted br={!acabamentos?.length} />
       {(acabamentos ?? []).map((nome, i) => {
         const val = acabamentoCustos?.[nome] ?? 0
@@ -291,8 +302,8 @@ export function TabelaRow({ linha, comFaca, incluirVerniz, isMin, isIdeal, custo
       </>}
       <TD mono>{brl(unitSF)}</TD>
       {comFaca && <TD mono>{brl(unitCF)}</TD>}
-      <td className={`px-3 py-2.5 whitespace-nowrap font-mono ${margemCls(margemSF)}`}>{num(margemSF, 1)}%</td>
-      {comFaca && <td className={`px-3 py-2.5 whitespace-nowrap font-mono ${margemCls(margemCF)}`}>{num(margemCF, 1)}%</td>}
+      <td className={`px-3 py-2.5 whitespace-nowrap font-mono ${margemLiqCls(margemSF)}`}>{num(margemSF, 1)}%</td>
+      {comFaca && <td className={`px-3 py-2.5 whitespace-nowrap font-mono ${margemLiqCls(margemCF)}`}>{num(margemCF, 1)}%</td>}
       <TD muted mono>{brl(linha.parcela12xSemFaca)}</TD>
       {comFaca && <TD muted mono>{brl(linha.parcela12xComFaca)}</TD>}
     </tr>
@@ -303,37 +314,39 @@ export function AnaliseEstrategica({ calculo, comFaca, cliente }: { calculo: Cal
   const { tabela, sweetSpotMinimoQtd, sweetSpotIdealQtd } = calculo
   if (!tabela.length) return null
 
-  const precoKey = comFaca ? "precoComFaca" : "precoSemFaca"
-  const unitKey  = comFaca ? "unitarioComFaca" : "unitarioSemFaca"
-  const margKey  = comFaca ? "margemComFaca" : "margemSemFaca"
-  const lucroKey = comFaca ? "lucroComFaca" : "lucroSemFaca"
-  const val = (l: LinhaTabela, k: string) => l[k as keyof LinhaTabela] as number
+  // Com preço = custo × 2 a margem é igual em todas as tiragens; o que muda é o lucro em reais
+  const preco  = (l: LinhaTabela) => comFaca ? l.precoComFaca : l.precoSemFaca
+  const unit   = (l: LinhaTabela) => comFaca ? l.unitarioComFaca : l.unitarioSemFaca
+  const custo  = (l: LinhaTabela) => comFaca ? l.custoTotalComFaca : l.custoTotalSemFaca
+  const imp    = (l: LinhaTabela) => preco(l) * ((l.imposto ?? 0) / Math.max(l.precoComFaca, 0.01))
+  const lucro  = (l: LinhaTabela) => preco(l) - imp(l) - custo(l)
+  const margem = (l: LinhaTabela) => preco(l) > 0 ? lucro(l) / preco(l) * 100 : 0
 
-  // Empate de margem: prefere a maior quantidade (mais lucro), não a primeira linha
-  const melhorMargem = tabela.reduce((b, c) => val(c, margKey) >= val(b, margKey) - 0.05 ? c : b, tabela[0])
-  const menorUnit    = tabela.reduce((b, c) => val(c, unitKey) < val(b, unitKey) ? c : b, tabela[0])
-  const sweetMin     = tabela.find(l => l.quantidade === sweetSpotMinimoQtd) ?? tabela[0]
-  const sweetIdeal   = tabela.find(l => l.quantidade === sweetSpotIdealQtd)  ?? tabela[tabela.length - 1]
+  const maiorLucro = tabela.reduce((b, c) => lucro(c) > lucro(b) ? c : b, tabela[0])
+  const menorUnit  = tabela.reduce((b, c) => unit(c) < unit(b) ? c : b, tabela[0])
+  const sweetMin   = tabela.find(l => l.quantidade === sweetSpotMinimoQtd) ?? tabela[0]
+  const sweetIdeal = tabela.find(l => l.quantidade === sweetSpotIdealQtd)  ?? tabela[tabela.length - 1]
+  const quedaUnit  = unit(sweetMin) > 0 ? (1 - unit(sweetIdeal) / unit(sweetMin)) * 100 : 0
 
   const cards = [
-    { tag: "Para o cliente",       desc: "Menor custo por unidade",      linha: menorUnit,    cor: "border-[#8456e8]/15 bg-[#8456e8]/[0.03]", tagCor: "bg-[#8456e8]/10 text-[#8456e8]" },
-    { tag: "Maior rentabilidade",  desc: "Melhor margem para a gráfica", linha: melhorMargem, cor: "border-[#009351]/20 bg-[#009351]/[0.03]",  tagCor: "bg-[#009351]/10 text-[#009351]" },
-    { tag: "Sweet spot ideal",     desc: "Equilíbrio preço × lucro",     linha: sweetIdeal,   cor: "border-[#c57800]/20 bg-[#c57800]/[0.03]",  tagCor: "bg-[#c57800]/10 text-[#c57800]" },
+    { tag: "Para o cliente",     desc: "Menor preço por unidade",          linha: menorUnit,  cor: "border-[#8456e8]/15 bg-[#8456e8]/[0.03]", tagCor: "bg-[#8456e8]/10 text-[#8456e8]" },
+    { tag: "Maior lucro",        desc: "Mais lucro líquido em reais",      linha: maiorLucro, cor: "border-[#009351]/20 bg-[#009351]/[0.03]", tagCor: "bg-[#009351]/10 text-[#009351]" },
+    { tag: "Sweet spot ideal",   desc: "Onde subir a tiragem para de compensar", linha: sweetIdeal, cor: "border-[#c57800]/20 bg-[#c57800]/[0.03]", tagCor: "bg-[#c57800]/10 text-[#c57800]" },
   ]
 
   return (
     <Section title="Análise estratégica">
-      <div className="grid grid-cols-3 gap-3 mb-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
         {cards.map(c => (
-          <div key={c.tag} className={`rounded-xl border p-5 bg-white ${c.cor}`}>
+          <div key={c.tag} className={`rounded-xl border p-5 bg-white transition-all duration-200 hover:-translate-y-px hover:shadow-md ${c.cor}`}>
             <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide ${c.tagCor}`}>{c.tag}</span>
             <p className="text-[rgba(60,60,67,0.55)] text-[11px] mt-3 mb-3 leading-snug">{c.desc}</p>
-            <p className="text-[26px] font-semibold text-[#191625] leading-none tabular-nums">{brl(c.linha[precoKey as keyof LinhaTabela] as number)}</p>
+            <p className="text-[26px] font-semibold text-[#191625] leading-none tabular-nums">{brl(preco(c.linha))}</p>
             <p className="text-[11px] text-[rgba(60,60,67,0.5)] mt-1.5 tabular-nums">
-              {num(c.linha.quantidade)} un · {brl(c.linha[unitKey as keyof LinhaTabela] as number)}/un
+              {num(c.linha.quantidade)} un · {brl(unit(c.linha))}/un
             </p>
-            <p className={`text-[11.5px] mt-1.5 font-semibold tabular-nums ${margemCls(c.linha[margKey as keyof LinhaTabela] as number)}`}>
-              {num(c.linha[margKey as keyof LinhaTabela] as number, 1)}% · lucro {brl(c.linha[lucroKey as keyof LinhaTabela] as number)}
+            <p className={`text-[11.5px] mt-1.5 tabular-nums ${margemLiqCls(margem(c.linha))}`}>
+              lucro líquido {brl(lucro(c.linha))} · {num(margem(c.linha), 1)}%
             </p>
           </div>
         ))}
@@ -342,13 +355,11 @@ export function AnaliseEstrategica({ calculo, comFaca, cliente }: { calculo: Cal
         <p className="text-[9px] uppercase tracking-wide font-bold text-[#898892] mb-3">Recomendação de fechamento</p>
         <p className="text-[rgba(60,60,67,0.7)] leading-relaxed text-[13px]">
           {cliente ? <strong className="text-[#191625]">{cliente}:</strong> : null}{" "}
-          Apresente <strong className="text-[#191625]">{num(sweetIdeal.quantidade)} unidades</strong> como ponto ideal —{" "}
-          {brl(sweetIdeal[precoKey as keyof LinhaTabela] as number)} com margem de{" "}
-          <span className={margemCls(sweetIdeal[margKey as keyof LinhaTabela] as number)}>
-            {num(sweetIdeal[margKey as keyof LinhaTabela] as number, 1)}%
-          </span>.{" "}
-          Se houver resistência, use <strong className="text-[#191625]">{num(sweetMin.quantidade)} un</strong> como mínimo aceitável.
-          {comFaca && " A faca é investimento único — amortizada já na segunda tiragem."}
+          Apresente <strong className="text-[#191625]">{num(sweetIdeal.quantidade)} unidades</strong> por {brl(preco(sweetIdeal))}
+          {quedaUnit > 0 && <> — o unitário cai {num(quedaUnit, 0)}% em relação a {num(sweetMin.quantidade)} un</>}
+          {" "}e o lucro líquido fica em <span className={margemLiqCls(margem(sweetIdeal))}>{brl(lucro(sweetIdeal))}</span>.{" "}
+          Se houver resistência, ofereça <strong className="text-[#191625]">{num(sweetMin.quantidade)} un</strong> por {brl(preco(sweetMin))}.
+          {comFaca && " A faca é paga uma vez e fica registrada para as próximas tiragens."}
         </p>
       </div>
     </Section>
