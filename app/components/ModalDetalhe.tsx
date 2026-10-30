@@ -196,10 +196,12 @@ export function ModalDetalhe({
   const finDespesasPagas = useMemo(() => finDespesasCard.filter(l => l.status === "pago" || l.formaPagamento === "conta"), [finDespesasCard])
   const finTotalRecebido = useMemo(() => finReceitasPagas.reduce((s, l) => s + l.valor, 0), [finReceitasPagas])
   const finTotalDesp     = useMemo(() => finDespesasCard.reduce((s, l) => s + l.valor, 0), [finDespesasCard])
-  const finResultado     = (card?.preco ?? 0) - finTotalDesp
+  // base para margem/markup: quando totalmente pago inclui sobras; senão usa valor orçado
+  const finBase          = finTotalRecebido >= (card?.preco ?? 0) && finTotalRecebido > 0 ? finTotalRecebido : (card?.preco ?? 0)
+  const finResultado     = finTotalRecebido - finTotalDesp
   const finSemDados      = finReceitasCard.length === 0 && finDespesasCard.length === 0
-  const finMargemPct     = !finSemDados && (card?.preco ?? 0) > 0 ? (((card?.preco ?? 0) - finTotalDesp) / (card?.preco ?? 0)) * 100 : null
-  const finMarkup        = !finSemDados && finTotalDesp > 0 ? (card?.preco ?? 0) / finTotalDesp : null
+  const finMargemPct     = !finSemDados && finBase > 0 ? ((finBase - finTotalDesp) / finBase) * 100 : null
+  const finMarkup        = !finSemDados && finTotalDesp > 0 ? finBase / finTotalDesp : null
   const finPercPagoBruto = (card?.preco ?? 0) > 0 ? (finTotalRecebido / (card?.preco ?? 0)) * 100 : 0
   const finPercPago      = Math.min(100, finPercPagoBruto)
   const finCmvUnit       = finTotalDesp > 0 && (card?.quantidade ?? 0) > 0 ? finTotalDesp / (card?.quantidade ?? 1) : null
