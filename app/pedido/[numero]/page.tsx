@@ -1,11 +1,6 @@
 import { notFound } from "next/navigation"
-import { createClient } from "@supabase/supabase-js"
+import { supabase as supabaseAdmin } from "@/app/lib/supabase"
 import { KanbanCard, PedidoArquivo, COLUNAS_KANBAN } from "@/app/types"
-
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
-)
 
 function brl(n: number) {
   return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
