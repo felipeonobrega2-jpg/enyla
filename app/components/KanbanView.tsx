@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Flame } from "lucide-react"
+import { Flame, X, ChevronDown } from "lucide-react"
 import { KanbanCard, KanbanOpcao, Lote, LancamentoFinanceiro, NegocioParceiro, StatusLoteParceiro, COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO, COL_HOT } from "../types"
 import { brl, num } from "../utils"
 import { COL_COLORS } from "./kanban-colors"
@@ -215,7 +215,7 @@ export function KanbanView({
   const [dragId, setDragId]       = useState<string | null>(null)
   const [overCol, setOverCol]     = useState<number | null>(null)
   const [modal, setModal]         = useState<ModalFechamento | null>(null)
-  const [colapsarVazias, setColapsarVazias] = useState(false)
+  const [colapsarVazias, setColapsarVazias] = useState(!!hideDashboard)
 
   function tentarMover(id: string, destCol: number) {
     const card = cards.find(c => c.id === id)
@@ -425,7 +425,7 @@ export function KanbanView({
           c.dataEntregaPrevista && c.dataEntregaPrevista < hj &&
           c.coluna < COL_ENTREGUE && c.coluna !== COL_PERDIDO
         )
-        if (atrasados.length === 0) return null
+        if (atrasados.length === 0 || hideDashboard) return null
         return (
           <div className="shrink-0 px-5 py-2.5 bg-[#FF3B30]/[0.04] border-b border-[#FF3B30]/10 flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-1.5 shrink-0">
@@ -450,8 +450,9 @@ export function KanbanView({
       })()}
 
       {/* Board */}
-      <div className={`flex-1 overflow-x-auto overflow-y-hidden ${isDark ? "bg-[#0C0C0E]" : "bg-[#F2F2F7]"}`}>
-        <div className="flex gap-2.5 h-full px-4 py-3.5" style={{ minWidth: `${BOARD_ORDER.length * 48}px` }}>
+      <div className="flex-1 overflow-x-auto overflow-y-hidden">
+        <div className="flex gap-3 h-full pt-1 pb-4"
+          style={{ minWidth: `${BOARD_ORDER.length * 48}px`, paddingLeft: hideDashboard ? "max(24px, calc((100% - 1320px) / 2 + 24px))" : 24, paddingRight: 24 }}>
           {BOARD_ORDER.map((colIdx, renderPos) => {
             const colNome  = colLabel(colIdx)
             const colCards = cards.filter(c => c.coluna === colIdx && c.materialNome !== "Terceirizado")
@@ -466,19 +467,18 @@ export function KanbanView({
               return (
                 <div
                   key={colIdx}
-                  className={`flex flex-col shrink-0 rounded-xl transition-all cursor-default ${
-                    isOver
-                      ? `ring-2 ${colors.border.replace("border-", "ring-")} ${colors.bg}`
-                      : isDark ? "border border-[rgba(255,255,255,0.08)] bg-[#1C1C1E]" : "border border-[rgba(0,0,0,0.06)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+                  className={`flex flex-col shrink-0 self-start rounded-xl transition-all duration-200 cursor-default ${
+                    isOver ? `ring-2 ${colors.border.replace("border-", "ring-")} ${colors.bg}` : "bg-[rgba(116,116,128,0.06)] hover:bg-[rgba(116,116,128,0.1)]"
                   }`}
-                  style={{ width: 36 }}
+                  style={{ width: 34, minHeight: isOver ? 260 : 190 }}
+                  title={`${colNome}: nenhum pedido. Arraste um cartão para cá.`}
                   onDragOver={e => handleDragOver(e, colIdx)}
                   onDrop={e => handleDrop(e, colIdx)}
                   onDragLeave={() => setOverCol(null)}
                 >
                   <div className="flex-1 flex items-center justify-center py-3 overflow-hidden">
                     <span
-                      className="text-[9.5px] font-semibold text-[#8E8E93] select-none whitespace-nowrap"
+                      className="text-[11px] font-medium text-[#898892] select-none whitespace-nowrap"
                       style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", letterSpacing: "0.04em" }}
                     >
                       {colNome}
@@ -494,33 +494,30 @@ export function KanbanView({
             return (
               <div
                 key={colIdx}
-                className={`flex flex-col w-72 shrink-0 rounded-xl transition-all ${
-                  isOver
-                    ? `ring-2 ${colors.border.replace("border-", "ring-")} ${colors.bg} border border-transparent`
-                    : isDark ? "border border-[rgba(255,255,255,0.08)] bg-[#1C1C1E]" : "border border-[rgba(0,0,0,0.06)] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]"
+                className={`flex flex-col w-[272px] shrink-0 rounded-xl transition-all duration-200 ds-entrada ${
+                  isOver ? `ring-2 ${colors.border.replace("border-", "ring-")} ${colors.bg}` : "bg-[rgba(116,116,128,0.06)]"
                 }`}
                 onDragOver={e => handleDragOver(e, colIdx)}
                 onDrop={e => handleDrop(e, colIdx)}
                 onDragLeave={() => setOverCol(null)}
               >
                 {/* Cabeçalho da coluna */}
-                <div className={`flex items-center gap-2 px-3 pt-2.5 pb-2 border-b shrink-0 ${isDark ? "border-[rgba(255,255,255,0.08)]" : "border-[rgba(60,60,67,0.12)]"}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colors.dot}`} />
-                  <p className={`text-[11px] font-semibold flex-1 leading-tight tracking-tight ${isDark ? "text-[rgba(255,255,255,0.85)]" : "text-[#1C1C1E]"}`}>{colNome}</p>
-                  <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center tabular-nums ${
-                    colCards.length > 0 ? colors.badge : "bg-[rgba(116,116,128,0.08)] text-[#8E8E93]"
-                  }`}>
-                    {colCards.length}
-                  </span>
+                <div className="flex items-center gap-2 px-3.5 pt-3 pb-2 shrink-0">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${colors.dot}`} />
+                  <p className="text-[12.5px] font-semibold flex-1 leading-tight text-[#191625]">{colNome}</p>
+                  <span className="text-[11px] font-semibold text-[#898892] ds-num">{colCards.length}</span>
                 </div>
+                {colCards.length > 0 && (
+                  <p className="px-3.5 -mt-1 pb-2 text-[11px] text-[#898892] ds-num">{brl(colCards.reduce((s, c) => s + c.preco, 0))}</p>
+                )}
 
                 {/* Cards */}
-                <div className="flex-1 overflow-y-auto px-2 pb-2.5 pt-1.5 space-y-1.5 min-h-[60px]">
+                <div className="flex-1 overflow-y-auto px-2 pb-2.5 pt-0.5 space-y-2 min-h-[60px] ds-escalonado">
                   {colCards.length === 0 && (
-                    <div className={`border-2 border-dashed rounded-lg h-10 flex items-center justify-center transition-colors ${
-                      isOver ? colors.border : "border-[rgba(60,60,67,0.12)]"
+                    <div className={`border border-dashed rounded-lg h-14 flex items-center justify-center transition-colors ${
+                      isOver ? colors.border : "border-[rgba(60,60,67,0.14)]"
                     }`}>
-                      <p className="text-[10px] text-[#8E8E93] select-none">Arraste aqui</p>
+                      <p className="text-[11px] text-[#898892] select-none">Solte um pedido aqui</p>
                     </div>
                   )}
                   {colCards.map(card => (
@@ -774,7 +771,6 @@ function KanbanCardItem({
     : null
   const emAtraso  = diasEnt !== null && diasEnt < 0
   const quaseVenc = diasEnt !== null && diasEnt >= 0 && diasEnt <= 3
-  const stage = STAGE[colIdx] ?? { color: "#8E8E93", bg: "rgba(142,142,147,0.1)", label: COLUNAS_KANBAN[colIdx] ?? "—" }
   const cardBg  = isDark ? "#2C2C2E" : "#fff"
   const border  = isPerdido ? "rgba(255,59,48,0.2)" : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"
   const txt     = isDark ? "rgba(255,255,255,0.85)" : "#1C1C1E"
@@ -787,84 +783,78 @@ function KanbanCardItem({
       draggable={!confirmando}
       onDragStart={e => !confirmando && onDragStart(e, card.id)}
       onDragEnd={onDragEnd}
-      className={`rounded-2xl overflow-hidden transition-all duration-150 select-none ${
-        isDragging ? "opacity-30 scale-95" : "shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
+      className={`rounded-xl overflow-hidden transition-all duration-200 select-none ${
+        isDragging ? "opacity-30 scale-95" : "shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_6px_18px_rgba(25,22,37,0.08)]"
       }`}
       style={{ background: isSelected ? "rgba(132,86,232,0.08)" : cardBg, border: `1px solid ${isSelected ? "#8456e8" : border}` }}
     >
-      {/* ── Collapsed row ── */}
-      <div className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer" onClick={e => {
+      {/* ── Resumo do cartão ── */}
+      <div className="group/card px-3.5 pt-3 pb-3 cursor-pointer" onClick={e => {
         if (e.metaKey || e.ctrlKey) { e.preventDefault(); onSelectCard?.(card.id) }
         else onDetalhes?.(card)
       }}>
-        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: isPerdido ? "#FF3B30" : stage.color }} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1 flex-wrap">
-            <span className={`text-[12.5px] font-semibold leading-snug truncate ${isPerdido ? "line-through" : ""}`}
-              style={{ color: isPerdido ? "rgba(255,59,48,0.7)" : card.loteNumero ? "#5009c4" : txt }}>
-              {card.loteNumero ?? card.nomeCliente}
-            </span>
-            {card.numero && (
-              <span className="text-[8.5px] font-bold px-1.5 py-[2px] rounded-md tabular-nums shrink-0"
-                style={{ background: "rgba(80,9,196,0.1)", color: "#8456e8" }}>{card.numero}</span>
-            )}
-            {card.loteNumero && (
-              <span className="text-[8.5px] font-semibold px-1.5 py-[2px] rounded-md shrink-0"
-                style={{ background: "rgba(90,200,250,0.15)", color: "#0099cc" }}>Lote</span>
-            )}
-            {!isPerdido && (
-              <span className="text-[8.5px] font-semibold px-1.5 py-[2px] rounded-md shrink-0"
-                style={{ background: stage.bg, color: stage.color }}>{stage.label}</span>
-            )}
-          </div>
-          <p className={`text-[9.5px] mt-0.5 truncate ${isPerdido ? "line-through" : ""}`} style={{ color: sub }}>
-            {card.loteNumero ? `${card.nomeCliente} · ` : ""}{card.data.split(",")[0]}{card.dimensoes ? ` · ${card.dimensoes} cm` : ""}{card.quantidade > 0 ? ` · ${num(card.quantidade)} un` : ""}
+        <div className="flex items-start gap-2">
+          <p className={`flex-1 min-w-0 text-[13px] font-semibold leading-snug truncate ${isPerdido ? "line-through" : ""}`}
+            style={{ color: isPerdido ? "rgba(211,58,60,0.75)" : txt }}>
+            {card.nomeCliente}
           </p>
+          <p className={`text-[13px] font-semibold ds-num shrink-0 ${isPerdido ? "line-through" : ""}`}
+            style={{ color: isPerdido ? "rgba(211,58,60,0.6)" : txt }}>{brl(card.preco)}</p>
         </div>
-        <div className="text-right shrink-0 space-y-0.5">
-          <p className={`text-[12.5px] font-bold tabular-nums ${isPerdido ? "line-through" : ""}`}
-            style={{ color: isPerdido ? "rgba(255,59,48,0.6)" : txt }}>{brl(card.preco)}</p>
+        <p className="text-[11px] mt-1 truncate ds-num" style={{ color: sub }}>
+          {card.loteNumero ?? card.numero}{card.loteNumero && card.numero ? ` · ${card.numero}` : ""}
+          {card.quantidade > 0 ? ` · ${num(card.quantidade)} un` : ""}
+          {card.dimensoes && !/^0[×x]0/.test(card.dimensoes) ? ` · ${card.dimensoes} cm` : ""}
+        </p>
+        <div className="flex items-center gap-1.5 mt-2.5 min-h-[20px]">
+          {colIdx === COL_ENTREGUE ? (
+            <span className="inline-flex items-center h-5 px-2 rounded-full whitespace-nowrap text-[10.5px] font-semibold bg-[#009351]/10 text-[#009351]">
+              {card.dataEntregaReal ? `Entregue ${fmt(card.dataEntregaReal)}` : "Entregue"}
+            </span>
+          ) : isPerdido ? (
+            <span className="inline-flex items-center h-5 px-2 rounded-full whitespace-nowrap text-[10.5px] font-semibold bg-[#d33a3c]/10 text-[#d33a3c] truncate max-w-[180px]">
+              {card.motivoPerdido || "Perdido"}
+            </span>
+          ) : diasEnt !== null ? (
+            <span className={`inline-flex items-center h-5 px-2 rounded-full text-[10.5px] font-semibold ${
+              emAtraso ? "bg-[#d33a3c]/10 text-[#d33a3c]" : quaseVenc ? "bg-[#c57800]/10 text-[#c57800]" : "bg-[rgba(116,116,128,0.1)] text-[#5e5c68]"}`}>
+              {emAtraso ? `${Math.abs(diasEnt)} ${Math.abs(diasEnt) === 1 ? "dia" : "dias"} de atraso` : diasEnt === 0 ? "Entrega hoje" : diasEnt === 1 ? "Entrega amanhã" : `Entrega ${fmt(entregaDate)}`}
+            </span>
+          ) : colIdx >= 1 && colIdx < COL_ENTREGUE ? (
+            <span className="inline-flex items-center h-5 px-2 rounded-full whitespace-nowrap text-[10.5px] font-medium bg-[rgba(116,116,128,0.08)] text-[#898892]">Sem prazo</span>
+          ) : (
+            <span className="text-[10.5px]" style={{ color: sub }}>{card.data.split(",")[0]}</span>
+          )}
           {(() => {
             const p = card.projecaoCustos
-            if (!p) return null
+            if (!p || isPerdido) return null
             const tot = (p.papel ?? 0) + (p.impressao ?? 0) + (p.corte ?? 0) + (p.verniz ?? 0) +
               (p.colagem ?? 0) + (p.arte ?? 0) + (p.faca ?? 0) + (p.hotstamping ?? 0) + (p.corteVinco ?? 0) + (p.outros ?? 0)
             if (tot <= 0) return null
             const mg = card.preco > 0 ? ((card.preco - tot) / card.preco) * 100 : 0
-            const ok = mg >= 40; const mid = mg >= 20
+            const cor = mg >= 45 ? "#009351" : mg >= 30 ? "#c57800" : "#d33a3c"
             return (
-              <span className="text-[8.5px] font-bold px-1.5 py-[2px] rounded-md tabular-nums"
-                style={{ background: ok ? "rgba(22,163,74,0.12)" : mid ? "rgba(197,120,0,0.12)" : "rgba(220,38,38,0.12)", color: ok ? "#15803d" : mid ? "#c57800" : "#b91c1c" }}>
-                M {num(mg, 0)}%
+              <span className="inline-flex items-center h-5 px-2 rounded-full whitespace-nowrap text-[10.5px] font-semibold" style={{ background: `${cor}14`, color: cor }}
+                title="Margem prevista no orçamento">
+                margem {num(mg, 0)}%
               </span>
             )
           })()}
-          {colIdx === COL_ENTREGUE ? (
-            <p className="text-[9px] font-semibold" style={{ color: "#30D158" }}>
-              {card.dataEntregaReal ? `Entregue ${fmt(card.dataEntregaReal)}` : "Entregue"}
-            </p>
-          ) : diasEnt !== null ? (
-            <p className="text-[9px] font-semibold tabular-nums"
-              style={{ color: emAtraso ? "#d33a3c" : quaseVenc ? "#c57800" : sub }}>
-              {emAtraso ? `${Math.abs(diasEnt)}d atraso` : diasEnt === 0 ? "Hoje" : `${diasEnt}d`}
-            </p>
-          ) : null}
+          <div className="flex-1" />
+          <button onClick={e => { e.stopPropagation(); if (confirm(`Remover "${card.nomeCliente}" do quadro?`)) onDelete(card.id) }}
+            title="Remover do quadro"
+            className="w-6 h-6 flex items-center justify-center rounded-md text-[#c7c7cc] hover:text-[#d33a3c] hover:bg-[#d33a3c]/[0.06] transition-all opacity-0 group-hover/card:opacity-100 shrink-0">
+            <X className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={e => { e.stopPropagation(); setIsOpen(v => !v) }} title="Ações"
+            className={`w-6 h-6 flex items-center justify-center rounded-md hover:bg-[rgba(116,116,128,0.1)] transition-all shrink-0 ${isOpen ? "opacity-100" : "opacity-0 group-hover/card:opacity-100"}`}>
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} style={{ color: sub }} />
+          </button>
         </div>
-        <button onClick={e => { e.stopPropagation(); if (confirm(`Remover "${card.nomeCliente}" do kanban?`)) onDelete(card.id) }}
-          className="w-5 h-5 flex items-center justify-center text-[rgba(60,60,67,0.36)] hover:text-[#FF3B30] hover:bg-[#FF3B30]/5 rounded-lg transition-colors text-[12px] leading-none shrink-0">
-          ×
-        </button>
-        <button onClick={e => { e.stopPropagation(); setIsOpen(v => !v) }}
-          className="w-5 h-5 flex items-center justify-center rounded-lg hover:bg-[rgba(0,0,0,0.04)] transition-colors shrink-0">
-          <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-            style={{ color: sub }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-          </svg>
-        </button>
       </div>
 
       {isOpen && (
-      <div style={{ borderTop: `1px solid ${divider}` }}>
+      <div className="apple-slide-up pt-2" style={{ borderTop: `1px solid ${divider}` }}>
 
           {/* ── Action bar ── */}
         {!isPerdido && !confirmando && (

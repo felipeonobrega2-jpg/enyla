@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   Package, TrendingUp, CheckCircle2,
   DollarSign, BarChart3, Factory, User, Users, Home, Building2, Megaphone, Wrench, ClipboardList,
@@ -15,7 +15,7 @@ import { brl, num } from "../utils"
 import { custoFixoPeriodo, rateioPorPedido } from "../lib/metrics"
 import { montarPedidos, margemContribuicao, Pedido } from "../lib/negocio"
 import { KanbanView } from "./KanbanView"
-import { CabecalhoPagina, Kpi, GradeKpis, Segmentado, Selo, Cartao, TituloCartao, ListaBarras, Gaveta, LinhaLista, Vazio } from "./ds"
+import { CabecalhoPagina, Kpi, GradeKpis, Segmentado, Selo, Cartao, TituloCartao, ListaBarras, Colunas, Gaveta, LinhaLista, Vazio } from "./ds"
 
 type Tab = "lista" | "kanban" | "visao"
 type FiltroStatus = "todos" | "andamento" | "atrasados" | "prazo" | "receber" | "entregue"
@@ -614,6 +614,15 @@ function DashboardTab({ entries, onDetalhes }: {
   })
   const etapas = [...etapaCount.entries()].sort((a, b) => a[0] - b[0])
 
+  const hojeD = new Date()
+  const meses = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(hojeD.getFullYear(), hojeD.getMonth() - 11 + i, 1)
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+    return { chave: ym, rotulo: d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""), valor: entries.filter(e => e.dataFechamento?.startsWith(ym)).length, destaque: i === 11 }
+  })
+  const comPedido = meses.filter(m => m.valor > 0)
+  const mediaMeses = comPedido.length ? comPedido.reduce((s, m) => s + m.valor, 0) / comPedido.length : 0
+
   const abrir = (titulo: string, itens: OrderEntry[]) =>
     setGaveta({ titulo, sub: `${itens.length} ${itens.length === 1 ? "pedido" : "pedidos"} · ${brl(itens.reduce((s, i) => s + i.precoTotal, 0))}`, itens })
 
@@ -623,10 +632,12 @@ function DashboardTab({ entries, onDetalhes }: {
 
   return (
     <div className="px-6 pb-10 space-y-4 max-w-[1320px] mx-auto ds-escalonado">
-      {entries.length >= 2 && (
-        <PedidosLineChart entries={entries}
-          onClickMes={ym => abrir(fmtMesAbbr(ym), entries.filter(e => e.dataFechamento?.startsWith(ym)))} />
-      )}
+      <Cartao>
+        <TituloCartao titulo="Pedidos fechados por mês" icone={<BarChart3 className="w-4 h-4" />}
+          sub={`${meses[meses.length - 1].valor} neste mês · média de ${num(mediaMeses, 1)} por mês · clique num mês para ver os pedidos`} />
+        <Colunas itens={meses} formato={n => `${Math.round(n)} ${Math.round(n) === 1 ? "pedido" : "pedidos"}`}
+          onClick={ym => abrir(fmtMesAbbr(ym), entries.filter(e => e.dataFechamento?.startsWith(ym)))} />
+      </Cartao>
 
       <GradeKpis>
         <Kpi rotulo="Total contratado" icone={<TrendingUp className="w-3.5 h-3.5" />} tom="acento" destaque
@@ -966,219 +977,7 @@ function fmtMesAbbr(ym: string) {
   return `${MES_ABBR[parseInt(m) - 1]}/${y.slice(2)}`
 }
 
-function PedidosLineChart({ entries, onClickMes }: { entries: OrderEntry[]; onClickMes?: (ym: string) => void }) {
-  const [hovIdx, setHovIdx] = useState<number | null>(null)
-  const svgRef = useRef<SVGSVGElement>(null)
-
-  const meses = useMemo(() => {
-    const map = new Map<string, number>()
-    entries.forEach(e => {
-      if (!e.dataFechamento) return
-      const key = e.dataFechamento.slice(0, 7)
-      map.set(key, (map.get(key) ?? 0) + 1)
-    })
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-18)
-  }, [entries])
-
-  if (meses.length < 2) return null
-
-  const VW = 800, VH = 180
-  const PL = 28, PR = 16, PT = 20, PB = 32
-  const CW = VW - PL - PR
-  const CH = VH - PT - PB
-
-  const maxVal = Math.max(...meses.map(([, v]) => v), 1)
-  const currentMesKey = new Date().toISOString().slice(0, 7)
-  const currentIdx = meses.findIndex(([ym]) => ym === currentMesKey)
-  const totalMeses = meses.length
-
-  const pts = meses.map(([ym, v], i) => ({
-    x: PL + (totalMeses > 1 ? (i / (totalMeses - 1)) : 0.5) * CW,
-    y: PT + CH - (v / maxVal) * CH,
-    v, ym,
-  }))
-
-  // Smooth cubic bezier (catmull-rom style)
-  function smoothLinePath(points: { x: number; y: number }[]) {
-    if (points.length < 2) return ""
-    let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`
-    for (let i = 0; i < points.length - 1; i++) {
-      const tension = 0.35
-      const dx = points[i + 1].x - points[i].x
-      const cp1x = points[i].x + dx * tension
-      const cp1y = points[i].y
-      const cp2x = points[i + 1].x - dx * tension
-      const cp2y = points[i + 1].y
-      d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${points[i + 1].x.toFixed(1)} ${points[i + 1].y.toFixed(1)}`
-    }
-    return d
-  }
-
-  const linePath = smoothLinePath(pts)
-  const areaPath = pts.length > 0
-    ? linePath + ` L ${pts[pts.length - 1].x.toFixed(1)} ${(PT + CH).toFixed(1)} L ${pts[0].x.toFixed(1)} ${(PT + CH).toFixed(1)} Z`
-    : ""
-
-  function getClosestIdx(e: React.MouseEvent<SVGSVGElement>) {
-    const rect = svgRef.current?.getBoundingClientRect()
-    if (!rect) return null
-    const svgX = ((e.clientX - rect.left) / rect.width) * VW
-    let closest = 0, minDist = Infinity
-    pts.forEach((p, i) => { const d = Math.abs(p.x - svgX); if (d < minDist) { minDist = d; closest = i } })
-    return closest
-  }
-
-  function onMouseMove(e: React.MouseEvent<SVGSVGElement>) {
-    const idx = getClosestIdx(e)
-    if (idx !== null) setHovIdx(idx)
-  }
-
-  function onClickSvg(e: React.MouseEvent<SVGSVGElement>) {
-    const idx = getClosestIdx(e)
-    if (idx !== null && onClickMes) onClickMes(meses[idx][0])
-  }
-
-  const hov = hovIdx !== null ? pts[hovIdx] : null
-  const gridVals = Array.from({ length: 4 }, (_, i) => Math.round((maxVal / 3) * i))
-  const stepLabel = Math.ceil(totalMeses / 7)
-
-  const mesAtual = currentIdx >= 0 ? meses[currentIdx][1] : 0
-  const mediaVal = entries.length / totalMeses
-
-  return (
-    <div>
-      <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl overflow-hidden">
-        {/* Header com números */}
-        <div className="px-6 pt-5 pb-4 flex items-start gap-10 border-b border-[rgba(0,0,0,0.04)]">
-          <div>
-            <p className="text-[10.5px] uppercase tracking-wider font-bold text-[#8E8E93] mb-1">Este mês</p>
-            <p className="text-[32px] font-bold text-[#1C1C1E] ds-num leading-none">{mesAtual}</p>
-            <p className="text-[11px] text-[#8E8E93] mt-1">pedidos fechados</p>
-          </div>
-          <div>
-            <p className="text-[10.5px] uppercase tracking-wider font-bold text-[#8E8E93] mb-1">Média mensal</p>
-            <p className="text-[32px] font-bold text-[#8456e8] ds-num leading-none">{num(mediaVal, 1)}</p>
-            <p className="text-[11px] text-[#8E8E93] mt-1">nos últimos {totalMeses} meses</p>
-          </div>
-          {hovIdx !== null && hovIdx !== currentIdx && (
-            <div className="transition-all">
-              <p className="text-[10.5px] uppercase tracking-wider font-bold text-[#8E8E93] mb-1">{fmtMesAbbr(meses[hovIdx][0])}</p>
-              <p className="text-[32px] font-bold text-[#1C1C1E] ds-num leading-none">{meses[hovIdx][1]}</p>
-              <p className="text-[11px] text-[#8E8E93] mt-1">pedidos</p>
-            </div>
-          )}
-        </div>
-
-        {/* SVG */}
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${VW} ${VH}`}
-          style={{ width: "100%", display: "block", cursor: onClickMes ? "pointer" : "crosshair" }}
-          onMouseMove={onMouseMove}
-          onMouseLeave={() => setHovIdx(null)}
-          onClick={onClickSvg}
-        >
-          <defs>
-            <linearGradient id="pg-grad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#8456e8" stopOpacity="0.14" />
-              <stop offset="85%" stopColor="#8456e8" stopOpacity="0.01" />
-            </linearGradient>
-          </defs>
-
-          {/* Grid horizontal */}
-          {gridVals.map(v => {
-            const gy = PT + CH - (v / maxVal) * CH
-            return (
-              <g key={v}>
-                <line x1={PL} y1={gy} x2={VW - PR} y2={gy}
-                  stroke={v === 0 ? "rgba(0,0,0,0.1)" : "rgba(0,0,0,0.05)"}
-                  strokeWidth={1} strokeDasharray={v === 0 ? "" : "4 4"} />
-                {v > 0 && (
-                  <text x={PL - 5} y={gy + 3.5} textAnchor="end" fontSize={9} fill="#c7c7cc"
-                    fontFamily="-apple-system,sans-serif">{v}</text>
-                )}
-              </g>
-            )
-          })}
-
-          {/* Área */}
-          <path d={areaPath} fill="url(#pg-grad)" />
-
-          {/* Linha */}
-          <path d={linePath} fill="none" stroke="#8456e8" strokeWidth={2.5}
-            strokeLinecap="round" strokeLinejoin="round" />
-
-          {/* Ponto do mês atual */}
-          {currentIdx >= 0 && hovIdx !== currentIdx && (
-            <circle cx={pts[currentIdx].x} cy={pts[currentIdx].y} r={4.5}
-              fill="#8456e8" stroke="white" strokeWidth={2} />
-          )}
-
-          {/* Labels eixo X */}
-          {pts.map((p, i) => {
-            if (i % stepLabel !== 0 && i !== totalMeses - 1) return null
-            return (
-              <text key={i} x={p.x} y={VH - 6} textAnchor="middle" fontSize={9} fill="#c7c7cc"
-                fontFamily="-apple-system,sans-serif">
-                {fmtMesAbbr(meses[i][0])}
-              </text>
-            )
-          })}
-
-          {/* Hover */}
-          {hov && (
-            <>
-              <line x1={hov.x} y1={PT} x2={hov.x} y2={PT + CH}
-                stroke="#8456e8" strokeWidth={1} strokeDasharray="4 3" strokeOpacity={0.35} />
-              <circle cx={hov.x} cy={hov.y} r={5.5} fill="white" stroke="#8456e8" strokeWidth={2.5} />
-              {/* Tooltip */}
-              {(() => {
-                const TW = 84, TH = 44, TR = 8
-                const tx = Math.min(Math.max(hov.x - TW / 2, PL), VW - PR - TW)
-                const ty = Math.max(PT + 4, hov.y - TH - 12)
-                return (
-                  <g>
-                    <rect x={tx} y={ty} width={TW} height={TH} rx={TR} fill="#1C1C1E" />
-                    <text x={tx + TW / 2} y={ty + 15} textAnchor="middle" fontSize={9.5}
-                      fill="rgba(255,255,255,0.55)" fontFamily="-apple-system,sans-serif">
-                      {fmtMesAbbr(hov.ym)}
-                    </text>
-                    <text x={tx + TW / 2} y={ty + 32} textAnchor="middle" fontSize={14}
-                      fontWeight="700" fill="white" fontFamily="-apple-system,sans-serif">
-                      {hov.v} pedido{hov.v !== 1 ? "s" : ""}
-                    </text>
-                  </g>
-                )
-              })()}
-            </>
-          )}
-        </svg>
-      </div>
-    </div>
-  )
-}
-
 // ── Sub-components ────────────────────────────────────────────────────────────
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <p className="text-[10.5px] uppercase tracking-wider font-bold text-[#8E8E93]">{children}</p>
-}
-
-function KpiCard({ icon, iconColor, iconBg, label, value, sub, subColor, highlight }: {
-  icon: React.ReactNode; iconColor: string; iconBg: string
-  label: string; value: string; sub?: string; subColor?: string; highlight?: boolean
-}) {
-  return (
-    <div className={`rounded-2xl px-5 py-4 ${highlight ? "ring-1 ring-[rgba(124,58,237,0.1)]" : ""}`} style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" }}>
-      <div className="flex items-center gap-2.5 mb-3">
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: iconBg, color: iconColor }}>{icon}</div>
-        <p className="text-[10.5px] uppercase tracking-wider font-semibold text-[#8E8E93] leading-tight">{label}</p>
-      </div>
-      <p className="text-[22px] font-bold ds-num text-[#1C1C1E] tracking-tight leading-none">{value}</p>
-      {sub && <p className="text-[11px] mt-1.5" style={{ color: subColor ?? "var(--text-faint)" }}>{sub}</p>}
-    </div>
-  )
-}
 
 function SmallKpi({ label, value, color, sub }: { label: string; value: string; color: string; sub?: string }) {
   return (

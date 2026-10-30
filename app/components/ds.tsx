@@ -280,20 +280,22 @@ export function ListaBarras({ itens, formatoValor, onClick }: {
 
 // ── Colunas (série mensal) ────────────────────────────────────────────────────
 
-export function Colunas({ itens, formato, altura = 140 }: {
-  itens: { rotulo: string; valor: number; destaque?: boolean }[]
+export function Colunas({ itens, formato, altura = 140, onClick }: {
+  itens: { rotulo: string; valor: number; destaque?: boolean; chave?: string }[]
   formato: (n: number) => string
   altura?: number
+  onClick?: (chave: string) => void
 }) {
   const max = Math.max(1, ...itens.map(i => i.valor))
   return (
     <div className="flex items-end gap-2" style={{ height: altura + 34 }}>
       {itens.map((it, idx) => (
-        <div key={it.rotulo} className="group flex-1 min-w-0 flex flex-col items-center justify-end h-full">
+        <div key={it.chave ?? it.rotulo} onClick={onClick ? () => onClick(it.chave ?? it.rotulo) : undefined}
+          className={cx("group flex-1 min-w-0 flex flex-col items-center justify-end h-full rounded-lg transition-colors", onClick && "cursor-pointer hover:bg-[rgba(132,86,232,0.04)]")}>
           <span className="text-[10.5px] ds-num text-[#898892] mb-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
             {formato(it.valor)}
           </span>
-          <div className="w-full max-w-[44px] rounded-t-md ds-cresce-y transition-colors"
+          <div className="w-full max-w-[44px] rounded-t-md ds-cresce-y transition-colors group-hover:brightness-95"
             style={{
               height: Math.max(2, (it.valor / max) * altura),
               background: it.destaque ? "#8456e8" : "rgba(132,86,232,0.22)",
