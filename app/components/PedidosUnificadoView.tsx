@@ -2,22 +2,23 @@
 
 import { useState, useEffect, useMemo, useRef } from "react"
 import {
-  Package, TrendingUp, CheckCircle2, Clock, AlertTriangle,
+  Package, TrendingUp, CheckCircle2,
   DollarSign, BarChart3, Factory, User, Users, Home, Building2, Megaphone, Wrench, ClipboardList,
-  CalendarDays,
+  CalendarDays, Search, X, Copy, ChevronDown, Check, Lock, Plus, Wallet, CalendarX2, CalendarClock,
 } from "lucide-react"
 import {
   KanbanCard, KanbanOpcao, Lote, LancamentoFinanceiro,
   NegocioParceiro, FormData, Calculo, PrazoEtapas,
-  COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO, COL_HOT,
+  COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO,
 } from "../types"
 import { brl, num } from "../utils"
 import { custoFixoPeriodo, rateioPorPedido } from "../lib/metrics"
-import { montarPedidos, margemContribuicao, producao as resumoProducao, Pedido } from "../lib/negocio"
+import { montarPedidos, margemContribuicao, Pedido } from "../lib/negocio"
 import { KanbanView } from "./KanbanView"
+import { CabecalhoPagina, Kpi, GradeKpis, Segmentado, Selo, Cartao, TituloCartao, ListaBarras, Gaveta, LinhaLista, Vazio } from "./ds"
 
-type Tab = "dashboard" | "lista" | "kanban"
-type FiltroStatus = "todos" | "andamento" | "entregue"
+type Tab = "lista" | "kanban" | "visao"
+type FiltroStatus = "todos" | "andamento" | "atrasados" | "prazo" | "receber" | "entregue"
 type OrdemPedidos = "cronologico" | "recente" | "valor" | "resultado" | "entrega"
 type HistItem = { form: FormData; calculo: Calculo; data: string; numero?: string }
 
@@ -67,6 +68,7 @@ export type OrderEntry = {
   dataFechamento?: string; dataEntregaPrevista?: string; dataEntregaReal?: string; prazoRecebimentoInterno?: string
   receitas: LancamentoFinanceiro[]; despesas: LancamentoFinanceiro[]
   precoTotal: number; totalPago: number; totalDespesa: number
+  aReceber: number; vencido: number
   specs: string; qtdTotal: number
 }
 
@@ -109,7 +111,7 @@ export function PedidosUnificadoView(props: Props) {
     negocios, onUpdateNegocio, onAddLancamento, onBulkUpdate, onCopiarPedido,
   } = props
 
-  const [tab, setTab]     = useState<Tab>("dashboard")
+  const [tab, setTab]     = useState<Tab>("lista")
   const [busca, setBusca] = useState("")
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
 
@@ -162,6 +164,7 @@ export function PedidosUnificadoView(props: Props) {
     }
 
     // Agrupamento, etapa e valores vêm da camada canônica (lib/negocio)
+    const hojeIso = new Date().toLocaleDateString("sv-SE")
     return montarPedidos(kanban, lancamentos).map(p => ({
       key: p.key, tipo: p.tipo, numero: p.numero, nomeCliente: p.nomeCliente, cards: p.cards, coluna: p.coluna,
       dataPedido: p.dataFechamento ?? "",
@@ -172,6 +175,8 @@ export function PedidosUnificadoView(props: Props) {
       receitas: p.receitas, despesas: p.despesas,
       precoTotal: p.valor, qtdTotal: p.quantidade,
       totalPago: p.recebido, totalDespesa: p.custoDireto,
+      aReceber: p.aReceber,
+      vencido: p.receitas.filter(l => l.status !== "pago" && l.dataVencimento < hojeIso).reduce((s, l) => s + l.valor, 0),
       specs: buildSpecs(p.cards),
     }))
   }, [kanban, lancamentos, histMap])
@@ -181,16 +186,12 @@ export function PedidosUnificadoView(props: Props) {
     receitaTotal:   allEntries.reduce((s, e) => s + e.precoTotal, 0),
   }), [lancamentos, allEntries])
 
-  const hoje = new Date()
+  const hoje = useMemo(() => new Date(), [])
 
   const lista = useMemo(() => {
     const q = busca.trim().toLowerCase()
     return allEntries
-      .filter(e => {
-        if (filtro === "andamento") return e.coluna !== COL_ENTREGUE
-        if (filtro === "entregue")  return e.coluna === COL_ENTREGUE
-        return true
-      })
+      .filter(e => passaFiltro(e, filtro, hoje))
       .filter(e => !q || e.nomeCliente.toLowerCase().includes(q) || e.numero.toLowerCase().includes(q))
       .sort((a, b) => {
         if (ordem === "cronologico") return b.dataPedido.localeCompare(a.dataPedido)
@@ -203,16 +204,21 @@ export function PedidosUnificadoView(props: Props) {
         }
         return 0
       })
-  }, [allEntries, filtro, busca, ordem])
+  }, [allEntries, filtro, busca, ordem, hoje])
 
   const kanbanFiltrado = useMemo(() => {
     let r = kanban
     const q = busca.trim().toLowerCase()
     if (q) r = r.filter(c => c.nomeCliente.toLowerCase().includes(q) || (c.numero ?? "").toLowerCase().includes(q))
     if (filtro === "andamento") r = r.filter(c => c.coluna >= COL_FECHADO && c.coluna !== COL_ENTREGUE && c.coluna !== COL_PERDIDO)
-    if (filtro === "entregue")  r = r.filter(c => c.coluna === COL_ENTREGUE)
+    else if (filtro === "entregue") r = r.filter(c => c.coluna === COL_ENTREGUE)
+    else if (filtro !== "todos") {
+      // Atrasados / prazo / a receber são definidos por pedido: mostra os cards desses pedidos
+      const ids = new Set(allEntries.filter(e => passaFiltro(e, filtro, new Date())).flatMap(e => e.cards.map(c => c.id)))
+      r = r.filter(c => ids.has(c.id))
+    }
     return r
-  }, [kanban, busca, filtro])
+  }, [kanban, busca, filtro, allEntries])
 
   const kpiConcluidos = useMemo(() => {
     const c = allEntries.filter(e => concluidos.has(e.key))
@@ -226,88 +232,87 @@ export function PedidosUnificadoView(props: Props) {
     return { cnt, fat, rec, custo, result, mkAvg, mgAvg }
   }, [allEntries, concluidos])
 
-  const cntAnd = allEntries.filter(e => e.coluna !== COL_ENTREGUE).length
-  const cntEnt = allEntries.filter(e => e.coluna === COL_ENTREGUE).length
+  const cnt = (f: FiltroStatus) => allEntries.filter(e => passaFiltro(e, f, hoje)).length
+  const emProd = allEntries.filter(e => passaFiltro(e, "andamento", hoje))
+  const atrasados = allEntries.filter(e => passaFiltro(e, "atrasados", hoje))
+  const prazo3 = allEntries.filter(e => passaFiltro(e, "prazo", hoje))
+  const aReceber = allEntries.reduce((s, e) => s + e.aReceber, 0)
+  const vencido = allEntries.reduce((s, e) => s + e.vencido, 0)
+  const entregues = allEntries.filter(e => e.coluna === COL_ENTREGUE)
 
-  const TAB = (active: boolean) =>
-    `px-4 py-2 text-[12.5px] font-semibold rounded-lg transition-colors ${
-      active ? "bg-white text-[#191625] shadow-sm" : "text-[#8E8E93] hover:text-[#5e5c68]"
-    }`
+  // Clicar num KPI filtra a lista (clicar de novo volta para todos)
+  const filtrar = (f: FiltroStatus) => {
+    setFiltro(atual => atual === f ? "todos" : f)
+    if (tab === "visao") setTab("lista")
+  }
 
-  const showFilterBar = tab !== "dashboard"
+  const FILTROS: { v: FiltroStatus; nome: string }[] = [
+    { v: "todos", nome: `Todos ${allEntries.length}` },
+    { v: "andamento", nome: `Em produção ${emProd.length}` },
+    { v: "atrasados", nome: `Atrasados ${atrasados.length}` },
+    { v: "receber", nome: `A receber ${cnt("receber")}` },
+    { v: "entregue", nome: `Entregues ${entregues.length}` },
+  ]
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" style={{ background: "var(--bg-page)" }}>
+      <div className="shrink-0 px-6 pt-6 pb-4 space-y-4 max-w-[1320px] w-full mx-auto">
+        <CabecalhoPagina
+          titulo="Pedidos"
+          sub={`${allEntries.length} pedidos · ${emProd.length} em produção · ${entregues.length} entregues`}
+          acoes={<Segmentado<Tab> valor={tab} onChange={setTab}
+            opcoes={[{ v: "lista", nome: "Lista" }, { v: "kanban", nome: "Quadro" }, { v: "visao", nome: "Visão geral" }]} />}
+        />
 
-      {/* Header */}
-      <div className="flex items-center justify-between px-8 pt-7 pb-5 shrink-0">
-        <div>
-          <h1 className="text-[20px] font-bold text-[#1C1C1E] tracking-tight">Pedidos</h1>
-          <p className="text-[12px] text-[#8E8E93] mt-0.5">
-            {allEntries.length} total · {cntAnd} em andamento · {cntEnt} entregues
-          </p>
-        </div>
-      </div>
+        <GradeKpis>
+          <Kpi rotulo="Em produção" icone={<Package className="w-3.5 h-3.5" />} tom="acento" destaque={filtro === "andamento"}
+            valor={emProd.length} formato={n => num(Math.round(n))} onClick={() => filtrar("andamento")}
+            sub={brl(emProd.reduce((s, e) => s + e.precoTotal, 0))} />
+          <Kpi rotulo="Atrasados" icone={<CalendarX2 className="w-3.5 h-3.5" />} tom={atrasados.length ? "perigo" : "sucesso"} destaque={filtro === "atrasados"}
+            valor={atrasados.length} formato={n => num(Math.round(n))} onClick={() => filtrar("atrasados")}
+            sub={atrasados.length ? "passaram da data de entrega" : "tudo no prazo"} />
+          <Kpi rotulo="Entregam em 3 dias" icone={<CalendarClock className="w-3.5 h-3.5" />} tom={prazo3.length ? "alerta" : "neutro"} destaque={filtro === "prazo"}
+            valor={prazo3.length} formato={n => num(Math.round(n))} onClick={() => filtrar("prazo")}
+            sub={`${allEntries.filter(e => e.coluna !== COL_ENTREGUE && !e.dataEntregaPrevista).length} sem data de entrega`} />
+          <Kpi rotulo="A receber" icone={<Wallet className="w-3.5 h-3.5" />} tom={vencido > 0 ? "perigo" : "neutro"} destaque={filtro === "receber"}
+            valor={aReceber} formato={brl} onClick={() => filtrar("receber")}
+            sub={vencido <= 0 ? "nada vencido" : vencido >= aReceber - 0.5 ? "tudo já venceu" : `${brl(vencido)} vencido`} />
+          <Kpi rotulo="Entregues" icone={<CheckCircle2 className="w-3.5 h-3.5" />} tom="sucesso" destaque={filtro === "entregue"}
+            valor={entregues.length} formato={n => num(Math.round(n))} onClick={() => filtrar("entregue")}
+            sub={brl(entregues.reduce((s, e) => s + e.precoTotal, 0))} />
+        </GradeKpis>
 
-      {/* Tab bar */}
-      <div className="px-8 pb-4 shrink-0">
-        <div className="inline-flex bg-[#F2F2F7] rounded-xl p-1 gap-0.5">
-          <button className={TAB(tab === "dashboard")} onClick={() => setTab("dashboard")}>Dashboard</button>
-          <button className={TAB(tab === "lista")} onClick={() => setTab("lista")}>Lista</button>
-          <button className={TAB(tab === "kanban")} onClick={() => setTab("kanban")}>Kanban</button>
-        </div>
-      </div>
-
-      {/* Filter bar — Lista e Kanban */}
-      {showFilterBar && (
-        <div className="px-8 pb-4 shrink-0 flex items-center gap-2 flex-wrap">
-          {/* Status pills */}
-          <div className="flex rounded-xl overflow-hidden border border-[rgba(0,0,0,0.1)] bg-white">
-            {([
-              ["todos",     `Todos (${allEntries.length})`],
-              ["andamento", `Em andamento (${cntAnd})`],
-              ["entregue",  `Entregues (${cntEnt})`],
-            ] as [FiltroStatus, string][]).map(([v, label]) => (
-              <button key={v} onClick={() => setFiltro(v)}
-                className="px-3 py-1.5 text-[11px] font-semibold transition-colors"
-                style={{ background: filtro === v ? "#161421" : "transparent", color: filtro === v ? "#fff" : "#8E8E93" }}>
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* Search */}
-          <div className="relative flex-1 min-w-[180px]">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8E8E93] pointer-events-none"
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-            </svg>
-            <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
-              placeholder="Buscar cliente, número…"
-              className="w-full border border-[rgba(0,0,0,0.12)] rounded-xl pl-9 pr-8 py-2 text-[12.5px] text-[#191625] placeholder:text-[rgba(60,60,67,0.36)] focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25 focus:border-[#8456e8] bg-white transition-all" />
-            {busca && (
-              <button onClick={() => setBusca("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-lg leading-none text-[rgba(60,60,67,0.36)] hover:text-[#191625]">×</button>
+        {tab !== "visao" && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <Segmentado<FiltroStatus> valor={filtro} onChange={setFiltro}
+              opcoes={tab === "kanban" ? FILTROS : [...FILTROS.slice(0, 3), { v: "prazo", nome: `Em 3 dias ${prazo3.length}` }, ...FILTROS.slice(3)]} />
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#898892] pointer-events-none" />
+              <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
+                placeholder="Buscar cliente ou número"
+                className="w-full h-9 rounded-lg pl-9 pr-8 text-[12.5px] text-[#191625] placeholder:text-[#898892] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] transition-all ds-borda" />
+              {busca && (
+                <button onClick={() => setBusca("")} className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded flex items-center justify-center text-[#898892] hover:text-[#191625]">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            {tab === "lista" && (
+              <select value={ordem} onChange={e => setOrdem(e.target.value as OrdemPedidos)}
+                className="h-9 rounded-lg px-3 text-[12.5px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 cursor-pointer ds-borda">
+                <option value="cronologico">Mais novos primeiro</option>
+                <option value="entrega">Entrega mais próxima</option>
+                <option value="valor">Maior valor</option>
+                <option value="resultado">Maior resultado</option>
+              </select>
             )}
           </div>
+        )}
+      </div>
 
-          {/* Sort (only lista) */}
-          {tab === "lista" && (
-            <select value={ordem} onChange={e => setOrdem(e.target.value as OrdemPedidos)}
-              className="border border-[rgba(0,0,0,0.12)] rounded-xl px-3 py-2 text-[12.5px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25 cursor-pointer transition-all">
-              <option value="cronologico">Cronológico</option>
-              <option value="recente">Mais recentes</option>
-              <option value="valor">Maior valor</option>
-              <option value="resultado">Maior resultado</option>
-              <option value="entrega">Entrega próxima</option>
-            </select>
-          )}
-        </div>
-      )}
-
-      {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {tab === "dashboard" ? (
-          <DashboardTab entries={allEntries} lancamentos={lancamentos} kanban={kanban} />
+        {tab === "visao" ? (
+          <DashboardTab entries={allEntries} lancamentos={lancamentos} kanban={kanban} onDetalhes={onDetalhes} />
         ) : tab === "lista" ? (
           <ListaTab
             lista={lista} busca={busca} expanded={expanded} concluidos={concluidos}
@@ -361,6 +366,26 @@ export function PedidosUnificadoView(props: Props) {
       )}
     </div>
   )
+}
+
+// Filtros por pedido (mesma regra para a lista, o quadro e os KPIs)
+function diasPara(iso: string, hoje: Date) {
+  return Math.round((new Date(iso + "T12:00:00").getTime() - new Date(hoje.toDateString()).getTime() - 12 * 3_600_000) / 86_400_000)
+}
+function passaFiltro(e: OrderEntry, f: FiltroStatus, hoje: Date): boolean {
+  const aberto = e.coluna !== COL_ENTREGUE
+  switch (f) {
+    case "todos":     return true
+    case "andamento": return aberto
+    case "entregue":  return !aberto
+    case "receber":   return e.aReceber > 0
+    case "atrasados": return aberto && !!e.dataEntregaPrevista && diasPara(e.dataEntregaPrevista, hoje) < 0
+    case "prazo": {
+      if (!aberto || !e.dataEntregaPrevista) return false
+      const d = diasPara(e.dataEntregaPrevista, hoje)
+      return d >= 0 && d <= 3
+    }
+  }
 }
 
 // ── BulkBar ───────────────────────────────────────────────────────────────────
@@ -497,7 +522,7 @@ function PrazosTimeline({
           <CalendarDays className="w-3.5 h-3.5 text-[#8456e8]" />
           <p className="text-[9px] font-bold uppercase tracking-wider text-[#8456e8]">Controle de Prazos</p>
         </div>
-        <span className="text-[9.5px] tabular-nums text-[#8E8E93]">{doneCnt}/{total} etapas</span>
+        <span className="text-[9.5px] ds-num text-[#8E8E93]">{doneCnt}/{total} etapas</span>
       </div>
 
       {/* Progress bar */}
@@ -559,188 +584,82 @@ function PrazosTimeline({
 
 // ── Dashboard Tab ─────────────────────────────────────────────────────────────
 
-function DashboardTab({ entries, lancamentos, kanban }: {
+function DashboardTab({ entries, onDetalhes }: {
   entries: OrderEntry[]
   lancamentos: LancamentoFinanceiro[]
   kanban: KanbanCard[]
+  onDetalhes?: (card: KanbanCard) => void
 }) {
-  const hoje = new Date()
-  const [modalMes, setModalMes] = useState<{ key: string; label: string; items: OrderEntry[] } | null>(null)
+  const [gaveta, setGaveta] = useState<{ titulo: string; sub: string; itens: OrderEntry[] } | null>(null)
 
   // Definições canônicas: pedido = lote (ou card avulso); etapa = item menos avançado
-  const emAndamento    = entries.filter(e => e.coluna !== COL_ENTREGUE)
-  const entregues      = entries.filter(e => e.coluna === COL_ENTREGUE)
-  const emProducao     = emAndamento.reduce((s, e) => s + e.precoTotal, 0)
-  const valorEntregue  = entregues.reduce((s, e) => s + e.precoTotal, 0)
   const contratado     = entries.reduce((s, e) => s + e.precoTotal, 0)
   const totalRecebido  = entries.reduce((s, e) => s + e.totalPago, 0)
-  const aReceber       = Math.max(0, contratado - totalRecebido)
+  const aReceber       = entries.reduce((s, e) => s + e.aReceber, 0)
+  const semCobranca    = Math.max(0, contratado - totalRecebido - aReceber)
   const ticketMedio    = entries.length > 0 ? contratado / entries.length : 0
 
-  const prod = resumoProducao(entries.map(e => ({ ...e, valor: e.precoTotal } as unknown as Pedido)), hoje)
-  const emAtraso    = prod.atrasados.length
-  const vencendoEm3 = prod.vencendo3d.length
-  const semData     = prod.semPrazo.length
-
   const margem = margemContribuicao(entries.map(e => ({ valor: e.precoTotal, custoDireto: e.totalDespesa } as Pedido)))
-  const margemMedia = margem.pct
 
   const mesesSet = new Set<string>()
   entries.forEach(e => { if (e.dataFechamento) mesesSet.add(e.dataFechamento.slice(0, 7)) })
-  const mesesAtivos = mesesSet.size || 1
-  const pedidosPorMes = entries.length / mesesAtivos
-
+  const pedidosPorMes = entries.length / (mesesSet.size || 1)
   const clientesUnicos = new Set(entries.map(e => e.nomeCliente.trim().toLowerCase())).size
   const pedidosPorCliente = clientesUnicos > 0 ? entries.length / clientesUnicos : 0
 
-  // Distribuição por etapa
-  // Conta PEDIDOS por etapa (não cards) — mesma unidade do "Em andamento"
-  const etapaCount: Record<number, number> = {}
-  entries.forEach(e => { etapaCount[e.coluna] = (etapaCount[e.coluna] ?? 0) + 1 })
-  const etapas = Object.entries(etapaCount)
-    .map(([col, cnt]) => ({ col: Number(col), cnt, ...STAGE[Number(col)] ?? { color: "#8E8E93", bg: "rgba(142,142,147,0.1)", label: COLUNAS_KANBAN[Number(col)] ?? "—" } }))
-    .sort((a, b) => a.col - b.col)
+  const etapaCount = new Map<number, { cnt: number; valor: number }>()
+  entries.forEach(e => {
+    const v = etapaCount.get(e.coluna) ?? { cnt: 0, valor: 0 }
+    etapaCount.set(e.coluna, { cnt: v.cnt + 1, valor: v.valor + e.precoTotal })
+  })
+  const etapas = [...etapaCount.entries()].sort((a, b) => a[0] - b[0])
 
-  const convColor = (margemMedia ?? 0) >= 40 ? "#15803d" : (margemMedia ?? 0) >= 20 ? "#c57800" : "#b91c1c"
+  const abrir = (titulo: string, itens: OrderEntry[]) =>
+    setGaveta({ titulo, sub: `${itens.length} ${itens.length === 1 ? "pedido" : "pedidos"} · ${brl(itens.reduce((s, i) => s + i.precoTotal, 0))}`, itens })
+
+  if (entries.length === 0) return (
+    <div className="px-6"><Vazio icone={<Package className="w-9 h-9" />} titulo="Nenhum pedido ainda" sub="Feche um orçamento para ele aparecer aqui." /></div>
+  )
 
   return (
-    <div className="px-8 pb-10 space-y-6">
-
-      {/* Modal: pedidos do mês clicado */}
-      {modalMes && (
-        <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }}
-          onClick={() => setModalMes(null)}
-        >
-          <div
-            className="w-full max-w-lg rounded-3xl overflow-hidden"
-            style={{ background: "var(--bg-surface)", boxShadow: "0 24px 64px rgba(0,0,0,0.22)" }}
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[rgba(60,60,67,0.08)]">
-              <div>
-                <p className="text-[10.5px] uppercase tracking-wider font-bold text-[#8E8E93]">Pedidos de</p>
-                <p className="text-[22px] font-bold text-[#1C1C1E] leading-tight">{modalMes.label}</p>
-                <p className="text-[12px] text-[#8E8E93] mt-0.5">{modalMes.items.length} pedido{modalMes.items.length !== 1 ? "s" : ""}</p>
-              </div>
-              <button
-                onClick={() => setModalMes(null)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-[#8E8E93] hover:text-[#1C1C1E] transition-colors"
-                style={{ background: "rgba(142,142,147,0.1)" }}
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-              </button>
-            </div>
-            {/* Lista */}
-            <div className="overflow-y-auto max-h-[55vh] divide-y divide-[rgba(60,60,67,0.06)]">
-              {modalMes.items.length === 0 ? (
-                <p className="px-6 py-8 text-center text-[13px] text-[#8E8E93]">Nenhum pedido neste período</p>
-              ) : modalMes.items.map(item => (
-                <div key={item.key} className="px-6 py-3.5 flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-[#1C1C1E] truncate">{item.numero || item.key}</p>
-                    <p className="text-[12px] text-[#8E8E93] truncate">{item.nomeCliente}</p>
-                  </div>
-                  <p className="text-[13px] font-bold text-[#1C1C1E] tabular-nums shrink-0">{brl(item.precoTotal ?? 0)}</p>
-                </div>
-              ))}
-            </div>
-            {/* Footer total */}
-            {modalMes.items.length > 0 && (
-              <div className="px-6 py-4 border-t border-[rgba(60,60,67,0.08)] flex items-center justify-between">
-                <p className="text-[12px] font-semibold text-[#8E8E93]">Total do mês</p>
-                <p className="text-[15px] font-bold text-[#8456e8] tabular-nums">
-                  {brl(modalMes.items.reduce((acc, i) => acc + (i.precoTotal ?? 0), 0))}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Gráfico de linha — topo */}
+    <div className="px-6 pb-10 space-y-4 max-w-[1320px] mx-auto ds-escalonado">
       {entries.length >= 2 && (
-        <PedidosLineChart
-          entries={entries}
-          onClickMes={ym => {
-            const items = entries.filter(e => e.dataFechamento?.startsWith(ym))
-            setModalMes({ key: ym, label: fmtMesAbbr(ym), items })
-          }}
-        />
+        <PedidosLineChart entries={entries}
+          onClickMes={ym => abrir(fmtMesAbbr(ym), entries.filter(e => e.dataFechamento?.startsWith(ym)))} />
       )}
 
-      {/* KPIs principais */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard icon={<Package className="w-4 h-4" />} iconColor="#7c3aed" iconBg="rgba(124,58,237,0.08)"
-          label="Em produção" value={String(emAndamento.length)} sub={emProducao > 0 ? `${brl(emProducao)} em pedidos` : "nenhum pedido ativo"} />
-        <KpiCard icon={<CheckCircle2 className="w-4 h-4" />} iconColor="#15803d" iconBg="rgba(22,163,74,0.08)"
-          label="Entregues" value={String(entregues.length)} sub={valorEntregue > 0 ? `${brl(valorEntregue)} entregue` : "pedidos concluídos"} subColor="#15803d" />
-        <KpiCard icon={<TrendingUp className="w-4 h-4" />} iconColor="#15803d" iconBg="rgba(22,163,74,0.08)"
-          label="Total contratado" value={contratado > 0 ? brl(contratado) : "—"} sub={`${entries.length} pedidos desde o início`} highlight />
-        <KpiCard icon={<DollarSign className="w-4 h-4" />} iconColor="#0ea5e9" iconBg="rgba(14,165,233,0.08)"
-          label="Recebido" value={brl(totalRecebido)} sub={aReceber > 0 ? `faltam ${brl(aReceber)}` : "tudo recebido"} subColor={aReceber > 0 ? "#c57800" : "#15803d"} />
-      </div>
+      <GradeKpis>
+        <Kpi rotulo="Total contratado" icone={<TrendingUp className="w-3.5 h-3.5" />} tom="acento" destaque
+          valor={contratado} formato={brl} sub={`${entries.length} pedidos desde o início`} onClick={() => abrir("Todos os pedidos", entries)} />
+        <Kpi rotulo="Recebido" icone={<DollarSign className="w-3.5 h-3.5" />} tom="sucesso"
+          valor={totalRecebido} formato={brl}
+          sub={semCobranca > 0 ? `${brl(semCobranca)} ainda sem cobrança lançada` : `${num(contratado > 0 ? totalRecebido / contratado * 100 : 0, 0)}% do contratado`}
+          onClick={semCobranca > 0 ? () => abrir("Sem cobrança lançada", entries.filter(e => e.precoTotal - e.totalPago - e.aReceber > 0.5)) : undefined} />
+        <Kpi rotulo="Ticket médio" icone={<BarChart3 className="w-3.5 h-3.5" />} valor={ticketMedio} formato={brl} sub="por pedido" />
+        <Kpi rotulo="Margem de contribuição" icone={<TrendingUp className="w-3.5 h-3.5" />}
+          tom={margem.pct == null ? "neutro" : margem.pct < 30 ? "perigo" : margem.pct < 45 ? "alerta" : "sucesso"}
+          valor={margem.pct} formato={n => `${num(n, 1)}%`}
+          sub={margem.pct != null ? `${margem.comCusto} de ${margem.total} pedidos com custo` : "sem custos lançados"}
+          onClick={() => abrir("Pedidos sem custo lançado", entries.filter(e => e.totalDespesa <= 0))} />
+        <Kpi rotulo="Ritmo" icone={<Users className="w-3.5 h-3.5" />} valor={pedidosPorMes} formato={n => `${num(n, 1)}/mês`}
+          sub={`${num(pedidosPorCliente, 1)} pedidos por cliente`} />
+      </GradeKpis>
 
-      {/* Alertas de prazo */}
-      <div>
-        <SectionLabel>Prazo de entrega</SectionLabel>
-        <div className="grid grid-cols-3 gap-3 mt-3">
-          <KpiCard icon={<AlertTriangle className="w-4 h-4" />} iconColor="#b91c1c" iconBg="rgba(185,28,28,0.08)"
-            label="Em atraso" value={String(emAtraso)} sub="prazo vencido" subColor={emAtraso > 0 ? "#b91c1c" : undefined} />
-          <KpiCard icon={<Clock className="w-4 h-4" />} iconColor="#c57800" iconBg="rgba(197,120,0,0.08)"
-            label="Vencendo em 3 dias" value={String(vencendoEm3)} sub="atenção urgente" subColor={vencendoEm3 > 0 ? "#c57800" : undefined} />
-          <KpiCard icon={<Clock className="w-4 h-4" />} iconColor="#8E8E93" iconBg="rgba(142,142,147,0.08)"
-            label="Sem data definida" value={String(semData)} sub="sem prazo registrado" />
-        </div>
-      </div>
+      <Cartao>
+        <TituloCartao titulo="Pedidos por etapa" icone={<Factory className="w-4 h-4" />} sub="Clique numa etapa para ver os pedidos" />
+        <ListaBarras formatoValor={brl} onClick={k => abrir(COLUNAS_KANBAN[Number(k)] ?? "Etapa", entries.filter(e => e.coluna === Number(k)))}
+          itens={etapas.map(([col, v]) => ({ chave: col, rotulo: COLUNAS_KANBAN[col] ?? "—", qtd: v.cnt, valor: v.valor, tom: col === COL_ENTREGUE ? "sucesso" as const : "acento" as const }))} />
+      </Cartao>
 
-      {/* KPIs financeiros */}
-      <div>
-        <SectionLabel>Financeiro</SectionLabel>
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
-          <KpiCard icon={<TrendingUp className="w-4 h-4" />} iconColor="#0ea5e9" iconBg="rgba(14,165,233,0.08)"
-            label="Ticket médio" value={ticketMedio > 0 ? brl(ticketMedio) : "—"} sub="por pedido" />
-          <KpiCard icon={<TrendingUp className="w-4 h-4" />} iconColor={convColor} iconBg={`${convColor}15`}
-            label="Margem de contribuição" value={margemMedia != null ? `${num(margemMedia, 1)}%` : "—"}
-            sub={margemMedia != null ? `${margem.comCusto} de ${margem.total} pedidos com custo lançado` : "Sem custos lançados"}
-            subColor={margemMedia != null ? convColor : undefined} />
-          <KpiCard icon={<BarChart3 className="w-4 h-4" />} iconColor="#7c3aed" iconBg="rgba(124,58,237,0.08)"
-            label="Pedidos por mês" value={num(pedidosPorMes, 1)} sub="média histórica" />
-          <KpiCard icon={<Users className="w-4 h-4" />} iconColor="#0ea5e9" iconBg="rgba(14,165,233,0.08)"
-            label="Pedidos por cliente" value={num(pedidosPorCliente, 1)} sub="média por cliente" />
-        </div>
-      </div>
-
-      {/* Distribuição por etapa */}
-      {etapas.length > 0 && (
-        <div>
-          <SectionLabel>Distribuição por etapa</SectionLabel>
-          <div className="mt-3 bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl p-5 space-y-2.5">
-            {etapas.map(e => (
-              <div key={e.col} className="flex items-center gap-3">
-                <span className="w-[130px] text-[11.5px] font-medium text-[#5e5c68] shrink-0">{e.label}</span>
-                <div className="flex-1 h-2 rounded-full bg-[rgba(0,0,0,0.05)] overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${(e.cnt / entries.length) * 100}%`, background: e.color }} />
-                </div>
-                <span className="w-6 text-right text-[12px] font-bold tabular-nums shrink-0" style={{ color: e.color }}>{e.cnt}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {entries.length === 0 && (
-        <div className="py-20 text-center">
-          <div className="flex justify-center mb-3"><Package className="w-10 h-10 text-[#c7c7cc]" /></div>
-          <p className="text-[14px] font-semibold text-[#5e5c68]">Nenhum pedido ainda</p>
-          <p className="text-[12px] text-[#8E8E93] mt-1">Feche um orçamento no Kanban para ele aparecer aqui</p>
-        </div>
-      )}
+      <Gaveta aberta={!!gaveta} titulo={gaveta?.titulo ?? ""} sub={gaveta?.sub} onFechar={() => setGaveta(null)}>
+        {gaveta?.itens.length === 0 && <Vazio icone={<Package className="w-8 h-8" />} titulo="Nenhum pedido" />}
+        {gaveta?.itens.map(e => (
+          <LinhaLista key={e.key} titulo={`${e.numero} · ${e.nomeCliente}`}
+            sub={`${COLUNAS_KANBAN[e.coluna] ?? "—"}${e.dataFechamento ? ` · fechado ${fmt(e.dataFechamento)}` : ""}`}
+            valor={brl(e.precoTotal)} valorSub={e.aReceber > 0 ? `falta ${brl(e.aReceber)}` : e.totalPago >= e.precoTotal - 0.5 ? "pago" : undefined}
+            onClick={onDetalhes ? () => { setGaveta(null); onDetalhes(e.cards[0]) } : undefined} />
+        ))}
+      </Gaveta>
     </div>
   )
 }
@@ -775,21 +694,18 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
   const innerBg = "rgba(116,116,128,0.03)"
 
   if (lista.length === 0) return (
-    <div className="py-16 text-center">
-      <p className="text-[13px] text-[#8E8E93]">
-        {busca ? `Nenhum resultado para "${busca}"` : "Nenhum pedido neste filtro"}
-      </p>
-    </div>
+    <Vazio icone={<Search className="w-8 h-8" />} titulo={busca ? `Nenhum resultado para "${busca}"` : "Nenhum pedido neste filtro"}
+      sub={busca ? undefined : "Clique de novo no número do topo para ver todos."} />
   )
 
   return (
-    <div className="px-8 pb-8 space-y-3">
+    <div className="px-6 pb-8 space-y-2 max-w-[1320px] mx-auto">
       {/* KPIs de concluídos */}
       {kpiConcluidos.cnt > 0 && (
-        <div className="rounded-2xl px-5 pt-4 pb-3 mb-1" style={{ background: "rgba(48,209,88,0.04)", border: "1px solid rgba(48,209,88,0.12)" }}>
+        <div className="rounded-xl px-5 pt-4 pb-3 mb-2 bg-white ds-cartao">
           <div className="flex items-center gap-2 mb-3">
-            <CheckCircle2 className="w-3.5 h-3.5 text-[#30D158]" />
-            <p className="text-[11px] font-bold text-[#30D158]">
+            <CheckCircle2 className="w-3.5 h-3.5 text-[#009351]" />
+            <p className="text-[12px] font-semibold text-[#191625]">
               {kpiConcluidos.cnt} {kpiConcluidos.cnt === 1 ? "pedido marcado como concluído" : "pedidos marcados como concluídos"}
             </p>
           </div>
@@ -805,10 +721,11 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
         </div>
       )}
 
-      <p className="text-[10px] uppercase tracking-wide font-semibold text-[#8E8E93] mb-1">
-        {lista.length} pedido{lista.length !== 1 ? "s" : ""}
+      <p className="text-[11px] font-medium text-[#898892] px-1 pb-1">
+        {lista.length} {lista.length === 1 ? "pedido" : "pedidos"}
       </p>
 
+      <div className="space-y-2 ds-escalonado">
       {lista.map(entry => {
         const stage = STAGE[entry.coluna] ?? { color: "#8E8E93", bg: "rgba(142,142,147,0.1)", label: COLUNAS_KANBAN[entry.coluna] ?? "—" }
         const resultado = entry.totalPago - entry.totalDespesa
@@ -827,9 +744,9 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
         const quaseVenc = diasEnt !== null && diasEnt >= 0 && diasEnt <= 3
 
         return (
-          <div key={entry.key} className="rounded-2xl overflow-hidden hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-all duration-200"
-            style={{ background: entry.cards.some(c => selectedCardIds?.has(c.id)) ? "rgba(132,86,232,0.06)" : "white", border: `1px solid ${entry.cards.some(c => selectedCardIds?.has(c.id)) ? "#8456e8" : "var(--border)"}` }}>
-            <div className="group/row flex items-center gap-3 px-5 py-3.5 cursor-pointer select-none" onClick={e => {
+          <div key={entry.key} className={`rounded-xl overflow-hidden ds-cartao ${isOpen ? "shadow-[0_8px_24px_rgba(25,22,37,0.07)]" : "hover:shadow-[0_4px_14px_rgba(25,22,37,0.06)]"}`}
+            style={{ background: entry.cards.some(c => selectedCardIds?.has(c.id)) ? "rgba(132,86,232,0.06)" : "white", borderColor: entry.cards.some(c => selectedCardIds?.has(c.id)) ? "#8456e8" : undefined }}>
+            <div className="group/row flex items-center gap-3 px-5 py-3.5 cursor-pointer select-none hover:bg-[rgba(116,116,128,0.03)] transition-colors" onClick={e => {
               if (e.metaKey || e.ctrlKey) { e.preventDefault(); entry.cards.forEach(c => onSelectCard?.(c.id)) }
               else toggle(entry.key)
             }}>
@@ -837,25 +754,32 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-[13px] font-semibold leading-snug truncate" style={{ color: txt }}>{entry.nomeCliente}</span>
-                  <span className="text-[9px] font-bold px-1.5 py-[2px] rounded-md tabular-nums bg-[rgba(80,9,196,0.1)] text-[#8456e8]">{entry.numero}</span>
-                  {entry.tipo === "lote" && (
-                    <span className="text-[9px] font-semibold px-1.5 py-[2px] rounded-md bg-[rgba(90,200,250,0.15)] text-[#0099cc]">Lote</span>
-                  )}
-                  <span className="text-[9px] font-semibold px-1.5 py-[2px] rounded-md" style={{ background: stage.bg, color: stage.color }}>{stage.label}</span>
+                  <Selo tom="acento">{entry.numero}</Selo>
+                  {entry.tipo === "lote" && entry.cards.length > 1 && <Selo tom="info">{entry.cards.length} itens</Selo>}
+                  <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full text-[10.5px] font-semibold" style={{ background: stage.bg, color: stage.color }}>{stage.label}</span>
                 </div>
-                <p className="text-[10px] mt-0.5 truncate" style={{ color: sub }}>
+                <p className="text-[11px] mt-1 truncate" style={{ color: sub }}>
                   {entry.dataPedido ? fmt(entry.dataPedido) : "Sem data"}{entry.specs ? ` · ${entry.specs}` : ""}{entry.qtdTotal > 0 ? ` · ${num(entry.qtdTotal)} un` : ""}
                 </p>
               </div>
-              <div className="text-right shrink-0 space-y-0.5">
-                <p className="text-[13px] font-bold tabular-nums" style={{ color: txt }}>{brl(entry.precoTotal)}</p>
+              <div className="text-right shrink-0 w-[150px] hidden sm:block">
                 {entry.coluna === COL_ENTREGUE ? (
-                  <p className="text-[9.5px] font-semibold text-[#30D158]">Entregue {entry.dataEntregaReal ? fmt(entry.dataEntregaReal) : ""}</p>
+                  <p className="text-[11px] font-semibold text-[#009351]">Entregue {entry.dataEntregaReal ? fmt(entry.dataEntregaReal) : ""}</p>
                 ) : entregaDate ? (
-                  <p className="text-[9.5px] font-semibold tabular-nums" style={{ color: emAtraso ? "#d33a3c" : quaseVenc ? "#c57800" : sub }}>
-                    {emAtraso ? `${Math.abs(diasEnt!)}d atraso` : diasEnt === 0 ? "Hoje" : `${diasEnt}d`}
+                  <p className="text-[11px] font-semibold" style={{ color: emAtraso ? "#d33a3c" : quaseVenc ? "#c57800" : sub }}>
+                    {emAtraso ? `${Math.abs(diasEnt!)} ${Math.abs(diasEnt!) === 1 ? "dia" : "dias"} de atraso` : diasEnt === 0 ? "Entrega hoje" : diasEnt === 1 ? "Entrega amanhã" : `Entrega em ${diasEnt} dias`}
                   </p>
-                ) : null}
+                ) : <p className="text-[11px] text-[#898892]">Sem data de entrega</p>}
+                <p className="text-[10.5px] text-[#898892] mt-0.5">{entregaDate && entry.coluna !== COL_ENTREGUE ? fmtFull(entregaDate) : ""}</p>
+              </div>
+              <div className="text-right shrink-0 w-[150px] whitespace-nowrap">
+                <p className="text-[13.5px] font-semibold ds-num" style={{ color: txt }}>{brl(entry.precoTotal)}</p>
+                <p className={`text-[10.5px] mt-0.5 ds-num ${entry.vencido > 0 ? "text-[#d33a3c] font-semibold" : entry.aReceber > 0 || entry.totalPago < entry.precoTotal - 0.5 ? "text-[#c57800]" : "text-[#009351]"}`}>
+                  {entry.vencido > 0 ? `${brl(entry.vencido)} vencido`
+                    : entry.aReceber > 0 ? `falta ${brl(entry.aReceber)}`
+                    : entry.totalPago >= entry.precoTotal - 0.5 ? "pago"
+                    : entry.totalPago > 0 ? `a cobrar ${brl(entry.precoTotal - entry.totalPago)}` : "sem cobrança lançada"}
+                </p>
               </div>
               {entry.coluna === COL_ENTREGUE && (() => {
                 const done = concluidos.has(entry.key)
@@ -867,7 +791,7 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
                       color: done ? "#30D158" : sub,
                       border: `1px solid ${done ? "rgba(48,209,88,0.25)" : "transparent"}`,
                     }}>
-                    {done ? <><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>Concluído</> : "Concluir"}
+                    {done ? <><Check className="w-3 h-3" />Concluído</> : "Concluir"}
                   </button>
                 )
               })()}
@@ -878,41 +802,29 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
                   className="shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity duration-150 p-1.5 rounded-lg hover:bg-[rgba(132,86,232,0.12)]"
                   style={{ color: "#8456e8" }}
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <rect x="9" y="9" width="13" height="13" rx="2" />
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                  </svg>
+                  <Copy className="w-3.5 h-3.5" />
                 </button>
               )}
-              <svg className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-                style={{ color: sub }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-              </svg>
+              <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} style={{ color: sub }} />
             </div>
 
             {isOpen && (
-              <div style={{ borderTop: `1px solid ${divider}` }}>
+              <div className="apple-slide-up" style={{ borderTop: `1px solid ${divider}` }}>
                 <div className="px-5 pt-3 pb-3">
                   {(() => {
-                    const markup = entry.totalDespesa > 0 ? entry.precoTotal / entry.totalDespesa : null
                     return (
-                      <div className="grid grid-cols-3 gap-2">
-                        <SmallKpi label="Valor" value={brl(entry.precoTotal)} color={txt} />
-                        <SmallKpi label="Recebido" value={brl(entry.totalPago)} color="#30D158" sub={`${num(percPago, 0)}% pago`} />
-                        <SmallKpi label="Custos" value={brl(entry.totalDespesa)} color={entry.totalDespesa > 0 ? "#d33a3c" : sub}
-                          sub={entry.despesas.filter(l => l.status === "pago" || l.formaPagamento === "conta").length > 0 ? `${entry.despesas.filter(l => l.status === "pago" || l.formaPagamento === "conta").length} lanç.` : "Sem despesas"} />
-                        <SmallKpi label="Margem" value={margemPct != null ? `${num(margemPct, 1)}%` : "—"}
-                          color={margemPct == null ? sub : margemPct >= 40 ? "#30D158" : margemPct >= 20 ? "#c57800" : "#d33a3c"}
-                          sub={margemPct != null ? (margemPct >= 40 ? "Boa" : margemPct >= 20 ? "Razoável" : "Baixa") : "Sem dados"} />
-                        <SmallKpi label="Markup" value={markup != null ? `${num(markup, 2)}x` : "—"}
-                          color={markup == null ? sub : markup >= 2 ? "#30D158" : markup >= 1.5 ? "#c57800" : "#d33a3c"}
-                          sub={markup != null ? (markup >= 2 ? "Bom" : markup >= 1.5 ? "Razoável" : "Baixo") : "Sem custos"} />
-                        <SmallKpi label="M. Contrib." value={brl(resultado)} color={resultado > 0 ? "#8456e8" : resultado < 0 ? "#d33a3c" : sub}
-                          sub={resultado > 0 ? "Positiva" : resultado < 0 ? "Negativa" : "Zero"} />
-                        {custoFixoTotal > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                        <SmallKpi label="Valor" value={brl(entry.precoTotal)} color={txt} sub={`${num(entry.qtdTotal)} un`} />
+                        <SmallKpi label="Recebido" value={brl(entry.totalPago)} color="#009351" sub={`${num(percPago, 0)}% pago`} />
+                        <SmallKpi label="Custos lançados" value={brl(entry.totalDespesa)} color={entry.totalDespesa > 0 ? "#d33a3c" : sub}
+                          sub={entry.totalDespesa > 0 ? `${entry.despesas.filter(l => l.status === "pago" || l.formaPagamento === "conta").length} lançamentos` : "nenhum ainda"} />
+                        <SmallKpi label="Margem de contribuição" value={margemPct != null && entry.totalDespesa > 0 ? `${num(margemPct, 1)}%` : "—"}
+                          color={margemPct == null || entry.totalDespesa <= 0 ? sub : margemPct >= 45 ? "#009351" : margemPct >= 30 ? "#c57800" : "#d33a3c"}
+                          sub={entry.totalDespesa > 0 ? brl(entry.precoTotal - entry.totalDespesa) : "lance os custos para ver"} />
+                        {custoFixoTotal > 0 && entry.totalDespesa > 0 ? (
                           <SmallKpi label="Lucro líquido" value={margemLiqPct != null ? `${num(margemLiqPct, 1)}%` : "—"}
-                            color={lucroLiq >= 0 ? "#009351" : "#d33a3c"} sub={brl(lucroLiq)} />
-                        )}
+                            color={lucroLiq >= 0 ? "#009351" : "#d33a3c"} sub={`${brl(lucroLiq)} após custo fixo`} />
+                        ) : <SmallKpi label="Resultado de caixa" value={brl(resultado)} color={resultado >= 0 ? txt : "#d33a3c"} sub="recebido − custos" />}
                       </div>
                     )
                   })()}
@@ -937,9 +849,7 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
                     )}
                     {onSalvarPrazoRecebimentoInterno && (
                       <span className="flex items-center gap-1.5 ml-1">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#8456e8", flexShrink: 0 }}>
-                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                        </svg>
+                        <Lock className="w-2.5 h-2.5 shrink-0 text-[#8456e8]" />
                         <span className="text-[10px] font-medium" style={{ color: "#8456e8" }}>Recebimento interno</span>
                         <input type="date"
                           defaultValue={entry.prazoRecebimentoInterno ?? ""}
@@ -958,14 +868,14 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
                         e.stopPropagation()
                         const card = entry.cards[0]
                         onNovoLancamento({ nomeCliente: card.nomeCliente, loteId: card.loteId ?? undefined, loteNumero: card.loteNumero ?? undefined, cardId: card.loteId ? undefined : card.id, cardNumero: card.loteId ? undefined : card.numero })
-                      }} className="text-[10.5px] font-semibold px-3 py-1.5 rounded-xl transition-colors bg-[rgba(60,60,67,0.07)] hover:bg-[rgba(60,60,67,0.12)]" style={{ color: txt }}>
-                        + Lançamento
+                      }} className="h-8 px-3 rounded-lg text-[12px] font-semibold inline-flex items-center gap-1.5 transition-colors bg-white hover:bg-[rgba(116,116,128,0.06)] ds-borda" style={{ color: txt }}>
+                        <Plus className="w-3.5 h-3.5" /> Lançamento
                       </button>
                     )}
                     {onDetalhes && (
                       <button onClick={e => { e.stopPropagation(); onDetalhes(entry.cards[0]) }}
-                        className="text-[10.5px] font-semibold px-3 py-1.5 rounded-xl transition-colors bg-[rgba(80,9,196,0.08)] hover:bg-[rgba(80,9,196,0.14)] text-[#8456e8]">
-                        Ver pedido
+                        className="h-8 px-3 rounded-lg text-[12px] font-semibold transition-colors bg-[#8456e8] hover:bg-[#7445d4] text-white">
+                        Abrir pedido
                       </button>
                     )}
                   </div>
@@ -983,7 +893,7 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
                               <span className="truncate" style={{ color: txt }}>{card.numero || card.nomeCliente}</span>
                               <span className="text-[9px] font-semibold px-1.5 py-[2px] rounded-md shrink-0" style={{ background: s.bg, color: s.color }}>{s.label}</span>
                             </div>
-                            <span className="font-semibold tabular-nums shrink-0 ml-3" style={{ color: txt }}>{brl(card.preco)} · {num(card.quantidade)} un</span>
+                            <span className="font-semibold ds-num shrink-0 ml-3" style={{ color: txt }}>{brl(card.preco)} · {num(card.quantidade)} un</span>
                           </div>
                         )
                       })}
@@ -995,14 +905,14 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
                   <div className="px-5 pt-3 pb-2" style={{ borderTop: `1px solid ${divider}`, background: innerBg }}>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[9px] font-bold uppercase tracking-wider text-[#30D158]">Entradas</p>
-                      <p className="text-[10px] font-semibold tabular-nums text-[#30D158]">{brl(entry.receitas.filter(l => l.status === "pago").reduce((s,l) => s + l.valor, 0))} recebido</p>
+                      <p className="text-[10px] font-semibold ds-num text-[#30D158]">{brl(entry.receitas.filter(l => l.status === "pago").reduce((s,l) => s + l.valor, 0))} recebido</p>
                     </div>
                     <div className="space-y-0.5">
                       {entry.receitas.filter(l => l.status === "pago").map(l => (
                         <div key={l.id} className="flex items-center gap-2.5 py-1.5">
                           <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-[#30D158]" />
                           <span className="flex-1 text-[11.5px] truncate" style={{ color: txt }}>{l.descricao || "Recebimento"}</span>
-                          <span className="text-[11.5px] font-bold tabular-nums shrink-0 text-[#30D158]">{brl(l.valor)}</span>
+                          <span className="text-[11.5px] font-bold ds-num shrink-0 text-[#30D158]">{brl(l.valor)}</span>
                           {l.dataPagamento && <span className="text-[10px] shrink-0" style={{ color: sub }}>{fmt(l.dataPagamento)}</span>}
                           {l.formaPagamento && <span className="text-[10px] shrink-0" style={{ color: sub }}>{formaPagLabel(l.formaPagamento)}</span>}
                         </div>
@@ -1015,14 +925,14 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
                   <div className="px-5 pt-3 pb-4" style={{ borderTop: `1px solid ${divider}`, background: innerBg }}>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[9px] font-bold uppercase tracking-wider text-[#d33a3c]">Saídas / Custos</p>
-                      <p className="text-[10px] font-semibold tabular-nums text-[#d33a3c]">{brl(entry.despesas.filter(l => l.status === "pago" || l.formaPagamento === "conta").reduce((s,l) => s + l.valor, 0))} pago</p>
+                      <p className="text-[10px] font-semibold ds-num text-[#d33a3c]">{brl(entry.despesas.filter(l => l.status === "pago" || l.formaPagamento === "conta").reduce((s,l) => s + l.valor, 0))} pago</p>
                     </div>
                     <div className="space-y-0.5">
                       {entry.despesas.filter(l => l.status === "pago" || l.formaPagamento === "conta").map(l => (
                         <div key={l.id} className="flex items-center gap-2.5 py-1.5">
                           <CatIcon cat={l.categoria} className="w-3 h-3 shrink-0 text-[#9ca3af]" />
                           <span className="flex-1 text-[11.5px] truncate" style={{ color: txt }}>{l.descricao || "Despesa"}</span>
-                          <span className="text-[11.5px] font-bold tabular-nums shrink-0 text-[#d33a3c]">−{brl(l.valor)}</span>
+                          <span className="text-[11.5px] font-bold ds-num shrink-0 text-[#d33a3c]">−{brl(l.valor)}</span>
                           {l.formaPagamento === "conta"
                             ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 shrink-0">conta</span>
                             : l.dataPagamento && <span className="text-[10px] shrink-0" style={{ color: sub }}>{fmt(l.dataPagamento)}</span>
@@ -1043,6 +953,7 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
           </div>
         )
       })}
+      </div>
     </div>
   )
 }
@@ -1141,18 +1052,18 @@ function PedidosLineChart({ entries, onClickMes }: { entries: OrderEntry[]; onCl
         <div className="px-6 pt-5 pb-4 flex items-start gap-10 border-b border-[rgba(0,0,0,0.04)]">
           <div>
             <p className="text-[10.5px] uppercase tracking-wider font-bold text-[#8E8E93] mb-1">Este mês</p>
-            <p className="text-[32px] font-bold text-[#1C1C1E] tabular-nums leading-none">{mesAtual}</p>
+            <p className="text-[32px] font-bold text-[#1C1C1E] ds-num leading-none">{mesAtual}</p>
             <p className="text-[11px] text-[#8E8E93] mt-1">pedidos fechados</p>
           </div>
           <div>
             <p className="text-[10.5px] uppercase tracking-wider font-bold text-[#8E8E93] mb-1">Média mensal</p>
-            <p className="text-[32px] font-bold text-[#8456e8] tabular-nums leading-none">{num(mediaVal, 1)}</p>
+            <p className="text-[32px] font-bold text-[#8456e8] ds-num leading-none">{num(mediaVal, 1)}</p>
             <p className="text-[11px] text-[#8E8E93] mt-1">nos últimos {totalMeses} meses</p>
           </div>
           {hovIdx !== null && hovIdx !== currentIdx && (
             <div className="transition-all">
               <p className="text-[10.5px] uppercase tracking-wider font-bold text-[#8E8E93] mb-1">{fmtMesAbbr(meses[hovIdx][0])}</p>
-              <p className="text-[32px] font-bold text-[#1C1C1E] tabular-nums leading-none">{meses[hovIdx][1]}</p>
+              <p className="text-[32px] font-bold text-[#1C1C1E] ds-num leading-none">{meses[hovIdx][1]}</p>
               <p className="text-[11px] text-[#8E8E93] mt-1">pedidos</p>
             </div>
           )}
@@ -1263,7 +1174,7 @@ function KpiCard({ icon, iconColor, iconBg, label, value, sub, subColor, highlig
         <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: iconBg, color: iconColor }}>{icon}</div>
         <p className="text-[10.5px] uppercase tracking-wider font-semibold text-[#8E8E93] leading-tight">{label}</p>
       </div>
-      <p className="text-[22px] font-bold tabular-nums text-[#1C1C1E] tracking-tight leading-none">{value}</p>
+      <p className="text-[22px] font-bold ds-num text-[#1C1C1E] tracking-tight leading-none">{value}</p>
       {sub && <p className="text-[11px] mt-1.5" style={{ color: subColor ?? "var(--text-faint)" }}>{sub}</p>}
     </div>
   )
@@ -1271,10 +1182,10 @@ function KpiCard({ icon, iconColor, iconBg, label, value, sub, subColor, highlig
 
 function SmallKpi({ label, value, color, sub }: { label: string; value: string; color: string; sub?: string }) {
   return (
-    <div className="rounded-xl p-2.5" style={{ background: "rgba(116,116,128,0.05)", border: "1px solid rgba(116,116,128,0.08)" }}>
-      <p className="text-[8.5px] uppercase tracking-wide font-semibold mb-1 text-[rgba(142,142,147,0.8)]">{label}</p>
-      <p className="text-[14px] font-bold tabular-nums leading-none" style={{ color }}>{value}</p>
-      {sub && <p className="text-[9.5px] mt-0.5 text-[rgba(142,142,147,0.7)]">{sub}</p>}
+    <div className="rounded-lg px-3 py-2.5 bg-[rgba(116,116,128,0.05)]">
+      <p className="text-[10.5px] font-medium mb-1.5 text-[#898892]">{label}</p>
+      <p className="text-[15px] font-semibold ds-num leading-none" style={{ color }}>{value}</p>
+      {sub && <p className="text-[10.5px] mt-1 text-[#898892]">{sub}</p>}
     </div>
   )
 }

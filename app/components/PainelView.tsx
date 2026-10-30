@@ -44,7 +44,6 @@ const brlCurto = (n: number) =>
   : Math.abs(n) >= 10_000 ? `R$ ${num(n / 1000, 1)} mil`
   : brl(n)
 const pct = (n: number) => `${num(n, 1)}%`
-const inteiro = (n: number) => num(Math.round(n))
 const dataCurta = (iso?: string) => {
   const d = parseData(iso)
   return d ? d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "") : "—"
