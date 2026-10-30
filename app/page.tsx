@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
-import { Ruler, Factory } from "lucide-react"
+import { Ruler, Factory, LayoutDashboard, FileText, Package, Users, Truck, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Trophy } from "lucide-react"
 import { signOut } from "next-auth/react"
 import WhatsAppView from "./components/WhatsAppView"
 import Image from "next/image"
@@ -37,6 +37,7 @@ import { Configuracoes, CONFIG_PADRAO } from "./config"
 import LayoutChapaVisual from "./LayoutChapaVisual"
 import { RotasProducao } from "./components/RotasProducao"
 import { FornecedoresView } from "./components/FornecedoresView"
+import { PainelView } from "./components/PainelView"
 import { normalizarProducao } from "./lib/producao"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
 import FormaView from "./FormaView"
@@ -167,7 +168,7 @@ export default function Home() {
   const [editandoHistorico, setEditandoHistorico] = useState<string | null>(null)
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
   const [contador, setContador] = useState<number>(0)
-  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores">("dashboard")
+  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel">("painel")
   const [perfilClienteExterno, setPerfilClienteExterno] = useState<string | null>(null)
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
   const [modalSalvar, setModalSalvar] = useState<{ form: FormData; calculo: Calculo; numero: string; data: string; cardId: string } | null>(null)
@@ -266,7 +267,7 @@ export default function Home() {
   // Persist main view across F5 — read on mount, write in navigate()
   useEffect(() => {
     const saved = sessionStorage.getItem("app:view")
-    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores"]
+    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel"]
     if (saved && valid.includes(saved)) setView(saved as typeof view)
   }, [])
 
@@ -470,6 +471,15 @@ export default function Home() {
     }
     salvarConfigTudo({ ...config, producao: { ...prod, ferramentais: [...prod.ferramentais, faca] } })
     showToast(`Faca de ${faca.cavidades} registrada para ${faca.cliente}`)
+  }
+
+  // Abre o detalhe certo de um card (orçamento salvo, proposta personalizada ou card simples)
+  function abrirDetalheCard(card: KanbanCard) {
+    const histItem = historico.find(h => h.numero === card.numero)
+    if (histItem) { setDetalheModal({ tipo: "historico", item: histItem, card }); return }
+    const proposta = propostasCustom.find(p => p.cardId === card.id)
+    if (proposta) { setDetalheModal({ tipo: "proposta", proposta, card }); return }
+    setDetalheModal({ tipo: "kanban", card })
   }
 
   function showToast(msg: string) {
@@ -1269,44 +1279,40 @@ export default function Home() {
             <kbd className="text-[9px] bg-white/[0.07] text-zinc-500 group-hover:text-zinc-400 px-1.5 py-0.5 rounded font-medium shrink-0">⌘K</kbd>
           </button>
 
-          <NavItem active={view === "dashboard"} onClick={() => navigate("dashboard")} label="Dashboard"
-            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" /></svg>}
-          />
+          <NavItem active={view === "painel"} onClick={() => navigate("painel")} label="Painel"
+            icon={<LayoutDashboard className="w-4 h-4" strokeWidth={1.8} />} />
 
-          <NavItem active={view === "orcamentos" || view === "historico"} onClick={() => navigate("orcamentos")} label="Orçamentos"
-            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" /></svg>}
-          />
-
+          <NavGroup label="Vendas" />
+          <NavItem active={view === "orcamentos" || view === "historico" || view === "orcamento"} onClick={() => navigate("orcamentos")} label="Orçamentos"
+            icon={<FileText className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "pedidos"} onClick={() => navigate("pedidos")} label="Pedidos"
-            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" /></svg>}
-          />
+            icon={<Package className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "clientes"} onClick={() => navigate("clientes")} label="Clientes"
-            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>}
-          />
-          <NavItem active={view === "parceiros"} onClick={() => navigate("parceiros")} label="Parceiros"
-            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z" /></svg>}
-          />
+            icon={<Users className="w-4 h-4" strokeWidth={1.8} />} />
+
+          <NavGroup label="Produção" />
           <NavItem active={view === "fornecedores"} onClick={() => navigate("fornecedores")} label="Fornecedores"
-            icon={<Factory className="w-4 h-4" strokeWidth={1.8} />}
-          />
+            icon={<Factory className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "terceirizados"} onClick={() => navigate("terceirizados")} label="Terceirizados"
-            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" /></svg>}
-          />
+            icon={<Truck className="w-4 h-4" strokeWidth={1.8} />} />
+
+          <NavGroup label="Gestão" />
           <NavItem active={view === "financeiro"} onClick={() => navigate("financeiro")} label="Financeiro"
-            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" /></svg>}
-          />
+            icon={<Wallet className="w-4 h-4" strokeWidth={1.8} />} />
+          <NavItem active={view === "dashboard"} onClick={() => navigate("dashboard")} label="Análises"
+            icon={<BarChart3 className="w-4 h-4" strokeWidth={1.8} />} />
+          <NavItem active={view === "parceiros"} onClick={() => navigate("parceiros")} label="Parceiros"
+            icon={<Handshake className="w-4 h-4" strokeWidth={1.8} />} />
+
+          <NavGroup label="Ferramentas" />
           <NavItem active={view === "meta"} onClick={() => navigate("meta")} label="Campanhas"
-            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6" /></svg>}
-          />
-          <NavItem active={view === "conquistas"} onClick={() => navigate("conquistas")} label="Conquistas"
-            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 0 1-.982-3.172M9.497 14.25a7.454 7.454 0 0 0 .981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 0 0 7.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 0 0 2.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 0 1 2.916.52 6.003 6.003 0 0 1-5.395 4.972m0 0a6.726 6.726 0 0 1-2.749 1.35m0 0a6.772 6.772 0 0 1-3.044 0" /></svg>}
-          />
+            icon={<Megaphone className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "whatsapp"} onClick={() => navigate("whatsapp")} label="WhatsApp"
-            icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.532 5.862L.057 23.929a.5.5 0 0 0 .614.614l6.067-1.475A11.944 11.944 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.933 0-3.742-.523-5.289-1.433l-.378-.225-3.924.953.953-3.924-.225-.378A9.956 9.956 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>}
-          />
+            icon={<MessageCircle className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "forma"} onClick={() => navigate("forma")} label="Forma IA"
-            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" /></svg>}
-          />
+            icon={<Box className="w-4 h-4" strokeWidth={1.8} />} />
+          <NavItem active={view === "conquistas"} onClick={() => navigate("conquistas")} label="Conquistas"
+            icon={<Trophy className="w-4 h-4" strokeWidth={1.8} />} />
         </div>
 
         {/* Sidebar gamificação widgets */}
@@ -1858,8 +1864,21 @@ export default function Home() {
         )}
 
         {/* ──── ÁREA PRINCIPAL ────────────────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto">
-          {view === "dashboard" ? (
+        <main key={view} className="flex-1 overflow-y-auto ds-troca-tela">
+          {view === "painel" ? (
+            <PainelView
+              kanban={kanban}
+              lancamentos={lancamentos}
+              historico={historico}
+              propostasCustom={propostasCustom}
+              clientes={clientes}
+              config={config}
+              onAbrirCard={abrirDetalheCard}
+              onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }}
+              onNavegar={v => navigate(v)}
+              onNovoOrcamento={() => navigate("orcamento")}
+            />
+          ) : view === "dashboard" ? (
             <DashboardView
               historico={historico}
               kanban={kanban}

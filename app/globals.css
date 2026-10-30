@@ -177,3 +177,44 @@ html.dark ::-webkit-scrollbar-thumb:hover { background: #4a4560; }
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; }
+
+/* ── Sistema de componentes (app/components/ds.tsx) ── */
+.ds-cartao {
+  border: 1px solid rgba(60, 60, 67, 0.08);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: box-shadow .22s cubic-bezier(.25,.46,.45,.94), transform .22s cubic-bezier(.25,.46,.45,.94), border-color .22s;
+}
+.ds-clicavel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(25, 22, 37, 0.07), 0 2px 6px rgba(25, 22, 37, 0.04);
+  border-color: rgba(132, 86, 232, 0.18);
+}
+.ds-clicavel:active { transform: translateY(0) scale(.99); }
+.ds-borda { border: 1px solid rgba(60, 60, 67, 0.14); }
+html.dark .ds-cartao { border-color: #312e3e; box-shadow: none; }
+html.dark .ds-borda  { border-color: #312e3e; }
+
+@keyframes ds-sobe     { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes ds-cresce-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes ds-cresce-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes ds-gaveta   { from { transform: translateX(32px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* fill-mode backwards: ao terminar não sobra transform, que prenderia modais (position: fixed) */
+.ds-entrada { animation: ds-sobe .28s cubic-bezier(.25,.46,.45,.94) backwards; }
+.ds-escalonado > * { animation: ds-sobe .32s cubic-bezier(.25,.46,.45,.94) backwards; }
+@keyframes ds-surge { from { opacity: 0; } to { opacity: 1; } }
+.ds-troca-tela { animation: ds-surge .2s ease-out backwards; }
+.ds-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+.ds-escalonado > *:nth-child(2) { animation-delay: 40ms; }
+.ds-escalonado > *:nth-child(3) { animation-delay: 80ms; }
+.ds-escalonado > *:nth-child(4) { animation-delay: 120ms; }
+.ds-escalonado > *:nth-child(5) { animation-delay: 160ms; }
+.ds-escalonado > *:nth-child(n+6) { animation-delay: 200ms; }
+.ds-cresce-x { transform-origin: left center; animation: ds-cresce-x .6s cubic-bezier(.3,.9,.3,1) backwards; }
+.ds-cresce-y { transform-origin: bottom center; animation: ds-cresce-y .6s cubic-bezier(.3,.9,.3,1) backwards; }
+.ds-gaveta   { animation: ds-gaveta .26s cubic-bezier(.3,.9,.3,1) backwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-entrada, .ds-escalonado > *, .ds-cresce-x, .ds-cresce-y, .ds-gaveta, .ds-troca-tela { animation: none !important; }
+  .ds-clicavel:hover { transform: none; }
+}
