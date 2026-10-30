@@ -66,9 +66,9 @@ function ModalParceiro({ inicial, onSave, onClose }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden apple-modal-enter">
         <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between">
           <p className="font-bold text-[#191625] text-[15px]">{inicial ? "Editar parceiro" : "Novo parceiro"}</p>
           <button onClick={onClose} className="text-[#898892] hover:text-[#8E8E93] text-xl leading-none">×</button>
@@ -129,7 +129,7 @@ function ModalParceiro({ inicial, onSave, onClose }: {
           <button
             disabled={!nome.trim() || !catFinal.trim()}
             onClick={salvar}
-            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#161421] hover:bg-[#0b0914] rounded-xl transition-colors disabled:opacity-40">
+            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#8456e8] hover:bg-[#7445d4] rounded-xl transition-colors disabled:opacity-40">
             {inicial ? "Salvar" : "Cadastrar"}
           </button>
         </div>
@@ -202,9 +202,9 @@ function ModalNegocio({ inicial, parceiros, lotes, onSave, onClose }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col overflow-hidden" style={{ maxHeight: "92vh" }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col overflow-hidden apple-modal-enter" style={{ maxHeight: "92vh" }}>
         <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between shrink-0">
           <p className="font-bold text-[#191625] text-[15px]">{inicial ? "Editar negócio" : "Registrar negócio"}</p>
           <button onClick={onClose} className="text-[#898892] hover:text-[#8E8E93] text-xl leading-none">×</button>
@@ -380,7 +380,7 @@ function ModalNegocio({ inicial, parceiros, lotes, onSave, onClose }: {
           <button
             disabled={!parceiroId || !descricao.trim() || vv <= 0}
             onClick={salvar}
-            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#161421] hover:bg-[#0b0914] rounded-xl transition-colors disabled:opacity-40">
+            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#8456e8] hover:bg-[#7445d4] rounded-xl transition-colors disabled:opacity-40">
             {inicial ? "Salvar" : "Registrar"}
           </button>
         </div>
@@ -455,7 +455,7 @@ export function ParceirosView({
           </div>
           <button
             onClick={() => tab === "parceiros" ? setModalParceiro(true) : setModalNegocio(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#161421] hover:bg-[#0b0914] text-white text-[12.5px] font-semibold rounded-xl transition-colors">
+            className="flex items-center gap-2 px-4 py-2 bg-[#8456e8] hover:bg-[#7445d4] text-white text-[12.5px] font-semibold rounded-xl transition-colors">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
@@ -565,14 +565,14 @@ export function ParceirosView({
               <select
                 value={filtroParceiro}
                 onChange={e => setFiltroParceiro(e.target.value)}
-                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[#72707d] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400">
+                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[#72707d] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8]">
                 <option value="">Todos os parceiros</option>
                 {parceiros.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
               </select>
               <select
                 value={filtroStatus}
                 onChange={e => setFiltroStatus(e.target.value as StatusNegocio | "")}
-                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[#72707d] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400">
+                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[#72707d] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8]">
                 <option value="">Todos os status</option>
                 <option value="pendente">Pendente</option>
                 <option value="pago">Pago</option>
@@ -632,10 +632,10 @@ export function ParceirosView({
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-semibold text-[#191625] text-[14px] tabular-nums">
+                        <p className="font-semibold text-[#191625] text-[14px] ds-num">
                           {brl(n.comissaoValor)}
                         </p>
-                        <p className="text-[10.5px] text-[#8E8E93] tabular-nums">
+                        <p className="text-[10.5px] text-[#8E8E93] ds-num">
                           {n.tipo === "comissao"
                             ? `${n.comissaoPerc.toFixed(1)}% de ${brl(n.valorVenda)}`
                             : `${brl(n.valorVenda)} venda`}
@@ -687,8 +687,8 @@ export function ParceirosView({
 
       {/* Confirmar exclusão */}
       {confirmarExcluir && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mx-4 p-6 text-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mx-4 p-6 text-center apple-modal-enter">
             <p className="font-bold text-[#191625] text-[14px] mb-1">Confirmar exclusão</p>
             <p className="text-[12px] text-[#8E8E93] mb-5">Esta ação não pode ser desfeita.</p>
             <div className="flex gap-2">
@@ -722,8 +722,8 @@ function KpiParceiro({ label, value, sub, color }: {
                : "text-amber-600"
   return (
     <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-4 py-3">
-      <p className="text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">{label}</p>
-      <p className={`font-semibold text-[17px] tabular-nums mt-0.5 ${accent}`}>{value}</p>
+      <p className="text-[10px] text-[#8E8E93] font-semibold">{label}</p>
+      <p className={`font-semibold text-[17px] ds-num mt-0.5 ${accent}`}>{value}</p>
       <p className="text-[10.5px] text-[#8E8E93] mt-0.5">{sub}</p>
     </div>
   )
@@ -741,7 +741,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function input() {
-  return "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[#5e5c68] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"
+  return "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[#5e5c68] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8]"
 }
 
 function formatDate(iso: string) {

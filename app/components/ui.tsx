@@ -14,7 +14,7 @@ function margemLiqCls(m: number) {
 export function FormSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(60,60,67,0.12)" }}>
-      <p className="text-[9.5px] uppercase tracking-wide font-semibold text-[#898892] mb-3">{label}</p>
+      <p className="text-[12px] font-semibold text-[#191625] mb-3">{label}</p>
       {children}
     </div>
   )
@@ -37,7 +37,7 @@ export function NumberInput({ value, onChange, min, max }: { value: number; onCh
   return (
     <input type="number" value={value || ""} onChange={e => onChange(Number(e.target.value))}
       min={min} max={max} placeholder="0"
-      className={`${inputCls} text-center font-semibold tabular-nums`}
+      className={`${inputCls} text-center font-semibold ds-num`}
       style={{ borderColor: "rgba(60,60,67,0.18)" }} />
   )
 }
@@ -50,7 +50,7 @@ export function KpiCard({ label, value, sub, accent }: { label: string; value: s
         : "bg-white hover:shadow-md hover:-translate-y-px"
     }`}
     style={{ borderColor: accent ? "rgba(255,255,255,0.08)" : "rgba(60,60,67,0.08)" }}>
-      <p className={`text-[9.5px] uppercase tracking-wide font-semibold mb-3 ${accent ? "text-[rgba(255,255,255,0.4)]" : "text-[#898892]"}`}>{label}</p>
+      <p className={`text-[9.5px] font-semibold mb-3 ${accent ? "text-[rgba(255,255,255,0.4)]" : "text-[#898892]"}`}>{label}</p>
       <p className={`text-[26px] font-semibold leading-none tracking-tight ${accent ? "text-white" : "text-[#191625]"}`}>{value}</p>
       {sub && <p className={`text-[11px] mt-2 leading-snug ${accent ? "text-[rgba(255,255,255,0.35)]" : "text-[rgba(60,60,67,0.45)]"}`}>{sub}</p>}
     </div>
@@ -61,7 +61,7 @@ export function Section({ title, children }: { title: string; children: React.Re
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <p className="text-[9.5px] uppercase tracking-wide font-semibold text-[#898892] shrink-0 leading-none">{title}</p>
+        <p className="text-[14px] font-semibold text-[#191625] tracking-[-0.01em] shrink-0 leading-none">{title}</p>
         <div className="flex-1 h-px" style={{ background: "rgba(60,60,67,0.1)" }} />
       </div>
       {children}
@@ -86,7 +86,7 @@ export function TD({ children, bold, muted, blue, green, mono, br }: {
     <td className={`px-3 py-2.5 whitespace-nowrap text-[12.5px]
       ${bold ? "font-semibold" : ""}
       ${muted ? "text-[#898892]" : blue ? "text-[#8456e8]" : green ? "text-[#009351]" : "text-[#191625]"}
-      ${mono ? "tabular-nums" : ""}
+      ${mono ? "ds-num" : ""}
       ${br ? "border-r border-[rgba(60,60,67,0.08)]" : ""}`}>
       {children}
     </td>
@@ -153,7 +153,7 @@ export function TabelaRow({ linha, comFaca, incluirVerniz, mostrarFrete, imposto
   function EditCell({ campo, val, muted, br }: { campo: CampoCusto; val: number; muted?: boolean; br?: boolean }) {
     const isCustom = cc[campo] != null
     const isEditing = editando === campo
-    const base = `px-3 py-2.5 whitespace-nowrap tabular-nums text-[12.5px]`
+    const base = `px-3 py-2.5 whitespace-nowrap ds-num text-[12.5px]`
 
     if (isEditing) return (
       <td className="px-1.5 py-1.5 whitespace-nowrap">
@@ -161,7 +161,7 @@ export function TabelaRow({ linha, comFaca, incluirVerniz, mostrarFrete, imposto
           onChange={e => setTempVal(e.target.value)}
           onBlur={() => confirmar(campo)}
           onKeyDown={e => { if (e.key === "Enter") confirmar(campo); if (e.key === "Escape") setEditando(null) }}
-          className="w-[88px] h-7 border-2 border-[#8456e8] rounded-lg px-2 text-[12px] font-mono text-[#191625] bg-white focus:outline-none tabular-nums text-right"
+          className="w-[88px] h-7 border-2 border-[#8456e8] rounded-lg px-2 text-[12px] font-mono text-[#191625] bg-white focus:outline-none ds-num text-right"
         />
       </td>
     )
@@ -219,7 +219,7 @@ export function TabelaRow({ linha, comFaca, incluirVerniz, mostrarFrete, imposto
               }
               if (e.key === "Escape") setEditandoPacote(false)
             }}
-            className="w-14 h-7 border-2 border-[#8456e8] rounded-lg px-2 text-[12px] font-mono text-[#191625] bg-white focus:outline-none tabular-nums text-center"
+            className="w-14 h-7 border-2 border-[#8456e8] rounded-lg px-2 text-[12px] font-mono text-[#191625] bg-white focus:outline-none ds-num text-center"
           />
         </td>
       ) : (
@@ -229,7 +229,7 @@ export function TabelaRow({ linha, comFaca, incluirVerniz, mostrarFrete, imposto
             setTempPacote(String(customPacotes ?? linha.folhasPacote / 100))
             setEditandoPacote(true)
           }}
-          className={`px-3 py-2.5 whitespace-nowrap tabular-nums text-[12.5px] font-semibold select-none cursor-pointer border-r border-[rgba(60,60,67,0.08)] group/pc transition-colors
+          className={`px-3 py-2.5 whitespace-nowrap ds-num text-[12.5px] font-semibold select-none cursor-pointer border-r border-[rgba(60,60,67,0.08)] group/pc transition-colors
             ${customPacotes !== undefined ? "text-[#8456e8]" : "text-[#191625]"}`}
         >
           <span className="flex items-center gap-1">
@@ -270,7 +270,7 @@ export function TabelaRow({ linha, comFaca, incluirVerniz, mostrarFrete, imposto
                 }
                 if (e.key === "Escape") setEditandoAcab(null)
               }}
-              className="w-[88px] h-7 border-2 border-[#8456e8] rounded-lg px-2 text-[12px] font-mono text-[#191625] bg-white focus:outline-none tabular-nums text-right"
+              className="w-[88px] h-7 border-2 border-[#8456e8] rounded-lg px-2 text-[12px] font-mono text-[#191625] bg-white focus:outline-none ds-num text-right"
             />
           </td>
         )
@@ -278,7 +278,7 @@ export function TabelaRow({ linha, comFaca, incluirVerniz, mostrarFrete, imposto
           <td key={nome}
             title="Duplo clique para editar"
             onDoubleClick={() => { setTempAcab(val.toFixed(2).replace(".", ",")); setEditandoAcab(nome) }}
-            className={`px-3 py-2.5 whitespace-nowrap tabular-nums text-[12.5px] select-none cursor-pointer group/acab transition-colors
+            className={`px-3 py-2.5 whitespace-nowrap ds-num text-[12.5px] select-none cursor-pointer group/acab transition-colors
               ${isCustom ? "text-[#8456e8] font-semibold" : "text-[#898892]"}
               ${isLast ? "border-r border-[rgba(60,60,67,0.08)]" : ""}`}
           >
@@ -294,10 +294,10 @@ export function TabelaRow({ linha, comFaca, incluirVerniz, mostrarFrete, imposto
           </td>
         )
       })}
-      <td className={`px-3 py-2.5 whitespace-nowrap tabular-nums text-[12.5px] ${anyCustom ? "text-[#8456e8] font-semibold" : "text-[#191625]"}`}>{brl(totalSF)}</td>
+      <td className={`px-3 py-2.5 whitespace-nowrap ds-num text-[12.5px] ${anyCustom ? "text-[#8456e8] font-semibold" : "text-[#191625]"}`}>{brl(totalSF)}</td>
       <TD blue bold mono>{brl(linha.precoSemFaca)}</TD>
       {comFaca && <>
-        <td className={`px-3 py-2.5 whitespace-nowrap tabular-nums text-[12.5px] ${anyCustom ? "text-[#8456e8] font-semibold" : "text-[#191625]"}`}>{brl(totalCF)}</td>
+        <td className={`px-3 py-2.5 whitespace-nowrap ds-num text-[12.5px] ${anyCustom ? "text-[#8456e8] font-semibold" : "text-[#191625]"}`}>{brl(totalCF)}</td>
         <TD blue bold mono>{brl(linha.precoComFaca)}</TD>
       </>}
       <TD mono>{brl(unitSF)}</TD>
@@ -322,37 +322,41 @@ export function AnaliseEstrategica({ calculo, comFaca, cliente }: { calculo: Cal
   const lucro  = (l: LinhaTabela) => preco(l) - imp(l) - custo(l)
   const margem = (l: LinhaTabela) => preco(l) > 0 ? lucro(l) / preco(l) * 100 : 0
 
-  const maiorLucro = tabela.reduce((b, c) => lucro(c) > lucro(b) ? c : b, tabela[0])
-  const menorUnit  = tabela.reduce((b, c) => unit(c) < unit(b) ? c : b, tabela[0])
   const sweetMin   = tabela.find(l => l.quantidade === sweetSpotMinimoQtd) ?? tabela[0]
   const sweetIdeal = tabela.find(l => l.quantidade === sweetSpotIdealQtd)  ?? tabela[tabela.length - 1]
   const quedaUnit  = unit(sweetMin) > 0 ? (1 - unit(sweetIdeal) / unit(sweetMin)) * 100 : 0
 
+  // Três opções diferentes para apresentar: menor investimento, intermediária e melhor custo-benefício
+  const entrada = tabela[0]
+  const melhor  = sweetIdeal.quantidade !== entrada.quantidade ? sweetIdeal : tabela[tabela.length - 1]
+  const meios   = tabela.filter(l => l.quantidade > entrada.quantidade && l.quantidade < melhor.quantidade)
+  const meio    = meios[Math.floor(meios.length / 2)] ?? null
+
   const cards = [
-    { tag: "Para o cliente",     desc: "Menor preço por unidade",          linha: menorUnit,  cor: "border-[#8456e8]/15 bg-[#8456e8]/[0.03]", tagCor: "bg-[#8456e8]/10 text-[#8456e8]" },
-    { tag: "Maior lucro",        desc: "Mais lucro líquido em reais",      linha: maiorLucro, cor: "border-[#009351]/20 bg-[#009351]/[0.03]", tagCor: "bg-[#009351]/10 text-[#009351]" },
-    { tag: "Sweet spot ideal",   desc: "Onde subir a tiragem para de compensar", linha: sweetIdeal, cor: "border-[#c57800]/20 bg-[#c57800]/[0.03]", tagCor: "bg-[#c57800]/10 text-[#c57800]" },
+    { tag: "Menor investimento", desc: "Para o cliente começar",                 linha: entrada, cor: "border-[rgba(60,60,67,0.1)]",  tagCor: "bg-[rgba(116,116,128,0.1)] text-[#5e5c68]" },
+    ...(meio ? [{ tag: "Intermediária", desc: "Equilíbrio entre valor e unitário", linha: meio, cor: "border-[rgba(60,60,67,0.1)]", tagCor: "bg-[rgba(116,116,128,0.1)] text-[#5e5c68]" }] : []),
+    { tag: "Melhor custo-benefício", desc: `Unitário ${num(quedaUnit > 0 ? (1 - unit(melhor) / unit(entrada)) * 100 : 0, 0)}% menor que na menor tiragem`, linha: melhor, cor: "border-[#8456e8]/25 bg-[#8456e8]/[0.02]", tagCor: "bg-[#8456e8]/10 text-[#8456e8]" },
   ]
 
   return (
     <Section title="Análise estratégica">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+      <div className={`grid grid-cols-1 gap-3 mb-3 ${cards.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
         {cards.map(c => (
           <div key={c.tag} className={`rounded-xl border p-5 bg-white transition-all duration-200 hover:-translate-y-px hover:shadow-md ${c.cor}`}>
-            <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide ${c.tagCor}`}>{c.tag}</span>
+            <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full ${c.tagCor}`}>{c.tag}</span>
             <p className="text-[rgba(60,60,67,0.55)] text-[11px] mt-3 mb-3 leading-snug">{c.desc}</p>
-            <p className="text-[26px] font-semibold text-[#191625] leading-none tabular-nums">{brl(preco(c.linha))}</p>
-            <p className="text-[11px] text-[rgba(60,60,67,0.5)] mt-1.5 tabular-nums">
+            <p className="text-[26px] font-semibold text-[#191625] leading-none ds-num">{brl(preco(c.linha))}</p>
+            <p className="text-[11px] text-[rgba(60,60,67,0.5)] mt-1.5 ds-num">
               {num(c.linha.quantidade)} un · {brl(unit(c.linha))}/un
             </p>
-            <p className={`text-[11.5px] mt-1.5 tabular-nums ${margemLiqCls(margem(c.linha))}`}>
+            <p className={`text-[11.5px] mt-1.5 ds-num ${margemLiqCls(margem(c.linha))}`}>
               lucro líquido {brl(lucro(c.linha))} · {num(margem(c.linha), 1)}%
             </p>
           </div>
         ))}
       </div>
       <div className="bg-white rounded-xl p-5" style={{ border: "1px solid rgba(60,60,67,0.08)" }}>
-        <p className="text-[9px] uppercase tracking-wide font-bold text-[#898892] mb-3">Recomendação de fechamento</p>
+        <p className="text-[9px] font-bold text-[#898892] mb-3">Recomendação de fechamento</p>
         <p className="text-[rgba(60,60,67,0.7)] leading-relaxed text-[13px]">
           {cliente ? <strong className="text-[#191625]">{cliente}:</strong> : null}{" "}
           Apresente <strong className="text-[#191625]">{num(sweetIdeal.quantidade)} unidades</strong> por {brl(preco(sweetIdeal))}

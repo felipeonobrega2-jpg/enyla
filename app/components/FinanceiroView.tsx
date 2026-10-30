@@ -401,9 +401,9 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 flex flex-col overflow-hidden" style={{ maxHeight: "92vh" }}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 flex flex-col overflow-hidden apple-modal-enter" style={{ maxHeight: "92vh" }}>
         <div className="px-6 pt-5 pb-0 border-b border-[rgba(60,60,67,0.08)] flex flex-col gap-3 shrink-0">
           <div className="flex items-center justify-between">
             <p className="font-bold text-[#191625] text-[15px]">
@@ -462,7 +462,7 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
                 placeholder="Ex: Impressão offset 4x0" className={inp()} />
             </CustoField>
             <button disabled={!custoValor || !custoFornId} onClick={salvarCusto}
-              className="w-full py-3 text-[13px] font-semibold text-white bg-[#161421] hover:bg-[#0b0914] rounded-xl transition-colors disabled:opacity-40 mt-2">
+              className="w-full py-3 text-[13px] font-semibold text-white bg-[#8456e8] hover:bg-[#7445d4] rounded-xl transition-colors disabled:opacity-40 mt-2">
               Registrar custo
             </button>
           </div>
@@ -642,7 +642,7 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
             Cancelar
           </button>
           <button disabled={!descricao.trim() || !parseFloat(valor) || !dataVenc} onClick={salvar}
-            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#161421] hover:bg-[#0b0914] rounded-xl transition-colors disabled:opacity-40">
+            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#8456e8] hover:bg-[#7445d4] rounded-xl transition-colors disabled:opacity-40">
             {inicial?.id ? "Salvar" : "Lançar"}
           </button>
         </div>
@@ -746,9 +746,9 @@ function ModalPagamento({ lancamento, onSave, onClose }: {
   const [obs, setObs]           = useState(lancamento.obs ?? "")
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden apple-modal-enter">
         <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between">
           <div>
             <p className="font-bold text-[#191625] text-[14px]">Registrar pagamento</p>
@@ -880,7 +880,7 @@ function ModalReceberDetalhe({ itens, total, onClose, onVerTudo, onClienteClick 
   }, [itens])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden max-h-[85vh] flex flex-col"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
@@ -1741,7 +1741,7 @@ export function FinanceiroView({
             {/* Parcerias pendentes (comissão ou ganho — ambos são receita) */}
             {negociosPendentes.length > 0 && (
               <div className="mb-4">
-                <p className="text-[10.5px] uppercase tracking-wider text-[#8E8E93] font-semibold mb-2">Receitas de parcerias</p>
+                <p className="text-[10.5px] text-[#8E8E93] font-semibold mb-2">Receitas de parcerias</p>
                 {negociosPendentes.map(n => (
                   <div key={n.id} className="bg-white border border-violet-100 rounded-xl px-5 py-4 flex items-center gap-4 mb-2">
                     <div className="flex-1 min-w-0">
@@ -1766,7 +1766,7 @@ export function FinanceiroView({
             )}
 
             {negociosPendentes.length > 0 && pedidosElegiveis.length > 0 && (
-              <p className="text-[10.5px] uppercase tracking-wider text-[#8E8E93] font-semibold mb-2">Pedidos</p>
+              <p className="text-[10.5px] text-[#8E8E93] font-semibold mb-2">Pedidos</p>
             )}
             {pedidosElegiveis.length === 0 ? (
               <Empty msg="Nenhum pedido fechado ainda." />
@@ -2234,7 +2234,7 @@ export function FinanceiroView({
                           {/* Cabeçalho do dia */}
                           <div className="px-4 py-2 flex items-center justify-between"
                             style={{ borderBottom: "1px solid var(--border)" }}>
-                            <span className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+                            <span className="text-[10.5px] font-bold" style={{ color: "var(--text-faint)" }}>
                               {fmtDate(date)}
                             </span>
                             <span className={`text-[11px] font-bold ds-num ${dayTotal >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
@@ -2629,8 +2629,8 @@ export function FinanceiroView({
       )}
 
       {confirmarDel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xs mx-4 p-6 text-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xs mx-4 p-6 text-center apple-modal-enter">
             <p className="font-bold text-[#191625] text-[14px] mb-1">Excluir lançamento?</p>
             <p className="text-[12px] text-[#8E8E93] mb-5">Esta ação não pode ser desfeita.</p>
             <div className="flex gap-2">
@@ -2714,7 +2714,7 @@ function Empty({ msg }: { msg: string }) {
 }
 
 function inp() {
-  return "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[#5e5c68] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"
+  return "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[#5e5c68] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8]"
 }
 
 // Nome cadastrado da categoria; se não houver, transforma o identificador em texto legível

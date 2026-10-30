@@ -71,8 +71,8 @@ export function ContasTab({ config, onUpdateConfig }: Props) {
       {contasComSaldo > 0 && (
         <div className="rounded-2xl px-5 py-4"
           style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" }}>
-          <p className="text-[10.5px] uppercase tracking-wider font-semibold mb-1" style={{ color: "var(--text-faint)" }}>Caixa disponível</p>
-          <p className="text-[28px] font-bold tabular-nums tracking-tight" style={{ color: totalCaixa >= 0 ? "#009351" : "#d33a3c" }}>
+          <p className="text-[10.5px] font-semibold mb-1" style={{ color: "var(--text-faint)" }}>Caixa disponível</p>
+          <p className="text-[28px] font-bold ds-num tracking-tight" style={{ color: totalCaixa >= 0 ? "#009351" : "#d33a3c" }}>
             {brl(totalCaixa)}
           </p>
           <p className="text-[11px] mt-0.5" style={{ color: "var(--text-faint)" }}>
@@ -157,7 +157,7 @@ export function ContasTab({ config, onUpdateConfig }: Props) {
                 {/* Saldo — apenas contas/poupança/débito */}
                 {isDebitoConta && (
                   <div className="mt-3 pt-3 flex items-center gap-3" style={{ borderTop: "1px solid rgba(0,0,0,0.06)" }}>
-                    <span className="text-[10.5px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-faint)" }}>
+                    <span className="text-[10.5px] font-semibold" style={{ color: "var(--text-faint)" }}>
                       Saldo atual
                     </span>
                     {isEd ? (
@@ -182,7 +182,7 @@ export function ContasTab({ config, onUpdateConfig }: Props) {
                     ) : (
                       <button onClick={() => iniciarEdicaoSaldo(c)}
                         className="flex items-center gap-1.5 group">
-                        <span className={`text-[15px] font-bold tabular-nums transition-colors ${
+                        <span className={`text-[15px] font-bold ds-num transition-colors ${
                           c.saldo == null ? "text-[#C7C7CC]" :
                           c.saldo >= 0 ? "text-[#009351]" : "text-[#d33a3c]"
                         }`}>
@@ -205,7 +205,7 @@ export function ContasTab({ config, onUpdateConfig }: Props) {
       )}
 
       <button onClick={() => setModal(true)}
-        className="flex items-center gap-2 px-4 py-2.5 bg-[#161421] hover:bg-[#0b0914] text-white text-[12.5px] font-semibold rounded-xl transition-colors">
+        className="flex items-center gap-2 px-4 py-2.5 bg-[#8456e8] hover:bg-[#7445d4] text-white text-[12.5px] font-semibold rounded-xl transition-colors">
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>
@@ -251,12 +251,12 @@ function ModalConta({ inicial, onSave, onClose }: {
     })
   }
 
-  const cls = "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[#5e5c68] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"
+  const cls = "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[#5e5c68] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8]"
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden apple-modal-enter">
         <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between">
           <p className="font-bold text-[#191625] text-[14px]">{inicial ? "Editar conta" : "Nova conta / cartão"}</p>
           <button onClick={onClose} className="text-[#898892] hover:text-[#8E8E93] text-xl leading-none">×</button>
@@ -309,7 +309,7 @@ function ModalConta({ inicial, onSave, onClose }: {
             Cancelar
           </button>
           <button disabled={!nome.trim()} onClick={salvar}
-            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#161421] hover:bg-[#0b0914] rounded-xl transition-colors disabled:opacity-40">
+            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#8456e8] hover:bg-[#7445d4] rounded-xl transition-colors disabled:opacity-40">
             {inicial ? "Salvar" : "Adicionar"}
           </button>
         </div>
@@ -321,7 +321,7 @@ function ModalConta({ inicial, onSave, onClose }: {
 function KpiBox({ label, value, color }: { label: string; value: string; color?: "violet" }) {
   return (
     <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-4 py-3">
-      <p className="text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">{label}</p>
+      <p className="text-[10px] text-[#8E8E93] font-semibold">{label}</p>
       <p className={`font-semibold text-[17px] mt-0.5 ${color === "violet" ? "text-violet-700" : "text-[#191625]"}`}>{value}</p>
     </div>
   )

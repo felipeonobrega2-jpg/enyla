@@ -110,10 +110,10 @@ export function ModalSobra({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 flex flex-col overflow-hidden" style={{ maxHeight: "85vh" }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 flex flex-col overflow-hidden apple-modal-enter" style={{ maxHeight: "85vh" }}>
 
         {/* Header */}
         <div className="px-5 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] shrink-0">

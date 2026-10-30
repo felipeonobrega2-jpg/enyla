@@ -136,10 +136,10 @@ export function ModalPropostaCustom({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl mx-4 flex flex-col overflow-hidden"
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl mx-4 flex flex-col overflow-hidden apple-modal-enter"
         style={{ maxHeight: "94vh" }}>
 
         {/* Header */}
@@ -394,10 +394,10 @@ export function ModalPropostaCustom({
                 <thead className="bg-[rgba(116,116,128,0.04)]">
                   <tr className="border-b border-[rgba(60,60,67,0.08)]">
                     <th className="py-2 px-3 w-9" />
-                    <th className="py-2 px-2 text-left text-[9.5px] uppercase tracking-wider text-[#8E8E93] font-semibold">Quantidade</th>
-                    <th className="py-2 px-2 text-right text-[9.5px] uppercase tracking-wider text-[#8E8E93] font-semibold">Unit. (R$)</th>
-                    <th className="py-2 px-2 text-right text-[9.5px] uppercase tracking-wider text-[#8E8E93] font-semibold">Total</th>
-                    <th className="py-2 px-2 text-center text-[9.5px] uppercase tracking-wider text-[#8E8E93] font-semibold">Ideal</th>
+                    <th className="py-2 px-2 text-left text-[9.5px] text-[#8E8E93] font-semibold">Quantidade</th>
+                    <th className="py-2 px-2 text-right text-[9.5px] text-[#8E8E93] font-semibold">Unit. (R$)</th>
+                    <th className="py-2 px-2 text-right text-[9.5px] text-[#8E8E93] font-semibold">Total</th>
+                    <th className="py-2 px-2 text-center text-[9.5px] text-[#8E8E93] font-semibold">Ideal</th>
                     <th className="py-2 px-2 w-8" />
                   </tr>
                 </thead>
@@ -428,7 +428,7 @@ export function ModalPropostaCustom({
                             min="1"
                             value={l.quantidade || ""}
                             onChange={e => updateLinha(l.id, "quantidade", parseInt(e.target.value) || 0)}
-                            className="w-full text-[12.5px] font-semibold tabular-nums border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#a582ff]/20 focus:border-[#a582ff]"
+                            className="w-full text-[12.5px] font-semibold ds-num border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#a582ff]/20 focus:border-[#a582ff]"
                           />
                         </td>
                         {/* Unitário */}
@@ -440,12 +440,12 @@ export function ModalPropostaCustom({
                             value={l.unitario || ""}
                             onChange={e => updateLinha(l.id, "unitario", parseFloat(e.target.value) || 0)}
                             onFocus={e => e.target.select()}
-                            className="w-full text-right text-[12.5px] font-semibold tabular-nums border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#a582ff]/20 focus:border-[#a582ff]"
+                            className="w-full text-right text-[12.5px] font-semibold ds-num border border-[rgba(60,60,67,0.12)] rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#a582ff]/20 focus:border-[#a582ff]"
                           />
                         </td>
                         {/* Total */}
                         <td className="py-2.5 px-2 text-right">
-                          <span className="text-[13px] font-semibold tabular-nums text-[#191625]">
+                          <span className="text-[13px] font-semibold ds-num text-[#191625]">
                             {total > 0 ? brl(total) : "—"}
                           </span>
                         </td>
@@ -690,7 +690,7 @@ export function BoxPreview3D({
       {/* Dimension chips */}
       <div className="flex items-center gap-1.5">
         {([ ["L", largura], ["A", altura], ["P", profundidade] ] as [string, number][]).map(([label, val]) => (
-          <span key={label} className="bg-[rgba(116,116,128,0.08)] rounded-md px-2 py-0.5 text-[11px] font-semibold text-[#5e5c68] tabular-nums">
+          <span key={label} className="bg-[rgba(116,116,128,0.08)] rounded-md px-2 py-0.5 text-[11px] font-semibold text-[#5e5c68] ds-num">
             <span className="text-[#8E8E93] text-[9px] font-normal">{label} </span>{val}
           </span>
         ))}

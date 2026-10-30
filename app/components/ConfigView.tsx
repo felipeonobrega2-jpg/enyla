@@ -295,7 +295,7 @@ function MaterialConfig({
       </div>
 
       {/* Cabeçalho de formatos */}
-      <div className="flex items-center px-4 py-2 border-b border-slate-50 text-[10px] uppercase tracking-wider text-slate-400 font-semibold gap-4">
+      <div className="flex items-center px-4 py-2 border-b border-slate-50 text-[10px] text-slate-400 font-semibold gap-4">
         <span className="flex-1">Material</span>
         {formatoIds.map(f => <span key={f} className="w-28 text-right">{f}</span>)}
         <span className="w-8" />

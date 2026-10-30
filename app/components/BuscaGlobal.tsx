@@ -171,10 +171,10 @@ export default function BuscaGlobal({
 
   return (
     <div
-      className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm flex items-start justify-center pt-[12vh]"
+      className="fixed inset-0 z-[200] bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter flex items-start justify-center pt-[12vh]"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl overflow-hidden">
+      <div className="w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl overflow-hidden apple-modal-enter">
 
         {/* Input */}
         <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[rgba(60,60,67,0.1)]">
@@ -239,7 +239,7 @@ export default function BuscaGlobal({
                           <p className="text-[10.5px] text-[#8E8E93] truncate mt-0.5">{r.subtitulo}</p>
                         </div>
                         {r.valor !== undefined && (
-                          <p className="text-[12px] font-semibold text-[#191625] tabular-nums shrink-0">{brl(r.valor)}</p>
+                          <p className="text-[12px] font-semibold text-[#191625] ds-num shrink-0">{brl(r.valor)}</p>
                         )}
                         {isSelected && (
                           <svg className="w-3.5 h-3.5 text-[#8456e8] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

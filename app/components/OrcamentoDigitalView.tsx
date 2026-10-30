@@ -177,12 +177,12 @@ export function OrcamentoDigitalView({
                 <div>
                   <p className="text-[15px] font-bold text-[#191625]">{l.quantidade.toLocaleString("pt-BR")} un</p>
                   {l.isIdeal && (
-                    <p className="text-[9px] font-bold text-[#8456e8] uppercase tracking-wider mt-0.5">Recomendado</p>
+                    <p className="text-[9px] font-bold text-[#8456e8] mt-0.5">Recomendado</p>
                   )}
                 </div>
                 <div className="text-right">
-                  <p className="text-[16px] font-bold text-[#191625] tabular-nums">{brl(total)}</p>
-                  <p className="text-[11px] text-[#8E8E93] tabular-nums">{brl(l.unitario)}/un</p>
+                  <p className="text-[16px] font-bold text-[#191625] ds-num">{brl(total)}</p>
+                  <p className="text-[11px] text-[#8E8E93] ds-num">{brl(l.unitario)}/un</p>
                 </div>
               </div>
             )
@@ -280,8 +280,8 @@ export function OrcamentoDigitalView({
                   </div>
                   {prev && (
                     <div className="text-right">
-                      <p className="text-[15px] font-bold text-[#191625] tabular-nums">{brl(prev.total)}</p>
-                      <p className="text-[11px] text-[#8E8E93] tabular-nums">{brl(prev.unit)}/un</p>
+                      <p className="text-[15px] font-bold text-[#191625] ds-num">{brl(prev.total)}</p>
+                      <p className="text-[11px] text-[#8E8E93] ds-num">{brl(prev.unit)}/un</p>
                     </div>
                   )}
                 </button>
@@ -297,10 +297,10 @@ export function OrcamentoDigitalView({
                     value={customQtd}
                     onChange={e => setCustomQtd(e.target.value)}
                     placeholder="Ex: 200"
-                    className="flex-1 px-3 py-2 bg-[rgba(116,116,128,0.06)] rounded-lg text-[14px] font-semibold text-[#191625] placeholder:text-[#C7C7CC] outline-none tabular-nums"
+                    className="flex-1 px-3 py-2 bg-[rgba(116,116,128,0.06)] rounded-lg text-[14px] font-semibold text-[#191625] placeholder:text-[#C7C7CC] outline-none ds-num"
                   />
                   {customQtd && dims && isFinite(parseInt(customQtd)) && parseInt(customQtd) > 0 && (
-                    <p className="text-[14px] font-bold tabular-nums text-[#191625] shrink-0">
+                    <p className="text-[14px] font-bold ds-num text-[#191625] shrink-0">
                       {brl(charm(precoNosso(parseInt(customQtd), dims.n)))}
                     </p>
                   )}

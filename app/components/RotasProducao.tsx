@@ -23,7 +23,7 @@ export function margemLiqCls(m: number) {
 
 function Estimado() {
   return (
-    <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-[#c57800]/10 text-[#c57800]">
+    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#c57800]/10 text-[#c57800]">
       estimado
     </span>
   )
@@ -52,7 +52,7 @@ function Passadas({ rota }: { rota: Rota }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {rota.passadas.map((p, i) => (
-        <span key={i} className="text-[11px] tabular-nums px-2 py-1 rounded-lg bg-[rgba(116,116,128,0.08)] text-[#5e5c68]">
+        <span key={i} className="text-[11px] ds-num px-2 py-1 rounded-lg bg-[rgba(116,116,128,0.08)] text-[#5e5c68]">
           Passada {i + 1}: <strong className="text-[#191625]">{p.cavidades} cav.</strong>
           {" "}em {num(p.largura / 10, 1)}×{num(p.altura / 10, 1)} cm{p.porPeca > 1 ? ` (×${p.porPeca})` : ""}
           {" · "}{num(p.folhas)} folhas
@@ -118,7 +118,7 @@ export function RotasProducao({ calculo, form, producao, comFaca, onOpcoes, onRe
       <div className="flex flex-wrap gap-1.5">
         {rotas.map(q => (
           <button key={q.quantidade} onClick={() => setQtdSel(q.quantidade)}
-            className={`px-3 py-1.5 rounded-full text-[12px] font-medium tabular-nums transition-all duration-150 ${
+            className={`px-3 py-1.5 rounded-full text-[12px] font-medium ds-num transition-all duration-150 ${
               q.quantidade === atual.quantidade ? "bg-[#0b0914] text-white" : "bg-white text-[#5e5c68] hover:bg-[rgba(116,116,128,0.08)]"
             }`} style={q.quantidade === atual.quantidade ? undefined : border}>
             {num(q.quantidade)} un
@@ -126,12 +126,12 @@ export function RotasProducao({ calculo, form, producao, comFaca, onOpcoes, onRe
         ))}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_1fr] gap-4">
+      <div className="grid grid-cols-1 2xl:grid-cols-[1.25fr_1fr] gap-4">
         {/* Rota escolhida */}
         <div key={melhor.id + atual.quantidade} className="bg-white rounded-xl p-5 animate-[apple-slide-up_.25s_ease-out]" style={border}>
           <div className="flex items-start justify-between gap-3 mb-4">
             <div className="min-w-0">
-              <p className="text-[9.5px] uppercase tracking-wide font-semibold text-[#009351] flex items-center gap-1.5">
+              <p className="text-[9.5px] font-semibold text-[#009351] flex items-center gap-1.5">
                 <Check className="w-3 h-3" /> {opcoes.impressorId ? "Rota escolhida" : "Rota mais barata"}
               </p>
               <p className="text-[15px] font-semibold text-[#191625] mt-1.5 truncate">{melhor.impressorNome}</p>
@@ -140,8 +140,8 @@ export function RotasProducao({ calculo, form, producao, comFaca, onOpcoes, onRe
               </p>
             </div>
             <div className="text-right shrink-0">
-              <p className="text-[22px] font-semibold text-[#191625] tabular-nums leading-none">{brl(melhor.preco)}</p>
-              <p className="text-[11px] text-[rgba(60,60,67,0.55)] tabular-nums mt-1">{brl(melhor.precoUnit)}/un</p>
+              <p className="text-[22px] font-semibold text-[#191625] ds-num leading-none">{brl(melhor.preco)}</p>
+              <p className="text-[11px] text-[rgba(60,60,67,0.55)] ds-num mt-1">{brl(melhor.precoUnit)}/un</p>
             </div>
           </div>
 
@@ -154,8 +154,8 @@ export function RotasProducao({ calculo, form, producao, comFaca, onOpcoes, onRe
               { icon: <Layers className="w-3.5 h-3.5" />, l: "Papel comprado", v: `${num(melhor.folhasPapel)} fls`, s: melhor.formatoNome },
             ].map(k => (
               <div key={k.l} className="rounded-lg px-3 py-2 bg-[rgba(116,116,128,0.05)]">
-                <p className="text-[9.5px] uppercase tracking-wide text-[#898892] font-semibold flex items-center gap-1">{k.icon}{k.l}</p>
-                <p className="text-[14px] font-semibold text-[#191625] tabular-nums mt-0.5">{k.v}</p>
+                <p className="text-[9.5px] text-[#898892] font-semibold flex items-center gap-1">{k.icon}{k.l}</p>
+                <p className="text-[14px] font-semibold text-[#191625] ds-num mt-0.5">{k.v}</p>
                 {k.s && <p className="text-[10px] text-[#898892]">{k.s}</p>}
               </div>
             ))}
@@ -170,24 +170,24 @@ export function RotasProducao({ calculo, form, producao, comFaca, onOpcoes, onRe
                   {i.descricao}{i.fornecedor ? ` · ${i.fornecedor}` : ""}
                 </span>
                 {i.estimado && <Estimado />}
-                <span className={`tabular-nums w-[92px] text-right ${i.valor === 0 ? "text-[#898892]" : "text-[#191625]"}`}>{brl(i.valor)}</span>
+                <span className={`ds-num w-[92px] text-right ${i.valor === 0 ? "text-[#898892]" : "text-[#191625]"}`}>{brl(i.valor)}</span>
               </div>
             ))}
             <div className="flex items-center py-2 text-[12.5px] font-semibold">
               <span className="flex-1 text-[#191625]">Custo total (sem imposto)</span>
-              <span className="tabular-nums text-[#191625]">{brl(melhor.custoTotal)}</span>
+              <span className="ds-num text-[#191625]">{brl(melhor.custoTotal)}</span>
             </div>
             <div className="flex items-center py-2 text-[12.5px]">
               <span className="flex-1 text-[#5e5c68]">Preço (custo × {num(melhor.preco / Math.max(melhor.custoTotal, 0.01), 1)})</span>
-              <span className="tabular-nums text-[#8456e8] font-semibold">{brl(melhor.preco)}</span>
+              <span className="ds-num text-[#8456e8] font-semibold">{brl(melhor.preco)}</span>
             </div>
             <div className="flex items-center py-2 text-[12.5px]">
               <span className="flex-1 text-[#5e5c68]">Impostos ({num(producao.impostoPct, 1)}%)</span>
-              <span className="tabular-nums text-[#5e5c68]">− {brl(melhor.imposto)}</span>
+              <span className="ds-num text-[#5e5c68]">− {brl(melhor.imposto)}</span>
             </div>
             <div className="flex items-center py-2 text-[13px] font-semibold">
               <span className="flex-1 text-[#191625]">Lucro líquido estimado</span>
-              <span className={`tabular-nums ${margemLiqCls(melhor.margemLiquidaPct)}`}>
+              <span className={`ds-num ${margemLiqCls(melhor.margemLiquidaPct)}`}>
                 {brl(melhor.lucroLiquido)} · {num(melhor.margemLiquidaPct, 1)}%
               </span>
             </div>
@@ -209,9 +209,9 @@ export function RotasProducao({ calculo, form, producao, comFaca, onOpcoes, onRe
         </div>
 
         {/* Escolhas */}
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-1 gap-4 items-start content-start">
           <div className="bg-white rounded-xl p-4 space-y-3" style={border}>
-            <p className="text-[9.5px] uppercase tracking-wide font-semibold text-[#898892]">Escolhas da rota</p>
+            <p className="text-[9.5px] font-semibold text-[#898892]">Escolhas da rota</p>
             <div className="grid grid-cols-2 gap-2.5">
               <Seletor label="Impressor" valor={opcoes.impressorId ?? ""}
                 opcoes={[{ v: "", nome: "Automático (mais barato)" }, ...impressores.map(f => ({ v: f.id, nome: f.nome }))]}
@@ -240,7 +240,7 @@ export function RotasProducao({ calculo, form, producao, comFaca, onOpcoes, onRe
                 <input type="number" min={0} step={0.01} value={opcoes.estimativaAcabamentoFolha ?? ""}
                   onChange={e => set({ estimativaAcabamentoFolha: e.target.value === "" ? null : Number(e.target.value) })}
                   placeholder="0,00"
-                  className="w-24 h-8 rounded-lg px-2 text-[12px] text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20"
+                  className="w-24 h-8 rounded-lg px-2 text-[12px] text-right ds-num focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20"
                   style={{ border: "1px solid rgba(60,60,67,0.18)" }} />
               </label>
             )}
@@ -249,11 +249,11 @@ export function RotasProducao({ calculo, form, producao, comFaca, onOpcoes, onRe
           {/* Impressor × tiragem */}
           {matriz.length > 1 && (
             <div className="bg-white rounded-xl overflow-hidden" style={border}>
-              <p className="px-4 pt-3.5 pb-2 text-[9.5px] uppercase tracking-wide font-semibold text-[#898892] flex items-center gap-1.5">
+              <p className="px-4 pt-3.5 pb-2 text-[9.5px] font-semibold text-[#898892] flex items-center gap-1.5">
                 <Truck className="w-3 h-3" /> Custo por impressor e tiragem
               </p>
               <div className="overflow-x-auto">
-                <table className="w-full text-[11.5px] tabular-nums">
+                <table className="w-full text-[11.5px] ds-num">
                   <thead>
                     <tr className="text-[#898892]">
                       <th className="px-4 py-1.5 text-left font-medium">Impressor</th>
@@ -288,9 +288,9 @@ export function RotasProducao({ calculo, form, producao, comFaca, onOpcoes, onRe
       {/* Alternativas */}
       <div className="bg-white rounded-xl overflow-hidden" style={border}>
         <div className="overflow-x-auto">
-          <table className="w-full text-[12px] tabular-nums">
+          <table className="w-full text-[12px] ds-num">
             <thead className="bg-[rgba(116,116,128,0.04)]">
-              <tr className="text-[9.5px] uppercase tracking-wide text-[#898892]">
+              <tr className="text-[9.5px] text-[#898892]">
                 {["Impressor", "Papel", "Passadas", "Faca", "Folhas", "Batidas", "Custo", "Preço", "Margem líq.", ""].map(h => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{h}</th>
                 ))}

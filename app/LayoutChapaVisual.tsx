@@ -656,7 +656,7 @@ export default function LayoutChapaVisual({
       {/* ── Rodapé: legenda ou resumo de chapa compartilhada ─────────── */}
       {hasMultiProduct ? (
         <div className="mt-3 pt-3 border-t border-slate-100">
-          <p className="text-[10.5px] font-semibold text-slate-500 mb-2 uppercase tracking-wide">Chapa compartilhada</p>
+          <p className="text-[10.5px] font-semibold text-slate-500 mb-2">Chapa compartilhada</p>
           <div className="flex flex-col gap-1">
             {prodStats.map(ps => (
               <div key={ps.id} className="flex items-center gap-2 text-[11.5px] text-slate-600">

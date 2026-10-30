@@ -33,7 +33,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-const inputCls = "w-full border border-[rgba(0,0,0,0.12)] rounded-xl px-3.5 py-2.5 text-[13px] text-[#191625] focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] transition-colors placeholder:text-[#898892] tabular-nums bg-white"
+const inputCls = "w-full border border-[rgba(0,0,0,0.12)] rounded-xl px-3.5 py-2.5 text-[13px] text-[#191625] focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] transition-colors placeholder:text-[#898892] ds-num bg-white"
 
 // ── Edit modal ─────────────────────────────────────────────────────────────────
 function EditModal({ card, onSave, onClose }: {
@@ -90,7 +90,7 @@ function EditModal({ card, onSave, onClose }: {
       onClick={e => { if (e.target === e.currentTarget) dismiss() }}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden transition-all duration-200"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden transition-all duration-200 apple-modal-enter"
         style={{ transform: visible ? "scale(1) translateY(0)" : "scale(0.94) translateY(12px)", opacity: visible ? 1 : 0 }}
       >
         {/* Header */}
@@ -161,7 +161,7 @@ function EditModal({ card, onSave, onClose }: {
               <span className="text-[11px] font-medium" style={{ color: margem >= 0 ? "#009351" : "#d33a3c" }}>
                 Margem bruta
               </span>
-              <span className="text-[13px] font-bold tabular-nums" style={{ color: margem >= 0 ? "#009351" : "#d33a3c" }}>
+              <span className="text-[13px] font-bold ds-num" style={{ color: margem >= 0 ? "#009351" : "#d33a3c" }}>
                 {brl(margem)}
               </span>
             </div>
@@ -295,7 +295,7 @@ function TercCard({ card, onMove, onEdit, onDelete }: {
           {/* Row 2: metadata */}
           <div className="flex items-center flex-wrap gap-x-2.5 gap-y-0.5 mt-1">
             {card.quantidade > 0 && (
-              <span className="text-[11px] text-[#8E8E93] tabular-nums">{num(card.quantidade)} un</span>
+              <span className="text-[11px] text-[#8E8E93] ds-num">{num(card.quantidade)} un</span>
             )}
             {card.fornecedor ? (
               <span className="text-[11px] text-[#8E8E93]">· via <span className="text-[#191625] font-medium">{card.fornecedor}</span></span>
@@ -304,7 +304,7 @@ function TercCard({ card, onMove, onEdit, onDelete }: {
             )}
             {card.dataEntregaPrevista && (
               <span
-                className="text-[10px] font-medium px-1.5 py-[2px] rounded-md tabular-nums"
+                className="text-[10px] font-medium px-1.5 py-[2px] rounded-md ds-num"
                 style={isLate
                   ? { background: "rgba(255,59,48,0.1)", color: "#d33a3c" }
                   : { background: "rgba(0,0,0,0.04)", color: "#8E8E93" }
@@ -319,17 +319,17 @@ function TercCard({ card, onMove, onEdit, onDelete }: {
           <div className="flex items-end justify-between mt-2.5">
             <div>
               {margin !== null && (
-                <p className="text-[10px] tabular-nums mb-0.5" style={{ color: margin >= 0 ? "#009351" : "#d33a3c" }}>
+                <p className="text-[10px] ds-num mb-0.5" style={{ color: margin >= 0 ? "#009351" : "#d33a3c" }}>
                   Custo {brl(card.custoTerceiro!)} · Margem {brl(margin)}
                 </p>
               )}
               {card.quantidade > 0 && card.preco > 0 && (
-                <p className="text-[10px] text-[#8E8E93] tabular-nums">
+                <p className="text-[10px] text-[#8E8E93] ds-num">
                   {brl(card.preco / card.quantidade)}/un
                 </p>
               )}
             </div>
-            <p className="text-[17px] font-bold text-[#191625] tabular-nums leading-none">
+            <p className="text-[17px] font-bold text-[#191625] ds-num leading-none">
               {brl(card.preco)}
             </p>
           </div>
@@ -445,11 +445,11 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
               <div className="w-1.5 h-1.5 rounded-full bg-[#c57800]" />
               <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold">Aguardando</p>
             </div>
-            <p className="text-[22px] font-semibold leading-none tabular-nums"
+            <p className="text-[22px] font-semibold leading-none ds-num"
               style={{ color: kpis.nAguardando > 0 ? "#c57800" : "#C7C7CC" }}>
               {kpis.nAguardando}
             </p>
-            <p className="text-[10px] text-[#8E8E93] mt-1 tabular-nums">{brl(kpis.vAberto)}</p>
+            <p className="text-[10px] text-[#8E8E93] mt-1 ds-num">{brl(kpis.vAberto)}</p>
           </div>
 
           {/* Recebido */}
@@ -458,11 +458,11 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
               <div className="w-1.5 h-1.5 rounded-full bg-[#8456e8]" />
               <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold">Recebido</p>
             </div>
-            <p className="text-[22px] font-semibold leading-none tabular-nums"
+            <p className="text-[22px] font-semibold leading-none ds-num"
               style={{ color: kpis.nRecebido > 0 ? "#8456e8" : "#C7C7CC" }}>
               {kpis.nRecebido}
             </p>
-            <p className="text-[10px] text-[#8E8E93] mt-1 tabular-nums">&nbsp;</p>
+            <p className="text-[10px] text-[#8E8E93] mt-1 ds-num">&nbsp;</p>
           </div>
 
           {/* Entregue */}
@@ -471,11 +471,11 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
               <div className="w-1.5 h-1.5 rounded-full bg-[#009351]" />
               <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold">Entregue</p>
             </div>
-            <p className="text-[22px] font-semibold leading-none tabular-nums"
+            <p className="text-[22px] font-semibold leading-none ds-num"
               style={{ color: kpis.nEntregue > 0 ? "#009351" : "#C7C7CC" }}>
               {kpis.nEntregue}
             </p>
-            <p className="text-[10px] text-[#8E8E93] mt-1 tabular-nums">{brl(kpis.vEntregue)}</p>
+            <p className="text-[10px] text-[#8E8E93] mt-1 ds-num">{brl(kpis.vEntregue)}</p>
           </div>
 
           {/* Total */}
@@ -484,7 +484,7 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
               style={{ color: "rgba(255,255,255,0.38)" }}>
               Total
             </p>
-            <p className="text-[16px] font-bold text-white tabular-nums leading-none">{brl(kpis.vTotal)}</p>
+            <p className="text-[16px] font-bold text-white ds-num leading-none">{brl(kpis.vTotal)}</p>
             <div className="mt-2 h-0.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
               <div className="h-full rounded-full transition-all duration-700"
                 style={{
@@ -492,7 +492,7 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
                   background: "#009351",
                 }} />
             </div>
-            <p className="text-[9px] mt-1.5 tabular-nums" style={{ color: "rgba(255,255,255,0.3)" }}>
+            <p className="text-[9px] mt-1.5 ds-num" style={{ color: "rgba(255,255,255,0.3)" }}>
               {kpis.vTotal > 0 ? Math.round(kpis.vEntregue / kpis.vTotal * 100) : 0}% entregue
             </p>
           </div>
@@ -532,10 +532,10 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete }: {
                 </span>
                 <span className="text-[12px] font-semibold text-[#191625]">{group.nomeCliente}</span>
                 <div className="flex-1 h-px bg-[rgba(60,60,67,0.07)]" />
-                <span className="text-[10px] text-[#8E8E93] tabular-nums">
+                <span className="text-[10px] text-[#8E8E93] ds-num">
                   {groupEntregues}/{group.cards.length} entregue{group.cards.length !== 1 ? "s" : ""}
                 </span>
-                <span className="text-[11px] font-bold tabular-nums text-[#191625]">
+                <span className="text-[11px] font-bold ds-num text-[#191625]">
                   {brl(groupTotal)}
                 </span>
               </div>

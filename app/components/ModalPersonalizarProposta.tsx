@@ -152,10 +152,10 @@ export function ModalPersonalizarProposta({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter"
       onClick={e => { if (e.target === e.currentTarget) handleClose() }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col overflow-hidden"
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col overflow-hidden apple-modal-enter"
         style={{ maxHeight: "92vh" }}>
 
         {/* Header */}
@@ -166,7 +166,7 @@ export function ModalPersonalizarProposta({
                 {form.nomeCliente || "Sem nome"}
               </p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className="text-[10px] font-bold text-[#8456e8] bg-[#8456e8]/[0.08] border border-[#8456e8]/20 px-1.5 py-0.5 rounded-full tabular-nums shrink-0">
+                <span className="text-[10px] font-bold text-[#8456e8] bg-[#8456e8]/[0.08] border border-[#8456e8]/20 px-1.5 py-0.5 rounded-full ds-num shrink-0">
                   {numero}
                 </span>
                 <span className="text-[11px] text-[#8E8E93]">{data}</span>
@@ -196,10 +196,10 @@ export function ModalPersonalizarProposta({
             <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b border-[rgba(60,60,67,0.08)]">
                 <th className="py-3 px-3 w-10" />
-                <th className="py-3 px-2 text-left text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Qtd</th>
-                <th className="py-3 px-2 text-right text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Unitário</th>
-                <th className="py-3 px-2 text-right text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">Total</th>
-                <th className="py-3 px-2 text-right text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">12×/mês</th>
+                <th className="py-3 px-2 text-left text-[10px] text-[#8E8E93] font-semibold">Qtd</th>
+                <th className="py-3 px-2 text-right text-[10px] text-[#8E8E93] font-semibold">Unitário</th>
+                <th className="py-3 px-2 text-right text-[10px] text-[#8E8E93] font-semibold">Total</th>
+                <th className="py-3 px-2 text-right text-[10px] text-[#8E8E93] font-semibold">12×/mês</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[rgba(0,0,0,0.04)]">
@@ -254,7 +254,7 @@ export function ModalPersonalizarProposta({
                             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                           </svg>
                         </button>
-                        <span className="font-bold text-[13px] text-[#191625] tabular-nums">{num(linha.quantidade)}</span>
+                        <span className="font-bold text-[13px] text-[#191625] ds-num">{num(linha.quantidade)}</span>
                         <button
                           onClick={() => toggleQual(linha.quantidade)}
                           title="Clique para alternar Digital / Offset"
@@ -279,7 +279,7 @@ export function ModalPersonalizarProposta({
                           value={unitOvr[linha.quantidade] ?? unit}
                           onChange={e => setUnitOvr(prev => ({ ...prev, [linha.quantidade]: e.target.value }))}
                           onFocus={e => e.target.select()}
-                          className={`w-[72px] text-right text-[12.5px] font-semibold tabular-nums border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                          className={`w-[72px] text-right text-[12.5px] font-semibold ds-num border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                             modified
                               ? "border-[#c57800]/50 bg-[#c57800]/[0.06] text-[#191625] focus:ring-[#c57800]/20 focus:border-[#c57800]"
                               : "border-[rgba(60,60,67,0.12)] text-[#191625] focus:ring-[#8456e8]/20 focus:border-[#8456e8]"
@@ -314,7 +314,7 @@ export function ModalPersonalizarProposta({
                             }
                             if (e.key === "Escape") setEditingTotal(null)
                           }}
-                          className={`w-[100px] text-right text-[12.5px] font-semibold tabular-nums border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-all ${
+                          className={`w-[100px] text-right text-[12.5px] font-semibold ds-num border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 transition-all ${
                             modified
                               ? "border-[#c57800]/50 bg-[#c57800]/[0.06] focus:ring-[#c57800]/20 focus:border-[#c57800]"
                               : "border-[#8456e8]/40 bg-[#8456e8]/[0.04] focus:ring-[#8456e8]/20 focus:border-[#8456e8]"
@@ -324,7 +324,7 @@ export function ModalPersonalizarProposta({
                         <button
                           disabled={!ativo}
                           onClick={() => { setTempTotal(total.toFixed(2)); setEditingTotal(linha.quantidade) }}
-                          className={`font-semibold text-[13.5px] tabular-nums text-right w-full transition-colors disabled:cursor-not-allowed ${
+                          className={`font-semibold text-[13.5px] ds-num text-right w-full transition-colors disabled:cursor-not-allowed ${
                             ativo ? (modified ? "text-[#c57800] hover:opacity-70" : "text-[#8456e8] hover:opacity-70") : "text-[#8E8E93]"
                           }`}
                           title="Clique para editar o total"
@@ -333,7 +333,7 @@ export function ModalPersonalizarProposta({
                         </button>
                       )}
                       {totalOvr[linha.quantidade] !== undefined && ativo && editingTotal !== linha.quantidade && (
-                        <p className="text-[9px] text-[#8E8E93] line-through tabular-nums text-right">
+                        <p className="text-[9px] text-[#8E8E93] line-through ds-num text-right">
                           {brl(getUnit(linha) * linha.quantidade)}
                         </p>
                       )}
@@ -341,7 +341,7 @@ export function ModalPersonalizarProposta({
 
                     {/* Parcela */}
                     <td className="py-3 px-2 text-right">
-                      <span className="text-[11.5px] text-[#8E8E93] tabular-nums">{brl(parcela)}</span>
+                      <span className="text-[11.5px] text-[#8E8E93] ds-num">{brl(parcela)}</span>
                     </td>
                   </tr>
                 )
@@ -353,8 +353,8 @@ export function ModalPersonalizarProposta({
         {/* Resumo + ações rápidas */}
         <div className="px-5 py-2.5 bg-[rgba(116,116,128,0.04)] border-t border-[rgba(60,60,67,0.08)] flex items-center justify-between gap-3 shrink-0">
           <p className="text-[11px] text-[#8E8E93]">
-            <span className="font-semibold tabular-nums">{ativos.size}</span> de{" "}
-            <span className="tabular-nums">{calculo.tabela.length}</span> tiers selecionados
+            <span className="font-semibold ds-num">{ativos.size}</span> de{" "}
+            <span className="ds-num">{calculo.tabela.length}</span> tiers selecionados
           </p>
           <div className="flex items-center gap-3">
             {/* Custo × 2 */}
@@ -450,7 +450,7 @@ export function ModalPersonalizarProposta({
                   onSalvar(custom, opcoes)
                   onClose()
                 }}
-                className="flex-1 py-2.5 text-[11.5px] font-semibold bg-[#161421] hover:bg-[#0b0914] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
+                className="flex-1 py-2.5 text-[11.5px] font-semibold bg-[#8456e8] hover:bg-[#7445d4] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
                 Salvar
               </button>
             )}

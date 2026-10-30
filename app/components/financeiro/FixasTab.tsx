@@ -67,7 +67,7 @@ export function FixasTab({ config, lancamentos, onUpdateConfig, onLancar }: Prop
         <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-5 py-4">
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-[12.5px] font-semibold text-[#191625]">Progresso do mês</span>
-            <span className="text-[12px] text-[#8E8E93] tabular-nums">{pagosMes.length} de {ativos.length} pagos</span>
+            <span className="text-[12px] text-[#8E8E93] ds-num">{pagosMes.length} de {ativos.length} pagos</span>
           </div>
           <div className="w-full h-2.5 bg-[rgba(116,116,128,0.1)] rounded-full overflow-hidden">
             <div
@@ -129,7 +129,7 @@ export function FixasTab({ config, lancamentos, onUpdateConfig, onLancar }: Prop
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <p className="font-semibold text-[14px] text-rose-600 tabular-nums">−{brl(gf.valor)}</p>
+                  <p className="font-semibold text-[14px] text-rose-600 ds-num">−{brl(gf.valor)}</p>
                   <div className="flex gap-1.5">
                     {!pago && (
                       <button
@@ -163,7 +163,7 @@ export function FixasTab({ config, lancamentos, onUpdateConfig, onLancar }: Prop
       )}
 
       <button onClick={() => setModal(true)}
-        className="flex items-center gap-2 px-4 py-2.5 bg-[#161421] hover:bg-[#0b0914] text-white text-[12.5px] font-semibold rounded-xl transition-colors">
+        className="flex items-center gap-2 px-4 py-2.5 bg-[#8456e8] hover:bg-[#7445d4] text-white text-[12.5px] font-semibold rounded-xl transition-colors">
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>
@@ -212,12 +212,12 @@ function ModalGastoFixo({ inicial, catsDesp, contas, onSave, onClose }: {
     })
   }
 
-  const cls = "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[#5e5c68] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"
+  const cls = "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[#5e5c68] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8]"
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 flex flex-col overflow-hidden" style={{ maxHeight: "90vh" }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 flex flex-col overflow-hidden apple-modal-enter" style={{ maxHeight: "90vh" }}>
         <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between shrink-0">
           <p className="font-bold text-[#191625] text-[14px]">{inicial ? "Editar gasto fixo" : "Novo gasto fixo"}</p>
           <button onClick={onClose} className="text-[#898892] hover:text-[#8E8E93] text-xl leading-none">×</button>
@@ -265,7 +265,7 @@ function ModalGastoFixo({ inicial, catsDesp, contas, onSave, onClose }: {
             Cancelar
           </button>
           <button disabled={!nome.trim() || !parseFloat(valor)} onClick={salvar}
-            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#161421] hover:bg-[#0b0914] rounded-xl transition-colors disabled:opacity-40">
+            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#8456e8] hover:bg-[#7445d4] rounded-xl transition-colors disabled:opacity-40">
             {inicial ? "Salvar" : "Adicionar"}
           </button>
         </div>
@@ -278,8 +278,8 @@ function KpiBox({ label, value, color }: { label: string; value: string; color?:
   const cls = color === "rose" ? "text-rose-600" : color === "green" ? "text-emerald-700" : color === "amber" ? "text-amber-600" : "text-[#191625]"
   return (
     <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-4 py-3">
-      <p className="text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">{label}</p>
-      <p className={`font-semibold text-[17px] mt-0.5 tabular-nums ${cls}`}>{value}</p>
+      <p className="text-[10px] text-[#8E8E93] font-semibold">{label}</p>
+      <p className={`font-semibold text-[17px] mt-0.5 ds-num ${cls}`}>{value}</p>
     </div>
   )
 }

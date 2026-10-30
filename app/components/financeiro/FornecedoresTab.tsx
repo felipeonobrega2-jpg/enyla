@@ -74,7 +74,7 @@ export function FornecedoresTab({ config, lancamentos, onUpdateConfig, onAddLanc
       {/* Cards de conta por fornecedor */}
       {contaAtivos.length > 0 && (
         <div>
-          <p className="text-[10.5px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-faint)" }}>
+          <p className="text-[10.5px] font-bold mb-2" style={{ color: "var(--text-faint)" }}>
             Contas abertas
           </p>
           <div className="grid grid-cols-1 gap-2">
@@ -98,7 +98,7 @@ export function FornecedoresTab({ config, lancamentos, onUpdateConfig, onAddLanc
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className={`text-[18px] font-bold tabular-nums ${saldo > 0 ? "text-rose-600" : saldo < 0 ? "text-emerald-600" : "text-[#8E8E93]"}`}>
+                    <p className={`text-[18px] font-bold ds-num ${saldo > 0 ? "text-rose-600" : saldo < 0 ? "text-emerald-600" : "text-[#8E8E93]"}`}>
                       {saldo > 0 ? "−" : saldo < 0 ? "+" : ""}{brl(Math.abs(saldo))}
                     </p>
                     <p className="text-[9.5px] font-medium mt-0.5" style={{ color: "var(--text-faint)" }}>
@@ -134,7 +134,7 @@ export function FornecedoresTab({ config, lancamentos, onUpdateConfig, onAddLanc
           {busca && <button onClick={() => setBusca("")} className="text-[#898892] text-base leading-none">×</button>}
         </div>
         <button onClick={() => setModal(true)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-[#161421] hover:bg-[#0b0914] text-white text-[12.5px] font-semibold rounded-xl transition-colors shrink-0">
+          className="flex items-center gap-1.5 px-4 py-2 bg-[#8456e8] hover:bg-[#7445d4] text-white text-[12.5px] font-semibold rounded-xl transition-colors shrink-0">
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
@@ -278,9 +278,9 @@ function ModalContaFornecedor({
   const saldoColor = saldo > 0 ? "#dc2626" : saldo < 0 ? "#059669" : "#8E8E93"
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 flex flex-col overflow-hidden" style={{ maxHeight: "88vh" }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 flex flex-col overflow-hidden apple-modal-enter" style={{ maxHeight: "88vh" }}>
 
         {/* Header */}
         <div className="px-5 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between shrink-0">
@@ -299,7 +299,7 @@ function ModalContaFornecedor({
 
         {/* Saldo */}
         <div className="px-5 py-5 border-b border-[rgba(60,60,67,0.08)] shrink-0">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#8E8E93] mb-2">Saldo em aberto</p>
+          <p className="text-[10px] font-bold text-[#8E8E93] mb-2">Saldo em aberto</p>
           <div className="flex items-center gap-2">
             {editandoSaldo ? (
               <>
@@ -311,7 +311,7 @@ function ModalContaFornecedor({
                   onChange={e => setNovoSaldo(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") salvarSaldo(); if (e.key === "Escape") setEditandoSaldo(false) }}
                   placeholder={String(saldo.toFixed(2))}
-                  className="flex-1 text-[22px] font-bold tabular-nums border-b-2 border-[#8456e8] bg-transparent focus:outline-none pb-0.5"
+                  className="flex-1 text-[22px] font-bold ds-num border-b-2 border-[#8456e8] bg-transparent focus:outline-none pb-0.5"
                   style={{ color: saldoColor }}
                 />
                 <button onClick={salvarSaldo}
@@ -325,7 +325,7 @@ function ModalContaFornecedor({
               </>
             ) : (
               <>
-                <p className="text-[26px] font-bold tabular-nums flex-1" style={{ color: saldoColor }}>
+                <p className="text-[26px] font-bold ds-num flex-1" style={{ color: saldoColor }}>
                   {saldo > 0 ? "−" : saldo < 0 ? "+" : ""}{brl(Math.abs(saldo))}
                 </p>
                 <p className="text-[11px] text-[#8E8E93] mr-1">
@@ -346,7 +346,7 @@ function ModalContaFornecedor({
 
         {/* Lista de lançamentos */}
         <div className="overflow-y-auto flex-1 px-5 py-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#8E8E93] mb-3">
+          <p className="text-[10px] font-bold text-[#8E8E93] mb-3">
             Lançamentos · {sorted.length}
           </p>
           {sorted.length === 0 ? (
@@ -370,7 +370,7 @@ function ModalContaFornecedor({
                         )}
                       </div>
                     </div>
-                    <p className={`text-[13px] font-bold tabular-nums shrink-0 ${isDebt ? "text-rose-600" : "text-emerald-600"}`}>
+                    <p className={`text-[13px] font-bold ds-num shrink-0 ${isDebt ? "text-rose-600" : "text-emerald-600"}`}>
                       {isDebt ? "−" : "+"}{brl(l.valor)}
                     </p>
                     {onDeleteLancamento && (
@@ -424,13 +424,13 @@ function ModalFornecedor({ inicial, categoriasExistentes, onSave, onClose }: {
     })
   }
 
-  const cls = "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[#5e5c68] bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"
+  const cls = "w-full h-9 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12.5px] text-[#5e5c68] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8]"
   const catsFiltradas = categoriasExistentes.filter(c => c.toLowerCase().includes(catInput.toLowerCase()))
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 flex flex-col overflow-hidden" style={{ maxHeight: "90vh" }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 flex flex-col overflow-hidden apple-modal-enter" style={{ maxHeight: "90vh" }}>
         <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between shrink-0">
           <p className="font-bold text-[#191625] text-[14px]">{inicial ? "Editar fornecedor" : "Novo fornecedor"}</p>
           <button onClick={onClose} className="text-[#898892] hover:text-[#8E8E93] text-xl leading-none">×</button>
@@ -496,7 +496,7 @@ function ModalFornecedor({ inicial, categoriasExistentes, onSave, onClose }: {
             Cancelar
           </button>
           <button disabled={!nome.trim()} onClick={salvar}
-            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#161421] hover:bg-[#0b0914] rounded-xl transition-colors disabled:opacity-40">
+            className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#8456e8] hover:bg-[#7445d4] rounded-xl transition-colors disabled:opacity-40">
             {inicial ? "Salvar" : "Adicionar"}
           </button>
         </div>
@@ -508,7 +508,7 @@ function ModalFornecedor({ inicial, categoriasExistentes, onSave, onClose }: {
 function Kpi({ label, value, color }: { label: string; value: string; color?: "green" }) {
   return (
     <div className="bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-4 py-3">
-      <p className="text-[10px] uppercase tracking-wider text-[#8E8E93] font-semibold">{label}</p>
+      <p className="text-[10px] text-[#8E8E93] font-semibold">{label}</p>
       <p className={`font-semibold text-[17px] mt-0.5 ${color === "green" ? "text-emerald-700" : "text-[#191625]"}`}>{value}</p>
     </div>
   )

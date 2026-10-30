@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
-import { Ruler, Factory, LayoutDashboard, FileText, Package, Users, Truck, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Trophy } from "lucide-react"
+import { Ruler, Check, Factory, LayoutDashboard, FileText, Package, Users, Truck, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Trophy } from "lucide-react"
 import { signOut } from "next-auth/react"
 import WhatsAppView from "./components/WhatsAppView"
 import Image from "next/image"
@@ -43,7 +43,8 @@ import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom,
 import FormaView from "./FormaView"
 import FormaBubble from "./components/FormaBubble"
 import { brl, num } from "./utils"
-import { FormSection, Label, NumberInput, KpiCard, Section, TH, TabelaRow, AnaliseEstrategica, EmptyState } from "./components/ui"
+import { FormSection, Label, NumberInput, Section, TH, TabelaRow, AnaliseEstrategica, EmptyState } from "./components/ui"
+import { CabecalhoPagina, Kpi, Segmentado } from "./components/ds"
 import { HistoricoView } from "./components/HistoricoView"
 import { OrcamentosView } from "./components/OrcamentosView"
 import { PedidosUnificadoView, OrderEntry } from "./components/PedidosUnificadoView"
@@ -136,7 +137,7 @@ function NavItem({ active, onClick, icon, label, badge, accent }: {
       </span>
       <span className="flex-1 text-left truncate">{label}</span>
       {badge !== undefined && badge > 0 && (
-        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums min-w-[18px] text-center"
+        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full ds-num min-w-[18px] text-center"
           style={{ background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}>
           {badge}
         </span>
@@ -1508,8 +1509,8 @@ export default function Home() {
             {form.blankOverride ? (
               <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl border-2 border-[#009351]/25 bg-[#009351]/[0.04]">
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11.5px] font-semibold text-[#009351] truncate">
-                    ✓ {dxfNome ?? "dieline.dxf"}
+                  <p className="text-[11.5px] font-semibold text-[#009351] truncate flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 shrink-0" /> {dxfNome ?? "dieline.dxf"}
                   </p>
                   <p className="text-[10px] text-[#8E8E93] mt-0.5">
                     Blank: {(form.blankOverride.largura / 10).toFixed(1)} × {(form.blankOverride.altura / 10).toFixed(1)} cm
@@ -1739,7 +1740,7 @@ export default function Home() {
               {form.quantidades.map(q => {
                 const qual = qualDe(q)
                 return (
-                  <span key={q} className="inline-flex items-center gap-1 text-[11.5px] tabular-nums bg-[rgba(116,116,128,0.08)] text-[#5e5c68] px-2 py-1 rounded-full font-medium">
+                  <span key={q} className="inline-flex items-center gap-1 text-[11.5px] ds-num bg-[rgba(116,116,128,0.08)] text-[#5e5c68] px-2 py-1 rounded-full font-medium">
                     {num(q)}
                     <button
                       onClick={() => toggleQual(q)}
@@ -2278,17 +2279,10 @@ export default function Home() {
           ) : (
             <>
               {/* ── Tab bar: Padrão / Digital Rápido ──────────────────────── */}
-              <div className="sticky top-0 z-10 bg-white border-b flex items-center gap-1 px-4 py-2.5 print:hidden" style={{ borderColor: "rgba(60,60,67,0.1)" }}>
-                {(["padrao", "digital"] as const).map(t => (
-                  <button key={t} onClick={() => setOrcTab(t)}
-                    className={`px-3.5 py-1.5 rounded-lg text-[12.5px] font-semibold transition-all ${
-                      orcTab === t
-                        ? "bg-[#8456e8] text-white shadow-sm"
-                        : "text-[#8E8E93] hover:text-[#191625] hover:bg-[rgba(116,116,128,0.06)]"
-                    }`}>
-                    {t === "padrao" ? "Padrão" : "Digital Rápido"}
-                  </button>
-                ))}
+              <div className="sticky top-0 z-10 flex items-center gap-3 px-6 py-3 print:hidden backdrop-blur-md" style={{ background: "color-mix(in srgb, var(--bg-page) 88%, transparent)", borderBottom: "1px solid rgba(60,60,67,0.08)" }}>
+                <Segmentado<"padrao" | "digital"> valor={orcTab} onChange={setOrcTab}
+                  opcoes={[{ v: "padrao", nome: "Caixa (offset)" }, { v: "digital", nome: "Digital rápido" }]} />
+                <span className="text-[11.5px] text-[#898892]">{orcTab === "padrao" ? "Medidas ou DXF à esquerda; rotas, tabela e análise aqui." : "Proposta rápida para impressão digital."}</span>
               </div>
 
               {orcTab === "digital" ? (
@@ -2301,26 +2295,33 @@ export default function Home() {
               ) : (
             <div className="max-w-6xl mx-auto px-6 py-5 space-y-5">
 
-              {/* Header do orçamento */}
-              {form.nomeCliente && (
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-[#8456e8] text-white text-xs font-bold flex items-center justify-center">
-                    {form.nomeCliente[0].toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-[#191625]">{form.nomeCliente}</p>
-                    <p className="text-[#8E8E93] text-xs">{new Date().toLocaleDateString("pt-BR", { day:"2-digit", month:"long", year:"numeric" })}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* ── KPIs ── */}
-              <div className="grid grid-cols-4 gap-3">
-                <KpiCard label="Melhor formato" value={r.melhorFormato.formatoNome} sub={r.melhorFormato.orientacao} />
-                <KpiCard label="Peças por folha" value={num(r.melhorFormato.pecasPorFolha)} sub={`${num(r.layoutChapa.pecasPorChapa)} por chapa${form.blankOverride ? " · DXF real" : ""}`} />
-                <KpiCard label="Chapas necessárias" value={num(r.numChapas)} sub={`${form.numArtes} arte${form.numArtes > 1 ? "s" : ""} · R$350/chapa`} accent />
-                <KpiCard label="Custo impressão (fixo)" value={brl(r.custoImpressaoFixo)} sub="independe da tiragem" accent />
-              </div>
+              {/* Resumo do orçamento na tiragem ideal */}
+              {(() => {
+                const ideal = r.tabela.find(l => l.quantidade === r.sweetSpotIdealQtd) ?? r.tabela[r.tabela.length - 1]
+                const rotaIdeal = r.rotas?.find(q => q.quantidade === ideal.quantidade)?.melhor
+                const preco = form.comFaca ? ideal.precoComFaca : ideal.precoSemFaca
+                const unit = form.comFaca ? ideal.unitarioComFaca : ideal.unitarioSemFaca
+                const ml = ideal.margemLiquida
+                return (
+                  <>
+                    <CabecalhoPagina
+                      titulo={form.nomeCliente || "Novo orçamento"}
+                      sub={`${form.blankOverride ? "Dieline importado" : `${form.frente}×${form.alturaBox}×${form.lateral} cm`} · ${form.materialNome}${r.alertas?.length ? ` · ${r.alertas.length} ${r.alertas.length === 1 ? "aviso" : "avisos"} nas rotas` : ""}`}
+                    />
+                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 ds-escalonado">
+                      <Kpi rotulo={`Preço em ${num(ideal.quantidade)} un`} tom="acento" destaque valor={preco} formato={brl}
+                        sub={`${brl(unit)} por unidade · tiragem ideal`} />
+                      <Kpi rotulo="Rota mais barata" valor={rotaIdeal ? rotaIdeal.pecasPorFolhaPapel : r.melhorFormato.pecasPorFolha} formato={n => `${num(Math.round(n))} por folha`}
+                        sub={rotaIdeal ? `${rotaIdeal.impressorNome} · ${rotaIdeal.divisaoNome.toLowerCase()} ${rotaIdeal.formatoNome}` : r.melhorFormato.formatoNome} />
+                      <Kpi rotulo="Custo de produção" valor={form.comFaca ? ideal.custoTotalComFaca : ideal.custoTotalSemFaca} formato={brl}
+                        sub={ideal.estimado ? "tem valores estimados" : "com preços cadastrados"} tom={ideal.estimado ? "alerta" : "neutro"} />
+                      <Kpi rotulo="Margem líquida" valor={ml ?? null} formato={n => `${num(n, 1)}%`}
+                        tom={ml == null ? "neutro" : ml >= 40 ? "sucesso" : ml >= 30 ? "alerta" : "perigo"}
+                        sub={ideal.lucroLiquido != null ? `${brl(ideal.lucroLiquido)} de lucro após impostos` : undefined} />
+                    </div>
+                  </>
+                )
+              })()}
 
               {/* ── Preview 3D ── */}
               {form.frente > 0 && form.alturaBox > 0 && form.lateral > 0 ? (
@@ -2363,7 +2364,7 @@ export default function Home() {
                       form.tipoCaixa === "americano" ? "4 abas (L/2)" : "fundo tuck"],
                   ]).map(([l, v, s]) => (
                     <div key={l} className="bg-[rgba(116,116,128,0.04)] border border-[rgba(60,60,67,0.08)] rounded-2xl px-4 py-2.5 min-w-[120px]">
-                      <p className="text-[10px] uppercase tracking-wide text-[#8E8E93] font-semibold">{l}</p>
+                      <p className="text-[10px] text-[#8E8E93] font-semibold">{l}</p>
                       <p className="text-[#191625] font-bold text-lg leading-tight">{v}</p>
                       {s && <p className="text-[10px] text-[#8E8E93] mt-0.5">{s}</p>}
                     </div>

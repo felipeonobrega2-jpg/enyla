@@ -82,7 +82,7 @@ function PixEmitModal({ card, loteTotal, onClose, onAddLancamento }: {
       onClick={e => { if (e.target === e.currentTarget) dismiss() }}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mx-4 overflow-hidden transition-all duration-200"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mx-4 overflow-hidden transition-all duration-200 apple-modal-enter"
         style={{ transform: visible ? "scale(1) translateY(0)" : "scale(0.94) translateY(12px)", opacity: visible ? 1 : 0 }}
       >
         {/* Header */}
@@ -90,7 +90,7 @@ function PixEmitModal({ card, loteTotal, onClose, onAddLancamento }: {
           <div>
             <p className="font-bold text-[14px] text-[#1C1C1E]">Emitir link de pagamento</p>
             <p className="text-[11px] text-[#8E8E93] mt-0.5">
-              Lote <span className="font-semibold text-[#5009c4]">{card.loteNumero}</span>
+              Lote <span className="font-semibold text-[#8456e8]">{card.loteNumero}</span>
               {" · "}{card.nomeCliente.split(" ")[0]}
             </p>
           </div>
@@ -113,19 +113,19 @@ function PixEmitModal({ card, loteTotal, onClose, onAddLancamento }: {
                 value={valor} onChange={e => setValor(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && emit()}
                 placeholder="0,00"
-                className="w-full pl-9 pr-20 py-2.5 border border-[rgba(0,0,0,0.12)] rounded-xl text-[15px] font-semibold text-[#1C1C1E] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#5009c4]/20 focus:border-[#5009c4] transition-colors"
+                className="w-full pl-9 pr-20 py-2.5 border border-[rgba(0,0,0,0.12)] rounded-xl text-[15px] font-semibold text-[#1C1C1E] ds-num focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] transition-colors"
               />
               {loteTotal > 0 && (
                 <button
                   onClick={() => setValor((loteTotal / 2).toFixed(2))}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-[#5009c4] bg-[#5009c4]/[0.08] hover:bg-[#5009c4]/[0.14] px-2.5 py-1 rounded-lg transition-colors">
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-[#8456e8] bg-[#8456e8]/[0.08] hover:bg-[#8456e8]/[0.14] px-2.5 py-1 rounded-lg transition-colors">
                   Metade
                 </button>
               )}
             </div>
             {loteTotal > 0 && (
               <button onClick={() => setValor(loteTotal.toFixed(2))}
-                className="mt-1 text-[10px] text-[#5009c4] hover:underline">
+                className="mt-1 text-[10px] text-[#8456e8] hover:underline">
                 Usar total do lote: {brl(loteTotal)}
               </button>
             )}
@@ -136,10 +136,10 @@ function PixEmitModal({ card, loteTotal, onClose, onAddLancamento }: {
             <label className="text-[9.5px] font-bold uppercase tracking-wide text-[#8E8E93] block mb-1.5">Expira em</label>
             <div className="grid grid-cols-[1fr_100px] gap-2">
               <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)}
-                className="w-full px-3 py-2.5 border border-[rgba(0,0,0,0.12)] rounded-xl text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-[#5009c4]/20 focus:border-[#5009c4] transition-colors"
+                className="w-full px-3 py-2.5 border border-[rgba(0,0,0,0.12)] rounded-xl text-[13px] text-[#1C1C1E] focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] transition-colors"
               />
               <input type="time" value={expTime} onChange={e => setExpTime(e.target.value)}
-                className="w-full px-3 py-2.5 border border-[rgba(0,0,0,0.12)] rounded-xl text-[13px] text-[#1C1C1E] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#5009c4]/20 focus:border-[#5009c4] transition-colors"
+                className="w-full px-3 py-2.5 border border-[rgba(0,0,0,0.12)] rounded-xl text-[13px] text-[#1C1C1E] ds-num focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] transition-colors"
               />
             </div>
           </div>
@@ -292,7 +292,7 @@ export function KanbanView({
             title={colapsarVazias ? "Expandir colunas vazias" : "Colapsar colunas vazias"}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-semibold transition-colors border ${
               colapsarVazias
-                ? "bg-[#5009c4]/[0.08] text-[#5009c4] border-[#5009c4]/20"
+                ? "bg-[#8456e8]/[0.08] text-[#8456e8] border-[#8456e8]/20"
                 : "bg-[rgba(116,116,128,0.06)] text-[#8E8E93] border-[rgba(60,60,67,0.1)] hover:text-[#1C1C1E] hover:border-[rgba(60,60,67,0.2)]"
             }`}
           >
@@ -304,7 +304,7 @@ export function KanbanView({
             </svg>
             {colapsarVazias ? "Expandir vazias" : "Ocultar vazias"}
           </button>
-          <span className="text-[10px] text-[#8E8E93] tabular-nums">{total} orçamento{total !== 1 ? "s" : ""}</span>
+          <span className="text-[10px] text-[#8E8E93] ds-num">{total} orçamento{total !== 1 ? "s" : ""}</span>
         </div>
         <div className="grid grid-cols-4 gap-3">
 
@@ -313,15 +313,15 @@ export function KanbanView({
             <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-3">Orçamentos</p>
             <div className="flex gap-3">
               <div>
-                <p className="text-[24px] font-semibold text-[#1C1C1E] leading-none tabular-nums">{total}</p>
+                <p className="text-[24px] font-semibold text-[#1C1C1E] leading-none ds-num">{total}</p>
                 <p className="text-[10px] text-[#8E8E93] mt-1">realizados</p>
               </div>
               <div className="border-l border-[rgba(60,60,67,0.12)] pl-3">
-                <p className="text-[24px] font-semibold leading-none tabular-nums" style={{ color: "#34C759" }}>{fechados}</p>
+                <p className="text-[24px] font-semibold leading-none ds-num" style={{ color: "#34C759" }}>{fechados}</p>
                 <p className="text-[10px] text-[#8E8E93] mt-1">fechados</p>
               </div>
               <div className="border-l border-[rgba(60,60,67,0.12)] pl-3">
-                <p className="text-[24px] font-semibold leading-none tabular-nums" style={{ color: "#FF3B30" }}>{perdidos}</p>
+                <p className="text-[24px] font-semibold leading-none ds-num" style={{ color: "#FF3B30" }}>{perdidos}</p>
                 <p className="text-[10px] text-[#8E8E93] mt-1">perdidos</p>
               </div>
             </div>
@@ -330,7 +330,7 @@ export function KanbanView({
           {/* Conversão */}
           <div className={`rounded-xl p-3.5 ${isDark ? "bg-[#2C2C2E] border border-[rgba(255,255,255,0.06)]" : "bg-white border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)]"}`}>
             <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-2">Taxa de conversão</p>
-            <p className="text-[24px] font-semibold leading-none tabular-nums" style={{
+            <p className="text-[24px] font-semibold leading-none ds-num" style={{
               color: conversao >= 60 ? "#34C759" : conversao >= 35 ? "#FF9500" : decididos === 0 ? "#8E8E93" : "#FF3B30"
             }}>
               {decididos === 0 ? "—" : `${num(conversao, 1)}%`}
@@ -351,11 +351,11 @@ export function KanbanView({
             <p className="text-[9px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-3">Em andamento</p>
             <div className="flex gap-3">
               <div>
-                <p className="text-[24px] font-semibold leading-none tabular-nums" style={{ color: "#FF9500" }}>{emProd}</p>
+                <p className="text-[24px] font-semibold leading-none ds-num" style={{ color: "#FF9500" }}>{emProd}</p>
                 <p className="text-[10px] text-[#8E8E93] mt-1">produção</p>
               </div>
               <div className="border-l border-[rgba(60,60,67,0.12)] pl-3">
-                <p className="text-[24px] font-semibold leading-none tabular-nums" style={{ color: "#AF52DE" }}>{aguardAprov}</p>
+                <p className="text-[24px] font-semibold leading-none ds-num" style={{ color: "#AF52DE" }}>{aguardAprov}</p>
                 <p className="text-[10px] text-[#8E8E93] mt-1">aprovação</p>
               </div>
             </div>
@@ -367,21 +367,21 @@ export function KanbanView({
             <div className="space-y-1.5">
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>Pipeline</p>
-                <p className="text-[13px] font-bold text-white tabular-nums">{brl(pipeline)}</p>
+                <p className="text-[13px] font-bold text-white ds-num">{brl(pipeline)}</p>
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>Faturado</p>
-                <p className="text-[13px] font-bold tabular-nums" style={{ color: "#34C759" }}>{brl(faturado)}</p>
+                <p className="text-[13px] font-bold ds-num" style={{ color: "#34C759" }}>{brl(faturado)}</p>
               </div>
               {hotTotal > 0 && (
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: "#FF6200" }}><Flame className="w-3 h-3" /> Hot</p>
-                  <p className="text-[13px] font-bold tabular-nums" style={{ color: "#FF6200" }}>{brl(hotTotal)}</p>
+                  <p className="text-[13px] font-bold ds-num" style={{ color: "#FF6200" }}>{brl(hotTotal)}</p>
                 </div>
               )}
               <div className="flex items-baseline justify-between gap-2 pt-1.5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
                 <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>Ticket médio</p>
-                <p className="text-[12px] font-semibold tabular-nums" style={{ color: "rgba(255,255,255,0.5)" }}>{brl(ticketMed)}</p>
+                <p className="text-[12px] font-semibold ds-num" style={{ color: "rgba(255,255,255,0.5)" }}>{brl(ticketMed)}</p>
               </div>
             </div>
           </div>
@@ -559,9 +559,9 @@ export function KanbanView({
 
       {/* ── Modal de fechamento ───────────────────────────────────────────── */}
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter"
           onClick={e => { if (e.target === e.currentTarget) setModal(null) }}>
-          <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] w-full max-w-sm mx-4 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] w-full max-w-sm mx-4 overflow-hidden apple-modal-enter">
 
             {/* Header */}
             <div className="px-6 pt-5 pb-4 border-b border-[rgba(60,60,67,0.12)]">
@@ -570,7 +570,7 @@ export function KanbanView({
                   <p className="text-[10px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-1">Fechar pedido</p>
                   <p className="font-bold text-[#1C1C1E] text-[15px] leading-snug truncate">{modal.card.nomeCliente}</p>
                   {modal.card.numero && (
-                    <span className="text-[10px] font-bold text-[#5009c4] bg-[#5009c4]/10 border border-[#5009c4]/20 px-1.5 py-0.5 rounded-full mt-1.5 inline-block tabular-nums">
+                    <span className="text-[10px] font-bold text-[#8456e8] bg-[#8456e8]/10 border border-[#8456e8]/20 px-1.5 py-0.5 rounded-full mt-1.5 inline-block ds-num">
                       {modal.card.numero}
                     </span>
                   )}
@@ -589,21 +589,21 @@ export function KanbanView({
                   <button key={i} onClick={() => setModal(m => m ? { ...m, opcaoIdx: i } : m)}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${
                       selected
-                        ? "border-[#5009c4] bg-[#5009c4]/5"
+                        ? "border-[#8456e8] bg-[#8456e8]/5"
                         : "border-[rgba(0,0,0,0.12)] hover:border-[rgba(0,0,0,0.18)] hover:bg-[rgba(0,0,0,0.04)]"
                     }`}>
                     <div className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${
-                      selected ? "border-[#5009c4]" : "border-[rgba(60,60,67,0.36)]"
+                      selected ? "border-[#8456e8]" : "border-[rgba(60,60,67,0.36)]"
                     }`}>
-                      {selected && <div className="w-2 h-2 rounded-full bg-[#5009c4]" />}
+                      {selected && <div className="w-2 h-2 rounded-full bg-[#8456e8]" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`font-bold text-sm leading-none ${selected ? "text-[#5009c4]" : "text-[#1C1C1E]"}`}>
+                      <p className={`font-bold text-sm leading-none ${selected ? "text-[#8456e8]" : "text-[#1C1C1E]"}`}>
                         {num(op.quantidade)} unidades
                       </p>
                       <p className="text-[11px] text-[#8E8E93] mt-0.5">{brl(op.unitario)}/un</p>
                     </div>
-                    <p className={`font-semibold text-[15px] tabular-nums shrink-0 ${selected ? "text-[#5009c4]" : "text-[#1C1C1E]"}`}>
+                    <p className={`font-semibold text-[15px] ds-num shrink-0 ${selected ? "text-[#8456e8]" : "text-[#1C1C1E]"}`}>
                       {brl(op.preco)}
                     </p>
                   </button>
@@ -618,7 +618,7 @@ export function KanbanView({
                 Cancelar
               </button>
               <button onClick={confirmarFechamento}
-                className="flex-1 py-2.5 text-[13px] font-bold text-white bg-[#5009c4] hover:bg-[#4307a6] active:bg-[#370689] rounded-xl transition-colors">
+                className="flex-1 py-2.5 text-[13px] font-bold text-white bg-[#8456e8] hover:bg-[#7445d4] active:bg-[#6234bc] rounded-xl transition-colors">
                 Confirmar →
               </button>
             </div>
@@ -876,7 +876,7 @@ function KanbanCardItem({
                 })
               }}
               className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${
-                copiedId ? "bg-[#34C759]/10" : "text-[rgba(60,60,67,0.36)] hover:text-[#5009c4] hover:bg-[#5009c4]/5"
+                copiedId ? "bg-[#34C759]/10" : "text-[rgba(60,60,67,0.36)] hover:text-[#8456e8] hover:bg-[#8456e8]/5"
               }`}
               style={copiedId ? { color: "#34C759" } : {}}>
               {copiedId
@@ -889,10 +889,10 @@ function KanbanCardItem({
               onClick={e => { e.stopPropagation(); setShowLotePanel(v => !v) }}
               className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${
                 showLotePanel
-                  ? "text-[#5009c4] bg-[#5009c4]/10"
+                  ? "text-[#8456e8] bg-[#8456e8]/10"
                   : card.loteNumero
-                    ? "text-[#5009c4] bg-[#5009c4]/5 hover:bg-[#5009c4]/10"
-                    : "text-[rgba(60,60,67,0.36)] hover:text-[#5009c4] hover:bg-[#5009c4]/5"
+                    ? "text-[#8456e8] bg-[#8456e8]/5 hover:bg-[#8456e8]/10"
+                    : "text-[rgba(60,60,67,0.36)] hover:text-[#8456e8] hover:bg-[#8456e8]/5"
               }`}>
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z" />
@@ -933,10 +933,10 @@ function KanbanCardItem({
                         value={loteNumeroEdit}
                         onChange={e => { setLoteNumeroEdit(e.target.value.toUpperCase()); setLoteRenameError("") }}
                         onKeyDown={e => { if (e.key === "Enter") handleRenomear(); if (e.key === "Escape") { setEditingLote(false); setLoteRenameError("") } }}
-                        className="flex-1 font-semibold text-[15px] text-[#5009c4] bg-white border-2 border-[#5009c4] rounded-xl px-2.5 py-1 focus:outline-none min-w-0 tracking-wide"
+                        className="flex-1 font-semibold text-[15px] text-[#8456e8] bg-white border-2 border-[#8456e8] rounded-xl px-2.5 py-1 focus:outline-none min-w-0 tracking-wide"
                       />
                       <button onClick={handleRenomear} disabled={savingRename}
-                        className="w-8 h-8 flex items-center justify-center text-white bg-[#5009c4] hover:bg-[#4307a6] disabled:opacity-50 rounded-xl transition-colors shrink-0">
+                        className="w-8 h-8 flex items-center justify-center text-white bg-[#8456e8] hover:bg-[#7445d4] disabled:opacity-50 rounded-xl transition-colors shrink-0">
                         {savingRename
                           ? <span className="text-[10px]">…</span>
                           : <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -951,7 +951,7 @@ function KanbanCardItem({
                     <button
                       onClick={() => { setLoteNumeroEdit(card.loteNumero ?? ""); setLoteRenameError(""); setEditingLote(true) }}
                       title="Clique para renomear"
-                      className="font-semibold text-[17px] text-[#5009c4] tracking-wide hover:text-[#4307a6] transition-colors cursor-text -mx-0.5 px-0.5 rounded-lg"
+                      className="font-semibold text-[17px] text-[#8456e8] tracking-wide hover:text-[#7445d4] transition-colors cursor-text -mx-0.5 px-0.5 rounded-lg"
                     >
                       {card.loteNumero}
                     </button>
@@ -981,7 +981,7 @@ function KanbanCardItem({
                       className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10.5px] font-semibold transition-all"
                       style={copiedLoteLink === "track"
                         ? { background: "rgba(52,199,89,0.12)", color: "#34C759" }
-                        : { background: "rgba(80,9,196,0.08)", color: "#5009c4" }}
+                        : { background: "rgba(80,9,196,0.08)", color: "#8456e8" }}
                     >
                       {copiedLoteLink === "track" ? (
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -1104,7 +1104,7 @@ function KanbanCardItem({
                               )}
                             </div>
                             <div className="text-right shrink-0">
-                              <p className="text-[11px] font-bold tabular-nums" style={{ color: "#1C1C1E" }}>
+                              <p className="text-[11px] font-bold ds-num" style={{ color: "#1C1C1E" }}>
                                 {brl(t.preco)}
                               </p>
                               {t.quantidade > 0 && (
@@ -1125,8 +1125,8 @@ function KanbanCardItem({
                     <div className="space-y-0.5">
                       {clientLotes.map(l => (
                         <button key={l.id} onClick={() => handleMerge(l.id, l.numero)} disabled={merging}
-                          className="w-full flex items-center gap-2 py-2 px-2.5 rounded-xl bg-white hover:bg-[#5009c4]/5 border border-transparent hover:border-[#5009c4]/20 disabled:opacity-50 transition-all text-left">
-                          <span className="font-bold text-[10px] text-[#5009c4]">{l.numero}</span>
+                          className="w-full flex items-center gap-2 py-2 px-2.5 rounded-xl bg-white hover:bg-[#8456e8]/5 border border-transparent hover:border-[#8456e8]/20 disabled:opacity-50 transition-all text-left">
+                          <span className="font-bold text-[10px] text-[#8456e8]">{l.numero}</span>
                           <span className="text-[9.5px] text-[#8E8E93] flex-1 truncate">{l.nomeCliente}</span>
                           {merging
                             ? <span className="text-[9px] text-[rgba(60,60,67,0.3)]">…</span>
@@ -1148,8 +1148,8 @@ function KanbanCardItem({
                   <div className="space-y-0.5">
                     {clientLotes.map(l => (
                       <button key={l.id} onClick={() => handleAssignLote(l.id, l.numero)}
-                        className="w-full flex items-center gap-2 py-2 px-2.5 rounded-xl bg-white hover:bg-[#5009c4]/5 border border-transparent hover:border-[#5009c4]/20 transition-all text-left">
-                        <span className="font-bold text-[10px] text-[#5009c4]">{l.numero}</span>
+                        className="w-full flex items-center gap-2 py-2 px-2.5 rounded-xl bg-white hover:bg-[#8456e8]/5 border border-transparent hover:border-[#8456e8]/20 transition-all text-left">
+                        <span className="font-bold text-[10px] text-[#8456e8]">{l.numero}</span>
                         <span className="text-[9.5px] text-[#8E8E93] flex-1 truncate">{l.nomeCliente}</span>
                         <svg className="w-3 h-3 text-[rgba(60,60,67,0.36)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                       </button>
@@ -1157,7 +1157,7 @@ function KanbanCardItem({
                   </div>
                 )}
                 <button onClick={handleCriarLote} disabled={criandoLote}
-                  className="w-full py-2 text-[10.5px] font-semibold text-white bg-[#5009c4] hover:bg-[#4307a6] disabled:opacity-50 rounded-xl transition-colors flex items-center justify-center gap-1.5">
+                  className="w-full py-2 text-[10.5px] font-semibold text-white bg-[#8456e8] hover:bg-[#7445d4] disabled:opacity-50 rounded-xl transition-colors flex items-center justify-center gap-1.5">
                   {criandoLote
                     ? <><span className="text-[9px]">●</span> Criando…</>
                     : <><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg> Criar novo lote</>
@@ -1183,7 +1183,7 @@ function KanbanCardItem({
               onChange={e => setMotivoRascunho(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") confirmarPerda(); if (e.key === "Escape") setConfirmando(false) }}
               placeholder="Motivo (opcional)…"
-              className="w-full text-[10px] text-[#1C1C1E] bg-white border border-[rgba(0,0,0,0.12)] rounded-xl px-2.5 py-1.5 placeholder:text-[rgba(60,60,67,0.36)] focus:outline-none focus:ring-2 focus:ring-[#5009c4]/25 focus:border-[#5009c4] cursor-text select-text"
+              className="w-full text-[10px] text-[#1C1C1E] bg-white border border-[rgba(0,0,0,0.12)] rounded-xl px-2.5 py-1.5 placeholder:text-[rgba(60,60,67,0.36)] focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25 focus:border-[#8456e8] cursor-text select-text"
             />
             <div className="flex gap-1.5">
               <button onClick={() => setConfirmando(false)}
