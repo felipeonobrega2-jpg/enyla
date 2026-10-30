@@ -5,7 +5,9 @@ import { Cliente, KanbanCard, LancamentoFinanceiro, PropostaCustom, COLUNAS_KANB
 import { brl, num } from "../utils"
 import { HistItem } from "./HistoricoView"
 import { COL_COLORS } from "./kanban-colors"
-import { hoje, isReceitaPendenteValida, isAtrasada, calcularPedidosFechados, pedidosAbertos } from "../lib/financeiro"
+import { hoje, isReceitaPendenteValida, calcularPedidosFechados } from "../lib/financeiro"
+import { montarPedidos, nomeChave } from "../lib/negocio"
+import { MessageCircle, X } from "lucide-react"
 
 interface MetaCampanha { id: string; nome: string }
 
@@ -116,11 +118,11 @@ export function ClientePerfilModal({
 
   const lancCliente = lancamentos.filter(l => (l.nomeCliente ?? "").trim().toLowerCase() === nome.toLowerCase())
   const pendentes = lancCliente.filter(isReceitaPendenteValida)
-  const emAtraso  = lancCliente.filter(isAtrasada).reduce((s, l) => s + l.valor, 0)
-
-  const aReceber = pedidosAbertos(calcularPedidosFechados(kanban, lancamentos))
-    .filter(p => p.cliente.trim().toLowerCase() === nome.toLowerCase())
-    .reduce((s, p) => s + p.restante, 0)
+  // Mesma conta do resto do sistema (lib/negocio): saldo devedor e parte vencida
+  const pedidosCli = montarPedidos(kanban, lancamentos).filter(p => nomeChave(p.nomeCliente) === nomeChave(nome))
+  const aReceber   = pedidosCli.reduce((s, p) => s + p.aReceber, 0)
+  const emAtraso   = pedidosCli.reduce((s, p) => s + p.vencido, 0)
+  const semCobranca = pedidosCli.reduce((s, p) => s + p.semCobranca, 0)
 
   const ltv         = cardsFechados.reduce((s, c) => s + c.preco, 0)
   const ticketMedio = vendas > 0 ? ltv / vendas : 0
@@ -186,23 +188,23 @@ export function ClientePerfilModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
-        className="rounded-2xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col overflow-hidden"
-        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)", maxHeight: "90vh" }}
+        className="rounded-2xl w-full max-w-2xl mx-4 flex flex-col overflow-hidden bg-white apple-modal-enter shadow-[0_24px_64px_-16px_rgba(25,22,37,0.35)]"
+        style={{ border: "1px solid rgba(60,60,67,0.08)", maxHeight: "90vh" }}
       >
 
         {/* Header */}
         <div className="px-6 pt-5 pb-4 shrink-0 flex items-start gap-4"
           style={{ borderBottom: "1px solid var(--border)" }}>
-          <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 text-white text-sm font-bold"
-            style={{ background: "#8456e8" }}>
+          <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 text-[14px] font-semibold"
+            style={{ background: "rgba(132,86,232,0.12)", color: "#8456e8" }}>
             {inicial}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-[15px] leading-snug truncate" style={{ color: "var(--text-main)" }}>{nome}</p>
+            <p className="font-semibold text-[17px] tracking-[-0.01em] leading-snug truncate text-[#191625]">{nome}</p>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap text-[11px]" style={{ color: "var(--text-faint)" }}>
               {cadastro?.telefone && <span>{cadastro.telefone}</span>}
               {cadastro?.email && <span>· {cadastro.email}</span>}
@@ -214,10 +216,17 @@ export function ClientePerfilModal({
               </p>
             )}
           </div>
+          {cadastro?.telefone && (
+            <a href={`https://wa.me/${(() => { const t = cadastro.telefone!.replace(/\D/g, ""); return t.length <= 11 ? "55" + t : t })()}`}
+              target="_blank" rel="noreferrer"
+              className="h-8 px-3 rounded-lg text-[12px] font-semibold text-[#009351] hover:bg-[#009351]/[0.08] transition-colors flex items-center gap-1.5 shrink-0"
+              style={{ border: "1px solid rgba(0,147,81,0.25)" }}>
+              <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+            </a>
+          )}
           <button onClick={onClose}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-lg leading-none transition-colors shrink-0"
-            style={{ background: "var(--bg-alt)", color: "var(--text-faint)" }}>
-            ×
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#898892] hover:bg-[rgba(116,116,128,0.08)] hover:text-[#191625] transition-colors shrink-0">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -226,9 +235,10 @@ export function ClientePerfilModal({
 
           {/* KPIs — 3 colunas × 2 linhas */}
           <div className="grid grid-cols-3 gap-2 px-6 pt-5">
-            <Kpi label="Em aberto" value={brl(aReceber)} color={aReceber > 0 ? "amber" : undefined} />
-            <Kpi label="Em atraso" value={brl(emAtraso)} color={emAtraso > 0 ? "rose" : undefined} />
-            <Kpi label="Total LTV" value={brl(ltv)} />
+            <Kpi label="A receber" value={brl(aReceber)} color={aReceber > 0.5 ? "amber" : undefined}
+              sub={semCobranca > 0.5 ? `${brl(semCobranca)} sem cobrança` : undefined} />
+            <Kpi label="Cobrança vencida" value={brl(emAtraso)} color={emAtraso > 0.5 ? "rose" : undefined} />
+            <Kpi label="Total comprado" value={brl(ltv)} />
             <Kpi label="Ticket médio" value={brl(ticketMedio)} />
             <Kpi label="Conversão" value={conversao !== null ? `${conversao}%` : "—"}
               color={conversao !== null ? (conversao >= 60 ? "green" : conversao >= 35 ? "amber" : "rose") : undefined} />
@@ -300,7 +310,7 @@ export function ClientePerfilModal({
                       }`}>
                         {atrasado ? "Atrasado" : "Pendente"}
                       </span>
-                      <p className="font-bold text-[12.5px] tabular-nums shrink-0" style={{ color: "var(--text-main)" }}>{brl(l.valor)}</p>
+                      <p className="font-bold text-[12.5px] ds-num shrink-0" style={{ color: "var(--text-main)" }}>{brl(l.valor)}</p>
                     </div>
                   )
                 })}
@@ -333,7 +343,7 @@ export function ClientePerfilModal({
                           </span>
                         )}
                         <div className="flex-1" />
-                        <p className="text-[13px] font-bold tabular-nums" style={{ color: "var(--text-main)" }}>
+                        <p className="text-[13px] font-bold ds-num" style={{ color: "var(--text-main)" }}>
                           {brl(totalOrcamentos > 0 ? totalOrcamentos : g.total)}
                         </p>
                       </div>
@@ -408,7 +418,7 @@ export function ClientePerfilModal({
                           </span>
                         )}
                         <div className="flex-1" />
-                        <p className="text-[13px] font-bold tabular-nums" style={{ color: "var(--text-main)" }}>
+                        <p className="text-[13px] font-bold ds-num" style={{ color: "var(--text-main)" }}>
                           {preco > 0 ? brl(preco) : "—"}
                         </p>
                       </div>
@@ -502,7 +512,7 @@ export function ClientePerfilModal({
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[9.5px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-faint)" }}>
+    <p className="text-[12.5px] font-semibold text-[#191625]">
       {children}
     </p>
   )
@@ -546,20 +556,19 @@ function ItemRow({
         <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-sub)" }}>{descricao}</p>
         <p className="text-[10px] mt-0.5" style={{ color: "var(--text-faint)" }}>{data}</p>
       </div>
-      <p className="font-semibold text-[13px] tabular-nums shrink-0" style={{ color: "var(--text-main)" }}>{preco}</p>
+      <p className="font-semibold text-[13px] ds-num shrink-0" style={{ color: "var(--text-main)" }}>{preco}</p>
       {(onWhatsApp || onReplicar) && (
         <div className="flex gap-1.5 shrink-0">
           {onWhatsApp && (
             <button onClick={onWhatsApp}
-              className="px-2.5 py-1.5 text-white text-[10px] font-medium rounded-lg transition-colors"
-              style={{ background: "#009351" }}>
+              className="px-2.5 py-1.5 text-white text-[11px] font-medium rounded-lg transition-colors bg-[#009351] hover:bg-[#007a43]">
               WhatsApp
             </button>
           )}
           {onReplicar && (
             <button onClick={onReplicar}
-              className="px-2.5 py-1.5 text-white text-[10px] font-medium rounded-lg transition-colors"
-              style={{ background: "var(--bg-alt)", border: "1px solid var(--border)" }}>
+              className="px-2.5 py-1.5 text-[#191625] text-[11px] font-medium rounded-lg transition-colors bg-white hover:bg-[rgba(116,116,128,0.06)]"
+              style={{ border: "1px solid rgba(60,60,67,0.14)" }}>
               Replicar
             </button>
           )}
@@ -570,12 +579,12 @@ function ItemRow({
 }
 
 function Kpi({ label, value, color, sub }: { label: string; value: string; color?: "green" | "rose" | "amber"; sub?: string }) {
-  const textColor = color === "green" ? "#34d399" : color === "rose" ? "#f87171" : color === "amber" ? "#fbbf24" : "var(--text-main)"
+  const textColor = color === "green" ? "#009351" : color === "rose" ? "#d33a3c" : color === "amber" ? "#c57800" : "#191625"
   return (
-    <div className="rounded-xl px-3 py-2.5" style={{ background: "var(--bg-alt)", border: "1px solid var(--border)" }}>
-      <p className="text-[9px] uppercase tracking-wider font-semibold leading-tight" style={{ color: "var(--text-faint)" }}>{label}</p>
-      <p className="font-semibold text-[15px] tabular-nums mt-1" style={{ color: textColor }}>{value}</p>
-      {sub && <p className="text-[9.5px] mt-0.5 leading-tight" style={{ color: "var(--text-faint)" }}>{sub}</p>}
+    <div className="rounded-xl px-3.5 py-3 bg-[rgba(116,116,128,0.05)]">
+      <p className="text-[11px] font-medium leading-tight text-[#898892]">{label}</p>
+      <p className="font-semibold text-[16px] ds-num mt-1.5" style={{ color: textColor }}>{value}</p>
+      {sub && <p className="text-[10.5px] mt-0.5 leading-tight text-[#898892]">{sub}</p>}
     </div>
   )
 }
