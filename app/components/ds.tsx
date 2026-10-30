@@ -193,7 +193,7 @@ export function Segmentado<T extends string>({ valor, opcoes, onChange }: {
   const achado = opcoes.findIndex(o => o.v === valor)
   const i = Math.max(0, achado)
   return (
-    <div className="relative inline-grid p-1 rounded-lg bg-[rgba(116,116,128,0.1)]"
+    <div className="relative inline-grid w-fit max-w-full self-start p-1 rounded-lg bg-[rgba(116,116,128,0.1)]"
       style={{ gridTemplateColumns: `repeat(${opcoes.length}, minmax(0, 1fr))` }}>
       <span aria-hidden className="absolute top-1 bottom-1 left-1 rounded-md bg-white shadow-sm transition-all duration-300 ease-[cubic-bezier(.3,.9,.3,1)]"
         style={{ width: `calc((100% - 8px) / ${opcoes.length})`, transform: `translateX(${i * 100}%)`, opacity: achado < 0 ? 0 : 1 }} />

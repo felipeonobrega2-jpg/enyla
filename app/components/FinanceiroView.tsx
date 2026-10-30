@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useEffect, useRef } from "react"
-import { CheckCircle2, Factory, TrendingUp, TrendingDown, DollarSign, Clock, AlertTriangle, Landmark, Plus } from "lucide-react"
+import { CheckCircle2, Factory, TrendingUp, TrendingDown, DollarSign, Clock, AlertTriangle, Landmark, Plus, ChevronLeft, ChevronRight } from "lucide-react"
 import { montarPedidos, recebiveis } from "../lib/negocio"
 import { CabecalhoPagina, Segmentado, Botao, Cartao, TituloCartao, Kpi, GradeKpis, LinhaLista, Vazio, ColunasDuplas } from "./ds"
 import {
@@ -1687,19 +1687,8 @@ export function FinanceiroView({
                   <button onClick={() => setBuscaReceber("")} className="text-[#898892] hover:text-[#8E8E93] text-base leading-none">×</button>
                 )}
               </div>
-              <div className="flex gap-1.5 flex-wrap">
-                {(["aberto", "pendente", "parcial", "todos"] as const).map(f => (
-                  <button key={f}
-                    onClick={() => setFiltroReceber(f)}
-                    className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-colors ${
-                      filtroReceber === f
-                        ? "bg-[#0b0914] text-white"
-                        : "bg-[rgba(116,116,128,0.08)] text-[#8E8E93] hover:bg-[rgba(116,116,128,0.14)]"
-                    }`}>
-                    {f === "aberto" ? "Pendentes" : f === "pendente" ? "Sem registro" : f === "parcial" ? "Em aberto" : "Todos"}
-                  </button>
-                ))}
-              </div>
+              <Segmentado<"aberto" | "pendente" | "parcial" | "todos"> valor={filtroReceber} onChange={setFiltroReceber}
+                opcoes={[{ v: "aberto", nome: "Pendentes" }, { v: "pendente", nome: "Sem registro" }, { v: "parcial", nome: "Em aberto" }, { v: "todos", nome: "Todos" }]} />
             </div>
 
             {/* Vencidos — pagamentos registrados com data no passado */}
@@ -1708,7 +1697,7 @@ export function FinanceiroView({
                 <div className="px-5 py-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-[#d33a3c] shrink-0" />
-                    <span className="text-[11px] font-semibold text-[#d33a3c] uppercase tracking-wide">
+                    <span className="text-[12px] font-semibold text-[#d33a3c]">
                       {vencidos.length} vencido{vencidos.length > 1 ? "s" : ""}
                     </span>
                   </div>
@@ -2054,7 +2043,7 @@ export function FinanceiroView({
             return (
               <div className="mt-6 space-y-2">
                 <div className="flex items-center gap-2">
-                  <p className="text-[9.5px] uppercase tracking-wide font-bold" style={{ color: "#c57800" }}>
+                  <p className="text-[11.5px] font-semibold" style={{ color: "#c57800" }}>
                     Terceirizados ({tercs.length})
                   </p>
                   <div className="flex-1 h-px" style={{ background: "rgba(255,149,0,0.2)" }} />
@@ -2120,29 +2109,25 @@ export function FinanceiroView({
               const label = `${MESES_PT[d.getMonth()]} ${d.getFullYear()}`
               const isTudo = periodo !== "mes"
               return (
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex items-center gap-2 flex-1 bg-white border border-[rgba(60,60,67,0.10)] rounded-xl px-4 py-3">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center gap-1 bg-white rounded-lg p-1 ds-borda">
                     <button onClick={() => { if (isTudo) { setPeriodo("mes"); setMesOffset(-1) } else setMesOffset(o => o - 1) }}
-                      className="w-9 h-9 flex items-center justify-center rounded-xl bg-[rgba(60,60,67,0.06)] hover:bg-[rgba(60,60,67,0.12)] text-[#191625] transition-colors">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                      title="Mês anterior"
+                      className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[rgba(116,116,128,0.1)] text-[#191625] transition-colors">
+                      <ChevronLeft className="w-4 h-4" />
                     </button>
-                    <span className="flex-1 text-center text-[14px] font-semibold text-[#191625]">
+                    <span className="min-w-[132px] text-center text-[13px] font-semibold text-[#191625]">
                       {isTudo ? "Todos os meses" : label}
                     </span>
                     <button onClick={() => { if (!isTudo) setMesOffset(o => Math.min(o + 1, 0)) }}
-                      disabled={!isTudo && mesOffset >= 0}
-                      className="w-9 h-9 flex items-center justify-center rounded-xl bg-[rgba(60,60,67,0.06)] hover:bg-[rgba(60,60,67,0.12)] text-[#191625] transition-colors disabled:opacity-25">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                      disabled={!isTudo && mesOffset >= 0} title="Próximo mês"
+                      className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[rgba(116,116,128,0.1)] text-[#191625] transition-colors disabled:opacity-25">
+                      <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
-                  <button
-                    onClick={() => { if (isTudo) { setPeriodo("mes"); setMesOffset(0) } else { setPeriodo("tudo") } }}
-                    className="h-[52px] px-4 text-[12px] font-semibold rounded-xl border transition-colors whitespace-nowrap"
-                    style={isTudo
-                      ? { background: "#191625", color: "#fff", borderColor: "#191625" }
-                      : { background: "white", color: "#8E8E93", borderColor: "rgba(60,60,67,0.10)" }}>
-                    {isTudo ? "Por mês" : "Ver todos"}
-                  </button>
+                  <Botao variante={isTudo ? "secundario" : "fantasma"} onClick={() => { if (isTudo) { setPeriodo("mes"); setMesOffset(0) } else { setPeriodo("tudo") } }}>
+                    {isTudo ? "Ver por mês" : "Ver todos os meses"}
+                  </Botao>
                 </div>
               )
             })()}
@@ -2489,7 +2474,7 @@ export function FinanceiroView({
 
             {/* Pendentes */}
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-[#8E8E93] mb-3">
+              <p className="text-[12.5px] font-semibold text-[#191625] mb-3">
                 Aguardando pagamento
               </p>
               {pixPendentes.length === 0 ? (
@@ -2529,7 +2514,7 @@ export function FinanceiroView({
             {/* Recebidos */}
             {pixRecebidos.length > 0 && (
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wide text-[#8E8E93] mb-3">Recebidos</p>
+                <p className="text-[12.5px] font-semibold text-[#191625] mb-3">Recebidos</p>
                 <div className="space-y-2">
                   {pixRecebidos.map(p => (
                     <div key={p.id} className="bg-[#F2F2F7] rounded-xl p-4 flex items-center gap-4">
@@ -2558,7 +2543,7 @@ export function FinanceiroView({
               <div>
                 <button
                   onClick={() => setShowPixHist(h => !h)}
-                  className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-[#8E8E93] hover:text-[#191625] transition-colors mb-3"
+                  className="flex items-center gap-2 text-[12.5px] font-semibold text-[#191625] hover:text-[#191625] transition-colors mb-3"
                 >
                   <svg className={`w-3.5 h-3.5 transition-transform ${showPixHist ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
