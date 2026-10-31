@@ -39,7 +39,7 @@ const REGRAS: [Componente, RegExp][] = [
   ["acabamento", /verniz|lamina|acabamento|acbamento|uv\b/],
   ["impressao", /impress|\bchapa\b|offset/],
   ["papel", /papel|cart[aã]o|couch|triplex|duplex|folha/],
-  ["arte", /\barte\b|design|desgin|prova digital|prova de cor/],
+  ["arte", /\barte\b|design|desgin|prova digital|prova de cor|fechamento/],
   ["frete", /lalamove|frete|transporte|motoboy|correios|entrega|uber|particular/],
   ["itens", /ber[cç]o|adesiv|sacola|etiqueta|r[oó]tulo|fita/],
 ]

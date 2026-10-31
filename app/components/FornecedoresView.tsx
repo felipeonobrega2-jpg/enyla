@@ -615,6 +615,7 @@ function Cadastro({ draft, setDraft, fornecedoresFin }: {
                             onChange={e => {
                               const servicos = { ...f.servicos }
                               if (e.target.checked) servicos[s.id] = s.id === "arte" ? { tipo: "por_trabalho", valor: 200 }
+                                : s.id === "fechamento" ? { tipo: "por_trabalho", valor: 80 }
                                 : s.id === "impressao" ? { tipo: "acerto_milheiro", acerto: 650, milheiro: 100 }
                                 : s.id === "laminacao" || s.id === "verniz" ? { tipo: "por_folha", precosPorTipo: {} }
                                 : { tipo: "acerto_milheiro", acerto: 70, milheiro: 70 }

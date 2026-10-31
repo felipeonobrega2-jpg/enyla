@@ -27,10 +27,11 @@ export type RegraCobranca = {
   precosPorTipo?: Record<string, number> // laminação/verniz: valor por tipo (substitui `valor`)
 }
 
-export type Servico = "arte" | "impressao" | "laminacao" | "verniz" | "hotStamping" | "corteVinco" | "colagem"
+export type Servico = "arte" | "fechamento" | "impressao" | "laminacao" | "verniz" | "hotStamping" | "corteVinco" | "colagem"
 
 export const SERVICOS: { id: Servico; nome: string }[] = [
   { id: "arte",        nome: "Arte" },
+  { id: "fechamento",  nome: "Fechamento de arquivo" },
   { id: "impressao",   nome: "Impressão" },
   { id: "laminacao",   nome: "Laminação" },
   { id: "verniz",      nome: "Verniz" },
@@ -91,7 +92,7 @@ export type MovimentoFornecedor = {
 
 // Etapa do quadro correspondente a um conjunto de serviços
 export function etapaDosServicos(servicos: Servico[]): EtapaPedido {
-  if (servicos.includes("arte") && servicos.length === 1) return "arte"
+  if (servicos.length && servicos.every(s => s === "arte" || s === "fechamento")) return "arte"
   if (servicos.includes("impressao")) return "impressao"
   if (servicos.length === 1 && servicos[0] === "corteVinco") return "corteVinco"
   if (servicos.length === 1 && servicos[0] === "colagem") return "colagem"
