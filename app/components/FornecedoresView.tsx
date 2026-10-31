@@ -2,9 +2,10 @@
 
 import React from "react"
 import {
-  Factory, Clock, AlertTriangle, PackageCheck, Plus, Trash2, Send, ChevronDown, Wrench, SlidersHorizontal, Save, Check,
+  Factory, Clock, AlertTriangle, Gauge, PackageCheck, Plus, Trash2, Send, ChevronDown, Wrench, SlidersHorizontal, Save, Check,
 } from "lucide-react"
-import { KanbanCard, LancamentoFinanceiro } from "../types"
+import { KanbanCard, LancamentoFinanceiro, FormData } from "../types"
+import { CalibragemView } from "./CalibragemView"
 import { Configuracoes } from "../config"
 import {
   ConfigProducao, FornecedorProducao, RegraCobranca, Servico, SERVICOS, TipoRegra, Ferramental, TipoFerramental,
@@ -668,13 +669,15 @@ function Parametros({ draft, setDraft }: { draft: ConfigProducao; setDraft: (p: 
 
 // ── Página ────────────────────────────────────────────────────────────────────
 
-type Aba = "desempenho" | "cadastro" | "ferramental" | "parametros"
+type Aba = "desempenho" | "calibragem" | "cadastro" | "ferramental" | "parametros"
 
-export function FornecedoresView({ config, kanban, lancamentos, onSave }: {
+export function FornecedoresView({ config, kanban, lancamentos, historico, onSave, onCategorizar }: {
   config: Configuracoes
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
   onSave: (cfg: Configuracoes) => void
+  historico: { form: FormData; numero?: string }[]
+  onCategorizar?: (lancamentoId: string, subcategoria: string) => void
 }) {
   const producao = normalizarProducao(config.producao)
   const [aba, setAba] = React.useState<Aba>("desempenho")
@@ -701,6 +704,7 @@ export function FornecedoresView({ config, kanban, lancamentos, onSave }: {
     { id: "cadastro", nome: "Cadastro e preços", icon: <Factory className="w-3.5 h-3.5" /> },
     { id: "ferramental", nome: "Ferramental", icon: <Wrench className="w-3.5 h-3.5" /> },
     { id: "parametros", nome: "Parâmetros", icon: <SlidersHorizontal className="w-3.5 h-3.5" /> },
+    { id: "calibragem", nome: "Calibragem", icon: <Gauge className="w-3.5 h-3.5" /> },
   ]
 
   return (
@@ -710,7 +714,7 @@ export function FornecedoresView({ config, kanban, lancamentos, onSave }: {
           <h1 className="text-[22px] font-semibold text-[#191625] tracking-tight">Fornecedores de produção</h1>
           <p className="text-[12.5px] text-[#898892] mt-0.5">Quem imprime, acaba e cola; quanto cobram; e como estão entregando.</p>
         </div>
-        {aba !== "desempenho" && (
+        {aba !== "desempenho" && aba !== "calibragem" && (
           <button onClick={salvarDraft} disabled={!sujo && !salvo}
             className={`h-9 px-4 rounded-lg text-[12.5px] font-semibold flex items-center gap-2 transition-all duration-200 ${
               salvo ? "bg-[#009351] text-white" : "bg-[#8456e8] hover:bg-[#7445d4] text-white disabled:opacity-30"
@@ -740,6 +744,7 @@ export function FornecedoresView({ config, kanban, lancamentos, onSave }: {
         {aba === "cadastro" && <Cadastro draft={draft} setDraft={setDraft} fornecedoresFin={(config.fornecedores ?? []).filter(f => f.ativo)} />}
         {aba === "ferramental" && <FerramentalLista draft={draft} setDraft={setDraft} />}
         {aba === "parametros" && <Parametros draft={draft} setDraft={setDraft} />}
+        {aba === "calibragem" && <CalibragemView kanban={kanban} lancamentos={lancamentos} historico={historico} config={config} onCategorizar={onCategorizar} />}
       </div>
     </div>
   )

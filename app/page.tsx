@@ -2322,7 +2322,12 @@ export default function Home() {
               }}
             />
           ) : view === "fornecedores" ? (
-            <FornecedoresView config={config} kanban={kanban} lancamentos={lancamentos} onSave={salvarConfigTudo} />
+            <FornecedoresView config={config} kanban={kanban} lancamentos={lancamentos} historico={historico} onSave={salvarConfigTudo}
+              onCategorizar={(id, subcategoria) => {
+                setLancamentos(prev => prev.map(x => x.id === id ? { ...x, subcategoria } : x))
+                fetch(`/api/lancamentos/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subcategoria }) }).catch(() => {})
+                showToast(`Custo classificado como ${subcategoria}.`)
+              }} />
 
           ) : (
             <>
