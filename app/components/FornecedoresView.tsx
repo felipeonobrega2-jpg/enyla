@@ -2,14 +2,14 @@
 
 import React from "react"
 import {
-  Factory, Clock, AlertTriangle, Gauge, PackageCheck, Plus, Trash2, Send, ChevronDown, Wrench, SlidersHorizontal, Save, Check,
+  Factory, Clock, AlertTriangle, Gauge, History, PackageCheck, Plus, Trash2, Send, ChevronDown, Wrench, SlidersHorizontal, Save, Check,
 } from "lucide-react"
 import { KanbanCard, LancamentoFinanceiro, FormData } from "../types"
 import { CalibragemView } from "./CalibragemView"
 import { Configuracoes } from "../config"
 import {
   ConfigProducao, FornecedorProducao, RegraCobranca, Servico, SERVICOS, TipoRegra, Ferramental, TipoFerramental,
-  MovimentoFornecedor, Ocorrencia, TIPOS_OCORRENCIA, TipoOcorrencia, EtapaPedido, normalizarProducao, descreverRegra,
+  MovimentoFornecedor, Ocorrencia, TIPOS_OCORRENCIA, TipoOcorrencia, normalizarProducao, descreverRegra, etapaDosServicos, nomeServicos,
 } from "../lib/producao"
 import { montarPedidos, pedidoEntregue } from "../lib/negocio"
 import { brl, num } from "../utils"
@@ -18,19 +18,13 @@ const border = { border: "1px solid rgba(60,60,67,0.08)" }
 const inputCls = "h-9 rounded-lg px-2.5 text-[12.5px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] transition-colors"
 const inputStyle = { border: "1px solid rgba(60,60,67,0.18)" }
 
-const ETAPAS: { id: EtapaPedido; nome: string }[] = [
-  { id: "impressao", nome: "Impressão" },
-  { id: "acabamento", nome: "Acabamento" },
-  { id: "corteVinco", nome: "Corte e vinco" },
-  { id: "colagem", nome: "Colagem" },
-  { id: "outro", nome: "Outro" },
-]
 const TIPOS_REGRA: { id: TipoRegra; nome: string }[] = [
   { id: "acerto_milheiro", nome: "Acerto + milheiro" },
   { id: "fixo_chapa", nome: "Fixo por chapa" },
   { id: "por_folha", nome: "Por folha" },
   { id: "por_m2", nome: "Por m²" },
   { id: "por_unidade", nome: "Por unidade" },
+  { id: "por_trabalho", nome: "Por trabalho" },
 ]
 const TIPOS_ACABAMENTO: Partial<Record<Servico, string[]>> = {
   laminacao: ["Fosca", "Brilhante", "Soft Touch", "Holográfica"],
@@ -59,8 +53,46 @@ function Campo({ label, children, className = "" }: { label: string; children: R
 function Num({ value, onChange, step = 1, w = "w-full" }: { value: number | undefined; onChange: (v: number) => void; step?: number; w?: string }) {
   return (
     <input type="number" step={step} min={0} value={value ?? ""} onChange={e => onChange(Number(e.target.value))}
-      className={`${inputCls} ${w} tabular-nums`} style={inputStyle} />
+      className={`${inputCls} ${w} ds-num`} style={inputStyle} />
   )
+}
+
+// Seleção de serviços de um envio (mostra só os que o fornecedor presta, se houver cadastro)
+function ServicosChips({ forn, valor, onChange }: { forn?: FornecedorProducao; valor: Servico[]; onChange: (s: Servico[]) => void }) {
+  const lista = forn && Object.keys(forn.servicos).length ? SERVICOS.filter(x => forn.servicos[x.id]) : SERVICOS
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {lista.map(x => {
+        const on = valor.includes(x.id)
+        return (
+          <button key={x.id} type="button" onClick={() => onChange(on ? valor.filter(v => v !== x.id) : [...valor, x.id])}
+            className={`h-8 px-3 rounded-full text-[12px] font-medium transition-all ${on ? "bg-[#8456e8] text-white" : "bg-white text-[#5e5c68] hover:bg-[rgba(116,116,128,0.06)]"}`}
+            style={on ? undefined : inputStyle}>
+            {x.nome}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+type PorServico = { nome: string; n: number; prazoMedio: number; atrasoPct: number | null; min: number; max: number }
+
+function estatisticasPorServico(movs: MovimentoFornecedor[]): PorServico[] {
+  const grupos = new Map<string, MovimentoFornecedor[]>()
+  for (const m of movs.filter(x => x.recebidoEm)) {
+    const k = nomeServicos(m)
+    grupos.set(k, [...(grupos.get(k) ?? []), m])
+  }
+  return [...grupos.entries()].map(([nome, ms]) => {
+    const dias = ms.map(m => diasEntre(m.enviadoEm, m.recebidoEm!))
+    const comPrazo = ms.filter(m => m.prazoPrevisto)
+    return {
+      nome, n: ms.length, prazoMedio: dias.reduce((a, b) => a + b, 0) / dias.length,
+      min: Math.min(...dias), max: Math.max(...dias),
+      atrasoPct: comPrazo.length ? comPrazo.filter(m => m.recebidoEm! > m.prazoPrevisto!).length / comPrazo.length * 100 : null,
+    }
+  }).sort((a, b) => b.n - a.n)
 }
 
 // ── Desempenho ────────────────────────────────────────────────────────────────
@@ -75,6 +107,7 @@ type Stats = {
   ocorrencias: Ocorrencia[]
   prejuizo: number
   historico: MovimentoFornecedor[]
+  porServico: PorServico[]
 }
 
 function calcularStats(p: ConfigProducao): Stats[] {
@@ -95,15 +128,38 @@ function calcularStats(p: ConfigProducao): Stats[] {
       ocorrencias,
       prejuizo: ocorrencias.reduce((s, o) => s + (o.prejuizo || 0), 0),
       historico: [...movs].sort((a, b) => b.enviadoEm.localeCompare(a.enviadoEm)),
+      porServico: estatisticasPorServico(movs),
     }
   })
 }
 
-function Desempenho({ producao, pedidosOpcoes, salvar }: {
+function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
   producao: ConfigProducao
   pedidosOpcoes: { key: string; label: string }[]
+  todosPedidos: { key: string; label: string }[]
   salvar: (p: ConfigProducao) => void
 }) {
+  const [hist, setHist] = React.useState<(Partial<MovimentoFornecedor> & { textoPedido?: string }) | null>(null)
+  const [registrados, setRegistrados] = React.useState(0)
+  const fornDe = (id?: string) => producao.fornecedores.find(f => f.id === id)
+
+  // Pedidos antigos: envio e retorno de uma vez; fornecedor e serviços ficam para o próximo
+  function registrarHistorico(continuar: boolean) {
+    if (!hist?.fornecedorId || !hist.enviadoEm || !hist.recebidoEm || !(hist.pedidoKey || hist.textoPedido?.trim()) || !hist.servicos?.length) return
+    const forn = fornDe(hist.fornecedorId)
+    const key = hist.pedidoKey || `manual-${hist.textoPedido!.trim().toLowerCase()}`
+    const mov: MovimentoFornecedor = {
+      id: novoId(), pedidoKey: key,
+      pedidoLabel: todosPedidos.find(p => p.key === hist.pedidoKey)?.label ?? hist.textoPedido!.trim(),
+      fornecedorId: hist.fornecedorId, etapa: etapaDosServicos(hist.servicos), servicos: hist.servicos,
+      enviadoEm: hist.enviadoEm, recebidoEm: hist.recebidoEm,
+      prazoPrevisto: forn?.prazoDias ? somarDias(hist.enviadoEm, forn.prazoDias) : undefined,
+      historico: true,
+    }
+    salvar({ ...producao, movimentos: [...producao.movimentos, mov] })
+    setRegistrados(n => n + 1)
+    setHist(continuar ? { fornecedorId: hist.fornecedorId, servicos: hist.servicos } : null)
+  }
   const stats = calcularStats(producao)
   const [envio, setEnvio] = React.useState<Partial<MovimentoFornecedor> | null>(null)
   const [ocorr, setOcorr] = React.useState<Partial<Ocorrencia> | null>(null)
@@ -113,7 +169,7 @@ function Desempenho({ producao, pedidosOpcoes, salvar }: {
   const emAndamento = producao.movimentos.filter(m => !m.recebidoEm).sort((a, b) => a.enviadoEm.localeCompare(b.enviadoEm))
 
   function registrarEnvio() {
-    if (!envio?.pedidoKey || !envio.fornecedorId) return
+    if (!envio?.pedidoKey || !envio.fornecedorId || !envio.servicos?.length) return
     const forn = producao.fornecedores.find(f => f.id === envio.fornecedorId)
     const enviadoEm = envio.enviadoEm || hoje()
     const mov: MovimentoFornecedor = {
@@ -121,7 +177,8 @@ function Desempenho({ producao, pedidosOpcoes, salvar }: {
       pedidoKey: envio.pedidoKey,
       pedidoLabel: pedidosOpcoes.find(p => p.key === envio.pedidoKey)?.label ?? envio.pedidoKey,
       fornecedorId: envio.fornecedorId,
-      etapa: envio.etapa ?? "impressao",
+      etapa: etapaDosServicos(envio.servicos ?? []),
+      servicos: envio.servicos,
       enviadoEm,
       prazoPrevisto: envio.prazoPrevisto || (forn?.prazoDias ? somarDias(enviadoEm, forn.prazoDias) : undefined),
     }
@@ -159,11 +216,15 @@ function Desempenho({ producao, pedidosOpcoes, salvar }: {
             <span className="text-[11px] font-medium text-[#898892]">{emAndamento.length}</span>
           </p>
           <div className="flex gap-2">
-            <button onClick={() => { setOcorr({ tipo: "atraso", data: hoje() }); setEnvio(null) }}
+            <button onClick={() => { setOcorr({ tipo: "atraso", data: hoje() }); setEnvio(null); setHist(null) }}
               className="h-8 px-3 rounded-lg text-[12px] font-medium text-[#5e5c68] hover:bg-[rgba(116,116,128,0.06)] transition-colors flex items-center gap-1.5" style={border}>
               <AlertTriangle className="w-3.5 h-3.5" /> Ocorrência
             </button>
-            <button onClick={() => { setEnvio({ etapa: "impressao", enviadoEm: hoje() }); setOcorr(null) }}
+            <button onClick={() => { setHist({}); setEnvio(null); setOcorr(null); setRegistrados(0) }}
+              className="h-8 px-3 rounded-lg text-[12px] font-medium text-[#5e5c68] hover:bg-[rgba(116,116,128,0.06)] transition-colors flex items-center gap-1.5" style={border}>
+              <History className="w-3.5 h-3.5" /> Registrar pedidos antigos
+            </button>
+            <button onClick={() => { setEnvio({ enviadoEm: hoje(), servicos: [] }); setOcorr(null); setHist(null) }}
               className="h-8 px-3 rounded-lg text-[12px] font-semibold text-white bg-[#8456e8] hover:bg-[#7445d4] transition-colors flex items-center gap-1.5">
               <Plus className="w-3.5 h-3.5" /> Enviar pedido
             </button>
@@ -179,23 +240,73 @@ function Desempenho({ producao, pedidosOpcoes, salvar }: {
               </select>
             </Campo>
             <Campo label="Fornecedor">
-              <select value={envio.fornecedorId ?? ""} onChange={e => setEnvio({ ...envio, fornecedorId: e.target.value })} className={inputCls} style={inputStyle}>
+              <select value={envio.fornecedorId ?? ""} onChange={e => setEnvio({ ...envio, fornecedorId: e.target.value, servicos: [] })} className={inputCls} style={inputStyle}>
                 <option value="">Escolha…</option>
                 {producao.fornecedores.filter(f => f.ativo).map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
               </select>
             </Campo>
-            <Campo label="Etapa">
-              <select value={envio.etapa} onChange={e => setEnvio({ ...envio, etapa: e.target.value as EtapaPedido })} className={inputCls} style={inputStyle}>
-                {ETAPAS.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-              </select>
-            </Campo>
+
             <Campo label="Enviado em">
               <input type="date" value={envio.enviadoEm ?? ""} onChange={e => setEnvio({ ...envio, enviadoEm: e.target.value })} className={inputCls} style={inputStyle} />
             </Campo>
             <div className="flex gap-2">
               <button onClick={() => setEnvio(null)} className="h-9 px-3 rounded-lg text-[12px] text-[#898892] hover:bg-[rgba(116,116,128,0.06)]">Cancelar</button>
-              <button onClick={registrarEnvio} disabled={!envio.pedidoKey || !envio.fornecedorId}
-                className="h-9 px-3 rounded-lg text-[12px] font-semibold text-white bg-[#0b0914] disabled:opacity-30">Registrar</button>
+              <button onClick={registrarEnvio} disabled={!envio.pedidoKey || !envio.fornecedorId || !envio.servicos?.length}
+                className="h-9 px-3 rounded-lg text-[12px] font-semibold text-white bg-[#8456e8] disabled:opacity-30">Registrar</button>
+            </div>
+            <div className="col-span-2 md:col-span-6">
+              <p className="text-[10px] text-[rgba(60,60,67,0.55)] font-medium mb-1.5">O que o fornecedor vai fazer</p>
+              <ServicosChips forn={fornDe(envio.fornecedorId)} valor={envio.servicos ?? []} onChange={sv => setEnvio({ ...envio, servicos: sv })} />
+            </div>
+          </div>
+        )}
+
+        {hist && (
+          <div className="px-5 py-4 space-y-3 bg-[#8456e8]/[0.03] animate-[apple-slide-up_.2s_ease-out]">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[12.5px] font-semibold text-[#191625]">Registrar pedidos antigos
+                <span className="font-normal text-[#898892]"> · data de envio e de retorno; fornecedor e serviços ficam preenchidos para o próximo</span></p>
+              {registrados > 0 && <span className="text-[11.5px] font-semibold text-[#009351]">{registrados} {registrados === 1 ? "registrado" : "registrados"}</span>}
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-2.5 items-end">
+              <Campo label="Pedido" className="col-span-2">
+                <select value={hist.pedidoKey ?? (hist.textoPedido !== undefined ? "__outro" : "")}
+                  onChange={e => e.target.value === "__outro" ? setHist({ ...hist, pedidoKey: undefined, textoPedido: "" }) : setHist({ ...hist, pedidoKey: e.target.value, textoPedido: undefined })}
+                  className={inputCls} style={inputStyle}>
+                  <option value="">Escolha…</option>
+                  <option value="__outro">Outro (digitar)</option>
+                  {todosPedidos.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+                </select>
+              </Campo>
+              {hist.textoPedido !== undefined && (
+                <Campo label="Qual pedido" className="col-span-2">
+                  <input autoFocus value={hist.textoPedido} onChange={e => setHist({ ...hist, textoPedido: e.target.value })} placeholder="Ex.: Pedido Raniere março" className={inputCls} style={inputStyle} />
+                </Campo>
+              )}
+              <Campo label="Fornecedor">
+                <select value={hist.fornecedorId ?? ""} onChange={e => setHist({ ...hist, fornecedorId: e.target.value, servicos: [] })} className={inputCls} style={inputStyle}>
+                  <option value="">Escolha…</option>
+                  {producao.fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                </select>
+              </Campo>
+              <Campo label="Enviado em">
+                <input type="date" value={hist.enviadoEm ?? ""} onChange={e => setHist({ ...hist, enviadoEm: e.target.value })} className={inputCls} style={inputStyle} />
+              </Campo>
+              <Campo label="Recebido em">
+                <input type="date" value={hist.recebidoEm ?? ""} min={hist.enviadoEm} onChange={e => setHist({ ...hist, recebidoEm: e.target.value })} className={inputCls} style={inputStyle} />
+              </Campo>
+            </div>
+            <div>
+              <p className="text-[10px] text-[rgba(60,60,67,0.55)] font-medium mb-1.5">O que o fornecedor fez</p>
+              <ServicosChips forn={fornDe(hist.fornecedorId)} valor={hist.servicos ?? []} onChange={sv => setHist({ ...hist, servicos: sv })} />
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              {hist.enviadoEm && hist.recebidoEm && <span className="text-[11.5px] text-[#898892] mr-auto">{diasEntre(hist.enviadoEm, hist.recebidoEm)} dias no fornecedor</span>}
+              <button onClick={() => setHist(null)} className="h-9 px-3 rounded-lg text-[12px] text-[#898892] hover:bg-[rgba(116,116,128,0.06)]">Fechar</button>
+              <button onClick={() => registrarHistorico(false)} disabled={!hist.fornecedorId || !hist.enviadoEm || !hist.recebidoEm || !hist.servicos?.length || !(hist.pedidoKey || hist.textoPedido?.trim())}
+                className="h-9 px-3 rounded-lg text-[12px] font-semibold text-[#191625] bg-white disabled:opacity-30" style={inputStyle}>Registrar</button>
+              <button onClick={() => registrarHistorico(true)} disabled={!hist.fornecedorId || !hist.enviadoEm || !hist.recebidoEm || !hist.servicos?.length || !(hist.pedidoKey || hist.textoPedido?.trim())}
+                className="h-9 px-3 rounded-lg text-[12px] font-semibold text-white bg-[#8456e8] disabled:opacity-30">Registrar e continuar</button>
             </div>
           </div>
         )}
@@ -246,10 +357,10 @@ function Desempenho({ producao, pedidosOpcoes, salvar }: {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-[#191625] truncate">{m.pedidoLabel}</p>
                     <p className="text-[11.5px] text-[#898892]">
-                      {nomeForn(m.fornecedorId)} · {ETAPAS.find(e => e.id === m.etapa)?.nome} · enviado {dataBR(m.enviadoEm)}
+                      {nomeForn(m.fornecedorId)} · {nomeServicos(m)} · enviado {dataBR(m.enviadoEm)}
                     </p>
                   </div>
-                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full tabular-nums ${atrasado ? "bg-[#e5484d]/10 text-[#e5484d]" : "bg-[rgba(116,116,128,0.08)] text-[#5e5c68]"}`}>
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ds-num ${atrasado ? "bg-[#e5484d]/10 text-[#e5484d]" : "bg-[rgba(116,116,128,0.08)] text-[#5e5c68]"}`}>
                     {dias} {dias === 1 ? "dia" : "dias"}{m.prazoPrevisto ? ` · prazo ${dataBR(m.prazoPrevisto)}` : ""}
                   </span>
                   <button onClick={() => marcarRecebido(m.id, hoje())}
@@ -287,12 +398,26 @@ function Desempenho({ producao, pedidosOpcoes, salvar }: {
                     { l: "Ocorrências", v: num(s.ocorrencias.length), sub: s.prejuizo > 0 ? brl(s.prejuizo) : undefined, alerta: s.ocorrencias.length > 0 },
                   ].map(k => (
                     <div key={k.l}>
-                      <p className="text-[9.5px] uppercase tracking-wide text-[#898892] font-semibold">{k.l}</p>
-                      <p className={`text-[17px] font-semibold tabular-nums ${k.alerta ? "text-[#e5484d]" : "text-[#191625]"}`}>{k.v}</p>
+                      <p className="text-[11px] text-[#898892] font-medium">{k.l}</p>
+                      <p className={`text-[17px] font-semibold ds-num ${k.alerta ? "text-[#d33a3c]" : "text-[#191625]"}`}>{k.v}</p>
                       {k.sub && <p className="text-[10px] text-[#898892] truncate">{k.sub}</p>}
                     </div>
                   ))}
                 </div>
+                {s.porServico.length > 0 && (
+                  <div className="mt-3 pt-3 space-y-1.5" style={{ borderTop: "1px solid rgba(60,60,67,0.06)" }}>
+                    <p className="text-[10.5px] font-medium text-[#898892]">Prazo por serviço</p>
+                    {s.porServico.map(ps => (
+                      <div key={ps.nome} className="flex items-center gap-3 text-[12px]">
+                        <span className="flex-1 min-w-0 truncate text-[#191625]">{ps.nome}</span>
+                        <span className="text-[#898892] ds-num">{ps.n} {ps.n === 1 ? "envio" : "envios"}</span>
+                        {ps.n > 1 && <span className="text-[#898892] ds-num">{ps.min}–{ps.max} d</span>}
+                        <span className="w-[64px] text-right font-semibold ds-num text-[#191625]">{num(ps.prazoMedio, 1)} d</span>
+                        {ps.atrasoPct != null && <span className={`w-[78px] text-right ds-num whitespace-nowrap ${ps.atrasoPct >= 25 ? "text-[#d33a3c]" : "text-[#898892]"}`}>{num(ps.atrasoPct, 0)}% atraso</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </button>
               {exp && (
                 <div className="px-5 pb-4 pt-1 space-y-3 animate-[apple-slide-up_.2s_ease-out]" style={{ borderTop: "1px solid rgba(60,60,67,0.06)" }}>
@@ -323,9 +448,9 @@ function Desempenho({ producao, pedidosOpcoes, salvar }: {
                       return (
                         <div key={m.id} className="flex items-center gap-2 py-1 text-[12px]">
                           <span className="flex-1 min-w-0 truncate text-[#191625]">{m.pedidoLabel}</span>
-                          <span className="text-[#898892] text-[11px]">{ETAPAS.find(e => e.id === m.etapa)?.nome}</span>
-                          <span className="text-[#898892] text-[11px] tabular-nums w-[78px] text-right">{dataBR(m.enviadoEm)}</span>
-                          <span className={`text-[11px] tabular-nums w-[64px] text-right font-medium ${d == null ? "text-[#8456e8]" : atrasou ? "text-[#e5484d]" : "text-[#009351]"}`}>
+                          <span className="text-[#898892] text-[11px] truncate max-w-[180px]">{nomeServicos(m)}{m.historico ? " · antigo" : ""}</span>
+                          <span className="text-[#898892] text-[11px] ds-num w-[78px] text-right">{dataBR(m.enviadoEm)}</span>
+                          <span className={`text-[11px] ds-num w-[64px] text-right font-medium ${d == null ? "text-[#8456e8]" : atrasou ? "text-[#e5484d]" : "text-[#009351]"}`}>
                             {d == null ? "aberto" : `${d} d`}
                           </span>
                           <button onClick={() => salvar({ ...producao, movimentos: producao.movimentos.filter(x => x.id !== m.id) })}
@@ -367,8 +492,8 @@ function EditorRegra({ servico, regra, onChange }: { servico: Servico; regra: Re
           Proporcional às cavidades (chapa de 2 numa máquina de 4 = metade)
         </label>
       </>}
-      {(regra.tipo === "por_folha" || regra.tipo === "por_m2" || regra.tipo === "por_unidade") && !usaTabela && (
-        <Campo label={`Valor (R$ ${regra.tipo === "por_m2" ? "por m²" : regra.tipo === "por_folha" ? "por folha" : "por unidade"})`}>
+      {(regra.tipo === "por_folha" || regra.tipo === "por_m2" || regra.tipo === "por_unidade" || regra.tipo === "por_trabalho") && !usaTabela && (
+        <Campo label={`Valor (R$ ${regra.tipo === "por_m2" ? "por m²" : regra.tipo === "por_folha" ? "por folha" : regra.tipo === "por_trabalho" ? "por trabalho" : "por unidade"})`}>
           <Num value={regra.valor} onChange={v => onChange({ ...regra, valor: v })} step={0.001} />
         </Campo>
       )}
@@ -405,6 +530,7 @@ function Cadastro({ draft, setDraft, fornecedoresFin }: {
   }
 
   const padroesEtapas: { k: keyof ConfigProducao["padroes"]; nome: string; servicos: Servico[] }[] = [
+    { k: "arte", nome: "Arte", servicos: ["arte"] },
     { k: "acabamento", nome: "Laminação / verniz", servicos: ["laminacao", "verniz"] },
     { k: "hotStamping", nome: "Hot stamping", servicos: ["hotStamping"] },
     { k: "corteVinco", nome: "Corte e vinco", servicos: ["corteVinco"] },
@@ -488,7 +614,8 @@ function Cadastro({ draft, setDraft, fornecedoresFin }: {
                           <input type="checkbox" checked={!!regra}
                             onChange={e => {
                               const servicos = { ...f.servicos }
-                              if (e.target.checked) servicos[s.id] = s.id === "impressao" ? { tipo: "acerto_milheiro", acerto: 650, milheiro: 100 }
+                              if (e.target.checked) servicos[s.id] = s.id === "arte" ? { tipo: "por_trabalho", valor: 200 }
+                                : s.id === "impressao" ? { tipo: "acerto_milheiro", acerto: 650, milheiro: 100 }
                                 : s.id === "laminacao" || s.id === "verniz" ? { tipo: "por_folha", precosPorTipo: {} }
                                 : { tipo: "acerto_milheiro", acerto: 70, milheiro: 70 }
                               else delete servicos[s.id]
@@ -592,10 +719,10 @@ function FerramentalLista({ draft, setDraft }: { draft: ConfigProducao; setDraft
                   <td className="px-4 py-2 font-medium text-[#191625]">{f.cliente}</td>
                   <td className="px-4 py-2 text-[#5e5c68] capitalize">{f.tipo === "cliche" ? "Clichê" : f.tipo}</td>
                   <td className="px-4 py-2 text-[#5e5c68]">{f.produto || "—"}</td>
-                  <td className="px-4 py-2 text-[#5e5c68] tabular-nums">{f.blankLargura}×{f.blankAltura} mm</td>
-                  <td className="px-4 py-2 text-[#5e5c68] tabular-nums">{f.tipo === "faca" ? f.cavidades : "—"}</td>
-                  <td className="px-4 py-2 text-[#5e5c68] tabular-nums">{brl(f.custo)}</td>
-                  <td className="px-4 py-2 text-[#898892] tabular-nums">{dataBR(f.data)}</td>
+                  <td className="px-4 py-2 text-[#5e5c68] ds-num">{f.blankLargura}×{f.blankAltura} mm</td>
+                  <td className="px-4 py-2 text-[#5e5c68] ds-num">{f.tipo === "faca" ? f.cavidades : "—"}</td>
+                  <td className="px-4 py-2 text-[#5e5c68] ds-num">{brl(f.custo)}</td>
+                  <td className="px-4 py-2 text-[#898892] ds-num">{dataBR(f.data)}</td>
                   <td className="px-4 py-2 text-right">
                     <button onClick={() => setDraft({ ...draft, ferramentais: draft.ferramentais.filter(x => x.id !== f.id) })}
                       className="text-[#898892] hover:text-[#e5484d] transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -691,6 +818,10 @@ export function FornecedoresView({ config, kanban, lancamentos, historico, onSav
     .sort((a, b) => (b.dataFechamento ?? "").localeCompare(a.dataFechamento ?? ""))
     .map(p => ({ key: p.key, label: `${p.numero} · ${p.nomeCliente}` })), [kanban, lancamentos])
 
+  const todosPedidos = React.useMemo(() => montarPedidos(kanban, lancamentos)
+    .sort((a, b) => (b.dataFechamento ?? "").localeCompare(a.dataFechamento ?? ""))
+    .map(p => ({ key: p.key, label: `${p.numero} · ${p.nomeCliente}` })), [kanban, lancamentos])
+
   const salvarProducao = (p: ConfigProducao) => onSave({ ...config, producao: p })
 
   function salvarDraft() {
@@ -740,7 +871,7 @@ export function FornecedoresView({ config, kanban, lancamentos, historico, onSav
       </div>
 
       <div key={aba} className="animate-[apple-slide-up_.22s_ease-out]">
-        {aba === "desempenho" && <Desempenho producao={producao} pedidosOpcoes={pedidosOpcoes} salvar={salvarProducao} />}
+        {aba === "desempenho" && <Desempenho producao={producao} pedidosOpcoes={pedidosOpcoes} todosPedidos={todosPedidos} salvar={salvarProducao} />}
         {aba === "cadastro" && <Cadastro draft={draft} setDraft={setDraft} fornecedoresFin={(config.fornecedores ?? []).filter(f => f.ativo)} />}
         {aba === "ferramental" && <FerramentalLista draft={draft} setDraft={setDraft} />}
         {aba === "parametros" && <Parametros draft={draft} setDraft={setDraft} />}

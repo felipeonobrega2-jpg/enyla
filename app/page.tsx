@@ -39,7 +39,7 @@ import { FornecedoresView } from "./components/FornecedoresView"
 import { PainelView } from "./components/PainelView"
 import { ParceriasView } from "./components/ParceriasView"
 import { RelatoriosView } from "./components/RelatoriosView"
-import { normalizarProducao, movimentosPorEtapa } from "./lib/producao"
+import { normalizarProducao, movimentosPorEtapa, Servico } from "./lib/producao"
 import { normalizarMetas } from "./lib/metas"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
 import FormaView from "./FormaView"
@@ -507,16 +507,25 @@ export default function Home() {
       avisos.push(`entrega prevista para ${base.toLocaleDateString("pt-BR")}`)
     }
 
-    if (prod.automacoes.fornecedores && coluna >= 5 && coluna <= 9) {
+    if (prod.automacoes.fornecedores && coluna >= 2 && coluna <= 9) {
       const hist = historico.find(h => h.numero === card.numero)
       const rotas = hist?.calculo?.rotas
       const rota = rotas?.find(q => q.quantidade === card.quantidade)?.melhor ?? rotas?.[rotas.length - 1]?.melhor
       const pedidoKey = card.loteId ? `lote-${card.loteId}` : `card-${card.id}`
       const label = `${card.loteNumero ?? card.numero} · ${card.nomeCliente}`
-      const movs = movimentosPorEtapa(prod, pedidoKey, label, coluna, rota?.impressorId ?? null, hojeIso)
+      // Serviços de acabamento pelo que o orçamento pediu
+      const f = hist?.form
+      const servicosAcab: Servico[] = [
+        ...(f?.laminacao ? ["laminacao" as const] : []),
+        ...(f?.incluirVerniz ? ["verniz" as const] : []),
+        ...(f?.outrosAcabamentos?.includes("Hot Stamping") ? ["hotStamping" as const] : []),
+        "corteVinco",
+        ...((f?.rota?.colagemModo ?? (f?.tipoCaixa === "aviao" ? "nenhuma" : "fornecedor")) === "fornecedor" ? ["colagem" as const] : []),
+      ]
+      const movs = movimentosPorEtapa(prod, pedidoKey, label, coluna, rota?.impressorId ?? null, hojeIso, servicosAcab)
       if (movs) {
         salvarConfigTudo({ ...config, producao: { ...prod, movimentos: movs } })
-        avisos.push(coluna === 5 ? "envio ao impressor registrado" : coluna <= 7 ? "impressão recebida e envio ao acabamento registrados" : "retorno dos fornecedores registrado")
+        avisos.push(coluna === 2 ? "envio da arte registrado" : coluna <= 4 ? "arte recebida" : coluna === 5 ? "envio ao impressor registrado" : coluna <= 7 ? "impressão recebida e envio ao acabamento registrados" : "retorno dos fornecedores registrado")
       }
     }
     if (avisos.length) showToast(`${card.loteNumero ?? card.numero}: ${avisos.join(" · ")}`)

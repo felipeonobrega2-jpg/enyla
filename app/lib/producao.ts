@@ -16,20 +16,21 @@ import type { TipoCaixa } from "../types"
 
 // ── Cadastro ──────────────────────────────────────────────────────────────────
 
-export type TipoRegra = "acerto_milheiro" | "fixo_chapa" | "por_folha" | "por_m2" | "por_unidade"
+export type TipoRegra = "acerto_milheiro" | "fixo_chapa" | "por_folha" | "por_m2" | "por_unidade" | "por_trabalho"
 
 export type RegraCobranca = {
   tipo: TipoRegra
   acerto?: number                  // acerto_milheiro; opcional nos demais
   milheiro?: number                // acerto_milheiro: R$ por milheiro
-  valor?: number                   // fixo_chapa / por_folha / por_m2 / por_unidade
+  valor?: number                   // fixo_chapa / por_folha / por_m2 / por_unidade / por_trabalho
   proporcionalCavidades?: boolean  // fixo_chapa: chapa de 2 numa máquina de 4 = metade
   precosPorTipo?: Record<string, number> // laminação/verniz: valor por tipo (substitui `valor`)
 }
 
-export type Servico = "impressao" | "laminacao" | "verniz" | "hotStamping" | "corteVinco" | "colagem"
+export type Servico = "arte" | "impressao" | "laminacao" | "verniz" | "hotStamping" | "corteVinco" | "colagem"
 
 export const SERVICOS: { id: Servico; nome: string }[] = [
+  { id: "arte",        nome: "Arte" },
   { id: "impressao",   nome: "Impressão" },
   { id: "laminacao",   nome: "Laminação" },
   { id: "verniz",      nome: "Verniz" },
@@ -73,7 +74,7 @@ export type Ferramental = {
   data: string          // ISO
 }
 
-export type EtapaPedido = "impressao" | "acabamento" | "corteVinco" | "colagem" | "outro"
+export type EtapaPedido = "arte" | "impressao" | "acabamento" | "corteVinco" | "colagem" | "outro"
 
 export type MovimentoFornecedor = {
   id: string
@@ -81,9 +82,26 @@ export type MovimentoFornecedor = {
   pedidoLabel: string
   fornecedorId: string
   etapa: EtapaPedido
+  servicos?: Servico[]  // o que foi feito neste envio (ex.: só colagem; corte e vinco + colagem)
   enviadoEm: string     // ISO yyyy-mm-dd
   recebidoEm?: string
   prazoPrevisto?: string
+  historico?: boolean   // registrado depois, a partir de pedidos antigos
+}
+
+// Etapa do quadro correspondente a um conjunto de serviços
+export function etapaDosServicos(servicos: Servico[]): EtapaPedido {
+  if (servicos.includes("arte") && servicos.length === 1) return "arte"
+  if (servicos.includes("impressao")) return "impressao"
+  if (servicos.length === 1 && servicos[0] === "corteVinco") return "corteVinco"
+  if (servicos.length === 1 && servicos[0] === "colagem") return "colagem"
+  return servicos.length ? "acabamento" : "outro"
+}
+
+// Nome do conjunto de serviços de um envio (envios antigos usam a etapa)
+export function nomeServicos(m: Pick<MovimentoFornecedor, "servicos" | "etapa">): string {
+  if (m.servicos?.length) return SERVICOS.filter(s => m.servicos!.includes(s.id)).map(s => s.nome).join(" + ")
+  return { arte: "Arte", impressao: "Impressão", acabamento: "Acabamento", corteVinco: "Corte e vinco", colagem: "Colagem", outro: "Outro" }[m.etapa]
 }
 
 export type TipoOcorrencia = "atraso" | "cor" | "registro" | "perda" | "defeito" | "outro"
@@ -110,7 +128,7 @@ export type Ocorrencia = {
 
 export type ConfigProducao = {
   fornecedores: FornecedorProducao[]
-  padroes: { acabamento?: string; hotStamping?: string; corteVinco?: string; colagem?: string }
+  padroes: { arte?: string; acabamento?: string; hotStamping?: string; corteVinco?: string; colagem?: string }
   espacoEntrePecas: number      // mm
   perdaPct: number              // % de folhas a mais
   arredondarPacote: boolean     // papel comprado em pacotes de 100
@@ -367,6 +385,7 @@ function cobrar(r: RegraCobranca, b: BaseCobranca, tipoAcabamento?: string | nul
     case "por_folha":       return acerto + v * b.folhas
     case "por_m2":          return acerto + v * b.m2
     case "por_unidade":     return acerto + v * b.unidades
+    case "por_trabalho":    return acerto + v
   }
 }
 
@@ -379,6 +398,7 @@ export function descreverRegra(r?: RegraCobranca): string {
     case "por_folha":       return `${brl(r.valor ?? 0)} por folha`
     case "por_m2":          return `${brl(r.valor ?? 0)} por m²`
     case "por_unidade":     return `${brl(r.valor ?? 0)} por unidade`
+    case "por_trabalho":    return `${brl(r.valor ?? 0)} por trabalho`
   }
 }
 
@@ -568,7 +588,13 @@ function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaEx
   }
   if (frete > 0) itens.push({ etapa: "frete", descricao: "Frete entre fornecedores", valor: frete, estimado: false })
 
-  itens.push({ etapa: "arte", descricao: "Arte", valor: e.arte, estimado: false })
+  // Arte: preço do fornecedor padrão de arte; sem ele, o valor fixo das Configurações
+  const fArte = e.producao.fornecedores.find(f => f.ativo && f.id === e.producao.padroes.arte && f.servicos.arte)
+  if (fArte) {
+    itens.push({ etapa: "arte", fornecedor: fArte.nome, descricao: "Arte", valor: cobrar(fArte.servicos.arte!, { folhas: 0, m2: 0, unidades: qtd, fracaoChapa: 1 }), estimado: false })
+  } else {
+    itens.push({ etapa: "arte", descricao: "Arte", valor: e.arte, estimado: false })
+  }
 
   // Faca
   const kCheio = Math.max(...base.passadas.map(ps => ps.cavidades))
@@ -651,11 +677,14 @@ export function calcularRotas(e: EntradaRotas): ResultadoRotas {
 }
 
 // ── Automação: envio e retorno de fornecedor a partir da etapa do pedido ──────
+//   Arte/Dieline (2)        → abre envio ao fornecedor de arte padrão (se houver)
+//   Aprovação/Fila (3,4)    → recebe a arte
 //   Impressão (5)          → abre envio ao impressor
 //   Verniz/Acabamento (6,7) → recebe a impressão e abre envio ao acabamento
 //   Expedição/Entregue (8,9) → recebe tudo que estiver aberto
 export function movimentosPorEtapa(
   p: ConfigProducao, pedidoKey: string, pedidoLabel: string, coluna: number, impressorId: string | null, hojeIso: string,
+  servicosAcabamento: Servico[] = ["corteVinco", "colagem"],
 ): MovimentoFornecedor[] | null {
   const forn = (id?: string | null) => p.fornecedores.find(f => f.id === id && f.ativo)
   const prazo = (fornecedorId: string) => {
@@ -669,20 +698,28 @@ export function movimentosPorEtapa(
   const receber = (etapa?: EtapaPedido) => {
     movs = movs.map(m => m.pedidoKey === pedidoKey && !m.recebidoEm && (!etapa || m.etapa === etapa) ? { ...m, recebidoEm: hojeIso } : m)
   }
-  const enviar = (etapa: EtapaPedido, fornecedorId: string | undefined) => {
+  const enviar = (etapa: EtapaPedido, fornecedorId: string | undefined, servicos: Servico[]) => {
     if (!fornecedorId || !forn(fornecedorId) || aberto(etapa) || movs.some(m => m.pedidoKey === pedidoKey && m.etapa === etapa)) return
     movs = [...movs, {
-      id: `auto-${pedidoKey}-${etapa}-${hojeIso}`, pedidoKey, pedidoLabel, fornecedorId, etapa,
+      id: `auto-${pedidoKey}-${etapa}-${hojeIso}`, pedidoKey, pedidoLabel, fornecedorId, etapa, servicos,
       enviadoEm: hojeIso, prazoPrevisto: prazo(fornecedorId),
     }]
   }
-  if (coluna === 5) {
+  if (coluna === 2) {
+    enviar("arte", p.padroes.arte, ["arte"])
+  } else if (coluna === 3 || coluna === 4) {
+    receber("arte")
+  } else if (coluna === 5) {
+    receber("arte")
     const imp = impressorId && forn(impressorId)?.servicos.impressao ? impressorId
       : p.fornecedores.find(f => f.ativo && f.maquina && f.servicos.impressao)?.id
-    enviar("impressao", imp)
+    enviar("impressao", imp, ["impressao"])
   } else if (coluna === 6 || coluna === 7) {
     receber("impressao")
-    enviar("acabamento", p.padroes.acabamento ?? p.padroes.corteVinco)
+    // Só os serviços que o fornecedor de acabamento presta
+    const fAcab = forn(p.padroes.acabamento ?? p.padroes.corteVinco)
+    const servicos = servicosAcabamento.filter(sv => !fAcab || fAcab.servicos[sv])
+    enviar("acabamento", fAcab?.id, servicos.length ? servicos : servicosAcabamento)
   } else if (coluna === 8 || coluna === 9) {
     receber()
   }
