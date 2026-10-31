@@ -1,0 +1,50 @@
+// Telas principais com dados fictícios, para conferência visual (npm run telas).
+import React from "react"
+import { createRoot } from "react-dom/client"
+import { CaixaView } from "@/app/components/CaixaView"
+import { ConfigView } from "@/app/components/ConfigView"
+import { CalibragemView } from "@/app/components/CalibragemView"
+import { RotasProducao } from "@/app/components/RotasProducao"
+import { ThemeProvider } from "@/app/components/ThemeProvider"
+import AprovarClient from "@/app/aprovar/[numero]/AprovarClient"
+import MobilePage from "@/app/mobile/page"
+import { calcular } from "@/app/calculos"
+import { normalizarProducao } from "@/app/lib/producao"
+import { dados, config } from "./dados"
+
+const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
+
+// O celular busca /api/data e /api/aprovacao/link: responde com os dados fictícios
+const orig = window.fetch
+window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
+  const u = String(url)
+  if (u.startsWith("/api/data")) return new Response(JSON.stringify({ ...dados, config, clientes: [], propostasCustom: [] }))
+  if (u.startsWith("/api/aprovacao/link")) return new Response(JSON.stringify({ url: "https://exemplo/aprovar/X?t=abc" }))
+  return orig(url, o)
+}
+
+function Telas() {
+  const [cfg, setCfg] = React.useState(config)
+  const [lancs, setLancs] = React.useState(dados.lancamentos)
+  const [form, setForm] = React.useState(dados.historico[0].form)
+  const pagina = (filho: React.ReactNode) => <div style={{ padding: 24, background: "#f5f5f7", minHeight: "100vh" }}><div className="max-w-[1320px] mx-auto">{filho}</div></div>
+  switch (tela) {
+    case "caixa": return pagina(<CaixaView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onUpdateConfig={setCfg} onAddLancamento={l => setLancs(p => [l, ...p])} />)
+    case "config": return <ThemeProvider><div style={{ height: "100vh" }}><ConfigView config={cfg} onSave={setCfg} onExportar={() => {}} onImportar={() => {}} clientes={["Cliente Relacionamento", "Outro Cliente"]} /></div></ThemeProvider>
+    case "calibragem": return pagina(<CalibragemView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onAtualizarConfig={setCfg} />)
+    case "rotas": {
+      const r = calcular(form, cfg)
+      return pagina(r ? <RotasProducao calculo={r} form={form} producao={normalizarProducao(cfg.producao)} multiplicadorPadrao={cfg.multiplicadores.semFaca || 2}
+        comFaca={form.comFaca} onOpcoes={o => setForm(f => ({ ...f, rota: o }))} onRegistrarFaca={() => {}} /> : <p>sem rota</p>)
+    }
+    case "aprovar": return <AprovarClient numero="ORC-2026-001" token="x" proposta={{
+      nomeCliente: "Cliente Teste", sinalPct: cfg.sinalPct ?? 50, validaAte: "2099-12-31", vencida: false, jaAprovado: false,
+      especificacoes: ["Caixa cartucho", "Dimensões: 15 × 20 × 8 cm (L × A × P)", "Material: Cartão 300g", "Verniz UV Total"],
+      opcoes: [{ quantidade: 1000, preco: 3890, unitario: 3.89 }, { quantidade: 3000, preco: 6540, unitario: 2.18 }],
+    }} />
+    case "mobile": return <MobilePage />
+    default: return <p>tela desconhecida: {tela}</p>
+  }
+}
+
+createRoot(document.getElementById("root")!).render(<Telas />)
