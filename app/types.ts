@@ -267,6 +267,19 @@ export type PedidoArquivo = {
   created_at: string
 }
 
+// Orçamento aprovado pelo cliente na página pública (gravado pelo servidor)
+export type AprovacaoOnline = {
+  numero: string
+  cardId: string
+  nomeCliente: string
+  aprovadoPor: string
+  quantidade: number
+  preco: number
+  sinal: number
+  em: string            // ISO
+  visto?: boolean
+}
+
 export type Lote = {
   id: string
   numero: string

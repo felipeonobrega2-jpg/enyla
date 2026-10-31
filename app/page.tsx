@@ -6,7 +6,7 @@ import { signOut } from "next-auth/react"
 import WhatsAppView from "./components/WhatsAppView"
 import Image from "next/image"
 import { useTheme } from "./components/ThemeProvider"
-import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, CustoSnapshot, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO, COL_HOT, COLUNAS_KANBAN, Parceiro, NegocioParceiro, LancamentoFinanceiro, Lote, TipoCaixa, PrazoEtapas } from "./types"
+import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, CustoSnapshot, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO, COL_HOT, COLUNAS_KANBAN, Parceiro, NegocioParceiro, LancamentoFinanceiro, Lote, TipoCaixa, PrazoEtapas, AprovacaoOnline } from "./types"
 
 // Mapa de coluna → quais campos de prazo auto-preencher (só se ainda vazios)
 const COLUNA_PRAZOS: Record<number, (keyof PrazoEtapas)[]> = {
@@ -295,6 +295,8 @@ export default function Home() {
         if (d.contadorProp !== undefined) setContadorProp(d.contadorProp)
         if (d.kanban)                 setKanban(d.kanban.map(unpackTerceirizado))
         if (d.config)                 setConfig(c => ({ ...CONFIG_PADRAO, ...c, ...d.config }))
+        const novasAprovacoes = (d.config?.aprovacoesOnline ?? []).filter((a: AprovacaoOnline) => !a.visto).length
+        if (novasAprovacoes) showToast(novasAprovacoes === 1 ? "Um cliente aprovou o orçamento online. Veja no Painel." : `${novasAprovacoes} orçamentos aprovados online. Veja no Painel.`)
         if (d.parceiros)              setParceiros(d.parceiros)
         if (d.negocios)               setNegocios(d.negocios)
         if (d.lancamentos)            setLancamentos(d.lancamentos)
@@ -1046,7 +1048,30 @@ export default function Home() {
     abrirPdf(gerarHtmlOS(card, histItem?.form ?? null, refStr, qrDataUrl, arquivos))
   }
 
-  function compartilharWhatsApp(form: FormData, calculo: Calculo, numero?: string) {
+  // Link público para o cliente aprovar o orçamento (o código vem do servidor)
+  async function linkAprovacao(numero: string): Promise<string | null> {
+    try {
+      const r = await fetch(`/api/aprovacao/link?numero=${encodeURIComponent(numero)}`)
+      return r.ok ? (await r.json()).url : null
+    } catch { return null }
+  }
+
+  // Cliente aprovou online: o card já está em Fechado; falta lote e sinal (fluxo de sempre)
+  function concluirAprovacaoOnline(a: AprovacaoOnline) {
+    const card = kanban.find(c => c.id === a.cardId)
+    if (!card) return
+    const abrirSinal = (loteId?: string, loteNumero?: string) =>
+      setModalSinal({ cardId: card.id, nomeCliente: card.nomeCliente, cardNumero: card.numero, loteId, loteNumero, preco: a.preco })
+    if (card.loteId) abrirSinal(card.loteId, card.loteNumero)
+    else criarLote(card.nomeCliente).then(l => { assignLote(card.id, l.id, l.numero); abrirSinal(l.id, l.numero) }).catch(() => abrirSinal())
+    setConfig(c => ({ ...c, aprovacoesOnline: (c.aprovacoesOnline ?? []).map(x => x.numero === a.numero ? { ...x, visto: true } : x) }))
+    fetch("/api/aprovacao/visto", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ numeros: [a.numero] }) }).catch(() => {})
+  }
+
+  async function compartilharWhatsApp(form: FormData, calculo: Calculo, numero?: string) {
+    // Abre a janela já no clique (navegadores bloqueiam janelas abertas depois de uma espera)
+    const janela = window.open("", "_blank")
+    const aprovar = numero ? await linkAprovacao(numero) : null
     const ideal = calculo.tabela.find(l => l.quantidade === calculo.sweetSpotIdealQtd) ?? calculo.tabela[calculo.tabela.length - 1]
     const min   = calculo.tabela.find(l => l.quantidade === calculo.sweetSpotMinimoQtd) ?? calculo.tabela[0]
     const preco = form.comFaca ? ideal.precoComFaca : ideal.precoSemFaca
@@ -1078,6 +1103,7 @@ export default function Home() {
       form.obsCliente ? `\n📝 ${form.obsCliente}` : null,
       ``,
       `⏳ Proposta válida por ${form.validadeDias} dias.`,
+      aprovar ? `\n✅ *Para aprovar online:* ${aprovar}` : null,
       ``,
       `Qualquer dúvida, é só falar! 😊`,
     ].filter(l => l !== null).join("\n")
@@ -1085,7 +1111,9 @@ export default function Home() {
     const clienteSalvo = clientes.find(c => c.nome.toLowerCase() === form.nomeCliente.trim().toLowerCase())
     const phone = clienteSalvo?.telefone?.replace(/\D/g, "")
     const base  = phone ? `https://wa.me/55${phone}` : `https://wa.me/`
-    window.open(`${base}?text=${encodeURIComponent(linhas)}`, "_blank")
+    const url = `${base}?text=${encodeURIComponent(linhas)}`
+    if (janela) janela.location.href = url
+    else window.open(url, "_blank")
   }
 
   function excluirHistorico(index: number) {
@@ -1924,6 +1952,7 @@ export default function Home() {
               onNovoOrcamento={() => navigate("orcamento")}
               onLancarCobranca={prefill => setModalLancPedidos(prefill)}
               onSalvarMeta={metaMensal => salvarConfigTudo({ ...configAtual.current, metaMensal })}
+              onAprovacaoOnline={concluirAprovacaoOnline}
             />
           ) : view === "dashboard" ? (
             <RelatoriosView kanban={kanban} lancamentos={lancamentos} clientes={clientes}

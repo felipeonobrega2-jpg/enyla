@@ -7,6 +7,8 @@ export default auth((req) => {
     pathname.startsWith("/login") ||
     pathname.startsWith("/track") ||
     pathname.startsWith("/pix") ||
+    pathname.startsWith("/aprovar") ||
+    pathname.startsWith("/api/aprovar/") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/whatsapp/webhook") ||
     pathname.startsWith("/api/track") ||

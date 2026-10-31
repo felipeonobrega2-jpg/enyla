@@ -56,6 +56,7 @@ export function ModalDetalhe({
   const [coluna, setColuna]               = useState(card?.coluna ?? 0)
   const [saving, setSaving]               = useState(false)
   const [pixCopied, setPixCopied]         = useState(false)
+  const [aprovCopiado, setAprovCopiado] = useState(false)
   const [pedidoOpen, setPedidoOpen]       = useState(false)
   const [openSections, setOpenSections]   = useState<Set<string>>(new Set(["financeiro", "opcoes", "prazos"]))
   const [arquivos, setArquivos]           = useState<PedidoArquivo[]>([])
@@ -1095,6 +1096,19 @@ export function ModalDetalhe({
                 <button onClick={() => { onEditar(data.proposta); onClose() }}
                   style={{ fontSize: 13, fontWeight: 600, color: '#8456e8', background: 'rgba(132,86,232,0.08)', border: '1px solid rgba(132,86,232,0.16)', padding: '8px 14px', borderRadius: 9, cursor: 'pointer', fontFamily: INTER }}>
                   Editar proposta
+                </button>
+              )}
+              {/* Link para o cliente aprovar online */}
+              {coluna === 0 && card?.numero && (
+                <button onClick={async () => {
+                  const r = await fetch(`/api/aprovacao/link?numero=${encodeURIComponent(card.numero)}`).catch(() => null)
+                  const url = r?.ok ? (await r.json()).url : null
+                  if (url) navigator.clipboard.writeText(url).then(() => { setAprovCopiado(true); setTimeout(() => setAprovCopiado(false), 2000) })
+                }}
+                  title="Copia o link para o cliente escolher a quantidade e aprovar"
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: aprovCopiado ? '#fff' : '#8456e8', background: aprovCopiado ? '#8456e8' : 'rgba(132,86,232,0.08)', border: `1px solid ${aprovCopiado ? '#8456e8' : 'rgba(132,86,232,0.16)'}`, padding: '8px 14px', borderRadius: 9, cursor: 'pointer', fontFamily: INTER }}>
+                  <Link2 size={13} />
+                  {aprovCopiado ? 'Copiado!' : 'Link de aprovação'}
                 </button>
               )}
               {/* PIX */}

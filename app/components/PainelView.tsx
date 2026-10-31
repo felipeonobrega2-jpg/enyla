@@ -2,10 +2,10 @@
 
 import React from "react"
 import {
-  AlertTriangle, CalendarClock, CalendarX2, CircleDollarSign, Clock, Factory, FileText, Hourglass,
+  AlertTriangle, CircleCheck, CalendarClock, CalendarX2, CircleDollarSign, Clock, Factory, FileText, Hourglass,
   MessageCircle, Percent, Plus, Receipt, TrendingUp, Truck, Users, Wallet, CheckCircle2, ArrowRight, Target, Trophy,
 } from "lucide-react"
-import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COL_HOT } from "../types"
+import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COL_HOT, AprovacaoOnline } from "../types"
 import { Configuracoes } from "../config"
 import {
   Periodo, montarPedidos, vendasDoPeriodo, caixaDoPeriodo, conversao, orcamentosDoPeriodo, producao,
@@ -65,7 +65,7 @@ type Detalhe = { titulo: string; sub?: string; linhas: React.ReactNode; destino?
 
 export function PainelView({
   kanban, lancamentos, historico, propostasCustom, clientes, config,
-  onAbrirCard, onAbrirCliente, onNavegar, onNovoOrcamento, onLancarCobranca, onSalvarMeta,
+  onAbrirCard, onAbrirCliente, onNavegar, onNovoOrcamento, onLancarCobranca, onSalvarMeta, onAprovacaoOnline,
 }: {
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
@@ -79,6 +79,7 @@ export function PainelView({
   onNovoOrcamento: () => void
   onLancarCobranca?: (prefill: Partial<LancamentoFinanceiro>) => void
   onSalvarMeta?: (metaMensal: number) => void
+  onAprovacaoOnline?: (a: AprovacaoOnline) => void
 }) {
   const [periodoId, setPeriodoId] = React.useState<PeriodoId>("mes")
   const [detalhe, setDetalhe] = React.useState<Detalhe | null>(null)
@@ -126,8 +127,17 @@ export function PainelView({
   const fornecedorAtrasado = prodCfg.movimentos.filter(m => !m.recebidoEm && m.prazoPrevisto && m.prazoPrevisto < hojeIso)
   const leadsQuentes = kanban.filter(c => c.coluna === COL_HOT)
 
-  type Acao = { id: string; tom: Tom; icone: React.ReactNode; titulo: string; sub: string; valor?: string; ir: () => void; whatsapp?: string; cobrar?: Partial<LancamentoFinanceiro> }
+  const aprovadosOnline = (config.aprovacoesOnline ?? []).filter(a => !a.visto && kanban.some(c => c.id === a.cardId))
+
+  type Acao = { id: string; tom: Tom; icone: React.ReactNode; titulo: string; sub: string; valor?: string; ir: () => void; whatsapp?: string; cobrar?: Partial<LancamentoFinanceiro>; botao?: { rotulo: string; onClick: () => void } }
   const acoes: Acao[] = [
+    ...aprovadosOnline.map(a => ({
+      id: `apr-${a.numero}`, tom: "sucesso" as Tom, icone: <CircleCheck className="w-4 h-4" />,
+      titulo: `${a.numero} · ${a.nomeCliente}`,
+      sub: `aprovado online por ${a.aprovadoPor} · ${a.quantidade.toLocaleString("pt-BR")} un · ${new Date(a.em).toLocaleDateString("pt-BR")}`,
+      valor: brl(a.preco), ir: () => { const c = kanban.find(k => k.id === a.cardId); if (c) onAbrirCard(c) },
+      botao: onAprovacaoOnline ? { rotulo: "Lançar sinal", onClick: () => onAprovacaoOnline(a) } : undefined,
+    })),
     ...prod.atrasados.map(p => ({
       id: `atr-${p.key}`, tom: "perigo" as Tom, icone: <CalendarX2 className="w-4 h-4" />,
       titulo: `${p.numero} · ${p.nomeCliente}`, sub: `${prazoTexto(p.dataEntregaPrevista)} · ${p.etapa}`,
@@ -371,7 +381,12 @@ export function PainelView({
               ? <Vazio icone={<CheckCircle2 className="w-9 h-9" />} titulo="Nada pendente" sub="Entregas no prazo, recebimentos em dia e nenhum orçamento vencendo." />
               : acoesVisiveis.map(a => (
                 <LinhaLista key={a.id} titulo={a.titulo} sub={a.sub} valor={a.valor} tom={a.tom} icone={a.icone} onClick={a.ir}
-                  acao={a.cobrar && onLancarCobranca ? (
+                  acao={a.botao ? (
+                    <button onClick={a.botao.onClick}
+                      className="h-8 px-2.5 mr-1 rounded-lg text-[11.5px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors shrink-0 whitespace-nowrap">
+                      {a.botao.rotulo}
+                    </button>
+                  ) : a.cobrar && onLancarCobranca ? (
                     <button onClick={() => onLancarCobranca(a.cobrar!)} title="Lançar a cobrança deste saldo"
                       className="h-8 px-2.5 mr-1 rounded-lg text-[11.5px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors shrink-0 whitespace-nowrap">
                       Lançar cobrança

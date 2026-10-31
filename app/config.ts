@@ -77,6 +77,7 @@ export type Configuracoes = {
   fornecedores: Fornecedor[]
   producao: ConfigProducao
   metas: ConfigMetas
+  aprovacoesOnline?: import("./types").AprovacaoOnline[]   // gravado pelo servidor
 }
 
 const CATS_RECEITA_PADRAO: CategoriaFinanceira[] = [
