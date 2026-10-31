@@ -13,6 +13,7 @@ import {
   parseData, diasAte, nomeChave, noPeriodo, Pedido, recebiveis, pedidoEntregue,
 } from "../lib/negocio"
 import { normalizarProducao } from "../lib/producao"
+import { ehDiaUtil } from "../lib/diasUteis"
 import { normalizarMetas, sugerirMeta, conquistasDeSaude } from "../lib/metas"
 import { brl, num } from "../utils"
 import {
@@ -311,8 +312,7 @@ export function PainelView({
   const diasUteisRestantes = (() => {
     let n = 0
     for (let d = hoje.getDate() + 1; d <= diasMes; d++) {
-      const dia = new Date(hoje.getFullYear(), hoje.getMonth(), d).getDay()
-      if (dia !== 0 && dia !== 6) n++
+      if (ehDiaUtil(new Date(hoje.getFullYear(), hoje.getMonth(), d, 12))) n++
     }
     return n
   })()

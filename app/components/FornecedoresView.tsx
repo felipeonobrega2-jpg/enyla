@@ -11,6 +11,7 @@ import {
   ConfigProducao, FornecedorProducao, RegraCobranca, Servico, SERVICOS, TipoRegra, Ferramental, TipoFerramental,
   MovimentoFornecedor, Ocorrencia, TIPOS_OCORRENCIA, TipoOcorrencia, normalizarProducao, descreverRegra, etapaDosServicos, nomeServicos,
 } from "../lib/producao"
+import { somarDiasUteis, diasUteisEntre } from "../lib/diasUteis"
 import { montarPedidos, pedidoEntregue } from "../lib/negocio"
 import { brl, num } from "../utils"
 
@@ -32,12 +33,9 @@ const TIPOS_ACABAMENTO: Partial<Record<Servico, string[]>> = {
 }
 
 const hoje = () => new Date().toLocaleDateString("sv-SE")
-const somarDias = (iso: string, d: number) => {
-  const dt = new Date(iso + "T12:00:00")
-  dt.setDate(dt.getDate() + d)
-  return dt.toLocaleDateString("sv-SE")
-}
-const diasEntre = (a: string, b: string) => Math.round((new Date(b + "T12:00:00").getTime() - new Date(a + "T12:00:00").getTime()) / 86400000)
+// Prazos de fornecedor contam em dias úteis
+const somarDias = somarDiasUteis
+const diasEntre = diasUteisEntre
 const dataBR = (iso?: string) => iso ? iso.split("-").reverse().join("/") : "—"
 const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
 
@@ -301,7 +299,7 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
               <ServicosChips forn={fornDe(hist.fornecedorId)} valor={hist.servicos ?? []} onChange={sv => setHist({ ...hist, servicos: sv })} />
             </div>
             <div className="flex items-center justify-end gap-2">
-              {hist.enviadoEm && hist.recebidoEm && <span className="text-[11.5px] text-[#898892] mr-auto">{diasEntre(hist.enviadoEm, hist.recebidoEm)} dias no fornecedor</span>}
+              {hist.enviadoEm && hist.recebidoEm && <span className="text-[11.5px] text-[#898892] mr-auto">{diasEntre(hist.enviadoEm, hist.recebidoEm)} dias úteis no fornecedor</span>}
               <button onClick={() => setHist(null)} className="h-9 px-3 rounded-lg text-[12px] text-[#898892] hover:bg-[rgba(116,116,128,0.06)]">Fechar</button>
               <button onClick={() => registrarHistorico(false)} disabled={!hist.fornecedorId || !hist.enviadoEm || !hist.recebidoEm || !hist.servicos?.length || !(hist.pedidoKey || hist.textoPedido?.trim())}
                 className="h-9 px-3 rounded-lg text-[12px] font-semibold text-[#191625] bg-white disabled:opacity-30" style={inputStyle}>Registrar</button>
@@ -361,7 +359,7 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
                     </p>
                   </div>
                   <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ds-num ${atrasado ? "bg-[#e5484d]/10 text-[#e5484d]" : "bg-[rgba(116,116,128,0.08)] text-[#5e5c68]"}`}>
-                    {dias} {dias === 1 ? "dia" : "dias"}{m.prazoPrevisto ? ` · prazo ${dataBR(m.prazoPrevisto)}` : ""}
+                    {dias} {dias === 1 ? "dia útil" : "dias úteis"}{m.prazoPrevisto ? ` · prazo ${dataBR(m.prazoPrevisto)}` : ""}
                   </span>
                   <button onClick={() => marcarRecebido(m.id, hoje())}
                     className="h-8 px-3 rounded-lg text-[12px] font-semibold text-[#009351] hover:bg-[#009351]/[0.08] transition-colors flex items-center gap-1.5" style={border}>
@@ -392,7 +390,7 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
                 </p>
                 <div className="grid grid-cols-4 gap-2 mt-3">
                   {[
-                    { l: "Prazo médio", v: s.prazoMedio != null ? `${num(s.prazoMedio, 1)} d` : "—", sub: s.forn.prazoDias ? `combinado ${s.forn.prazoDias} d` : undefined },
+                    { l: "Prazo médio", v: s.prazoMedio != null ? `${num(s.prazoMedio, 1)} d` : "—", sub: s.forn.prazoDias ? `dias úteis · combinado ${s.forn.prazoDias}` : "dias úteis" },
                     { l: "Atrasos", v: s.atrasoPct != null ? `${num(s.atrasoPct, 0)}%` : "—", alerta: (s.atrasoPct ?? 0) >= 25 },
                     { l: "Pedidos", v: num(s.pedidos), sub: s.abertos.length ? `${s.abertos.length} em andamento` : undefined },
                     { l: "Ocorrências", v: num(s.ocorrencias.length), sub: s.prejuizo > 0 ? brl(s.prejuizo) : undefined, alerta: s.ocorrencias.length > 0 },
@@ -406,7 +404,7 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
                 </div>
                 {s.porServico.length > 0 && (
                   <div className="mt-3 pt-3 space-y-1.5" style={{ borderTop: "1px solid rgba(60,60,67,0.06)" }}>
-                    <p className="text-[10.5px] font-medium text-[#898892]">Prazo por serviço</p>
+                    <p className="text-[10.5px] font-medium text-[#898892]">Prazo por serviço · dias úteis</p>
                     {s.porServico.map(ps => (
                       <div key={ps.nome} className="flex items-center gap-3 text-[12px]">
                         <span className="flex-1 min-w-0 truncate text-[#191625]">{ps.nome}</span>
@@ -583,7 +581,7 @@ function Cadastro({ draft, setDraft, fornecedoresFin }: {
                     </select>
                   </Campo>
                   <Campo label="Frete até ele (R$)"><Num value={f.frete} onChange={v => upd(f.id, { frete: v })} step={0.01} /></Campo>
-                  <Campo label="Prazo combinado (dias)"><Num value={f.prazoDias} onChange={v => upd(f.id, { prazoDias: v })} /></Campo>
+                  <Campo label="Prazo combinado (dias úteis)"><Num value={f.prazoDias} onChange={v => upd(f.id, { prazoDias: v })} /></Campo>
                 </div>
 
                 <div className="rounded-lg p-3.5 bg-[rgba(116,116,128,0.04)] space-y-2.5">
@@ -772,7 +770,7 @@ function Parametros({ draft, setDraft }: { draft: ConfigProducao; setDraft: (p: 
             <span className="block text-[11.5px] text-[#898892]">Usa a data de fechamento + o prazo padrão abaixo. Você pode ajustar no pedido.</span></span>
         </label>
         <div className="w-48 pl-6">
-          <Campo label="Prazo padrão de entrega (dias)"><Num value={draft.prazoEntregaPadraoDias} onChange={v => setDraft({ ...draft, prazoEntregaPadraoDias: Math.max(1, v) })} /></Campo>
+          <Campo label="Prazo padrão de entrega (dias úteis)"><Num value={draft.prazoEntregaPadraoDias} onChange={v => setDraft({ ...draft, prazoEntregaPadraoDias: Math.max(1, v) })} /></Campo>
         </div>
         <label className="flex items-start gap-2.5 text-[12.5px] text-[#191625] cursor-pointer">
           <input type="checkbox" className="mt-0.5" checked={draft.automacoes.fornecedores}

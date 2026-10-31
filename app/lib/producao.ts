@@ -13,6 +13,7 @@
 //   preço = custo total × multiplicador (sem imposto)
 
 import type { TipoCaixa } from "../types"
+import { somarDiasUteis } from "./diasUteis"
 
 // ── Cadastro ──────────────────────────────────────────────────────────────────
 
@@ -194,9 +195,19 @@ export function normalizarProducao(p?: Partial<ConfigProducao> | null): ConfigPr
     ferramentalPadrao: { ...d.ferramentalPadrao, ...p.ferramentalPadrao },
     automacoes: { ...d.automacoes, ...p.automacoes },
     ferramentais: p.ferramentais ?? [],
-    movimentos: p.movimentos ?? [],
+    movimentos: (p.movimentos ?? []).map(m => prazoEmDiasUteis(m, p.fornecedores ?? d.fornecedores)),
     ocorrencias: p.ocorrencias ?? [],
   }
+}
+
+// Envios antigos tinham o prazo previsto em dias corridos: os que batem com o prazo
+// combinado do fornecedor são recontados em dias úteis (datas digitadas ficam como estão)
+function prazoEmDiasUteis(m: MovimentoFornecedor, fornecedores: FornecedorProducao[]): MovimentoFornecedor {
+  const dias = fornecedores.find(f => f.id === m.fornecedorId)?.prazoDias
+  if (!m.prazoPrevisto || !dias) return m
+  const corrido = new Date(m.enviadoEm + "T12:00:00"); corrido.setDate(corrido.getDate() + dias)
+  if (m.prazoPrevisto !== corrido.toLocaleDateString("sv-SE")) return m
+  return { ...m, prazoPrevisto: somarDiasUteis(m.enviadoEm, dias) }
 }
 
 // ── Entrada do orçamento ──────────────────────────────────────────────────────
@@ -691,8 +702,7 @@ export function movimentosPorEtapa(
   const prazo = (fornecedorId: string) => {
     const f = forn(fornecedorId)
     if (!f?.prazoDias) return undefined
-    const d = new Date(hojeIso + "T12:00:00"); d.setDate(d.getDate() + f.prazoDias)
-    return d.toLocaleDateString("sv-SE")
+    return somarDiasUteis(hojeIso, f.prazoDias)
   }
   let movs = p.movimentos
   const aberto = (etapa: EtapaPedido) => movs.find(m => m.pedidoKey === pedidoKey && m.etapa === etapa && !m.recebidoEm)

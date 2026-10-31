@@ -40,6 +40,7 @@ import { PainelView } from "./components/PainelView"
 import { ParceriasView } from "./components/ParceriasView"
 import { RelatoriosView } from "./components/RelatoriosView"
 import { normalizarProducao, movimentosPorEtapa, Servico } from "./lib/producao"
+import { somarDiasUteis } from "./lib/diasUteis"
 import { normalizarMetas } from "./lib/metas"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
 import FormaView from "./FormaView"
@@ -499,12 +500,10 @@ export default function Home() {
     const avisos: string[] = []
 
     if (prod.automacoes.prazoEntrega && coluna >= COL_FECHADO && coluna < COL_ENTREGUE && !card.dataEntregaPrevista) {
-      const base = new Date((card.dataFechamento ?? hojeIso) + "T12:00:00")
-      base.setDate(base.getDate() + prod.prazoEntregaPadraoDias)
-      const dataEntregaPrevista = base.toLocaleDateString("sv-SE")
+      const dataEntregaPrevista = somarDiasUteis((card.dataFechamento ?? hojeIso).slice(0, 10), prod.prazoEntregaPadraoDias)
       setKanban(prev => prev.map(c => c.id === card.id ? { ...c, dataEntregaPrevista } : c))
       fetch(`/api/kanban/${card.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataEntregaPrevista }) }).catch(() => {})
-      avisos.push(`entrega prevista para ${base.toLocaleDateString("pt-BR")}`)
+      avisos.push(`entrega prevista para ${dataEntregaPrevista.split("-").reverse().join("/")} (${prod.prazoEntregaPadraoDias} dias úteis)`)
     }
 
     if (prod.automacoes.fornecedores && coluna >= 2 && coluna <= 9) {
