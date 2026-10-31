@@ -6,6 +6,7 @@
 // "isso conta como atrasado" deve importar daqui, não recalcular.
 
 import { LancamentoFinanceiro, KanbanCard, NegocioParceiro, COL_FECHADO, COL_PERDIDO, COL_HOT } from "../types"
+import { montarPedidos, pixExpirado } from "./negocio"
 
 export const hoje = () => new Date().toISOString().split("T")[0]
 
@@ -79,46 +80,28 @@ export type PedidoFechado = {
   restante: number
 }
 
-// Pra cada pedido fechado (cards de um mesmo lote contam como um pedido só),
-// calcula o valor total (preço dos cards + sobras), quanto já foi pago, e
-// quanto falta — incluindo pedidos sem NENHUM lançamento registrado (pago=0).
+// Pedidos fechados com total (venda + sobras), pago e quanto falta.
+// Vem da camada canônica (lib/negocio): os mesmos números do Painel, Pedidos e celular.
 export function calcularPedidosFechados(kanban: KanbanCard[], lancamentos: LancamentoFinanceiro[]): PedidoFechado[] {
-  const elegiveis = pedidosElegiveis(kanban)
-  const porLote = pagamentosPorLote(lancamentos)
-  const porCard = pagamentosPorCard(lancamentos)
-  const sobLote = sobrasPorLote(lancamentos)
-  const sobCard = sobrasPorCard(lancamentos)
-
-  const itens: PedidoFechado[] = []
-  const lotesSeen = new Set<string>()
-
-  for (const c of elegiveis) {
-    if (c.loteId) {
-      if (lotesSeen.has(c.loteId)) continue
-      lotesSeen.add(c.loteId)
-      const sobras = sobLote[c.loteId] ?? []
-      const pago = somaPago(porLote[c.loteId] ?? []) + somaPago(sobras)
-      const loteCards = elegiveis.filter(cc => cc.loteId === c.loteId)
-      const total = loteCards.reduce((s, cc) => s + cc.preco, 0) + sobras.reduce((s, l) => s + l.valor, 0)
-      itens.push({ key: `lote-${c.loteId}`, loteId: c.loteId, cliente: c.nomeCliente, label: c.loteNumero ?? "Lote", total, pago, restante: total - pago })
-    } else {
-      const sobras = sobCard[c.id] ?? []
-      const pago = somaPago(porCard[c.id] ?? []) + somaPago(sobras)
-      const total = c.preco + sobras.reduce((s, l) => s + l.valor, 0)
-      itens.push({ key: `card-${c.id}`, cardId: c.id, cliente: c.nomeCliente, label: c.numero || "Pedido", total, pago, restante: total - pago })
-    }
-  }
-  return itens
+  return montarPedidos(kanban, lancamentos).map(p => ({
+    key: p.key,
+    loteId: p.tipo === "lote" ? p.cards[0].loteId : undefined,
+    cardId: p.tipo === "card" ? p.cards[0].id : undefined,
+    cliente: p.nomeCliente,
+    label: p.numero,
+    total: p.venda,
+    pago: p.venda - p.aReceber,
+    restante: p.aReceber,
+  }))
 }
 
 export function pedidosAbertos(itens: PedidoFechado[]): PedidoFechado[] {
-  return itens.filter(i => i.pago < i.total)
+  return itens.filter(i => i.restante > 0.5)
 }
 
-// Conta pedidos sem registro financeiro completo — inclui os de valor zero
-// (nunca tiveram lançamento criado), não só os com saldo positivo.
+// Pedidos sem registro financeiro completo — inclui os de valor zero
 export function contarNaoRegistrados(itens: PedidoFechado[]): number {
-  return itens.filter(i => i.total === 0 || i.pago < i.total).length
+  return itens.filter(i => i.total === 0 || i.restante > 0.5).length
 }
 
 export function negociosPendentes(negocios: NegocioParceiro[]): NegocioParceiro[] {
@@ -137,25 +120,30 @@ export type Vencido = {
   lancamentos: LancamentoFinanceiro[]
 }
 
-// Lançamentos de receita pendentes e vencidos, agrupados por lote/card.
-export function calcularVencidos(lancamentos: LancamentoFinanceiro[]): Vencido[] {
-  const atrasados = lancamentos.filter(isAtrasada)
-  const grupos: Record<string, Vencido> = {}
-  for (const l of atrasados) {
-    const key = l.loteId ? `lote:${l.loteId}` : `card:${l.cardId}`
-    if (!grupos[key]) {
-      const dias = Math.floor((Date.now() - new Date(l.dataVencimento).getTime()) / 86_400_000)
-      grupos[key] = {
-        key, loteId: l.loteId, cardId: l.cardId,
-        nomeCliente: l.nomeCliente || "",
-        loteNumero: l.loteNumero, cardNumero: l.cardNumero,
-        total: 0, diasAtraso: dias, lancamentos: [],
+// Cobranças vencidas, por pedido (mesma régua do Painel: sobras pendentes contam,
+// sobras já pagas com o pedido e links Pix vencidos não)
+export function calcularVencidos(kanban: KanbanCard[], lancamentos: LancamentoFinanceiro[]): Vencido[] {
+  const hj = hoje()
+  return montarPedidos(kanban, lancamentos)
+    .filter(p => p.vencido > 0.5)
+    .map(p => {
+      const lancs = p.receitas
+        .filter(l => l.status !== "pago" && l.dataVencimento < hj && !p.sobrasQuitadas.includes(l.id) && !pixExpirado(l, hj))
+        .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))
+      const maisAntigo = lancs[0]?.dataVencimento ?? hj
+      return {
+        key: p.tipo === "lote" ? `lote:${p.cards[0].loteId}` : `card:${p.cards[0].id}`,
+        loteId: p.tipo === "lote" ? p.cards[0].loteId : undefined,
+        cardId: p.tipo === "card" ? p.cards[0].id : undefined,
+        nomeCliente: p.nomeCliente,
+        loteNumero: p.tipo === "lote" ? p.numero : undefined,
+        cardNumero: p.tipo === "card" ? p.numero : undefined,
+        total: p.vencido,
+        diasAtraso: Math.floor((Date.now() - new Date(maisAntigo + "T12:00:00").getTime()) / 86_400_000),
+        lancamentos: lancs,
       }
-    }
-    grupos[key].total += l.valor
-    grupos[key].lancamentos.push(l)
-  }
-  return Object.values(grupos).sort((a, b) => b.total - a.total)
+    })
+    .sort((a, b) => b.total - a.total)
 }
 
 // Soma de receita paga (inclui sobras pagas — uma sobra só sai da régua de "a
@@ -182,7 +170,7 @@ export function calcularResumoFinanceiro(kanban: KanbanCard[], lancamentos: Lanc
   const itens = calcularPedidosFechados(kanban, lancamentos)
   const abertos = pedidosAbertos(itens)
   const negPendentes = negociosPendentes(negocios)
-  const vencidos = calcularVencidos(lancamentos)
+  const vencidos = calcularVencidos(kanban, lancamentos)
 
   return {
     recebidoTotal: calcularRecebidoTotal(lancamentos, negocios),

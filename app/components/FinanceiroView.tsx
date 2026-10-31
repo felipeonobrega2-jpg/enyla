@@ -16,7 +16,7 @@ import { ContasTab } from "./financeiro/ContasTab"
 import { FixasTab } from "./financeiro/FixasTab"
 import { FornecedoresTab } from "./financeiro/FornecedoresTab"
 import {
-  hoje, pixVencido, isReceitaPendenteValida, isAtrasada, pedidosElegiveis as calcPedidosElegiveis,
+  hoje, isReceitaPendenteValida, pedidosElegiveis as calcPedidosElegiveis,
   pagamentosPorLote as calcPagamentosPorLote, pagamentosPorCard as calcPagamentosPorCard,
   sobrasPorLote as calcSobrasPorLote, sobrasPorCard as calcSobrasPorCard,
   calcularPedidosFechados, pedidosAbertos, contarNaoRegistrados, calcularVencidos,
@@ -1159,6 +1159,7 @@ export function FinanceiroView({
   // do contador de não-registrados. Uma única passada, em vez de recalcular o mesmo loop 3x.
   const pedidosFechadosTotais = useMemo(() => calcularPedidosFechados(kanban, lancamentos), [kanban, lancamentos])
   const pedidosEmAberto = useMemo(() => pedidosAbertos(pedidosFechadosTotais), [pedidosFechadosTotais])
+  const fechadoPorKey = useMemo(() => new Map(pedidosFechadosTotais.map(p => [p.key, p])), [pedidosFechadosTotais])
 
   // Recebíveis canônicos (mesma conta do Painel e de Pedidos)
   const rec = useMemo(() => recebiveis(montarPedidos(kanban, lancamentos), lancamentos), [kanban, lancamentos])
@@ -1168,23 +1169,22 @@ export function FinanceiroView({
     const all = lancamentos.filter(inPeriodo).filter(semConta)
     const recebidas = all.filter(l => l.tipo === "receita" && l.status === "pago")
     const despesas  = all.filter(l => l.tipo === "despesa" && l.status === "pago")
-    const atrasados = lancamentos.filter(isAtrasada).filter(semConta)
 
     const totalParceiros = negociosPagos.reduce((s, n) => s + n.comissaoValor, 0)
     const totalRecebido  = recebidas.reduce((s, l) => s + l.valor, 0) + totalParceiros
     const totalDespesas  = despesas.reduce((s, l) => s + l.valor, 0)
-    const aReceberPedidos = pedidosEmAberto.reduce((s, i) => s + i.restante, 0)
 
     return {
       recebido:   totalRecebido,
       despesasPg: totalDespesas,
-      aReceber:   aReceberPedidos + negociosPendentes.reduce((s, n) => s + n.comissaoValor, 0),
-      emAtraso:   atrasados.reduce((s, l) => s + l.valor, 0),
+      // A receber e em atraso: mesma conta do Painel e do celular
+      aReceber:   rec.aReceber + negociosPendentes.reduce((s, n) => s + n.comissaoValor, 0),
+      emAtraso:   rec.vencido,
       resultado:  totalRecebido - totalDespesas,
       naoRegistrados: contarNaoRegistrados(pedidosFechadosTotais),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lancamentos, negocios, periodo, mesOffset, pedidosEmAberto, pedidosFechadosTotais])
+  }, [lancamentos, negocios, periodo, mesOffset, rec, pedidosFechadosTotais])
 
   // Itens que compõem o "A receber" — mesma base do kpis.aReceber, detalhada item a item
   const receberItens = useMemo(() => {
@@ -1221,7 +1221,7 @@ export function FinanceiroView({
   }, [pedidosElegiveis, periodo, mesOffset])
 
   // Pagamentos vencidos — pendentes com dataVencimento no passado, agrupados por lote/card
-  const vencidos = useMemo(() => calcularVencidos(lancamentos), [lancamentos])
+  const vencidos = useMemo(() => calcularVencidos(kanban, lancamentos), [kanban, lancamentos])
 
   // PIX links emitidos
   const pixLinks = useMemo(() => {
@@ -1740,30 +1740,15 @@ export function FinanceiroView({
                 }
               }
 
-              // Apply status filter
-              const isComplete = (pags: LancamentoFinanceiro[], total: number) => {
-                const totalPago = pags.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
-                return total > 0 && totalPago >= total
-              }
-              const loteEntries = Object.entries(loteGroups).filter(([loteId, cards]) => {
-                if (filtroReceber === "todos") return true
-                const pags = pagamentosPorLote[loteId] ?? []
-                const sobrasLote = sobrasPorLote[loteId] ?? []
-                const total = cards.reduce((s, c) => s + c.preco, 0) + sobrasLote.reduce((s, l) => s + l.valor, 0)
-                if (filtroReceber === "aberto") return !isComplete([...pags, ...sobrasLote], total)
-                if (filtroReceber === "pendente") return pags.length === 0
-                // "parcial" = tem registro mas não está completo
-                return pags.length > 0 && !isComplete([...pags, ...sobrasLote], total)
-              })
-              const solosFiltrados = solos.filter(card => {
-                if (filtroReceber === "todos") return true
-                const pags = pagamentosPorCard[card.id] ?? []
-                const sobrasCard = sobrasPorCard[card.id] ?? []
-                const total = card.preco + sobrasCard.reduce((s, l) => s + l.valor, 0)
-                if (filtroReceber === "aberto") return !isComplete([...pags, ...sobrasCard], total)
-                if (filtroReceber === "pendente") return pags.length === 0
-                return pags.length > 0 && !isComplete([...pags, ...sobrasCard], total)
-              })
+              // Filtro de status com os números do pedido (camada canônica)
+              const emAberto = (key: string) => (fechadoPorKey.get(key)?.restante ?? 0) > 0.5
+              const passa = (key: string, pags: LancamentoFinanceiro[]) =>
+                filtroReceber === "todos" ? true
+                : filtroReceber === "aberto" ? emAberto(key)
+                : filtroReceber === "pendente" ? pags.length === 0
+                : pags.length > 0 && emAberto(key)   // "parcial": tem registro mas falta
+              const loteEntries = Object.entries(loteGroups).filter(([loteId]) => passa(`lote-${loteId}`, pagamentosPorLote[loteId] ?? []))
+              const solosFiltrados = solos.filter(card => passa(`card-${card.id}`, pagamentosPorCard[card.id] ?? []))
 
               if (loteEntries.length === 0 && solosFiltrados.length === 0) {
                 const msg = q
@@ -1782,16 +1767,15 @@ export function FinanceiroView({
                   {loteEntries.map(([loteId, cards]) => {
                     const loteNum = cards[0].loteNumero ?? loteId
                     const loteInfo = (lotes ?? []).find(l => l.id === loteId)
-                    const totalPedidos = cards.reduce((s, c) => s + c.preco, 0)
                     const sobrasLote = sobrasPorLote[loteId] ?? []
                     const totalSobras = sobrasLote.reduce((s, l) => s + l.valor, 0)
-                    const total = totalPedidos + totalSobras
                     const pagamentosLote = pagamentosPorLote[loteId] ?? []
-                    // Pago = pagamentos do pedido + sobras pagas à parte
-                    const totalPago = [...pagamentosLote, ...sobrasLote].filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+                    const fech = fechadoPorKey.get(`lote-${loteId}`)
+                    const total = fech?.total ?? 0
+                    const restante = fech?.restante ?? 0
+                    const totalPago = total - restante
                     const pagoPct = total > 0 ? Math.min(100, Math.round((totalPago / total) * 100)) : 0
-                    const completo = totalPago >= total && total > 0
-                    const restante = Math.max(0, total - totalPago)
+                    const completo = total > 0 && restante <= 0.5
                     const podeSobra = cards.some(c => c.coluna >= COL_EXPEDICAO && c.coluna !== COL_PERDIDO)
 
                     return (
@@ -1891,11 +1875,12 @@ export function FinanceiroView({
                     const pagamentosCard = pagamentosPorCard[card.id] ?? []
                     const sobrasCard = sobrasPorCard[card.id] ?? []
                     const totalSobrasCard = sobrasCard.reduce((s, l) => s + l.valor, 0)
-                    const totalCard = card.preco + totalSobrasCard
-                    const totalPagoCard = [...pagamentosCard, ...sobrasCard].filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+                    const fechCard = fechadoPorKey.get(`card-${card.id}`)
+                    const totalCard = fechCard?.total ?? card.preco
+                    const restanteCard = fechCard?.restante ?? 0
+                    const totalPagoCard = totalCard - restanteCard
                     const pagoPctCard = totalCard > 0 ? Math.min(100, Math.round((totalPagoCard / totalCard) * 100)) : 0
-                    const completoCard = totalPagoCard >= totalCard && totalCard > 0
-                    const restanteCard = Math.max(0, totalCard - totalPagoCard)
+                    const completoCard = totalCard > 0 && restanteCard <= 0.5
                     return (
                       <div key={card.id} className="bg-white border border-[rgba(60,60,67,0.08)] rounded-xl overflow-hidden mb-2">
                         {/* Header */}
