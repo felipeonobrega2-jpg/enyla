@@ -1,9 +1,39 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from "react"
-import { Configuracoes, Material, CONFIG_PADRAO } from "../config"
+import React, { useState, useRef } from "react"
+import { Percent, Layers, Target, Palette, Sparkles, Database, Download, Upload, Plus, X, Check, Save, RotateCcw, Info, KeyRound } from "lucide-react"
+import { Configuracoes, Material } from "../config"
+import { FORMATOS_PAPEL } from "../dados"
 import { normalizarMetas } from "../lib/metas"
+import { normalizarProducao } from "../lib/producao"
+import { brl, num } from "../utils"
 import { useTheme, ThemeChoice } from "./ThemeProvider"
+import { Pagina, CabecalhoPagina, Cartao, TituloCartao, Segmentado, Botao } from "./ds"
+
+const inputCls = "h-9 rounded-lg px-2.5 text-[12.5px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] transition-colors ds-borda"
+
+function Campo({ label, dica, children, className = "" }: { label: string; dica?: React.ReactNode; children: React.ReactNode; className?: string }) {
+  return (
+    <label className={`flex flex-col gap-1 min-w-0 ${className}`}>
+      <span className="text-[11px] text-[#5e5c68] font-medium">{label}</span>
+      {children}
+      {dica && <span className="text-[11px] text-[#898892] leading-snug">{dica}</span>}
+    </label>
+  )
+}
+
+function Num({ value, onChange, step = 1, prefixo, sufixo, className = "w-full" }: {
+  value: number | undefined; onChange: (v: number) => void; step?: number; prefixo?: string; sufixo?: string; className?: string
+}) {
+  return (
+    <div className={`relative ${className}`}>
+      {prefixo && <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11.5px] text-[#898892] pointer-events-none">{prefixo}</span>}
+      <input type="number" step={step} min={0} value={value ?? ""} onChange={e => onChange(Number(e.target.value))}
+        className={`${inputCls} w-full text-right ds-num ${prefixo ? "pl-8" : ""} ${sufixo ? "pr-8" : ""}`} />
+      {sufixo && <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11.5px] text-[#898892] pointer-events-none">{sufixo}</span>}
+    </div>
+  )
+}
 
 export function ConfigView({ config, onSave, onExportar, onImportar }: {
   config: Configuracoes
@@ -12,374 +42,234 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
   onImportar: (file: File) => void
 }) {
   const [draft, setDraft] = useState<Configuracoes>(config)
+  const [salvo, setSalvo] = useState(false)
   const importRef = useRef<HTMLInputElement>(null)
-
-  // Sync draft when config loads from API (useState only uses initial value once)
-  useEffect(() => { setDraft(config) }, [config])
-
-  function setCusto(k: keyof Configuracoes["custos"], v: number) {
-    setDraft(d => ({ ...d, custos: { ...d.custos, [k]: v } }))
-  }
-  function setMult(k: keyof Configuracoes["multiplicadores"], v: number) {
-    setDraft(d => ({ ...d, multiplicadores: { ...d.multiplicadores, [k]: v } }))
-  }
-
   const { theme, setTheme } = useTheme()
 
-  const themeOptions: { value: ThemeChoice; label: string; icon: React.ReactNode }[] = [
-    {
-      value: "system",
-      label: "Sistema",
-      icon: (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0H3" />
-        </svg>
-      ),
-    },
-    {
-      value: "light",
-      label: "Claro",
-      icon: (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-        </svg>
-      ),
-    },
-    {
-      value: "dark",
-      label: "Escuro",
-      icon: (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
-        </svg>
-      ),
-    },
-  ]
+  // A configuração chega da API depois da primeira renderização: o rascunho acompanha
+  const [base, setBase] = useState(config)
+  if (base !== config) { setBase(config); setDraft(config) }
 
-  const custosLabels: [keyof Configuracoes["custos"], string, string][] = [
-    ["impressaoPorChapa", "Impressão por chapa", "R$/chapa"],
-    ["corteAcerto",       "Corte — acerto",      "R$ fixo"],
-    ["corteMilheiro",     "Corte — milheiro",    "R$/milheiro"],
-    ["vernizPor2000",     "Verniz UV",            "R$/2000 un"],
-    ["colagemMilheiro",   "Colagem",              "R$/milheiro"],
-    ["arte",              "Arte / diagramação",   "R$ fixo"],
-  ]
+  const sujo = JSON.stringify(draft) !== JSON.stringify(config)
+  const metas = normalizarMetas(draft.metas)
+  const setMetas = (m: Partial<typeof metas>) => setDraft(d => ({ ...d, metas: { ...normalizarMetas(d.metas), ...m } }))
+  const prod = normalizarProducao(draft.producao)
+  const fornArte = prod.fornecedores.find(f => f.ativo && f.id === prod.padroes.arte && f.servicos.arte)
+  const temTabelaVerniz = prod.fornecedores.some(f => {
+    const r = f.ativo ? f.servicos.verniz : undefined
+    return !!r && ((r.valor ?? 0) > 0 || Object.values(r.precosPorTipo ?? {}).some(v => v > 0))
+  })
 
-  const multLabels: [keyof Configuracoes["multiplicadores"], string, string][] = [
-    ["semFaca",       "Multiplicador de preço",  "×custo"],
-    ["parcelamento12x","Fator parcelamento 12×", "×preço"],
-  ]
+  function salvar() {
+    onSave(draft)
+    setSalvo(true)
+    setTimeout(() => setSalvo(false), 1800)
+  }
+
+  // Leitura do multiplicador: margem de contribuição antes e depois do imposto
+  const mult = draft.multiplicadores.semFaca || 1
+  const margemBruta = (1 - 1 / mult) * 100
+  const margemLiquida = margemBruta - prod.impostoPct
 
   return (
-    <div className="h-full overflow-y-auto px-6 py-6 space-y-6" style={{ background: "var(--bg-page)" }}>
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] uppercase tracking-wide font-semibold text-slate-400">Configurações de custos</p>
-        <div className="flex gap-2">
-          <button onClick={() => setDraft(CONFIG_PADRAO)}
-            className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-500 text-xs rounded-lg transition-colors">
-            Restaurar padrões
-          </button>
-          <button onClick={() => onSave(draft)}
-            className="px-4 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-lg transition-colors">
-            Salvar configurações
-          </button>
-        </div>
-      </div>
+    <Pagina>
+      <CabecalhoPagina titulo="Configurações" sub="Preço, papel, metas e preferências do sistema. Preços de fornecedores ficam em Fornecedores."
+        acoes={<>
+          {sujo && <Botao variante="fantasma" icone={<RotateCcw className="w-3.5 h-3.5" />} onClick={() => setDraft(config)}>Descartar</Botao>}
+          <Botao variante="primario" onClick={salvar} disabled={!sujo && !salvo}
+            className={salvo ? "!bg-[#009351] !shadow-none" : ""}
+            icone={salvo ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}>
+            {salvo ? "Salvo" : "Salvar alterações"}
+          </Botao>
+        </>} />
 
-      {/* Chave da API — Forma */}
-      <div className="bg-white border border-slate-100 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-          <div className="w-5 h-5 rounded bg-slate-900 flex items-center justify-center">
-            <span className="text-white text-[9px] font-black">F</span>
-          </div>
-          <p className="text-xs font-semibold text-slate-600">Forma — Chave da API</p>
-        </div>
-        <div className="px-4 py-3">
-          <p className="text-[11px] text-slate-400 mb-2">Chave Anthropic para usar a IA de design de embalagens.</p>
-          <input
-            type="password"
-            value={draft.apiKey}
-            onChange={e => setDraft(d => ({ ...d, apiKey: e.target.value }))}
-            placeholder="sk-ant-api03-…"
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 font-mono placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-          />
-        </div>
-      </div>
-
-      {/* Aparência */}
-      <div className="bg-white border border-slate-100 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-          <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
-          </svg>
-          <p className="text-xs font-semibold text-slate-600">Aparência</p>
-        </div>
-        <div className="px-4 py-4">
-          <p className="text-[11px] text-slate-400 mb-3">Tema da interface. "Sistema" acompanha automaticamente a preferência do seu dispositivo.</p>
-          <div className="flex gap-2">
-            {themeOptions.map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => setTheme(opt.value)}
-                className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 text-xs font-semibold transition-all ${
-                  theme === opt.value
-                    ? "border-violet-500 bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-400"
-                    : "border-slate-200 dark:border-[#30363d] text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-[#484f58] hover:bg-slate-50 dark:hover:bg-[#1e2535]"
-                }`}
-              >
-                {opt.icon}
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white border border-slate-100 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
-          <p className="text-xs font-semibold text-slate-600">Custos de produção</p>
-        </div>
-        <div className="divide-y divide-slate-50">
-          {custosLabels.map(([k, label, unit]) => (
-            <div key={k} className="flex items-center px-4 py-3 gap-4">
-              <div className="flex-1">
-                <p className="text-sm text-slate-700">{label}</p>
-                <p className="text-[11px] text-slate-400">{unit}</p>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        <div className="space-y-4">
+          {/* Preço */}
+          <Cartao className="ds-entrada">
+            <TituloCartao titulo="Preço de venda" icone={<Percent className="w-4 h-4" />} sub="Aplicado sobre o custo calculado pelo motor. Dá para mudar em cada orçamento." />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Campo label="Multiplicador sobre o custo" dica={`Preço = custo × ${num(mult, 2)}`}>
+                <Num value={draft.multiplicadores.semFaca} step={0.05} sufixo="×"
+                  onChange={v => setDraft(d => ({ ...d, multiplicadores: { ...d.multiplicadores, semFaca: v } }))} />
+              </Campo>
+              <Campo label="Fator do parcelamento em 12×" dica="Parcela = preço × fator ÷ 12">
+                <Num value={draft.multiplicadores.parcelamento12x} step={0.01} sufixo="×"
+                  onChange={v => setDraft(d => ({ ...d, multiplicadores: { ...d.multiplicadores, parcelamento12x: v } }))} />
+              </Campo>
+            </div>
+            <div className="mt-4 rounded-xl px-4 py-3 bg-[rgba(116,116,128,0.05)] grid grid-cols-3 gap-3">
+              <div>
+                <p className="text-[11px] text-[#898892]">Custo de exemplo</p>
+                <p className="text-[14px] font-semibold text-[#191625] ds-num mt-0.5">{brl(1000)}</p>
               </div>
-              <div className="relative w-32">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">R$</span>
-                <input type="number" min={0} step={0.01}
-                  value={draft.custos[k]}
-                  onChange={e => setCusto(k, Number(e.target.value))}
-                  className="w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm text-right text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent" />
+              <div>
+                <p className="text-[11px] text-[#898892]">Preço</p>
+                <p className="text-[14px] font-semibold text-[#8456e8] ds-num mt-0.5">{brl(1000 * mult)}</p>
+                <p className="text-[10.5px] text-[#898892] ds-num">12× de {brl(1000 * mult * (draft.multiplicadores.parcelamento12x || 1) / 12)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-[#898892]">Margem</p>
+                <p className={`text-[14px] font-semibold ds-num mt-0.5 ${margemLiquida >= 40 ? "text-[#009351]" : margemLiquida >= 30 ? "text-[#c57800]" : "text-[#d33a3c]"}`}>{num(margemLiquida, 1)}%</p>
+                <p className="text-[10.5px] text-[#898892] ds-num">{num(margemBruta, 1)}% antes de {num(prod.impostoPct, 1)}% de imposto</p>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+          </Cartao>
 
-      <div className="bg-white border border-slate-100 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
-          <p className="text-xs font-semibold text-slate-600">Multiplicadores de preço</p>
-        </div>
-        <div className="divide-y divide-slate-50">
-          {multLabels.map(([k, label, unit]) => (
-            <div key={k} className="flex items-center px-4 py-3 gap-4">
-              <div className="flex-1">
-                <p className="text-sm text-slate-700">{label}</p>
-                <p className="text-[11px] text-slate-400">{unit}</p>
-              </div>
-              <input type="number" min={0} step={0.01}
-                value={draft.multiplicadores[k]}
-                onChange={e => setMult(k, Number(e.target.value))}
-                className="w-32 border border-slate-200 rounded-lg px-3 py-2 text-sm text-right text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent" />
+          {/* Papel */}
+          <MateriaisCartao materiais={draft.materiais} onChange={materiais => setDraft(d => ({ ...d, materiais }))} />
+
+          {/* Valores de reserva */}
+          <Cartao className="ds-entrada">
+            <TituloCartao titulo="Valores de reserva" icone={<Layers className="w-4 h-4" />}
+              sub="Usados só quando não há preço de fornecedor cadastrado. Os preços reais ficam em Fornecedores › Cadastro e preços." />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Campo label="Arte (por trabalho)"
+                dica={fornArte ? <span className="text-[#009351]">Não está em uso: o orçamento usa o preço de {fornArte.nome}.</span> : "Em uso: não há fornecedor de arte padrão."}>
+                <Num value={draft.custos.arte} prefixo="R$" step={10}
+                  onChange={v => setDraft(d => ({ ...d, custos: { ...d.custos, arte: v } }))} />
+              </Campo>
+              <Campo label="Verniz sem tabela (a cada 2.000 un)"
+                dica={temTabelaVerniz ? <span className="text-[#009351]">Não está em uso: há fornecedor com tabela de verniz.</span> : "Em uso quando o verniz não tem tabela nem estimativa por folha."}>
+                <Num value={draft.custos.vernizPor2000} prefixo="R$" step={5}
+                  onChange={v => setDraft(d => ({ ...d, custos: { ...d.custos, vernizPor2000: v } }))} />
+              </Campo>
             </div>
-          ))}
+          </Cartao>
         </div>
-      </div>
 
-      {/* Metas e marcos */}
-      <div className="bg-white border border-slate-100 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
-          <p className="text-xs font-semibold text-slate-600">Metas e marcos</p>
-        </div>
-        <div className="px-4 py-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <label className="block">
-              <span className="text-[11px] text-slate-500">Meta mensal (R$)</span>
-              <input type="number" min={0} value={draft.metaMensal}
-                onChange={e => setDraft(d => ({ ...d, metaMensal: Number(e.target.value) }))}
-                className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-right ds-num focus:outline-none focus:ring-2 focus:ring-[#8456e8]/30" />
-            </label>
-            <label className="block">
-              <span className="text-[11px] text-slate-500">Crescimento para sugerir a meta (%)</span>
-              <input type="number" min={0} value={normalizarMetas(draft.metas).crescimentoPct}
-                onChange={e => setDraft(d => ({ ...d, metas: { ...normalizarMetas(d.metas), crescimentoPct: Number(e.target.value) } }))}
-                className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-right ds-num focus:outline-none focus:ring-2 focus:ring-[#8456e8]/30" />
-            </label>
-            <label className="block">
-              <span className="text-[11px] text-slate-500">Faturamento anterior ao sistema (R$)</span>
-              <input type="number" min={0} value={draft.baselineFaturamento}
-                onChange={e => setDraft(d => ({ ...d, baselineFaturamento: Number(e.target.value) }))}
-                className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-right ds-num focus:outline-none focus:ring-2 focus:ring-[#8456e8]/30" />
-            </label>
-          </div>
-          <div>
-            <p className="text-[11px] text-slate-500 mb-2">Marcos de faturamento acumulado (aparecem no Painel)</p>
+        <div className="space-y-4">
+          {/* Metas */}
+          <Cartao className="ds-entrada">
+            <TituloCartao titulo="Metas e marcos" icone={<Target className="w-4 h-4" />} sub="A meta aparece no Painel; os marcos são etapas do faturamento acumulado." />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Campo label="Meta mensal">
+                <Num value={draft.metaMensal} prefixo="R$" step={1000} onChange={v => setDraft(d => ({ ...d, metaMensal: v }))} />
+              </Campo>
+              <Campo label="Crescimento para sugerir a meta">
+                <Num value={metas.crescimentoPct} sufixo="%" onChange={v => setMetas({ crescimentoPct: v })} />
+              </Campo>
+              <Campo label="Faturamento antes do sistema">
+                <Num value={draft.baselineFaturamento} prefixo="R$" step={1000} onChange={v => setDraft(d => ({ ...d, baselineFaturamento: v }))} />
+              </Campo>
+            </div>
+            <p className="text-[11px] font-medium text-[#5e5c68] mt-5 mb-2">Marcos de faturamento acumulado</p>
             <div className="space-y-2">
-              {normalizarMetas(draft.metas).marcos.map((m, i, lista) => (
+              {metas.marcos.map((m, i, lista) => (
                 <div key={m.id} className="flex items-center gap-2">
-                  <input value={m.nome}
-                    onChange={e => setDraft(d => ({ ...d, metas: { ...normalizarMetas(d.metas), marcos: lista.map((x, j) => j === i ? { ...x, nome: e.target.value } : x) } }))}
-                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8456e8]/30" />
-                  <div className="relative w-40">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">R$</span>
-                    <input type="number" min={0} value={m.valor}
-                      onChange={e => setDraft(d => ({ ...d, metas: { ...normalizarMetas(d.metas), marcos: lista.map((x, j) => j === i ? { ...x, valor: Number(e.target.value) } : x) } }))}
-                      className="w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm text-right ds-num focus:outline-none focus:ring-2 focus:ring-[#8456e8]/30" />
-                  </div>
-                  <button onClick={() => setDraft(d => ({ ...d, metas: { ...normalizarMetas(d.metas), marcos: lista.filter((_, j) => j !== i) } }))}
-                    className="w-8 h-8 rounded-lg text-slate-400 hover:text-[#d33a3c] hover:bg-[#d33a3c]/[0.06] transition-colors" title="Remover marco">×</button>
+                  <span className="w-5 text-[11px] text-[#898892] ds-num text-right shrink-0">{i + 1}</span>
+                  <input value={m.nome} aria-label="Nome do marco"
+                    onChange={e => setMetas({ marcos: lista.map((x, j) => j === i ? { ...x, nome: e.target.value } : x) })}
+                    className={`${inputCls} flex-1 min-w-0`} />
+                  <Num value={m.valor} prefixo="R$" step={1000} className="w-40 shrink-0"
+                    onChange={v => setMetas({ marcos: lista.map((x, j) => j === i ? { ...x, valor: v } : x) })} />
+                  <button onClick={() => setMetas({ marcos: lista.filter((_, j) => j !== i) })} aria-label="Remover marco"
+                    className="w-8 h-8 grid place-items-center rounded-lg text-[#898892] hover:text-[#d33a3c] hover:bg-[#d33a3c]/10 transition-colors shrink-0">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               ))}
             </div>
-            <button onClick={() => setDraft(d => { const m = normalizarMetas(d.metas); const ultimo = m.marcos[m.marcos.length - 1]?.valor ?? 0; return { ...d, metas: { ...m, marcos: [...m.marcos, { id: Date.now().toString(36), nome: "Novo marco", valor: ultimo ? ultimo * 2 : 10_000 }] } } })}
-              className="mt-2 text-[12px] font-semibold text-[#8456e8] hover:underline">+ Adicionar marco</button>
-          </div>
+            <button onClick={() => { const ultimo = metas.marcos[metas.marcos.length - 1]?.valor ?? 0; setMetas({ marcos: [...metas.marcos, { id: Date.now().toString(36), nome: "Novo marco", valor: ultimo ? ultimo * 2 : 10_000 }] }) }}
+              className="mt-3 h-8 px-2.5 rounded-lg text-[12px] font-medium text-[#8456e8] hover:bg-[#8456e8]/10 transition-colors inline-flex items-center gap-1.5">
+              <Plus className="w-3.5 h-3.5" /> Adicionar marco
+            </button>
+          </Cartao>
+
+          {/* Aparência */}
+          <Cartao className="ds-entrada">
+            <TituloCartao titulo="Aparência" icone={<Palette className="w-4 h-4" />} sub="“Sistema” acompanha a preferência do seu dispositivo. Vale só para este navegador." />
+            <Segmentado<ThemeChoice> valor={theme} onChange={setTheme}
+              opcoes={[{ v: "system", nome: "Sistema" }, { v: "light", nome: "Claro" }, { v: "dark", nome: "Escuro" }]} />
+          </Cartao>
+
+          {/* IA */}
+          <Cartao className="ds-entrada">
+            <TituloCartao titulo="Forma IA" icone={<Sparkles className="w-4 h-4" />} sub="Chave da Anthropic usada pela assistente de design de embalagens." />
+            <Campo label="Chave da API">
+              <div className="relative">
+                <KeyRound className="w-3.5 h-3.5 text-[#898892] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input type="password" value={draft.apiKey} autoComplete="off" placeholder="sk-ant-…"
+                  onChange={e => setDraft(d => ({ ...d, apiKey: e.target.value }))}
+                  className={`${inputCls} w-full pl-8 font-mono`} />
+              </div>
+            </Campo>
+          </Cartao>
+
+          {/* Backup */}
+          <Cartao className="ds-entrada">
+            <TituloCartao titulo="Backup" icone={<Database className="w-4 h-4" />} sub="Histórico, clientes, quadro e configurações em um arquivo JSON." />
+            <div className="flex items-center gap-2 flex-wrap">
+              <Botao icone={<Download className="w-3.5 h-3.5" />} onClick={onExportar}>Exportar</Botao>
+              <Botao variante="fantasma" icone={<Upload className="w-3.5 h-3.5" />} onClick={() => importRef.current?.click()}>Importar…</Botao>
+              <input ref={importRef} type="file" accept=".json" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) onImportar(f); e.target.value = "" }} />
+            </div>
+            <p className="text-[11px] text-[#898892] mt-2.5 flex items-start gap-1.5"><Info className="w-3.5 h-3.5 mt-px shrink-0" /> Importar substitui os dados atuais pelos do arquivo.</p>
+          </Cartao>
         </div>
       </div>
-
-      <MaterialConfig
-        materiais={draft.materiais}
-        formatoIds={["66x96", "77x113"]}
-        onChange={materiais => setDraft(d => ({ ...d, materiais }))}
-      />
-
-      {/* Backup */}
-      <div className="bg-white border border-slate-100 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-          <p className="text-xs font-semibold text-slate-600">Backup de dados</p>
-          <span className="text-[9.5px] text-slate-400 font-normal">histórico, clientes, kanban e configurações</span>
-        </div>
-        <div className="px-4 py-4 flex items-center gap-3">
-          <button
-            onClick={onExportar}
-            className="flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Exportar JSON
-          </button>
-          <button
-            onClick={() => importRef.current?.click()}
-            className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium rounded-lg transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12" />
-            </svg>
-            Importar JSON
-          </button>
-          <input
-            ref={importRef}
-            type="file"
-            accept=".json"
-            className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) onImportar(f); e.target.value = "" }}
-          />
-          <p className="text-[10.5px] text-slate-400 ml-1">Substitui todos os dados locais pelo arquivo importado.</p>
-        </div>
-      </div>
-    </div>
+    </Pagina>
   )
 }
 
-// Isolated row so nome uses local state — prevents cursor-jumping on each keystroke
-function MaterialRow({ m, formatoIds, onNomeChange, onPrecoChange, onRemove }: {
+// Linha isolada: o nome usa estado local para o cursor não pular a cada tecla
+function MaterialLinha({ m, onNome, onPreco, onRemover }: {
   m: Material
-  formatoIds: string[]
-  onNomeChange: (id: string, nome: string) => void
-  onPrecoChange: (id: string, fmtId: string, v: number) => void
-  onRemove: (id: string) => void
+  onNome: (nome: string) => void
+  onPreco: (fmtId: string, v: number) => void
+  onRemover: () => void
 }) {
   const [nome, setNome] = useState(m.nome)
-  useEffect(() => { setNome(m.nome) }, [m.nome])
-
+  const [nomeBase, setNomeBase] = useState(m.nome)
+  if (nomeBase !== m.nome) { setNomeBase(m.nome); setNome(m.nome) }
   return (
-    <div className="flex items-center px-4 py-2.5 gap-4">
-      <input
-        value={nome}
-        onChange={e => setNome(e.target.value)}
-        onBlur={e => onNomeChange(m.id, e.target.value)}
-        className="flex-1 border border-transparent hover:border-slate-200 focus:border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 transition"
-      />
-      {formatoIds.map(fmtId => (
-        <div key={fmtId} className="relative w-28">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">R$</span>
-          <input type="number" min={0} step={1}
-            value={m.precos[fmtId] ?? 0}
-            onChange={e => onPrecoChange(m.id, fmtId, Number(e.target.value))}
-            className="w-full border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-sm text-right text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent" />
-        </div>
+    <div className="flex items-center gap-2 py-1.5">
+      <input value={nome} aria-label="Nome do material" onChange={e => setNome(e.target.value)} onBlur={() => nome.trim() && nome !== m.nome && onNome(nome.trim())}
+        className={`${inputCls} flex-1 min-w-0`} />
+      {FORMATOS_PAPEL.map(f => (
+        <Num key={f.id} value={m.precos[f.id] ?? f.precoPor100} prefixo="R$" className="w-[118px] shrink-0" onChange={v => onPreco(f.id, v)} />
       ))}
-      <button onClick={() => onRemove(m.id)}
-        className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors text-lg leading-none shrink-0">
-        ×
+      <button onClick={onRemover} aria-label={`Remover ${m.nome}`}
+        className="w-8 h-8 grid place-items-center rounded-lg text-[#898892] hover:text-[#d33a3c] hover:bg-[#d33a3c]/10 transition-colors shrink-0">
+        <X className="w-3.5 h-3.5" />
       </button>
     </div>
   )
 }
 
-function MaterialConfig({
-  materiais, formatoIds, onChange,
-}: {
-  materiais: Material[]
-  formatoIds: string[]
-  onChange: (m: Material[]) => void
-}) {
-  const [novoNome, setNovoNome] = useState("")
-
-  function setPreco(id: string, fmtId: string, v: number) {
-    onChange(materiais.map(m => m.id === id ? { ...m, precos: { ...m.precos, [fmtId]: v } } : m))
-  }
-  function setNome(id: string, nome: string) {
-    onChange(materiais.map(m => m.id === id ? { ...m, nome } : m))
-  }
-  function remover(id: string) {
-    onChange(materiais.filter(m => m.id !== id))
-  }
+function MateriaisCartao({ materiais, onChange }: { materiais: Material[]; onChange: (m: Material[]) => void }) {
+  const [novo, setNovo] = useState("")
   function adicionar() {
-    const nome = novoNome.trim()
+    const nome = novo.trim()
     if (!nome) return
-    const id = nome.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
-    if (materiais.find(m => m.id === id)) return
-    const precos: { [k: string]: number } = {}
-    formatoIds.forEach(f => { precos[f] = 0 })
-    onChange([...materiais, { id, nome, precos }])
-    setNovoNome("")
+    const id = nome.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
+    if (!id || materiais.some(m => m.id === id)) return
+    onChange([...materiais, { id, nome, precos: Object.fromEntries(FORMATOS_PAPEL.map(f => [f.id, f.precoPor100])) }])
+    setNovo("")
   }
-
   return (
-    <div className="bg-white border border-slate-100 rounded-xl overflow-hidden">
-      <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
-        <p className="text-xs font-semibold text-slate-600">Materiais / Gramaturas</p>
-        <p className="text-[11px] text-slate-400 mt-0.5">R$ por 100 folhas, por formato de papel</p>
-      </div>
-
-      {/* Cabeçalho de formatos */}
-      <div className="flex items-center px-4 py-2 border-b border-slate-50 text-[10px] text-slate-400 font-semibold gap-4">
+    <Cartao className="ds-entrada">
+      <TituloCartao titulo="Papel" icone={<Layers className="w-4 h-4" />}
+        sub="R$ por 100 folhas, em cada formato. A Calibragem sugere ajustes quando o custo real se afasta destes valores." />
+      <div className="flex items-center gap-2 pb-1 text-[10.5px] font-medium text-[#898892]">
         <span className="flex-1">Material</span>
-        {formatoIds.map(f => <span key={f} className="w-28 text-right">{f}</span>)}
-        <span className="w-8" />
+        {FORMATOS_PAPEL.map(f => <span key={f.id} className="w-[118px] text-right pr-1 shrink-0">{f.nome}</span>)}
+        <span className="w-8 shrink-0" />
       </div>
-
-      <div className="divide-y divide-slate-50">
+      <div className="divide-y divide-[rgba(60,60,67,0.06)]">
         {materiais.map(m => (
-          <MaterialRow
-            key={m.id}
-            m={m}
-            formatoIds={formatoIds}
-            onNomeChange={setNome}
-            onPrecoChange={setPreco}
-            onRemove={remover}
-          />
+          <MaterialLinha key={m.id} m={m}
+            onNome={nome => onChange(materiais.map(x => x.id === m.id ? { ...x, nome } : x))}
+            onPreco={(fmtId, v) => onChange(materiais.map(x => x.id === m.id ? { ...x, precos: { ...x.precos, [fmtId]: v } } : x))}
+            onRemover={() => onChange(materiais.filter(x => x.id !== m.id))} />
         ))}
       </div>
-
-      {/* Adicionar novo */}
-      <div className="flex items-center gap-2 px-4 py-3 border-t border-slate-100 bg-slate-50">
-        <input
-          value={novoNome}
-          onChange={e => setNovoNome(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && adicionar()}
-          placeholder="Novo material (ex: Couchê 170g)…"
-          className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-        />
-        <button onClick={adicionar}
-          className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-lg transition-colors">
-          + Adicionar
-        </button>
+      <div className="flex items-center gap-2 mt-3">
+        <input value={novo} onChange={e => setNovo(e.target.value)} onKeyDown={e => e.key === "Enter" && adicionar()}
+          placeholder="Novo material (ex.: Couchê 170g)" className={`${inputCls} flex-1 min-w-0`} />
+        <Botao icone={<Plus className="w-3.5 h-3.5" />} onClick={adicionar} disabled={!novo.trim()}>Adicionar</Botao>
       </div>
-    </div>
+    </Cartao>
   )
 }
