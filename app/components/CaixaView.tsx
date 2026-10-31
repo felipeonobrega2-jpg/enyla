@@ -112,7 +112,7 @@ export function CaixaView({ kanban, lancamentos, historico, config, onUpdateConf
 function LinhaMov({ m, onAbrirCard }: { m: Movimento; onAbrirCard?: (c: KanbanCard) => void }) {
   return (
     <LinhaLista titulo={m.descricao}
-      sub={`${ORIGEM[m.origem]}${m.atrasado ? " · atrasado" : ` · ${dataCurta(m.data)}`}`}
+      sub={`${m.detalhe ? `${m.detalhe} · ` : ""}${ORIGEM[m.origem]}${m.atrasado ? " · atrasado" : ` · ${dataCurta(m.data)}`}`}
       valor={`${m.tipo === "entrada" ? "+" : "−"}${brl(m.valor)}`} tom={m.tipo === "entrada" ? "sucesso" : "perigo"}
       onClick={m.card && onAbrirCard ? () => onAbrirCard(m.card!) : undefined} />
   )

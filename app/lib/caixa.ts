@@ -12,7 +12,8 @@ import { KanbanCard, LancamentoFinanceiro, FormData } from "../types"
 import { Configuracoes } from "../config"
 import { calcular } from "../calculos"
 import { Pedido, pedidoEmProducao, pedidoEntregue, pixExpirado, isTerceirizado } from "./negocio"
-import { normalizarProducao } from "./producao"
+import { normalizarProducao, ItemCusto } from "./producao"
+import { classificar, Componente } from "./calibragem"
 
 export type PlanoConta = { id: string; fornecedorId: string; data: string; valor: number }
 export type ConfigCaixa = { planos?: PlanoConta[] }
@@ -28,6 +29,7 @@ export type Movimento = {
   valor: number
   atrasado?: boolean
   estimado?: boolean
+  detalhe?: string          // composição (ex.: etapas de produção que faltam)
   card?: KanbanCard
 }
 
@@ -69,19 +71,65 @@ export function saldoInformado(cfg: Configuracoes): number | null {
   return contas.length ? contas.reduce((s, c) => s + (c.saldo ?? 0), 0) : null
 }
 
-// Custo de produção previsto pelo motor para um pedido, separando o que vai para conta corrente
-function custoPrevisto(p: Pedido, historico: HistItem[], cfg: Configuracoes, contaProdIds: Set<string>) {
-  let total = 0, emConta = 0
+const NOME_COMP: Partial<Record<Componente, string>> = {
+  papel: "papel", impressao: "impressão", acabamento: "laminação/verniz", hotStamping: "hot stamping",
+  corteVinco: "corte e vinco", colagem: "colagem", faca: "faca", frete: "frete",
+}
+
+// Etapa do motor → componente de custo (mesma divisão da calibragem)
+const COMPONENTE_DA_ETAPA: Partial<Record<ItemCusto["etapa"], Componente>> = {
+  papel: "papel", impressao: "impressao", laminacao: "acabamento", verniz: "acabamento",
+  hotStamping: "hotStamping", cliche: "hotStamping", fotolito: "hotStamping",
+  corteVinco: "corteVinco", colagem: "colagem", faca: "faca", frete: "frete",
+}
+
+// O que ainda falta pagar de produção, etapa por etapa (previsto pelo motor − lançado naquela etapa),
+// separando o que vai para conta corrente de fornecedor e o que sai do caixa
+function custoAVir(p: Pedido, historico: HistItem[], cfg: Configuracoes, contaProdIds: Set<string>, contaFinIds: Set<string>) {
+  const prodCfg = normalizarProducao(cfg.producao)
+  const previsto = new Map<Componente, { valor: number; emConta: boolean }>()
   for (const card of p.cards.filter(c => !isTerceirizado(c))) {
     const hist = historico.find(h => h.numero === card.numero)
     if (!hist?.form || !card.quantidade) return null
-    const r = calcular({ ...hist.form, quantidades: [card.quantidade] }, cfg)
-    const rota = r?.rotas?.[0]?.melhor
+    const rota = calcular({ ...hist.form, quantidades: [card.quantidade] }, cfg)?.rotas?.[0]?.melhor
     if (!rota) return null
-    total += rota.custoTotal
-    emConta += rota.itens.filter(i => i.fornecedorId && contaProdIds.has(i.fornecedorId)).reduce((s, i) => s + i.valor, 0)
+    for (const i of rota.itens) {
+      const comp = COMPONENTE_DA_ETAPA[i.etapa]
+      if (!comp || i.valor <= 0) continue
+      const atual = previsto.get(comp) ?? { valor: 0, emConta: false }
+      previsto.set(comp, { valor: atual.valor + i.valor, emConta: atual.emConta || (!!i.fornecedorId && contaProdIds.has(i.fornecedorId)) })
+    }
   }
-  return { total, emConta }
+  // Lançado por etapa e se essa etapa já está indo para conta corrente
+  const lancado = new Map<Componente, number>()
+  const contaReal = new Set<Componente>()
+  for (const l of p.despesas.filter(x => x.status === "pago" || x.formaPagamento === "conta")) {
+    const comp = classificar(l, cfg.fornecedores ?? [], cfg)
+    lancado.set(comp, (lancado.get(comp) ?? 0) + l.valor)
+    if (l.formaPagamento === "conta" && l.fornecedorId && contaFinIds.has(l.fornecedorId)) contaReal.add(comp)
+  }
+  // Envios registrados em Fornecedores dizem quem fez (ou está fazendo) cada etapa
+  const daEtapa: Record<string, Componente[]> = { impressao: ["impressao"], acabamento: ["acabamento"], corteVinco: ["corteVinco"], colagem: ["colagem"] }
+  const doServico: Record<string, Componente> = { impressao: "impressao", laminacao: "acabamento", verniz: "acabamento", hotStamping: "hotStamping", corteVinco: "corteVinco", colagem: "colagem" }
+  for (const m of prodCfg.movimentos.filter(x => x.pedidoKey === p.key || x.pedidoLabel.startsWith(`${p.numero} `))) {
+    if (!contaProdIds.has(m.fornecedorId)) continue
+    const comps = m.servicos?.length ? m.servicos.map(sv => doServico[sv]).filter(Boolean) : daEtapa[m.etapa] ?? []
+    for (const c of comps) contaReal.add(c)
+  }
+  const vaiParaConta = (comp: Componente): boolean =>
+    contaReal.has(comp) || (!lancado.has(comp) && !!previsto.get(comp)?.emConta)
+    // Papel é comprado com o impressor: segue a impressão
+    || (comp === "papel" && !lancado.has("papel") && vaiParaConta("impressao"))
+  let caixa = 0, conta = 0
+  const partes: string[] = []
+  const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+  for (const [comp, prev] of previsto) {
+    const falta = Math.max(0, prev.valor - (lancado.get(comp) ?? 0))
+    if (falta <= 1) continue
+    if (vaiParaConta(comp)) conta += falta
+    else { caixa += falta; partes.push(`${NOME_COMP[comp] ?? comp} ${brl(falta)}`) }
+  }
+  return { caixa, conta, detalhe: partes.join(" · ") }
 }
 
 export function previsaoDeCaixa(args: {
@@ -139,24 +187,19 @@ export function previsaoDeCaixa(args: {
 
   // ── Saídas: custos de produção que ainda vão chegar ────────────────────────
   for (const p of pedidos.filter(x => pedidoEmProducao(x))) {
-    const prev = custoPrevisto(p, historico, config, contaProdIds)
-    if (!prev) continue
-    const falta = prev.total - p.custoDireto
-    if (falta <= 1) continue
-    // Parte que vai para conta corrente (proporcional ao que o motor atribui a esses fornecedores)
-    const fracConta = prev.total > 0 ? prev.emConta / prev.total : 0
-    const paraConta = falta * fracConta
-    if (paraConta > 1) {
-      const fin = prod.fornecedores.find(f => contaProdIds.has(f.id))?.fornecedorId
-      if (fin) aVirConta.set(fin, (aVirConta.get(fin) ?? 0) + paraConta)
+    const falta = custoAVir(p, historico, config, contaProdIds, contaFinIds)
+    if (!falta) continue
+    if (falta.conta > 1) {
+      // Conta corrente: soma ao saldo a vir do fornecedor (hoje, um só com conta na prática)
+      const fin = prod.fornecedores.find(f => contaProdIds.has(f.id))?.fornecedorId ?? fornConta[0]?.id
+      if (fin) aVirConta.set(fin, (aVirConta.get(fin) ?? 0) + falta.conta)
     }
-    const caixa = falta - paraConta
-    if (caixa <= 1) continue
+    if (falta.caixa <= 1) continue
     // Fornecedores pagos na hora: o custo sai enquanto o pedido anda (até a entrega, no máximo em 1 semana)
     const entrega = p.dataEntregaPrevista
     const data = entrega && entrega < somarDias(hojeIso, 7) ? (entrega < hojeIso ? hojeIso : entrega) : somarDias(hojeIso, 7)
     movs.push({ id: `prod-${p.key}`, data, tipo: "saida", origem: "producao", estimado: true,
-      descricao: `${p.numero} · ${p.nomeCliente} · custos de produção a vir`, valor: caixa, card: p.cards[0] })
+      descricao: `${p.numero} · ${p.nomeCliente} · custos de produção a vir`, valor: falta.caixa, detalhe: falta.detalhe, card: p.cards[0] })
   }
 
   // ── Saídas: custos fixos ───────────────────────────────────────────────────
