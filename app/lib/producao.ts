@@ -143,6 +143,8 @@ export type ConfigProducao = {
   // Automações ao mover o pedido no quadro
   automacoes: { prazoEntrega: boolean; fornecedores: boolean }
   prazoEntregaPadraoDias: number
+  // Ajustes aprendidos com a calibragem (histórico para desfazer)
+  aprendizado?: import("./aprendizado").Aprendizado
 }
 
 export const PRODUCAO_PADRAO: ConfigProducao = {
@@ -269,6 +271,7 @@ export type ItemCusto = {
   etapa: EtapaCusto
   descricao: string
   fornecedor?: string
+  fornecedorId?: string
   valor: number
   estimado: boolean
   ferramental?: boolean
@@ -537,7 +540,7 @@ function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaEx
     custoImp += fixo * jogos + variavel
   }
   itens.push({
-    etapa: "impressao", fornecedor: imp.nome,
+    etapa: "impressao", fornecedor: imp.nome, fornecedorId: imp.id,
     descricao: `${passadas.map(ps => ps.cavidades).join(" + ")} cavidades${jogos > 1 ? ` · ${jogos} jogos de chapa` : ""}`,
     valor: custoImp, estimado: false,
   })
@@ -562,7 +565,7 @@ function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaEx
       valor = Math.max(1, Math.ceil(qtd / 2000)) * e.vernizPor2000Legado
     }
     if (f) sequencia.push(f)
-    itens.push({ etapa: servico, fornecedor: f?.nome, descricao: `${servico === "laminacao" ? "Laminação" : "Verniz"} ${tipo}`, valor, estimado })
+    itens.push({ etapa: servico, fornecedor: f?.nome, fornecedorId: f?.id, descricao: `${servico === "laminacao" ? "Laminação" : "Verniz"} ${tipo}`, valor, estimado })
   }
 
   // Hot stamping: uma batida por folha impressa + clichê e fotolito
@@ -571,7 +574,7 @@ function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaEx
     const regra = f?.servicos.hotStamping
     const valor = regra ? cobrar(regra, { folhas: folhasImpressas, m2, unidades: qtd, fracaoChapa: 1 }) : 0
     if (f) sequencia.push(f)
-    itens.push({ etapa: "hotStamping", fornecedor: f?.nome, descricao: `${folhasImpressas} batidas`, valor, estimado: !regra })
+    itens.push({ etapa: "hotStamping", fornecedor: f?.nome, fornecedorId: f?.id, descricao: `${folhasImpressas} batidas`, valor, estimado: !regra })
     const fp = p.ferramentalPadrao
     const cliche = ferramentalDoCliente(p.ferramentais, "cliche", e.cliente, e.blank)
     const fotolito = ferramentalDoCliente(p.ferramentais, "fotolito", e.cliente, e.blank)
@@ -585,7 +588,7 @@ function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaEx
   const regraCorte = fCorte?.servicos.corteVinco ?? { tipo: "acerto_milheiro" as const, acerto: 70, milheiro: 70 }
   if (fCorte) sequencia.push(fCorte)
   itens.push({
-    etapa: "corteVinco", fornecedor: fCorte?.nome,
+    etapa: "corteVinco", fornecedor: fCorte?.nome, fornecedorId: fCorte?.id,
     descricao: `${batidas.toLocaleString("pt-BR")} batidas · faca de ${k}`,
     valor: cobrar(regraCorte, { folhas: batidas, m2, unidades: qtd, fracaoChapa: 1 }), estimado: !fCorte,
   })
@@ -597,7 +600,7 @@ function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaEx
     const regra = f?.servicos.colagem
     if (f) sequencia.push(f)
     itens.push({
-      etapa: "colagem", fornecedor: f?.nome, descricao: "Colagem no fornecedor",
+      etapa: "colagem", fornecedor: f?.nome, fornecedorId: f?.id, descricao: "Colagem no fornecedor",
       valor: regra ? cobrar(regra, { folhas: qtd, m2, unidades: qtd, fracaoChapa: 1 }) : qtd * p.colagemManualUnit,
       estimado: !regra,
     })
@@ -615,7 +618,7 @@ function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaEx
   // Arte: preço do fornecedor padrão de arte; sem ele, o valor fixo das Configurações
   const fArte = e.producao.fornecedores.find(f => f.ativo && f.id === e.producao.padroes.arte && f.servicos.arte)
   if (fArte) {
-    itens.push({ etapa: "arte", fornecedor: fArte.nome, descricao: "Arte", valor: cobrar(fArte.servicos.arte!, { folhas: 0, m2: 0, unidades: qtd, fracaoChapa: 1 }), estimado: false })
+    itens.push({ etapa: "arte", fornecedor: fArte.nome, fornecedorId: fArte.id, descricao: "Arte", valor: cobrar(fArte.servicos.arte!, { folhas: 0, m2: 0, unidades: qtd, fracaoChapa: 1 }), estimado: false })
   } else {
     itens.push({ etapa: "arte", descricao: "Arte", valor: e.arte, estimado: false })
   }

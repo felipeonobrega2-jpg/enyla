@@ -874,7 +874,8 @@ export function FornecedoresView({ config, kanban, lancamentos, historico, onSav
         {aba === "cadastro" && <Cadastro draft={draft} setDraft={setDraft} fornecedoresFin={(config.fornecedores ?? []).filter(f => f.ativo)} />}
         {aba === "ferramental" && <FerramentalLista draft={draft} setDraft={setDraft} />}
         {aba === "parametros" && <Parametros draft={draft} setDraft={setDraft} />}
-        {aba === "calibragem" && <CalibragemView kanban={kanban} lancamentos={lancamentos} historico={historico} config={config} onCategorizar={onCategorizar} />}
+        {aba === "calibragem" && <CalibragemView kanban={kanban} lancamentos={lancamentos} historico={historico} config={config} onCategorizar={onCategorizar}
+          onAtualizarConfig={cfg => { onSave(cfg); setDraft(normalizarProducao(cfg.producao)) }} />}
       </div>
     </div>
   )

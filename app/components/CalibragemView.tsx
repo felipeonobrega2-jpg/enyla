@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { Gauge, ListChecks, Tag, AlertTriangle, CheckCircle2, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { Gauge, ListChecks, Tag, AlertTriangle, CheckCircle2, ArrowUpRight, ArrowDownRight, Sparkles, ArrowRight, RotateCcw, Check, EyeOff, History } from "lucide-react"
 import { FormData, KanbanCard, LancamentoFinanceiro } from "../types"
 import { Configuracoes } from "../config"
 import { montarPedidos } from "../lib/negocio"
@@ -9,7 +9,9 @@ import {
   compararPedidos, desviosPorComponente, comparavel, COMPONENTES, SUBCATEGORIA, Componente, Leitura, Comparacao,
 } from "../lib/calibragem"
 import { brl, num } from "../utils"
-import { Kpi, GradeKpis, Cartao, TituloCartao, LinhaLista, Selo, Vazio, Gaveta, Tom } from "./ds"
+import { Kpi, GradeKpis, Cartao, TituloCartao, LinhaLista, Selo, Vazio, Gaveta, Tom, Botao } from "./ds"
+import { sugerirAjustes, aplicarSugestao, desfazerAjuste, ignorarSugestao, aprendizadoDe, Sugestao, AMOSTRA_MINIMA } from "../lib/aprendizado"
+import { normalizarProducao } from "../lib/producao"
 
 const LEITURA: Record<Leitura, { nome: string; tom: Tom; orientacao: (nome: string) => string }> = {
   calibrado:   { nome: "calibrado", tom: "sucesso", orientacao: () => "O motor está acertando. Nada a fazer." },
@@ -28,12 +30,67 @@ const ORIENTACAO_RARO: Partial<Record<Componente, string>> = {
   arte: "A arte é trabalho seu: entra no preço, mas não sai do caixa. Pode ficar como está.",
 }
 
-export function CalibragemView({ kanban, lancamentos, historico, config, onCategorizar }: {
+const dataBR = (iso?: string) => iso ? iso.slice(0, 10).split("-").reverse().join("/") : ""
+const vezes = (n: number) => `${num(n, n < 10 ? 2 : 1)}×`
+
+function CartaoSugestao({ s, onAplicar, onIgnorar }: { s: Sugestao; onAplicar?: () => void; onIgnorar: () => void }) {
+  const acima = s.real > s.previsto
+  return (
+    <div className="px-5 py-4 ds-entrada">
+      <div className="flex items-start gap-4 flex-wrap">
+        <div className="flex-1 min-w-[260px]">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-[13.5px] font-semibold text-[#191625]">{s.titulo}</p>
+            {s.porFolha ? <Selo tom="info">valor aprendido</Selo> : s.inconsistente ? <Selo tom="alerta">revisar a regra</Selo> : <Selo tom="acento">ajuste sugerido</Selo>}
+          </div>
+          {s.porFolha ? <p className="text-[12px] text-[#5e5c68] mt-1">Aprendido em {s.pedidos.length} pedidos: {s.pedidos.join(", ")}.</p> :
+          <p className="text-[12px] text-[#5e5c68] mt-1 leading-relaxed">
+            Em {s.pedidos.length} pedidos{s.periodo.de ? ` (${dataBR(s.periodo.de)} a ${dataBR(s.periodo.ate)})` : ""}, o real ficou{" "}
+            <span className={`font-semibold ${acima ? "text-[#d33a3c]" : "text-[#c57800]"}`}>{num(Math.abs(s.desvioPct), 0)}% {acima ? "acima" : "abaixo"}</span>{" "}
+            do previsto: <span className="ds-num">{brl(s.previsto)}</span> previsto, <span className="ds-num font-semibold text-[#191625]">{brl(s.real)}</span> real.
+          </p>}
+
+          {s.inconsistente ? <>
+            <p className="text-[12px] text-[#191625] mt-2 leading-relaxed">{s.inconsistente.motivo}</p>
+            {s.inconsistente.porPedido.length > 0 && <div className="flex flex-wrap gap-1.5 mt-2">
+              {s.inconsistente.porPedido.map(p => (
+                <span key={p.numero} className="text-[11px] ds-num px-2 py-1 rounded-lg bg-[rgba(116,116,128,0.08)] text-[#5e5c68]">
+                  <strong className="text-[#191625]">{p.numero}</strong> · {num(p.quantidade)} un{p.jogos && p.jogos > 1 ? ` · ${p.jogos} jogos` : ""} · real {vezes(p.razao)} o previsto
+                </span>
+              ))}
+            </div>}
+          </> : <>
+            <div className="mt-2.5 space-y-1">
+              {s.mudancas.map((m, i) => (
+                <p key={i} className="text-[12px] ds-num flex items-center gap-2 flex-wrap">
+                  <span className="text-[#898892] line-through decoration-[#898892]/40">{m.de}</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-[#8456e8] shrink-0" />
+                  <span className="text-[#191625] font-semibold">{m.para}</span>
+                </p>
+              ))}
+            </div>
+            <p className="text-[11px] text-[#898892] mt-2">
+              Pedidos usados: {s.pedidos.join(", ")}.
+              {s.foraDaCurva && <> Fora da conta por destoar dos demais: {s.foraDaCurva.map(f => `${f.numero} (real ${vezes(f.razao)} o previsto)`).join(", ")}; vale conferir os lançamentos.</>}
+            </p>
+          </>}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Botao variante="fantasma" icone={<EyeOff className="w-3.5 h-3.5" />} onClick={onIgnorar} title="Esconder por 30 dias">Ignorar</Botao>
+          {onAplicar && <Botao variante="primario" icone={<Check className="w-3.5 h-3.5" />} onClick={onAplicar}>Aplicar ajuste</Botao>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function CalibragemView({ kanban, lancamentos, historico, config, onCategorizar, onAtualizarConfig }: {
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
   historico: { form: FormData; numero?: string }[]
   config: Configuracoes
   onCategorizar?: (lancamentoId: string, subcategoria: string) => void
+  onAtualizarConfig?: (cfg: Configuracoes) => void
 }) {
   const [aberto, setAberto] = React.useState<Comparacao | null>(null)
   const pedidos = React.useMemo(() => montarPedidos(kanban, lancamentos), [kanban, lancamentos])
@@ -46,6 +103,11 @@ export function CalibragemView({ kanban, lancamentos, historico, config, onCateg
   const realTotal = completos.reduce((s, c) => s + c.realTotal, 0)
   const desvioGeral = prevTotal > 0 ? (realTotal - prevTotal) / prevTotal * 100 : null
   const aRevisar = desvios.filter(d => d.leitura !== "calibrado" && d.componente !== "arte")
+  const hojeIso = new Date().toLocaleDateString("sv-SE")
+  const sugestoes = React.useMemo(() => sugerirAjustes(comps, config), [comps, config])
+  const ajustes = aprendizadoDe(normalizarProducao(config.producao)).ajustes
+  // Só o ajuste mais recente de cada item pode ser desfeito (os anteriores já foram sobrescritos)
+  const desfazivel = new Set(ajustes.filter((a, i) => ajustes.findIndex(b => b.chave === a.chave) === i).map(a => a.id))
 
   if (comps.length === 0) return <Vazio icone={<Gauge className="w-9 h-9" />} titulo="Nenhum pedido com custo lançado ainda" sub="A calibragem compara o custo previsto no orçamento com os custos lançados em cada pedido." />
 
@@ -65,6 +127,42 @@ export function CalibragemView({ kanban, lancamentos, historico, config, onCateg
         <Kpi rotulo="Pedidos incompletos" icone={<ListChecks className="w-3.5 h-3.5" />} tom={incompletos.length ? "neutro" : "sucesso"}
           valor={incompletos.length} formato={n => num(Math.round(n))} sub="sem papel ou impressão lançados" />
       </GradeKpis>
+
+      <Cartao padding={false} className="ds-entrada">
+        <div className="px-5 pt-5">
+          <TituloCartao titulo="O que o motor aprendeu" icone={<Sparkles className="w-4 h-4" />}
+            sub={`Comparando o previsto com o real (recalculado com quem fez cada etapa). Precisa de pelo menos ${AMOSTRA_MINIMA} pedidos concordando; nada muda sem você aplicar, e dá para desfazer.`} />
+        </div>
+        {sugestoes.length === 0
+          ? <div className="px-5 pb-5"><p className="text-[12.5px] text-[#5e5c68] flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-[#009351]" /> Nenhum ajuste a sugerir agora. Os preços cadastrados estão batendo com os custos lançados.</p></div>
+          : <div className="divide-y divide-[rgba(60,60,67,0.06)]">
+              {sugestoes.map(s => (
+                <CartaoSugestao key={s.chave} s={s}
+                  onAplicar={onAtualizarConfig && !s.inconsistente ? () => onAtualizarConfig(aplicarSugestao(config, s, hojeIso)) : undefined}
+                  onIgnorar={() => onAtualizarConfig?.(ignorarSugestao(config, s.chave, hojeIso))} />
+              ))}
+            </div>}
+        {ajustes.length > 0 && (
+          <div className="px-5 py-4" style={{ borderTop: "1px solid rgba(60,60,67,0.06)" }}>
+            <p className="text-[11px] font-semibold text-[#898892] flex items-center gap-1.5 mb-2"><History className="w-3.5 h-3.5" /> Ajustes aplicados</p>
+            <div className="space-y-1.5">
+              {ajustes.slice(0, 8).map(a => (
+                <div key={a.id} className="flex items-center gap-3 text-[12px]">
+                  <span className="text-[#898892] ds-num w-[72px] shrink-0">{dataBR(a.data)}</span>
+                  <span className="text-[#191625] font-medium shrink-0">{a.titulo}</span>
+                  <span className="text-[#898892] truncate flex-1 min-w-0 ds-num">{a.mudancas.map(m => `${m.de} → ${m.para}`).join(" · ")}</span>
+                  {desfazivel.has(a.id) && onAtualizarConfig && (
+                    <button onClick={() => onAtualizarConfig(desfazerAjuste(config, a.id))}
+                      className="h-7 px-2 rounded-md text-[11.5px] text-[#5e5c68] hover:text-[#8456e8] hover:bg-[#8456e8]/10 transition-colors flex items-center gap-1 shrink-0">
+                      <RotateCcw className="w-3 h-3" /> Desfazer
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Cartao>
 
       <Cartao padding={false} className="ds-entrada">
         <div className="px-5 pt-5">
