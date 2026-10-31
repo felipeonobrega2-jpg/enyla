@@ -39,7 +39,7 @@ import { FornecedoresView } from "./components/FornecedoresView"
 import { PainelView } from "./components/PainelView"
 import { ParceriasView } from "./components/ParceriasView"
 import { RelatoriosView } from "./components/RelatoriosView"
-import { normalizarProducao, movimentosPorEtapa, Servico } from "./lib/producao"
+import { normalizarProducao, movimentosPorEtapa, desfazerMovimentosAteColuna, Servico } from "./lib/producao"
 import { somarDiasUteis } from "./lib/diasUteis"
 import { normalizarMetas } from "./lib/metas"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
@@ -295,7 +295,7 @@ export default function Home() {
         if (d.contadorProp !== undefined) setContadorProp(d.contadorProp)
         if (d.kanban)                 setKanban(d.kanban.map(unpackTerceirizado))
         if (d.config)                 setConfig(c => ({ ...CONFIG_PADRAO, ...c, ...d.config }))
-        const novasAprovacoes = (d.config?.aprovacoesOnline ?? []).filter((a: AprovacaoOnline) => !a.visto).length
+        const novasAprovacoes = (d.config?.aprovacoesOnline ?? []).filter((a: AprovacaoOnline) => !a.visto && !a.desfeita).length
         if (novasAprovacoes) showToast(novasAprovacoes === 1 ? "Um cliente aprovou o orçamento online. Veja no Painel." : `${novasAprovacoes} orçamentos aprovados online. Veja no Painel.`)
         if (d.parceiros)              setParceiros(d.parceiros)
         if (d.negocios)               setNegocios(d.negocios)
@@ -528,6 +528,12 @@ export default function Home() {
         salvarConfigTudo({ ...config, producao: { ...prod, movimentos: movs } })
         avisos.push(coluna === 2 ? "envio da arte registrado" : coluna <= 4 ? "arte recebida" : coluna === 5 ? "envio ao impressor registrado" : coluna <= 7 ? "impressão recebida e envio ao acabamento registrados" : "retorno dos fornecedores registrado")
       }
+    }
+    // Entregue: registra a data real da entrega (base de "entregue no prazo")
+    if (coluna === COL_ENTREGUE && !card.dataEntregaReal) {
+      setKanban(prev => prev.map(c => c.id === card.id ? { ...c, dataEntregaReal: hojeIso } : c))
+      fetch(`/api/kanban/${card.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataEntregaReal: hojeIso }) }).catch(() => {})
+      avisos.push("entrega registrada hoje")
     }
     if (avisos.length) showToast(`${card.loteNumero ?? card.numero}: ${avisos.join(" · ")}`)
   }
@@ -804,7 +810,10 @@ export default function Home() {
       const entry = await res.json()
       const dataHora = new Date().toLocaleString("pt-BR")
       const colNome = COLUNAS_KANBAN[novaColuna] ?? `Coluna ${novaColuna}`
-      const etapas = [...entry.etapas]
+      // Voltou no quadro: etapas depois da nova coluna ainda não aconteceram (perdido mantém o histórico)
+      const limite = novaColuna === COL_HOT ? 0 : novaColuna
+      const etapas = novaColuna === COL_PERDIDO ? [...entry.etapas]
+        : entry.etapas.filter((e: { coluna: number }) => e.coluna <= limite)
       const jatem = etapas.some((e: { coluna: number; tipo?: string }) => e.coluna === novaColuna && (!e.tipo || e.tipo === "coluna"))
       if (!jatem) etapas.push({ coluna: novaColuna, nome: colNome, dataHora, tipo: "coluna" })
       if (preco !== undefined && entry.preco > 0 && entry.preco !== preco) {
@@ -1054,6 +1063,47 @@ export default function Home() {
       const r = await fetch(`/api/aprovacao/link?numero=${encodeURIComponent(numero)}`)
       return r.ok ? (await r.json()).url : null
     } catch { return null }
+  }
+
+  // Voltar um card no quadro desfaz o que o avanço gravou: datas de fechamento/entrega,
+  // prazos das etapas seguintes, envios automáticos a fornecedor e aprovação online.
+  // (O rastreio é ajustado em atualizarTracking; lote volta em removeLote.)
+  function desfazerAoVoltar(card: KanbanCard, novaColuna: number) {
+    const ordem = (c: number) => c === COL_HOT ? 0 : c
+    if (card.coluna === COL_PERDIDO || novaColuna === COL_PERDIDO || ordem(novaColuna) >= ordem(card.coluna)) return
+    const alvo = ordem(novaColuna)
+    const patch: Partial<KanbanCard> = {}
+    const desfeito: string[] = []
+    if (alvo === 0) {
+      if (card.dataFechamento) { patch.dataFechamento = undefined; desfeito.push("data de fechamento") }
+      if (card.dataEntregaPrevista) { patch.dataEntregaPrevista = undefined; desfeito.push("entrega prevista") }
+    }
+    if (card.dataEntregaReal && alvo < COL_ENTREGUE) { patch.dataEntregaReal = undefined; desfeito.push("data de entrega") }
+    const chavesDepois = Object.entries(COLUNA_PRAZOS).filter(([c]) => Number(c) > alvo).flatMap(([, ks]) => ks)
+    if (card.prazos && chavesDepois.some(k => card.prazos?.[k])) {
+      const prazos = { ...card.prazos }
+      for (const k of chavesDepois) delete prazos[k]
+      patch.prazos = prazos as PrazoEtapas
+    }
+    if (Object.keys(patch).length) {
+      setKanban(prev => prev.map(c => c.id === card.id ? { ...c, ...patch } : c))
+      // undefined vira null para apagar no banco
+      const corpo: Record<string, unknown> = Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, v ?? null]))
+      fetch(`/api/kanban/${card.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }).catch(() => {})
+    }
+    // Envios automáticos a fornecedor de etapas que ainda não chegaram
+    const config = configAtual.current
+    const prod = normalizarProducao(config.producao)
+    const movs = desfazerMovimentosAteColuna(prod, card.loteId ? `lote-${card.loteId}` : `card-${card.id}`, alvo)
+    if (movs) { salvarConfigTudo({ ...config, producao: { ...prod, movimentos: movs } }); desfeito.push("envios a fornecedor") }
+    // Aprovação online deixa de valer
+    const aprov = (config.aprovacoesOnline ?? []).filter(a => a.cardId === card.id && !a.desfeita)
+    if (alvo === 0 && aprov.length) {
+      setConfig(c => ({ ...c, aprovacoesOnline: (c.aprovacoesOnline ?? []).map(a => a.cardId === card.id ? { ...a, visto: true, desfeita: true } : a) }))
+      fetch("/api/aprovacao/visto", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ numeros: aprov.map(a => a.numero), desfeita: true }) }).catch(() => {})
+      desfeito.push("aprovação online")
+    }
+    if (desfeito.length) showToast(`${card.numero} voltou: desfeito ${desfeito.join(", ")}.`)
   }
 
   // Cliente aprovou online: o card já está em Fechado; falta lote e sinal (fluxo de sempre)
@@ -2044,6 +2094,7 @@ export default function Home() {
               }}
               onMove={(id, coluna) => {
                 const card = kanban.find(c => c.id === id)
+                if (card) desfazerAoVoltar(card, coluna)
                 const hoje = new Date().toISOString().slice(0, 10)
                 const dataFechamento = (coluna === COL_FECHADO && !card?.dataFechamento) ? hoje : undefined
                 setKanban(prev => prev.map(c => c.id === id ? { ...c, coluna, ...(dataFechamento ? { dataFechamento } : {}) } : c))
@@ -2651,6 +2702,7 @@ export default function Home() {
           onSavePrazos={"card" in detalheModal && detalheModal.card ? salvarPrazos : undefined}
           onMoveEtapa={"card" in detalheModal && detalheModal.card ? (id, coluna) => {
             const card = kanban.find(c => c.id === id)
+            if (card) desfazerAoVoltar(card, coluna)
             const hoje = new Date().toISOString().slice(0, 10)
             const dataFechamento = (coluna === COL_FECHADO && !card?.dataFechamento) ? hoje : undefined
             setKanban(prev => prev.map(c => c.id === id ? { ...c, coluna, ...(dataFechamento ? { dataFechamento } : {}) } : c))

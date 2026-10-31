@@ -278,6 +278,7 @@ export type AprovacaoOnline = {
   sinal: number
   em: string            // ISO
   visto?: boolean
+  desfeita?: boolean    // o pedido voltou para orçamento depois da aprovação
 }
 
 export type Lote = {

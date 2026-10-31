@@ -1,7 +1,7 @@
 // "Precisa de você": o que pede ação agora, em ordem de urgência.
 // Fonte única para o Painel (computador) e para o celular.
 
-import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData } from "../types"
+import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COL_FECHADO, COL_PERDIDO, COL_HOT } from "../types"
 import { Configuracoes } from "../config"
 import { Pedido, producao, recebiveis, pedidoEntregue, isTerceirizado, parseData, diasAte, nomeChave } from "./negocio"
 import { normalizarProducao } from "./producao"
@@ -77,7 +77,9 @@ export function pendencias(args: {
     .filter((x): x is { card: KanbanCard; dias: number } => !!x && x.dias >= 0 && x.dias <= 3)
     .sort((a, b) => a.dias - b.dias)
 
-  const aprovados = (config.aprovacoesOnline ?? []).filter(a => !a.visto && kanban.some(c => c.id === a.cardId))
+  // Só enquanto o pedido continua fechado (voltar para orçamento desfaz a aprovação)
+  const aprovados = (config.aprovacoesOnline ?? []).filter(a => !a.visto && !a.desfeita
+    && kanban.some(c => c.id === a.cardId && c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO && c.coluna !== COL_HOT))
   const fornecedorAtrasado = normalizarProducao(config.producao).movimentos.filter(m => !m.recebidoEm && m.prazoPrevisto && m.prazoPrevisto < hojeIso)
 
   return [

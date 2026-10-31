@@ -733,6 +733,24 @@ export function calcularRotas(e: EntradaRotas): ResultadoRotas {
   return { porQuantidade, alertas, facaRegistrada }
 }
 
+// ── Desfazer ao voltar o pedido no quadro ─────────────────────────────────────
+// Só mexe nos envios criados pela automação (id "auto-…"); os registrados à mão ficam.
+//   Volta para antes da coluna em que o envio é aberto → o envio some
+//   Volta para antes da coluna em que o retorno é registrado → o retorno é desfeito
+const COLUNA_ENVIO: Record<EtapaPedido, number> = { arte: 2, impressao: 5, acabamento: 6, corteVinco: 6, colagem: 6, outro: 99 }
+const COLUNA_RETORNO: Record<EtapaPedido, number> = { arte: 3, impressao: 6, acabamento: 8, corteVinco: 8, colagem: 8, outro: 99 }
+
+export function desfazerMovimentosAteColuna(p: ConfigProducao, pedidoKey: string, coluna: number): MovimentoFornecedor[] | null {
+  let mudou = false
+  const movs = p.movimentos.flatMap(m => {
+    if (m.pedidoKey !== pedidoKey || !m.id.startsWith("auto-")) return [m]
+    if (coluna < COLUNA_ENVIO[m.etapa]) { mudou = true; return [] }
+    if (m.recebidoEm && coluna < COLUNA_RETORNO[m.etapa]) { mudou = true; return [{ ...m, recebidoEm: undefined }] }
+    return [m]
+  })
+  return mudou ? movs : null
+}
+
 // ── Automação: envio e retorno de fornecedor a partir da etapa do pedido ──────
 //   Arte/Dieline (2)        → abre envio ao fornecedor de arte padrão (se houver)
 //   Aprovação/Fila (3,4)    → recebe a arte

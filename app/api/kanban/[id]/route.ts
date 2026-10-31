@@ -10,12 +10,11 @@ export async function PATCH(
     const body = await req.json()
     // fornecedor/custoTerceiro/projecaoCustos have no columns — pack into opcoes._x.
     // Normal cards keep their pricing array in opcoes._items; _x carries metadata.
-    const { fornecedor: pFornecedor, custoTerceiro: pCustoTerceiro, dataEntregaReal: _d,
+    const { fornecedor: pFornecedor, custoTerceiro: pCustoTerceiro,
       cores: pCores, acabamentos: pAcabamentos, observacoesOS: pObsOS,
       projecaoCustos: pProjecao, prazos: pPrazos,
       prazoRecebimentoInterno: pPrazoRec,
       ...baseBody } = body
-    void _d
     const safeBody: Record<string, unknown> = { ...baseBody }
     if (pCores !== undefined)      safeBody.cores = pCores ?? null
     if (pAcabamentos !== undefined) safeBody.acabamentos = pAcabamentos ?? null
