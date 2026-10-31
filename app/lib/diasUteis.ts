@@ -1,5 +1,30 @@
-// Dias úteis: segunda a sexta, fora feriados nacionais (inclui Carnaval e Corpus Christi).
+// Dias úteis: segunda a sexta, fora feriados nacionais (inclui Carnaval e Corpus Christi)
+// e os feriados locais configurados (cidade/estado e dias sem expediente).
 // Datas em ISO "aaaa-mm-dd".
+
+export type ConfigFeriados = {
+  cidade?: "sp" | null      // feriados da cidade e do estado de São Paulo
+  extras?: string[]         // "mm-dd" (todo ano) ou "aaaa-mm-dd" (uma vez, ex.: recesso)
+}
+
+// Estimativa de entrega quando o pedido não tem data prevista (rastreio do cliente)
+export const DIAS_UTEIS_ESTIMATIVA = 11
+
+export const FERIADOS_SP: { md: string; nome: string }[] = [
+  { md: "01-25", nome: "Aniversário de São Paulo" },
+  { md: "07-09", nome: "Revolução Constitucionalista" },
+]
+
+// Definido ao carregar a configuração (tela) ou antes do cálculo (servidor)
+let locais: ConfigFeriados = {}
+let chaveLocais = "{}"
+export function definirFeriadosLocais(cfg?: ConfigFeriados | null) {
+  const chave = JSON.stringify(cfg ?? {})
+  if (chave === chaveLocais) return
+  locais = cfg ?? {}
+  chaveLocais = chave
+  cache.clear()
+}
 
 const iso = (d: Date) => d.toLocaleDateString("sv-SE")
 const data = (s: string) => new Date(s.slice(0, 10) + "T12:00:00")
@@ -21,6 +46,8 @@ function feriados(ano: number): Set<string> {
   const rel = (n: number) => { const d = new Date(p); d.setDate(d.getDate() + n); return iso(d) }
   s = new Set([
     ...["01-01", "04-21", "05-01", "09-07", "10-12", "11-02", "11-15", "11-20", "12-25"].map(md => `${ano}-${md}`),
+    ...(locais.cidade === "sp" ? FERIADOS_SP.map(f => `${ano}-${f.md}`) : []),
+    ...(locais.extras ?? []).map(e => e.length === 5 ? `${ano}-${e}` : e).filter(e => e.startsWith(`${ano}-`)),
     rel(-48), rel(-47),   // Carnaval
     rel(-2),              // Sexta-feira Santa
     rel(60),              // Corpus Christi

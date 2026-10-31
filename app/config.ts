@@ -79,7 +79,13 @@ export type Configuracoes = {
   metas: ConfigMetas
   aprovacoesOnline?: import("./types").AprovacaoOnline[]   // gravado pelo servidor
   caixa?: import("./lib/caixa").ConfigCaixa                // pagamentos planejados das contas de fornecedor
+  sinalPct?: number                                        // sinal pedido na aprovação online (%)
+  feriados?: import("./lib/diasUteis").ConfigFeriados      // feriados locais nos prazos
+  clientesRelacionamento?: ClienteRelacionamento[]         // pagam depois da entrega
 }
+
+// Cliente de confiança: recebe antes de quitar; o saldo é esperado alguns dias após a entrega
+export type ClienteRelacionamento = { nome: string; diasAposEntrega: number }
 
 const CATS_RECEITA_PADRAO: CategoriaFinanceira[] = [
   { id: "pedido",      nome: "Pedido" },
@@ -101,6 +107,8 @@ const CATS_DESPESA_PADRAO: CategoriaFinanceira[] = [
 ]
 
 export const CONFIG_PADRAO: Configuracoes = {
+  sinalPct: 50,
+  feriados: { cidade: "sp", extras: [] },
   custos: {
     impressaoPorChapa: 350,
     corteAcerto: 50,

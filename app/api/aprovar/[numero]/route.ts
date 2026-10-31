@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { tokenValido, AprovacaoOnline, SINAL_PCT_PADRAO } from "@/app/lib/aprovacao"
 import { carregarProposta } from "@/app/lib/propostaPublica"
-import { somarDiasUteis } from "@/app/lib/diasUteis"
+import { somarDiasUteis, definirFeriadosLocais } from "@/app/lib/diasUteis"
+import { CONFIG_PADRAO } from "@/app/config"
 import { normalizarProducao } from "@/app/lib/producao"
 import { COL_FECHADO, COL_HOT, COLUNAS_KANBAN } from "@/app/types"
 import { isAberto } from "@/app/lib/negocio"
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ num
   const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
   const cfg = (cfgRow?.data ?? {}) as Record<string, unknown>
   const prod = normalizarProducao(cfg.producao as never)
+  definirFeriadosLocais((cfg.feriados ?? CONFIG_PADRAO.feriados) as never)
   const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
 
   const patch: Record<string, unknown> = { coluna: COL_FECHADO, preco: opcao.preco, quantidade: opcao.quantidade, dataFechamento: hoje }
@@ -48,7 +50,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ num
   }
 
   // Aviso para o painel (campo do servidor: salvar a configuração na tela não apaga)
-  const sinal = Math.round(opcao.preco * SINAL_PCT_PADRAO) / 100
+  const sinal = Math.round(opcao.preco * ((cfg.sinalPct as number | undefined) ?? SINAL_PCT_PADRAO)) / 100
   const aprovacao: AprovacaoOnline = {
     numero, cardId: p.card.id, nomeCliente: p.card.nomeCliente, aprovadoPor: nome,
     quantidade: opcao.quantidade, preco: opcao.preco, sinal, em: new Date().toISOString(),

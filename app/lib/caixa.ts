@@ -11,7 +11,7 @@
 import { KanbanCard, LancamentoFinanceiro, FormData } from "../types"
 import { Configuracoes } from "../config"
 import { calcular } from "../calculos"
-import { Pedido, pedidoEmProducao, pedidoEntregue, pixExpirado, isTerceirizado } from "./negocio"
+import { Pedido, pedidoEmProducao, pedidoEntregue, pixExpirado, isTerceirizado, nomeChave } from "./negocio"
 import { normalizarProducao, ItemCusto } from "./producao"
 import { classificar, Componente } from "./calibragem"
 
@@ -170,11 +170,15 @@ export function previsaoDeCaixa(args: {
         descricao: `${p.numero} · ${p.nomeCliente}${l.categoria === "sobra" ? " · sobra" : ""}`, valor, atrasado, card })
     }
     if (restante > 0.5) {
-      const entrega = p.dataEntregaPrevista
+      // Cliente de relacionamento paga alguns dias depois da entrega; os demais, na entrega
+      const rel = (config.clientesRelacionamento ?? []).find(r => nomeChave(r.nome) === nomeChave(p.nomeCliente))
+      const entrega = pedidoEntregue(p) ? (p.dataEntregaReal ?? p.dataEntregaPrevista ?? hojeIso) : p.dataEntregaPrevista
+      const quando = entrega && rel ? somarDias(entrega.slice(0, 10), rel.diasAposEntrega) : entrega
       const base: Movimento = { id: `saldo-${p.key}`, data: hojeIso, tipo: "entrada", origem: "saldoEntrega",
-        descricao: `${p.numero} · ${p.nomeCliente} · saldo na entrega`, valor: restante, card }
-      if (pedidoEntregue(p) || (entrega && entrega < hojeIso)) movs.push({ ...base, atrasado: true })
-      else if (entrega) movs.push({ ...base, data: entrega })
+        descricao: `${p.numero} · ${p.nomeCliente} · ${rel ? `saldo ${rel.diasAposEntrega} dias após a entrega` : "saldo na entrega"}`, valor: restante, card }
+      if (quando && quando < hojeIso) movs.push({ ...base, atrasado: true })
+      else if (quando) movs.push({ ...base, data: quando })
+      else if (pedidoEntregue(p)) movs.push({ ...base, atrasado: true })
       else semData.push(base)
     }
   }

@@ -1,5 +1,6 @@
 "use client"
 
+import { somarDiasUteis, DIAS_UTEIS_ESTIMATIVA } from "@/app/lib/diasUteis"
 import React, { useState, useEffect } from "react"
 import Image from "next/image"
 
@@ -123,7 +124,11 @@ function calcDelivery(etapas: TrackingEtapa[], colunaAtual: number, override?: s
   const producaoEtapa = etapas.filter(e => e.coluna >= 4).sort((a, b) => a.coluna - b.coluna)[0]
   if (producaoEtapa) {
     const d = parseBRDate(producaoEtapa.dataHora)
-    if (d) { d.setDate(d.getDate() + 15); return { text: formatDateLong(d), isEstimate: true, delivered: false } }
+    if (d) {
+      // Sem entrega prevista no pedido: estima ~3 semanas de produção em dias úteis
+      const est = new Date(somarDiasUteis(d.toLocaleDateString("sv-SE"), DIAS_UTEIS_ESTIMATIVA) + "T12:00:00")
+      return { text: formatDateLong(est), isEstimate: true, delivered: false }
+    }
   }
   return null
 }

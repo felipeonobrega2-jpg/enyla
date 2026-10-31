@@ -78,6 +78,15 @@ export function pendencias(args: {
     .sort((a, b) => a.dias - b.dias)
 
   // Só enquanto o pedido continua fechado (voltar para orçamento desfaz a aprovação)
+  // Cliente de relacionamento: só cobra depois dos dias combinados após a entrega
+  const dentroDoPrazoCombinado = (p: Pedido) => {
+    const rel = (config.clientesRelacionamento ?? []).find(r => nomeChave(r.nome) === nomeChave(p.nomeCliente))
+    const entrega = p.dataEntregaReal ?? p.dataEntregaPrevista
+    if (!rel) return false
+    if (!entrega) return true   // sem data de entrega: conta a partir de hoje (igual à previsão de caixa)
+    const limite = new Date(entrega.slice(0, 10) + "T12:00:00"); limite.setDate(limite.getDate() + rel.diasAposEntrega)
+    return limite.toLocaleDateString("sv-SE") >= hojeIso
+  }
   const aprovados = (config.aprovacoesOnline ?? []).filter(a => !a.visto && !a.desfeita
     && kanban.some(c => c.id === a.cardId && c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO && c.coluna !== COL_HOT))
   const fornecedorAtrasado = normalizarProducao(config.producao).movimentos.filter(m => !m.recebidoEm && m.prazoPrevisto && m.prazoPrevisto < hojeIso)
@@ -105,7 +114,7 @@ export function pendencias(args: {
       valor: p.vencido, card: cardDoPedido(p),
       whatsapp: linkWhatsApp(telefoneDe(p.nomeCliente), `Olá! Tudo bem? Passando para lembrar do pagamento do pedido ${p.numero}, no valor de ${brl(p.vencido)}, que já venceu. Se já pagou, pode desconsiderar. Qualquer dúvida, estou à disposição!`),
     })),
-    ...rec.comSaldo.filter(p => pedidoEntregue(p) && p.semCobranca > 0.5).map(p => {
+    ...rec.comSaldo.filter(p => pedidoEntregue(p) && p.semCobranca > 0.5 && !dentroDoPrazoCombinado(p)).map(p => {
       const c = cardDoPedido(p)
       return {
         id: `sc-${p.key}`, tipo: "semCobranca" as const, tom: "alerta" as const,

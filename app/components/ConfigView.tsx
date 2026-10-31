@@ -1,8 +1,10 @@
 "use client"
 
 import React, { useState, useRef } from "react"
-import { Percent, Layers, Target, Palette, Sparkles, Database, Download, Upload, Plus, X, Check, Save, RotateCcw, Info, KeyRound } from "lucide-react"
-import { Configuracoes, Material } from "../config"
+import { Percent, Layers, Target, Palette, Sparkles, Database, Download, Upload, Plus, X, Check, Save, RotateCcw, Info, KeyRound, CalendarOff, Handshake } from "lucide-react"
+import { Configuracoes, Material, CONFIG_PADRAO } from "../config"
+import { FERIADOS_SP } from "../lib/diasUteis"
+import { nomeChave } from "../lib/negocio"
 import { FORMATOS_PAPEL } from "../dados"
 import { normalizarMetas } from "../lib/metas"
 import { normalizarProducao } from "../lib/producao"
@@ -35,8 +37,9 @@ function Num({ value, onChange, step = 1, prefixo, sufixo, className = "w-full" 
   )
 }
 
-export function ConfigView({ config, onSave, onExportar, onImportar }: {
+export function ConfigView({ config, onSave, onExportar, onImportar, clientes = [] }: {
   config: Configuracoes
+  clientes?: string[]
   onSave: (c: Configuracoes) => void
   onExportar: () => void
   onImportar: (file: File) => void
@@ -96,6 +99,10 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
               <Campo label="Fator do parcelamento em 12×" dica="Parcela = preço × fator ÷ 12">
                 <Num value={draft.multiplicadores.parcelamento12x} step={0.01} sufixo="×"
                   onChange={v => setDraft(d => ({ ...d, multiplicadores: { ...d.multiplicadores, parcelamento12x: v } }))} />
+              </Campo>
+              <Campo label="Sinal na aprovação online" dica="Pedido ao cliente ao aprovar pelo link (Pix na hora)">
+                <Num value={draft.sinalPct ?? CONFIG_PADRAO.sinalPct} step={5} sufixo="%"
+                  onChange={v => setDraft(d => ({ ...d, sinalPct: Math.min(100, Math.max(0, v)) }))} />
               </Campo>
             </div>
             <div className="mt-4 rounded-xl px-4 py-3 bg-[rgba(116,116,128,0.05)] grid grid-cols-3 gap-3">
@@ -175,6 +182,9 @@ export function ConfigView({ config, onSave, onExportar, onImportar }: {
               <Plus className="w-3.5 h-3.5" /> Adicionar marco
             </button>
           </Cartao>
+
+          <FeriadosCartao config={draft} onChange={feriados => setDraft(d => ({ ...d, feriados }))} />
+          <RelacionamentoCartao config={draft} clientes={clientes} onChange={lista => setDraft(d => ({ ...d, clientesRelacionamento: lista }))} />
 
           {/* Aparência */}
           <Cartao className="ds-entrada">
@@ -269,6 +279,99 @@ function MateriaisCartao({ materiais, onChange }: { materiais: Material[]; onCha
         <input value={novo} onChange={e => setNovo(e.target.value)} onKeyDown={e => e.key === "Enter" && adicionar()}
           placeholder="Novo material (ex.: Couchê 170g)" className={`${inputCls} flex-1 min-w-0`} />
         <Botao icone={<Plus className="w-3.5 h-3.5" />} onClick={adicionar} disabled={!novo.trim()}>Adicionar</Botao>
+      </div>
+    </Cartao>
+  )
+}
+
+const dataBR = (e: string) => e.length === 5 ? `${e.slice(3)}/${e.slice(0, 2)} (todo ano)` : e.split("-").reverse().join("/")
+
+// Feriados locais: entram em todos os prazos (fornecedores, entrega, meta por dia útil)
+function FeriadosCartao({ config, onChange }: { config: Configuracoes; onChange: (f: NonNullable<Configuracoes["feriados"]>) => void }) {
+  const f = config.feriados ?? CONFIG_PADRAO.feriados!
+  const [data, setData] = useState("")
+  const [todoAno, setTodoAno] = useState(true)
+  const extras = f.extras ?? []
+  const adicionar = () => {
+    if (!data) return
+    const valor = todoAno ? data.slice(5) : data
+    if (!extras.includes(valor)) onChange({ ...f, extras: [...extras, valor].sort() })
+    setData("")
+  }
+  return (
+    <Cartao className="ds-entrada">
+      <TituloCartao titulo="Feriados e dias sem expediente" icone={<CalendarOff className="w-4 h-4" />}
+        sub="Além dos nacionais, estes dias não contam nos prazos em dias úteis." />
+      <label className="flex items-start gap-2.5 cursor-pointer">
+        <input type="checkbox" className="mt-0.5" checked={f.cidade === "sp"} onChange={e => onChange({ ...f, cidade: e.target.checked ? "sp" : null })} />
+        <span className="text-[12.5px] text-[#191625]">São Paulo (cidade e estado)
+          <span className="block text-[11px] text-[#898892]">{FERIADOS_SP.map(x => `${x.md.slice(3)}/${x.md.slice(0, 2)} ${x.nome}`).join(" · ")}</span>
+        </span>
+      </label>
+      {extras.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {extras.map(e => (
+            <span key={e} className="inline-flex items-center gap-1 h-7 pl-2.5 pr-1 rounded-lg bg-[rgba(116,116,128,0.08)] text-[11.5px] text-[#191625] ds-num">
+              {dataBR(e)}
+              <button onClick={() => onChange({ ...f, extras: extras.filter(x => x !== e) })} aria-label="Remover dia"
+                className="w-5 h-5 grid place-items-center rounded text-[#898892] hover:text-[#d33a3c]"><X className="w-3 h-3" /></button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-2 mt-3 flex-wrap">
+        <input type="date" value={data} onChange={e => setData(e.target.value)} className={`${inputCls} w-[150px]`} />
+        <label className="flex items-center gap-1.5 text-[11.5px] text-[#5e5c68] cursor-pointer">
+          <input type="checkbox" checked={todoAno} onChange={e => setTodoAno(e.target.checked)} /> todo ano
+        </label>
+        <Botao icone={<Plus className="w-3.5 h-3.5" />} onClick={adicionar} disabled={!data}>Adicionar dia</Botao>
+      </div>
+      <p className="text-[11px] text-[#898892] mt-2">Ex.: recesso de fim de ano (desmarque “todo ano”) ou feriado do município do fornecedor.</p>
+    </Cartao>
+  )
+}
+
+// Clientes que recebem antes de quitar: o saldo é esperado alguns dias depois da entrega
+function RelacionamentoCartao({ config, clientes, onChange }: {
+  config: Configuracoes; clientes: string[]; onChange: (l: NonNullable<Configuracoes["clientesRelacionamento"]>) => void
+}) {
+  const lista = config.clientesRelacionamento ?? []
+  const [nome, setNome] = useState("")
+  const [dias, setDias] = useState("30")
+  const adicionar = (n = nome.trim(), d = parseInt(dias) || 30) => {
+    if (!n || lista.some(r => nomeChave(r.nome) === nomeChave(n))) return
+    onChange([...lista, { nome: n, diasAposEntrega: d }])
+    setNome("")
+  }
+  const sugestao = clientes.find(c => /maur[ií]cio/i.test(c))
+  return (
+    <Cartao className="ds-entrada">
+      <TituloCartao titulo="Clientes de relacionamento" icone={<Handshake className="w-4 h-4" />}
+        sub="Recebem o pedido antes de quitar. A previsão de caixa espera o pagamento depois da entrega, e o Painel só cobra depois desse prazo." />
+      <div className="divide-y divide-[rgba(60,60,67,0.06)]">
+        {lista.map((r, i) => (
+          <div key={r.nome} className="flex items-center gap-2 py-2">
+            <span className="flex-1 text-[12.5px] text-[#191625] truncate">{r.nome}</span>
+            <Num value={r.diasAposEntrega} sufixo="d" className="w-[84px] shrink-0"
+              onChange={v => onChange(lista.map((x, j) => j === i ? { ...x, diasAposEntrega: Math.max(0, v) } : x))} />
+            <span className="text-[11px] text-[#898892] w-[92px]">após a entrega</span>
+            <button onClick={() => onChange(lista.filter((_, j) => j !== i))} aria-label={`Remover ${r.nome}`}
+              className="w-8 h-8 grid place-items-center rounded-lg text-[#898892] hover:text-[#d33a3c] hover:bg-[#d33a3c]/10 shrink-0"><X className="w-3.5 h-3.5" /></button>
+          </div>
+        ))}
+      </div>
+      {lista.length === 0 && sugestao && (
+        <button onClick={() => adicionar(sugestao, 30)}
+          className="mb-1 w-full h-9 rounded-lg text-[12px] font-medium text-[#8456e8] bg-[#8456e8]/[0.06] hover:bg-[#8456e8]/10 transition-colors flex items-center justify-center gap-1.5">
+          <Plus className="w-3.5 h-3.5" /> Adicionar {sugestao} · 30 dias após a entrega
+        </button>
+      )}
+      <div className="flex items-center gap-2 mt-2">
+        <input value={nome} onChange={e => setNome(e.target.value)} list="clientes-relacionamento" placeholder="Cliente"
+          onKeyDown={e => e.key === "Enter" && adicionar()} className={`${inputCls} flex-1 min-w-0`} />
+        <datalist id="clientes-relacionamento">{clientes.map(c => <option key={c} value={c} />)}</datalist>
+        <input value={dias} onChange={e => setDias(e.target.value)} inputMode="numeric" className={`${inputCls} w-[64px] text-center ds-num`} aria-label="Dias após a entrega" />
+        <Botao icone={<Plus className="w-3.5 h-3.5" />} onClick={() => adicionar()} disabled={!nome.trim()}>Adicionar</Botao>
       </div>
     </Cartao>
   )

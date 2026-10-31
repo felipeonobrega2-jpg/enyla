@@ -40,7 +40,7 @@ import { PainelView } from "./components/PainelView"
 import { ParceriasView } from "./components/ParceriasView"
 import { RelatoriosView } from "./components/RelatoriosView"
 import { normalizarProducao, movimentosPorEtapa, desfazerMovimentosAteColuna, Servico } from "./lib/producao"
-import { somarDiasUteis } from "./lib/diasUteis"
+import { somarDiasUteis, definirFeriadosLocais } from "./lib/diasUteis"
 import { normalizarMetas } from "./lib/metas"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
 import FormaView from "./FormaView"
@@ -175,6 +175,7 @@ export default function Home() {
   const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel">("painel")
   const [perfilClienteExterno, setPerfilClienteExterno] = useState<string | null>(null)
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
+  definirFeriadosLocais(config.feriados)
   const configAtual = useRef<Configuracoes>(CONFIG_PADRAO)
   useEffect(() => { configAtual.current = config }, [config])
   const [modalSalvar, setModalSalvar] = useState<{ form: FormData; calculo: Calculo; numero: string; data: string; cardId: string } | null>(null)
@@ -2010,6 +2011,7 @@ export default function Home() {
           ) : view === "config" ? (
             <ConfigView
               config={config}
+              clientes={[...new Set([...clientes.map(c => c.nome), ...kanban.map(c => c.nomeCliente)].filter(Boolean))].sort()}
               onSave={cfg => {
               setConfig(cfg)
               setResult(calcular(form, cfg))

@@ -17,7 +17,7 @@ import {
 import { pendencias, Pendencia, TipoPendencia, cardDoPedido, prazoTexto, linkWhatsApp } from "../lib/pendencias"
 import { normalizarProducao, nomeServicos } from "../lib/producao"
 import { normalizarMetas } from "../lib/metas"
-import { ehDiaUtil, diasUteisEntre } from "../lib/diasUteis"
+import { ehDiaUtil, diasUteisEntre, definirFeriadosLocais } from "../lib/diasUteis"
 import { brl, num } from "../utils"
 
 type Aba = "inicio" | "cobrancas" | "producao" | "orcamentos"
@@ -162,6 +162,7 @@ export default function MobilePage() {
   const [propostas, setPropostas] = useState<PropostaCustom[]>([])
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [config, setConfig] = useState<Configuracoes>(CONFIG_PADRAO)
+  definirFeriadosLocais(config.feriados)
   const [carregando, setCarregando] = useState(true)
   const [aba, setAba] = useState<Aba>("inicio")
   const [periodoId, setPeriodoId] = useState<PeriodoId>("mes")
