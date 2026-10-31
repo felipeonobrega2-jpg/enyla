@@ -2219,6 +2219,7 @@ export default function Home() {
             />
           ) : view === "financeiro" ? (
             <FinanceiroView
+              historico={historico}
               lancamentos={lancamentos}
               kanban={kanban}
               negocios={negocios}

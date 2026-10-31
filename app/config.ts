@@ -78,6 +78,7 @@ export type Configuracoes = {
   producao: ConfigProducao
   metas: ConfigMetas
   aprovacoesOnline?: import("./types").AprovacaoOnline[]   // gravado pelo servidor
+  caixa?: import("./lib/caixa").ConfigCaixa                // pagamentos planejados das contas de fornecedor
 }
 
 const CATS_RECEITA_PADRAO: CategoriaFinanceira[] = [

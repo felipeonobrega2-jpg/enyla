@@ -1,5 +1,6 @@
 "use client"
 
+import { CaixaView } from "./CaixaView"
 import React, { useState, useMemo, useEffect, useRef } from "react"
 import { CheckCircle2, Factory, TrendingUp, TrendingDown, DollarSign, Clock, AlertTriangle, Landmark, Plus, ChevronLeft, ChevronRight } from "lucide-react"
 import { montarPedidos, recebiveis } from "../lib/negocio"
@@ -1018,7 +1019,7 @@ function periodoRange(p: Periodo, mesOffset = 0): { from: Date | null; to: Date 
 
 const MESES_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]
 
-type FinTab = "dash" | "dre" | "receber" | "lancamentos" | "pix" | "contas" | "fixas" | "fornecedores" | "config"
+type FinTab = "dash" | "previsao" | "dre" | "receber" | "lancamentos" | "pix" | "contas" | "fixas" | "fornecedores" | "config"
 
 const PERIODO_LABEL: Record<Periodo, string> = {
   mes: "Este mês", trimestre: "Este trimestre", semestre: "Este semestre", ano: "Este ano", tudo: "Tudo"
@@ -1040,6 +1041,7 @@ export function FinanceiroView({
   onDeleteCard,
   onDetalhesCard,
   onAbrirPerfil,
+  historico,
 }: {
   lancamentos: LancamentoFinanceiro[]
   kanban: KanbanCard[]
@@ -1054,6 +1056,7 @@ export function FinanceiroView({
   onDeleteCard?: (id: string) => void
   onDetalhesCard?: (card: KanbanCard) => void
   onAbrirPerfil?: (nome: string) => void
+  historico?: { form: import("../types").FormData; numero?: string }[]
 }) {
   const catsRec  = config?.categoriasReceita ?? DEFAULT_CATS_REC
   const catsDesp = config?.categoriasDespesa ?? DEFAULT_CATS_DESP
@@ -1081,8 +1084,8 @@ export function FinanceiroView({
   // Restore on mount — write effects would corrupt sessionStorage during SSR hydration
   useEffect(() => {
     const t = sessionStorage.getItem("fin:tab")
-    if (t && ["dash", "dre", "receber", "lancamentos", "pix", "contas", "fixas", "fornecedores", "config"].includes(t))
-      setTab(t as "dash" | "dre" | "receber" | "lancamentos" | "pix" | "contas" | "fixas" | "fornecedores" | "config")
+    if (t && ["dash", "previsao", "dre", "receber", "lancamentos", "pix", "contas", "fixas", "fornecedores", "config"].includes(t))
+      setTab(t as "dash" | "previsao" | "dre" | "receber" | "lancamentos" | "pix" | "contas" | "fixas" | "fornecedores" | "config")
     const p = sessionStorage.getItem("fin:periodo")
     if (p && ["mes", "trimestre", "semestre", "ano", "tudo"].includes(p))
       setPeriodo(p as Periodo)
@@ -1389,6 +1392,7 @@ export function FinanceiroView({
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <Segmentado<FinTab> valor={tab} onChange={irAba} opcoes={[
             { v: "dash", nome: "Visão geral" },
+            { v: "previsao", nome: "Previsão de caixa" },
             { v: "receber", nome: vencidos.length ? `A receber · ${vencidos.length} vencidos` : "A receber" },
             { v: "lancamentos", nome: "Lançamentos" },
             { v: "dre", nome: "DRE" },
@@ -2401,6 +2405,12 @@ export function FinanceiroView({
             )}
           </>
         )}
+        {/* ── PREVISÃO DE CAIXA ── */}
+        {tab === "previsao" && config && onUpdateConfig && (
+          <CaixaView kanban={kanban} lancamentos={lancamentos} historico={historico ?? []} config={config}
+            onUpdateConfig={cfg => onUpdateConfig(cfg)} onAddLancamento={onAdd} onAbrirCard={onDetalhesCard} />
+        )}
+
         {/* ── CONTAS ── */}
         {tab === "contas" && config && onUpdateConfig && (
           <ContasTab config={config} onUpdateConfig={cfg => { onUpdateConfig(cfg) }} />
