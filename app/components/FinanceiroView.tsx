@@ -1894,13 +1894,7 @@ export function FinanceiroView({
                               <p className="text-[12px] font-medium text-[#5e5c68] ds-num">{brl(card.preco)}</p>
                             </div>
                           ))}
-                          {sobrasLote.map(s => (
-                            <div key={s.id} className="px-5 py-2.5 flex items-center gap-3">
-                              <div className="w-1.5 h-1.5 rounded-full bg-[#c57800] shrink-0 ml-0.5" />
-                              <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.5)] truncate">{s.descricao}</p>
-                              <p className="text-[12px] font-medium text-[#c57800] ds-num">+{brl(s.valor)}</p>
-                            </div>
-                          ))}
+                          {sobrasLote.map(s => <LinhaSobra key={s.id} s={s} quitadaNoPedido={completo} />)}
                           {pagamentosLote.map(p => (
                             <div key={p.id} className="px-5 py-2.5 flex items-center gap-3">
                               {p.status === "pago" ? (
@@ -1996,13 +1990,7 @@ export function FinanceiroView({
                         {/* Rows */}
                         {(sobrasCard.length > 0 || pagamentosCard.length > 0) && (
                           <div className="border-t border-[rgba(60,60,67,0.05)] divide-y divide-[rgba(60,60,67,0.04)]">
-                            {sobrasCard.map(s => (
-                              <div key={s.id} className="px-5 py-2.5 flex items-center gap-3">
-                                <div className="w-1.5 h-1.5 rounded-full bg-[#c57800] shrink-0 ml-0.5" />
-                                <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.5)] truncate">{s.descricao}</p>
-                                <p className="text-[12px] font-medium text-[#c57800] ds-num">+{brl(s.valor)}</p>
-                              </div>
-                            ))}
+                            {sobrasCard.map(s => <LinhaSobra key={s.id} s={s} quitadaNoPedido={completoCard} />)}
                             {pagamentosCard.map(p => (
                               <div key={p.id} className="px-5 py-2.5 flex items-center gap-3">
                                 {p.status === "pago" ? (
@@ -2901,6 +2889,21 @@ function CategoriaSection({
           + Adicionar
         </button>
       </div>
+    </div>
+  )
+}
+
+// Sobra no pedido: paga à parte, paga junto com o pedido (cliente quitou venda + excedente) ou a receber
+function LinhaSobra({ s, quitadaNoPedido }: { s: LancamentoFinanceiro; quitadaNoPedido: boolean }) {
+  const paga = s.status === "pago" || quitadaNoPedido
+  return (
+    <div className="px-5 py-2.5 flex items-center gap-3">
+      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ml-0.5 ${paga ? "bg-[#009351]" : "bg-[#c57800]"}`} />
+      <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.5)] truncate">{s.descricao}</p>
+      <span className={`text-[10.5px] font-medium shrink-0 ${paga ? "text-[#009351]" : "text-[#c57800]"}`}>
+        {s.status === "pago" ? "paga" : quitadaNoPedido ? "paga com o pedido" : "a receber"}
+      </span>
+      <p className={`text-[12px] font-medium ds-num ${paga ? "text-[#009351]" : "text-[#c57800]"}`}>+{brl(s.valor)}</p>
     </div>
   )
 }

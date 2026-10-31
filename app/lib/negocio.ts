@@ -121,6 +121,8 @@ export type Pedido = {
   sobras: number
   /** Venda efetiva: valor contratado + sobras. Base de margem — o custo lançado já inclui as unidades extras. */
   venda: number
+  /** Sobras ainda "pendentes" que o cliente já pagou junto com o pedido (pagou venda + excedente). */
+  sobrasQuitadas: string[]
   /** Saldo devedor: valor + sobras − recebido. É o "a receber" em todas as telas. */
   aReceber: number
   /** Parte do saldo com cobrança lançada (pendente). */
@@ -132,6 +134,10 @@ export type Pedido = {
   /** Custos diretos lançados (pagos ou na conta do fornecedor). */
   custoDireto: number
 }
+
+// Link Pix que venceu sem pagamento: era só um meio de cobrança, não conta como dívida
+export const pixExpirado = (l: LancamentoFinanceiro, hojeIso: string) =>
+  l.categoria === "pix_link" && l.status !== "pago" && l.dataVencimento < hojeIso
 
 export function montarPedidos(kanban: KanbanCard[], lancamentos: LancamentoFinanceiro[]): Pedido[] {
   const ganhos = kanban.filter(isGanho)
@@ -173,7 +179,13 @@ export function montarPedidos(kanban: KanbanCard[], lancamentos: LancamentoFinan
     const sobras   = receitas.filter(l => l.categoria === "sobra").reduce((s, l) => s + l.valor, 0)
     const valor    = cards.reduce((s, c) => s + c.preco, 0)
     const saldo    = Math.max(0, valor + sobras - recebido)
-    const pendentes = receitas.filter(l => l.status !== "pago")
+    // Link Pix vencido não é dívida: o cliente simplesmente não usou aquele link
+    const pendentes = receitas.filter(l => l.status !== "pago" && !pixExpirado(l, hojeIso))
+    // Cliente pagou venda + excedente nos pagamentos do pedido: as sobras pendentes já estão pagas
+    // (não marcamos como pagas no banco para não contar o mesmo dinheiro duas vezes no caixa)
+    const pagoSemSobras = receitas.filter(l => l.status === "pago" && l.categoria !== "sobra").reduce((s, l) => s + l.valor, 0)
+    const sobrasQuitadas = pagoSemSobras >= valor + sobras - 0.5
+      ? receitas.filter(l => l.categoria === "sobra" && l.status !== "pago").map(l => l.id) : []
     const cobrado  = Math.min(saldo, pendentes.reduce((s, l) => s + l.valor, 0))
     const vencido  = Math.min(saldo, pendentes.filter(l => l.dataVencimento < hojeIso).reduce((s, l) => s + l.valor, 0))
 
@@ -190,7 +202,7 @@ export function montarPedidos(kanban: KanbanCard[], lancamentos: LancamentoFinan
       dataEntregaReal: reais[reais.length - 1],
       valor,
       quantidade: base.reduce((s, c) => s + c.quantidade, 0),
-      receitas, despesas, recebido, sobras, venda: valor + sobras,
+      receitas, despesas, recebido, sobras, venda: valor + sobras, sobrasQuitadas,
       aReceber: saldo, cobrado, vencido, semCobranca: saldo - cobrado,
       custoDireto: despesas
         .filter(l => l.status === "pago" || l.formaPagamento === "conta")
@@ -271,10 +283,12 @@ export type Recebiveis = {
 }
 
 export function recebiveis(pedidos: Pedido[], lancamentos: LancamentoFinanceiro[]): Recebiveis {
+  const hojeIso = new Date().toLocaleDateString("sv-SE")
   const comSaldo = pedidos.filter(p => p.aReceber > 0.5)
   const ligados = new Set(pedidos.flatMap(p => p.receitas.map(l => l.id)))
-  const quitados = pedidos.filter(p => p.aReceber <= 0.5).flatMap(p => p.receitas.filter(l => l.status !== "pago"))
-  const soltos = lancamentos.filter(l => l.tipo === "receita" && l.status !== "pago" && !ligados.has(l.id) && l.formaPagamento !== "conta")
+  const quitados = pedidos.filter(p => p.aReceber <= 0.5)
+    .flatMap(p => p.receitas.filter(l => l.status !== "pago" && !p.sobrasQuitadas.includes(l.id) && !pixExpirado(l, hojeIso)))
+  const soltos = lancamentos.filter(l => l.tipo === "receita" && l.status !== "pago" && !ligados.has(l.id) && l.formaPagamento !== "conta" && !pixExpirado(l, hojeIso))
   const soma = (f: (p: Pedido) => number) => comSaldo.reduce((s, p) => s + f(p), 0)
   return {
     aReceber: soma(p => p.aReceber),
