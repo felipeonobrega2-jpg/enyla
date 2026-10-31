@@ -214,12 +214,20 @@ function prazoEmDiasUteis(m: MovimentoFornecedor, fornecedores: FornecedorProduc
 
 export type ColagemModo = "fornecedor" | "manual" | "nenhuma"
 
+export type CustoExtra = { id: string; descricao: string; valor: number; porUnidade?: boolean }
+
 export type OpcoesRota = {
   impressorId?: string | null          // null = automático (mais barato)
+  formatoId?: string | null            // papel escolhido à mão
+  divisao?: 1 | 2 | 4 | null           // divisão da folha escolhida à mão
   facaCavidades?: number | null        // null = automático
   fornecedores?: Partial<Record<"acabamento" | "hotStamping" | "corteVinco" | "colagem", string>>
   colagemModo?: ColagemModo
   estimativaAcabamentoFolha?: number | null // R$ por folha impressa, quando não há tabela
+  // Decisões manuais sobre a rota em uso
+  valores?: Record<string, Partial<Record<EtapaCusto, number>>>  // por tiragem ("1000") ou "*" = todas
+  extras?: CustoExtra[]
+  multiplicador?: number | null        // markup deste orçamento (sem = o das Configurações)
 }
 
 export type FormatoPapelRota = { id: string; nome: string; largura: number; altura: number; precoPor100: number }
@@ -255,13 +263,17 @@ export type Passada = {
   batidasPorFolha: number
 }
 
+export type EtapaCusto = "papel" | "impressao" | "laminacao" | "verniz" | "hotStamping" | "corteVinco" | "colagem" | "arte" | "frete" | "faca" | "cliche" | "fotolito" | "extra"
+
 export type ItemCusto = {
-  etapa: "papel" | "impressao" | "laminacao" | "verniz" | "hotStamping" | "corteVinco" | "colagem" | "arte" | "frete" | "faca" | "cliche" | "fotolito"
+  etapa: EtapaCusto
   descricao: string
   fornecedor?: string
   valor: number
   estimado: boolean
   ferramental?: boolean
+  valorMotor?: number   // presente quando o valor foi definido à mão
+  extraId?: string
 }
 
 export type Rota = {
@@ -619,14 +631,7 @@ function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaEx
     }
   }
 
-  const custoFerramental = itens.filter(i => i.ferramental).reduce((s, i) => s + i.valor, 0)
-  const custoProducao = itens.filter(i => !i.ferramental).reduce((s, i) => s + i.valor, 0)
-  const custoTotal = custoProducao + custoFerramental
-  const preco = custoTotal * e.multiplicador
-  const imposto = preco * p.impostoPct / 100
-  const lucroLiquido = preco - imposto - custoTotal
-
-  return {
+  return fecharRota(e, {
     id: `${imp.id}|${base.formato.id}|${base.divisao.d}|${k}`,
     impressorId: imp.id, impressorNome: imp.nome, maquinaNome: imp.maquina!.nome,
     formatoId: base.formato.id, formatoNome: base.formato.nome,
@@ -634,11 +639,45 @@ function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaEx
     passadas, pecasPorPeca: base.pecasPorPeca, pecasPorFolhaPapel: base.pecasPorPeca * base.divisao.d,
     facaCavidades: k, facaExistente: !!facaExistente,
     quantidade: qtd, pecasPapel, folhasPapel, folhasImpressas, batidas, jogos,
-    itens, custoProducao, custoFerramental, custoTotal,
-    preco, precoUnit: qtd > 0 ? preco / qtd : 0, imposto, lucroLiquido,
+  }, itens)
+}
+
+type RotaSemTotais = Omit<Rota, "itens" | "custoProducao" | "custoFerramental" | "custoTotal" | "preco" | "precoUnit" | "imposto" | "lucroLiquido" | "margemLiquidaPct" | "estimado">
+
+function fecharRota(e: EntradaRotas, r: RotaSemTotais, itens: ItemCusto[]): Rota {
+  const custoFerramental = itens.filter(i => i.ferramental).reduce((s, i) => s + i.valor, 0)
+  const custoProducao = itens.filter(i => !i.ferramental).reduce((s, i) => s + i.valor, 0)
+  const custoTotal = custoProducao + custoFerramental
+  const preco = custoTotal * e.multiplicador
+  const imposto = preco * e.producao.impostoPct / 100
+  const lucroLiquido = preco - imposto - custoTotal
+  return {
+    ...r, itens, custoProducao, custoFerramental, custoTotal,
+    preco, precoUnit: r.quantidade > 0 ? preco / r.quantidade : 0, imposto, lucroLiquido,
     margemLiquidaPct: preco > 0 ? lucroLiquido / preco * 100 : 0,
     estimado: itens.some(i => i.estimado && i.valor > 0),
   }
+}
+
+// Valores digitados e custos extras entram em todas as rotas, para a comparação continuar justa
+function aplicarDecisoes(e: EntradaRotas, r: Rota): Rota {
+  const { valores, extras } = e.opcoes
+  if (!valores && !extras?.length) return r
+  const daTiragem = valores?.[String(r.quantidade)] ?? {}
+  const todas = valores?.["*"] ?? {}
+  const itens: ItemCusto[] = r.itens.map(i => {
+    const v = daTiragem[i.etapa] ?? todas[i.etapa]
+    return v == null ? i : { ...i, valor: v, estimado: false, valorMotor: i.valor }
+  })
+  for (const x of extras ?? []) {
+    if (!x.valor) continue
+    itens.push({
+      etapa: "extra", extraId: x.id, estimado: false,
+      descricao: (x.descricao || "Custo extra") + (x.porUnidade ? ` · ${x.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}/un` : ""),
+      valor: x.porUnidade ? x.valor * r.quantidade : x.valor,
+    })
+  }
+  return fecharRota(e, r, itens)
 }
 
 function opcoesDeFaca(base: RotaBase, e: EntradaRotas, existente: Ferramental | null): number[] {
@@ -663,14 +702,17 @@ export function calcularRotas(e: EntradaRotas): ResultadoRotas {
   const porQuantidade = [...e.quantidades].sort((a, b) => a - b).map(qtd => {
     const todas: Rota[] = []
     for (const base of bases) {
-      for (const k of opcoesDeFaca(base, e, facaRegistrada)) todas.push(custear(e, base, k, qtd, facaRegistrada))
+      for (const k of opcoesDeFaca(base, e, facaRegistrada)) todas.push(aplicarDecisoes(e, custear(e, base, k, qtd, facaRegistrada)))
     }
     todas.sort((a, b) => a.custoTotal - b.custoTotal)
     // Escolhas manuais definem a rota usada; as demais continuam na comparação
-    const { impressorId, facaCavidades } = e.opcoes
-    const escolhida = todas.find(r =>
+    const { impressorId, formatoId, divisao, facaCavidades } = e.opcoes
+    const atende = (r: Rota, faca: boolean) =>
       (!impressorId || r.impressorId === impressorId) &&
-      (!facaCavidades || r.facaCavidades === Math.min(facaCavidades, Math.max(...r.passadas.map(p => p.cavidades)))))
+      (!formatoId || r.formatoId === formatoId) &&
+      (!divisao || r.divisao === divisao) &&
+      (!faca || !facaCavidades || r.facaCavidades === Math.min(facaCavidades, Math.max(...r.passadas.map(p => p.cavidades))))
+    const escolhida = todas.find(r => atende(r, true)) ?? todas.find(r => atende(r, false))
     return { quantidade: qtd, melhor: escolhida ?? todas[0], alternativas: todas }
   })
 

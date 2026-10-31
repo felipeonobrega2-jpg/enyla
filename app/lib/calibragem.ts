@@ -87,7 +87,9 @@ const soma = (o: Partial<Record<Componente, number>>) => Object.values(o).reduce
 // Custo previsto pelo motor de hoje para um card, na quantidade vendida
 function previstoDoCard(card: KanbanCard, hist: HistItem | undefined, cfg: Configuracoes): Partial<Record<Componente, number>> | null {
   if (!hist?.form || !card.quantidade) return null
-  const r = calcular({ ...hist.form, quantidades: [card.quantidade] }, cfg)
+  // Só o motor: valores digitados à mão e custos extras não entram na calibragem
+  const rota = hist.form.rota ? { ...hist.form.rota, valores: undefined, extras: undefined } : undefined
+  const r = calcular({ ...hist.form, rota, quantidades: [card.quantidade] }, cfg)
   const l = r?.tabela[0]
   if (!l) return null
   const comFaca = hist.form.comFaca

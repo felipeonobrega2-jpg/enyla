@@ -2438,6 +2438,7 @@ export default function Home() {
                 calculo={r}
                 form={form}
                 producao={normalizarProducao(config.producao)}
+                multiplicadorPadrao={config.multiplicadores.semFaca || 2}
                 comFaca={form.comFaca}
                 onOpcoes={o => mudarForm(p => ({ ...p, rota: o }))}
                 onRegistrarFaca={registrarFaca}

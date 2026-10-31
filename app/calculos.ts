@@ -207,7 +207,7 @@ export function calcular(form: FormData, config: Configuracoes): Calculo | null 
   for (const fmt of formatosComConfig) todosFormatos.push(...testarFolhaInteira(dieline, fmt))
 
   const producao = normalizarProducao(config.producao)
-  const multiplicador = config.multiplicadores.semFaca || 2
+  const multiplicador = form.rota?.multiplicador || config.multiplicadores.semFaca || 2
   const quantidades = [...form.quantidades].filter(q => q > 0).sort((a, b) => a - b)
 
   const rotas = calcularRotas({
