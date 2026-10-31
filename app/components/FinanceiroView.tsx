@@ -1794,19 +1794,19 @@ export function FinanceiroView({
                 const pags = pagamentosPorLote[loteId] ?? []
                 const sobrasLote = sobrasPorLote[loteId] ?? []
                 const total = cards.reduce((s, c) => s + c.preco, 0) + sobrasLote.reduce((s, l) => s + l.valor, 0)
-                if (filtroReceber === "aberto") return !isComplete(pags, total)
+                if (filtroReceber === "aberto") return !isComplete([...pags, ...sobrasLote], total)
                 if (filtroReceber === "pendente") return pags.length === 0
                 // "parcial" = tem registro mas não está completo
-                return pags.length > 0 && !isComplete(pags, total)
+                return pags.length > 0 && !isComplete([...pags, ...sobrasLote], total)
               })
               const solosFiltrados = solos.filter(card => {
                 if (filtroReceber === "todos") return true
                 const pags = pagamentosPorCard[card.id] ?? []
                 const sobrasCard = sobrasPorCard[card.id] ?? []
                 const total = card.preco + sobrasCard.reduce((s, l) => s + l.valor, 0)
-                if (filtroReceber === "aberto") return !isComplete(pags, total)
+                if (filtroReceber === "aberto") return !isComplete([...pags, ...sobrasCard], total)
                 if (filtroReceber === "pendente") return pags.length === 0
-                return pags.length > 0 && !isComplete(pags, total)
+                return pags.length > 0 && !isComplete([...pags, ...sobrasCard], total)
               })
 
               if (loteEntries.length === 0 && solosFiltrados.length === 0) {
@@ -1831,7 +1831,8 @@ export function FinanceiroView({
                     const totalSobras = sobrasLote.reduce((s, l) => s + l.valor, 0)
                     const total = totalPedidos + totalSobras
                     const pagamentosLote = pagamentosPorLote[loteId] ?? []
-                    const totalPago = pagamentosLote.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+                    // Pago = pagamentos do pedido + sobras pagas à parte
+                    const totalPago = [...pagamentosLote, ...sobrasLote].filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
                     const pagoPct = total > 0 ? Math.min(100, Math.round((totalPago / total) * 100)) : 0
                     const completo = totalPago >= total && total > 0
                     const restante = Math.max(0, total - totalPago)
@@ -1935,7 +1936,7 @@ export function FinanceiroView({
                     const sobrasCard = sobrasPorCard[card.id] ?? []
                     const totalSobrasCard = sobrasCard.reduce((s, l) => s + l.valor, 0)
                     const totalCard = card.preco + totalSobrasCard
-                    const totalPagoCard = pagamentosCard.filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
+                    const totalPagoCard = [...pagamentosCard, ...sobrasCard].filter(p => p.status === "pago").reduce((s, p) => s + p.valor, 0)
                     const pagoPctCard = totalCard > 0 ? Math.min(100, Math.round((totalPagoCard / totalCard) * 100)) : 0
                     const completoCard = totalPagoCard >= totalCard && totalCard > 0
                     const restanteCard = Math.max(0, totalCard - totalPagoCard)
