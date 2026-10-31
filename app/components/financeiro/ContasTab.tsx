@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { Landmark, PiggyBank, CreditCard, Wallet } from "lucide-react"
+import { Landmark, PiggyBank, CreditCard, Wallet, X } from "lucide-react"
 import { ContaBancaria, Configuracoes } from "../../config"
 import { brl } from "../../utils"
 
@@ -66,7 +66,7 @@ export function ContasTab({ config, onUpdateConfig }: Props) {
   const totalContas = ativas.filter(c => c.tipo !== "credito").length
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="space-y-5 pt-1">
       {/* KPI principal de caixa */}
       {contasComSaldo > 0 && (
         <div className="rounded-2xl px-5 py-4"
@@ -82,7 +82,7 @@ export function ContasTab({ config, onUpdateConfig }: Props) {
       )}
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3 max-w-3xl">
         <KpiBox label="Contas ativas" value={String(ativas.filter(c => c.tipo !== "credito").length)} />
         <KpiBox label="Cartões ativos" value={String(ativas.filter(c => c.tipo === "credito" || c.tipo === "debito").length)} />
         <KpiBox label="Limite total crédito" value={brl(totalCredito)} color="violet" />
@@ -96,7 +96,7 @@ export function ContasTab({ config, onUpdateConfig }: Props) {
           <p className="text-[12px] text-[#8E8E93]">Adicione contas bancárias e cartões para vincular nos lançamentos</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
           {contas.map(c => {
             const t = TIPOS.find(x => x.value === c.tipo)!
             const isEd = editandoSaldo === c.id
@@ -149,7 +149,7 @@ export function ContasTab({ config, onUpdateConfig }: Props) {
                     </button>
                     <button onClick={() => del(c.id)}
                       className="px-2.5 py-1.5 text-[11px] font-medium rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 transition-colors">
-                      ✕
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>

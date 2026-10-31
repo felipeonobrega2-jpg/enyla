@@ -1,5 +1,5 @@
 "use client"
-import { CheckCircle2, Clock, ClipboardList } from "lucide-react"
+import { CheckCircle2, Clock, ClipboardList, X } from "lucide-react"
 import { useState } from "react"
 import { GastoFixo, CategoriaFinanceira, ContaBancaria, Configuracoes } from "../../config"
 import { LancamentoFinanceiro } from "../../types"
@@ -54,9 +54,9 @@ export function FixasTab({ config, lancamentos, onUpdateConfig, onLancar }: Prop
   const pctPago    = totalMensal > 0 ? (totalPago / totalMensal) * 100 : 0
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="space-y-5 pt-1">
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3 max-w-3xl">
         <KpiBox label="Comprometido/mês"  value={brl(totalMensal)}         color="rose" />
         <KpiBox label="Pago este mês"     value={brl(totalPago)}           color="green" />
         <KpiBox label="Pendente"          value={brl(totalMensal - totalPago)} color="amber" />
@@ -90,7 +90,7 @@ export function FixasTab({ config, lancamentos, onUpdateConfig, onLancar }: Prop
           <p className="text-[12px] text-[#8E8E93]">Adicione aluguel, energia, salários e outros recorrentes mensais</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
           {gastosFixos.map(gf => {
             const pago  = statusMes(gf)
             const cat   = catsDesp.find(c => c.id === gf.categoriaId)
@@ -152,7 +152,7 @@ export function FixasTab({ config, lancamentos, onUpdateConfig, onLancar }: Prop
                     </button>
                     <button onClick={() => del(gf.id)}
                       className="px-2.5 py-1.5 text-[11px] font-medium rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 transition-colors">
-                      ✕
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>

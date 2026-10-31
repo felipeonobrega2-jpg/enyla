@@ -181,3 +181,71 @@ export function calcularResumoFinanceiro(kanban: KanbanCard[], lancamentos: Lanc
     vencidos,
   }
 }
+
+// ── DRE (regime de caixa) ──────────────────────────────────────────────────────
+// Mesma base do "resultado" do Financeiro: o que foi pago no período, sem os
+// lançamentos da conta corrente de fornecedor (débitos e abatimentos não são caixa).
+
+export type LinhaDre = { nome: string; valor: number }
+
+export type Dre = {
+  receitaPedidos: number
+  receitaSobras: number
+  receitaOutras: number
+  receitaParcerias: number
+  receita: number
+  custosProducao: LinhaDre[]      // despesas ligadas a pedidos, por tipo
+  custoProducao: number
+  margemBruta: number
+  margemBrutaPct: number | null
+  despesasOperacionais: LinhaDre[] // demais despesas, por categoria
+  despesaOperacional: number
+  resultado: number
+  resultadoPct: number | null
+  impostoEstimado: number
+  resultadoAposImposto: number
+}
+
+const agrupar = (ls: LancamentoFinanceiro[], nome: (l: LancamentoFinanceiro) => string): LinhaDre[] => {
+  const m = new Map<string, number>()
+  for (const l of ls) m.set(nome(l), (m.get(nome(l)) ?? 0) + l.valor)
+  return [...m.entries()].map(([n, valor]) => ({ nome: n, valor })).sort((a, b) => b.valor - a.valor)
+}
+
+export function dreDoPeriodo(args: {
+  lancamentos: LancamentoFinanceiro[]
+  noPeriodo: (l: LancamentoFinanceiro) => boolean
+  parcerias?: number
+  nomeCategoria: (id: string) => string
+  impostoPct?: number
+}): Dre {
+  const { lancamentos, noPeriodo, nomeCategoria } = args
+  const base = lancamentos.filter(l => l.status === "pago" && l.formaPagamento !== "conta" && noPeriodo(l))
+  const receitas = base.filter(l => l.tipo === "receita")
+  const despesas = base.filter(l => l.tipo === "despesa")
+  const soma = (ls: LancamentoFinanceiro[]) => ls.reduce((s, l) => s + l.valor, 0)
+  const ligado = (l: LancamentoFinanceiro) => !!(l.cardId || l.loteId)
+
+  const receitaSobras = soma(receitas.filter(isSobra))
+  const receitaPedidos = soma(receitas.filter(l => !isSobra(l) && ligado(l)))
+  const receitaOutras = soma(receitas.filter(l => !isSobra(l) && !ligado(l)))
+  const receitaParcerias = args.parcerias ?? 0
+  const receita = receitaSobras + receitaPedidos + receitaOutras + receitaParcerias
+
+  // Custo de produção: ligado a um pedido, ou de categoria de fornecedor/material/terceirização
+  const deProducao = (l: LancamentoFinanceiro) => ligado(l) || l.categoria === "fornecedor" || l.categoria === "materiais"
+    || /fornecedor|terceiriz|materia|insumo/i.test(nomeCategoria(l.categoria || ""))
+  const custosProducao = agrupar(despesas.filter(deProducao), l => l.subcategoria || nomeCategoria(l.categoria || "outros"))
+  const despesasOperacionais = agrupar(despesas.filter(l => !deProducao(l)), l => nomeCategoria(l.categoria || "outros"))
+  const custoProducao = custosProducao.reduce((s, x) => s + x.valor, 0)
+  const despesaOperacional = despesasOperacionais.reduce((s, x) => s + x.valor, 0)
+  const margemBruta = receita - custoProducao
+  const resultado = margemBruta - despesaOperacional
+  const impostoEstimado = Math.max(0, receita * (args.impostoPct ?? 0) / 100)
+  return {
+    receitaPedidos, receitaSobras, receitaOutras, receitaParcerias, receita,
+    custosProducao, custoProducao, margemBruta, margemBrutaPct: receita > 0 ? margemBruta / receita * 100 : null,
+    despesasOperacionais, despesaOperacional, resultado, resultadoPct: receita > 0 ? resultado / receita * 100 : null,
+    impostoEstimado, resultadoAposImposto: resultado - impostoEstimado,
+  }
+}

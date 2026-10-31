@@ -2,6 +2,7 @@
 
 import { CaixaView } from "./CaixaView"
 import { previsaoDeCaixa } from "../lib/caixa"
+import { normalizarProducao } from "../lib/producao"
 import React, { useState, useMemo, useEffect, useRef } from "react"
 import { CheckCircle2, Factory, TrendingUp, TrendingDown, DollarSign, Clock, AlertTriangle, Landmark, Plus, ChevronLeft, ChevronRight, Search } from "lucide-react"
 import { montarPedidos, recebiveis, pixExpirado, Pedido } from "../lib/negocio"
@@ -17,7 +18,7 @@ import { FixasTab } from "./financeiro/FixasTab"
 import { FornecedoresTab } from "./financeiro/FornecedoresTab"
 import {
   hoje, isReceitaPendenteValida, pedidosElegiveis as calcPedidosElegiveis,
-  calcularPedidosFechados, pedidosAbertos, contarNaoRegistrados, calcularVencidos,
+  calcularPedidosFechados, pedidosAbertos, contarNaoRegistrados, calcularVencidos, dreDoPeriodo,
 } from "../lib/financeiro"
 
 
@@ -1278,16 +1279,6 @@ export function FinanceiroView({
   }
 
   // DRE por categoria de despesas
-  const dreDesp = useMemo(() => {
-    const map: Record<string, number> = {}
-    for (const l of lancamentos.filter(inPeriodo)) {
-      if (l.tipo !== "despesa" || l.status !== "pago") continue
-      const cat = l.categoria || "outros"
-      map[cat] = (map[cat] ?? 0) + l.valor
-    }
-    return Object.entries(map).sort((a, b) => b[1] - a[1])
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lancamentos, periodo, mesOffset])
 
   // Dados mensais — últimos 12 meses (para charts do dashboard)
   const MES_BR = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"]
@@ -1527,29 +1518,55 @@ export function FinanceiroView({
         })()}
 
         {/* ── DRE ── */}
-        {tab === "dre" && (
-          <div className="space-y-5 max-w-2xl">
-            {/* DRE table */}
-            <div className="rounded-xl overflow-hidden"
-              style={{ background: "var(--bg-surface)", border: "1px solid rgba(60,60,67,0.08)" }}>
-              <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
-                <p className="font-bold text-[13px]" style={{ color: "var(--text-main)" }}>DRE — {PERIODO_LABEL[periodo]}</p>
-                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-faint)" }}>Demonstrativo do Resultado do Exercício</p>
-              </div>
-              <div>
-                <DreRow label="Receitas de pedidos" value={lancamentos.filter(l => l.tipo === "receita" && l.status === "pago" && inPeriodo(l)).reduce((s, l) => s + l.valor, 0)} bold accent="green" />
-                {negociosPagos.length > 0 && (
-                  <DreRow label="Receitas de parcerias" value={negociosPagos.reduce((s, n) => s + n.comissaoValor, 0)} accent="green" />
-                )}
-                {dreDesp.map(([cat, val]) => (
-                  <DreRow key={cat} label={nomeCategoria(cat, catsDesp)} value={-val} />
-                ))}
-                {dreDesp.length === 0 && <DreRow label="Despesas" value={0} />}
-                <DreRow label="Resultado líquido" value={kpis.resultado}
-                  bold accent={kpis.resultado >= 0 ? "green" : "rose"} separator />
-              </div>
+        {tab === "dre" && (() => {
+          const dre = dreDoPeriodo({
+            lancamentos, noPeriodo: inPeriodo, parcerias: negociosPagos.reduce((s, n) => s + n.comissaoValor, 0),
+            nomeCategoria: id => nomeCategoria(id, catsDesp), impostoPct: normalizarProducao(config?.producao).impostoPct,
+          })
+          const pctDe = (v: number) => dre.receita > 0 ? `${num(v / dre.receita * 100, 1)}%` : ""
+          const Linha = ({ nome, valor, nivel = 0, forte, tom }: { nome: string; valor: number; nivel?: 0 | 1; forte?: boolean; tom?: "sucesso" | "perigo" }) => (
+            <div className={`flex items-center gap-3 px-5 py-2.5 ${forte ? "bg-[rgba(116,116,128,0.04)]" : ""}`}>
+              <span className={`flex-1 text-[13px] ${nivel ? "pl-4 text-[#5e5c68]" : "text-[#191625]"} ${forte ? "font-semibold" : ""}`}>{nome}</span>
+              <span className="w-14 text-right text-[11px] text-[#898892] ds-num">{pctDe(Math.abs(valor))}</span>
+              <span className={`w-32 text-right text-[13px] ds-num ${forte ? "font-semibold" : ""} ${tom === "sucesso" ? "text-[#009351]" : tom === "perigo" ? "text-[#d33a3c]" : "text-[#191625]"}`}>
+                {valor < 0 ? "−" : ""}{brl(Math.abs(valor))}
+              </span>
             </div>
-
+          )
+          return (
+          <div className="space-y-4">
+            <GradeKpis>
+              <Kpi rotulo="Receita recebida" icone={<TrendingUp className="w-3.5 h-3.5" />} tom="sucesso" valor={dre.receita} formato={brl} sub={PERIODO_LABEL[periodo].toLowerCase()} />
+              <Kpi rotulo="Custo de produção" icone={<Factory className="w-3.5 h-3.5" />} tom="perigo" valor={dre.custoProducao} formato={brl} sub={pctDe(dre.custoProducao) ? `${pctDe(dre.custoProducao)} da receita` : undefined} />
+              <Kpi rotulo="Margem bruta" icone={<Landmark className="w-3.5 h-3.5" />} tom={dre.margemBrutaPct == null ? "neutro" : dre.margemBrutaPct >= 45 ? "sucesso" : "alerta"}
+                valor={dre.margemBrutaPct} formato={n => `${num(n, 1)}%`} sub={brl(dre.margemBruta)} />
+              <Kpi rotulo="Despesas operacionais" icone={<TrendingDown className="w-3.5 h-3.5" />} tom="perigo" valor={dre.despesaOperacional} formato={brl} />
+              <Kpi rotulo="Resultado" icone={<DollarSign className="w-3.5 h-3.5" />} tom={dre.resultado >= 0 ? "sucesso" : "perigo"} valor={dre.resultado} formato={brl}
+                sub={dre.resultadoPct != null ? `${num(dre.resultadoPct, 1)}% da receita` : undefined} />
+            </GradeKpis>
+            <div className="grid grid-cols-1 xl:grid-cols-[1.3fr_1fr] gap-4 items-start">
+            <Cartao padding={false} className="ds-entrada overflow-hidden">
+              <div className="px-5 pt-5">
+                <TituloCartao titulo={`Demonstrativo de resultado · ${PERIODO_LABEL[periodo].toLowerCase()}`} icone={<Landmark className="w-4 h-4" />}
+                  sub="Regime de caixa: o que entrou e saiu no período. Lançamentos na conta corrente de fornecedor ficam de fora." />
+              </div>
+              <div className="divide-y divide-[rgba(60,60,67,0.05)] pb-1">
+                <Linha nome="Receita recebida" valor={dre.receita} forte tom="sucesso" />
+                {dre.receitaPedidos > 0 && <Linha nome="Pedidos" valor={dre.receitaPedidos} nivel={1} />}
+                {dre.receitaSobras > 0 && <Linha nome="Sobras" valor={dre.receitaSobras} nivel={1} />}
+                {dre.receitaParcerias > 0 && <Linha nome="Parcerias" valor={dre.receitaParcerias} nivel={1} />}
+                {dre.receitaOutras > 0 && <Linha nome="Outras receitas" valor={dre.receitaOutras} nivel={1} />}
+                <Linha nome="Custos de produção" valor={-dre.custoProducao} forte tom="perigo" />
+                {dre.custosProducao.map(x => <Linha key={x.nome} nome={x.nome} valor={-x.valor} nivel={1} />)}
+                <Linha nome="Margem bruta" valor={dre.margemBruta} forte tom={dre.margemBruta >= 0 ? "sucesso" : "perigo"} />
+                <Linha nome="Despesas operacionais" valor={-dre.despesaOperacional} forte tom="perigo" />
+                {dre.despesasOperacionais.map(x => <Linha key={x.nome} nome={x.nome} valor={-x.valor} nivel={1} />)}
+                <Linha nome="Resultado" valor={dre.resultado} forte tom={dre.resultado >= 0 ? "sucesso" : "perigo"} />
+                {dre.impostoEstimado > 0 && <Linha nome={`Impostos estimados (${num(normalizarProducao(config?.producao).impostoPct, 1)}% da receita)`} valor={-dre.impostoEstimado} nivel={1} />}
+                {dre.impostoEstimado > 0 && <Linha nome="Resultado depois dos impostos" valor={dre.resultadoAposImposto} forte tom={dre.resultadoAposImposto >= 0 ? "sucesso" : "perigo"} />}
+              </div>
+            </Cartao>
+            <div className="space-y-4">
             {/* Margem de terceirizados */}
             {margemTerceiros.itens.length > 0 && (
               <div className="rounded-xl overflow-hidden"
@@ -1613,8 +1630,11 @@ export function FinanceiroView({
                 </div>
               </div>
             )}
+            </div>
+            </div>
           </div>
-        )}
+          )
+        })()}
 
         {/* ── A RECEBER ── */}
         {tab === "receber" && (
@@ -2348,24 +2368,6 @@ export function FinanceiroView({
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-function DreRow({ label, value, bold, accent, separator }: {
-  label: string; value: number; bold?: boolean; separator?: boolean
-  accent?: "green" | "rose"
-}) {
-  const valCls = accent === "green" ? "text-emerald-700"
-               : accent === "rose"  ? "text-rose-600"
-               : value < 0          ? "text-rose-600"
-               :                      "text-[#5e5c68]"
-  return (
-    <div className={`px-5 py-3 flex items-center justify-between ${separator ? "border-t border-[rgba(60,60,67,0.1)] bg-[rgba(116,116,128,0.04)]" : ""}`}>
-      <span className={`text-[12.5px] ${bold ? "font-bold text-[#191625]" : "text-[#72707d]"}`}>{label}</span>
-      <span className={`text-[13px] ds-num ${bold ? "font-semibold" : "font-semibold"} ${valCls}`}>
-        {value < 0 ? `−${brl(Math.abs(value))}` : brl(value)}
-      </span>
-    </div>
-  )
-}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

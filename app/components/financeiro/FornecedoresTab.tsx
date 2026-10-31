@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { Factory } from "lucide-react"
+import { Factory, X } from "lucide-react"
 import { Fornecedor, Configuracoes } from "../../config"
 import { LancamentoFinanceiro } from "../../types"
 
@@ -69,7 +69,7 @@ export function FornecedoresTab({ config, lancamentos, onUpdateConfig, onAddLanc
   })
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="space-y-5 pt-1">
 
       {/* Cards de conta por fornecedor */}
       {contaAtivos.length > 0 && (
@@ -113,7 +113,7 @@ export function FornecedoresTab({ config, lancamentos, onUpdateConfig, onAddLanc
       )}
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3 max-w-3xl">
         <Kpi label="Total cadastrados" value={String(fornecedores.length)} />
         <Kpi label="Ativos" value={String(ativos.length)} color="green" />
         <Kpi label="Categorias" value={String(categorias.length)} />
@@ -152,7 +152,7 @@ export function FornecedoresTab({ config, lancamentos, onUpdateConfig, onAddLanc
           {!busca && <p className="text-[12px] text-[#8E8E93]">Cadastre papelarias, gráficas parceiras, serviços e qualquer fornecedor recorrente</p>}
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
           {lista.map(f => (
             <div key={f.id}
               className={`bg-white border border-[rgba(60,60,67,0.08)] rounded-2xl px-5 py-4 flex items-center gap-4 transition-opacity ${!f.ativo ? "opacity-50" : ""}`}>
@@ -202,7 +202,7 @@ export function FornecedoresTab({ config, lancamentos, onUpdateConfig, onAddLanc
                 </button>
                 <button onClick={() => del(f.id)}
                   className="px-2.5 py-1.5 text-[11px] font-medium rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 transition-colors">
-                  ✕
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
@@ -320,7 +320,7 @@ function ModalContaFornecedor({
                 </button>
                 <button onClick={() => setEditandoSaldo(false)}
                   className="px-2.5 py-1.5 text-[11.5px] font-medium text-[#8E8E93] hover:text-[#5e5c68] shrink-0">
-                  ✕
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </>
             ) : (
