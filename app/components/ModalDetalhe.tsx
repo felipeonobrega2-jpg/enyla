@@ -196,12 +196,13 @@ export function ModalDetalhe({
   const finDespesasPagas = useMemo(() => finDespesasCard.filter(l => l.status === "pago" || l.formaPagamento === "conta"), [finDespesasCard])
   const finTotalRecebido = useMemo(() => finReceitasPagas.reduce((s, l) => s + l.valor, 0), [finReceitasPagas])
   const finTotalDesp     = useMemo(() => finDespesasCard.reduce((s, l) => s + l.valor, 0), [finDespesasCard])
-  // base para margem/markup: quando totalmente pago inclui sobras; senão usa valor orçado
-  const finBase          = finTotalRecebido >= (card?.preco ?? 0) && finTotalRecebido > 0 ? finTotalRecebido : (card?.preco ?? 0)
-  const finResultado     = finTotalRecebido - finTotalDesp
+  // base para margem: valor orçado + sobras lançadas (o custo já inclui as unidades extras), pagas ou não
+  const finSobras        = useMemo(() => finReceitasCard.filter(l => l.categoria === "sobra").reduce((s, l) => s + l.valor, 0), [finReceitasCard])
+  const finBase          = (card?.preco ?? 0) + finSobras
+  const finResultado     = finBase - finTotalDesp
   const finSemDados      = finReceitasCard.length === 0 && finDespesasCard.length === 0
   const finMargemPct     = !finSemDados && finBase > 0 ? ((finBase - finTotalDesp) / finBase) * 100 : null
-  const finPercPagoBruto = (card?.preco ?? 0) > 0 ? (finTotalRecebido / (card?.preco ?? 0)) * 100 : 0
+  const finPercPagoBruto = finBase > 0 ? (finTotalRecebido / finBase) * 100 : 0
   const finPercPago      = Math.min(100, finPercPagoBruto)
   const finCmvUnit       = finTotalDesp > 0 && (card?.quantidade ?? 0) > 0 ? finTotalDesp / (card?.quantidade ?? 1) : null
 
@@ -554,7 +555,7 @@ export function ModalDetalhe({
 
                     {/* KPI grid 3 colunas */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 7, marginBottom: 10 }}>
-                      <KpiCard label="Valor" value={brl(card.preco)} color="#191625" bg="rgba(116,116,128,0.05)" />
+                      <KpiCard label="Valor" value={brl(finBase)} color="#191625" sub={finSobras > 0 ? `inclui ${brl(finSobras)} de sobras` : undefined} bg="rgba(116,116,128,0.05)" />
                       <KpiCard label="Recebido" value={brl(finTotalRecebido)} color="#009351"
                         sub={`${num(finPercPagoBruto, 0)}% pago`} bg="rgba(116,116,128,0.05)" />
                       <KpiCard label="Custos" value={brl(finTotalDesp)}

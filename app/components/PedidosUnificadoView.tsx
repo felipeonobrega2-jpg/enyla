@@ -67,7 +67,7 @@ export type OrderEntry = {
   cards: KanbanCard[]; coluna: number; dataPedido: string
   dataFechamento?: string; dataEntregaPrevista?: string; dataEntregaReal?: string; prazoRecebimentoInterno?: string
   receitas: LancamentoFinanceiro[]; despesas: LancamentoFinanceiro[]
-  precoTotal: number; totalPago: number; totalDespesa: number
+  precoTotal: number; sobras: number; totalPago: number; totalDespesa: number
   aReceber: number; cobrado: number; vencido: number; semCobranca: number
   specs: string; qtdTotal: number
 }
@@ -172,7 +172,7 @@ export function PedidosUnificadoView(props: Props) {
       dataEntregaReal: p.dataEntregaReal,
       prazoRecebimentoInterno: p.cards.find(c => c.prazoRecebimentoInterno)?.prazoRecebimentoInterno,
       receitas: p.receitas, despesas: p.despesas,
-      precoTotal: p.valor, qtdTotal: p.quantidade,
+      precoTotal: p.venda, sobras: p.sobras, qtdTotal: p.quantidade,
       totalPago: p.recebido, totalDespesa: p.custoDireto,
       aReceber: p.aReceber, cobrado: p.cobrado, vencido: p.vencido, semCobranca: p.semCobranca,
       specs: buildSpecs(p.cards),
@@ -598,7 +598,7 @@ function DashboardTab({ entries, onDetalhes }: {
   const semCobranca    = entries.reduce((s, e) => s + e.semCobranca, 0)
   const ticketMedio    = entries.length > 0 ? contratado / entries.length : 0
 
-  const margem = margemContribuicao(entries.map(e => ({ valor: e.precoTotal, custoDireto: e.totalDespesa } as Pedido)))
+  const margem = margemContribuicao(entries.map(e => ({ venda: e.precoTotal, custoDireto: e.totalDespesa } as Pedido)))
 
   const mesesSet = new Set<string>()
   entries.forEach(e => { if (e.dataFechamento) mesesSet.add(e.dataFechamento.slice(0, 7)) })
@@ -825,7 +825,7 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
                   {(() => {
                     return (
                       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                        <SmallKpi label="Valor" value={brl(entry.precoTotal)} color={txt} sub={`${num(entry.qtdTotal)} un`} />
+                        <SmallKpi label="Valor" value={brl(entry.precoTotal)} color={txt} sub={entry.sobras > 0 ? `inclui ${brl(entry.sobras)} de sobras` : `${num(entry.qtdTotal)} un`} />
                         <SmallKpi label="Recebido" value={brl(entry.totalPago)} color="#009351" sub={`${num(percPago, 0)}% pago`} />
                         <SmallKpi label="Custos lançados" value={brl(entry.totalDespesa)} color={entry.totalDespesa > 0 ? "#d33a3c" : sub}
                           sub={entry.totalDespesa > 0 ? `${entry.despesas.filter(l => l.status === "pago" || l.formaPagamento === "conta").length} lançamentos` : "nenhum ainda"} />

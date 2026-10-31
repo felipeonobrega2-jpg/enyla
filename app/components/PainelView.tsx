@@ -279,10 +279,10 @@ export function PainelView({
   const abrirMargem = () => setDetalhe({
     titulo: "Margem de contribuição",
     sub: margem.pct != null ? `${pct(margem.pct)} sobre ${brl(margem.valor)} vendidos com custo lançado` : "Nenhum pedido do período tem custo lançado",
-    linhas: vendas.pedidos.length ? [...vendas.pedidos].sort((a, b) => (a.custoDireto > 0 ? (a.valor - a.custoDireto) / a.valor : 2) - (b.custoDireto > 0 ? (b.valor - b.custoDireto) / b.valor : 2)).map(p => {
-      const m = p.custoDireto > 0 && p.valor > 0 ? (p.valor - p.custoDireto) / p.valor * 100 : null
+    linhas: vendas.pedidos.length ? [...vendas.pedidos].sort((a, b) => (a.custoDireto > 0 ? (a.venda - a.custoDireto) / a.venda : 2) - (b.custoDireto > 0 ? (b.venda - b.custoDireto) / b.venda : 2)).map(p => {
+      const m = p.custoDireto > 0 && p.venda > 0 ? (p.venda - p.custoDireto) / p.venda * 100 : null
       return <LinhaLista key={p.key} titulo={`${p.numero} · ${p.nomeCliente}`}
-        sub={p.custoDireto > 0 ? `venda ${brl(p.valor)} · custo ${brl(p.custoDireto)}` : "sem custo lançado"}
+        sub={p.custoDireto > 0 ? `venda ${brl(p.venda)}${p.sobras > 0 ? ` (sobras ${brl(p.sobras)})` : ""} · custo ${brl(p.custoDireto)}` : "sem custo lançado"}
         valor={m == null ? "—" : pct(m)} tom={m == null ? undefined : m < 30 ? "perigo" : m < 45 ? "alerta" : "sucesso"}
         onClick={() => { fechar(); onAbrirCard(cardDoPedido(p)) }} />
     }) : <Vazio icone={<Percent className="w-8 h-8" />} titulo="Nenhum pedido no período" />,

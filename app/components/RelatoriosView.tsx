@@ -122,7 +122,7 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente }
     const d = new Date(hoje.getFullYear(), hoje.getMonth() - 11 + i, 1)
     const p: Periodo = { from: d, to: new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59) }
     const doMes = pedidos.filter(x => noPeriodo(x.dataFechamento, p))
-    return { rotulo: d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""), a: doMes.reduce((s, x) => s + x.valor, 0), b: doMes.reduce((s, x) => s + x.custoDireto, 0), destaque: i === 11 }
+    return { rotulo: d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""), a: doMes.reduce((s, x) => s + x.venda, 0), b: doMes.reduce((s, x) => s + x.custoDireto, 0), destaque: i === 11 }
   })
 
   // Origem dos clientes (campanha informada no cadastro) × valor comprado no período

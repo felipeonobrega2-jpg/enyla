@@ -119,6 +119,8 @@ export type Pedido = {
   recebido: number
   /** Sobras vendidas ao cliente neste pedido (somam ao que ele deve). */
   sobras: number
+  /** Venda efetiva: valor contratado + sobras. Base de margem — o custo lançado já inclui as unidades extras. */
+  venda: number
   /** Saldo devedor: valor + sobras − recebido. É o "a receber" em todas as telas. */
   aReceber: number
   /** Parte do saldo com cobrança lançada (pendente). */
@@ -188,7 +190,7 @@ export function montarPedidos(kanban: KanbanCard[], lancamentos: LancamentoFinan
       dataEntregaReal: reais[reais.length - 1],
       valor,
       quantidade: base.reduce((s, c) => s + c.quantidade, 0),
-      receitas, despesas, recebido, sobras,
+      receitas, despesas, recebido, sobras, venda: valor + sobras,
       aReceber: saldo, cobrado, vencido, semCobranca: saldo - cobrado,
       custoDireto: despesas
         .filter(l => l.status === "pago" || l.formaPagamento === "conta")
@@ -329,7 +331,7 @@ export function pipelineComercial(kanban: KanbanCard[]) {
 // ─── Margem ──────────────────────────────────────────────────────────────────
 
 export type Margem = {
-  /** Margem de contribuição ponderada (Σ(valor − custo) ÷ Σ valor) dos pedidos com custo lançado. */
+  /** Margem de contribuição ponderada (Σ(venda − custo) ÷ Σ venda) dos pedidos com custo lançado. */
   pct: number | null
   valor: number
   custo: number
@@ -339,7 +341,7 @@ export type Margem = {
 
 export function margemContribuicao(pedidos: Pedido[]): Margem {
   const comCusto = pedidos.filter(p => p.custoDireto > 0)
-  const valor = comCusto.reduce((s, p) => s + p.valor, 0)
+  const valor = comCusto.reduce((s, p) => s + p.venda, 0)
   const custo = comCusto.reduce((s, p) => s + p.custoDireto, 0)
   return {
     pct: valor > 0 ? ((valor - custo) / valor) * 100 : null,
@@ -385,7 +387,7 @@ export function resumoClientes(kanban: KanbanCard[], pedidos: Pedido[]): Cliente
   for (const p of pedidos) {
     const r = get(p.nomeCliente)
     r.pedidos.push(p)
-    r.ltv += p.valor
+    r.ltv += p.venda
     r.recebido += p.recebido
   }
   for (const r of map.values()) {
