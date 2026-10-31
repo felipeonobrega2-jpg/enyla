@@ -1,428 +1,259 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+// Enyla no celular: os mesmos números do computador (lib/negocio), pensados para o polegar.
+
+import React, { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import {
-  KanbanCard, LancamentoFinanceiro,
-  COLUNAS_KANBAN, COL_FECHADO, COL_PERDIDO, COL_ENTREGUE, COL_HOT, COL_EXPEDICAO,
-} from "../types"
+  Home, Wallet, Factory, FileText, ChevronRight, MessageCircle, Copy, Check, X, Target, AlertTriangle,
+  CircleCheck, CalendarX2, CalendarClock, Clock, Hourglass, Receipt, Link2, Truck, QrCode, Share2,
+} from "lucide-react"
+import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COLUNAS_KANBAN, COL_HOT } from "../types"
 import { Configuracoes, CONFIG_PADRAO } from "../config"
-import { brl } from "../utils"
+import {
+  Periodo, Pedido, montarPedidos, vendasDoPeriodo, caixaDoPeriodo, recebiveis, producao, pipelineComercial,
+  margemContribuicao, conversao, orcamentosDoPeriodo, parseData, nomeChave, isTerceirizado, isAberto,
+} from "../lib/negocio"
+import { pendencias, Pendencia, TipoPendencia, cardDoPedido, prazoTexto, linkWhatsApp } from "../lib/pendencias"
+import { normalizarProducao, nomeServicos } from "../lib/producao"
+import { normalizarMetas } from "../lib/metas"
+import { ehDiaUtil, diasUteisEntre } from "../lib/diasUteis"
+import { brl, num } from "../utils"
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+type Aba = "inicio" | "cobrancas" | "producao" | "orcamentos"
+type PeriodoId = "mes" | "mesPassado" | "90d" | "ano"
+type HistItem = { form: FormData; numero?: string }
 
-const MESES_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
-const MARCOS = [
-  { threshold: 10_000,     label: "Primeiro Salto",    sub: "R$10k"    },
-  { threshold: 50_000,     label: "Tração Real",        sub: "R$50k"    },
-  { threshold: 100_000,    label: "6 Dígitos",          sub: "R$100k"   },
-  { threshold: 500_000,    label: "Meio Milhão",        sub: "R$500k"   },
-  { threshold: 1_000_000,  label: "Primeiro Milhão",    sub: "R$1M"     },
-  { threshold: 10_000_000, label: "Empresa de Verdade", sub: "R$10M"    },
+const PERIODOS: { v: PeriodoId; nome: string }[] = [
+  { v: "mes", nome: "Este mês" }, { v: "mesPassado", nome: "Mês passado" }, { v: "90d", nome: "90 dias" }, { v: "ano", nome: "Ano" },
 ]
 
-const STAGE_COLOR: Record<number, { color: string; bg: string }> = {
-  1:  { color: "#009351", bg: "rgba(0,147,81,0.10)"   },
-  2:  { color: "#5856D6", bg: "rgba(88,86,214,0.10)"  },
-  3:  { color: "#8456e8", bg: "rgba(132,86,232,0.10)" },
-  4:  { color: "#c57800", bg: "rgba(197,120,0,0.10)"  },
-  5:  { color: "#0ea5e9", bg: "rgba(14,165,233,0.10)" },
-  6:  { color: "#e85686", bg: "rgba(232,86,134,0.10)" },
-  7:  { color: "#7c3aed", bg: "rgba(124,58,237,0.10)" },
-  8:  { color: "#f97316", bg: "rgba(249,115,22,0.10)" },
-  9:  { color: "#009351", bg: "rgba(0,147,81,0.10)"   },
-  10: { color: "#d33a3c", bg: "rgba(211,58,60,0.10)"  },
-}
-
-type TabId = "visao" | "cobrancas" | "producao" | "negocios"
-type PeriodoId = "mes" | "mes_ant" | "3m" | "ano" | "tudo"
-
-type ClienteDevedor = { nome: string; total: number; vencido: number; items: LancamentoFinanceiro[] }
-type EtapaItem = { col: number; label: string; count: number; valor: number }
-type DashData = {
-  receita: number; qtd: number; ticket: number; entregues: number; variacao: number | null
-  margemMedia: number | null
-  recebido: number; despesas: number; saldo: number
-  aReceber: number; valorVencido: number; vencidosAll: LancamentoFinanceiro[]
-  clientesDevedores: ClienteDevedor[]
-  emProducao: number; emProducaoValor: number
-  porEtapa: EtapaItem[]; atrasados: KanbanCard[]; vencendoEm5: KanbanCard[]; semDataEntrega: number
-  meses6: { label: string; v: number }[]
-  totalFaturado: number; proximoMarco: { threshold: number; label: string; sub: string } | null
-  pctMarco: number; faturadoMes: number; pctMeta: number
-  ultimosNegocios: KanbanCard[]; winRate: number | null; pedsMes: number
-}
-
-const PERIODOS: { id: PeriodoId; label: string }[] = [
-  { id: "mes",     label: "Este mês"   },
-  { id: "mes_ant", label: "Mês ant."   },
-  { id: "3m",      label: "3 meses"    },
-  { id: "ano",     label: "Este ano"   },
-  { id: "tudo",    label: "Tudo"       },
-]
-
-const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: "visao",     label: "Visão Geral", icon: "◻" },
-  { id: "cobrancas", label: "Cobranças",   icon: "◻" },
-  { id: "producao",  label: "Produção",    icon: "◻" },
-  { id: "negocios",  label: "Negócios",    icon: "◻" },
-]
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function parseIso(s: string): Date {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + "T12:00:00")
-  try {
-    const [d, m, y] = s.split(",")[0].trim().split("/")
-    return new Date(+y, +m - 1, +d, 12)
-  } catch { return new Date(0) }
-}
-
-function fmtShort(v: number): string {
-  if (Math.abs(v) >= 1_000_000) return `R$${(v / 1_000_000).toFixed(1).replace(".", ",")}M`
-  if (Math.abs(v) >= 1_000) return `R$${(v / 1_000).toFixed(0)}k`
-  return brl(v)
-}
-
-function fmtDate(s: string): string {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    const [y, m, d] = s.split("-")
-    return `${d}/${m}/${y.slice(2)}`
-  }
-  return s.split(",")[0] ?? s
-}
-
-function daysOverdue(dateStr: string): number {
-  return Math.floor((Date.now() - parseIso(dateStr).getTime()) / 86_400_000)
-}
-
-function bounds(periodo: PeriodoId, now: Date): { from: Date | null; to: Date | null } {
-  const y = now.getFullYear(), m = now.getMonth()
-  switch (periodo) {
-    case "mes":     return { from: new Date(y, m, 1), to: now }
-    case "mes_ant": return { from: new Date(y, m - 1, 1), to: new Date(y, m, 1) }
-    case "3m":      return { from: new Date(y, m - 2, 1), to: now }
-    case "ano":     return { from: new Date(y, 0, 1), to: now }
-    case "tudo":    return { from: null, to: null }
+function periodoDe(id: PeriodoId, hoje: Date): Periodo {
+  const y = hoje.getFullYear(), m = hoje.getMonth()
+  const fim = new Date(y, m, hoje.getDate(), 23, 59, 59)
+  switch (id) {
+    case "mes":        return { from: new Date(y, m, 1), to: fim }
+    case "mesPassado": return { from: new Date(y, m - 1, 1), to: new Date(y, m, 0, 23, 59, 59) }
+    case "90d":        return { from: new Date(y, m, hoje.getDate() - 89), to: fim }
+    case "ano":        return { from: new Date(y, 0, 1), to: fim }
   }
 }
 
-function prevBounds(periodo: PeriodoId, now: Date): { from: Date | null; to: Date | null } | null {
-  const y = now.getFullYear(), m = now.getMonth()
-  switch (periodo) {
-    case "mes":     return { from: new Date(y, m - 1, 1), to: new Date(y, m, 1) }
-    case "mes_ant": return { from: new Date(y, m - 2, 1), to: new Date(y, m - 1, 1) }
-    case "3m":      return { from: new Date(y, m - 5, 1), to: new Date(y, m - 2, 1) }
-    case "ano":     return { from: new Date(y - 1, 0, 1), to: new Date(y, 0, 1) }
-    case "tudo":    return null
-  }
+const curto = (n: number) =>
+  Math.abs(n) >= 1_000_000 ? `R$ ${num(n / 1_000_000, 1)} mi`
+  : Math.abs(n) >= 10_000 ? `R$ ${num(n / 1000, n >= 100_000 ? 0 : 1)} mil`
+  : brl(n)
+const dataCurta = (iso?: string) => {
+  const d = parseData(iso)
+  return d ? d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "") : "—"
 }
 
-function inRange(d: Date, f: Date | null, t: Date | null): boolean {
-  return (!f || d >= f) && (!t || d <= t)
+const COR = { perigo: "#d33a3c", alerta: "#c57800", info: "#2f7cf6", sucesso: "#009351", acento: "#8456e8" } as const
+
+const ICONE: Record<TipoPendencia, React.ReactNode> = {
+  aprovado: <CircleCheck className="w-4 h-4" />, atrasado: <CalendarX2 className="w-4 h-4" />, fornecedor: <Factory className="w-4 h-4" />,
+  cobrancaVencida: <Receipt className="w-4 h-4" />, semCobranca: <Receipt className="w-4 h-4" />, conferir: <Receipt className="w-4 h-4" />,
+  entregaProxima: <CalendarClock className="w-4 h-4" />, orcamentoVencendo: <Hourglass className="w-4 h-4" />, semPrazo: <Clock className="w-4 h-4" />,
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ── Peças ─────────────────────────────────────────────────────────────────────
 
-function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+function Cartao({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${className}`}>{children}</div>
+}
+
+function Titulo({ children, extra }: { children: React.ReactNode; extra?: React.ReactNode }) {
   return (
-    <div className={`bg-white border border-[rgba(0,0,0,0.06)] rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${className}`}>
-      {children}
+    <div className="flex items-baseline justify-between px-1 mb-2 mt-1">
+      <p className="text-[13px] font-semibold text-[#191625]">{children}</p>
+      {extra && <span className="text-[11.5px] text-[#8E8E93]">{extra}</span>}
     </div>
   )
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <p className="text-[10.5px] uppercase tracking-wider font-bold text-[#8E8E93] mb-3">{children}</p>
+function Kpi({ rotulo, valor, sub, cor = "#191625", onClick, compacto }: { rotulo: string; valor: string; sub?: string; cor?: string; onClick?: () => void; compacto?: boolean }) {
+  const Comp = onClick ? "button" : "div"
+  return (
+    <Comp onClick={onClick} className="bg-white rounded-2xl p-3.5 text-left shadow-[0_1px_3px_rgba(0,0,0,0.04)] active:scale-[0.98] transition-transform">
+      <p className="text-[11px] text-[#8E8E93] font-medium">{rotulo}</p>
+      <p className={`${compacto ? "text-[15px]" : "text-[19px]"} font-semibold ds-num leading-tight mt-1 whitespace-nowrap`} style={{ color: cor }}>{valor}</p>
+      {sub && <p className="text-[10.5px] text-[#8E8E93] mt-1 leading-snug">{sub}</p>}
+    </Comp>
+  )
 }
 
-function KpiTile({
-  label, value, sub, accent = "#191625", highlight = false, badge,
-}: {
-  label: string; value: string; sub?: string
-  accent?: string; highlight?: boolean; badge?: { text: string; color: string }
+function Linha({ titulo, sub, valor, valorSub, tom, icone, onClick, acao }: {
+  titulo: string; sub?: string; valor?: string; valorSub?: string; tom?: keyof typeof COR
+  icone?: React.ReactNode; onClick?: () => void; acao?: React.ReactNode
 }) {
   return (
-    <div className={`p-4 rounded-2xl bg-white border ${highlight ? "border-[rgba(132,86,232,0.2)]" : "border-[rgba(0,0,0,0.06)]"} shadow-[0_1px_3px_rgba(0,0,0,0.04)]`}>
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93] mb-2">{label}</p>
-      <p className="text-[20px] font-bold tabular-nums leading-none tracking-tight" style={{ color: accent }}>{value}</p>
-      {sub && <p className="text-[10px] text-[#8E8E93] mt-1.5 leading-tight">{sub}</p>}
-      {badge && (
-        <span className="mt-2 inline-flex text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ color: badge.color, background: badge.color + "18" }}>
-          {badge.text}
-        </span>
+    <div className="flex items-center gap-3 px-4 py-3 active:bg-[rgba(116,116,128,0.06)] transition-colors">
+      {icone && (
+        <span className="w-8 h-8 rounded-xl grid place-items-center shrink-0" style={{ color: tom ? COR[tom] : "#5e5c68", background: tom ? `${COR[tom]}14` : "rgba(116,116,128,0.08)" }}>{icone}</span>
       )}
+      <button onClick={onClick} disabled={!onClick} className="flex-1 min-w-0 text-left flex items-center gap-3">
+        <span className="flex-1 min-w-0">
+          <span className="block text-[13.5px] font-medium text-[#191625] truncate">{titulo}</span>
+          {sub && <span className="block text-[11.5px] text-[#8E8E93] truncate mt-0.5">{sub}</span>}
+        </span>
+        {valor && (
+          <span className="text-right shrink-0">
+            <span className="block text-[13.5px] font-semibold ds-num" style={{ color: tom && tom !== "info" ? COR[tom] : "#191625" }}>{valor}</span>
+            {valorSub && <span className="block text-[10.5px] text-[#8E8E93]">{valorSub}</span>}
+          </span>
+        )}
+        {onClick && !acao && <ChevronRight className="w-4 h-4 text-[#C7C7CC] shrink-0" />}
+      </button>
+      {acao}
     </div>
   )
 }
 
-function ProgressBar({ pct, color }: { pct: number; color: string }) {
+function BotaoWhats({ href }: { href?: string }) {
+  if (!href) return null
   return (
-    <div className="h-1.5 rounded-full bg-[rgba(0,0,0,0.06)] overflow-hidden">
-      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(pct * 100, 100)}%`, background: color }} />
+    <a href={href} target="_blank" rel="noreferrer" aria-label="Mandar WhatsApp"
+      className="w-9 h-9 rounded-xl grid place-items-center text-[#25a35a] bg-[#25a35a]/10 active:scale-95 transition-transform shrink-0">
+      <MessageCircle className="w-4 h-4" />
+    </a>
+  )
+}
+
+function Barra({ pct, cor = COR.acento }: { pct: number; cor?: string }) {
+  return (
+    <div className="h-1.5 rounded-full bg-[rgba(116,116,128,0.12)] overflow-hidden">
+      <div className="h-full rounded-full transition-[width] duration-700 ease-out" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: cor }} />
     </div>
   )
 }
 
-function SaldoBadge({ value }: { value: number }) {
-  const pos = value >= 0
-  return (
-    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${pos ? "text-[#009351] bg-[rgba(0,147,81,0.10)]" : "text-[#d33a3c] bg-[rgba(211,58,60,0.10)]"}`}>
-      {pos ? "+" : ""}{fmtShort(value)}
-    </span>
-  )
+function Vazio({ texto }: { texto: string }) {
+  return <p className="px-4 py-6 text-center text-[12.5px] text-[#8E8E93]">{texto}</p>
 }
 
-function MiniChart({ meses }: { meses: { label: string; v: number }[] }) {
-  const max = Math.max(...meses.map(m => m.v), 1)
+// Folha que sobe de baixo com o detalhe e as ações
+function Folha({ aberta, onFechar, children }: { aberta: boolean; onFechar: () => void; children: React.ReactNode }) {
   return (
-    <div className="flex items-end gap-1 h-[56px]">
-      {meses.map((m, i) => (
-        <div key={i} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-          <div className="w-full flex items-end" style={{ height: 40 }}>
-            <div
-              className="w-full rounded-md transition-all"
-              style={{
-                height: `${Math.max((m.v / max) * 100, m.v > 0 ? 6 : 0)}%`,
-                background: i === meses.length - 1 ? "#8456e8" : "rgba(132,86,232,0.20)",
-              }}
-            />
-          </div>
-          <p className="text-[8px] text-[#8E8E93] truncate w-full text-center">{m.label}</p>
-        </div>
-      ))}
+    <div className={`fixed inset-0 z-40 transition-[visibility] duration-300 ${aberta ? "visible" : "invisible pointer-events-none"}`} aria-hidden={!aberta}>
+      <div onClick={onFechar} className={`absolute inset-0 bg-black/30 transition-opacity duration-300 ${aberta ? "opacity-100" : "opacity-0"}`} />
+      <div className={`absolute left-0 right-0 bottom-0 bg-[#F2F2F7] rounded-t-3xl max-h-[88vh] overflow-y-auto transition-transform duration-300 ease-[cubic-bezier(.3,.9,.3,1)] ${aberta ? "translate-y-0" : "translate-y-full"}`}
+        style={{ paddingBottom: "max(env(safe-area-inset-bottom),16px)" }}>
+        <div className="sticky top-0 bg-[#F2F2F7] pt-2.5 pb-1 flex justify-center"><span className="w-10 h-1.5 rounded-full bg-[rgba(60,60,67,0.2)]" /></div>
+        {children}
+      </div>
     </div>
   )
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+function useCopiar() {
+  const [copiado, setCopiado] = useState<string | null>(null)
+  const copiar = (id: string, texto: string) => {
+    navigator.clipboard?.writeText(texto).then(() => { setCopiado(id); setTimeout(() => setCopiado(null), 1600) })
+  }
+  return { copiado, copiar }
+}
+
+// ── Página ────────────────────────────────────────────────────────────────────
 
 export default function MobilePage() {
-  const [kanban, setKanban]       = useState<KanbanCard[]>([])
-  const [lancs, setLancs]         = useState<LancamentoFinanceiro[]>([])
-  const [config, setConfig]       = useState<Configuracoes>(CONFIG_PADRAO)
-  const [loading, setLoading]     = useState(true)
-  const [tab, setTab]             = useState<TabId>("visao")
-  const [periodo, setPeriodo]     = useState<PeriodoId>("mes")
-  const [expandCli, setExpandCli] = useState<string | null>(null)
+  const [kanban, setKanban] = useState<KanbanCard[]>([])
+  const [lancamentos, setLancamentos] = useState<LancamentoFinanceiro[]>([])
+  const [historico, setHistorico] = useState<HistItem[]>([])
+  const [propostas, setPropostas] = useState<PropostaCustom[]>([])
+  const [clientes, setClientes] = useState<Cliente[]>([])
+  const [config, setConfig] = useState<Configuracoes>(CONFIG_PADRAO)
+  const [carregando, setCarregando] = useState(true)
+  const [aba, setAba] = useState<Aba>("inicio")
+  const [periodoId, setPeriodoId] = useState<PeriodoId>("mes")
+  const [aberto, setAberto] = useState<KanbanCard | null>(null)
+  const [folhaAberta, setFolhaAberta] = useState(false)
 
   useEffect(() => {
-    fetch("/api/data")
-      .then(r => r.json())
-      .then(d => {
-        if (d.kanban)      setKanban(d.kanban)
-        if (d.lancamentos) setLancs(d.lancamentos)
-        if (d.config)      setConfig(c => ({ ...CONFIG_PADRAO, ...c, ...d.config }))
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    fetch("/api/data").then(r => r.json()).then(d => {
+      if (d.kanban) setKanban(d.kanban)
+      if (d.lancamentos) setLancamentos(d.lancamentos)
+      if (d.historico) setHistorico(d.historico)
+      if (d.propostasCustom) setPropostas(d.propostasCustom)
+      if (d.clientes) setClientes(d.clientes)
+      if (d.config) setConfig({ ...CONFIG_PADRAO, ...d.config })
+    }).catch(() => {}).finally(() => setCarregando(false))
   }, [])
 
-  const now = useMemo(() => new Date(), [])
-  const hoje = now.toISOString().split("T")[0]
-  const mesAtualKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+  const hoje = useMemo(() => new Date(), [])
+  const pedidos = useMemo(() => montarPedidos(kanban, lancamentos), [kanban, lancamentos])
+  const telefoneDe = (nome: string) => clientes.find(c => nomeChave(c.nome) === nomeChave(nome))?.telefone
 
-  const data = useMemo((): DashData => {
-    const { from, to } = bounds(periodo, now)
-    const pb            = prevBounds(periodo, now)
+  const abrir = (c?: KanbanCard) => { if (!c) return; setAberto(c); setFolhaAberta(true) }
 
-    const confirmados = kanban.filter(c => c.coluna !== 0 && c.coluna !== COL_PERDIDO && c.coluna !== COL_HOT)
+  const pend = useMemo(() => pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom: propostas, clientes, config, hoje }),
+    [pedidos, kanban, lancamentos, historico, propostas, clientes, config, hoje])
+  const rec = useMemo(() => recebiveis(pedidos, lancamentos), [pedidos, lancamentos])
+  const urgentes = pend.filter(p => p.tom === "perigo").length
 
-    const noPeriodo = confirmados.filter(c =>
-      inRange(parseIso(c.dataFechamento ?? c.data), from, to)
-    )
-
-    const receita   = noPeriodo.reduce((s, c) => s + c.preco, 0)
-    const qtd       = noPeriodo.length
-    const ticket    = qtd > 0 ? receita / qtd : 0
-    const entregues = noPeriodo.filter(c => c.coluna === COL_ENTREGUE).length
-
-    const receitaAnterior = pb
-      ? confirmados.filter(c => inRange(parseIso(c.dataFechamento ?? c.data), pb.from, pb.to)).reduce((s, c) => s + c.preco, 0)
-      : null
-    const variacao = receitaAnterior !== null && receitaAnterior > 0
-      ? ((receita - receitaAnterior) / receitaAnterior) * 100 : null
-
-    // ── Margens via custosSnapshot ──
-    const margens = noPeriodo.flatMap(c => {
-      if (!c.custosSnapshot?.length) return []
-      const snap = c.custosSnapshot.find(s => s.quantidade === c.quantidade) ?? c.custosSnapshot[0]
-      return snap.preco > 0 ? [(snap.preco - snap.total) / snap.preco * 100] : []
-    })
-    const margemMedia = margens.length ? margens.reduce((s, m) => s + m, 0) / margens.length : null
-
-    // ── Lançamentos financeiros ──
-    // Usa dataPagamento se disponível, senão dataVencimento (para lançamentos pagos sem data preenchida)
-    const dataEfetiva = (l: LancamentoFinanceiro) => l.dataPagamento || l.dataVencimento
-
-    const recebido = lancs
-      .filter(l => l.tipo === "receita" && l.status === "pago" && inRange(parseIso(dataEfetiva(l)), from, to))
-      .reduce((s, l) => s + l.valor, 0)
-
-    const despesas = lancs
-      .filter(l => l.tipo === "despesa" && l.status === "pago" && inRange(parseIso(dataEfetiva(l)), from, to))
-      .reduce((s, l) => s + l.valor, 0)
-
-    const saldo = recebido - despesas
-
-    // A receber: pendentes (excluindo pix_link vencido)
-    const pendentes = lancs.filter(l =>
-      l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra" &&
-      !(l.categoria === "pix_link" && l.dataVencimento < hoje)
-    )
-    const aReceber     = pendentes.reduce((s, l) => s + l.valor, 0)
-    const vencidosAll  = pendentes.filter(l => l.dataVencimento < hoje)
-      .sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento))
-    const valorVencido = vencidosAll.reduce((s, l) => s + l.valor, 0)
-
-    // A receber por cliente
-    const porCliente: Record<string, { nome: string; total: number; vencido: number; items: LancamentoFinanceiro[] }> = {}
-    pendentes.forEach(l => {
-      const key = (l.nomeCliente ?? l.descricao ?? "—").trim()
-      if (!porCliente[key]) porCliente[key] = { nome: key, total: 0, vencido: 0, items: [] }
-      porCliente[key].total += l.valor
-      porCliente[key].items.push(l)
-      if (l.dataVencimento < hoje) porCliente[key].vencido += l.valor
-    })
-    const clientesDevedores = Object.values(porCliente)
-      .sort((a, b) => b.total - a.total)
-
-    // ── Produção ──
-    const emProducao  = kanban.filter(c => c.coluna >= COL_FECHADO && c.coluna < COL_ENTREGUE && c.coluna !== COL_PERDIDO && c.coluna !== COL_HOT)
-    const porEtapa: { col: number; label: string; count: number; valor: number }[] = []
-    for (let col = 1; col <= COL_EXPEDICAO; col++) {
-      const cards = emProducao.filter(c => c.coluna === col)
-      if (cards.length > 0)
-        porEtapa.push({ col, label: COLUNAS_KANBAN[col], count: cards.length, valor: cards.reduce((s, c) => s + c.preco, 0) })
-    }
-
-    // Alertas de prazo
-    const atrasados = emProducao.filter(c => {
-      if (!c.dataEntregaPrevista) return false
-      return new Date(c.dataEntregaPrevista + "T12:00:00") < now
-    }).sort((a, b) => (a.dataEntregaPrevista ?? "").localeCompare(b.dataEntregaPrevista ?? ""))
-
-    const vencendoEm5 = emProducao.filter(c => {
-      if (!c.dataEntregaPrevista) return false
-      const diff = Math.round((new Date(c.dataEntregaPrevista + "T12:00:00").getTime() - now.getTime()) / 86_400_000)
-      return diff >= 0 && diff <= 5
-    }).sort((a, b) => (a.dataEntregaPrevista ?? "").localeCompare(b.dataEntregaPrevista ?? ""))
-
-    const semDataEntrega = emProducao.filter(c => !c.dataEntregaPrevista).length
-
-    // ── Chart: últimos 6 meses ──
-    const meses6: { label: string; v: number }[] = []
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      meses6.push({ label: MESES_PT[d.getMonth()], v: 0 })
-    }
-    confirmados.forEach(c => {
-      const d = parseIso(c.dataFechamento ?? c.data)
-      const diff = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth())
-      if (diff >= 0 && diff <= 5) meses6[5 - diff].v += c.preco
-    })
-
-    // ── Metas ──
-    const totalFaturado = config.baselineFaturamento + confirmados.reduce((s, c) => s + c.preco, 0)
-    const proximoMarco  = MARCOS.find(m => m.threshold > totalFaturado) ?? null
-    const pctMarco      = proximoMarco ? Math.min(totalFaturado / proximoMarco.threshold, 1) : 1
-    const faturadoMes   = confirmados.filter(c => (c.dataFechamento ?? "").startsWith(mesAtualKey)).reduce((s, c) => s + c.preco, 0)
-    const pctMeta       = config.metaMensal > 0 ? Math.min(faturadoMes / config.metaMensal, 1) : 0
-
-    // ── Últimos negócios ──
-    const ultimosNegocios = [...confirmados]
-      .sort((a, b) => parseIso(b.dataFechamento ?? b.data).getTime() - parseIso(a.dataFechamento ?? a.data).getTime())
-      .slice(0, 8)
-
-    // ── Taxa de conversão (win rate) ──
-    const totalCards = kanban.filter(c => c.coluna !== 0 && c.coluna !== COL_HOT).length
-    const perdidos   = kanban.filter(c => c.coluna === COL_PERDIDO).length
-    const winRate    = totalCards > 0 ? ((totalCards - perdidos) / totalCards) * 100 : null
-
-    // ── Meses únicos de atividade ──
-    const mesesSet = new Set(confirmados.map(c => (c.dataFechamento ?? c.data).slice(0, 7)))
-    const mesesAtivos = mesesSet.size || 1
-    const pedsMes = confirmados.length / mesesAtivos
-
-    return {
-      receita, qtd, ticket, entregues, variacao,
-      margemMedia,
-      recebido, despesas, saldo,
-      aReceber, valorVencido, vencidosAll, clientesDevedores,
-      emProducao: emProducao.length, emProducaoValor: emProducao.reduce((s, c) => s + c.preco, 0),
-      porEtapa, atrasados, vencendoEm5, semDataEntrega,
-      meses6,
-      totalFaturado, proximoMarco, pctMarco, faturadoMes, pctMeta,
-      ultimosNegocios, winRate, pedsMes,
-    }
-  }, [kanban, lancs, config, periodo, now, hoje, mesAtualKey])
-
-  // ─── Render ────────────────────────────────────────────────────────────────
-
-  const alertCount = data.atrasados.length + data.vencidosAll.length
+  const saudacao = (() => { const d = hoje.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" }); return d.charAt(0).toUpperCase() + d.slice(1) })()
 
   return (
     <div className="min-h-screen bg-[#F2F2F7] pb-28">
-
-      {/* ── Header ── */}
-      <header className="bg-white border-b border-[rgba(60,60,67,0.08)] px-4 pt-[max(env(safe-area-inset-top),16px)] pb-0 sticky top-0 z-20">
-        <div className="flex items-center justify-between mb-3">
+      <header className="bg-white/90 backdrop-blur-xl border-b border-[rgba(60,60,67,0.1)] px-4 sticky top-0 z-20" style={{ paddingTop: "max(env(safe-area-inset-top),12px)" }}>
+        <div className="flex items-center justify-between h-11">
           <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1335} height={328} className="h-5 w-auto" priority />
-          {alertCount > 0 && (
-            <span className="text-[10px] font-bold bg-[#d33a3c] text-white rounded-full px-2 py-0.5">
-              {alertCount} alerta{alertCount > 1 ? "s" : ""}
-            </span>
+          {urgentes > 0 && (
+            <button onClick={() => setAba("inicio")} className="text-[11px] font-semibold text-white bg-[#d33a3c] rounded-full px-2.5 py-1 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" /> {urgentes} {urgentes === 1 ? "urgente" : "urgentes"}
+            </button>
           )}
         </div>
-        {/* Period selector — only on visão tab */}
-        {tab === "visao" && (
-          <div className="flex gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden pb-3">
+        {aba === "inicio" && (
+          <div className="flex gap-1.5 overflow-x-auto pb-2.5 -mx-1 px-1 [&::-webkit-scrollbar]:hidden">
             {PERIODOS.map(p => (
-              <button key={p.id} onClick={() => setPeriodo(p.id)}
-                className={`shrink-0 text-[11.5px] font-semibold px-3.5 py-1.5 rounded-full transition-all ${
-                  periodo === p.id
-                    ? "bg-[#8456e8] text-white shadow-sm"
-                    : "bg-[rgba(0,0,0,0.05)] text-[#8E8E93]"
-                }`}
-              >{p.label}</button>
+              <button key={p.v} onClick={() => setPeriodoId(p.v)}
+                className={`shrink-0 text-[12px] font-medium px-3.5 h-8 rounded-full transition-colors ${periodoId === p.v ? "bg-[#191625] text-white" : "bg-[rgba(116,116,128,0.1)] text-[#5e5c68]"}`}>{p.nome}</button>
             ))}
           </div>
         )}
-        {tab !== "visao" && <div className="pb-3" />}
       </header>
 
-      {/* ── Content ── */}
-      <main className="px-4 pt-4">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <div className="w-8 h-8 rounded-full border-2 border-[#8456e8] border-t-transparent animate-spin" />
-            <p className="text-[12px] text-[#8E8E93]">Carregando dados…</p>
+      <main key={aba} className="px-4 pt-4 space-y-4 animate-[apple-slide-up_.25s_ease-out]">
+        {carregando ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-3">
+            <div className="w-7 h-7 rounded-full border-2 border-[#8456e8] border-t-transparent animate-spin" />
+            <p className="text-[12px] text-[#8E8E93]">Carregando…</p>
           </div>
+        ) : aba === "inicio" ? (
+          <Inicio saudacao={saudacao} hoje={hoje} periodo={periodoDe(periodoId, hoje)} nomePeriodo={PERIODOS.find(p => p.v === periodoId)!.nome.toLowerCase()}
+            pedidos={pedidos} lancamentos={lancamentos} config={config} pend={pend} rec={rec}
+            onAbrir={abrir} onAba={setAba} />
+        ) : aba === "cobrancas" ? (
+          <Cobrancas rec={rec} telefoneDe={telefoneDe} onAbrir={abrir} />
+        ) : aba === "producao" ? (
+          <Producao pedidos={pedidos} config={config} hoje={hoje} onAbrir={abrir} />
         ) : (
-          <>
-            {tab === "visao"     && <VisaoTab data={data} config={config} periodo={periodo} />}
-            {tab === "cobrancas" && <CobrancasTab data={data} expandCli={expandCli} setExpandCli={setExpandCli} hoje={hoje} />}
-            {tab === "producao"  && <ProducaoTab data={data} />}
-            {tab === "negocios"  && <NegociosTab data={data} />}
-          </>
+          <Orcamentos kanban={kanban} hoje={hoje} historico={historico} propostas={propostas} telefoneDe={telefoneDe} onAbrir={abrir} />
         )}
       </main>
 
-      {/* ── Bottom Tab Bar ── */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-[rgba(60,60,67,0.08)] flex z-20"
-        style={{ paddingBottom: "max(env(safe-area-inset-bottom),8px)" }}>
-        {TABS.map(t => {
-          const active = tab === t.id
-          const hasBadge = t.id === "cobrancas" && data.vencidosAll.length > 0
+      <Folha aberta={folhaAberta} onFechar={() => setFolhaAberta(false)}>
+        {aberto && <Detalhe card={aberto} pedido={pedidos.find(p => p.cards.some(c => c.id === aberto.id))} telefone={telefoneDe(aberto.nomeCliente)} onFechar={() => setFolhaAberta(false)} />}
+      </Folha>
+
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-[rgba(60,60,67,0.1)] flex z-30"
+        style={{ paddingBottom: "max(env(safe-area-inset-bottom),6px)" }}>
+        {([
+          { id: "inicio", nome: "Início", icone: Home, badge: urgentes > 0 },
+          { id: "cobrancas", nome: "Cobranças", icone: Wallet, badge: rec.vencido > 0.5 },
+          { id: "producao", nome: "Produção", icone: Factory, badge: false },
+          { id: "orcamentos", nome: "Orçamentos", icone: FileText, badge: false },
+        ] as const).map(t => {
+          const ativo = aba === t.id
+          const Icone = t.icone
           return (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`flex-1 flex flex-col items-center pt-2 pb-1 gap-0.5 transition-colors ${active ? "text-[#8456e8]" : "text-[#8E8E93]"}`}
-            >
+            <button key={t.id} onClick={() => { setAba(t.id); window.scrollTo({ top: 0 }) }}
+              className={`flex-1 flex flex-col items-center pt-2 pb-1 gap-0.5 transition-colors ${ativo ? "text-[#8456e8]" : "text-[#8E8E93]"}`}>
               <span className="relative">
-                <TabIcon id={t.id} active={active} />
-                {hasBadge && <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-[#d33a3c] rounded-full border border-white" />}
+                <Icone className="w-[22px] h-[22px]" strokeWidth={ativo ? 2.2 : 1.8} />
+                {t.badge && <span className="absolute -top-0.5 -right-1 w-2 h-2 bg-[#d33a3c] rounded-full ring-2 ring-white" />}
               </span>
-              <span className={`text-[9.5px] font-semibold ${active ? "text-[#8456e8]" : "text-[#8E8E93]"}`}>{t.label}</span>
+              <span className="text-[10px] font-medium">{t.nome}</span>
             </button>
           )
         })}
@@ -431,415 +262,331 @@ export default function MobilePage() {
   )
 }
 
-// ─── Tab: Visão Geral ─────────────────────────────────────────────────────────
+// ── Início ────────────────────────────────────────────────────────────────────
 
-function VisaoTab({ data, config, periodo }: {
-  data: DashData
-  config: Configuracoes
-  periodo: PeriodoId
+function Inicio({ saudacao, hoje, periodo, nomePeriodo, pedidos, lancamentos, config, pend, rec, onAbrir, onAba }: {
+  saudacao: string; hoje: Date; periodo: Periodo; nomePeriodo: string
+  pedidos: Pedido[]; lancamentos: LancamentoFinanceiro[]; config: Configuracoes
+  pend: Pendencia[]; rec: ReturnType<typeof recebiveis>
+  onAbrir: (c?: KanbanCard) => void; onAba: (a: Aba) => void
 }) {
-  const periodoLabel = PERIODOS.find(p => p.id === periodo)?.label ?? ""
-  return (
-    <div className="flex flex-col gap-4">
+  const [verTodas, setVerTodas] = useState(false)
+  const vendas = vendasDoPeriodo(pedidos, lancamentos, periodo)
+  const caixa = caixaDoPeriodo(lancamentos, periodo, hoje)
+  const margem = margemContribuicao(vendas.pedidos)
 
-      {/* Hero */}
-      <Card className="p-5">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93] mb-1.5">Faturamento · {periodoLabel}</p>
-        <div className="flex items-baseline gap-2.5 mb-1">
-          <p className="text-[32px] font-bold tabular-nums leading-none text-[#191625] tracking-tight">{brl(data.receita)}</p>
-          {data.variacao !== null && (
-            <span className={`text-[12px] font-bold ${data.variacao >= 0 ? "text-[#009351]" : "text-[#d33a3c]"}`}>
-              {data.variacao >= 0 ? "▲" : "▼"} {Math.abs(data.variacao).toFixed(0)}%
-            </span>
-          )}
-        </div>
-        <p className="text-[11px] text-[#8E8E93]">
-          {data.qtd} pedido{data.qtd !== 1 ? "s" : ""} · ticket médio {brl(data.ticket)}
-          {data.margemMedia !== null ? ` · margem ${data.margemMedia.toFixed(0)}%` : ""}
-        </p>
-      </Card>
+  // Meta do mês: mesma conta do Painel
+  const meta = config.metaMensal || 0
+  const vendidoMes = vendasDoPeriodo(pedidos, lancamentos, periodoDe("mes", hoje)).receita
+  const diasMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate()
+  let diasUteis = 0
+  for (let d = hoje.getDate() + 1; d <= diasMes; d++) if (ehDiaUtil(new Date(hoje.getFullYear(), hoje.getMonth(), d, 12))) diasUteis++
+  const projecao = vendidoMes / hoje.getDate() * diasMes
+  const falta = Math.max(0, meta - vendidoMes)
 
-      {/* KPIs 2×2 */}
-      <div className="grid grid-cols-2 gap-3">
-        <KpiTile
-          label="Recebido"
-          value={fmtShort(data.recebido)}
-          accent="#009351"
-          sub={data.receita > 0 ? `${Math.round(data.recebido / data.receita * 100)}% do faturado` : "no período"}
-        />
-        <KpiTile
-          label="A receber (total)"
-          value={fmtShort(data.aReceber)}
-          accent={data.valorVencido > 0 ? "#d33a3c" : "#191625"}
-          sub={data.valorVencido > 0 ? `${fmtShort(data.valorVencido)} vencido` : `${data.clientesDevedores.length} cliente${data.clientesDevedores.length !== 1 ? "s" : ""}`}
-        />
-        <KpiTile
-          label="Despesas"
-          value={data.despesas > 0 ? fmtShort(data.despesas) : "—"}
-          accent={data.despesas > 0 ? "#c57800" : "#8E8E93"}
-          sub="pagas no período"
-        />
-        <KpiTile
-          label="Saldo líquido"
-          value={(data.saldo >= 0 ? "+" : "") + fmtShort(data.saldo)}
-          accent={data.saldo >= 0 ? "#009351" : "#d33a3c"}
-          sub="recebido − despesas"
-        />
-      </div>
+  // Marco: faturamento acumulado (pedidos + sobras + anterior ao sistema)
+  const acumulado = (config.baselineFaturamento || 0) + pedidos.reduce((s, p) => s + p.valor, 0)
+    + vendasDoPeriodo(pedidos, lancamentos, { from: null, to: null }).sobras
+  const marcos = normalizarMetas(config.metas).marcos
+  const proximo = marcos.find(m => m.valor > acumulado)
 
-      {/* Gráfico 6 meses */}
-      <Card className="p-4">
-        <SectionTitle>Últimos 6 meses</SectionTitle>
-        <MiniChart meses={data.meses6} />
-      </Card>
+  const lista = verTodas ? pend : pend.slice(0, 6)
 
-      {/* Metas */}
-      <Card className="p-4">
-        <SectionTitle>Metas</SectionTitle>
-        <div className="flex flex-col gap-4">
+  return <>
+    <div className="px-1">
+      <p className="text-[12px] text-[#8E8E93]">{saudacao}</p>
+    </div>
+
+    {meta > 0 && (
+      <Cartao className="p-4">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="flex items-baseline justify-between mb-1.5">
-              <p className="text-[12px] font-semibold text-[#191625]">Meta do mês</p>
-              <p className="text-[14px] font-bold tabular-nums" style={{ color: data.pctMeta >= 1 ? "#009351" : "#8456e8" }}>
-                {Math.round(data.pctMeta * 100)}%
-              </p>
-            </div>
-            <ProgressBar pct={data.pctMeta} color={data.pctMeta >= 1 ? "#009351" : data.pctMeta >= 0.7 ? "#c57800" : "#8456e8"} />
-            <div className="flex justify-between mt-1.5">
-              <p className="text-[10px] text-[#8E8E93]">{brl(data.faturadoMes)} de {brl(config.metaMensal)}</p>
-              {data.pctMeta < 1 && <p className="text-[10px] text-[#8E8E93]">faltam {brl(config.metaMensal - data.faturadoMes)}</p>}
-              {data.pctMeta >= 1 && <p className="text-[10px] text-[#009351] font-semibold">Batida! ✓</p>}
-            </div>
+            <p className="text-[11px] text-[#8E8E93] font-medium flex items-center gap-1.5"><Target className="w-3.5 h-3.5" /> Meta do mês</p>
+            <p className="text-[24px] font-semibold text-[#191625] ds-num leading-tight mt-1">{curto(vendidoMes)}</p>
+            <p className="text-[11.5px] text-[#8E8E93] ds-num">de {curto(meta)}</p>
           </div>
-          {data.proximoMarco && (
-            <div>
-              <div className="flex items-baseline justify-between mb-1.5">
-                <p className="text-[12px] font-semibold text-[#191625]">{data.proximoMarco.label}</p>
-                <p className="text-[14px] font-bold tabular-nums text-[#c57800]">{data.proximoMarco.sub}</p>
-              </div>
-              <ProgressBar pct={data.pctMarco} color="#c57800" />
-              <p className="text-[10px] text-[#8E8E93] mt-1.5">{brl(data.totalFaturado)} acumulado</p>
-            </div>
-          )}
+          <span className={`text-[13px] font-semibold ds-num px-2.5 py-1 rounded-full ${vendidoMes >= meta ? "bg-[#009351]/10 text-[#009351]" : "bg-[#8456e8]/10 text-[#8456e8]"}`}>{num(Math.min(999, vendidoMes / meta * 100), 0)}%</span>
         </div>
-      </Card>
+        <div className="mt-3"><Barra pct={vendidoMes / meta * 100} cor={vendidoMes >= meta ? COR.sucesso : COR.acento} /></div>
+        <p className="text-[11.5px] text-[#5e5c68] mt-2.5 leading-snug">
+          {vendidoMes >= meta ? "Meta batida. " : diasUteis > 0 ? <>Faltam {brl(falta)}: <strong className="text-[#191625]">{brl(falta / diasUteis)}</strong> por dia útil. </> : <>Faltam {brl(falta)}. </>}
+          No ritmo atual, o mês fecha em {curto(projecao)}.
+        </p>
+      </Cartao>
+    )}
 
-      {/* KPIs secundários */}
-      <div className="grid grid-cols-3 gap-2.5">
-        <KpiTile label="Em produção" value={String(data.emProducao)} sub={fmtShort(data.emProducaoValor)} />
-        {data.margemMedia !== null
-          ? <KpiTile label="Margem" value={`${data.margemMedia.toFixed(0)}%`} accent={data.margemMedia >= 40 ? "#009351" : data.margemMedia >= 20 ? "#c57800" : "#d33a3c"} sub="média geral" />
-          : <KpiTile label="Entregues" value={String(data.entregues)} sub="no período" />
-        }
-        <KpiTile label="Pedidos/mês" value={data.pedsMes.toFixed(1)} sub="média histórica" />
-      </div>
-
-      {/* Alertas rápidos */}
-      {(data.atrasados.length > 0 || data.valorVencido > 0) && (
-        <Card className="p-4 border-[rgba(211,58,60,0.2)]">
-          <SectionTitle>⚠ Atenção</SectionTitle>
-          <div className="flex flex-col gap-2.5">
-            {data.atrasados.length > 0 && (
-              <div className="flex items-center justify-between">
-                <p className="text-[12px] text-[#d33a3c] font-medium">{data.atrasados.length} entrega{data.atrasados.length > 1 ? "s" : ""} atrasada{data.atrasados.length > 1 ? "s" : ""}</p>
-                <p className="text-[11px] text-[#8E8E93]">{fmtShort(data.atrasados.reduce((s, c) => s + c.preco, 0))}</p>
-              </div>
-            )}
-            {data.valorVencido > 0 && (
-              <div className="flex items-center justify-between">
-                <p className="text-[12px] text-[#d33a3c] font-medium">{data.vencidosAll.length} cobrança{data.vencidosAll.length > 1 ? "s" : ""} vencida{data.vencidosAll.length > 1 ? "s" : ""}</p>
-                <p className="text-[11px] text-[#8E8E93]">{fmtShort(data.valorVencido)}</p>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
+    <div className="grid grid-cols-2 gap-2.5">
+      <Kpi rotulo={`Vendido · ${nomePeriodo}`} valor={curto(vendas.receita)} sub={`${vendas.pedidos.length} pedidos${vendas.sobras > 0 ? ` + sobras` : ""}`} />
+      <Kpi rotulo={`Recebido · ${nomePeriodo}`} valor={curto(caixa.recebido)} cor={COR.sucesso} sub="entrou no caixa" />
+      <Kpi rotulo="Clientes devem" valor={curto(rec.aReceber)} cor={rec.vencido > 0.5 ? COR.perigo : "#191625"}
+        sub={rec.vencido > 0.5 ? `${curto(rec.vencido)} vencido` : rec.semCobranca > 0.5 ? `${curto(rec.semCobranca)} sem cobrança` : "tudo em dia"} onClick={() => onAba("cobrancas")} />
+      <Kpi rotulo="Margem" valor={margem.pct == null ? "—" : `${num(margem.pct, 1)}%`}
+        cor={margem.pct == null ? "#8E8E93" : margem.pct >= 45 ? COR.sucesso : margem.pct >= 30 ? COR.alerta : COR.perigo}
+        sub={margem.pct == null ? "sem custos lançados" : `${margem.comCusto} de ${margem.total} com custo`} />
     </div>
-  )
+
+    <div>
+      <Titulo extra={pend.length ? `${pend.length} ${pend.length === 1 ? "item" : "itens"}` : undefined}>Precisa de você</Titulo>
+      <Cartao className="overflow-hidden divide-y divide-[rgba(60,60,67,0.08)]">
+        {pend.length === 0 && <Vazio texto="Nada pendente. Entregas no prazo e recebimentos em dia." />}
+        {lista.map(p => (
+          <Linha key={p.id} titulo={p.titulo} sub={p.sub} valor={p.valor != null ? curto(p.valor) : undefined} tom={p.tom} icone={ICONE[p.tipo]}
+            onClick={p.card ? () => onAbrir(p.card) : p.tipo === "conferir" ? () => onAba("cobrancas") : undefined}
+            acao={<BotaoWhats href={p.whatsapp} />} />
+        ))}
+        {pend.length > 6 && (
+          <button onClick={() => setVerTodas(v => !v)} className="w-full py-3 text-[12.5px] font-medium text-[#8456e8]">
+            {verTodas ? "Mostrar menos" : `Ver todos os ${pend.length}`}
+          </button>
+        )}
+      </Cartao>
+    </div>
+
+    {proximo && (
+      <Cartao className="p-4">
+        <p className="text-[11px] text-[#8E8E93] font-medium">Próximo marco</p>
+        <div className="flex items-baseline justify-between mt-1">
+          <p className="text-[14px] font-semibold text-[#191625]">{proximo.nome}</p>
+          <p className="text-[12px] text-[#8E8E93] ds-num">{curto(acumulado)} de {curto(proximo.valor)}</p>
+        </div>
+        <div className="mt-2.5"><Barra pct={acumulado / proximo.valor * 100} cor={COR.alerta} /></div>
+      </Cartao>
+    )}
+  </>
 }
 
-// ─── Tab: Cobranças ───────────────────────────────────────────────────────────
+// ── Cobranças ─────────────────────────────────────────────────────────────────
 
-function CobrancasTab({ data, expandCli, setExpandCli, hoje }: {
-  data: DashData
-  expandCli: string | null
-  setExpandCli: (v: string | null) => void
-  hoje: string
+function Cobrancas({ rec, telefoneDe, onAbrir }: {
+  rec: ReturnType<typeof recebiveis>; telefoneDe: (nome: string) => string | undefined; onAbrir: (c?: KanbanCard) => void
 }) {
-  return (
-    <div className="flex flex-col gap-4">
-
-      {/* Header */}
-      <Card className="p-5">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-[#8E8E93] mb-1.5">Total a receber</p>
-        <p className="text-[32px] font-bold tabular-nums leading-none text-[#191625] tracking-tight">{brl(data.aReceber)}</p>
-        <div className="flex gap-3 mt-2">
-          {data.valorVencido > 0 && (
-            <span className="text-[10px] font-bold text-[#d33a3c] bg-[rgba(211,58,60,0.08)] px-2 py-0.5 rounded-full">
-              {brl(data.valorVencido)} vencido
-            </span>
-          )}
-          <span className="text-[10px] font-medium text-[#8E8E93]">
-            {data.clientesDevedores.length} cliente{data.clientesDevedores.length !== 1 ? "s" : ""}
-          </span>
-        </div>
-      </Card>
-
-      {/* Por cliente */}
-      {data.clientesDevedores.length === 0 ? (
-        <Card className="p-6 flex flex-col items-center gap-2">
-          <p className="text-[28px]">✓</p>
-          <p className="text-[13px] font-semibold text-[#191625]">Tudo em dia</p>
-          <p className="text-[11px] text-[#8E8E93]">Nenhum valor pendente</p>
-        </Card>
-      ) : (
-        <Card>
-          <div className="divide-y divide-[rgba(60,60,67,0.07)]">
-            {data.clientesDevedores.map(cli => {
-              const expanded = expandCli === cli.nome
-              return (
-                <div key={cli.nome}>
-                  <button
-                    className="w-full px-4 py-3.5 flex items-center justify-between active:bg-[rgba(0,0,0,0.02)]"
-                    onClick={() => setExpandCli(expanded ? null : cli.nome)}
-                  >
-                    <div className="text-left min-w-0">
-                      <p className="text-[13px] font-semibold text-[#191625] truncate">{cli.nome}</p>
-                      <p className="text-[10px] text-[#8E8E93] mt-0.5">
-                        {cli.items.length} lançamento{cli.items.length !== 1 ? "s" : ""}
-                        {cli.vencido > 0 && <span className="text-[#d33a3c] font-medium"> · {brl(cli.vencido)} vencido</span>}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-3">
-                      <p className={`text-[15px] font-bold tabular-nums ${cli.vencido > 0 ? "text-[#d33a3c]" : "text-[#191625]"}`}>
-                        {brl(cli.total)}
-                      </p>
-                      <span className="text-[10px] text-[#8E8E93]">{expanded ? "▲" : "▼"}</span>
-                    </div>
-                  </button>
-                  {expanded && (
-                    <div className="bg-[#F2F2F7] divide-y divide-[rgba(60,60,67,0.06)]">
-                      {cli.items.map(l => {
-                        const overdue = l.dataVencimento < hoje
-                        const dias    = overdue ? daysOverdue(l.dataVencimento) : 0
-                        return (
-                          <div key={l.id} className="px-5 py-2.5 flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-[11.5px] text-[#191625] truncate">{l.descricao || l.cardNumero || "—"}</p>
-                              <p className={`text-[10px] mt-0.5 ${overdue ? "text-[#d33a3c] font-medium" : "text-[#8E8E93]"}`}>
-                                {overdue ? `${dias}d atrasado` : `vence ${fmtDate(l.dataVencimento)}`}
-                              </p>
-                            </div>
-                            <p className={`text-[12px] font-bold tabular-nums shrink-0 ${overdue ? "text-[#d33a3c]" : "text-[#191625]"}`}>
-                              {brl(l.valor)}
-                            </p>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </Card>
-      )}
+  const { copiado, copiar } = useCopiar()
+  const lista = [...rec.comSaldo].sort((a, b) => b.vencido - a.vencido || b.aReceber - a.aReceber)
+  return <>
+    <div className="grid grid-cols-3 gap-2.5">
+      <Kpi compacto rotulo="A receber" valor={curto(rec.aReceber)} />
+      <Kpi compacto rotulo="Vencido" valor={curto(rec.vencido)} cor={rec.vencido > 0.5 ? COR.perigo : "#191625"} />
+      <Kpi compacto rotulo="Sem cobrança" valor={curto(rec.semCobranca)} cor={rec.semCobranca > 0.5 ? COR.alerta : "#191625"} />
     </div>
-  )
+
+    <div>
+      <Titulo extra={`${lista.length} pedidos`}>Quem deve</Titulo>
+      <Cartao className="overflow-hidden divide-y divide-[rgba(60,60,67,0.08)]">
+        {lista.length === 0 && <Vazio texto="Ninguém devendo. Tudo recebido." />}
+        {lista.map(p => {
+          const valorPix = p.vencido > 0.5 ? p.vencido : p.aReceber
+          const pix = `${window.location.origin}/pix/${encodeURIComponent(p.numero)}?v=${valorPix.toFixed(2)}&c=${encodeURIComponent(p.nomeCliente)}`
+          const tom = p.vencido > 0.5 ? "perigo" : p.semCobranca > 0.5 ? "alerta" : undefined
+          const msg = `Olá! Tudo bem? Segue o link para pagamento do pedido ${p.numero}, no valor de ${brl(valorPix)}: ${pix}`
+          return (
+            <Linha key={p.key} titulo={p.nomeCliente} tom={tom}
+              sub={`${p.numero} · ${p.vencido > 0.5 ? `${brl(p.vencido)} vencido` : p.semCobranca > 0.5 ? "sem cobrança lançada" : "cobrança lançada"}`}
+              valor={curto(p.aReceber)} onClick={() => onAbrir(cardDoPedido(p))}
+              acao={<div className="flex gap-1.5 shrink-0">
+                <button onClick={() => copiar(p.key, pix)} aria-label="Copiar link Pix"
+                  className="w-9 h-9 rounded-xl grid place-items-center text-[#8456e8] bg-[#8456e8]/10 active:scale-95 transition-transform">
+                  {copiado === p.key ? <Check className="w-4 h-4" /> : <QrCode className="w-4 h-4" />}
+                </button>
+                <BotaoWhats href={linkWhatsApp(telefoneDe(p.nomeCliente), msg)} />
+              </div>} />
+          )
+        })}
+      </Cartao>
+      <p className="text-[11px] text-[#8E8E93] px-1 mt-2 leading-snug">O botão roxo copia o link Pix do valor vencido (ou do saldo). O verde manda o link pelo WhatsApp.</p>
+    </div>
+
+    {rec.aConferir.length > 0 && (
+      <div>
+        <Titulo extra={curto(rec.aConferir.reduce((s, l) => s + l.valor, 0))}>Para conferir</Titulo>
+        <Cartao className="overflow-hidden divide-y divide-[rgba(60,60,67,0.08)]">
+          {rec.aConferir.map(l => (
+            <Linha key={l.id} titulo={l.nomeCliente || l.descricao} sub={`${l.descricao} · venc. ${dataCurta(l.dataVencimento)}`} valor={curto(l.valor)} tom="info" />
+          ))}
+        </Cartao>
+        <p className="text-[11px] text-[#8E8E93] px-1 mt-2">Cobranças pendentes em pedidos já quitados ou fora do quadro: dê baixa no computador.</p>
+      </div>
+    )}
+  </>
 }
 
-// ─── Tab: Produção ────────────────────────────────────────────────────────────
+// ── Produção ──────────────────────────────────────────────────────────────────
 
-function ProducaoTab({ data }: { data: DashData }) {
-  return (
-    <div className="flex flex-col gap-4">
-
-      {/* Resumo */}
-      <div className="grid grid-cols-2 gap-3">
-        <KpiTile label="Em produção" value={String(data.emProducao)} accent="#8456e8" sub={brl(data.emProducaoValor)} highlight />
-        <KpiTile label="Atrasados" value={String(data.atrasados.length)} accent={data.atrasados.length > 0 ? "#d33a3c" : "#009351"} sub="entregas vencidas" />
-        <KpiTile label="Vencem em 5d" value={String(data.vencendoEm5.length)} accent={data.vencendoEm5.length > 0 ? "#c57800" : "#8E8E93"} sub="atenção necessária" />
-        <KpiTile label="Sem data" value={String(data.semDataEntrega)} accent={data.semDataEntrega > 0 ? "#c57800" : "#8E8E93"} sub="sem prazo definido" />
-      </div>
-
-      {/* Pipeline por etapa */}
-      {data.porEtapa.length > 0 && (
-        <Card>
-          <div className="px-4 pt-4 pb-2">
-            <SectionTitle>Por etapa</SectionTitle>
-          </div>
-          <div className="divide-y divide-[rgba(60,60,67,0.07)]">
-            {data.porEtapa.map(e => {
-              const sc = STAGE_COLOR[e.col] ?? { color: "#8E8E93", bg: "rgba(142,142,147,0.1)" }
-              return (
-                <div key={e.col} className="px-4 py-3 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-[13px] font-bold" style={{ background: sc.bg, color: sc.color }}>
-                    {e.count}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-semibold text-[#191625]">{e.label}</p>
-                    <p className="text-[10px] text-[#8E8E93]">{brl(e.valor)}</p>
-                  </div>
-                  <div className="w-24 shrink-0">
-                    <ProgressBar pct={e.count / Math.max(data.emProducao, 1)} color={sc.color} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </Card>
-      )}
-
-      {/* Atrasados */}
-      {data.atrasados.length > 0 && (
-        <Card className="border-[rgba(211,58,60,0.15)]">
-          <div className="px-4 pt-4 pb-2">
-            <SectionTitle>⚠ Entregas atrasadas</SectionTitle>
-          </div>
-          <div className="divide-y divide-[rgba(60,60,67,0.07)]">
-            {data.atrasados.map(c => {
-              const dias = Math.round((now_ts() - new Date(c.dataEntregaPrevista! + "T12:00:00").getTime()) / 86_400_000)
-              return (
-                <div key={c.id} className="px-4 py-3 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[12px] font-semibold text-[#191625] truncate">{c.nomeCliente}</p>
-                    <p className="text-[10px] text-[#8E8E93] truncate">{c.numero} · {COLUNAS_KANBAN[c.coluna]}</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-[10px] font-bold text-[#d33a3c]">{dias}d atraso</p>
-                    <p className="text-[11px] text-[#8E8E93] tabular-nums">{brl(c.preco)}</p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </Card>
-      )}
-
-      {/* Vencendo em breve */}
-      {data.vencendoEm5.length > 0 && (
-        <Card className="border-[rgba(197,120,0,0.15)]">
-          <div className="px-4 pt-4 pb-2">
-            <SectionTitle>Vencem em 5 dias</SectionTitle>
-          </div>
-          <div className="divide-y divide-[rgba(60,60,67,0.07)]">
-            {data.vencendoEm5.map(c => {
-              const diff = Math.round((new Date(c.dataEntregaPrevista! + "T12:00:00").getTime() - now_ts()) / 86_400_000)
-              return (
-                <div key={c.id} className="px-4 py-3 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[12px] font-semibold text-[#191625] truncate">{c.nomeCliente}</p>
-                    <p className="text-[10px] text-[#8E8E93] truncate">{c.numero} · {COLUNAS_KANBAN[c.coluna]}</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-[10px] font-bold text-[#c57800]">{diff === 0 ? "hoje" : `em ${diff}d`}</p>
-                    <p className="text-[11px] text-[#8E8E93] tabular-nums">{brl(c.preco)}</p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </Card>
-      )}
-
-      {data.emProducao === 0 && (
-        <Card className="p-8 flex flex-col items-center gap-2">
-          <p className="text-[28px]">🏭</p>
-          <p className="text-[13px] font-semibold text-[#191625]">Nada em produção</p>
-          <p className="text-[11px] text-[#8E8E93]">Fila vazia por agora</p>
-        </Card>
-      )}
+function Producao({ pedidos, config, hoje, onAbrir }: { pedidos: Pedido[]; config: Configuracoes; hoje: Date; onAbrir: (c?: KanbanCard) => void }) {
+  const prod = producao(pedidos, hoje)
+  const prodCfg = normalizarProducao(config.producao)
+  const hojeIso = hoje.toLocaleDateString("sv-SE")
+  const noFornecedor = prodCfg.movimentos.filter(m => !m.recebidoEm).sort((a, b) => (a.prazoPrevisto ?? "9").localeCompare(b.prazoPrevisto ?? "9"))
+  const maxEtapa = Math.max(1, ...prod.porEtapa.map(e => e.count))
+  return <>
+    <div className="grid grid-cols-3 gap-2.5">
+      <Kpi compacto rotulo="Em produção" valor={String(prod.emProducao.length)} sub={curto(prod.valorEmProducao)} />
+      <Kpi compacto rotulo="Atrasados" valor={String(prod.atrasados.length)} cor={prod.atrasados.length ? COR.perigo : "#191625"} />
+      <Kpi compacto rotulo="Em 3 dias" valor={String(prod.vencendo3d.length)} cor={prod.vencendo3d.length ? COR.alerta : "#191625"} />
     </div>
-  )
+
+    {prod.porEtapa.length > 0 && (
+      <Cartao className="p-4 space-y-2.5">
+        {prod.porEtapa.map(e => (
+          <div key={e.coluna}>
+            <div className="flex items-baseline justify-between text-[12px]">
+              <span className="text-[#191625] font-medium">{e.etapa}</span>
+              <span className="text-[#8E8E93] ds-num">{e.count} · {curto(e.valor)}</span>
+            </div>
+            <div className="mt-1"><Barra pct={e.count / maxEtapa * 100} /></div>
+          </div>
+        ))}
+      </Cartao>
+    )}
+
+    <div>
+      <Titulo extra={`${prod.emProducao.length} pedidos`}>Pedidos</Titulo>
+      <Cartao className="overflow-hidden divide-y divide-[rgba(60,60,67,0.08)]">
+        {prod.emProducao.length === 0 && <Vazio texto="Nenhum pedido em produção." />}
+        {[...prod.emProducao].sort((a, b) => (a.dataEntregaPrevista ?? "9").localeCompare(b.dataEntregaPrevista ?? "9")).map(p => {
+          const atrasado = prod.atrasados.includes(p), logo = prod.vencendo3d.includes(p)
+          return (
+            <Linha key={p.key} titulo={`${p.numero} · ${p.nomeCliente}`} sub={`${p.etapa} · ${prazoTexto(p.dataEntregaPrevista, hoje)}`}
+              valor={curto(p.valor)} tom={atrasado ? "perigo" : logo ? "alerta" : undefined} onClick={() => onAbrir(cardDoPedido(p))} />
+          )
+        })}
+      </Cartao>
+    </div>
+
+    {noFornecedor.length > 0 && (
+      <div>
+        <Titulo extra={`${noFornecedor.length} ${noFornecedor.length === 1 ? "envio" : "envios"}`}>No fornecedor agora</Titulo>
+        <Cartao className="overflow-hidden divide-y divide-[rgba(60,60,67,0.08)]">
+          {noFornecedor.map(m => {
+            const forn = prodCfg.fornecedores.find(f => f.id === m.fornecedorId)
+            const dias = diasUteisEntre(m.enviadoEm, hojeIso)
+            const atrasado = !!m.prazoPrevisto && hojeIso > m.prazoPrevisto
+            return (
+              <Linha key={m.id} titulo={m.pedidoLabel} icone={<Truck className="w-4 h-4" />} tom={atrasado ? "perigo" : undefined}
+                sub={`${forn?.nome ?? "Fornecedor"} · ${nomeServicos(m)}`}
+                valor={`${dias} ${dias === 1 ? "dia útil" : "dias úteis"}`} valorSub={m.prazoPrevisto ? `prazo ${dataCurta(m.prazoPrevisto)}` : undefined} />
+            )
+          })}
+        </Cartao>
+      </div>
+    )}
+  </>
 }
 
-// ─── Tab: Negócios ────────────────────────────────────────────────────────────
+// ── Orçamentos ────────────────────────────────────────────────────────────────
 
-function NegociosTab({ data }: { data: DashData }) {
+function Orcamentos({ kanban, hoje, historico, propostas, telefoneDe, onAbrir }: {
+  kanban: KanbanCard[]; hoje: Date; historico: HistItem[]; propostas: PropostaCustom[]
+  telefoneDe: (nome: string) => string | undefined; onAbrir: (c?: KanbanCard) => void
+}) {
+  const pipe = pipelineComercial(kanban)
+  const conv = conversao(orcamentosDoPeriodo(kanban, periodoDe("90d", hoje)))
+  const validade = (c: KanbanCard) => historico.find(h => h.numero === c.numero)?.form?.validadeDias ?? propostas.find(p => p.cardId === c.id)?.validadeDias ?? 30
+  const lista = pipe.cards.map(c => {
+    const d = parseData(c.data)
+    const dias = d ? Math.ceil((d.getTime() + validade(c) * 86_400_000 - hoje.getTime()) / 86_400_000) : null
+    return { c, dias }
+  }).sort((a, b) => (a.dias ?? 999) - (b.dias ?? 999))
+
+  return <>
+    <div className="grid grid-cols-2 gap-2.5">
+      <Kpi rotulo="Em negociação" valor={curto(pipe.valor)} sub={`${pipe.count} orçamentos abertos`} />
+      <Kpi rotulo="Conversão · 90 dias" valor={conv.decididos ? `${num(conv.taxa, 0)}%` : "—"} sub={conv.decididos ? `${conv.ganhos} de ${conv.decididos} decididos` : "nenhum decidido"}
+        cor={conv.decididos ? (conv.taxa >= 40 ? COR.sucesso : conv.taxa >= 25 ? COR.alerta : COR.perigo) : "#8E8E93"} />
+    </div>
+
+    <div>
+      <Titulo extra="toque para enviar o link">Abertos</Titulo>
+      <Cartao className="overflow-hidden divide-y divide-[rgba(60,60,67,0.08)]">
+        {lista.length === 0 && <Vazio texto="Nenhum orçamento em aberto." />}
+        {lista.map(({ c, dias }) => (
+          <Linha key={c.id} titulo={c.nomeCliente} valor={curto(c.preco)}
+            sub={`${c.numero} · ${dias == null ? "sem data" : dias < 0 ? "proposta vencida" : dias === 0 ? "vence hoje" : dias === 1 ? "vence amanhã" : `vence em ${dias} dias`}`}
+            tom={dias != null && dias < 0 ? "perigo" : dias != null && dias <= 2 ? "alerta" : undefined}
+            onClick={() => onAbrir(c)} acao={<BotaoWhats href={linkWhatsApp(telefoneDe(c.nomeCliente), `Olá! Tudo bem? Passando para saber se conseguiu avaliar o orçamento ${c.numero}. Posso ajudar em algo?`)} />} />
+        ))}
+      </Cartao>
+    </div>
+  </>
+}
+
+// ── Detalhe (folha) ───────────────────────────────────────────────────────────
+
+function Detalhe({ card, pedido, telefone, onFechar }: { card: KanbanCard; pedido?: Pedido; telefone?: string; onFechar: () => void }) {
+  const { copiado, copiar } = useCopiar()
+  const [linkAprov, setLinkAprov] = useState<string | null>(null)
+  const orcamento = isAberto(card)
+  const origem = typeof window !== "undefined" ? window.location.origin : ""
+  const rastreio = `${origem}/track/${card.loteNumero ? `lote/${encodeURIComponent(card.loteNumero)}` : encodeURIComponent(card.numero)}`
+  const [cardBase, setCardBase] = useState(card.id)
+  if (cardBase !== card.id) { setCardBase(card.id); setLinkAprov(null) }
+
+  useEffect(() => {
+    if (!orcamento) return
+    let vivo = true
+    fetch(`/api/aprovacao/link?numero=${encodeURIComponent(card.numero)}`).then(r => r.ok ? r.json() : null).then(d => { if (vivo && d?.url) setLinkAprov(d.url) }).catch(() => {})
+    return () => { vivo = false }
+  }, [card.numero, orcamento])
+
+  const compartilhar = async (titulo: string, url: string, id: string) => {
+    if (navigator.share) { try { await navigator.share({ title: titulo, url }); return } catch { /* cancelado */ } }
+    copiar(id, url)
+  }
+
+  const itens: [string, string][] = [
+    ["Etapa", card.coluna === COL_HOT ? "Lead quente" : COLUNAS_KANBAN[card.coluna] ?? "—"],
+    ["Quantidade", card.quantidade ? `${num(card.quantidade)} un` : "—"],
+    [pedido ? "Valor do pedido" : "Valor", brl(pedido?.venda ?? card.preco)],
+    ...(pedido ? [["Recebido", brl(pedido.recebido)], ["Falta receber", brl(pedido.aReceber)]] as [string, string][] : []),
+    ...(card.dataEntregaPrevista ? [["Entrega prevista", `${dataCurta(card.dataEntregaPrevista)} · ${prazoTexto(card.dataEntregaPrevista)}`]] as [string, string][] : []),
+    ...(card.materialNome ? [["Material", card.materialNome]] as [string, string][] : []),
+  ]
+
   return (
-    <div className="flex flex-col gap-4">
-
-      {/* Performance */}
-      <div className="grid grid-cols-2 gap-3">
-        {data.winRate !== null && (
-          <KpiTile label="Win rate" value={`${data.winRate.toFixed(0)}%`} accent={data.winRate >= 60 ? "#009351" : "#c57800"} sub="taxa de fechamento" />
-        )}
-        <KpiTile label="Pedidos/mês" value={data.pedsMes.toFixed(1)} sub="média histórica" />
-        {data.margemMedia !== null && (
-          <KpiTile label="Margem média" value={`${data.margemMedia.toFixed(0)}%`} accent={data.margemMedia >= 40 ? "#009351" : data.margemMedia >= 20 ? "#c57800" : "#d33a3c"} sub="nos pedidos calculados" />
-        )}
-        <KpiTile label="Entregues" value={String(data.ultimosNegocios.filter(c => c.coluna === COL_ENTREGUE).length)} sub="na seleção" />
+    <div className="px-4 pt-2 space-y-3">
+      <div className="flex items-start justify-between gap-3 px-1">
+        <div className="min-w-0">
+          <p className="text-[12px] text-[#8E8E93] font-mono">{pedido?.numero ?? card.numero}</p>
+          <p className="text-[19px] font-semibold text-[#191625] leading-tight truncate">{card.nomeCliente}</p>
+        </div>
+        <button onClick={onFechar} aria-label="Fechar" className="w-8 h-8 rounded-full grid place-items-center bg-[rgba(116,116,128,0.12)] text-[#5e5c68] shrink-0"><X className="w-4 h-4" /></button>
       </div>
 
-      {/* Últimos negócios */}
-      <Card>
-        <div className="px-4 pt-4 pb-2">
-          <SectionTitle>Últimos negócios</SectionTitle>
-        </div>
-        {data.ultimosNegocios.length === 0 ? (
-          <p className="px-4 pb-4 text-[12px] text-[#8E8E93]">Nenhum negócio ainda</p>
+      <Cartao className="divide-y divide-[rgba(60,60,67,0.08)]">
+        {itens.map(([k, v]) => (
+          <div key={k} className="flex items-center justify-between px-4 py-3 text-[13.5px]">
+            <span className="text-[#8E8E93]">{k}</span>
+            <span className={`ds-num font-medium ${k === "Falta receber" && pedido && pedido.aReceber > 0.5 ? "text-[#d33a3c]" : "text-[#191625]"}`}>{v}</span>
+          </div>
+        ))}
+      </Cartao>
+
+      <div className="grid grid-cols-2 gap-2.5">
+        {telefone && (
+          <a href={linkWhatsApp(telefone, `Olá, ${card.nomeCliente.split(" ")[0]}! Tudo bem?`)} target="_blank" rel="noreferrer"
+            className="h-12 rounded-2xl bg-[#25a35a] text-white font-semibold text-[14px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
+            <MessageCircle className="w-4 h-4" /> WhatsApp
+          </a>
+        )}
+        {orcamento ? (
+          <button disabled={!linkAprov} onClick={() => linkAprov && compartilhar(`Proposta ${card.numero}`, linkAprov, "aprov")}
+            className="h-12 rounded-2xl bg-[#8456e8] text-white font-semibold text-[14px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40">
+            {copiado === "aprov" ? <><Check className="w-4 h-4" /> Copiado</> : <><Link2 className="w-4 h-4" /> Link de aprovação</>}
+          </button>
         ) : (
-          <div className="divide-y divide-[rgba(60,60,67,0.07)]">
-            {data.ultimosNegocios.map(c => {
-              const sc = STAGE_COLOR[c.coluna] ?? { color: "#8E8E93", bg: "rgba(142,142,147,0.1)" }
-              return (
-                <div key={c.id} className="px-4 py-3 flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: sc.bg }}>
-                    <span className="text-[9px] font-bold" style={{ color: sc.color }}>
-                      {COLUNAS_KANBAN[c.coluna]?.slice(0, 2) ?? "—"}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-semibold text-[#191625] truncate">{c.nomeCliente}</p>
-                    <p className="text-[10px] text-[#8E8E93]">
-                      {c.numero} · {c.dataFechamento ? fmtDate(c.dataFechamento) : fmtDate(c.data)}
-                    </p>
-                  </div>
-                  <p className="text-[13px] font-bold tabular-nums text-[#191625] shrink-0">{brl(c.preco)}</p>
-                </div>
-              )
-            })}
-          </div>
+          <button onClick={() => compartilhar(`Pedido ${card.numero}`, rastreio, "track")}
+            className="h-12 rounded-2xl bg-[#8456e8] text-white font-semibold text-[14px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
+            {copiado === "track" ? <><Check className="w-4 h-4" /> Copiado</> : <><Share2 className="w-4 h-4" /> Rastreio</>}
+          </button>
         )}
-      </Card>
+        {!telefone && (
+          <button onClick={() => copiar("num", card.numero)}
+            className="h-12 rounded-2xl bg-white text-[#191625] font-medium text-[14px] flex items-center justify-center gap-2 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+            {copiado === "num" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} Copiar número
+          </button>
+        )}
+      </div>
+      {orcamento && <p className="text-[11.5px] text-[#8E8E93] px-1 leading-snug">O cliente abre o link, escolhe a quantidade e aprova. O pedido entra em Fechado sozinho.</p>}
+      {pedido && isTerceirizado(card) && <p className="text-[11.5px] text-[#8E8E93] px-1">Item de revenda.</p>}
     </div>
   )
 }
-
-// ─── Icons ────────────────────────────────────────────────────────────────────
-
-function TabIcon({ id, active }: { id: TabId; active: boolean }) {
-  const c = active ? "#8456e8" : "#8E8E93"
-  const s = { width: 22, height: 22 }
-  if (id === "visao") return (
-    <svg viewBox="0 0 24 24" fill="none" style={s}>
-      <rect x="3" y="3" width="8" height="8" rx="2" fill={active ? c : "none"} stroke={c} strokeWidth="1.8"/>
-      <rect x="13" y="3" width="8" height="8" rx="2" fill={active ? c : "none"} stroke={c} strokeWidth="1.8"/>
-      <rect x="3" y="13" width="8" height="8" rx="2" fill={active ? c : "none"} stroke={c} strokeWidth="1.8"/>
-      <rect x="13" y="13" width="8" height="8" rx="2" fill={active ? c : "none"} stroke={c} strokeWidth="1.8"/>
-    </svg>
-  )
-  if (id === "cobrancas") return (
-    <svg viewBox="0 0 24 24" fill="none" style={s}>
-      <circle cx="12" cy="12" r="9" stroke={c} strokeWidth="1.8"/>
-      <path d="M12 7v1m0 8v1M9.5 10a2.5 2.5 0 015 0c0 1.5-2.5 2-2.5 3.5" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
-    </svg>
-  )
-  if (id === "producao") return (
-    <svg viewBox="0 0 24 24" fill="none" style={s}>
-      <path d="M4 17L4 7l4 4V7l4 4V7l4 10H4z" stroke={c} strokeWidth="1.8" strokeLinejoin="round" fill={active ? c+"33" : "none"}/>
-      <path d="M4 20h16" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
-    </svg>
-  )
-  if (id === "negocios") return (
-    <svg viewBox="0 0 24 24" fill="none" style={s}>
-      <polyline points="3,17 9,11 13,15 21,7" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-      <polyline points="17,7 21,7 21,11" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  )
-  return null
-}
-
-// ─── Utilities ────────────────────────────────────────────────────────────────
-
-function now_ts() { return Date.now() }

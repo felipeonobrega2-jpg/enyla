@@ -9,10 +9,10 @@ import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, CO
 import { Configuracoes } from "../config"
 import {
   Periodo, montarPedidos, vendasDoPeriodo, caixaDoPeriodo, conversao, orcamentosDoPeriodo, producao,
-  pipelineComercial, margemContribuicao, isTerceirizado, isAberto, isGanho, isPerdido, isExpirado,
-  parseData, diasAte, nomeChave, noPeriodo, Pedido, recebiveis, pedidoEntregue,
+  pipelineComercial, margemContribuicao, isAberto, isGanho, isPerdido, isExpirado,
+  parseData, diasAte, nomeChave, noPeriodo, Pedido, recebiveis,
 } from "../lib/negocio"
-import { normalizarProducao } from "../lib/producao"
+import { pendencias, cardDoPedido, prazoTexto, TipoPendencia } from "../lib/pendencias"
 import { ehDiaUtil } from "../lib/diasUteis"
 import { normalizarMetas, sugerirMeta, conquistasDeSaude } from "../lib/metas"
 import { brl, num } from "../utils"
@@ -49,14 +49,6 @@ const pct = (n: number) => `${num(n, 1)}%`
 const dataCurta = (iso?: string) => {
   const d = parseData(iso)
   return d ? d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "") : "—"
-}
-const prazoTexto = (iso?: string) => {
-  if (!iso) return "sem prazo"
-  const d = diasAte(iso)
-  if (d < 0) return `atrasado ${-d} ${-d === 1 ? "dia" : "dias"}`
-  if (d === 0) return "entrega hoje"
-  if (d === 1) return "entrega amanhã"
-  return `entrega em ${d} dias`
 }
 
 type HistItem = { form: FormData; numero?: string }
@@ -99,101 +91,23 @@ export function PainelView({
   const prod = producao(pedidos, hoje)
   const rec = recebiveis(pedidos, lancamentos)
 
-  const cardDoPedido = (p: Pedido) => p.cards.find(c => !isTerceirizado(c)) ?? p.cards[0]
-  const telefoneDe = (nome: string) => clientes.find(c => nomeChave(c.nome) === nomeChave(nome))?.telefone
 
-  // ── O que precisa de ação ──────────────────────────────────────────────────
-  const validadeDe = (card: KanbanCard) =>
-    historico.find(h => h.numero === card.numero)?.form?.validadeDias
-    ?? propostasCustom.find(p => p.cardId === card.id)?.validadeDias
-    ?? 30
-  const vencendo = kanban
-    .filter(c => c.coluna === 0 && !isTerceirizado(c))
-    .map(c => {
-      const d = parseData(c.data)
-      if (!d) return null
-      const vence = new Date(d.getTime() + validadeDe(c) * 86_400_000)
-      const dias = Math.ceil((vence.getTime() - hoje.getTime()) / 86_400_000)
-      return { card: c, dias }
-    })
-    .filter((x): x is { card: KanbanCard; dias: number } => !!x && x.dias >= 0 && x.dias <= 3)
-    .sort((a, b) => a.dias - b.dias)
-
-  const cobrancaVencida = rec.comSaldo.filter(p => p.vencido > 0.5)
-  const entregueSemCobranca = rec.comSaldo.filter(p => pedidoEntregue(p) && p.semCobranca > 0.5)
-
-  const prodCfg = normalizarProducao(config.producao)
-  const hojeIso = hoje.toLocaleDateString("sv-SE")
-  const fornecedorAtrasado = prodCfg.movimentos.filter(m => !m.recebidoEm && m.prazoPrevisto && m.prazoPrevisto < hojeIso)
+  // ── O que precisa de ação (mesma lista do celular) ─────────────────────────
   const leadsQuentes = kanban.filter(c => c.coluna === COL_HOT)
-
-  const aprovadosOnline = (config.aprovacoesOnline ?? []).filter(a => !a.visto && kanban.some(c => c.id === a.cardId))
-
+  const ICONE: Record<TipoPendencia, React.ReactNode> = {
+    aprovado: <CircleCheck className="w-4 h-4" />, atrasado: <CalendarX2 className="w-4 h-4" />, fornecedor: <Factory className="w-4 h-4" />,
+    cobrancaVencida: <Receipt className="w-4 h-4" />, semCobranca: <Receipt className="w-4 h-4" />, conferir: <Receipt className="w-4 h-4" />,
+    entregaProxima: <CalendarClock className="w-4 h-4" />, orcamentoVencendo: <Hourglass className="w-4 h-4" />, semPrazo: <Clock className="w-4 h-4" />,
+  }
   type Acao = { id: string; tom: Tom; icone: React.ReactNode; titulo: string; sub: string; valor?: string; ir: () => void; whatsapp?: string; cobrar?: Partial<LancamentoFinanceiro>; botao?: { rotulo: string; onClick: () => void } }
-  const acoes: Acao[] = [
-    ...aprovadosOnline.map(a => ({
-      id: `apr-${a.numero}`, tom: "sucesso" as Tom, icone: <CircleCheck className="w-4 h-4" />,
-      titulo: `${a.numero} · ${a.nomeCliente}`,
-      sub: `aprovado online por ${a.aprovadoPor} · ${a.quantidade.toLocaleString("pt-BR")} un · ${new Date(a.em).toLocaleDateString("pt-BR")}`,
-      valor: brl(a.preco), ir: () => { const c = kanban.find(k => k.id === a.cardId); if (c) onAbrirCard(c) },
-      botao: onAprovacaoOnline ? { rotulo: "Lançar sinal", onClick: () => onAprovacaoOnline(a) } : undefined,
-    })),
-    ...prod.atrasados.map(p => ({
-      id: `atr-${p.key}`, tom: "perigo" as Tom, icone: <CalendarX2 className="w-4 h-4" />,
-      titulo: `${p.numero} · ${p.nomeCliente}`, sub: `${prazoTexto(p.dataEntregaPrevista)} · ${p.etapa}`,
-      valor: brl(p.valor), ir: () => onAbrirCard(cardDoPedido(p)),
-    })),
-    ...fornecedorAtrasado.map(m => ({
-      id: `forn-${m.id}`, tom: "perigo" as Tom, icone: <Factory className="w-4 h-4" />,
-      titulo: `${m.pedidoLabel}`, sub: `fornecedor passou do prazo (${dataCurta(m.prazoPrevisto)})`,
-      ir: () => onNavegar("fornecedores"),
-    })),
-    ...cobrancaVencida.map(p => ({
-      id: `rec-${p.key}`, tom: "perigo" as Tom, icone: <Receipt className="w-4 h-4" />,
-      titulo: `${p.numero} · ${p.nomeCliente}`,
-      sub: `cobrança vencida${p.semCobranca > 0.5 ? ` · mais ${brl(p.semCobranca)} sem cobrança` : ""}`,
-      valor: brl(p.vencido), ir: () => onAbrirCard(cardDoPedido(p)),
-    })),
-    ...entregueSemCobranca.map(p => ({
-      id: `sc-${p.key}`, tom: "alerta" as Tom, icone: <Receipt className="w-4 h-4" />,
-      titulo: `${p.numero} · ${p.nomeCliente}`, sub: "entregue e sem cobrança lançada",
-      valor: brl(p.semCobranca), ir: () => onAbrirCard(cardDoPedido(p)),
-      cobrar: (() => {
-        const c = cardDoPedido(p)
-        return {
-          tipo: "receita" as const, valor: Math.round(p.semCobranca * 100) / 100, descricao: `Saldo ${p.numero} — ${p.nomeCliente}`,
-          categoria: "saldo-final", nomeCliente: p.nomeCliente, dataVencimento: hoje.toLocaleDateString("sv-SE"),
-          ...(c.loteId ? { loteId: c.loteId, loteNumero: c.loteNumero } : { cardId: c.id, cardNumero: c.numero }),
-        }
-      })(),
-    })),
-    ...(rec.aConferir.length ? [{
-      id: "conferir", tom: "info" as Tom, icone: <Receipt className="w-4 h-4" />,
-      titulo: `${rec.aConferir.length} ${rec.aConferir.length === 1 ? "cobrança para conferir" : "cobranças para conferir"}`,
-      sub: "pendentes em pedidos já quitados ou fora do quadro: confira e dê baixa",
-      valor: brl(rec.aConferir.reduce((s, l) => s + l.valor, 0)), ir: () => abrirCaixa(),
-    }] : []),
-    ...prod.vencendo3d.map(p => ({
-      id: `ven-${p.key}`, tom: "alerta" as Tom, icone: <CalendarClock className="w-4 h-4" />,
-      titulo: `${p.numero} · ${p.nomeCliente}`, sub: `${prazoTexto(p.dataEntregaPrevista)} · ${p.etapa}`,
-      valor: brl(p.valor), ir: () => onAbrirCard(cardDoPedido(p)),
-    })),
-    ...vencendo.map(({ card, dias }) => {
-      const tel = telefoneDe(card.nomeCliente)?.replace(/\D/g, "")
-      return {
-        id: `orc-${card.id}`, tom: "alerta" as Tom, icone: <Hourglass className="w-4 h-4" />,
-        titulo: `${card.numero} · ${card.nomeCliente}`,
-        sub: `orçamento ${dias === 0 ? "vence hoje" : dias === 1 ? "vence amanhã" : `vence em ${dias} dias`} sem resposta`,
-        valor: brl(card.preco), ir: () => onAbrirCard(card),
-        whatsapp: tel ? `https://wa.me/${tel.length <= 11 ? "55" + tel : tel}?text=${encodeURIComponent(`Olá! Tudo bem? Passando para saber se conseguiu avaliar o orçamento ${card.numero}. Ele vale até ${dias === 0 ? "hoje" : dias === 1 ? "amanhã" : `daqui a ${dias} dias`}. Posso ajudar em algo?`)}` : undefined,
-      }
-    }),
-    ...prod.semPrazo.map(p => ({
-      id: `sem-${p.key}`, tom: "info" as Tom, icone: <Clock className="w-4 h-4" />,
-      titulo: `${p.numero} · ${p.nomeCliente}`, sub: `em produção sem data de entrega · ${p.etapa}`,
-      valor: brl(p.valor), ir: () => onAbrirCard(cardDoPedido(p)),
-    })),
-  ]
+  const acoes: Acao[] = pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom, clientes, config, hoje }).map(x => ({
+    id: x.id, tom: x.tom, icone: ICONE[x.tipo], titulo: x.titulo, sub: x.sub,
+    valor: x.valor != null ? brl(x.valor) : undefined,
+    ir: x.tipo === "fornecedor" ? () => onNavegar("fornecedores") : x.tipo === "conferir" ? () => abrirCaixa() : () => { if (x.card) onAbrirCard(x.card) },
+    whatsapp: x.tipo === "orcamentoVencendo" ? x.whatsapp : undefined,
+    cobrar: x.cobrar,
+    botao: x.aprovacao && onAprovacaoOnline ? { rotulo: "Lançar sinal", onClick: () => onAprovacaoOnline(x.aprovacao!) } : undefined,
+  }))
   const [verTodas, setVerTodas] = React.useState(false)
   const acoesVisiveis = verTodas ? acoes : acoes.slice(0, 7)
 

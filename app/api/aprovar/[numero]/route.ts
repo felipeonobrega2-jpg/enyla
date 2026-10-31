@@ -4,7 +4,8 @@ import { tokenValido, AprovacaoOnline, SINAL_PCT_PADRAO } from "@/app/lib/aprova
 import { carregarProposta } from "@/app/lib/propostaPublica"
 import { somarDiasUteis } from "@/app/lib/diasUteis"
 import { normalizarProducao } from "@/app/lib/producao"
-import { COL_FECHADO, COLUNAS_KANBAN } from "@/app/types"
+import { COL_FECHADO, COL_HOT, COLUNAS_KANBAN } from "@/app/types"
+import { isAberto } from "@/app/lib/negocio"
 
 // Cliente aprova o orçamento pela página pública. Fecha o card, registra no rastreio
 // e deixa a aprovação para o painel avisar (sinal e lote ficam com a Enyla).
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ num
 
   const p = await carregarProposta(numero)
   if (!p) return NextResponse.json({ erro: "Orçamento não encontrado." }, { status: 404 })
-  if (p.card.coluna !== 0) return NextResponse.json({ erro: "Este orçamento já foi aprovado.", jaAprovado: true }, { status: 409 })
+  if (!isAberto(p.card)) return NextResponse.json({ erro: "Este orçamento já foi aprovado.", jaAprovado: true }, { status: 409 })
   if (p.vencida) return NextResponse.json({ erro: "Esta proposta venceu. Fale com a gente para atualizar os valores." }, { status: 410 })
   const opcao = p.opcoes.find(o => o.quantidade === Number(body.quantidade))
   if (!opcao) return NextResponse.json({ erro: "Escolha uma das quantidades da proposta." }, { status: 400 })
@@ -29,8 +30,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ num
 
   const patch: Record<string, unknown> = { coluna: COL_FECHADO, preco: opcao.preco, quantidade: opcao.quantidade, dataFechamento: hoje }
   if (prod.automacoes.prazoEntrega && !p.card.dataEntregaPrevista) patch.dataEntregaPrevista = somarDiasUteis(hoje, prod.prazoEntregaPadraoDias)
-  // Só fecha se ainda estiver em orçamento (evita aprovar duas vezes em cliques simultâneos)
-  const { data: atualizado } = await supabase.from("KanbanCard").update(patch).eq("numero", numero).eq("coluna", 0).select("id")
+  // Só fecha se ainda estiver em aberto (orçamento ou lead quente) (evita aprovar duas vezes em cliques simultâneos)
+  const { data: atualizado } = await supabase.from("KanbanCard").update(patch).eq("numero", numero).in("coluna", [0, COL_HOT]).select("id")
   if (!atualizado?.length) return NextResponse.json({ erro: "Este orçamento já foi aprovado.", jaAprovado: true }, { status: 409 })
 
   // Rastreio: etapa de fechamento com quem aprovou

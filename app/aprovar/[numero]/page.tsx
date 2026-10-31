@@ -1,6 +1,7 @@
 import { tokenValido, SINAL_PCT_PADRAO } from "@/app/lib/aprovacao"
 import { carregarProposta } from "@/app/lib/propostaPublica"
 import AprovarClient from "./AprovarClient"
+import { isAberto } from "@/app/lib/negocio"
 
 export const dynamic = "force-dynamic"
 
@@ -15,7 +16,7 @@ export default async function AprovarPage({ params, searchParams }: {
     <AprovarClient numero={numero} token={t ?? ""}
       proposta={p && {
         nomeCliente: p.card.nomeCliente, opcoes: p.opcoes, especificacoes: p.especificacoes, observacao: p.observacao,
-        validaAte: p.validaAte, vencida: p.vencida, jaAprovado: p.card.coluna !== 0, sinalPct: SINAL_PCT_PADRAO,
+        validaAte: p.validaAte, vencida: p.vencida, jaAprovado: !isAberto(p.card), sinalPct: SINAL_PCT_PADRAO,
       }} />
   )
 }

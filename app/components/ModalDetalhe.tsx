@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { Palette, Scissors, Package, Paperclip, FileText, Factory, User, Home, Building2, Megaphone, Wrench, ClipboardList, Printer, Star, Square, MessageCircle, Link2 } from "lucide-react"
 import type { FormData, Calculo, PropostaCustom, KanbanCard, LancamentoFinanceiro, PedidoArquivo, ProjecaoCustos, PrazoEtapas } from "../types"
-import { COLUNAS_KANBAN, COL_FECHADO, COL_EXPEDICAO, COL_PERDIDO } from "../types"
+import { COLUNAS_KANBAN, COL_FECHADO, COL_EXPEDICAO, COL_PERDIDO, COL_HOT } from "../types"
 import { brl, num } from "../utils"
 
 const CORES_RAPIDAS = ["4x0", "4x4", "2x0", "1x0", "1x1"]
@@ -1099,7 +1099,7 @@ export function ModalDetalhe({
                 </button>
               )}
               {/* Link para o cliente aprovar online */}
-              {coluna === 0 && card?.numero && (
+              {(coluna === 0 || coluna === COL_HOT) && card?.numero && (
                 <button onClick={async () => {
                   const r = await fetch(`/api/aprovacao/link?numero=${encodeURIComponent(card.numero)}`).catch(() => null)
                   const url = r?.ok ? (await r.json()).url : null
