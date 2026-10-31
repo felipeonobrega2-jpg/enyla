@@ -20,6 +20,8 @@ const cards: KanbanCard[] = [
   { id: "c2", numero: "ORC-002", nomeCliente: "Bruno Perfumes", dimensoes: "15×20×8", materialNome: "Cartão 300g", preco: 9540, quantidade: 6000, data: br(dia(-10)), coluna: 7, dataFechamento: dia(-10), dataEntregaPrevista: dia(3) },
   { id: "c3", numero: "ORC-003", nomeCliente: "Cliente Relacionamento", dimensoes: "15×20×8", materialNome: "Cartão 300g", preco: 3890, quantidade: 1000, data: br(dia(-5)), coluna: 5, dataFechamento: dia(-5), dataEntregaPrevista: dia(9) },
   { id: "c4", numero: "ORC-004", nomeCliente: "Carla Velas", dimensoes: "15×20×8", materialNome: "Cartão 300g", preco: 6540, quantidade: 3000, data: br(dia(-2)), coluna: 0 },
+  { id: "c6", numero: "ORC-006", nomeCliente: "Ana Cosméticos", dimensoes: "8×8×8", materialNome: "Cartão 300g", preco: 1200, quantidade: 1000, data: br(dia(-20)), coluna: 9, dataFechamento: dia(-20), dataEntregaPrevista: dia(-3), loteId: "L1", loteNumero: "ANA-001",
+    opcoes: [{ quantidade: 500, preco: 800, unitario: 1.6 }, { quantidade: 1000, preco: 1200, unitario: 1.2 }] },
   { id: "c5", numero: "ORC-005", nomeCliente: "Davi Chás", dimensoes: "15×20×8", materialNome: "Cartão 300g", preco: 3890, quantidade: 1000, data: br(dia(-40)), coluna: 9, dataFechamento: dia(-40), dataEntregaReal: dia(-30) },
 ]
 

@@ -10,6 +10,8 @@ import AprovarClient from "@/app/aprovar/[numero]/AprovarClient"
 import MobilePage from "@/app/mobile/page"
 import { calcular } from "@/app/calculos"
 import { normalizarProducao } from "@/app/lib/producao"
+import { montarPedidos } from "@/app/lib/negocio"
+import { ModalDetalhe } from "@/app/components/ModalDetalhe"
 import { dados, config } from "./dados"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
@@ -20,6 +22,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
   const u = String(url)
   if (u.startsWith("/api/data")) return new Response(JSON.stringify({ ...dados, config, clientes: [], propostasCustom: [] }))
   if (u.startsWith("/api/aprovacao/link")) return new Response(JSON.stringify({ url: "https://exemplo/aprovar/X?t=abc" }))
+  if (u.startsWith("/api/")) return new Response("{}", { status: 404 })
   return orig(url, o)
 }
 
@@ -43,6 +46,17 @@ function Telas() {
       opcoes: [{ quantidade: 1000, preco: 3890, unitario: 3.89 }, { quantidade: 3000, preco: 6540, unitario: 2.18 }],
     }} />
     case "mobile": return <MobilePage />
+    case "detalhe": {
+      const c = dados.kanban.find(k => k.id === "c1")!
+      return <ModalDetalhe data={{ tipo: "kanban", card: c }} parcFator={1.2} onClose={() => {}} lancamentos={lancs}
+        pedido={montarPedidos(dados.kanban, lancs).find(p => p.cards.some(k => k.id === c.id))}
+        onSaveDelivery={() => {}} onSaveDeliveryReal={() => {}} onSaveCloseDate={() => {}} onRegistrarSobra={() => {}} onEmitirOS={() => {}}
+        onSaveCardExtras={() => {}} onSaveProjecao={() => {}} onSavePrazos={() => {}} onMoveEtapa={() => {}} onSavePreco={() => {}} />
+    }
+    case "detalhe-orcamento": {
+      const h = { ...dados.historico[3], calculo: calcular(dados.historico[3].form, cfg)!, data: "01/11/2026, 10:00:00" }
+      return <ModalDetalhe data={{ tipo: "historico", item: h }} parcFator={1.2} onClose={() => {}} onEditarHistorico={() => {}} onPersonalizarHistorico={() => {}} />
+    }
     default: return <p>tela desconhecida: {tela}</p>
   }
 }

@@ -17,7 +17,7 @@ await build({
 })
 writeFileSync(path.join(saida, "index.html"), '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="app.css"><body><div id="root"></div><script src="app.js"></script>')
 
-const telas = [["caixa", 1440], ["config", 1440], ["calibragem", 1440], ["rotas", 1440], ["aprovar", 390], ["mobile", 390]]
+const telas = [["caixa", 1440], ["config", 1440], ["calibragem", 1440], ["rotas", 1440], ["aprovar", 390], ["mobile", 390], ["detalhe", 1440], ["detalhe-orcamento", 1440]]
 const navegador = await chromium.launch()
 let erros = 0
 for (const [tela, largura] of telas) {

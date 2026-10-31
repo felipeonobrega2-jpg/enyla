@@ -41,6 +41,7 @@ import { ParceriasView } from "./components/ParceriasView"
 import { RelatoriosView } from "./components/RelatoriosView"
 import { normalizarProducao, movimentosPorEtapa, desfazerMovimentosAteColuna, Servico } from "./lib/producao"
 import { somarDiasUteis, definirFeriadosLocais } from "./lib/diasUteis"
+import { montarPedidos } from "./lib/negocio"
 import { normalizarMetas } from "./lib/metas"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
 import FormaView from "./FormaView"
@@ -2688,6 +2689,7 @@ export default function Home() {
       {detalheModal && (
         <ModalDetalhe
           data={detalheModal}
+          pedido={"card" in detalheModal && detalheModal.card ? montarPedidos(kanban, lancamentos).find(p => p.cards.some(c => c.id === detalheModal.card!.id)) : undefined}
           parcFator={config.multiplicadores.parcelamento12x}
           onClose={() => setDetalheModal(null)}
           onEditar={(p) => { setDetalheModal(null); setEditandoProposta(p) }}
