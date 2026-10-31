@@ -1,4 +1,6 @@
 "use client"
+
+import { Image as ImageIcon, FileText, Smile } from "lucide-react"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { brl } from "../utils"
 
@@ -298,13 +300,13 @@ export default function WhatsAppView({
                           </div>
                         )}
                         {m.tipo === "image" && (
-                          <div className="text-[12px] italic mb-1" style={{ color: "#54656f" }}>📷 Imagem</div>
+                          <div className="text-[12px] italic mb-1" style={{ color: "#54656f" }}><ImageIcon className="w-3.5 h-3.5 inline -mt-px mr-1" />Imagem</div>
                         )}
                         {m.tipo === "document" && (
-                          <div className="text-[12px] italic mb-1" style={{ color: "#54656f" }}>📄 Documento</div>
+                          <div className="text-[12px] italic mb-1" style={{ color: "#54656f" }}><FileText className="w-3.5 h-3.5 inline -mt-px mr-1" />Documento</div>
                         )}
                         {m.tipo === "sticker" && (
-                          <div className="text-[12px] italic" style={{ color: "#54656f" }}>🎭 Sticker</div>
+                          <div className="text-[12px] italic" style={{ color: "#54656f" }}><Smile className="w-3.5 h-3.5 inline -mt-px mr-1" />Figurinha</div>
                         )}
                         {m.corpo && (
                           <p className="text-[13.5px] leading-snug whitespace-pre-wrap" style={{ color: "#111b21" }}>{m.corpo}</p>

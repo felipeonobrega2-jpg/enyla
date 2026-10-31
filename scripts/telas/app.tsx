@@ -12,9 +12,12 @@ import { calcular } from "@/app/calculos"
 import { normalizarProducao } from "@/app/lib/producao"
 import { montarPedidos } from "@/app/lib/negocio"
 import { ModalDetalhe } from "@/app/components/ModalDetalhe"
+import { FinanceiroView } from "@/app/components/FinanceiroView"
 import { dados, config } from "./dados"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
+// Abas do Financeiro: "financeiro-receber" abre a aba "receber"
+if (tela.startsWith("financeiro-")) sessionStorage.setItem("fin:tab", tela.slice(11))
 
 // O celular busca /api/data e /api/aprovacao/link: responde com os dados fictícios
 const orig = window.fetch
@@ -57,7 +60,10 @@ function Telas() {
       const h = { ...dados.historico[3], calculo: calcular(dados.historico[3].form, cfg)!, data: "01/11/2026, 10:00:00" }
       return <ModalDetalhe data={{ tipo: "historico", item: h }} parcFator={1.2} onClose={() => {}} onEditarHistorico={() => {}} onPersonalizarHistorico={() => {}} />
     }
-    default: return <p>tela desconhecida: {tela}</p>
+    default:
+      if (tela.startsWith("financeiro-")) return <div style={{ height: "100vh" }}><FinanceiroView lancamentos={lancs} kanban={dados.kanban} negocios={[]} lotes={[]} config={cfg} historico={dados.historico}
+        onAdd={l => setLancs(p => [l, ...p])} onUpdate={() => {}} onDelete={() => {}} onUpdateConfig={setCfg} onRegistrarSobra={() => {}} /></div>
+      return <p>tela desconhecida: {tela}</p>
   }
 }
 

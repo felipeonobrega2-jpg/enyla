@@ -3,8 +3,8 @@
 import { CaixaView } from "./CaixaView"
 import { previsaoDeCaixa } from "../lib/caixa"
 import React, { useState, useMemo, useEffect, useRef } from "react"
-import { CheckCircle2, Factory, TrendingUp, TrendingDown, DollarSign, Clock, AlertTriangle, Landmark, Plus, ChevronLeft, ChevronRight } from "lucide-react"
-import { montarPedidos, recebiveis } from "../lib/negocio"
+import { CheckCircle2, Factory, TrendingUp, TrendingDown, DollarSign, Clock, AlertTriangle, Landmark, Plus, ChevronLeft, ChevronRight, Search } from "lucide-react"
+import { montarPedidos, recebiveis, pixExpirado, Pedido } from "../lib/negocio"
 import { CabecalhoPagina, Segmentado, Botao, Cartao, TituloCartao, Kpi, GradeKpis, LinhaLista, Vazio, ColunasDuplas } from "./ds"
 import {
   LancamentoFinanceiro, TipoLancamento, StatusLancamento,
@@ -17,8 +17,6 @@ import { FixasTab } from "./financeiro/FixasTab"
 import { FornecedoresTab } from "./financeiro/FornecedoresTab"
 import {
   hoje, isReceitaPendenteValida, pedidosElegiveis as calcPedidosElegiveis,
-  pagamentosPorLote as calcPagamentosPorLote, pagamentosPorCard as calcPagamentosPorCard,
-  sobrasPorLote as calcSobrasPorLote, sobrasPorCard as calcSobrasPorCard,
   calcularPedidosFechados, pedidosAbertos, contarNaoRegistrados, calcularVencidos,
 } from "../lib/financeiro"
 
@@ -632,7 +630,7 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
             </span>
             {revisarDepois && (
               <span className="ml-auto text-[10px] font-bold tracking-wide text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">
-                🔍 PENDENTE
+                <Search className="w-3 h-3 inline -mt-px mr-1" />Pendente
               </span>
             )}
           </button>
@@ -1094,10 +1092,6 @@ export function FinanceiroView({
 
   // Pedidos elegíveis (fechado, em produção, entregue — exceto perdido)
   const pedidosElegiveis = useMemo(() => calcPedidosElegiveis(kanban), [kanban])
-  const pagamentosPorLote = useMemo(() => calcPagamentosPorLote(lancamentos), [lancamentos])
-  const pagamentosPorCard = useMemo(() => calcPagamentosPorCard(lancamentos), [lancamentos])
-  const sobrasPorLote = useMemo(() => calcSobrasPorLote(lancamentos), [lancamentos])
-  const sobrasPorCard = useMemo(() => calcSobrasPorCard(lancamentos), [lancamentos])
 
   // Filtrar por período
   const { from, to } = periodoRange(periodo, mesOffset)
@@ -1159,10 +1153,10 @@ export function FinanceiroView({
   // do contador de não-registrados. Uma única passada, em vez de recalcular o mesmo loop 3x.
   const pedidosFechadosTotais = useMemo(() => calcularPedidosFechados(kanban, lancamentos), [kanban, lancamentos])
   const pedidosEmAberto = useMemo(() => pedidosAbertos(pedidosFechadosTotais), [pedidosFechadosTotais])
-  const fechadoPorKey = useMemo(() => new Map(pedidosFechadosTotais.map(p => [p.key, p])), [pedidosFechadosTotais])
 
-  // Recebíveis canônicos (mesma conta do Painel e de Pedidos)
-  const rec = useMemo(() => recebiveis(montarPedidos(kanban, lancamentos), lancamentos), [kanban, lancamentos])
+  // Pedidos e recebíveis canônicos (mesma conta do Painel e de Pedidos)
+  const pedidosLista = useMemo(() => montarPedidos(kanban, lancamentos), [kanban, lancamentos])
+  const rec = useMemo(() => recebiveis(pedidosLista, lancamentos), [pedidosLista, lancamentos])
 
   const kpis = useMemo(() => {
     const semConta = (l: LancamentoFinanceiro) => l.formaPagamento !== "conta"
@@ -1277,7 +1271,6 @@ export function FinanceiroView({
     return { atrasados, atrasadoRec, atrasadoDesp, semanas: semanas60, maxVal, netFinal: running }
   }, [lancamentos])
 
-  const [semanaAberta, setSemanaAberta] = useState<number | null>(null)
 
   function fmtSemana(from: Date, to: Date) {
     const fmt = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "")
@@ -1717,258 +1710,37 @@ export function FinanceiroView({
             {negociosPendentes.length > 0 && pedidosElegiveis.length > 0 && (
               <p className="text-[10.5px] text-[#8E8E93] font-semibold mb-2">Pedidos</p>
             )}
-            {pedidosElegiveis.length === 0 ? (
+            {pedidosLista.length === 0 ? (
               <Empty msg="Nenhum pedido fechado ainda." />
             ) : (() => {
-              // Apply search filter
+              // Pedidos da camada canônica: lote e pedido avulso no mesmo cartão
               const q = buscaReceber.toLowerCase().trim()
-              const pedidosBuscados = q
-                ? pedidosElegiveis.filter(c =>
-                    c.nomeCliente.toLowerCase().includes(q) || c.numero.toLowerCase().includes(q)
-                  )
-                : pedidosElegiveis
-
-              // Group by lote (cards with same loteId → one row)
-              const loteGroups: Record<string, KanbanCard[]> = {}
-              const solos: KanbanCard[] = []
-              for (const card of pedidosBuscados) {
-                if (card.loteId) {
-                  if (!loteGroups[card.loteId]) loteGroups[card.loteId] = []
-                  loteGroups[card.loteId].push(card)
-                } else {
-                  solos.push(card)
-                }
+              const hj = hoje()
+              const pagamentos = (p: Pedido) => p.receitas.filter(l => l.categoria !== "sobra" && !pixExpirado(l, hj))
+              const lista = pedidosLista
+                .filter(p => !q || p.nomeCliente.toLowerCase().includes(q) || p.numero.toLowerCase().includes(q) || p.cards.some(c => c.numero.toLowerCase().includes(q)))
+                .filter(p => filtroReceber === "todos" ? true
+                  : filtroReceber === "aberto" ? p.aReceber > 0.5
+                  : filtroReceber === "pendente" ? pagamentos(p).length === 0
+                  : pagamentos(p).length > 0 && p.aReceber > 0.5)   // "parcial": tem registro mas falta
+                .sort((a, b) => b.aReceber - a.aReceber || b.venda - a.venda)
+              if (lista.length === 0) {
+                return <Empty msg={q ? `Nenhum resultado para "${buscaReceber}".`
+                  : filtroReceber === "pendente" ? "Todos os pedidos já têm pagamento registrado."
+                  : filtroReceber === "aberto" ? "Todos os pedidos estão quitados."
+                  : "Nenhum pedido em aberto."} />
               }
-
-              // Filtro de status com os números do pedido (camada canônica)
-              const emAberto = (key: string) => (fechadoPorKey.get(key)?.restante ?? 0) > 0.5
-              const passa = (key: string, pags: LancamentoFinanceiro[]) =>
-                filtroReceber === "todos" ? true
-                : filtroReceber === "aberto" ? emAberto(key)
-                : filtroReceber === "pendente" ? pags.length === 0
-                : pags.length > 0 && emAberto(key)   // "parcial": tem registro mas falta
-              const loteEntries = Object.entries(loteGroups).filter(([loteId]) => passa(`lote-${loteId}`, pagamentosPorLote[loteId] ?? []))
-              const solosFiltrados = solos.filter(card => passa(`card-${card.id}`, pagamentosPorCard[card.id] ?? []))
-
-              if (loteEntries.length === 0 && solosFiltrados.length === 0) {
-                const msg = q
-                  ? `Nenhum resultado para "${buscaReceber}".`
-                  : filtroReceber === "pendente"
-                    ? "Todos os pedidos já têm pagamento registrado."
-                    : filtroReceber === "aberto"
-                      ? "Todos os pedidos estão quitados."
-                      : "Nenhum pedido em aberto."
-                return <Empty msg={msg} />
-              }
-
-              return (
-                <>
-                  {/* Lote groups */}
-                  {loteEntries.map(([loteId, cards]) => {
-                    const loteNum = cards[0].loteNumero ?? loteId
-                    const loteInfo = (lotes ?? []).find(l => l.id === loteId)
-                    const sobrasLote = sobrasPorLote[loteId] ?? []
-                    const totalSobras = sobrasLote.reduce((s, l) => s + l.valor, 0)
-                    const pagamentosLote = pagamentosPorLote[loteId] ?? []
-                    const fech = fechadoPorKey.get(`lote-${loteId}`)
-                    const total = fech?.total ?? 0
-                    const restante = fech?.restante ?? 0
-                    const totalPago = total - restante
-                    const pagoPct = total > 0 ? Math.min(100, Math.round((totalPago / total) * 100)) : 0
-                    const completo = total > 0 && restante <= 0.5
-                    const podeSobra = cards.some(c => c.coluna >= COL_EXPEDICAO && c.coluna !== COL_PERDIDO)
-
-                    return (
-                      <div key={loteId} className="bg-white border border-[rgba(60,60,67,0.08)] rounded-xl overflow-hidden mb-2">
-                        {/* Header */}
-                        <div className="px-5 pt-4 pb-3 flex items-start gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-[#191625] text-[14px] leading-tight">{loteInfo?.nomeCliente ?? cards[0].nomeCliente}</span>
-                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#a582ff]/10 text-[#a582ff] shrink-0">{loteNum}</span>
-                              {completo && (
-                                <svg className="w-3.5 h-3.5 text-[#009351] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                                </svg>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-[#8E8E93] mt-0.5">
-                              {cards.length} produto{cards.length > 1 ? "s" : ""}
-                              {pagamentosLote.length > 0 && !completo && ` · ${brl(totalPago)} recebido`}
-                              {sobrasLote.length > 0 && ` · +${brl(totalSobras)} sobras`}
-                              {!completo && total > 0 && <span className="text-amber-600 font-medium"> · {brl(restante)} restante</span>}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="font-semibold text-[#191625] text-[15px] ds-num">{brl(total)}</span>
-                            {onRegistrarSobra && podeSobra && (
-                              <button onClick={() => onRegistrarSobra(cards[0])}
-                                className="h-7 px-2.5 text-[11px] font-medium text-[#c57800] bg-[#c57800]/[0.08] hover:bg-[#c57800]/[0.14] rounded-lg transition-colors shrink-0">
-                                Sobras
-                              </button>
-                            )}
-                            {!completo && (
-                              <button onClick={() => setModalLanc({
-                                  tipo: "receita",
-                                  descricao: `Lote ${loteNum} — ${cards[0].nomeCliente}`,
-                                  valor: restante,
-                                  nomeCliente: cards[0].nomeCliente,
-                                  loteId,
-                                  loteNumero: loteNum,
-                                  dataVencimento: hoje(),
-                                })}
-                                className="h-7 px-3 text-[11px] font-semibold text-white bg-[#009351] hover:bg-[#2DB84D] rounded-lg transition-colors shrink-0">
-                                Receber
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        {/* Progress bar — only when payments exist */}
-                        {pagamentosLote.length > 0 && (
-                          <div className="h-0.5 bg-[rgba(60,60,67,0.06)] mx-5 rounded-full overflow-hidden mb-1">
-                            <div className="h-full rounded-full bg-[#009351] transition-all"
-                              style={{ width: `${pagoPct}%` }} />
-                          </div>
-                        )}
-                        {/* Rows */}
-                        <div className="border-t border-[rgba(60,60,67,0.05)] divide-y divide-[rgba(60,60,67,0.04)]">
-                          {cards.map(card => (
-                            <div key={card.id} className="px-5 py-2.5 flex items-center gap-3">
-                              <span className="text-[9.5px] font-bold text-[#8456e8] bg-[#8456e8]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">{card.numero}</span>
-                              <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.55)] truncate">{card.dimensoes}{card.materialNome ? ` · ${card.materialNome}` : ""}</p>
-                              <p className="text-[12px] font-medium text-[#5e5c68] ds-num">{brl(card.preco)}</p>
-                            </div>
-                          ))}
-                          {sobrasLote.map(s => <LinhaSobra key={s.id} s={s} quitadaNoPedido={completo} />)}
-                          {pagamentosLote.map(p => (
-                            <div key={p.id} className="px-5 py-2.5 flex items-center gap-3">
-                              {p.status === "pago" ? (
-                                <svg className="w-3.5 h-3.5 text-[#009351] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                                </svg>
-                              ) : (
-                                <svg className="w-3.5 h-3.5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                </svg>
-                              )}
-                              <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.5)] truncate">
-                                {p.dataPagamento ? fmtDate(p.dataPagamento) : `vence ${fmtDate(p.dataVencimento)}`}
-                                {p.formaPagamento ? ` · ${p.formaPagamento}` : ""}
-                              </p>
-                              <p className={`text-[12px] font-semibold ds-num ${p.status === "pago" ? "text-[#009351]" : "text-amber-600"}`}>{brl(p.valor)}</p>
-                              {p.status !== "pago" && (
-                                <button
-                                  onClick={() => setModalPag(p)}
-                                  className="h-6 px-2.5 text-[10.5px] font-semibold text-white bg-[#009351] hover:bg-[#2DB84D] rounded-lg transition-colors shrink-0">
-                                  Recebido
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )
+              return lista.map(p => (
+                <CartaoReceber key={p.key} p={p} pagamentos={pagamentos(p)}
+                  nomeLote={p.tipo === "lote" ? (lotes ?? []).find(l => l.id === p.cards[0].loteId)?.nomeCliente : undefined}
+                  onRegistrarSobra={onRegistrarSobra}
+                  onReceber={() => setModalLanc({
+                    tipo: "receita", descricao: `${p.tipo === "lote" ? "Lote" : "Pedido"} ${p.numero} — ${p.nomeCliente}`, valor: Math.round(p.aReceber * 100) / 100,
+                    nomeCliente: p.nomeCliente, dataVencimento: hoje(),
+                    ...(p.tipo === "lote" ? { loteId: p.cards[0].loteId, loteNumero: p.numero } : { cardId: p.cards[0].id, cardNumero: p.numero }),
                   })}
-
-                  {/* Solo cards */}
-                  {solosFiltrados.sort((a, b) => b.preco - a.preco).map(card => {
-                    const pagamentosCard = pagamentosPorCard[card.id] ?? []
-                    const sobrasCard = sobrasPorCard[card.id] ?? []
-                    const totalSobrasCard = sobrasCard.reduce((s, l) => s + l.valor, 0)
-                    const fechCard = fechadoPorKey.get(`card-${card.id}`)
-                    const totalCard = fechCard?.total ?? card.preco
-                    const restanteCard = fechCard?.restante ?? 0
-                    const totalPagoCard = totalCard - restanteCard
-                    const pagoPctCard = totalCard > 0 ? Math.min(100, Math.round((totalPagoCard / totalCard) * 100)) : 0
-                    const completoCard = totalCard > 0 && restanteCard <= 0.5
-                    return (
-                      <div key={card.id} className="bg-white border border-[rgba(60,60,67,0.08)] rounded-xl overflow-hidden mb-2">
-                        {/* Header */}
-                        <div className="px-5 pt-4 pb-3 flex items-start gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-[#191625] text-[14px] leading-tight">{card.nomeCliente}</span>
-                              <span className="text-[9.5px] font-bold text-[#8456e8] bg-[#8456e8]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">{card.numero}</span>
-                              {completoCard && (
-                                <svg className="w-3.5 h-3.5 text-[#009351] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                                </svg>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-[#8E8E93] mt-0.5">
-                              {[card.dimensoes, card.materialNome].filter(Boolean).join(" · ")}
-                              {pagamentosCard.length > 0 && !completoCard && ` · ${brl(totalPagoCard)} recebido`}
-                              {sobrasCard.length > 0 && ` · +${brl(totalSobrasCard)} sobras`}
-                              {!completoCard && totalCard > 0 && <span className="text-amber-600 font-medium"> · {brl(restanteCard)} restante</span>}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="font-semibold text-[#191625] text-[15px] ds-num">{brl(totalCard)}</span>
-                            {onRegistrarSobra && card.coluna >= COL_EXPEDICAO && card.coluna !== COL_PERDIDO && (
-                              <button onClick={() => onRegistrarSobra(card)}
-                                className="h-7 px-2.5 text-[11px] font-medium text-[#c57800] bg-[#c57800]/[0.08] hover:bg-[#c57800]/[0.14] rounded-lg transition-colors shrink-0">
-                                Sobras
-                              </button>
-                            )}
-                            {!completoCard && (
-                              <button onClick={() => setModalLanc({
-                                  tipo: "receita",
-                                  descricao: `Pedido ${card.numero} — ${card.nomeCliente}`,
-                                  valor: restanteCard,
-                                  cardId: card.id,
-                                  cardNumero: card.numero,
-                                  nomeCliente: card.nomeCliente,
-                                  dataVencimento: hoje(),
-                                })}
-                                className="h-7 px-3 text-[11px] font-semibold text-white bg-[#009351] hover:bg-[#2DB84D] rounded-lg transition-colors shrink-0">
-                                Receber
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        {/* Progress bar — only when payments exist */}
-                        {pagamentosCard.length > 0 && (
-                          <div className="h-0.5 bg-[rgba(60,60,67,0.06)] mx-5 rounded-full overflow-hidden mb-1">
-                            <div className="h-full rounded-full bg-[#009351] transition-all"
-                              style={{ width: `${pagoPctCard}%` }} />
-                          </div>
-                        )}
-                        {/* Rows */}
-                        {(sobrasCard.length > 0 || pagamentosCard.length > 0) && (
-                          <div className="border-t border-[rgba(60,60,67,0.05)] divide-y divide-[rgba(60,60,67,0.04)]">
-                            {sobrasCard.map(s => <LinhaSobra key={s.id} s={s} quitadaNoPedido={completoCard} />)}
-                            {pagamentosCard.map(p => (
-                              <div key={p.id} className="px-5 py-2.5 flex items-center gap-3">
-                                {p.status === "pago" ? (
-                                  <svg className="w-3.5 h-3.5 text-[#009351] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                                  </svg>
-                                ) : (
-                                  <svg className="w-3.5 h-3.5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                  </svg>
-                                )}
-                                <p className="flex-1 text-[12px] text-[rgba(60,60,67,0.5)] truncate">
-                                  {p.dataPagamento ? fmtDate(p.dataPagamento) : `vence ${fmtDate(p.dataVencimento)}`}
-                                  {p.formaPagamento ? ` · ${p.formaPagamento}` : ""}
-                                </p>
-                                <p className={`text-[12px] font-semibold ds-num ${p.status === "pago" ? "text-[#009351]" : "text-amber-600"}`}>{brl(p.valor)}</p>
-                                {p.status !== "pago" && (
-                                  <button
-                                    onClick={() => setModalPag(p)}
-                                    className="h-6 px-2.5 text-[10.5px] font-semibold text-white bg-[#009351] hover:bg-[#2DB84D] rounded-lg transition-colors shrink-0">
-                                    Recebido
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </>
-              )
+                  onMarcarRecebido={l => setModalPag(l)} />
+              ))
             })()}
           {/* ── Terceirizados ── */}
           {(() => {
@@ -2092,7 +1864,7 @@ export function FinanceiroView({
                     ? "bg-amber-50 border-amber-300 text-amber-700"
                     : "bg-white border-[rgba(60,60,67,0.12)] text-[#8E8E93] hover:border-amber-200 hover:text-amber-600"
                 }`}>
-                🔍 Revisar
+                <Search className="w-3.5 h-3.5 inline -mt-px mr-1" />Revisar
               </button>
               <input value={buscaLanc} onChange={e => setBuscaLanc(e.target.value)}
                 placeholder="Buscar lançamento…"
@@ -2216,7 +1988,7 @@ export function FinanceiroView({
                                     )}
                                     {l.revisarDepois && (
                                       <span className="text-[9.5px] font-bold px-1.5 py-px rounded-full bg-amber-50 text-amber-600 border border-amber-200 shrink-0 flex items-center gap-1">
-                                        🔍 Revisar
+                                        <Search className="w-2.5 h-2.5" />Revisar
                                       </span>
                                     )}
                                   </div>
@@ -2577,27 +2349,6 @@ export function FinanceiroView({
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function KpiCard({ label, value, sub, icon, iconColor, subColor, highlight, onClick }: {
-  label: string; value: string; sub?: string
-  icon: React.ReactNode
-  iconBg: string
-  iconColor: string
-  subColor?: string
-  highlight?: boolean
-  onClick?: () => void
-}) {
-  // Mesma aparência do Kpi de ds.tsx (aqui o valor já vem formatado)
-  return (
-    <Cartao onClick={onClick} className={`group min-w-0 ${highlight ? "ring-1 ring-[#8456e8]/20" : ""}`}>
-      <p className="text-[11px] font-medium text-[#898892] flex items-center gap-1.5 mb-3 truncate">
-        <span style={{ color: iconColor }} className="shrink-0 [&>svg]:w-3.5 [&>svg]:h-3.5">{icon}</span>{label}
-      </p>
-      <p className="text-[22px] font-semibold ds-num text-[#191625] tracking-[-0.02em] leading-none truncate">{value}</p>
-      {sub && <p className="text-[11px] mt-2 truncate" style={{ color: subColor ?? "#898892" }}>{sub}</p>}
-    </Cartao>
-  )
-}
-
 function DreRow({ label, value, bold, accent, separator }: {
   label: string; value: number; bold?: boolean; separator?: boolean
   accent?: "green" | "rose"
@@ -2856,6 +2607,75 @@ function LinhaSobra({ s, quitadaNoPedido }: { s: LancamentoFinanceiro; quitadaNo
         {s.status === "pago" ? "paga" : quitadaNoPedido ? "paga com o pedido" : "a receber"}
       </span>
       <p className={`text-[12px] font-medium ds-num ${paga ? "text-[#009351]" : "text-[#c57800]"}`}>+{brl(s.valor)}</p>
+    </div>
+  )
+}
+
+// Pedido no "A receber": itens, sobras e pagamentos, com os números da camada canônica
+function CartaoReceber({ p, pagamentos, nomeLote, onRegistrarSobra, onReceber, onMarcarRecebido }: {
+  p: Pedido
+  pagamentos: LancamentoFinanceiro[]
+  nomeLote?: string
+  onRegistrarSobra?: (card: KanbanCard) => void
+  onReceber: () => void
+  onMarcarRecebido: (l: LancamentoFinanceiro) => void
+}) {
+  const completo = p.aReceber <= 0.5
+  const pagoPct = p.venda > 0 ? Math.min(100, Math.round((p.venda - p.aReceber) / p.venda * 100)) : 0
+  const sobras = p.receitas.filter(l => l.categoria === "sobra")
+  const podeSobra = p.cards.some(c => c.coluna >= COL_EXPEDICAO && c.coluna !== COL_PERDIDO)
+  return (
+    <div className="bg-white rounded-xl ds-borda overflow-hidden mb-2 ds-entrada">
+      <div className="px-5 pt-4 pb-3 flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-[#191625] text-[14px] leading-tight truncate">{nomeLote ?? p.nomeCliente}</span>
+            <span className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded-full bg-[#8456e8]/10 text-[#8456e8] shrink-0">{p.numero}</span>
+            {completo && <CheckCircle2 className="w-3.5 h-3.5 text-[#009351] shrink-0" />}
+          </div>
+          <p className="text-[11.5px] text-[#898892] mt-0.5">
+            {p.cards.length} {p.cards.length > 1 ? "produtos" : "produto"} · {p.etapa}
+            {p.sobras > 0 && ` · +${brl(p.sobras)} sobras`}
+            {completo ? " · quitado" : <> · {brl(p.venda - p.aReceber)} recebido · <span className="text-[#c57800] font-medium">{brl(p.aReceber)} falta</span></>}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="font-semibold text-[#191625] text-[15px] ds-num">{brl(p.venda)}</span>
+          {onRegistrarSobra && podeSobra && (
+            <button onClick={() => onRegistrarSobra(p.cards[0])} className="h-7 px-2.5 text-[11px] font-medium text-[#c57800] bg-[#c57800]/[0.08] hover:bg-[#c57800]/[0.14] rounded-lg transition-colors">Sobras</button>
+          )}
+          {!completo && (
+            <button onClick={onReceber} className="h-7 px-3 text-[11px] font-semibold text-white bg-[#009351] hover:bg-[#007f45] rounded-lg transition-colors">Receber</button>
+          )}
+        </div>
+      </div>
+      {pagamentos.length > 0 && (
+        <div className="h-0.5 bg-[rgba(60,60,67,0.06)] mx-5 rounded-full overflow-hidden mb-1">
+          <div className="h-full rounded-full bg-[#009351] transition-[width] duration-500" style={{ width: `${pagoPct}%` }} />
+        </div>
+      )}
+      <div className="border-t border-[rgba(60,60,67,0.05)] divide-y divide-[rgba(60,60,67,0.04)]">
+        {p.cards.length > 1 && p.cards.map(card => (
+          <div key={card.id} className="px-5 py-2.5 flex items-center gap-3">
+            <span className="text-[10px] font-semibold text-[#8456e8] bg-[#8456e8]/[0.08] px-1.5 py-0.5 rounded-md shrink-0">{card.numero}</span>
+            <p className="flex-1 text-[12px] text-[#898892] truncate">{card.dimensoes}{card.materialNome ? ` · ${card.materialNome}` : ""}</p>
+            <p className="text-[12px] font-medium text-[#5e5c68] ds-num">{brl(card.preco)}</p>
+          </div>
+        ))}
+        {sobras.map(s => <LinhaSobra key={s.id} s={s} quitadaNoPedido={completo || p.sobrasQuitadas.includes(s.id)} />)}
+        {pagamentos.map(l => (
+          <div key={l.id} className="px-5 py-2.5 flex items-center gap-3">
+            {l.status === "pago" ? <CheckCircle2 className="w-3.5 h-3.5 text-[#009351] shrink-0" /> : <Clock className="w-3.5 h-3.5 text-[#c57800] shrink-0" />}
+            <p className="flex-1 text-[12px] text-[#898892] truncate">
+              {l.dataPagamento ? fmtDate(l.dataPagamento) : `vence ${fmtDate(l.dataVencimento)}`}{l.formaPagamento ? ` · ${FORMAS.find(f => f.value === l.formaPagamento)?.label ?? l.formaPagamento}` : ""}
+            </p>
+            <p className={`text-[12px] font-semibold ds-num ${l.status === "pago" ? "text-[#009351]" : "text-[#c57800]"}`}>{brl(l.valor)}</p>
+            {l.status !== "pago" && (
+              <button onClick={() => onMarcarRecebido(l)} className="h-6 px-2.5 text-[10.5px] font-semibold text-white bg-[#009351] hover:bg-[#007f45] rounded-lg transition-colors">Recebido</button>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
