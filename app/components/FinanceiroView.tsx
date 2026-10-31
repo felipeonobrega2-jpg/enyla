@@ -1,6 +1,7 @@
 "use client"
 
 import { CaixaView } from "./CaixaView"
+import { previsaoDeCaixa } from "../lib/caixa"
 import React, { useState, useMemo, useEffect, useRef } from "react"
 import { CheckCircle2, Factory, TrendingUp, TrendingDown, DollarSign, Clock, AlertTriangle, Landmark, Plus, ChevronLeft, ChevronRight } from "lucide-react"
 import { montarPedidos, recebiveis } from "../lib/negocio"
@@ -139,7 +140,7 @@ function CaixaProjetadoChart({ data, saldoAtual }: {
             {hover === 0
               ? <p className="ds-num" style={{ color: "#8456e8" }}>Caixa atual · {brl(saldoAtual)}</p>
               : <div className="flex items-center gap-3">
-                  <span className="ds-num font-semibold" style={{ color: "#30D158" }}>+{brl(entrada!)}</span>
+                  <span className="ds-num font-semibold" style={{ color: entrada! >= 0 ? "#30D158" : "#d33a3c" }}>{entrada! >= 0 ? "+" : "−"}{brl(Math.abs(entrada!))}</span>
                   <span className="text-[10px]" style={{ color: "var(--text-faint)" }}>→</span>
                   <span className="ds-num font-bold" style={{ color: "#8456e8" }}>{brl(p.value)}</span>
                 </div>
@@ -1318,62 +1319,14 @@ export function FinanceiroView({
     return result
   }, [lancamentos, negocios])
 
-  const caixaProjetado = useMemo(() => {
-    const recebidoCard: Record<string, number> = {}
-    const recebidoLote: Record<string, number> = {}
-    lancamentos.forEach(l => {
-      if (l.tipo !== "receita" || l.status !== "pago") return
-      if (l.cardId) recebidoCard[l.cardId] = (recebidoCard[l.cardId] ?? 0) + l.valor
-      if (l.loteId) recebidoLote[l.loteId] = (recebidoLote[l.loteId] ?? 0) + l.valor
-    })
-    const lotePrecoTotal: Record<string, number> = {}
-    kanban.forEach(c => { if (c.loteId) lotePrecoTotal[c.loteId] = (lotePrecoTotal[c.loteId] ?? 0) + c.preco })
-
-    // Group by DAY (YYYY-MM-DD)
-    const byDay: Record<string, { valor: number; pedidos: { numero: string; cliente: string; valor: number }[] }> = {}
-    kanban.forEach(card => {
-      if (!card.prazoRecebimentoInterno) return
-      if (card.coluna === COL_PERDIDO) return
-      const day = card.prazoRecebimentoInterno.slice(0, 10)
-      let recebido = 0
-      if (card.loteId) {
-        const loteTotal = lotePrecoTotal[card.loteId] || 1
-        recebido = ((recebidoLote[card.loteId] ?? 0) * card.preco) / loteTotal
-      } else {
-        recebido = recebidoCard[card.id] ?? 0
-      }
-      const valor = Math.max(card.preco - recebido, 0)
-      if (!byDay[day]) byDay[day] = { valor: 0, pedidos: [] }
-      byDay[day].valor += valor
-      byDay[day].pedidos.push({ numero: card.numero ?? "", cliente: card.nomeCliente, valor })
-    })
-
-    const days = Object.keys(byDay).sort()
-    if (days.length === 0) return []
-
-    const saldoAtual = (config?.contas ?? [])
-      .filter(c => c.ativa && c.tipo !== "credito" && c.saldo != null)
-      .reduce((s, c) => s + (c.saldo ?? 0), 0)
-
-    const DIAS_PT = ["dom","seg","ter","qua","qui","sex","sáb"]
-    const MESES_PT = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"]
-
-    let cumulo = saldoAtual
-    return days.map(day => {
-      const [y, m, d] = day.split("-").map(Number)
-      const dt = new Date(y, m - 1, d)
-      const diaSemana = DIAS_PT[dt.getDay()]
-      const label = `${String(d).padStart(2,"0")} ${MESES_PT[m - 1]}`
-      cumulo += byDay[day].valor
-      return {
-        date: day, label, diaSemana,
-        valor: byDay[day].valor,
-        pedidos: byDay[day].pedidos,
-        cumulo,
-        saldoInicio: cumulo - byDay[day].valor,
-      }
-    })
-  }, [kanban, lancamentos, config])
+  // Mesma previsão da aba "Previsão de caixa" (lib/caixa): saldo no fim de cada semana
+  const previsao = useMemo(() => config ? previsaoDeCaixa({ pedidos: montarPedidos(kanban, lancamentos), lancamentos, historico: historico ?? [], config }) : null,
+    [kanban, lancamentos, historico, config])
+  const caixaProjetado = useMemo(() => (previsao?.semanas ?? []).map(w => ({
+    label: `${w.inicio.slice(8, 10)}/${w.inicio.slice(5, 7)}`, diaSemana: "Semana",
+    valor: w.totalEntradas - w.totalSaidas, cumulo: w.saldoFinal ?? 0, saldoInicio: (w.saldoFinal ?? 0) - (w.totalEntradas - w.totalSaidas),
+    entradas: w.totalEntradas, saidas: w.totalSaidas, fim: `${w.fim.slice(8, 10)}/${w.fim.slice(5, 7)}`,
+  })), [previsao])
 
 
   return (
@@ -1425,7 +1378,6 @@ export function FinanceiroView({
           const mesAtual = monthlyData12m[11]?.receita ?? 0
           const mesAnterior = monthlyData12m[10]?.receita ?? 0
           const variacao = mesAnterior > 0 ? (mesAtual - mesAnterior) / mesAnterior * 100 : null
-          const saldoAtual = totalCaixa
           return (
           <div className="space-y-4">
             {contasSaldo.length > 0 && (
@@ -1489,23 +1441,27 @@ export function FinanceiroView({
                     itens={monthlyData12m.map((m, i) => ({ rotulo: m.label, a: m.receita, b: m.despesas, destaque: i === 11 }))} />
                 </Cartao>
 
-                {caixaProjetado.length > 0 && (() => {
-                  const totalEntradas = caixaProjetado.reduce((s, d) => s + d.valor, 0)
-                  const caixaFinal = caixaProjetado[caixaProjetado.length - 1]?.cumulo ?? saldoAtual
+                {previsao && caixaProjetado.length > 0 && (() => {
+                  const inicial = previsao.saldoInicial ?? 0
+                  const caixaFinal = caixaProjetado[caixaProjetado.length - 1].cumulo
                   return (
                     <Cartao padding={false}>
                       <div className="px-5 pt-5">
                         <TituloCartao titulo="Caixa projetado" icone={<Landmark className="w-4 h-4" />}
-                          sub={`${saldoAtual > 0 ? `${brl(saldoAtual)} agora · ` : ""}${brl(totalEntradas)} de entradas previstas pelos prazos internos`}
-                          acao={<div className="text-right"><p className="text-[15px] font-semibold ds-num text-[#8456e8]">{brl(caixaFinal)}</p><p className="text-[10.5px] text-[#898892]">ao final</p></div>} />
-                        <CaixaProjetadoChart data={caixaProjetado} saldoAtual={saldoAtual} />
+                          sub={previsao.saldoInicial == null ? "Informe o saldo de hoje na Previsão de caixa" : `${brl(inicial)} hoje · entradas, saídas, produção e custos fixos das próximas 8 semanas`}
+                          acao={<div className="text-right"><p className={`text-[15px] font-semibold ds-num ${caixaFinal < 0 ? "text-[#d33a3c]" : "text-[#8456e8]"}`}>{brl(caixaFinal)}</p><p className="text-[10.5px] text-[#898892]">em 8 semanas</p></div>} />
+                        <CaixaProjetadoChart data={caixaProjetado} saldoAtual={inicial} />
                       </div>
                       <div className="mt-2 px-2 pb-2" style={{ borderTop: "1px solid rgba(60,60,67,0.06)" }}>
-                        {caixaProjetado.map((d, i) => (
-                          <LinhaLista key={i} titulo={`${d.diaSemana}, ${d.label}`}
-                            sub={d.pedidos.map(p => `${p.numero ? p.numero + " · " : ""}${p.cliente}`).join(" · ")}
-                            valor={`+${brl(d.valor)}`} tom="sucesso" valorSub={`saldo ${brl(d.cumulo)}`} />
+                        {caixaProjetado.filter(d => d.entradas || d.saidas).map((d, i) => (
+                          <LinhaLista key={i} titulo={`${d.label} a ${d.fim}`}
+                            sub={`+${brl(d.entradas)} · −${brl(d.saidas)}`}
+                            valor={brl(d.cumulo)} valorSub="saldo no fim" tom={d.cumulo < 0 ? "perigo" : undefined}
+                            onClick={() => irAba("previsao")} />
                         ))}
+                        <button onClick={() => irAba("previsao")} className="w-full py-2.5 text-[12px] font-medium text-[#8456e8] hover:bg-[#8456e8]/[0.04] rounded-lg transition-colors">
+                          Abrir previsão de caixa
+                        </button>
                       </div>
                     </Cartao>
                   )
