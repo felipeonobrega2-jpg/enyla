@@ -150,7 +150,7 @@ export function calcularVencidos(kanban: KanbanCard[], lancamentos: LancamentoFi
 // receber"/"em atraso", mas dinheiro que já entrou conta normalmente aqui),
 // mais comissões de parceria pagas.
 export function calcularRecebidoTotal(lancamentos: LancamentoFinanceiro[], negocios: NegocioParceiro[] = []): number {
-  const recebidoLancamentos = somaPago(lancamentos.filter(l => l.tipo === "receita"))
+  const recebidoLancamentos = somaPago(lancamentos.filter(l => l.tipo === "receita" && l.formaPagamento !== "conta"))
   const recebidoParceiros = somaPago(negocios.map(n => ({ status: n.status, valor: n.comissaoValor, tipo: "receita" } as LancamentoFinanceiro)))
   return recebidoLancamentos + recebidoParceiros
 }

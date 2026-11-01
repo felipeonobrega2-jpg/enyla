@@ -948,8 +948,8 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       if (to   && d > to)   return false
       return true
     }
-    const entrou = lancamentos.filter(l => l.tipo === "receita" && l.status === "pago" && inPeriod(l)).reduce((s, l) => s + l.valor, 0)
-    const saiu   = lancamentos.filter(l => l.tipo === "despesa" && l.status === "pago" && inPeriod(l)).reduce((s, l) => s + l.valor, 0)
+    const entrou = lancamentos.filter(l => l.tipo === "receita" && l.status === "pago" && l.formaPagamento !== "conta" && inPeriod(l)).reduce((s, l) => s + l.valor, 0)
+    const saiu   = lancamentos.filter(l => l.tipo === "despesa" && l.status === "pago" && l.formaPagamento !== "conta" && inPeriod(l)).reduce((s, l) => s + l.valor, 0)
     return { entrou, saiu, liquido: entrou - saiu }
   }, [lancamentos, periodBounds])
 
@@ -1176,8 +1176,8 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       if (to   && d > to)   return false
       return true
     }
-    const dreRec  = lancamentos.filter(l => l.tipo === "receita" && l.status === "pago" && inPer(l)).reduce((s, l) => s + l.valor, 0)
-    const dreDesp = lancamentos.filter(l => l.tipo === "despesa" && l.status === "pago" && inPer(l)).reduce((s, l) => s + l.valor, 0)
+    const dreRec  = lancamentos.filter(l => l.tipo === "receita" && l.status === "pago" && l.formaPagamento !== "conta" && inPer(l)).reduce((s, l) => s + l.valor, 0)
+    const dreDesp = lancamentos.filter(l => l.tipo === "despesa" && l.status === "pago" && l.formaPagamento !== "conta" && inPer(l)).reduce((s, l) => s + l.valor, 0)
     const pendentes   = lancamentos.filter(l =>
       l.tipo === "receita" && l.status !== "pago" && l.categoria !== "sobra" &&
       !(l.categoria === "pix_link" && l.dataVencimento < hj)

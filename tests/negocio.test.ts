@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { montarPedidos, recebiveis, margemContribuicao } from "@/app/lib/negocio"
+import { montarPedidos, recebiveis, margemContribuicao, caixaDoPeriodo } from "@/app/lib/negocio"
 import { card, receita, despesa } from "./fixtures"
 
 describe("pedidos e recebíveis", () => {
@@ -74,5 +74,16 @@ describe("volume vendido", () => {
   it("lê a quantidade anotada na sobra", () => {
     expect(unidadesDaSobra(receita({ valor: 1, descricao: "Sobras Lote RAN-003 — Raniere · 1170 un." }))).toBe(1170)
     expect(unidadesDaSobra(receita({ valor: 1, descricao: "Sobra Pedido X — Cliente" }))).toBe(0)
+  })
+})
+
+describe("conta corrente do fornecedor", () => {
+  it("ajuste de saldo a favor (receita na conta) não entra como recebido", () => {
+    const p = { from: new Date("2026-10-01T00:00:00"), to: new Date("2026-10-31T23:59:59") }
+    const lancs = [
+      { id: "a", tipo: "receita", status: "pago", formaPagamento: "conta", valor: 25514, descricao: "Ajuste de saldo — Jerograf", dataVencimento: "2026-10-31", dataPagamento: "2026-10-31", fornecedorId: "f1", criadoEm: "" },
+      { id: "b", tipo: "receita", status: "pago", formaPagamento: "pix", valor: 1000, descricao: "Saldo", dataVencimento: "2026-10-20", dataPagamento: "2026-10-20", criadoEm: "" },
+    ] as never[]
+    expect(caixaDoPeriodo(lancs, p).recebido).toBe(1000)
   })
 })

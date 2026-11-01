@@ -274,8 +274,12 @@ export function vendasDoPeriodo(pedidos: Pedido[], lancamentos: LancamentoFinanc
 
 export type Caixa = { recebido: number; aReceber: number; vencido: number }
 
+/** Movimento na conta corrente do fornecedor (custos lançados na conta, ajustes de saldo):
+ *  não é dinheiro entrando nem saindo do caixa, e o ajuste a favor nunca é venda. */
+export const naContaDoFornecedor = (l: Pick<LancamentoFinanceiro, "formaPagamento">) => l.formaPagamento === "conta"
+
 export function caixaDoPeriodo(lancamentos: LancamentoFinanceiro[], p: Periodo, hoje = new Date()): Caixa {
-  const rec = lancamentos.filter(l => l.tipo === "receita")
+  const rec = lancamentos.filter(l => l.tipo === "receita" && !naContaDoFornecedor(l))
   const pendentes = rec.filter(l => l.status !== "pago")
   return {
     recebido: rec.filter(l => l.status === "pago" && noPeriodo(l.dataPagamento ?? l.dataVencimento, p)).reduce((s, l) => s + l.valor, 0),

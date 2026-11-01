@@ -1291,13 +1291,13 @@ export function FinanceiroView({
       const key = d.toISOString().slice(0, 7)
       const label = MES_BR[d.getMonth()]
       const receita = lancamentos
-        .filter(l => l.tipo === "receita" && l.status === "pago" && (l.dataPagamento || l.dataVencimento)?.slice(0, 7) === key)
+        .filter(l => l.tipo === "receita" && l.status === "pago" && l.formaPagamento !== "conta" && (l.dataPagamento || l.dataVencimento)?.slice(0, 7) === key)
         .reduce((s, l) => s + l.valor, 0)
       const parceiros = negocios
         .filter(n => n.status === "pago" && (n.dataOrcamento || n.criadoEm)?.slice(0, 7) === key)
         .reduce((s, n) => s + n.comissaoValor, 0)
       const despesas = lancamentos
-        .filter(l => l.tipo === "despesa" && l.status === "pago" && (l.dataPagamento || l.dataVencimento)?.slice(0, 7) === key)
+        .filter(l => l.tipo === "despesa" && l.status === "pago" && l.formaPagamento !== "conta" && (l.dataPagamento || l.dataVencimento)?.slice(0, 7) === key)
         .reduce((s, l) => s + l.valor, 0)
       result.push({ key, label, receita: receita + parceiros, despesas })
     }
@@ -1940,7 +1940,8 @@ export function FinanceiroView({
                 return (
                   <div className="space-y-2">
                     {groups.map(({ date, items }) => {
-                      const dayTotal = items.reduce((s, l) => s + (l.tipo === "receita" ? l.valor : -l.valor), 0)
+                      // Movimento na conta do fornecedor não é caixa: fica fora do total do dia
+                      const dayTotal = items.filter(l => l.formaPagamento !== "conta").reduce((s, l) => s + (l.tipo === "receita" ? l.valor : -l.valor), 0)
                       return (
                         <div key={date} className="rounded-xl overflow-hidden"
                           style={{ background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04)" }}>
@@ -1962,6 +1963,7 @@ export function FinanceiroView({
                             const conta = l.contaId ? (config?.contas ?? []).find(c => c.id === l.contaId) : null
                             const forn  = l.fornecedorId ? (config?.fornecedores ?? []).find(f => f.id === l.fornecedorId) : null
                             const isRec = l.tipo === "receita"
+                            const naConta = l.formaPagamento === "conta"
                             const isSel = selectedIds.has(l.id)
                             return (
                               <div key={l.id}
@@ -1985,8 +1987,9 @@ export function FinanceiroView({
                                 )}
                                 {/* Ícone compacto */}
                                 <div className="w-7 h-7 rounded-lg shrink-0 flex items-center justify-center text-[13px] font-bold"
-                                  style={{ background: isRec ? "rgba(0,147,81,0.09)" : "rgba(211,58,60,0.08)", color: isRec ? "#009351" : "#d33a3c" }}>
-                                  {isRec ? "↑" : "↓"}
+                                  title={naConta ? "Na conta corrente do fornecedor: não entra no caixa nem nas vendas" : undefined}
+                                  style={naConta ? { background: "rgba(116,116,128,0.1)", color: "#8E8E93" } : { background: isRec ? "rgba(0,147,81,0.09)" : "rgba(211,58,60,0.08)", color: isRec ? "#009351" : "#d33a3c" }}>
+                                  {naConta ? "≡" : isRec ? "↑" : "↓"}
                                 </div>
                                 {/* Info */}
                                 <div className="flex-1 min-w-0">
@@ -2030,7 +2033,7 @@ export function FinanceiroView({
                                   </div>
                                 </div>
                                 {/* Valor */}
-                                <span className={`text-[13.5px] font-bold ds-num shrink-0 ${isRec ? "text-emerald-700" : "text-rose-600"}`}>
+                                <span className={`text-[13.5px] font-bold ds-num shrink-0 ${naConta ? "text-[#8E8E93]" : isRec ? "text-emerald-700" : "text-rose-600"}`}>
                                   {isRec ? "+" : "−"}{brl(l.valor)}
                                 </span>
                                 {/* Ações no hover */}

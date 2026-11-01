@@ -87,7 +87,7 @@ export function AnalyticsView({
   const monthlyData = useMemo(() => {
     return months.map(({ key, label }) => {
       const receita = lancamentos
-        .filter(l => l.tipo === "receita" && l.status === "pago" && monthKey(l.dataPagamento || l.dataVencimento) === key)
+        .filter(l => l.tipo === "receita" && l.status === "pago" && l.formaPagamento !== "conta" && monthKey(l.dataPagamento || l.dataVencimento) === key)
         .reduce((s, l) => s + l.valor, 0)
 
       const parceiros = negocios

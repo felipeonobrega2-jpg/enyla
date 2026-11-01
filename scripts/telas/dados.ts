@@ -35,6 +35,7 @@ const L = (p: Partial<LancamentoFinanceiro> & { valor: number; tipo: LancamentoF
   ({ id: Math.random().toString(36).slice(2), descricao: "Lançamento", dataVencimento: dia(-5), status: "pago", dataPagamento: dia(-5), criadoEm: "", ...p })
 
 const lancamentos: LancamentoFinanceiro[] = [
+  { id: "aj1", tipo: "receita", descricao: "Ajuste de saldo — Jerograf", valor: 2500, dataVencimento: dia(0), dataPagamento: dia(0), status: "pago", formaPagamento: "conta", fornecedorId: "f1", criadoEm: "" },
   L({ tipo: "receita", valor: 3270, loteId: "L1", descricao: "Sinal ANA-001" }),
   L({ tipo: "receita", valor: 650, loteId: "L1", cardId: "c1", categoria: "sobra", status: "pendente", dataPagamento: undefined, dataVencimento: dia(-2), descricao: "Sobra ANA-001" }),
   L({ tipo: "receita", valor: 4770, cardId: "c2", descricao: "Sinal ORC-002" }),
