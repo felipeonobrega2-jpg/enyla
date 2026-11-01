@@ -5,11 +5,12 @@ import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, CO
 import { Configuracoes } from "../config"
 import { Pedido, producao, recebiveis, pedidoEntregue, isTerceirizado, parseData, diasAte, nomeChave } from "./negocio"
 import { normalizarProducao } from "./producao"
+import { ritmoDosClientes, hojeDeLembrar, textoRitmo } from "./ritmo"
 
 export type TipoPendencia =
   | "aprovado" | "atrasado" | "fornecedor" | "cobrancaVencida" | "semCobranca"
   | "conferir" | "entregaProxima" | "orcamentoVencendo" | "semPrazo"
-  | "abriuProposta" | "comoFicou" | "avaliado"
+  | "abriuProposta" | "comoFicou" | "avaliado" | "reposicao"
 
 export type Pendencia = {
   id: string
@@ -22,6 +23,7 @@ export type Pendencia = {
   whatsapp?: string                         // mensagem pronta
   cobrar?: Partial<LancamentoFinanceiro>    // cobrança pronta para lançar
   aprovacao?: NonNullable<Configuracoes["aprovacoesOnline"]>[number]
+  cliente?: string                          // abre o perfil do cliente
 }
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -100,6 +102,9 @@ export function pendencias(args: {
     const d = -diasAte(p.dataEntregaReal, hoje)
     return d >= 1 && d <= 7
   })
+  // Recompra antecipada: cliente chegando (ou passando) da data em que costuma pedir
+  const lembrar = ritmoDosClientes(pedidos, kanban, hoje).filter(hojeDeLembrar)
+    .sort((a, b) => (a.curva ?? "D").localeCompare(b.curva ?? "D") || b.vendido12m - a.vendido12m)
   const avaliadosRecentes = avaliacoes.filter(a => hoje.getTime() - new Date(a.em).getTime() <= 3 * 86_400_000)
 
   // Só enquanto o pedido continua fechado (voltar para orçamento desfaz a aprovação)
@@ -186,6 +191,17 @@ export function pendencias(args: {
         titulo: `${p.numero} · ${p.nomeCliente}`, sub: `entregue ${dataCurta(p.dataEntregaReal)} · pergunte como ficou`,
         card: c,
         whatsapp: `/api/cliente/whatsapp?modelo=como-ficou&nome=${encodeURIComponent(p.nomeCliente)}&numero=${encodeURIComponent(p.numero)}${tel ? `&tel=${encodeURIComponent(tel)}` : ""}`,
+      }
+    }),
+    ...lembrar.map(r => {
+      const tel = telefoneDe(r.nome)
+      const ultimoCard = [...kanban].filter(c => nomeChave(c.nomeCliente) === r.chave && !isTerceirizado(c)).sort((a, b) => (b.dataFechamento ?? "").localeCompare(a.dataFechamento ?? ""))[0]
+      return {
+        id: `rep-${r.chave}`, tipo: "reposicao" as const, tom: r.status === "atrasado" ? "alerta" as const : "info" as const,
+        titulo: r.nome,
+        sub: `${r.curva ? `cliente ${r.curva} · ` : ""}${textoRitmo(r)} dias · ${r.status === "perto" ? "hora de lembrar" : "passou do ritmo"}`,
+        valor: r.ticket, card: ultimoCard, cliente: r.nome,
+        whatsapp: `/api/cliente/whatsapp?modelo=reposicao&nome=${encodeURIComponent(r.nome)}${tel ? `&tel=${encodeURIComponent(tel)}` : ""}`,
       }
     }),
     ...vencendo.filter(v => !abriuIds.has(v.card.id)).map(({ card, dias }) => ({

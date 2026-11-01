@@ -7,7 +7,7 @@ import { enviarFotoProducao } from "../lib/imagem"
 import Image from "next/image"
 import {
   Home, Wallet, Factory, FileText, ChevronRight, MessageCircle, Copy, Check, X, Target, AlertTriangle,
-  CircleCheck, CalendarX2, CalendarClock, Clock, Hourglass, Receipt, Link2, Truck, QrCode, Share2, Camera, Eye, MessageCircleHeart, Star,
+  CircleCheck, CalendarX2, CalendarClock, Clock, Hourglass, Receipt, Link2, Truck, QrCode, Share2, Camera, Eye, MessageCircleHeart, Star, RotateCcw,
 } from "lucide-react"
 import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COLUNAS_KANBAN, COL_HOT } from "../types"
 import { Configuracoes, CONFIG_PADRAO } from "../config"
@@ -55,7 +55,7 @@ const ICONE: Record<TipoPendencia, React.ReactNode> = {
   aprovado: <CircleCheck className="w-4 h-4" />, atrasado: <CalendarX2 className="w-4 h-4" />, fornecedor: <Factory className="w-4 h-4" />,
   cobrancaVencida: <Receipt className="w-4 h-4" />, semCobranca: <Receipt className="w-4 h-4" />, conferir: <Receipt className="w-4 h-4" />,
   entregaProxima: <CalendarClock className="w-4 h-4" />, orcamentoVencendo: <Hourglass className="w-4 h-4" />, semPrazo: <Clock className="w-4 h-4" />,
-  abriuProposta: <Eye className="w-4 h-4" />, comoFicou: <MessageCircleHeart className="w-4 h-4" />, avaliado: <Star className="w-4 h-4" />,
+  abriuProposta: <Eye className="w-4 h-4" />, comoFicou: <MessageCircleHeart className="w-4 h-4" />, avaliado: <Star className="w-4 h-4" />, reposicao: <RotateCcw className="w-4 h-4" />,
 }
 
 // ── Peças ─────────────────────────────────────────────────────────────────────

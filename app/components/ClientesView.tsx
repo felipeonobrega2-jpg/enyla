@@ -16,9 +16,14 @@ type Tab = "clientes" | "leads" | "visao"
 type Ordem = "ltv" | "valor" | "nome" | "orcamentos" | "recente"
 
 const DIAS_REATIVAR = 90
+
+// Com ritmo conhecido: passou bem da data (1,3× o intervalo). Sem ritmo (1 compra): o corte fixo de dias
+const precisaReativar = (r: RitmoCliente | undefined, dias: number | null) =>
+  r?.intervalo ? (r.status === "atrasado" || r.status === "sumido") && !r.emAndamento : (dias ?? 0) > DIAS_REATIVAR
 const diasDesde = (d?: string) => { const x = parseData(d); return x ? Math.floor((Date.now() - x.getTime()) / 86_400_000) : null }
 
 import { origemDoCliente, textoOrigem, OrigensClientes, OrigemCliente } from "../lib/coleta"
+import { ritmoDosClientes, RitmoCliente } from "../lib/ritmo"
 
 export function ClientesView({
   historico, kanban, propostasCustom, lancamentos, cadastro,
@@ -48,6 +53,7 @@ export function ClientesView({
   }, [initialPerfil])
 
   const pedidos = useMemo(() => montarPedidos(kanban, lancamentos), [kanban, lancamentos])
+  const ritmos = useMemo(() => new Map(ritmoDosClientes(pedidos, kanban).map(r => [r.chave, r])), [pedidos, kanban])
 
   const { clientes, listaClientes, listaLeads } = useMemo(() => {
     // Contagens vêm da camada canônica (kanban); histórico/propostas só alimentam ações e o perfil
@@ -119,7 +125,7 @@ export function ClientesView({
         return 0
       })
 
-  const paraReativar = listaClientes.filter(c => (diasDesde(c.ultimoPedido) ?? 0) > DIAS_REATIVAR)
+  const paraReativar = listaClientes.filter(c => precisaReativar(ritmos.get(nomeChave(c.nome)), diasDesde(c.ultimoPedido)))
   const listaAtiva = sortList(tab === "clientes" ? (soReativar ? paraReativar : listaClientes) : listaLeads)
 
   const irPara = (t: Tab, reativar = false) => { setTab(t); setSoReativar(reativar); setBusca("") }
@@ -144,7 +150,7 @@ export function ClientesView({
               valor={metrics.ltvMedio} formato={brl} sub={`${brl(metrics.totalLtv)} contratados no total`} />
             <Kpi rotulo="Para reativar" icone={<RotateCcw className="w-3.5 h-3.5" />} tom={paraReativar.length ? "alerta" : "sucesso"} destaque={soReativar}
               valor={paraReativar.length} formato={n => num(Math.round(n))} onClick={() => irPara("clientes", !soReativar)}
-              sub={`sem pedido há mais de ${DIAS_REATIVAR} dias`} />
+              sub="passaram do ritmo de compra" />
             <Kpi rotulo="Leads" icone={<UserPlus className="w-3.5 h-3.5" />} tom="info" destaque={tab === "leads"}
               valor={listaLeads.length} formato={n => num(Math.round(n))} onClick={() => irPara("leads")}
               sub="orçaram e ainda não compraram" />
@@ -195,6 +201,7 @@ export function ClientesView({
               kanban={kanban}
               cadastro={cadastro}
               origens={origens}
+              ritmos={ritmos}
               onReplicar={onReplicar}
               onWhatsApp={onWhatsApp}
             />
@@ -297,7 +304,7 @@ function DashboardTab({ metrics, listaClientes, onPerfil }: {
 
 // ── Lista ──────────────────────────────────────────────────────────────────────
 
-function ListaTab({ lista, busca, isLeads, expandido, setExpandido, setPerfilAberto, kanban, cadastro, origens, onReplicar, onWhatsApp }: {
+function ListaTab({ lista, busca, isLeads, expandido, setExpandido, setPerfilAberto, kanban, cadastro, origens, ritmos, onReplicar, onWhatsApp }: {
   lista: ClienteItem[]
   busca: string
   isLeads: boolean
@@ -307,6 +314,7 @@ function ListaTab({ lista, busca, isLeads, expandido, setExpandido, setPerfilAbe
   kanban: KanbanCard[]
   cadastro: Cliente[]
   origens?: OrigensClientes
+  ritmos: Map<string, RitmoCliente>
   onReplicar: (item: HistItem) => void
   onWhatsApp: (item: HistItem) => void
 }) {
@@ -324,7 +332,8 @@ function ListaTab({ lista, busca, isLeads, expandido, setExpandido, setPerfilAbe
         const aberto = expandido === nome
         const cad    = cadastro.find(cl => cl.nome.trim().toLowerCase() === nome.toLowerCase())
         const dias   = diasDesde(numPedidos > 0 ? ultimoPedido : ultimaData)
-        const reativar = numPedidos > 0 && (dias ?? 0) > DIAS_REATIVAR
+        const ritmo = ritmos.get(nomeChave(nome))
+        const reativar = numPedidos > 0 && precisaReativar(ritmo, dias)
 
         return (
           <div key={nome} className={`rounded-xl overflow-hidden bg-white ds-cartao ${aberto ? "shadow-[0_8px_24px_rgba(25,22,37,0.07)]" : "hover:shadow-[0_4px_14px_rgba(25,22,37,0.06)]"}`}>
@@ -336,7 +345,9 @@ function ListaTab({ lista, busca, isLeads, expandido, setExpandido, setPerfilAbe
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-[13.5px] font-semibold text-[#191625] leading-snug">{nome}</span>
-                  {reativar && <Selo tom="alerta">sem pedir há {dias} dias</Selo>}
+                  {ritmo?.curva && <Selo tom={ritmo.curva === "A" ? "sucesso" : "neutro"}>{ritmo.curva}</Selo>}
+                  {reativar ? <Selo tom="alerta">{ritmo?.intervalo ? `passou do ritmo · ${dias} dias` : `sem pedir há ${dias} dias`}</Selo>
+                    : ritmo?.status === "perto" && !ritmo.emAndamento ? <Selo tom="info">hora de lembrar</Selo> : null}
                   {(() => { const o = origemDoCliente(nome, origens, cadastro); if (!o) return null; const t = textoOrigem(o); return <Selo tom="acento">{t.length > 28 ? t.slice(0, 28) + "…" : t}</Selo> })()}
                 </div>
                 <p className="text-[11px] text-[#898892] mt-1 truncate">
@@ -345,6 +356,7 @@ function ListaTab({ lista, busca, isLeads, expandido, setExpandido, setPerfilAbe
                   {perdidos > 0 && ` · ${perdidos} recusados`}
                   {expirados > 0 && ` · ${expirados} sem resposta`}
                   {dias != null ? ` · último ${numPedidos > 0 ? "pedido" : "orçamento"} há ${dias} dias` : ""}
+                  {ritmo?.intervalo ? ` · pede a cada ~${ritmo.intervalo} dias` : ""}
                 </p>
               </div>
               {conv !== null && (

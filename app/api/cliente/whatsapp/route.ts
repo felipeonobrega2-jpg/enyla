@@ -11,6 +11,7 @@ export async function GET(req: NextRequest) {
   const primeiro = nome.split(" ")[0]
   const numero = q.get("numero") ?? ""
   const textos: Record<string, string> = {
+    "reposicao": `Oi, ${primeiro}! Tudo bem? Passando para ver como estão as embalagens por aí. Se estiver na hora de repor, dá para repetir o último pedido em 1 toque, pelo mesmo preço:\n${link}`,
     "como-ficou": `Oi, ${primeiro}! Tudo bem? Suas embalagens do pedido ${numero} chegaram. Como ficou? Conta pra gente com uma nota rapidinha aqui:\n${link}\n\nE se puder mandar uma foto delas em uso, a gente adora ver!`,
   }
   const texto = textos[q.get("modelo") ?? ""] ?? link
