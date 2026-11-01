@@ -1,70 +1,63 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
+import { verificarToken, gravarStatus, camposDoStatus } from "@/app/lib/metaToken"
 
 const APP_ID     = process.env.META_APP_ID
 const APP_SECRET = process.env.META_APP_SECRET
 
+// Salva o token só depois de conferir na Meta: válido, com leitura de anúncios e acesso à conta.
+// Token temporário é trocado pelo de 60 dias quando o app está configurado; o recomendado é o permanente.
 export async function POST(req: NextRequest) {
-  const { token } = await req.json()
-  if (!token) return NextResponse.json({ error: "Token obrigatório" }, { status: 400 })
+  const { token } = await req.json().catch(() => ({})) as { token?: string }
+  const colado = token?.trim()
+  if (!colado) return NextResponse.json({ error: "Cole o token." }, { status: 400 })
 
-  let longToken = token
-  let expiresAt: number | null = null
+  let final = colado
+  let status = await verificarToken(final)
+  if (!status.valido) return NextResponse.json({ error: status.erro ?? "Token inválido." }, { status: 400 })
 
-  // If APP credentials are available, exchange for long-lived token (~60 days)
-  if (APP_ID && APP_SECRET) {
+  if (status.permanente === false && APP_ID && APP_SECRET) {
     const url = new URL("https://graph.facebook.com/v20.0/oauth/access_token")
     url.searchParams.set("grant_type", "fb_exchange_token")
     url.searchParams.set("client_id", APP_ID)
     url.searchParams.set("client_secret", APP_SECRET)
-    url.searchParams.set("fb_exchange_token", token)
-
-    const res  = await fetch(url.toString())
-    const data = await res.json()
-
-    if (data.access_token) {
-      longToken = data.access_token
-      // expires_in is in seconds
-      if (data.expires_in) {
-        expiresAt = Math.floor(Date.now() / 1000) + Number(data.expires_in)
-      }
-    }
+    url.searchParams.set("fb_exchange_token", final)
+    const r = await fetch(url.toString()).then(r => r.json()).catch(() => null)
+    if (r?.access_token) { final = r.access_token; status = await verificarToken(final) }
   }
 
-  // If we got a long token, debug it to confirm expiry
-  if (longToken && APP_ID && APP_SECRET && !expiresAt) {
-    const dbgUrl = new URL("https://graph.facebook.com/debug_token")
-    dbgUrl.searchParams.set("input_token", longToken)
-    dbgUrl.searchParams.set("access_token", `${APP_ID}|${APP_SECRET}`)
-    const dbg = await fetch(dbgUrl.toString()).then(r => r.json())
-    if (dbg.data?.expires_at) expiresAt = dbg.data.expires_at
-  }
-
-  // Persist token in AppConfig
-  const { data: existing } = await supabase
-    .from("AppConfig")
-    .select("data")
-    .eq("id", 1)
-    .single()
-
-  const current = (existing?.data as Record<string, unknown>) ?? {}
-  await supabase.from("AppConfig").upsert(
-    { id: 1, data: { ...current, metaToken: longToken, metaTokenExpiry: expiresAt } },
-    { onConflict: "id" }
-  )
-
-  const expiresDate = expiresAt ? new Date(expiresAt * 1000).toISOString() : null
-  return NextResponse.json({ ok: true, expiresAt: expiresDate, longLived: longToken !== token })
+  await gravarStatus({ metaToken: final, ...camposDoStatus(status) })
+  return NextResponse.json({
+    ok: true, permanente: status.permanente, tipo: status.tipo, aviso: status.erro ?? null,
+    expiresAt: status.expiraEm ? new Date(status.expiraEm * 1000).toISOString() : null,
+  })
 }
 
+// Situação atual; reconfere na Meta se a última verificação tem mais de 6 horas
 export async function GET() {
   const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
   const cfg = (data?.data as Record<string, unknown>) ?? {}
-  const expiry = cfg.metaTokenExpiry as number | null
-  const hasToken = !!cfg.metaToken
+  const token = cfg.metaToken as string | undefined
+  if (!token) return NextResponse.json({ hasToken: false, valido: false, canAutoRefresh: !!(APP_ID && APP_SECRET) })
 
+  let campos = {
+    metaTokenExpiry: cfg.metaTokenExpiry as number | null, metaTokenTipo: cfg.metaTokenTipo as string | null,
+    metaTokenValido: cfg.metaTokenValido as boolean | undefined, metaTokenErro: cfg.metaTokenErro as string | null,
+    metaTokenVerificadoEm: cfg.metaTokenVerificadoEm as string | undefined,
+  }
+  const velho = !campos.metaTokenVerificadoEm || Date.now() - new Date(campos.metaTokenVerificadoEm).getTime() > 6 * 3600_000
+  if (velho) {
+    const st = await verificarToken(token)
+    campos = camposDoStatus(st)
+    await gravarStatus(campos)
+  }
+  const expiry = campos.metaTokenExpiry
   return NextResponse.json({
-    hasToken,
+    hasToken: true,
+    valido: campos.metaTokenValido !== false,
+    erro: campos.metaTokenErro ?? null,
+    tipo: campos.metaTokenTipo ?? null,
+    permanente: campos.metaTokenValido !== false && !expiry && !!campos.metaTokenTipo,
     expiresAt: expiry ? new Date(expiry * 1000).toISOString() : null,
     daysLeft: expiry ? Math.floor((expiry - Date.now() / 1000) / 86400) : null,
     canAutoRefresh: !!(APP_ID && APP_SECRET),

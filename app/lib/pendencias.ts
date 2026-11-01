@@ -10,7 +10,7 @@ import { ritmoDosClientes, hojeDeLembrar, textoRitmo } from "./ritmo"
 export type TipoPendencia =
   | "aprovado" | "atrasado" | "fornecedor" | "cobrancaVencida" | "semCobranca"
   | "conferir" | "entregaProxima" | "orcamentoVencendo" | "semPrazo"
-  | "abriuProposta" | "comoFicou" | "avaliado" | "reposicao"
+  | "abriuProposta" | "comoFicou" | "avaliado" | "reposicao" | "meta"
 
 export type Pendencia = {
   id: string
@@ -121,7 +121,15 @@ export function pendencias(args: {
     && kanban.some(c => c.id === a.cardId && c.coluna >= COL_FECHADO && c.coluna !== COL_PERDIDO && c.coluna !== COL_HOT))
   const fornecedorAtrasado = normalizarProducao(config.producao).movimentos.filter(m => !m.recebidoEm && m.prazoPrevisto && m.prazoPrevisto < hojeIso)
 
+  // Anúncios: token da Meta caiu ou vai vencer em até 7 dias
+  const diasMeta = config.metaTokenExpiry ? Math.floor((config.metaTokenExpiry * 1000 - hoje.getTime()) / 86_400_000) : null
+  const meta = config.metaTokenValido === false
+    ? { sub: `${config.metaTokenErro ?? "o token não funciona mais"} · as campanhas não atualizam`, tom: "perigo" as const }
+    : diasMeta != null && diasMeta <= 7 ? { sub: `o token vence em ${Math.max(0, diasMeta)} ${diasMeta === 1 ? "dia" : "dias"} · troque pelo permanente`, tom: "alerta" as const }
+    : null
+
   return [
+    ...(meta ? [{ id: "meta", tipo: "meta" as const, tom: meta.tom, titulo: "Anúncios da Meta desconectados", sub: meta.sub }] : []),
     ...aprovados.map(a => ({
       id: `apr-${a.numero}`, tipo: "aprovado" as const, tom: "sucesso" as const, aprovacao: a,
       titulo: `${a.numero} · ${a.nomeCliente}`,

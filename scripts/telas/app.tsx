@@ -21,6 +21,7 @@ import { dados, config } from "./dados"
 import { origemDoCliente } from "@/app/lib/coleta"
 import { PrecoQueFecha } from "@/app/components/PrecoQueFecha"
 import { ModalLancamento } from "@/app/components/FinanceiroView"
+import { PainelToken } from "@/app/components/MetaAdsView"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
 // Abas do Financeiro: "financeiro-receber" abre a aba "receber"
@@ -45,6 +46,11 @@ function Telas() {
     case "caixa": return pagina(<CaixaView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onUpdateConfig={setCfg} onAddLancamento={l => setLancs(p => [l, ...p])} />)
     case "config": return <ThemeProvider><div style={{ height: "100vh" }}><ConfigView config={cfg} onSave={setCfg} onExportar={() => {}} onImportar={() => {}} clientes={["Cliente Relacionamento", "Outro Cliente"]} /></div></ThemeProvider>
     case "lancamento": return <ModalLancamento inicial={{ tipo: "despesa", descricao: "Impressão + Papel", valor: 3100 }} kanban={dados.kanban} onSave={() => {}} onClose={() => {}} />
+    case "metatoken": return pagina(<div className="space-y-4">
+      <PainelToken status={{ hasToken: true, valido: false, erro: "O token já venceu.", canAutoRefresh: false }} expirou novo="" setNovo={() => {}} salvando={false} onSalvar={() => {}} msg={null} />
+      <PainelToken status={{ hasToken: true, valido: true, daysLeft: 5, canAutoRefresh: false }} expirou={false} novo="" setNovo={() => {}} salvando={false} onSalvar={() => {}} msg={null} />
+      <PainelToken status={{ hasToken: true, valido: true, permanente: true, tipo: "SYSTEM_USER", canAutoRefresh: false }} expirou={false} novo="" setNovo={() => {}} salvando={false} onSalvar={() => {}} msg="ok:Token permanente salvo. Não vai mais vencer." />
+    </div>)
     case "calibragem": return pagina(<CalibragemView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onAtualizarConfig={setCfg} onDividir={() => {}} />)
     case "rotas": {
       const r = calcular(form, cfg)

@@ -78,6 +78,10 @@ export type Configuracoes = {
   producao: ConfigProducao
   metas: ConfigMetas
   aprovacoesOnline?: import("./types").AprovacaoOnline[]   // gravado pelo servidor
+  metaTokenValido?: boolean                                // situação do token da Meta (gravado pelo servidor)
+  metaTokenErro?: string | null
+  metaTokenExpiry?: number | null
+  metaTokenTipo?: string | null
   avaliacoes?: import("./types").Avaliacao[]                // gravado pelo servidor (página do cliente)
   visitasProposta?: Record<string, import("./types").VisitaProposta>  // gravado pelo servidor (link de aprovação)
   caixa?: import("./lib/caixa").ConfigCaixa                // pagamentos planejados das contas de fornecedor

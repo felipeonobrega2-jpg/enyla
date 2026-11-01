@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
+import { gravarStatus } from "@/app/lib/metaToken"
 
 const ACCOUNT    = process.env.META_AD_ACCOUNT_ID
 const APP_ID     = process.env.META_APP_ID
@@ -90,6 +91,8 @@ export async function GET(request: Request) {
     // Detect token expiry
     const errCode = iData.error?.code ?? iData.error?.error_code
     if (errCode === 190 || errCode === 463 || iData.error?.type === "OAuthException") {
+      // Marca na hora, para o Painel avisar sem esperar a verificação diária
+      await gravarStatus({ metaTokenValido: false, metaTokenErro: "A Meta recusou o token (venceu ou foi derrubado).", metaTokenVerificadoEm: new Date().toISOString() }).catch(() => {})
       return NextResponse.json({ error: "TOKEN_EXPIRED" }, { status: 401 })
     }
 

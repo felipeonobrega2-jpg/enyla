@@ -3,7 +3,7 @@
 import React from "react"
 import {
   AlertTriangle, CircleCheck, CalendarClock, CalendarX2, CircleDollarSign, Clock, Factory, FileText, Hourglass,
-  MessageCircle, Percent, Plus, Receipt, TrendingUp, Truck, Users, Wallet, CheckCircle2, ArrowRight, Target, Trophy, Eye, MessageCircleHeart, Star, RotateCcw,
+  MessageCircle, Percent, Plus, Receipt, TrendingUp, Truck, Users, Wallet, CheckCircle2, ArrowRight, Target, Trophy, Eye, MessageCircleHeart, Star, RotateCcw, Megaphone,
 } from "lucide-react"
 import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COL_HOT, AprovacaoOnline } from "../types"
 import { Configuracoes } from "../config"
@@ -67,7 +67,7 @@ export function PainelView({
   config: Configuracoes
   onAbrirCard: (card: KanbanCard) => void
   onAbrirCliente: (nome: string) => void
-  onNavegar: (view: "orcamentos" | "pedidos" | "financeiro" | "fornecedores" | "clientes") => void
+  onNavegar: (view: "orcamentos" | "pedidos" | "financeiro" | "fornecedores" | "clientes" | "meta") => void
   onNovoOrcamento: () => void
   onLancarCobranca?: (prefill: Partial<LancamentoFinanceiro>) => void
   onSalvarMeta?: (metaMensal: number) => void
@@ -98,13 +98,13 @@ export function PainelView({
     aprovado: <CircleCheck className="w-4 h-4" />, atrasado: <CalendarX2 className="w-4 h-4" />, fornecedor: <Factory className="w-4 h-4" />,
     cobrancaVencida: <Receipt className="w-4 h-4" />, semCobranca: <Receipt className="w-4 h-4" />, conferir: <Receipt className="w-4 h-4" />,
     entregaProxima: <CalendarClock className="w-4 h-4" />, orcamentoVencendo: <Hourglass className="w-4 h-4" />, semPrazo: <Clock className="w-4 h-4" />,
-    abriuProposta: <Eye className="w-4 h-4" />, comoFicou: <MessageCircleHeart className="w-4 h-4" />, avaliado: <Star className="w-4 h-4" />, reposicao: <RotateCcw className="w-4 h-4" />,
+    abriuProposta: <Eye className="w-4 h-4" />, comoFicou: <MessageCircleHeart className="w-4 h-4" />, avaliado: <Star className="w-4 h-4" />, reposicao: <RotateCcw className="w-4 h-4" />, meta: <Megaphone className="w-4 h-4" />,
   }
   type Acao = { id: string; tom: Tom; icone: React.ReactNode; titulo: string; sub: string; valor?: string; ir: () => void; whatsapp?: string; cobrar?: Partial<LancamentoFinanceiro>; botao?: { rotulo: string; onClick: () => void } }
   const acoes: Acao[] = pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom, clientes, config, hoje }).map(x => ({
     id: x.id, tom: x.tom, icone: ICONE[x.tipo], titulo: x.titulo, sub: x.sub,
     valor: x.valor != null ? brl(x.valor) : undefined,
-    ir: x.tipo === "fornecedor" ? () => onNavegar("fornecedores") : x.tipo === "conferir" ? () => abrirCaixa() : x.cliente ? () => onAbrirCliente(x.cliente!) : () => { if (x.card) onAbrirCard(x.card) },
+    ir: x.tipo === "fornecedor" ? () => onNavegar("fornecedores") : x.tipo === "meta" ? () => onNavegar("meta") : x.tipo === "conferir" ? () => abrirCaixa() : x.cliente ? () => onAbrirCliente(x.cliente!) : () => { if (x.card) onAbrirCard(x.card) },
     whatsapp: x.tipo === "orcamentoVencendo" || x.tipo === "abriuProposta" || x.tipo === "comoFicou" || x.tipo === "reposicao" ? x.whatsapp : undefined,
     cobrar: x.cobrar,
     botao: x.aprovacao && onAprovacaoOnline ? { rotulo: x.aprovacao.tipo === "recompra_qtd" ? "Orçar" : "Lançar sinal", onClick: () => onAprovacaoOnline(x.aprovacao!) } : undefined,

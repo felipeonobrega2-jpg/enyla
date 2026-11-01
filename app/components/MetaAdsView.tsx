@@ -137,7 +137,7 @@ export default function MetaAdsView({ isDark = false, faturamentoPorCampanha = {
   const [colPickerOpen, setColPickerOpen] = useState(false)
   const colPickerRef = useRef<HTMLDivElement>(null)
   // Token management
-  const [tokenStatus, setTokenStatus] = useState<{ daysLeft: number | null; canAutoRefresh: boolean } | null>(null)
+  const [tokenStatus, setTokenStatus] = useState<StatusTokenTela | null>(null)
   const [newToken, setNewToken]       = useState("")
   const [savingToken, setSavingToken] = useState(false)
   const [tokenMsg, setTokenMsg]       = useState<string | null>(null)
@@ -161,15 +161,17 @@ export default function MetaAdsView({ isDark = false, faturamentoPorCampanha = {
         const dias = data.expiresAt
           ? Math.floor((new Date(data.expiresAt).getTime() - Date.now()) / 86_400_000)
           : null
-        const tipo = data.longLived ? "longa duração (60 dias)" : "curta duração"
-        setTokenMsg(`✓ Token ${tipo} salvo${dias ? ` — expira em ${dias} dias` : ""}`)
+        setTokenMsg(data.aviso ? `Salvo, mas: ${data.aviso}`
+          : data.permanente ? "ok:Token permanente salvo. Não vai mais vencer."
+          : dias != null ? `Salvo, mas é temporário: vence em ${dias} ${dias === 1 ? "dia" : "dias"}. Gere o permanente pelo guia abaixo.`
+          : "ok:Token salvo e funcionando.")
         setNewToken("")
         setError(null)
-        setTokenStatus(prev => ({ ...prev!, daysLeft: dias }))
+        fetch("/api/meta/token").then(r => r.json()).then(d => setTokenStatus(d)).catch(() => {})
         // Reload campaigns
         setPreset(p => { setTimeout(() => setPreset(p), 50); return "last_30d" })
       } else {
-        setTokenMsg(`Erro: ${data.error}`)
+        setTokenMsg(`Não salvei: ${data.error}`)
       }
     } catch {
       setTokenMsg("Erro ao salvar token")
@@ -376,53 +378,8 @@ export default function MetaAdsView({ isDark = false, faturamentoPorCampanha = {
         </div>
       </div>
 
-      {/* Token warning: expiring soon */}
-      {tokenStatus && tokenStatus.daysLeft !== null && tokenStatus.daysLeft <= 10 && tokenStatus.daysLeft > 0 && (
-        <div className="rounded-2xl border px-5 py-3 flex items-center gap-3" style={{
-          background: isDark ? "rgba(197,120,0,0.12)" : "#fffbf0",
-          borderColor: "#c57800",
-        }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c57800" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-          </svg>
-          <p className="text-[13px] font-medium" style={{ color: "#c57800" }}>
-            Token expira em {tokenStatus.daysLeft} dia{tokenStatus.daysLeft !== 1 ? "s" : ""}
-            {tokenStatus.canAutoRefresh ? " — será renovado automaticamente em breve" : " — cole um novo token abaixo"}
-          </p>
-        </div>
-      )}
-
-      {/* Token expired / missing — renewal panel */}
-      {(error === "TOKEN_EXPIRED" || error === "TOKEN_MISSING") && (
-        <div className="rounded-2xl border p-5" style={{
-          background: isDark ? "rgba(211,58,60,0.08)" : "#fff5f5",
-          borderColor: "#d33a3c",
-        }}>
-          <p className="font-bold text-[15px] text-[#d33a3c] mb-1">Token da Meta expirou</p>
-          <p className="text-[12px] text-[#d33a3c] opacity-75 mb-4">
-            Cole um novo token abaixo. Ele será convertido automaticamente para token de longa duração (~60 dias)
-            {tokenStatus?.canAutoRefresh ? " e renovado antes de expirar." : "."}
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="EAAxxxxxxxx…"
-              value={newToken}
-              onChange={e => setNewToken(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-xl border text-[12.5px] outline-none"
-              style={{ background: "var(--bg-surface)", borderColor: "var(--border)", color: "var(--text-main)" }}
-            />
-            <button
-              onClick={salvarToken}
-              disabled={savingToken || !newToken.trim()}
-              className="px-4 py-2 rounded-xl text-[13px] font-semibold text-white transition-opacity disabled:opacity-50"
-              style={{ background: "#8456e8" }}>
-              {savingToken ? "Salvando…" : "Salvar token"}
-            </button>
-          </div>
-          {tokenMsg && <p className="text-[12px] mt-2" style={{ color: tokenMsg.startsWith("✓") ? "#009351" : "#d33a3c" }}>{tokenMsg}</p>}
-        </div>
-      )}
+      <PainelToken status={tokenStatus} expirou={error === "TOKEN_EXPIRED" || error === "TOKEN_MISSING"}
+        novo={newToken} setNovo={setNewToken} salvando={savingToken} onSalvar={salvarToken} msg={tokenMsg} />
 
       {error && error !== "TOKEN_EXPIRED" && error !== "TOKEN_MISSING" && (
         <div className="rounded-2xl border p-5 text-center" style={{
@@ -745,5 +702,58 @@ function Td({ children }: { children: React.ReactNode }) {
     <td className="px-4 py-3">
       <span className="ds-num text-[12.5px]" style={{ color: "var(--text-main)" }}>{children}</span>
     </td>
+  )
+}
+
+type StatusTokenTela = { hasToken: boolean; valido: boolean; erro?: string | null; tipo?: string | null; permanente?: boolean; expiresAt?: string | null; daysLeft?: number | null; canAutoRefresh: boolean }
+
+// Situação do token + troca + guia do token permanente (usuário do sistema do Business Manager)
+export function PainelToken({ status, expirou, novo, setNovo, salvando, onSalvar, msg }: {
+  status: StatusTokenTela | null; expirou: boolean
+  novo: string; setNovo: (v: string) => void; salvando: boolean; onSalvar: () => void; msg: string | null
+}) {
+  const [aberto, setAberto] = useState(false)
+  const caiu = expirou || (status != null && (!status.hasToken || !status.valido))
+  const dias = status?.daysLeft ?? null
+  const situacao = !status ? null
+    : caiu ? { tom: "#d33a3c", fundo: "rgba(211,58,60,0.07)", txt: status.erro ?? "Anúncios desconectados: o token não funciona mais." }
+    : status.permanente ? { tom: "#009351", fundo: "rgba(0,147,81,0.07)", txt: "Conectado com token permanente: não vence." }
+    : dias != null ? { tom: dias <= 7 ? "#d33a3c" : "#c57800", fundo: "rgba(197,120,0,0.08)", txt: `Conectado, mas com token temporário: vence em ${dias} ${dias === 1 ? "dia" : "dias"}. Troque pelo permanente para não cair mais.` }
+    : { tom: "#c57800", fundo: "rgba(197,120,0,0.08)", txt: "Conectado, mas não deu para confirmar se o token vence. Use o permanente." }
+  const mostrar = aberto || caiu
+  if (!situacao) return null
+  const ok = msg?.startsWith("ok:")
+  return (
+    <div className="rounded-2xl px-5 py-4" style={{ background: situacao.fundo }}>
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: situacao.tom }} />
+        <p className="text-[13px] font-semibold flex-1 min-w-0" style={{ color: situacao.tom }}>{situacao.txt}</p>
+        {!caiu && <button onClick={() => setAberto(a => !a)} className="text-[12px] font-semibold text-[#8456e8]">{aberto ? "Fechar" : "Trocar token"}</button>}
+      </div>
+      {mostrar && (
+        <div className="mt-4 space-y-4">
+          <div className="flex gap-2">
+            <input type="text" placeholder="Cole aqui o token (EAA…)" value={novo} onChange={e => setNovo(e.target.value)}
+              className="flex-1 px-3 py-2 rounded-xl border text-[12.5px] outline-none"
+              style={{ background: "var(--bg-surface)", borderColor: "var(--border)", color: "var(--text-main)" }} />
+            <button onClick={onSalvar} disabled={salvando || !novo.trim()}
+              className="px-4 py-2 rounded-xl text-[13px] font-semibold text-white disabled:opacity-50" style={{ background: "#8456e8" }}>
+              {salvando ? "Conferindo…" : "Conferir e salvar"}
+            </button>
+          </div>
+          {msg && <p className="text-[12px]" style={{ color: ok ? "#009351" : "#c57800" }}>{ok ? msg.slice(3) : msg}</p>}
+          <div className="rounded-xl p-4" style={{ background: "var(--bg-surface)" }}>
+            <p className="text-[12.5px] font-semibold" style={{ color: "var(--text-main)" }}>Como gerar o token permanente (uma vez só)</p>
+            <ol className="mt-2 space-y-1.5 text-[12px] list-decimal pl-4" style={{ color: "var(--text-sub)" }}>
+              <li>Entre em <b>business.facebook.com</b> → Configurações do negócio → <b>Usuários → Usuários do sistema</b> → Adicionar. Dê um nome (ex.: “Enyla sistema”) e a função <b>Administrador</b>.</li>
+              <li>Com o usuário do sistema selecionado, clique em <b>Atribuir ativos</b> → <b>Contas de anúncios</b> → marque a sua conta → permissão de <b>ver desempenho</b> (ou gerenciar).</li>
+              <li>Clique em <b>Gerar novo token</b>, escolha o seu app, em <b>Validade</b> selecione <b>Nunca</b> e marque a permissão <b>ads_read</b>.</li>
+              <li>Copie o token, cole acima e toque em <b>Conferir e salvar</b>. O sistema confere na Meta e confirma se ficou permanente.</li>
+            </ol>
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>Token pessoal (do Explorador da Graph API ou do seu perfil) sempre vence e cai quando a senha do Facebook muda. O do usuário do sistema não depende do seu login.</p>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

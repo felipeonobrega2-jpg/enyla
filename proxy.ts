@@ -13,6 +13,7 @@ export default auth((req) => {
     pathname.startsWith("/api/aprovar/") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/whatsapp/webhook") ||
+    pathname === "/api/meta/cron-refresh" ||     // agendador da Vercel (exige CRON_SECRET na própria rota)
     pathname.startsWith("/api/track") ||
     pathname.startsWith("/brand/") ||
     pathname === "/manifest.webmanifest" ||
