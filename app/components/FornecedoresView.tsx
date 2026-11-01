@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import { KanbanCard, LancamentoFinanceiro, FormData } from "../types"
 import { CalibragemView } from "./CalibragemView"
+import { prazoDeProducao, Rastreio } from "../lib/prazoProducao"
 import { Configuracoes } from "../config"
 import {
   ConfigProducao, FornecedorProducao, RegraCobranca, Servico, SERVICOS, TipoRegra, Ferramental, TipoFerramental,
@@ -870,6 +871,7 @@ export function FornecedoresView({ config, kanban, lancamentos, historico, onSav
       </div>
 
       <div key={aba} className="animate-[apple-slide-up_.22s_ease-out]">
+        {aba === "desempenho" && <PrazoProducaoCartao kanban={kanban} />}
         {aba === "desempenho" && <Desempenho producao={producao} pedidosOpcoes={pedidosOpcoes} todosPedidos={todosPedidos} salvar={salvarProducao} />}
         {aba === "cadastro" && <Cadastro draft={draft} setDraft={setDraft} fornecedoresFin={(config.fornecedores ?? []).filter(f => f.ativo)} />}
         {aba === "ferramental" && <FerramentalLista draft={draft} setDraft={setDraft} />}
@@ -877,6 +879,57 @@ export function FornecedoresView({ config, kanban, lancamentos, historico, onSav
         {aba === "calibragem" && <CalibragemView kanban={kanban} lancamentos={lancamentos} historico={historico} config={config} onCategorizar={onCategorizar}
           onAtualizarConfig={cfg => { onSave(cfg); setDraft(normalizarProducao(cfg.producao)) }} />}
       </div>
+    </div>
+  )
+}
+
+// Prazo do pedido inteiro, do fechamento à entrega, etapa por etapa (a partir do rastreio)
+function PrazoProducaoCartao({ kanban }: { kanban: KanbanCard[] }) {
+  const [rastreios, setRastreios] = React.useState<Rastreio[] | null>(null)
+  React.useEffect(() => {
+    let vivo = true
+    fetch("/api/prazos-producao").then(r => r.ok ? r.json() : null).then(d => { if (vivo) setRastreios(d?.rastreios ?? []) }).catch(() => { if (vivo) setRastreios([]) })
+    return () => { vivo = false }
+  }, [])
+  const prazo = React.useMemo(() => {
+    if (!rastreios) return null
+    const entregaReal = Object.fromEntries(kanban.filter(c => c.dataEntregaReal).map(c => [c.numero, c.dataEntregaReal!]))
+    return prazoDeProducao(rastreios, entregaReal)
+  }, [rastreios, kanban])
+  if (!prazo) return null
+  // Por etapa a média diz mais: muitos cards passaram por várias colunas no mesmo dia (mediana 0)
+  const maior = Math.max(1, ...prazo.trechos.map(t => t.media))
+  return (
+    <div className="bg-white rounded-2xl ds-borda p-5 mb-4 ds-entrada">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <p className="text-[13.5px] font-semibold text-[#191625] flex items-center gap-2"><Clock className="w-4 h-4 text-[#8456e8]" /> Prazo de produção</p>
+          <p className="text-[12px] text-[#898892] mt-0.5">Do pedido fechado até a entrega, em dias úteis. Mediana: metade dos pedidos leva menos que isso.</p>
+        </div>
+        {prazo.total ? (
+          <div className="text-right">
+            <p className="text-[26px] font-semibold text-[#191625] ds-num leading-none">{num(prazo.total.mediana, 0)} <span className="text-[13px] font-medium text-[#898892]">dias úteis</span></p>
+            <p className="text-[11.5px] text-[#898892] ds-num mt-1">média {num(prazo.total.media, 1)} · de {prazo.total.min} a {prazo.total.max} · {prazo.total.n} pedidos</p>
+          </div>
+        ) : <p className="text-[12px] text-[#898892]">Ainda sem pedidos entregues com o caminho registrado.</p>}
+      </div>
+      {prazo.trechos.length > 0 && (
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+          {prazo.trechos.map(t => (
+            <div key={t.nome} className="flex items-center gap-3 text-[12px]">
+              <span className="w-[150px] shrink-0 text-[#5e5c68]">{t.nome}</span>
+              <div className="flex-1 h-1.5 rounded-full bg-[rgba(116,116,128,0.12)] overflow-hidden">
+                <div className="h-full rounded-full bg-[#8456e8] transition-[width] duration-700" style={{ width: `${t.media / maior * 100}%` }} />
+              </div>
+              <span className="w-[120px] text-right ds-num text-[#191625]">{num(t.media, 1)} d <span className="text-[#898892]">· {t.n} pedidos</span></span>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-[11px] text-[#898892] mt-3">
+        {prazo.registradosDeUmaVez > 0 && `${prazo.registradosDeUmaVez} pedidos registrados de uma vez (todas as etapas no mesmo dia) ficaram de fora. `}
+        Fica mais preciso conforme os cards são movidos no dia em que cada etapa acontece e a entrega real é lançada.
+      </p>
     </div>
   )
 }
