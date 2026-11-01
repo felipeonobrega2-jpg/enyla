@@ -7,15 +7,17 @@ const APP_ID     = process.env.META_APP_ID
 const APP_SECRET = process.env.META_APP_SECRET
 const BASE       = "https://graph.facebook.com/v20.0"
 
-async function getToken(): Promise<{ token: string; expiry: number | null }> {
+async function getToken(): Promise<{ token: string; expiry: number | null; conta: string | null }> {
   // 1. Try Supabase (updated via UI without redeployment)
   const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
   const cfg = (data?.data as Record<string, unknown>) ?? {}
+  // Conta de anúncios: a que o token enxerga (escolhida ao salvar o token); senão a da Vercel
+  const conta = (cfg.metaContaId as string | undefined) ?? (ACCOUNT ? (ACCOUNT.startsWith("act_") ? ACCOUNT : `act_${ACCOUNT}`) : null)
   if (cfg.metaToken) {
-    return { token: cfg.metaToken as string, expiry: (cfg.metaTokenExpiry as number) ?? null }
+    return { token: cfg.metaToken as string, expiry: (cfg.metaTokenExpiry as number) ?? null, conta }
   }
   // 2. Fall back to env var (legacy)
-  return { token: process.env.META_ACCESS_TOKEN ?? "", expiry: null }
+  return { token: process.env.META_ACCESS_TOKEN ?? "", expiry: null, conta }
 }
 
 async function autoRefresh(currentToken: string, expiry: number | null) {
@@ -47,9 +49,8 @@ async function autoRefresh(currentToken: string, expiry: number | null) {
 }
 
 export async function GET(request: Request) {
-  if (!ACCOUNT) return NextResponse.json({ error: "Meta API não configurada" }, { status: 500 })
-
-  const { token, expiry } = await getToken()
+  const { token, expiry, conta } = await getToken()
+  if (!conta) return NextResponse.json({ error: "SEM_CONTA" }, { status: 400 })
   if (!token) return NextResponse.json({ error: "TOKEN_MISSING" }, { status: 401 })
 
   const { searchParams } = new URL(request.url)
@@ -83,14 +84,18 @@ export async function GET(request: Request) {
 
   try {
     const [iRes, cRes] = await Promise.all([
-      fetch(`${BASE}/${ACCOUNT}/insights?${iParams}`),
-      fetch(`${BASE}/${ACCOUNT}/campaigns?${cParams}`),
+      fetch(`${BASE}/${conta}/insights?${iParams}`),
+      fetch(`${BASE}/${conta}/campaigns?${cParams}`),
     ])
     const [iData, cData] = await Promise.all([iRes.json(), cRes.json()])
 
     // Detect token expiry
     const errCode = iData.error?.code ?? iData.error?.error_code
-    if (errCode === 190 || errCode === 463 || iData.error?.type === "OAuthException") {
+    // Só o código 190 é token vencido/derrubado; 100/200/10 são falta de acesso à conta (token continua bom)
+    if (errCode && errCode !== 190 && iData.error?.type === "OAuthException") {
+      return NextResponse.json({ error: "SEM_ACESSO_CONTA" }, { status: 403 })
+    }
+    if (errCode === 190) {
       // Marca na hora, para o Painel avisar sem esperar a verificação diária
       await gravarStatus({ metaTokenValido: false, metaTokenErro: "A Meta recusou o token (venceu ou foi derrubado).", metaTokenVerificadoEm: new Date().toISOString() }).catch(() => {})
       return NextResponse.json({ error: "TOKEN_EXPIRED" }, { status: 401 })

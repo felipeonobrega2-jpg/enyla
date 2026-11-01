@@ -379,9 +379,13 @@ export default function MetaAdsView({ isDark = false, faturamentoPorCampanha = {
       </div>
 
       <PainelToken status={tokenStatus} expirou={error === "TOKEN_EXPIRED" || error === "TOKEN_MISSING"}
-        novo={newToken} setNovo={setNewToken} salvando={savingToken} onSalvar={salvarToken} msg={tokenMsg} />
+        novo={newToken} setNovo={setNewToken} salvando={savingToken} onSalvar={salvarToken} msg={tokenMsg}
+        onEscolherConta={async conta => {
+          const r = await fetch("/api/meta/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conta }) }).then(r => r.json()).catch(() => null)
+          if (r?.ok) { setError(null); fetch("/api/meta/token").then(r => r.json()).then(d => setTokenStatus(d)).catch(() => {}); setPreset(p => { setTimeout(() => setPreset(p), 50); return "last_30d" }) }
+        }} />
 
-      {error && error !== "TOKEN_EXPIRED" && error !== "TOKEN_MISSING" && (
+      {error && !["TOKEN_EXPIRED", "TOKEN_MISSING", "SEM_CONTA", "SEM_ACESSO_CONTA"].includes(error) && (
         <div className="rounded-2xl border p-5 text-center" style={{
           background: isDark ? "rgba(211,58,60,0.1)" : "#fff0f0",
           borderColor: "#d33a3c", color: "#d33a3c",
@@ -705,19 +709,22 @@ function Td({ children }: { children: React.ReactNode }) {
   )
 }
 
-type StatusTokenTela = { hasToken: boolean; valido: boolean; erro?: string | null; tipo?: string | null; permanente?: boolean; expiresAt?: string | null; daysLeft?: number | null; canAutoRefresh: boolean }
+type StatusTokenTela = { hasToken: boolean; valido: boolean; erro?: string | null; tipo?: string | null; permanente?: boolean; expiresAt?: string | null; daysLeft?: number | null; canAutoRefresh: boolean; contaId?: string | null; contas?: { id: string; nome: string }[] }
 
 // Situação do token + troca + guia do token permanente (usuário do sistema do Business Manager)
-export function PainelToken({ status, expirou, novo, setNovo, salvando, onSalvar, msg }: {
+export function PainelToken({ status, expirou, novo, setNovo, salvando, onSalvar, msg, onEscolherConta }: {
   status: StatusTokenTela | null; expirou: boolean
+  onEscolherConta?: (conta: string) => void
   novo: string; setNovo: (v: string) => void; salvando: boolean; onSalvar: () => void; msg: string | null
 }) {
   const [aberto, setAberto] = useState(false)
   const caiu = expirou || (status != null && (!status.hasToken || !status.valido))
   const dias = status?.daysLeft ?? null
+  const contas = status?.contas ?? []
+  const nomeConta = contas.find(c => c.id === status?.contaId)?.nome
   const situacao = !status ? null
     : caiu ? { tom: "#d33a3c", fundo: "rgba(211,58,60,0.07)", txt: status.erro ?? "Anúncios desconectados: o token não funciona mais." }
-    : status.permanente ? { tom: "#009351", fundo: "rgba(0,147,81,0.07)", txt: "Conectado com token permanente: não vence." }
+    : status.permanente ? { tom: "#009351", fundo: "rgba(0,147,81,0.07)", txt: `Conectado com token permanente: não vence.${nomeConta ? ` Conta: ${nomeConta}.` : ""}` }
     : dias != null ? { tom: dias <= 7 ? "#d33a3c" : "#c57800", fundo: "rgba(197,120,0,0.08)", txt: `Conectado, mas com token temporário: vence em ${dias} ${dias === 1 ? "dia" : "dias"}. Troque pelo permanente para não cair mais.` }
     : { tom: "#c57800", fundo: "rgba(197,120,0,0.08)", txt: "Conectado, mas não deu para confirmar se o token vence. Use o permanente." }
   const mostrar = aberto || caiu
@@ -730,6 +737,16 @@ export function PainelToken({ status, expirou, novo, setNovo, salvando, onSalvar
         <p className="text-[13px] font-semibold flex-1 min-w-0" style={{ color: situacao.tom }}>{situacao.txt}</p>
         {!caiu && <button onClick={() => setAberto(a => !a)} className="text-[12px] font-semibold text-[#8456e8]">{aberto ? "Fechar" : "Trocar token"}</button>}
       </div>
+      {contas.length > 1 && onEscolherConta && (
+        <div className="mt-3 flex items-center gap-2 flex-wrap">
+          <span className="text-[12px] font-semibold" style={{ color: "var(--text-sub)" }}>Conta de anúncios:</span>
+          <select value={status?.contaId ?? ""} onChange={e => e.target.value && onEscolherConta(e.target.value)}
+            className="h-8 rounded-lg px-2 text-[12.5px] border outline-none" style={{ background: "var(--bg-surface)", borderColor: "var(--border)", color: "var(--text-main)" }}>
+            <option value="" disabled>Escolha…</option>
+            {contas.map(c => <option key={c.id} value={c.id}>{c.nome} (…{c.id.slice(-4)})</option>)}
+          </select>
+        </div>
+      )}
       {mostrar && (
         <div className="mt-4 space-y-4">
           <div className="flex gap-2">

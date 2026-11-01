@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   let token = cfg.metaToken as string | undefined
   if (!token) return NextResponse.json({ ok: true, semToken: true })
 
-  let status = await verificarToken(token)
+  let status = await verificarToken(token, cfg.metaContaId as string | undefined)
   const diasRestantes = status.expiraEm ? (status.expiraEm - Date.now() / 1000) / 86400 : null
   if (status.valido && diasRestantes != null && diasRestantes < 20 && APP_ID && APP_SECRET) {
     const url = new URL("https://graph.facebook.com/v20.0/oauth/access_token")
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     url.searchParams.set("client_secret", APP_SECRET)
     url.searchParams.set("fb_exchange_token", token)
     const r = await fetch(url.toString()).then(r => r.json()).catch(() => null)
-    if (r?.access_token) { token = r.access_token as string; status = await verificarToken(token) }
+    if (r?.access_token) { token = r.access_token as string; status = await verificarToken(token, cfg.metaContaId as string | undefined) }
   }
   await gravarStatus({ metaToken: token, ...camposDoStatus(status) })
   return NextResponse.json({ ok: true, valido: status.valido && !status.erro, permanente: status.permanente, erro: status.erro ?? null })

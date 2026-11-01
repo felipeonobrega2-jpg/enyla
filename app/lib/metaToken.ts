@@ -14,11 +14,13 @@ export type StatusToken = {
   expiraEm: number | null          // epoch (s); null = não vence
   temLeituraAnuncios: boolean
   acessaConta: boolean | null      // null = conta de anúncios não configurada
+  contaId?: string | null          // conta usada (act_…): a configurada, se o token enxerga; senão a única que ele enxerga
+  contas?: { id: string; nome: string }[]
   erro?: string
 }
 
 // Lê os detalhes do token na própria Meta (o token serve de credencial para se inspecionar)
-export async function verificarToken(token: string): Promise<StatusToken> {
+export async function verificarToken(token: string, contaPreferida?: string | null): Promise<StatusToken> {
   const appId = process.env.META_APP_ID, appSecret = process.env.META_APP_SECRET
   const credencial = appId && appSecret ? `${appId}|${appSecret}` : token
   const dbg = await fetch(`${BASE}/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(credencial)}`)
@@ -28,9 +30,9 @@ export async function verificarToken(token: string): Promise<StatusToken> {
   if (dbg?.error && !d) {
     const me = await fetch(`${BASE}/me?fields=id&access_token=${encodeURIComponent(token)}`).then(r => r.json()).catch(() => null)
     if (!me || me.error) return { valido: false, tipo: null, permanente: false, expiraEm: null, temLeituraAnuncios: false, acessaConta: null, erro: traduzir(me?.error?.message ?? "a Meta não aceitou o token") }
-    const acessaConta = await enxergaConta(token)
-    return { valido: true, tipo: null, permanente: null, expiraEm: null, temLeituraAnuncios: acessaConta !== false, acessaConta,
-      erro: acessaConta === false ? "O token não enxerga a conta de anúncios. Atribua a conta ao usuário do sistema no Business Manager." : undefined }
+    const { contaId, contas } = await contaDoToken(token, contaPreferida)
+    return { valido: true, tipo: null, permanente: null, expiraEm: null, temLeituraAnuncios: true, acessaConta: !!contaId, contaId, contas,
+      erro: semConta(contaId, contas) }
   }
   if (!d || d.is_valid === false || dbg?.error) {
     const msg = d?.error?.message ?? dbg?.error?.message ?? "a Meta não aceitou o token"
@@ -38,24 +40,29 @@ export async function verificarToken(token: string): Promise<StatusToken> {
   }
   const scopes = d.scopes ?? []
   const temLeituraAnuncios = scopes.includes("ads_read") || scopes.includes("ads_management")
-  const acessaConta = await enxergaConta(token)
+  const { contaId, contas } = await contaDoToken(token, contaPreferida)
   const expiraEm = d.expires_at ? d.expires_at : null   // 0 = nunca
   return {
     valido: true, tipo: d.type ?? null, permanente: !expiraEm, expiraEm,
-    temLeituraAnuncios, acessaConta,
-    erro: !temLeituraAnuncios ? "O token não tem a permissão ads_read (ler anúncios)."
-      : acessaConta === false ? "O token não enxerga a conta de anúncios. Atribua a conta ao usuário do sistema no Business Manager."
-      : undefined,
+    temLeituraAnuncios, acessaConta: !!contaId, contaId, contas,
+    erro: !temLeituraAnuncios ? "O token não tem a permissão ads_read (ler anúncios)." : semConta(contaId, contas),
   }
 }
 
-async function enxergaConta(token: string): Promise<boolean | null> {
-  const conta = process.env.META_AD_ACCOUNT_ID
-  if (!conta) return null
-  const id = conta.startsWith("act_") ? conta : `act_${conta}`
-  const r = await fetch(`${BASE}/${id}?fields=name&access_token=${encodeURIComponent(token)}`).then(r => r.json()).catch(() => null)
-  return !!r && !r.error
+// Contas de anúncio que o token enxerga, e qual usar: a escolhida no sistema / configurada na Vercel, se estiver
+// entre elas; senão, a única que ele enxerga. Várias e nenhuma escolhida: a tela pede para escolher.
+async function contaDoToken(token: string, preferida?: string | null): Promise<{ contaId: string | null; contas: { id: string; nome: string }[] }> {
+  const r = await fetch(`${BASE}/me/adaccounts?fields=account_id,name&limit=100&access_token=${encodeURIComponent(token)}`).then(r => r.json()).catch(() => null)
+  const contas = ((r?.data ?? []) as { account_id: string; name: string }[]).map(a => ({ id: `act_${a.account_id}`, nome: a.name }))
+  const norm = (id?: string | null) => id ? (id.startsWith("act_") ? id : `act_${id}`) : null
+  for (const p of [norm(preferida), norm(process.env.META_AD_ACCOUNT_ID)]) if (p && contas.some(c => c.id === p)) return { contaId: p, contas }
+  return { contaId: contas.length === 1 ? contas[0].id : null, contas }
 }
+
+const semConta = (contaId: string | null, contas: { id: string }[]) =>
+  contaId ? undefined
+    : contas.length === 0 ? "O token não enxerga nenhuma conta de anúncios. Atribua a conta ao usuário do sistema no Business Manager (Atribuir ativos → Contas de anúncios)."
+    : "O token enxerga mais de uma conta de anúncios: escolha qual usar."
 
 function traduzir(msg: string) {
   if (/expired|expirou/i.test(msg)) return "O token já venceu."
@@ -73,6 +80,8 @@ export async function gravarStatus(campos: Record<string, unknown>) {
 }
 
 export const camposDoStatus = (s: StatusToken) => ({
+  metaContaId: s.contaId ?? null,
+  metaContas: s.contas ?? [],
   metaTokenExpiry: s.expiraEm,
   metaTokenTipo: s.tipo,
   metaTokenValido: s.valido && !s.erro,
