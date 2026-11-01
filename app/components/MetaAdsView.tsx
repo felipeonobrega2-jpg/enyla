@@ -8,6 +8,7 @@ interface Props {
   faturamentoPorCampanha?: Record<string, number>
   clientesPorCampanha?: Record<string, number>
   ltvPorCampanha?: Record<string, number>
+  margemPorCampanha?: Record<string, { margem: number; estimada: boolean }>
 }
 
 interface Campaign {
@@ -61,7 +62,7 @@ const ALL_COLS: { key: string; label: string; default: boolean }[] = [
   { key: "conversoes",  label: "Conversões",        default: false },
   { key: "faturamento", label: "Faturamento",       default: true  },
   { key: "roas",        label: "ROAS",              default: true  },
-  { key: "roi",         label: "ROI",               default: true  },
+  { key: "roi",         label: "ROI real",          default: true  },
   { key: "clientes",    label: "Clientes",          default: true  },
   { key: "cac",         label: "CAC",               default: true  },
   { key: "ltv_cac",     label: "LTV/CAC",           default: true  },
@@ -122,7 +123,7 @@ function saveSet(key: string, s: Set<string>) {
   try { localStorage.setItem(key, JSON.stringify([...s])) } catch { /* ignore */ }
 }
 
-export default function MetaAdsView({ isDark = false, faturamentoPorCampanha = {}, clientesPorCampanha = {}, ltvPorCampanha = {} }: Props) {
+export default function MetaAdsView({ isDark = false, faturamentoPorCampanha = {}, clientesPorCampanha = {}, ltvPorCampanha = {}, margemPorCampanha = {} }: Props) {
   const [preset, setPreset]         = useState("maximum")
   const [since, setSince]           = useState("")
   const [until, setUntil]           = useState("")
@@ -480,7 +481,7 @@ export default function MetaAdsView({ isDark = false, faturamentoPorCampanha = {
             onToggleHide={toggleHide} visibleCols={visibleCols}
             faturamentoPorCampanha={faturamentoPorCampanha}
             clientesPorCampanha={clientesPorCampanha}
-            ltvPorCampanha={ltvPorCampanha} />
+            ltvPorCampanha={ltvPorCampanha} margemPorCampanha={margemPorCampanha} />
         )}
       </div>
 
@@ -514,7 +515,7 @@ export default function MetaAdsView({ isDark = false, faturamentoPorCampanha = {
                 onToggleHide={toggleHide} visibleCols={visibleCols}
                 faturamentoPorCampanha={faturamentoPorCampanha}
                 clientesPorCampanha={clientesPorCampanha}
-                ltvPorCampanha={ltvPorCampanha} />
+                ltvPorCampanha={ltvPorCampanha} margemPorCampanha={margemPorCampanha} />
             </div>
           )}
         </div>
@@ -524,7 +525,7 @@ export default function MetaAdsView({ isDark = false, faturamentoPorCampanha = {
   )
 }
 
-function CampaignRows({ campaigns, isDark, hiddenIds, onToggleHide, visibleCols, faturamentoPorCampanha, clientesPorCampanha, ltvPorCampanha }: {
+function CampaignRows({ campaigns, isDark, hiddenIds, onToggleHide, visibleCols, faturamentoPorCampanha, clientesPorCampanha, ltvPorCampanha, margemPorCampanha }: {
   campaigns: Campaign[]
   isDark: boolean
   hiddenIds: Set<string>
@@ -533,6 +534,7 @@ function CampaignRows({ campaigns, isDark, hiddenIds, onToggleHide, visibleCols,
   faturamentoPorCampanha: Record<string, number>
   clientesPorCampanha: Record<string, number>
   ltvPorCampanha: Record<string, number>
+  margemPorCampanha: Record<string, { margem: number; estimada: boolean }>
 }) {
   const col = (key: string) => visibleCols.has(key)
 
@@ -557,7 +559,7 @@ function CampaignRows({ campaigns, isDark, hiddenIds, onToggleHide, visibleCols,
             {col("conversoes")  && <Th>Conversões</Th>}
             {col("faturamento") && <Th>Faturamento</Th>}
             {col("roas")        && <Th>ROAS</Th>}
-            {col("roi")         && <Th>ROI</Th>}
+            {col("roi")         && <Th>ROI real</Th>}
             {col("clientes")    && <Th>Clientes</Th>}
             {col("cac")         && <Th>CAC</Th>}
             {col("ltv_cac")     && <Th>LTV/CAC</Th>}
@@ -651,14 +653,15 @@ function CampaignRows({ campaigns, isDark, hiddenIds, onToggleHide, visibleCols,
                   )
                 })()}
                 {col("roi") && (() => {
-                  const fat   = faturamentoPorCampanha[c.campaign_id] ?? 0
+                  // ROI real: sobre a margem (venda − custo de produção), não sobre o faturamento
+                  const m     = margemPorCampanha[c.campaign_id]
                   const spend = Number(c.spend ?? 0)
-                  const roi   = fat > 0 && spend > 0 ? ((fat - spend) / spend) * 100 : null
+                  const roi   = m && m.margem > 0 && spend > 0 ? ((m.margem - spend) / spend) * 100 : null
                   return (
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3" title={m ? `Margem ${brl(m.margem)}${m.estimada ? " (parte estimada pela margem média: pedido sem custo lançado)" : ""} − gasto ${brl(spend)}` : undefined}>
                       <span className="ds-num text-[12.5px] font-semibold"
                         style={{ color: roi == null ? "var(--text-faint)" : roi >= 0 ? "#009351" : "#d33a3c" }}>
-                        {roi != null ? `${num(roi, 0)}%` : "—"}
+                        {roi != null ? `${num(roi, 0)}%${m?.estimada ? "*" : ""}` : "—"}
                       </span>
                     </td>
                   )

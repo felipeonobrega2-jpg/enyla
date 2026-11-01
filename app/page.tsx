@@ -47,6 +47,7 @@ import { origemDoCliente } from "./lib/coleta"
 import { EditorOrigem } from "./components/EditorOrigem"
 import { PrecoQueFecha } from "./components/PrecoQueFecha"
 import { linhasDeOrcamento } from "./lib/precoQueFecha"
+import { retornoPorCampanha } from "./lib/retornoCampanhas"
 import { normalizarMetas } from "./lib/metas"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
 import FormaView from "./FormaView"
@@ -372,20 +373,10 @@ export default function Home() {
 
   const linhasOrcamento = useMemo(() => linhasDeOrcamento(kanban, historico), [kanban, historico])
 
-  const faturamentoPorCampanha = useMemo(() => {
-    const map: Record<string, number> = {}
-    for (const cliente of clientes) {
-      if (!cliente.origemCampanhaId) continue
-      const fat = kanban
-        .filter(c =>
-          c.nomeCliente?.trim().toLowerCase() === cliente.nome.trim().toLowerCase() &&
-          c.coluna !== 0 && c.coluna !== COL_PERDIDO && c.coluna !== COL_HOT
-        )
-        .reduce((s, c) => s + c.preco, 0)
-      if (fat > 0) map[cliente.origemCampanhaId] = (map[cliente.origemCampanhaId] ?? 0) + fat
-    }
-    return map
-  }, [clientes, kanban])
+  // Retorno das campanhas pela camada canônica: venda (com sobras) e margem dos pedidos dos clientes que vieram delas
+  const retornoCampanhas = useMemo(() => retornoPorCampanha(montarPedidos(kanban, lancamentos), clientes), [kanban, lancamentos, clientes])
+  const faturamentoPorCampanha = useMemo(() => Object.fromEntries(Object.entries(retornoCampanhas).filter(([, r]) => r.venda > 0).map(([id, r]) => [id, r.venda])), [retornoCampanhas])
+  const margemPorCampanha = useMemo(() => Object.fromEntries(Object.entries(retornoCampanhas).map(([id, r]) => [id, { margem: r.margem, estimada: r.margemEstimada }])), [retornoCampanhas])
 
   const clientesPorCampanha = useMemo(() => {
     const map: Record<string, number> = {}
@@ -2445,6 +2436,7 @@ export default function Home() {
                 faturamentoPorCampanha={faturamentoPorCampanha}
                 clientesPorCampanha={clientesPorCampanha}
                 ltvPorCampanha={ltvPorCampanha}
+                margemPorCampanha={margemPorCampanha}
               />
           ) : view === "whatsapp" ? (
             <WhatsAppView
