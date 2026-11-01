@@ -4,7 +4,7 @@ import { supabase } from "@/app/lib/supabase"
 // Campos gravados só pelo servidor (renovação do token da Meta, aprovações online dos clientes). A tela envia a
 // configuração inteira que carregou; sem isto, salvar qualquer ajuste regravaria
 // um token antigo por cima do renovado.
-const CAMPOS_DO_SERVIDOR = ["metaToken", "metaTokenExpiry", "metaTokenTipo", "metaTokenValido", "metaTokenErro", "metaTokenVerificadoEm", "metaContaId", "metaContas", "aprovacoesOnline", "avaliacoes", "visitasProposta"] as const
+const CAMPOS_DO_SERVIDOR = ["metaToken", "metaTokenExpiry", "metaTokenTipo", "metaTokenValido", "metaTokenErro", "metaTokenVerificadoEm", "metaContaId", "metaContaEscolhida", "metaContas", "aprovacoesOnline", "avaliacoes", "visitasProposta"] as const
 
 export async function POST(req: NextRequest) {
   try {

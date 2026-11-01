@@ -709,7 +709,7 @@ function Td({ children }: { children: React.ReactNode }) {
   )
 }
 
-type StatusTokenTela = { hasToken: boolean; valido: boolean; erro?: string | null; tipo?: string | null; permanente?: boolean; expiresAt?: string | null; daysLeft?: number | null; canAutoRefresh: boolean; contaId?: string | null; contas?: { id: string; nome: string }[] }
+type StatusTokenTela = { hasToken: boolean; valido: boolean; erro?: string | null; tipo?: string | null; permanente?: boolean; expiresAt?: string | null; daysLeft?: number | null; canAutoRefresh: boolean; contaId?: string | null; contas?: { id: string; nome: string; gasto?: number }[] }
 
 // Situação do token + troca + guia do token permanente (usuário do sistema do Business Manager)
 export function PainelToken({ status, expirou, novo, setNovo, salvando, onSalvar, msg, onEscolherConta }: {
@@ -721,9 +721,12 @@ export function PainelToken({ status, expirou, novo, setNovo, salvando, onSalvar
   const caiu = expirou || (status != null && (!status.hasToken || !status.valido))
   const dias = status?.daysLeft ?? null
   const contas = status?.contas ?? []
-  const nomeConta = contas.find(c => c.id === status?.contaId)?.nome
+  const contaUsada = contas.find(c => c.id === status?.contaId)
+  const nomeConta = contaUsada?.nome
+  const contaVazia = contaUsada != null && !contaUsada.gasto
   const situacao = !status ? null
     : caiu ? { tom: "#d33a3c", fundo: "rgba(211,58,60,0.07)", txt: status.erro ?? "Anúncios desconectados: o token não funciona mais." }
+    : contaVazia ? { tom: "#c57800", fundo: "rgba(197,120,0,0.08)", txt: `Token permanente ok, mas a conta “${nomeConta}” nunca teve gasto: não deve ser a conta dos seus anúncios. No Business Manager, atribua ao usuário do sistema a conta onde estão as campanhas.` }
     : status.permanente ? { tom: "#009351", fundo: "rgba(0,147,81,0.07)", txt: `Conectado com token permanente: não vence.${nomeConta ? ` Conta: ${nomeConta}.` : ""}` }
     : dias != null ? { tom: dias <= 7 ? "#d33a3c" : "#c57800", fundo: "rgba(197,120,0,0.08)", txt: `Conectado, mas com token temporário: vence em ${dias} ${dias === 1 ? "dia" : "dias"}. Troque pelo permanente para não cair mais.` }
     : { tom: "#c57800", fundo: "rgba(197,120,0,0.08)", txt: "Conectado, mas não deu para confirmar se o token vence. Use o permanente." }

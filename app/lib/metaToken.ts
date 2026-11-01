@@ -14,8 +14,9 @@ export type StatusToken = {
   expiraEm: number | null          // epoch (s); null = não vence
   temLeituraAnuncios: boolean
   acessaConta: boolean | null      // null = conta de anúncios não configurada
-  contaId?: string | null          // conta usada (act_…): a configurada, se o token enxerga; senão a única que ele enxerga
-  contas?: { id: string; nome: string }[]
+  contaId?: string | null          // conta usada (act_…): a escolhida/configurada, se o token enxerga; senão a única que ele enxerga
+  contaEscolhida?: boolean         // escolhida por você na tela (fica fixa); falso = automática
+  contas?: { id: string; nome: string; gasto: number }[]
   erro?: string
 }
 
@@ -49,11 +50,11 @@ export async function verificarToken(token: string, contaPreferida?: string | nu
   }
 }
 
-// Contas de anúncio que o token enxerga, e qual usar: a escolhida no sistema / configurada na Vercel, se estiver
-// entre elas; senão, a única que ele enxerga. Várias e nenhuma escolhida: a tela pede para escolher.
-async function contaDoToken(token: string, preferida?: string | null): Promise<{ contaId: string | null; contas: { id: string; nome: string }[] }> {
-  const r = await fetch(`${BASE}/me/adaccounts?fields=account_id,name&limit=100&access_token=${encodeURIComponent(token)}`).then(r => r.json()).catch(() => null)
-  const contas = ((r?.data ?? []) as { account_id: string; name: string }[]).map(a => ({ id: `act_${a.account_id}`, nome: a.name }))
+// Contas de anúncio que o token enxerga, e qual usar: a escolhida na tela / configurada na Vercel, se estiver
+// entre elas; senão, a única que ele enxerga (escolha automática, refeita a cada verificação). Várias: a tela pede.
+async function contaDoToken(token: string, preferida?: string | null): Promise<{ contaId: string | null; contas: { id: string; nome: string; gasto: number }[] }> {
+  const r = await fetch(`${BASE}/me/adaccounts?fields=account_id,name,amount_spent&limit=100&access_token=${encodeURIComponent(token)}`).then(r => r.json()).catch(() => null)
+  const contas = ((r?.data ?? []) as { account_id: string; name: string; amount_spent?: string }[]).map(a => ({ id: `act_${a.account_id}`, nome: a.name, gasto: Number(a.amount_spent ?? 0) / 100 }))
   const norm = (id?: string | null) => id ? (id.startsWith("act_") ? id : `act_${id}`) : null
   for (const p of [norm(preferida), norm(process.env.META_AD_ACCOUNT_ID)]) if (p && contas.some(c => c.id === p)) return { contaId: p, contas }
   return { contaId: contas.length === 1 ? contas[0].id : null, contas }
@@ -79,8 +80,9 @@ export async function gravarStatus(campos: Record<string, unknown>) {
   await supabase.from("AppConfig").upsert({ id: 1, data: { ...atual, ...campos } }, { onConflict: "id" })
 }
 
-export const camposDoStatus = (s: StatusToken) => ({
+export const camposDoStatus = (s: StatusToken, escolhida = false) => ({
   metaContaId: s.contaId ?? null,
+  metaContaEscolhida: escolhida && !!s.contaId,
   metaContas: s.contas ?? [],
   metaTokenExpiry: s.expiraEm,
   metaTokenTipo: s.tipo,

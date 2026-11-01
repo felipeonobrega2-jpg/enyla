@@ -14,7 +14,9 @@ export async function POST(req: NextRequest) {
   // Só escolhendo a conta de anúncios (token já salvo)
   const colado = token?.trim() || (conta ? cfg.metaToken as string | undefined : undefined)
   if (!colado) return NextResponse.json({ error: "Cole o token." }, { status: 400 })
-  const preferida = conta ?? (cfg.metaContaId as string | undefined)
+  // Conta fixa só quando você escolheu na tela; a automática é refeita a cada verificação
+  const escolhida = !!conta || (!token && !!cfg.metaContaEscolhida)
+  const preferida = conta ?? (cfg.metaContaEscolhida ? cfg.metaContaId as string | undefined : undefined)
 
   let final = colado
   let status = await verificarToken(final, preferida)
@@ -30,7 +32,7 @@ export async function POST(req: NextRequest) {
     if (r?.access_token) { final = r.access_token; status = await verificarToken(final, preferida) }
   }
 
-  await gravarStatus({ metaToken: final, ...camposDoStatus(status) })
+  await gravarStatus({ metaToken: final, ...camposDoStatus(status, escolhida || (!!preferida && status.contaId === preferida)) })
   return NextResponse.json({
     ok: true, permanente: status.permanente, tipo: status.tipo, aviso: status.erro ?? null, contaId: status.contaId, contas: status.contas,
     expiresAt: status.expiraEm ? new Date(status.expiraEm * 1000).toISOString() : null,
@@ -52,8 +54,8 @@ export async function GET() {
   }
   const velho = !campos.metaTokenVerificadoEm || Date.now() - new Date(campos.metaTokenVerificadoEm).getTime() > 6 * 3600_000
   if (velho) {
-    const st = await verificarToken(token, cfg.metaContaId as string | undefined)
-    campos = camposDoStatus(st)
+    const st = await verificarToken(token, cfg.metaContaEscolhida ? cfg.metaContaId as string | undefined : undefined)
+    campos = { ...camposDoStatus(st, !!cfg.metaContaEscolhida && st.contaId === cfg.metaContaId) }
     await gravarStatus(campos)
   }
   const expiry = campos.metaTokenExpiry
