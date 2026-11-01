@@ -316,12 +316,30 @@ type StatusWhats = { segredoConfigurado: boolean; totalConversas: number; evolut
 export function ConexaoWhats({ status, onAtualizar }: { status: StatusWhats | null; onAtualizar: (s: StatusWhats) => void }) {
   const [configurando, setConfigurando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [qr, setQr] = useState<string | null>(null)
+  const [pareando, setPareando] = useState(false)
+  // Enquanto o QR está na tela: busca um novo a cada 15 s (ele expira) até o número conectar
+  useEffect(() => {
+    if (!pareando) return
+    let vivo = true
+    const buscar = async () => {
+      const r = await fetch("/api/whatsapp/qr").then(r => r.json()).catch(() => null)
+      if (!vivo || !r) return
+      if (r.evolution && status) onAtualizar({ ...status, evolution: r.evolution })
+      if (r.conectado) { setPareando(false); setQr(null); return }
+      if (r.qr) setQr(r.qr); else if (r.erro) setErro(r.erro)
+    }
+    buscar()
+    const t = setInterval(buscar, 15_000)
+    return () => { vivo = false; clearInterval(t) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pareando])
   const e = status?.evolution
   const itens: { ok: boolean; txt: string; dica?: string }[] = !status ? [] : [
     { ok: !!e?.configurado, txt: "Endereço, chave e instância do Evolution na Vercel", dica: "EVOLUTION_API_URL, EVOLUTION_API_KEY e EVOLUTION_INSTANCE" },
     { ok: !!e?.alcancavel, txt: `Servidor do Evolution respondendo${e?.host ? ` (${e.host})` : ""}`, dica: "Confira se a VPS e o contêiner do Evolution estão no ar" },
     { ok: !!e?.autorizado, txt: "Chave aceita pelo Evolution", dica: "A EVOLUTION_API_KEY não confere com a da VPS" },
-    { ok: !!e?.conectado, txt: `Seu número conectado${e?.estado && e.estado !== "open" ? ` (estado: ${e.estado})` : ""}`, dica: "No painel do Evolution, leia o QR code com o WhatsApp do celular" },
+    { ok: !!e?.conectado, txt: `Seu número conectado${e?.estado && e.estado !== "open" ? ` (estado: ${e.estado})` : ""}`, dica: "Toque em \"Conectar meu número\" abaixo e leia o QR code com o WhatsApp do celular" },
     { ok: status.segredoConfigurado, txt: "Senha do webhook definida", dica: "WHATSAPP_WEBHOOK_SECRET na Vercel" },
     { ok: !!e?.webhookOk, txt: "Webhook apontando para o sistema", dica: e?.webhookDestino ? `Hoje aponta para ${e.webhookDestino}` : "Ainda não configurado" },
   ]
@@ -348,6 +366,25 @@ export function ConexaoWhats({ status, onAtualizar }: { status: StatusWhats | nu
             </li>
           ))}
         </ul>
+      )}
+      {e?.autorizado && !e.conectado && (
+        pareando ? (
+          <div className="rounded-xl p-3 space-y-2" style={{ background: "var(--bg-surface)" }}>
+            {qr
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={qr} alt="QR code para conectar o WhatsApp" className="w-56 h-56 mx-auto" />
+              : <p className="text-[12px] py-10 text-center" style={{ color: "var(--text-faint)" }}>Gerando o QR code…</p>}
+            <p className="text-[11.5px] leading-relaxed" style={{ color: "var(--text-sub)" }}>
+              No celular: WhatsApp → <b>Configurações</b> → <b>Aparelhos conectados</b> → <b>Conectar aparelho</b>, e aponte para o código. Ele se renova sozinho até conectar.
+            </p>
+            <button onClick={() => { setPareando(false); setQr(null) }} className="text-[12px] font-semibold text-[#8456e8]">Cancelar</button>
+          </div>
+        ) : (
+          <button onClick={() => { setErro(null); setPareando(true) }}
+            className="h-9 px-4 rounded-xl text-[12.5px] font-semibold text-white mr-2" style={{ background: "#25a35a" }}>
+            Conectar meu número
+          </button>
+        )
       )}
       {podeConfigurar && (
         <button onClick={configurar} disabled={configurando}
