@@ -7,7 +7,7 @@ import { HistItem } from "./HistoricoView"
 import { COL_COLORS } from "./kanban-colors"
 import { hoje, isReceitaPendenteValida, calcularPedidosFechados } from "../lib/financeiro"
 import { montarPedidos, nomeChave } from "../lib/negocio"
-import { MessageCircle, X } from "lucide-react"
+import { MessageCircle, X, Link2, Check, ExternalLink } from "lucide-react"
 
 interface MetaCampanha { id: string; nome: string }
 
@@ -216,6 +216,7 @@ export function ClientePerfilModal({
               </p>
             )}
           </div>
+          <PaginaDoCliente nome={nome} />
           {cadastro?.telefone && (
             <a href={`https://wa.me/${(() => { const t = cadastro.telefone!.replace(/\D/g, ""); return t.length <= 11 ? "55" + t : t })()}`}
               target="_blank" rel="noreferrer"
@@ -585,6 +586,29 @@ function Kpi({ label, value, color, sub }: { label: string; value: string; color
       <p className="text-[11px] font-medium leading-tight text-[#898892]">{label}</p>
       <p className="font-semibold text-[16px] ds-num mt-1.5" style={{ color: textColor }}>{value}</p>
       {sub && <p className="text-[10.5px] mt-0.5 leading-tight text-[#898892]">{sub}</p>}
+    </div>
+  )
+}
+
+// Link permanente da página do cliente: copiar para mandar, ou abrir para ver como ele vê
+function PaginaDoCliente({ nome }: { nome: string }) {
+  const [copiado, setCopiado] = useState(false)
+  const obter = async () => {
+    const r = await fetch(`/api/cliente/link?nome=${encodeURIComponent(nome)}`).catch(() => null)
+    return r?.ok ? ((await r.json()).url as string) : null
+  }
+  return (
+    <div className="flex items-center shrink-0 rounded-lg overflow-hidden" style={{ border: "1px solid rgba(132,86,232,0.25)" }}>
+      <button title="Copia o link com os pedidos, arquivos e pagamentos do cliente"
+        onClick={async () => { const u = await obter(); if (u) navigator.clipboard.writeText(u).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 1800) }) }}
+        className="h-8 px-3 text-[12px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors flex items-center gap-1.5">
+        {copiado ? <><Check className="w-3.5 h-3.5" /> Copiado</> : <><Link2 className="w-3.5 h-3.5" /> Página do cliente</>}
+      </button>
+      <button title="Ver como o cliente vê" aria-label="Abrir a página do cliente"
+        onClick={async () => { const w = window.open("", "_blank"); const u = await obter(); if (w && u) w.location.href = u; else w?.close() }}
+        className="h-8 w-8 grid place-items-center text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors" style={{ borderLeft: "1px solid rgba(132,86,232,0.2)" }}>
+        <ExternalLink className="w-3.5 h-3.5" />
+      </button>
     </div>
   )
 }

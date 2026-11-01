@@ -16,6 +16,7 @@ import { FinanceiroView } from "@/app/components/FinanceiroView"
 import { RelatoriosView } from "@/app/components/RelatoriosView"
 import { IdeiasView } from "@/app/components/IdeiasView"
 import PortalClient from "@/app/c/[token]/PortalClient"
+import { ClientePerfilModal } from "@/app/components/ClientePerfilModal"
 import { dados, config } from "./dados"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
@@ -72,6 +73,9 @@ function Telas() {
         ] : [],
       })) }} />
     }
+    case "perfil":
+      return <ClientePerfilModal nome="Ana Cosméticos" cadastro={{ id: "x", nome: "Ana Cosméticos", telefone: "11999990000", criadoEm: "" }}
+        itens={[]} propostas={[]} kanban={dados.kanban} lancamentos={lancs} onClose={() => {}} onReplicar={() => {}} onWhatsApp={() => {}} onSave={() => {}} />
     case "ideias": return <div style={{ height: "100vh" }}><IdeiasView config={cfg} onSalvar={setCfg} /></div>
     case "relatorios": return <div style={{ height: "100vh" }}><RelatoriosView kanban={dados.kanban} lancamentos={lancs} clientes={[]} onAbrirCliente={() => {}} /></div>
     case "detalhe": {
