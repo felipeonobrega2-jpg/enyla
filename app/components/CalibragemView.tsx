@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { Gauge, ListChecks, Tag, AlertTriangle, CheckCircle2, ArrowUpRight, ArrowDownRight, Sparkles, ArrowRight, RotateCcw, Check, EyeOff, History } from "lucide-react"
+import { Split, Gauge, ListChecks, Tag, AlertTriangle, CheckCircle2, ArrowUpRight, ArrowDownRight, Sparkles, ArrowRight, RotateCcw, Check, EyeOff, History } from "lucide-react"
 import { FormData, KanbanCard, LancamentoFinanceiro } from "../types"
 import { Configuracoes } from "../config"
 import { montarPedidos } from "../lib/negocio"
@@ -12,6 +12,7 @@ import { brl, num } from "../utils"
 import { Kpi, GradeKpis, Cartao, TituloCartao, LinhaLista, Selo, Vazio, Gaveta, Tom, Botao } from "./ds"
 import { sugerirAjustes, aplicarSugestao, desfazerAjuste, ignorarSugestao, aprendizadoDe, Sugestao, AMOSTRA_MINIMA } from "../lib/aprendizado"
 import { normalizarProducao } from "../lib/producao"
+import { etapasNoTexto } from "../lib/calibragem"
 
 const LEITURA: Record<Leitura, { nome: string; tom: Tom; orientacao: (nome: string) => string }> = {
   calibrado:   { nome: "calibrado", tom: "sucesso", orientacao: () => "O motor está acertando. Nada a fazer." },
@@ -84,7 +85,8 @@ function CartaoSugestao({ s, onAplicar, onIgnorar }: { s: Sugestao; onAplicar?: 
   )
 }
 
-export function CalibragemView({ kanban, lancamentos, historico, config, onCategorizar, onAtualizarConfig }: {
+export function CalibragemView({ kanban, lancamentos, historico, config, onCategorizar, onAtualizarConfig, onDividir }: {
+  onDividir?: (lancamento: LancamentoFinanceiro, partes: { nome: string; valor: number }[]) => void
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
   historico: { form: FormData; numero?: string }[]
@@ -98,6 +100,10 @@ export function CalibragemView({ kanban, lancamentos, historico, config, onCateg
   const desvios = desviosPorComponente(comps)
   const completos = comps.filter(comparavel)
   const incompletos = comps.filter(c => !comparavel(c))
+  // Um lançamento com duas etapas ("Impressão + Papel") deixa o pedido fora da calibragem
+  const misturados = comps.flatMap(c => c.custosReais
+    .filter(x => !x.lancamento.subcategoria && etapasNoTexto(x.lancamento.descricao ?? "").length >= 2)
+    .map(x => ({ ...x, pedido: c.pedido, etapas: etapasNoTexto(x.lancamento.descricao ?? "") })))
   const semCategoria = comps.flatMap(c => c.custosReais.filter(x => x.componente === "semCategoria").map(x => ({ ...x, pedido: c.pedido })))
   const prevTotal = completos.reduce((s, c) => s + c.previstoTotal, 0)
   const realTotal = completos.reduce((s, c) => s + c.realTotal, 0)
@@ -201,6 +207,18 @@ export function CalibragemView({ kanban, lancamentos, historico, config, onCateg
         </div>
       </Cartao>
 
+      {misturados.length > 0 && (
+        <Cartao padding={false} className="ds-entrada">
+          <div className="px-5 pt-5">
+            <TituloCartao titulo="Custos com duas etapas juntas" icone={<Split className="w-4 h-4" />}
+              sub={`${misturados.length} ${misturados.length === 1 ? "lançamento junta" : "lançamentos juntam"} etapas num valor só e ${misturados.length === 1 ? "deixa o pedido" : "deixam os pedidos"} fora da calibragem. Divida pelo valor de cada etapa (da nota do fornecedor).`} />
+          </div>
+          <div className="px-2 pb-2 -mt-1">
+            {misturados.map(x => <LinhaMisturada key={x.lancamento.id} item={x} onDividir={onDividir} />)}
+          </div>
+        </Cartao>
+      )}
+
       <div className="grid grid-cols-1 xl:grid-cols-[1.3fr_1fr] gap-4 items-start">
         <Cartao padding={false} className="ds-entrada">
           <div className="px-5 pt-5">
@@ -261,6 +279,47 @@ export function CalibragemView({ kanban, lancamentos, historico, config, onCateg
           ))}
         </>}
       </Gaveta>
+    </div>
+  )
+}
+
+// Um custo "Impressão + Papel": valores de cada etapa e um botão para dividir
+function LinhaMisturada({ item, onDividir }: {
+  item: { lancamento: LancamentoFinanceiro; pedido: { numero: string; nomeCliente: string }; etapas: Exclude<Componente, "semCategoria">[] }
+  onDividir?: (l: LancamentoFinanceiro, partes: { nome: string; valor: number }[]) => void
+}) {
+  const [aberto, setAberto] = React.useState(false)
+  const [valores, setValores] = React.useState<string[]>(item.etapas.map(() => ""))
+  const total = item.lancamento.valor
+  const nums = valores.map(v => parseFloat(v.replace(",", ".")) || 0)
+  const falta = total - nums.reduce((a, b) => a + b, 0)
+  const ok = nums.every(n => n > 0) && Math.abs(falta) < 0.01
+  const mudar = (i: number, v: string) => {
+    const nova = [...valores]; nova[i] = v
+    if (nova.length === 2) { const r = total - (parseFloat(v.replace(",", ".")) || 0); nova[1 - i] = r > 0 ? r.toFixed(2) : "" }
+    setValores(nova)
+  }
+  return (
+    <div>
+      <LinhaLista titulo={item.lancamento.descricao} sub={`${item.pedido.numero} · ${item.pedido.nomeCliente}`} valor={brl(total)}
+        acao={onDividir ? <Botao onClick={() => setAberto(a => !a)}>{aberto ? "Fechar" : "Dividir"}</Botao> : undefined} />
+      {aberto && (
+        <div className="mx-3 mb-3 rounded-xl p-3.5 bg-[rgba(116,116,128,0.05)] flex flex-wrap items-end gap-3">
+          {item.etapas.map((e, i) => (
+            <label key={e} className="flex flex-col gap-1">
+              <span className="text-[11px] font-semibold text-[#5e5c68]">{SUBCATEGORIA[e]}</span>
+              <input value={valores[i]} onChange={ev => mudar(i, ev.target.value)} inputMode="decimal" placeholder="0,00"
+                className="w-32 h-9 rounded-lg px-3 text-[13px] ds-num bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25 ds-borda" />
+            </label>
+          ))}
+          <span className="text-[11.5px] ds-num pb-2" style={{ color: Math.abs(falta) < 0.01 ? "#009351" : "#c57800" }}>
+            {Math.abs(falta) < 0.01 ? "soma certa" : `${falta > 0 ? "faltam" : "passou"} ${brl(Math.abs(falta))}`}
+          </span>
+          <Botao variante="primario" disabled={!ok} onClick={() => onDividir?.(item.lancamento, item.etapas.map((e, i) => ({ nome: SUBCATEGORIA[e], valor: nums[i] })))}>
+            Dividir em {item.etapas.length}
+          </Botao>
+        </div>
+      )}
     </div>
   )
 }

@@ -45,6 +45,23 @@ const REGRAS: [Componente, RegExp][] = [
   ["itens", /ber[cç]o|adesiv|sacola|etiqueta|r[oó]tulo|fita/],
 ]
 
+// Etapas citadas num texto de lançamento ("Impressão + Papel" → impressão e papel). Mais estrito que REGRAS
+// para não acusar mistura à toa: "faca de corte" é só faca; "folha" não conta como papel; frete é sempre um só.
+const ETAPAS_TEXTO: [Exclude<Componente, "semCategoria">, RegExp][] = [
+  ["papel", /papel|cart[aã]o|triplex|duplex|couch/],
+  ["impressao", /impress|offset/],
+  ["acabamento", /verniz|lamina/],
+  ["hotStamping", /hot\s?stamp/],
+  ["corteVinco", /corte|vinco/],
+  ["colagem", /colagem/],
+  ["faca", /\bfaca\b/],
+]
+export function etapasNoTexto(texto: string): Exclude<Componente, "semCategoria">[] {
+  const s = texto.toLowerCase().replace(/faca de corte( e vinco)?/g, "faca")
+  if (REGRAS[0][1].test(s)) return ["frete"]
+  return ETAPAS_TEXTO.filter(([, re]) => re.test(s)).map(([c]) => c)
+}
+
 // Componente de um custo real: subcategoria → descrição → categoria → fornecedor vinculado
 export function classificar(l: LancamentoFinanceiro, fornecedores: Fornecedor[], cfg: Configuracoes): Componente {
   const textos = [l.subcategoria, l.descricao, l.categoria === "transporte" ? "transporte" : ""]

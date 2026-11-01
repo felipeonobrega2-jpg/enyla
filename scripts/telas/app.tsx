@@ -20,6 +20,7 @@ import { ClientePerfilModal } from "@/app/components/ClientePerfilModal"
 import { dados, config } from "./dados"
 import { origemDoCliente } from "@/app/lib/coleta"
 import { PrecoQueFecha } from "@/app/components/PrecoQueFecha"
+import { ModalLancamento } from "@/app/components/FinanceiroView"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
 // Abas do Financeiro: "financeiro-receber" abre a aba "receber"
@@ -43,7 +44,8 @@ function Telas() {
   switch (tela) {
     case "caixa": return pagina(<CaixaView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onUpdateConfig={setCfg} onAddLancamento={l => setLancs(p => [l, ...p])} />)
     case "config": return <ThemeProvider><div style={{ height: "100vh" }}><ConfigView config={cfg} onSave={setCfg} onExportar={() => {}} onImportar={() => {}} clientes={["Cliente Relacionamento", "Outro Cliente"]} /></div></ThemeProvider>
-    case "calibragem": return pagina(<CalibragemView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onAtualizarConfig={setCfg} />)
+    case "lancamento": return <ModalLancamento inicial={{ tipo: "despesa", descricao: "Impressão + Papel", valor: 3100 }} kanban={dados.kanban} onSave={() => {}} onClose={() => {}} />
+    case "calibragem": return pagina(<CalibragemView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onAtualizarConfig={setCfg} onDividir={() => {}} />)
     case "rotas": {
       const r = calcular(form, cfg)
       return pagina(r ? <RotasProducao calculo={r} form={form} producao={normalizarProducao(cfg.producao)} multiplicadorPadrao={cfg.multiplicadores.semFaca || 2}

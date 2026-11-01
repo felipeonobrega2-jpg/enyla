@@ -1,5 +1,6 @@
 "use client"
 
+import { etapasNoTexto, SUBCATEGORIA } from "../lib/calibragem"
 import { CaixaView } from "./CaixaView"
 import { ConciliacaoView } from "./ConciliacaoView"
 import { previsaoDeCaixa } from "../lib/caixa"
@@ -260,6 +261,16 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
   const [forma, setForma]             = useState<FormaPagamento | "">(inicial?.formaPagamento ?? "")
   const [obs, setObs]                 = useState(inicial?.obs ?? "")
   const [revisarDepois, setRevisarDepois] = useState(inicial?.revisarDepois ?? false)
+  // Nome com duas etapas ("Impressão + Papel"): pede para dividir o valor, senão o motor não aprende com o pedido
+  const [divisao, setDivisao] = useState<{ nome: string; valor: string }[] | null>(null)
+  const abrirDivisao = (texto: string, total: number) => {
+    const etapas = etapasNoTexto(texto)
+    if (etapas.length < 2) return false
+    setDivisao(etapas.map((c, i) => ({ nome: SUBCATEGORIA[c], valor: i === 0 ? total.toFixed(2) : "" })))
+    return true
+  }
+  const partesValidas = (total: number) => divisao && divisao.every(d => parseFloat(d.valor) > 0)
+    && Math.abs(divisao.reduce((t, d) => t + (parseFloat(d.valor) || 0), 0) - total) < 0.01 ? divisao.map(d => ({ nome: d.nome, valor: parseFloat(d.valor) })) : null
 
   // Modo Custo — aba separada para registrar na conta do fornecedor
   const [modoCusto, setModoCusto]         = useState(false)
@@ -269,17 +280,21 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
   const [custoData, setCustoData]         = useState(hoje())
   const [custoDesc, setCustoDesc]         = useState("")
 
-  function salvarCusto() {
+  function salvarCusto(partes?: { nome: string; valor: number }[] | "junto") {
     const v = parseFloat(custoValor)
     if (!v || !custoFornId) return
+    if (!partes && abrirDivisao(custoDesc, v)) return
     const vin = vinculaveis.find(x => x.key === custoCardKey)
     const forn = fornecedoresConta.find(f => f.id === custoFornId)
     const descAuto = `${forn?.nome ?? "Custo"}${vin ? ` — ${vin.loteId ? "Lote" : "Pedido"} ${vin.numero}` : ""}`
-    onSave({
-      id:             Date.now().toString(),
+    const lista = Array.isArray(partes) ? partes : [{ nome: "", valor: v }]
+    const agora = Date.now()
+    lista.forEach((parte, i) => onSave({
+      id:             lista.length > 1 ? `${agora}-${i}` : agora.toString(),
       tipo:           "despesa",
-      descricao:      (custoDesc.trim() || descAuto),
-      valor:          v,
+      descricao:      parte.nome || (custoDesc.trim() || descAuto),
+      ...(parte.nome ? { subcategoria: parte.nome } : {}),
+      valor:          parte.valor,
       dataVencimento: custoData,
       status:         "pendente",
       fornecedorId:   custoFornId,
@@ -290,7 +305,7 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
       loteNumero:     vin?.loteNumero,
       formaPagamento: "conta",
       criadoEm:       new Date().toLocaleString("pt-BR"),
-    } as LancamentoFinanceiro)
+    } as LancamentoFinanceiro))
     onClose()
   }
 
@@ -352,9 +367,10 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
     }
   }
 
-  function salvar() {
+  function salvar(partes?: { nome: string; valor: number }[] | "junto") {
     const v = parseFloat(valor)
     if (!descricao.trim() || !v || !dataVenc) return
+    if (!partes && tipo === "despesa" && !(temSubs && subcategoria) && vinculoKeys.filter(k => k).length <= 1 && abrirDivisao(descricao, v)) return
     const base = {
       tipo,
       descricao:      descricao.trim(),
@@ -373,16 +389,20 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
     const activeKeys = vinculoKeys.filter(k => k)
     if (activeKeys.length <= 1) {
       const vinSel = activeKeys.length === 1 ? vinculaveis.find(x => x.key === activeKeys[0]) : undefined
-      onSave({
+      const lista = Array.isArray(partes) ? partes : [null]
+      const agora = Date.now()
+      lista.forEach((parte, i) => onSave({
         ...base,
-        id:          inicial?.id ?? Date.now().toString(),
+        ...(parte ? { descricao: parte.nome, subcategoria: parte.nome, valor: parte.valor } : {}),
+        // Na divisão, a primeira parte fica no lançamento original (se editando); as outras são novas
+        id:          i === 0 ? (inicial?.id ?? (lista.length > 1 ? `${agora}-0` : agora.toString())) : `${agora}-${i}`,
         cardId:      vinSel?.cardId || undefined,
         cardNumero:  vinSel?.cardNumero || inicial?.cardNumero,
         nomeCliente: vinSel?.nomeCliente || inicial?.nomeCliente,
         loteId:      vinSel?.loteId || inicial?.loteId,
         loteNumero:  vinSel?.loteNumero || (vinSel ? undefined : inicial?.loteNumero),
         criadoEm:    inicial?.criadoEm ?? new Date().toLocaleString("pt-BR"),
-      })
+      }))
     } else {
       const now = Date.now()
       for (let i = 0; i < activeKeys.length; i++) {
@@ -463,10 +483,16 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
               <input value={custoDesc} onChange={e => setCustoDesc(e.target.value)}
                 placeholder="Ex: Impressão offset 4x0" className={inp()} />
             </CustoField>
-            <button disabled={!custoValor || !custoFornId} onClick={salvarCusto}
+            {divisao ? (
+              <PainelDivisao divisao={divisao} setDivisao={setDivisao} total={parseFloat(custoValor) || 0}
+                onDividir={() => { const p = partesValidas(parseFloat(custoValor) || 0); if (p) salvarCusto(p) }}
+                pronto={!!partesValidas(parseFloat(custoValor) || 0)} onJunto={() => salvarCusto("junto")} />
+            ) : (
+            <button disabled={!custoValor || !custoFornId} onClick={() => salvarCusto()}
               className="w-full py-3 text-[13px] font-semibold text-white bg-[#8456e8] hover:bg-[#7445d4] rounded-xl transition-colors disabled:opacity-40 mt-2">
               Registrar custo
             </button>
+            )}
           </div>
         ) : (
         <>
@@ -638,16 +664,24 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
           </button>
         </div>
 
+        {divisao ? (
+          <div className="px-6 pb-5 shrink-0 border-t border-[rgba(60,60,67,0.08)] pt-4">
+            <PainelDivisao divisao={divisao} setDivisao={setDivisao} total={parseFloat(valor) || 0}
+              onDividir={() => { const p = partesValidas(parseFloat(valor) || 0); if (p) salvar(p) }}
+              pronto={!!partesValidas(parseFloat(valor) || 0)} onJunto={() => salvar("junto")} />
+          </div>
+        ) : (
         <div className="px-6 pb-5 flex gap-2 shrink-0 border-t border-[rgba(60,60,67,0.08)] pt-4">
           <button onClick={onClose}
             className="flex-1 py-2.5 text-[12.5px] font-medium text-[#8E8E93] hover:bg-[rgba(116,116,128,0.04)] rounded-xl transition-colors">
             Cancelar
           </button>
-          <button disabled={!descricao.trim() || !parseFloat(valor) || !dataVenc} onClick={salvar}
+          <button disabled={!descricao.trim() || !parseFloat(valor) || !dataVenc} onClick={() => salvar()}
             className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#8456e8] hover:bg-[#7445d4] rounded-xl transition-colors disabled:opacity-40">
             {inicial?.id ? "Salvar" : "Lançar"}
           </button>
         </div>
+        )}
         </>
         )}
       </div>
@@ -2330,7 +2364,9 @@ export function FinanceiroView({
           contas={config?.contas}
           fornecedores={config?.fornecedores}
           onSave={l => {
-            if ((modalLanc as LancamentoFinanceiro).id) onUpdate((modalLanc as LancamentoFinanceiro).id!, l)
+            // Editando: só o lançamento original é atualizado; partes novas (divisão por etapa) são criadas
+            const editId = (modalLanc as LancamentoFinanceiro).id
+            if (editId && l.id === editId) onUpdate(editId, l)
             else onAdd(l)
           }}
           onClose={() => setModalLanc(null)}
@@ -2687,6 +2723,54 @@ function CartaoReceber({ p, pagamentos, nomeLote, onRegistrarSobra, onReceber, o
             )}
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// Divide um custo com duas etapas ("Impressão + Papel") em um lançamento por etapa
+function PainelDivisao({ divisao, setDivisao, total, pronto, onDividir, onJunto }: {
+  divisao: { nome: string; valor: string }[]
+  setDivisao: (d: { nome: string; valor: string }[] | null) => void
+  total: number
+  pronto: boolean
+  onDividir: () => void
+  onJunto: () => void
+}) {
+  const soma = divisao.reduce((t, d) => t + (parseFloat(d.valor) || 0), 0)
+  const falta = total - soma
+  const mudar = (i: number, v: string) => {
+    const nova = divisao.map((d, k) => k === i ? { ...d, valor: v } : d)
+    // Com duas etapas, a outra completa o total sozinha
+    if (nova.length === 2) { const outro = 1 - i; const r = total - (parseFloat(v) || 0); nova[outro] = { ...nova[outro], valor: r > 0 ? r.toFixed(2) : "" } }
+    setDivisao(nova)
+  }
+  return (
+    <div className="space-y-3">
+      <div className="rounded-xl px-3.5 py-3" style={{ background: "rgba(197,120,0,0.08)" }}>
+        <p className="text-[12px] font-semibold text-[#8a5400]">Esse custo tem {divisao.length} etapas: {divisao.map(d => d.nome).join(" e ")}</p>
+        <p className="text-[11px] text-[#8a5400]/80 mt-0.5 leading-relaxed">Divida o valor para o motor aprender o custo de cada uma. Junto, o pedido fica fora da calibragem.</p>
+      </div>
+      <div className="space-y-2">
+        {divisao.map((d, i) => (
+          <label key={d.nome} className="flex items-center gap-3">
+            <span className="w-28 text-[12.5px] font-medium text-[#191625]">{d.nome}</span>
+            <input value={d.valor} onChange={e => mudar(i, e.target.value.replace(",", "."))} inputMode="decimal" placeholder="0,00"
+              className="flex-1 rounded-lg px-3 py-2 text-[13px] ds-num bg-[rgba(116,116,128,0.08)] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25" />
+          </label>
+        ))}
+        <p className="text-[11px] text-right ds-num" style={{ color: Math.abs(falta) < 0.01 ? "#009351" : "#c57800" }}>
+          {Math.abs(falta) < 0.01 ? `Soma certa: ${total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}` : `${falta > 0 ? "Faltam" : "Passou"} ${Math.abs(falta).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`}
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={onJunto} className="flex-1 py-2.5 text-[12px] font-medium text-[#5e5c68] hover:bg-[rgba(116,116,128,0.06)] rounded-xl transition-colors">
+          Lançar junto mesmo assim
+        </button>
+        <button onClick={onDividir} disabled={!pronto}
+          className="flex-1 py-2.5 text-[12.5px] font-semibold text-white bg-[#8456e8] hover:bg-[#7445d4] rounded-xl transition-colors disabled:opacity-40">
+          Dividir em {divisao.length}
+        </button>
       </div>
     </div>
   )

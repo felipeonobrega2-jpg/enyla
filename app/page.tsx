@@ -2461,6 +2461,16 @@ export default function Home() {
             />
           ) : view === "fornecedores" ? (
             <FornecedoresView config={config} kanban={kanban} lancamentos={lancamentos} historico={historico} onSave={salvarConfigTudo}
+              onDividir={(l, partes) => {
+                // A primeira etapa fica no lançamento original; as outras viram lançamentos novos iguais a ele
+                const agora = Date.now()
+                const [primeira, ...resto] = partes.map(p => ({ descricao: p.nome, subcategoria: p.nome, valor: p.valor }))
+                const novos = resto.map((p, i) => ({ ...l, ...p, id: `${agora}-${i + 1}`, criadoEm: new Date().toLocaleString("pt-BR") }))
+                setLancamentos(prev => [...novos, ...prev.map(x => x.id === l.id ? { ...x, ...primeira } : x)])
+                fetch(`/api/lancamentos/${l.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(primeira) }).catch(() => {})
+                novos.forEach(n => fetch("/api/lancamentos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(n) }).catch(() => {}))
+                showToast(`Dividido em ${partes.map(p => p.nome).join(" e ")}.`)
+              }}
               onCategorizar={(id, subcategoria) => {
                 setLancamentos(prev => prev.map(x => x.id === id ? { ...x, subcategoria } : x))
                 fetch(`/api/lancamentos/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subcategoria }) }).catch(() => {})
