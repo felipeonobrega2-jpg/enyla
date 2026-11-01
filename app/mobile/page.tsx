@@ -2,11 +2,12 @@
 
 // Enyla no celular: os mesmos números do computador (lib/negocio), pensados para o polegar.
 
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
+import { enviarFotoProducao } from "../lib/imagem"
 import Image from "next/image"
 import {
   Home, Wallet, Factory, FileText, ChevronRight, MessageCircle, Copy, Check, X, Target, AlertTriangle,
-  CircleCheck, CalendarX2, CalendarClock, Clock, Hourglass, Receipt, Link2, Truck, QrCode, Share2,
+  CircleCheck, CalendarX2, CalendarClock, Clock, Hourglass, Receipt, Link2, Truck, QrCode, Share2, Camera,
 } from "lucide-react"
 import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COLUNAS_KANBAN, COL_HOT } from "../types"
 import { Configuracoes, CONFIG_PADRAO } from "../config"
@@ -514,6 +515,21 @@ function Orcamentos({ kanban, hoje, historico, propostas, telefoneDe, onAbrir }:
 
 function Detalhe({ card, pedido, telefone, onFechar }: { card: KanbanCard; pedido?: Pedido; telefone?: string; onFechar: () => void }) {
   const { copiado, copiar } = useCopiar()
+  const camera = useRef<HTMLInputElement>(null)
+  const [foto, setFoto] = useState<"enviando" | "ok" | "erro" | null>(null)
+  async function mandarFoto(f?: File) {
+    if (!f) return
+    setFoto("enviando")
+    setFoto(await enviarFotoProducao(card.id, card.numero, f) ? "ok" : "erro")
+  }
+  // Depois da foto: mensagem pronta para o cliente, com a página dele
+  async function avisarCliente() {
+    const r = await fetch(`/api/cliente/link?nome=${encodeURIComponent(card.nomeCliente)}`).catch(() => null)
+    const url = r?.ok ? (await r.json()).url : ""
+    const msg = `Olá, ${card.nomeCliente.split(" ")[0]}! Suas embalagens estão em produção. Separei uma foto para você acompanhar: ${url}`
+    const href = linkWhatsApp(telefone, msg)
+    if (href) window.open(href, "_blank")
+  }
   const [linkAprov, setLinkAprov] = useState<string | null>(null)
   const orcamento = isAberto(card)
   const origem = typeof window !== "undefined" ? window.location.origin : ""
@@ -590,6 +606,23 @@ function Detalhe({ card, pedido, telefone, onFechar }: { card: KanbanCard; pedid
           </button>
         )}
       </div>
+      {!orcamento && (
+        <div className="space-y-2">
+          <input ref={camera} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => { mandarFoto(e.target.files?.[0]); e.target.value = "" }} />
+          <button onClick={() => camera.current?.click()} disabled={foto === "enviando"}
+            className="h-12 w-full rounded-2xl bg-white text-[#191625] font-medium text-[14px] flex items-center justify-center gap-2 shadow-[0_1px_3px_rgba(0,0,0,0.04)] active:scale-[0.98] transition-transform disabled:opacity-60">
+            <Camera className="w-4 h-4 text-[#8456e8]" /> {foto === "enviando" ? "Enviando foto…" : "Foto da produção"}
+          </button>
+          {foto === "ok" && (
+            <div className="rounded-2xl bg-[#009351]/[0.08] px-4 py-3 flex items-center gap-3 animate-[apple-slide-up_.25s_ease-out]">
+              <Check className="w-4 h-4 text-[#009351] shrink-0" />
+              <p className="flex-1 text-[12.5px] text-[#191625]">Foto na página do cliente.</p>
+              {telefone && <button onClick={avisarCliente} className="text-[12.5px] font-semibold text-[#25a35a]">Avisar no WhatsApp</button>}
+            </div>
+          )}
+          {foto === "erro" && <p className="text-[12px] text-[#d33a3c] px-1">Não deu para enviar a foto. Tente de novo.</p>}
+        </div>
+      )}
       {orcamento && <p className="text-[11.5px] text-[#8E8E93] px-1 leading-snug">O cliente abre o link, escolhe a quantidade e aprova. O pedido entra em Fechado sozinho.</p>}
       {pedido && isTerceirizado(card) && <p className="text-[11.5px] text-[#8E8E93] px-1">Item de revenda.</p>}
     </div>

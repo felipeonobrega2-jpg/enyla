@@ -4,18 +4,19 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import {
   Palette, Scissors, Package, Paperclip, FileText, Factory, User, Home, Building2, Megaphone, Wrench, ClipboardList,
   Printer, Star, Square, MessageCircle, Link2, X, ChevronRight, ChevronDown, LayoutGrid, DollarSign, CalendarDays,
-  CircleCheck, Truck, Check, Download, Upload, Send, Zap, FileOutput, ExternalLink, Boxes,
+  CircleCheck, Truck, Check, Download, Upload, Send, Zap, FileOutput, ExternalLink, Boxes, Camera,
 } from "lucide-react"
 import type { FormData, Calculo, PropostaCustom, KanbanCard, LancamentoFinanceiro, PedidoArquivo, ProjecaoCustos, PrazoEtapas } from "../types"
 import { COLUNAS_KANBAN, COL_FECHADO, COL_EXPEDICAO, COL_PERDIDO, COL_HOT } from "../types"
 import type { Pedido } from "../lib/negocio"
 import { brl, num } from "../utils"
+import { enviarFotoProducao } from "../lib/imagem"
 import { Botao, Selo, Tom } from "./ds"
 
 const CORES_RAPIDAS = ["4x0", "4x4", "2x0", "1x0", "1x1"]
 const ACABAMENTOS_OPCOES = ["Verniz UV", "Laminação fosca", "Laminação brilho", "Hot stamp", "Relevo seco", "Corte e vinco"]
-const TIPO_ARQUIVO_ICON: Record<string, React.ElementType> = { arte: Palette, faca: Scissors, mockup: Package, referencia: Paperclip, outro: FileText }
-const TIPO_LABEL = { arte: "Arte", faca: "Faca", mockup: "Mockup", referencia: "Ref.", outro: "Outro" } as const
+const TIPO_ARQUIVO_ICON: Record<string, React.ElementType> = { arte: Palette, faca: Scissors, mockup: Package, referencia: Paperclip, foto: Camera, outro: FileText }
+const TIPO_LABEL = { arte: "Arte", faca: "Faca", mockup: "Mockup", referencia: "Ref.", foto: "Foto da produção (cliente vê)", outro: "Outro" } as const
 const FORMA_PAG: Record<string, string> = { pix: "Pix", boleto: "Boleto", cartao_credito: "Crédito", cartao_debito: "Débito", dinheiro: "Dinheiro", transferencia: "Transf.", outro: "Outro" }
 const CAT_ICONE: Record<string, React.ElementType> = { fornecedor: Factory, materiais: Package, salarios: User, aluguel: Home, impostos: Building2, marketing: Megaphone, servicos: Wrench, outros: ClipboardList }
 
@@ -240,6 +241,7 @@ export function ModalDetalhe({
   const [acabamentos, setAcabamentos] = useState<string[]>(card?.acabamentos ?? [])
   const [obsOS, setObsOS] = useState(card?.observacoesOS ?? "")
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const fotoInputRef = useRef<HTMLInputElement>(null)
   const [etapasLog, setEtapasLog] = useState<Etapa[] | null>(null)
   const [obsInput, setObsInput] = useState("")
   const [savingObs, setSavingObs] = useState(false)
@@ -588,10 +590,16 @@ export function ModalDetalhe({
               </Secao>
 
               <Secao {...sec("os")} titulo="Ordem de serviço" selo={arquivos.length ? `${arquivos.length} arquivo${arquivos.length > 1 ? "s" : ""}` : undefined}
-                acao={<button onClick={() => fileInputRef.current?.click()} disabled={uploading}
-                  className="h-7 px-2.5 rounded-md text-[11.5px] font-medium text-[#8456e8] hover:bg-[#8456e8]/10 flex items-center gap-1.5 transition-colors">
-                  <Upload className="w-3.5 h-3.5" />{uploading ? "Enviando…" : "Arquivo"}
-                </button>}>
+                acao={<div className="flex items-center gap-1">
+                  <button onClick={() => fotoInputRef.current?.click()} disabled={uploading} title="Aparece na página do cliente"
+                    className="h-7 px-2.5 rounded-md text-[11.5px] font-medium text-[#8456e8] hover:bg-[#8456e8]/10 flex items-center gap-1.5 transition-colors">
+                    <Camera className="w-3.5 h-3.5" />Foto
+                  </button>
+                  <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
+                    className="h-7 px-2.5 rounded-md text-[11.5px] font-medium text-[#8456e8] hover:bg-[#8456e8]/10 flex items-center gap-1.5 transition-colors">
+                    <Upload className="w-3.5 h-3.5" />{uploading ? "Enviando…" : "Arquivo"}
+                  </button>
+                </div>}>
                 <div className="space-y-4">
                   <div>
                     <Rotulo>Observações para a gráfica</Rotulo>
@@ -622,6 +630,13 @@ export function ModalDetalhe({
                     </div>
                   </div>
                   <input ref={fileInputRef} type="file" multiple className="hidden" onChange={e => handleUpload(e.target.files)} />
+                  <input ref={fotoInputRef} type="file" accept="image/*" multiple className="hidden" onChange={async e => {
+                    const fs = Array.from(e.target.files ?? []); e.target.value = ""
+                    if (!fs.length) return
+                    setUploading(true)
+                    for (const f of fs) await enviarFotoProducao(card.id, card.numero, f)
+                    setUploading(false); fetchArquivos()
+                  }} />
                   {arquivos.length === 0 ? (
                     <button onClick={() => fileInputRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); handleUpload(e.dataTransfer.files) }}
                       className="w-full rounded-xl border-2 border-dashed border-[rgba(60,60,67,0.12)] hover:border-[#8456e8]/30 py-4 text-[12.5px] text-[#898892] transition-colors">

@@ -262,7 +262,7 @@ export type PedidoArquivo = {
   card_numero: string
   nome: string
   url: string
-  tipo: "arte" | "faca" | "mockup" | "referencia" | "outro"
+  tipo: "arte" | "faca" | "mockup" | "referencia" | "foto" | "outro"
   tamanho?: number
   created_at: string
 }
