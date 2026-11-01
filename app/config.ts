@@ -82,7 +82,11 @@ export type Configuracoes = {
   sinalPct?: number                                        // sinal pedido na aprovação online (%)
   feriados?: import("./lib/diasUteis").ConfigFeriados      // feriados locais nos prazos
   clientesRelacionamento?: ClienteRelacionamento[]         // pagam depois da entrega
+  ideias?: Ideia[]                                         // anotações para implementar depois
 }
+
+export type StatusIdeia = "ideia" | "andamento" | "feita"
+export type Ideia = { id: string; texto: string; status: StatusIdeia; criadaEm: string }
 
 // Cliente de confiança: recebe antes de quitar; o saldo é esperado alguns dias após a entrega
 export type ClienteRelacionamento = { nome: string; diasAposEntrega: number }
@@ -108,6 +112,11 @@ const CATS_DESPESA_PADRAO: CategoriaFinanceira[] = [
 
 export const CONFIG_PADRAO: Configuracoes = {
   sinalPct: 50,
+  ideias: [
+    { id: "i3", texto: "Cada vez mais integração", status: "ideia", criadaEm: "2026-11-01" },
+    { id: "i2", texto: "Agentes de IA dentro do sistema", status: "ideia", criadaEm: "2026-11-01" },
+    { id: "i1", texto: "Média de cada etapa nos fornecedores, para saber o prazo médio de produção", status: "ideia", criadaEm: "2026-11-01" },
+  ],
   feriados: { cidade: "sp", extras: [] },
   custos: {
     impressaoPorChapa: 350,

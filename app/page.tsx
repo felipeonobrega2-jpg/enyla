@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
-import { Ruler, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box } from "lucide-react"
+import { Ruler, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb } from "lucide-react"
+import { IdeiasView } from "./components/IdeiasView"
 import { signOut } from "next-auth/react"
 import WhatsAppView from "./components/WhatsAppView"
 import Image from "next/image"
@@ -173,7 +174,7 @@ export default function Home() {
   const [editandoHistorico, setEditandoHistorico] = useState<string | null>(null)
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
   const [contador, setContador] = useState<number>(0)
-  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel">("painel")
+  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias">("painel")
   const [perfilClienteExterno, setPerfilClienteExterno] = useState<string | null>(null)
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
   definirFeriadosLocais(config.feriados)
@@ -275,7 +276,7 @@ export default function Home() {
   // Persist main view across F5 — read on mount, write in navigate()
   useEffect(() => {
     const saved = sessionStorage.getItem("app:view")
-    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel"]
+    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias"]
     // Conquistas virou o cartão "Meta do mês" do Painel
     if (saved === "conquistas") setView("painel")
     else if (saved && valid.includes(saved)) setView(saved as typeof view)
@@ -1437,6 +1438,8 @@ export default function Home() {
             icon={<MessageCircle className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "forma"} onClick={() => navigate("forma")} label="Forma IA"
             icon={<Box className="w-4 h-4" strokeWidth={1.8} />} />
+          <NavItem active={view === "ideias"} onClick={() => navigate("ideias")} label="Ideias"
+            icon={<Lightbulb className="w-4 h-4" strokeWidth={1.8} />} badge={(config.ideias ?? []).filter(i => i.status !== "feita").length || undefined} />
         </div>
 
         {/* Sidebar gamificação widgets */}
@@ -2025,6 +2028,8 @@ export default function Home() {
               onExportar={exportarDados}
               onImportar={importarDados}
             />
+          ) : view === "ideias" ? (
+            <IdeiasView config={config} onSalvar={salvarConfigTudo} />
           ) : view === "forma" ? (
             <FormaView
               apiKey={config.apiKey}

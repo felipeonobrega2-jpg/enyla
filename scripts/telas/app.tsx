@@ -14,6 +14,7 @@ import { montarPedidos } from "@/app/lib/negocio"
 import { ModalDetalhe } from "@/app/components/ModalDetalhe"
 import { FinanceiroView } from "@/app/components/FinanceiroView"
 import { RelatoriosView } from "@/app/components/RelatoriosView"
+import { IdeiasView } from "@/app/components/IdeiasView"
 import { dados, config } from "./dados"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
@@ -50,6 +51,7 @@ function Telas() {
       opcoes: [{ quantidade: 1000, preco: 3890, unitario: 3.89 }, { quantidade: 3000, preco: 6540, unitario: 2.18 }],
     }} />
     case "mobile": return <MobilePage />
+    case "ideias": return <div style={{ height: "100vh" }}><IdeiasView config={cfg} onSalvar={setCfg} /></div>
     case "relatorios": return <div style={{ height: "100vh" }}><RelatoriosView kanban={dados.kanban} lancamentos={lancs} clientes={[]} onAbrirCliente={() => {}} /></div>
     case "detalhe": {
       const c = dados.kanban.find(k => k.id === "c1")!
