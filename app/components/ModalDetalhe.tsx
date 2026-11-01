@@ -759,6 +759,13 @@ export function ModalDetalhe({
                   }} />
               )}
               {showPix && <BotaoCopiar rotulo="Link Pix" icone={<Zap className="w-3.5 h-3.5" />} obterUrl={linkPix} />}
+              {coluna >= COL_FECHADO && coluna !== COL_PERDIDO && (
+                <BotaoCopiar rotulo="Página do cliente" icone={<User className="w-3.5 h-3.5" />} titulo="Copia o link com todos os pedidos, arquivos e pagamentos do cliente"
+                  obterUrl={async () => {
+                    const r = await fetch(`/api/cliente/link?nome=${encodeURIComponent(card.nomeCliente)}`).catch(() => null)
+                    return r?.ok ? (await r.json()).url : null
+                  }} />
+              )}
               {coluna >= COL_FECHADO && coluna !== COL_PERDIDO && onEmitirOS && (
                 <Botao variante="primario" icone={<FileOutput className="w-3.5 h-3.5" />} onClick={() => onEmitirOS(card)}>Emitir pedido</Botao>
               )}

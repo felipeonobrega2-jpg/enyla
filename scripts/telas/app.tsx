@@ -15,6 +15,7 @@ import { ModalDetalhe } from "@/app/components/ModalDetalhe"
 import { FinanceiroView } from "@/app/components/FinanceiroView"
 import { RelatoriosView } from "@/app/components/RelatoriosView"
 import { IdeiasView } from "@/app/components/IdeiasView"
+import PortalClient from "@/app/c/[token]/PortalClient"
 import { dados, config } from "./dados"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
@@ -51,6 +52,26 @@ function Telas() {
       opcoes: [{ quantidade: 1000, preco: 3890, unitario: 3.89 }, { quantidade: 3000, preco: 6540, unitario: 2.18 }],
     }} />
     case "mobile": return <MobilePage />
+    case "portal": {
+      const hoje = new Date()
+      const br = (n: number) => { const d = new Date(hoje); d.setDate(d.getDate() - n); return d.toLocaleDateString("pt-BR") + ", 10:00:00" }
+      const etapas: Record<string, { coluna: number; dataHora: string; tipo: string }[]> = {
+        "ANA-001": [1, 2, 3, 4, 5, 6, 7, 8, 9].map((c, i) => ({ coluna: c, dataHora: br(20 - i * 2), tipo: "coluna" })),
+        "ORC-002": [1, 2, 3, 4, 5, 6, 7].map((c, i) => ({ coluna: c, dataHora: br(10 - i), tipo: "coluna" })),
+        "ORC-003": [1, 2, 3, 4, 5].map((c, i) => ({ coluna: c, dataHora: br(5 - i), tipo: "coluna" })),
+      }
+      const pedidos = montarPedidos(dados.kanban, lancs).filter(p => ["Ana Cosméticos", "Bruno Perfumes", "Cliente Relacionamento"].includes(p.nomeCliente))
+      return <PortalClient dados={{ nome: "Ana Cosméticos", pedidos: pedidos.map(p => ({
+        key: p.key, numero: p.numero, coluna: p.coluna, dataFechamento: p.dataFechamento ?? null, dataEntregaPrevista: p.dataEntregaPrevista ?? null, dataEntregaReal: p.dataEntregaReal ?? null,
+        venda: p.venda, recebido: p.venda - p.aReceber, aReceber: p.aReceber, quantidade: p.quantidade,
+        itens: p.cards.map(c => ({ numero: c.numero, dimensoes: c.dimensoes, material: c.materialNome, quantidade: c.quantidade })),
+        etapas: etapas[p.numero] ?? [],
+        arquivos: p.numero === "ORC-002" ? [
+          { id: "f1", nome: "impressao.jpg", url: "../../../public/icon-512.png", tipo: "foto", quando: hoje.toISOString() },
+          { id: "f2", nome: "arte-final.pdf", url: "#", tipo: "arte", quando: hoje.toISOString() },
+        ] : [],
+      })) }} />
+    }
     case "ideias": return <div style={{ height: "100vh" }}><IdeiasView config={cfg} onSalvar={setCfg} /></div>
     case "relatorios": return <div style={{ height: "100vh" }}><RelatoriosView kanban={dados.kanban} lancamentos={lancs} clientes={[]} onAbrirCliente={() => {}} /></div>
     case "detalhe": {

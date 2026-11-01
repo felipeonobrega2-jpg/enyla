@@ -14,8 +14,13 @@ function segredo(): string {
   return s
 }
 
+// Assinatura curta de um valor com o segredo do servidor (links públicos sem senha)
+export function assinar(proposito: string, valor: string, tamanho = 16): string {
+  return createHmac("sha256", segredo()).update(`${proposito}:${valor}`).digest("base64url").slice(0, tamanho)
+}
+
 export function tokenAprovacao(numero: string): string {
-  return createHmac("sha256", segredo()).update(`aprovar:${numero}`).digest("base64url").slice(0, 16)
+  return assinar("aprovar", numero)
 }
 
 export function tokenValido(numero: string, token: string | null | undefined): boolean {

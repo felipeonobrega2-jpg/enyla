@@ -169,7 +169,7 @@ export default function Home() {
   const [dxfPreview, setDxfPreview] = useState<{ result: DXFResult; nome: string } | null>(null)
   const [novaQtd, setNovaQtd] = useState("")
   const [toast, setToast]     = useState("")
-  const [notifWA, setNotifWA] = useState<{ nomeCliente: string; numero: string; etapa: string; telefone: string } | null>(null)
+  const [notifWA, setNotifWA] = useState<{ nomeCliente: string; numero: string; etapa: string; telefone: string; portal?: string } | null>(null)
   const [historico, setHistorico] = useState<Array<{ form: FormData; calculo: Calculo; data: string; numero?: string }>>([])
   const [editandoHistorico, setEditandoHistorico] = useState<string | null>(null)
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
@@ -1585,8 +1585,8 @@ export default function Home() {
           <a
             href={(() => {
               const firstName = notifWA.nomeCliente.split(" ")[0]
-              const url = `${typeof window !== "undefined" ? window.location.origin : ""}/track/${encodeURIComponent(notifWA.numero)}`
-              const msg = `Olá, ${firstName}! 🎉 Seu pedido *${notifWA.numero}* avançou para: *${notifWA.etapa}*.\n\nAcompanhe em tempo real:\n${url}`
+              const url = notifWA.portal ?? `${typeof window !== "undefined" ? window.location.origin : ""}/track/${encodeURIComponent(notifWA.numero)}`
+              const msg = `Olá, ${firstName}! 🎉 Seu pedido *${notifWA.numero}* avançou para: *${notifWA.etapa}*.\n\nAcompanhe seus pedidos:\n${url}`
               return `https://wa.me/55${notifWA.telefone.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`
             })()}
             target="_blank"
@@ -2122,7 +2122,12 @@ export default function Home() {
                 if (card) automacoesDeEtapa({ ...card, ...(dataFechamento ? { dataFechamento } : {}) }, coluna)
                 if (card?.numero && coluna >= 2 && coluna <= 8) {
                   const telefone = clientes.find(c => c.nome.toLowerCase() === card.nomeCliente.toLowerCase())?.telefone
-                  if (telefone) setNotifWA({ nomeCliente: card.nomeCliente, numero: card.numero, etapa: COLUNAS_KANBAN[coluna] ?? `Etapa ${coluna}`, telefone })
+                  if (telefone) {
+                    setNotifWA({ nomeCliente: card.nomeCliente, numero: card.numero, etapa: COLUNAS_KANBAN[coluna] ?? `Etapa ${coluna}`, telefone })
+                    // A mensagem leva a página do cliente (todos os pedidos dele), não só o rastreio deste
+                    fetch(`/api/cliente/link?nome=${encodeURIComponent(card.nomeCliente)}`).then(r => r.ok ? r.json() : null)
+                      .then(d => { if (d?.url) setNotifWA(n => n && n.numero === card.numero ? { ...n, portal: d.url } : n) }).catch(() => {})
+                  }
                 }
                 // Auto-preencher datas de prazo ao entrar na etapa
                 if (card) {

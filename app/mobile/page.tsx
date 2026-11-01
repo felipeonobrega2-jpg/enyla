@@ -574,9 +574,13 @@ function Detalhe({ card, pedido, telefone, onFechar }: { card: KanbanCard; pedid
             {copiado === "aprov" ? <><Check className="w-4 h-4" /> Copiado</> : <><Link2 className="w-4 h-4" /> Link de aprovação</>}
           </button>
         ) : (
-          <button onClick={() => compartilhar(`Pedido ${card.numero}`, rastreio, "track")}
+          <button onClick={async () => {
+            const r = await fetch(`/api/cliente/link?nome=${encodeURIComponent(card.nomeCliente)}`).catch(() => null)
+            const url = r?.ok ? (await r.json()).url : rastreio
+            compartilhar(`Pedidos de ${card.nomeCliente}`, url, "track")
+          }}
             className="h-12 rounded-2xl bg-[#8456e8] text-white font-semibold text-[14px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
-            {copiado === "track" ? <><Check className="w-4 h-4" /> Copiado</> : <><Share2 className="w-4 h-4" /> Rastreio</>}
+            {copiado === "track" ? <><Check className="w-4 h-4" /> Copiado</> : <><Share2 className="w-4 h-4" /> Página do cliente</>}
           </button>
         )}
         {!telefone && (
