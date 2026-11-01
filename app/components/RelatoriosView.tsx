@@ -1,9 +1,10 @@
 "use client"
 
 import React from "react"
-import { FileDown, TrendingUp, Megaphone, Layers, ArrowUpRight, ArrowDownRight, Minus, CalendarRange, Package, CircleSlash } from "lucide-react"
+import { FileDown, TrendingUp, Megaphone, Layers, ArrowUpRight, ArrowDownRight, Minus, CalendarRange, Package, CircleSlash, Target } from "lucide-react"
 import { origemDoCliente, rotuloCanal, categoriaPerda, rotuloPerda, OrigensClientes, CategoriaPerda } from "../lib/coleta"
-import { KanbanCard, LancamentoFinanceiro, Cliente } from "../types"
+import { KanbanCard, LancamentoFinanceiro, Cliente, Calculo } from "../types"
+import { linhasDeOrcamento, taxa, ROTULO_QTD, ROTULO_MARKUP, AMOSTRA_MINIMA, FaixaQtd, FaixaMarkup, LinhaOrcamento } from "../lib/precoQueFecha"
 import {
   Periodo, montarPedidos, vendasDoPeriodo, caixaDoPeriodo, conversao, orcamentosDoPeriodo, margemContribuicao,
   pipelineComercial, noPeriodo, nomeChave, isTerceirizado, recebiveis,
@@ -70,8 +71,9 @@ function Delta({ atual, base, menorMelhor }: { atual: number | null; base: numbe
   )
 }
 
-export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, origensClientes }: {
+export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, origensClientes, historico = [] }: {
   origensClientes?: OrigensClientes
+  historico?: { numero?: string; calculo?: Pick<Calculo, "tabela"> }[]
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
   clientes: Cliente[]
@@ -140,6 +142,18 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, 
     porOrigem.set(o, atual)
   }
   const origens = [...porOrigem.entries()].sort((x, y) => y[1].valor - x[1].valor)
+
+  // O que faz fechar: todos os orçamentos decididos (a amostra do período seria pequena demais)
+  const linhasOrc = linhasDeOrcamento(kanban, historico)
+  const grupo = (nome: string, filtros: [string, (l: LinhaOrcamento) => boolean][]) => ({
+    nome, itens: filtros.map(([rotulo, f]) => ({ rotulo, t: taxa(linhasOrc.filter(f)) })).filter(i => i.t.total > 0),
+  })
+  const fechamento = [
+    grupo("Tipo de cliente", [["Cliente novo", l => !l.recorrente], ["Já tinha comprado", l => l.recorrente]]),
+    grupo("Quantidade", (Object.keys(ROTULO_QTD) as FaixaQtd[]).map(f => [ROTULO_QTD[f], (l: LinhaOrcamento) => l.faixaQtd === f])),
+    grupo("Preço sobre o custo do motor", (Object.keys(ROTULO_MARKUP) as FaixaMarkup[]).map(f => [ROTULO_MARKUP[f], (l: LinhaOrcamento) => l.faixaMarkup === f])),
+  ]
+  const geral = taxa(linhasOrc)
 
   // Por que perdemos: orçamentos do período que foram para Perdido, por motivo (os que venceram sem resposta à parte)
   const porMotivo = new Map<CategoriaPerda, { qtd: number; valor: number }>()
@@ -261,6 +275,23 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, 
             sub={`Caixas dos pedidos fechados no mês, mais as sobras vendidas · ${num(meses.reduce((s, m) => s + m.unidades, 0))} un em 12 meses`} />
           <Colunas formato={n => `${num(n)} un`} itens={meses.map(m => ({ rotulo: m.rotulo, valor: m.unidades, destaque: m.destaque }))} />
         </Cartao>
+
+        {linhasOrc.length >= AMOSTRA_MINIMA && (
+          <Cartao className="ds-entrada">
+            <TituloCartao titulo="O que faz fechar" icone={<Target className="w-4 h-4" />}
+              sub={`Todos os ${geral.total} orçamentos decididos: ${geral.ganhos} viraram pedido, ${geral.recusados} foram recusados e ${geral.semResposta} ficaram sem resposta. A barra é a taxa de fechamento; o número em negrito, quantos fecharam.`} />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {fechamento.map(g => (
+                <div key={g.nome}>
+                  <p className="text-[11.5px] font-semibold text-[#5e5c68] mb-2">{g.nome}</p>
+                  {g.itens.length === 0 ? <p className="text-[12px] text-[#898892]">Sem orçamentos com custo do motor salvo.</p> :
+                  <ListaBarras formatoValor={n => `${Math.round(n)}% de fechamento`}
+                    itens={g.itens.map((i, k) => ({ chave: `${g.nome}-${k}`, rotulo: `${i.rotulo}${i.t.total < AMOSTRA_MINIMA ? " (pouca amostra)" : ""}`, qtd: i.t.ganhos, valor: (i.t.taxa ?? 0) * 100, peso: (i.t.taxa ?? 0) * 100, tom: (i.t.taxa ?? 0) >= 0.4 ? "sucesso" as const : (i.t.taxa ?? 0) >= 0.2 ? "acento" as const : "alerta" as const }))} />}
+                </div>
+              ))}
+            </div>
+          </Cartao>
+        )}
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
           <Cartao className="ds-entrada">

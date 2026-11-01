@@ -45,6 +45,8 @@ import { somarDiasUteis, definirFeriadosLocais } from "./lib/diasUteis"
 import { montarPedidos, nomeChave } from "./lib/negocio"
 import { origemDoCliente } from "./lib/coleta"
 import { EditorOrigem } from "./components/EditorOrigem"
+import { PrecoQueFecha } from "./components/PrecoQueFecha"
+import { linhasDeOrcamento } from "./lib/precoQueFecha"
 import { normalizarMetas } from "./lib/metas"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
 import FormaView from "./FormaView"
@@ -367,6 +369,8 @@ export default function Home() {
       ))
     })
   }, [kanban, historico, propostasCustom])
+
+  const linhasOrcamento = useMemo(() => linhasDeOrcamento(kanban, historico), [kanban, historico])
 
   const faturamentoPorCampanha = useMemo(() => {
     const map: Record<string, number> = {}
@@ -2043,7 +2047,7 @@ export default function Home() {
               onAprovacaoOnline={concluirAprovacaoOnline}
             />
           ) : view === "dashboard" ? (
-            <RelatoriosView kanban={kanban} lancamentos={lancamentos} clientes={clientes} origensClientes={config.origensClientes}
+            <RelatoriosView kanban={kanban} lancamentos={lancamentos} clientes={clientes} origensClientes={config.origensClientes} historico={historico}
               onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }} />
           ) : view === "config" ? (
             <ConfigView
@@ -2679,6 +2683,7 @@ export default function Home() {
 
               {/* ── Análise estratégica ── */}
               {r.tabela.length > 0 && <AnaliseEstrategica calculo={r} comFaca={form.comFaca} cliente={form.nomeCliente} />}
+              {r.tabela.length > 0 && <PrecoQueFecha linhas={linhasOrcamento} calculo={r} comFaca={form.comFaca} nomeCliente={form.nomeCliente} kanban={kanban} />}
 
             </div>
               )}

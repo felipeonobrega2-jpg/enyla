@@ -19,6 +19,7 @@ import PortalClient from "@/app/c/[token]/PortalClient"
 import { ClientePerfilModal } from "@/app/components/ClientePerfilModal"
 import { dados, config } from "./dados"
 import { origemDoCliente } from "@/app/lib/coleta"
+import { PrecoQueFecha } from "@/app/components/PrecoQueFecha"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
 // Abas do Financeiro: "financeiro-receber" abre a aba "receber"
@@ -81,6 +82,17 @@ function Telas() {
         origem={origemDoCliente("Ana Cosméticos", cfg.origensClientes, [])}
         onSalvarOrigem={o => setCfg({ ...cfg, origensClientes: o ? { "ana cosmeticos": o } : {} })} />
     case "ideias": return <div style={{ height: "100vh" }}><IdeiasView config={cfg} onSalvar={setCfg} /></div>
+    case "precofecha": {
+      const calc = calcular(dados.historico[3].form, cfg)!
+      const base = dados.kanban[0]
+      const mk = (i: number) => ({
+        card: { ...base, id: `x${i}`, numero: `X-${i}`, nomeCliente: i % 3 ? `Novo ${i}` : "Ana Cosméticos" },
+        desfecho: (i % 5 === 0 ? "ganho" : i % 7 === 0 ? "recusado" : "semResposta") as "ganho" | "recusado" | "semResposta",
+        faixaQtd: (["1a3k", "3a6k", "6k+"] as const)[i % 3], markup: 1.7 + (i % 6) * 0.2, faixaMarkup: null, recorrente: i % 3 === 0, unitario: 1,
+      })
+      const linhas = Array.from({ length: 40 }, (_, i) => mk(i)).map(l => ({ ...l, desfecho: l.recorrente && l.desfecho !== "ganho" ? (l.card.numero.endsWith("3") ? "recusado" as const : "ganho" as const) : l.desfecho }))
+      return <div style={{ padding: 24, background: "#f2f2f7", minHeight: "100vh" }}><PrecoQueFecha linhas={linhas} calculo={calc} comFaca={false} nomeCliente="Ana Cosméticos" kanban={dados.kanban} /></div>
+    }
     case "relatorios": return <div style={{ height: "100vh" }}><RelatoriosView kanban={dados.kanban} lancamentos={lancs} clientes={[]} onAbrirCliente={() => {}}
       origensClientes={{ "ana cosmeticos": { canal: "indicacao", detalhe: "Bruno" }, "bruno perfumes": { canal: "instagram" } }} /></div>
     case "detalhe": {
