@@ -83,6 +83,7 @@ export type Configuracoes = {
   feriados?: import("./lib/diasUteis").ConfigFeriados      // feriados locais nos prazos
   clientesRelacionamento?: ClienteRelacionamento[]         // pagam depois da entrega
   ideias?: Ideia[]                                         // anotações para implementar depois
+  conciliacao?: import("./lib/conciliacao").MemoriaConciliacao  // quem paga por quem e entradas ignoradas
 }
 
 export type StatusIdeia = "ideia" | "andamento" | "feita"
