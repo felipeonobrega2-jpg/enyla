@@ -238,18 +238,37 @@ export type Vendas = {
   /** Receita = valor dos pedidos + sobras vendidas. */
   receita: number
   ticketMedio: number
+  /** Caixas vendidas: itens de produção dos pedidos (revenda fica de fora) + unidades das sobras. */
+  unidades: number
+  unidadesSobras: number
+  /** Valor dos pedidos ÷ caixas dos pedidos (sem sobras). */
+  precoMedioUnidade: number | null
+}
+
+// Quantidade anotada no lançamento de sobra ("Sobra Pedido X · 1548 un. — Cliente")
+export const unidadesDaSobra = (l: LancamentoFinanceiro) => {
+  const m = l.descricao.match(/(\d[\d.]*)\s*un\b/)
+  return m ? parseInt(m[1].replace(/\./g, ""), 10) || 0 : 0
 }
 
 export function vendasDoPeriodo(pedidos: Pedido[], lancamentos: LancamentoFinanceiro[], p: Periodo): Vendas {
   const doPeriodo = pedidos.filter(x => noPeriodo(x.dataFechamento, p))
   const valorPedidos = doPeriodo.reduce((s, x) => s + x.valor, 0)
   const sobras = sobrasNoPeriodo(lancamentos, p)
+  const unidadesPedidos = doPeriodo.reduce((s, x) => s + x.cards.filter(c => !isTerceirizado(c)).reduce((a, c) => a + (c.quantidade || 0), 0), 0)
+  const valorProducao = doPeriodo.reduce((s, x) => s + x.cards.filter(c => !isTerceirizado(c)).reduce((a, c) => a + c.preco, 0), 0)
+  const unidadesSobras = lancamentos
+    .filter(l => l.tipo === "receita" && l.categoria === "sobra" && noPeriodo(l.dataPagamento || l.dataVencimento, p))
+    .reduce((s, l) => s + unidadesDaSobra(l), 0)
   return {
     pedidos: doPeriodo,
     valorPedidos,
     sobras,
     receita: valorPedidos + sobras,
     ticketMedio: doPeriodo.length > 0 ? valorPedidos / doPeriodo.length : 0,
+    unidades: unidadesPedidos + unidadesSobras,
+    unidadesSobras,
+    precoMedioUnidade: unidadesPedidos > 0 ? valorProducao / unidadesPedidos : null,
   }
 }
 

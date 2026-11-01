@@ -1,14 +1,14 @@
 "use client"
 
 import React from "react"
-import { FileDown, TrendingUp, Megaphone, Layers, ArrowUpRight, ArrowDownRight, Minus, CalendarRange } from "lucide-react"
+import { FileDown, TrendingUp, Megaphone, Layers, ArrowUpRight, ArrowDownRight, Minus, CalendarRange, Package } from "lucide-react"
 import { KanbanCard, LancamentoFinanceiro, Cliente } from "../types"
 import {
   Periodo, montarPedidos, vendasDoPeriodo, caixaDoPeriodo, conversao, orcamentosDoPeriodo, margemContribuicao,
   pipelineComercial, noPeriodo, nomeChave, isTerceirizado, recebiveis,
 } from "../lib/negocio"
 import { brl, num } from "../utils"
-import { CabecalhoPagina, Segmentado, Botao, Cartao, TituloCartao, ColunasDuplas, ListaBarras, Vazio } from "./ds"
+import { CabecalhoPagina, Segmentado, Botao, Cartao, TituloCartao, ColunasDuplas, Colunas, ListaBarras, Vazio } from "./ds"
 import { gerarHtmlRelatorio } from "./DashboardView"
 
 // Relatórios: comparações que nenhuma outra tela faz (período × anterior × ano passado),
@@ -99,7 +99,7 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente }
     const mg = margemContribuicao(v.pedidos)
     const novos = [...primeiroPedido.values()].filter(d => noPeriodo(d, p)).length
     return {
-      vendido: v.receita, pedidos: v.pedidos.length, ticket: v.ticketMedio, recebido: cx.recebido, despesas: desp,
+      vendido: v.receita, pedidos: v.pedidos.length, ticket: v.ticketMedio, unidades: v.unidades, precoUnidade: v.precoMedioUnidade, recebido: cx.recebido, despesas: desp,
       caixa: cx.recebido - desp, orcamentos: conv.total, conversao: conv.decididos ? conv.taxa : null, margem: mg.pct, novos,
     }
   }
@@ -108,6 +108,8 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente }
     { nome: "Vendido", formato: brl, valores: [a.vendido, b.vendido, c.vendido] },
     { nome: "Pedidos fechados", formato: n => num(n), valores: [a.pedidos, b.pedidos, c.pedidos] },
     { nome: "Ticket médio", formato: brl, valores: [a.ticket, b.ticket, c.ticket] },
+    { nome: "Unidades vendidas", formato: n => `${num(n)} un`, valores: [a.unidades, b.unidades, c.unidades] },
+    { nome: "Preço médio por unidade", formato: brl, valores: [a.precoUnidade, b.precoUnidade, c.precoUnidade] },
     { nome: "Recebido", formato: brl, valores: [a.recebido, b.recebido, c.recebido] },
     { nome: "Despesas pagas", formato: brl, valores: [a.despesas, b.despesas, c.despesas], menorMelhor: true },
     { nome: "Geração de caixa", formato: brl, valores: [a.caixa, b.caixa, c.caixa] },
@@ -122,7 +124,8 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente }
     const d = new Date(hoje.getFullYear(), hoje.getMonth() - 11 + i, 1)
     const p: Periodo = { from: d, to: new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59) }
     const doMes = pedidos.filter(x => noPeriodo(x.dataFechamento, p))
-    return { rotulo: d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""), a: doMes.reduce((s, x) => s + x.venda, 0), b: doMes.reduce((s, x) => s + x.custoDireto, 0), destaque: i === 11 }
+    return { rotulo: d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""), a: doMes.reduce((s, x) => s + x.venda, 0), b: doMes.reduce((s, x) => s + x.custoDireto, 0), destaque: i === 11,
+      unidades: vendasDoPeriodo(pedidos, lancamentos, p).unidades }
   })
 
   // Origem dos clientes (campanha informada no cadastro) × valor comprado no período
@@ -236,6 +239,12 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente }
           <TituloCartao titulo="Vendido e custo por mês" icone={<TrendingUp className="w-4 h-4" />}
             sub="Pedidos pela data de fechamento; custo = custos diretos lançados nesses pedidos. Passe o mouse para ver a diferença." />
           <ColunasDuplas formato={brl} nomes={["Vendido", "Custo lançado"]} itens={meses} />
+        </Cartao>
+
+        <Cartao className="ds-entrada">
+          <TituloCartao titulo="Unidades vendidas por mês" icone={<Package className="w-4 h-4" />}
+            sub={`Caixas dos pedidos fechados no mês, mais as sobras vendidas · ${num(meses.reduce((s, m) => s + m.unidades, 0))} un em 12 meses`} />
+          <Colunas formato={n => `${num(n)} un`} itens={meses.map(m => ({ rotulo: m.rotulo, valor: m.unidades, destaque: m.destaque }))} />
         </Cartao>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">

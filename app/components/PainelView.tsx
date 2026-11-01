@@ -150,7 +150,7 @@ export function PainelView({
 
   const abrirVendas = () => setDetalhe({
     titulo: `Vendido — ${nomePeriodo}`,
-    sub: `${vendas.pedidos.length} pedidos fechados${vendas.sobras > 0 ? ` + ${brl(vendas.sobras)} em sobras` : ""}`,
+    sub: `${vendas.pedidos.length} pedidos fechados · ${num(vendas.unidades)} caixas${vendas.unidadesSobras ? ` (${num(vendas.unidadesSobras)} de sobras)` : ""}${vendas.sobras > 0 ? ` · ${brl(vendas.sobras)} em sobras` : ""} · ticket ${brl(vendas.ticketMedio)}`,
     linhas: vendas.pedidos.length ? [...vendas.pedidos].sort((a, b) => b.valor - a.valor).map(linhaPedido)
       : <Vazio icone={<TrendingUp className="w-8 h-8" />} titulo="Nenhum pedido fechado no período" />,
     destino: { nome: "Abrir Pedidos", ir: () => onNavegar("pedidos") },
@@ -267,7 +267,7 @@ export function PainelView({
       <GradeKpis>
         <Kpi rotulo="Vendido" icone={<TrendingUp className="w-3.5 h-3.5" />} tom="acento" destaque
           valor={vendas.receita} formato={brlCurto} onClick={abrirVendas}
-          sub={`${vendas.pedidos.length} ${vendas.pedidos.length === 1 ? "pedido" : "pedidos"} · ticket ${brlCurto(vendas.ticketMedio)}`} />
+          sub={`${vendas.pedidos.length} ${vendas.pedidos.length === 1 ? "pedido" : "pedidos"} · ${num(vendas.unidades)} un${vendas.precoMedioUnidade ? ` · ${brl(vendas.precoMedioUnidade)}/un` : ""}`} />
         <Kpi rotulo="Recebido" icone={<Wallet className="w-3.5 h-3.5" />} tom="sucesso"
           valor={caixa.recebido} formato={brlCurto} onClick={abrirCaixa}
           sub={<>{brlCurto(rec.aReceber)} a receber{rec.vencido > 0.5 && <span className="text-[#d33a3c]"> · {`R$ ${num(rec.vencido, 0)}`} vencido</span>}</>} />

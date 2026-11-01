@@ -317,7 +317,7 @@ function Inicio({ saudacao, hoje, periodo, nomePeriodo, pedidos, lancamentos, co
     )}
 
     <div className="grid grid-cols-2 gap-2.5">
-      <Kpi rotulo={`Vendido · ${nomePeriodo}`} valor={curto(vendas.receita)} sub={`${vendas.pedidos.length} pedidos${vendas.sobras > 0 ? ` + sobras` : ""}`} />
+      <Kpi rotulo={`Vendido · ${nomePeriodo}`} valor={curto(vendas.receita)} sub={`${vendas.pedidos.length} pedidos · ${num(vendas.unidades)} un`} />
       <Kpi rotulo={`Recebido · ${nomePeriodo}`} valor={curto(caixa.recebido)} cor={COR.sucesso} sub="entrou no caixa" />
       <Kpi rotulo="Clientes devem" valor={curto(rec.aReceber)} cor={rec.vencido > 0.5 ? COR.perigo : "#191625"}
         sub={rec.vencido > 0.5 ? `${curto(rec.vencido)} vencido` : rec.semCobranca > 0.5 ? `${curto(rec.semCobranca)} sem cobrança` : "tudo em dia"} onClick={() => onAba("cobrancas")} />

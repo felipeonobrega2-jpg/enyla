@@ -55,3 +55,24 @@ describe("pedidos e recebíveis", () => {
     expect(montarPedidos([card({ numero: "O1", preco: 1000, coluna: 0 }), card({ numero: "O2", preco: 1000, coluna: 11 })], [])).toHaveLength(0)
   })
 })
+
+import { vendasDoPeriodo, unidadesDaSobra } from "@/app/lib/negocio"
+
+describe("volume vendido", () => {
+  it("soma as caixas dos pedidos do período e as unidades das sobras; revenda fica de fora", () => {
+    const a = card({ numero: "V1", preco: 6000, quantidade: 3000, coluna: 5, dataFechamento: "2026-10-05" })
+    const b = card({ numero: "V2", preco: 3000, quantidade: 1000, coluna: 9, dataFechamento: "2026-10-20", loteId: "LV", loteNumero: "LV-1" })
+    const revenda = card({ numero: "V3", preco: 500, quantidade: 2000, coluna: 9, dataFechamento: "2026-10-20", loteId: "LV", loteNumero: "LV-1", materialNome: "Terceirizado", isTerceirizado: true })
+    const fora = card({ numero: "V4", preco: 1000, quantidade: 500, coluna: 9, dataFechamento: "2026-09-01" })
+    const sobra = receita({ valor: 650, cardId: b.id, categoria: "sobra", descricao: "Sobra Pedido V2 · 1.548 un. — Cliente", dataPagamento: "2026-10-25", dataVencimento: "2026-10-25" })
+    const pedidos = montarPedidos([a, b, revenda, fora], [sobra])
+    const v = vendasDoPeriodo(pedidos, [sobra], { from: new Date("2026-10-01T00:00:00"), to: new Date("2026-10-31T23:59:59") })
+    expect(v.unidadesSobras).toBe(1548)
+    expect(v.unidades).toBe(3000 + 1000 + 1548)
+    expect(v.precoMedioUnidade).toBeCloseTo(9000 / 4000)
+  })
+  it("lê a quantidade anotada na sobra", () => {
+    expect(unidadesDaSobra(receita({ valor: 1, descricao: "Sobras Lote RAN-003 — Raniere · 1170 un." }))).toBe(1170)
+    expect(unidadesDaSobra(receita({ valor: 1, descricao: "Sobra Pedido X — Cliente" }))).toBe(0)
+  })
+})
