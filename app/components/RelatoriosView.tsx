@@ -13,6 +13,8 @@ import { brl, num } from "../utils"
 import { CabecalhoPagina, Segmentado, Botao, Cartao, TituloCartao, ColunasDuplas, Colunas, ListaBarras, Vazio } from "./ds"
 import { gerarHtmlRelatorio } from "./DashboardView"
 import { PrevisaoCartao } from "./PrevisaoCartao"
+import { SimuladorCartao } from "./SimuladorCartao"
+import { baseDoSimulador } from "../lib/simulador"
 import { previsao } from "../lib/previsao"
 import { ritmoDosClientes } from "../lib/ritmo"
 
@@ -74,7 +76,8 @@ function Delta({ atual, base, menorMelhor }: { atual: number | null; base: numbe
   )
 }
 
-export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, origensClientes, historico = [] }: {
+export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, origensClientes, historico = [], fixosMes = 0 }: {
+  fixosMes?: number
   origensClientes?: OrigensClientes
   historico?: { numero?: string; calculo?: Pick<Calculo, "tabela"> }[]
   kanban: KanbanCard[]
@@ -157,6 +160,7 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, 
     grupo("Preço sobre o custo do motor", (Object.keys(ROTULO_MARKUP) as FaixaMarkup[]).map(f => [ROTULO_MARKUP[f], (l: LinhaOrcamento) => l.faixaMarkup === f])),
   ]
   const geral = taxa(linhasOrc)
+  const baseSim = baseDoSimulador({ pedidos, linhas: linhasOrc, fixosMes, hoje })
   const prev = previsao({ kanban, pedidos, linhas: linhasOrc, ritmos: ritmoDosClientes(pedidos, kanban, hoje), hoje })
 
   // Por que perdemos: orçamentos do período que foram para Perdido, por motivo (os que venceram sem resposta à parte)
@@ -298,6 +302,8 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, 
             </div>
           </Cartao>
         )}
+
+        {baseSim.ticketNovo > 0 && <SimuladorCartao base={baseSim} />}
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
           <Cartao className="ds-entrada">

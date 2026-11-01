@@ -2039,6 +2039,7 @@ export default function Home() {
             />
           ) : view === "dashboard" ? (
             <RelatoriosView kanban={kanban} lancamentos={lancamentos} clientes={clientes} origensClientes={config.origensClientes} historico={historico}
+              fixosMes={(config.gastosFixos ?? []).filter(g => g.ativa !== false).reduce((t, g) => t + g.valor, 0)}
               onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }} />
           ) : view === "config" ? (
             <ConfigView
