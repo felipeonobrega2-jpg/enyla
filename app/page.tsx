@@ -68,7 +68,7 @@ import { GamificacaoView, SidebarGamificacao } from "./components/GamificacaoVie
 import { TerceirizadosView } from "./components/TerceirizadosView"
 import MetaAdsView from "./components/MetaAdsView"
 import BuscaGlobal from "./components/BuscaGlobal"
-import { parseDXF, DXFResult } from "./lib/dxf"
+import { parseDXF, DXFResult, caixaDoDxf } from "./lib/dxf"
 import type { DXFGeo } from "./LayoutChapaVisual"
 
 function unpackTerceirizado(card: KanbanCard): KanbanCard {
@@ -1560,7 +1560,7 @@ export default function Home() {
                   setDxfNome(nome)
                   setDxfGeo({ bounds: result.bounds, paths: result.paths })
                   setForm(p => {
-                    const next = { ...p, blankOverride: { largura: result.largura, altura: result.altura } }
+                    const next = { ...p, blankOverride: { largura: result.largura, altura: result.altura }, caixaDxf: caixaDoDxf(nome, result) }
                     setResult(calcular(next, config))
                     return next
                   })
@@ -1650,9 +1650,14 @@ export default function Home() {
                   <p className="text-[10px] text-[#8E8E93] mt-0.5">
                     Blank: {(form.blankOverride.largura / 10).toFixed(1)} × {(form.blankOverride.altura / 10).toFixed(1)} cm
                   </p>
+                  {form.caixaDxf && (
+                    <p className="text-[10px] text-[#8E8E93] mt-0.5">
+                      Caixa montada: {[form.caixaDxf.largura, form.caixaDxf.altura, form.caixaDxf.profundidade].map(n => (n / 10).toLocaleString("pt-BR", { maximumFractionDigits: 1 })).join(" × ")} cm (L × A × P)
+                    </p>
+                  )}
                 </div>
                 <button type="button"
-                  onClick={() => { setForm(p => { const next = { ...p, blankOverride: null }; setResult(calcular(next, config)); return next }); setDxfNome(null); setDxfGeo(null) }}
+                  onClick={() => { setForm(p => { const next = { ...p, blankOverride: null, caixaDxf: null }; setResult(calcular(next, config)); return next }); setDxfNome(null); setDxfGeo(null) }}
                   className="text-[#8E8E93] hover:text-rose-500 text-sm transition-colors shrink-0 px-1">
                   ✕
                 </button>

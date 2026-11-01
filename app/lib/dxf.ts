@@ -15,7 +15,10 @@ export type DXFResult = {
   source:  "extents" | "scan"
   bounds:  { minX: number; minY: number; maxX: number; maxY: number }
   paths:   DXFPaths
+  caixa:   MedidasCaixa | null   // L × A × P montada, deduzida dos vincos (quando dá)
 }
+
+export type MedidasCaixa = { largura: number; altura: number; profundidade: number }  // mm
 
 // ── Unit conversion ──────────────────────────────────────────────────────────
 
@@ -390,6 +393,7 @@ export function parseDXF(raw: string): DXFResult | null {
   }
 
   return {
+    caixa: medidasPelosVincos(allEntities),
     largura: Math.round(w * 100) / 100,
     altura:  Math.round(h * 100) / 100,
     source,
@@ -400,4 +404,58 @@ export function parseDXF(raw: string): DXFResult | null {
       misc:  pathsByType.misc.join(" "),
     },
   }
+}
+
+// ── Medidas da caixa montada ─────────────────────────────────────────────────
+//
+// Num cartucho, o corpo é uma tira de painéis (frente, lateral, fundo, lateral) separados por vincos
+// paralelos do mesmo comprimento: esse comprimento é a altura, e a distância entre eles alterna
+// largura e profundidade. Procura nos dois sentidos o maior grupo de vincos assim.
+export function medidasPelosVincos(ents: { type: string; layer: string; nums: Map<number, number[]> }[]): MedidasCaixa | null {
+  const linhas = ents.filter(e => e.type === "LINE" && layerType(e.layer) === "fold").map(e => ({
+    x1: num(e as EntityRaw, 10), y1: num(e as EntityRaw, 20), x2: num(e as EntityRaw, 11), y2: num(e as EntityRaw, 21),
+  }))
+  const perto = (a: number, b: number, tol = 1.5) => Math.abs(a - b) <= tol
+  let melhor: { n: number; altura: number; gaps: number[] } | null = null
+  for (const vertical of [true, false]) {
+    const ls = linhas
+      .filter(l => vertical ? perto(l.x1, l.x2, 0.3) : perto(l.y1, l.y2, 0.3))
+      .map(l => vertical
+        ? { pos: l.x1, ini: Math.min(l.y1, l.y2), comp: Math.abs(l.y2 - l.y1) }
+        : { pos: l.y1, ini: Math.min(l.x1, l.x2), comp: Math.abs(l.x2 - l.x1) })
+      .filter(l => l.comp > 5)
+    for (const ref of ls) {
+      const grupo = ls.filter(l => perto(l.comp, ref.comp) && perto(l.ini, ref.ini))
+      const pos = [...new Set(grupo.map(l => Math.round(l.pos * 10) / 10))].sort((a, b) => a - b)
+      if (pos.length < 3) continue
+      const gaps = pos.slice(1).map((p, i) => p - pos[i])
+      if (!melhor || pos.length > melhor.n || (pos.length === melhor.n && ref.comp > melhor.altura)) melhor = { n: pos.length, altura: ref.comp, gaps }
+    }
+  }
+  if (!melhor) return null
+  const [a, b] = melhor.gaps
+  const r = (n: number) => Math.round(n)   // os vincos somam a espessura do papel (85,3 → 85)
+  return { largura: r(Math.max(a, b)), profundidade: r(Math.min(a, b)), altura: r(melhor.altura) }
+}
+
+// Pacdora põe as medidas no nome: "dieline_de_caixa_..._52×32×85_mm.dxf" = L × P × A em mm
+export function medidasPeloNome(nome: string): MedidasCaixa | null {
+  const m = nome.match(/(\d+(?:[.,]\d+)?)\s*[×xX]\s*(\d+(?:[.,]\d+)?)\s*[×xX]\s*(\d+(?:[.,]\d+)?)[\s_]*mm/)
+  if (!m) return null
+  const [l, p, a] = m.slice(1, 4).map(v => parseFloat(v.replace(",", ".")))
+  return l > 0 && p > 0 && a > 0 ? { largura: l, profundidade: p, altura: a } : null
+}
+
+// "dieline_de_caixa_com_fundo_automático_52×32×85_mm.dxf" → "Caixa com fundo automático"
+export function modeloPeloNome(nome: string): string | undefined {
+  const m = nome.normalize("NFC").match(/^(?:dieline|mockup)_de_(.+?)_\d/i)
+  if (!m) return undefined
+  const t = m[1].replace(/_/g, " ").trim()
+  return t.charAt(0).toUpperCase() + t.slice(1)
+}
+
+// Medidas da caixa montada para guardar no orçamento: nome do arquivo primeiro, vincos depois
+export function caixaDoDxf(nome: string, r: DXFResult) {
+  const m = medidasPeloNome(nome.normalize("NFC")) ?? r.caixa
+  return m ? { ...m, modelo: modeloPeloNome(nome) } : null
 }

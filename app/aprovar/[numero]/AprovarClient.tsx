@@ -115,7 +115,7 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
               <div className="bg-white rounded-2xl pt-4 pb-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
                 <Caixa3D {...proposta.caixa} tamanho={150} />
                 <p className="text-center text-[11px] text-[#8E8E93] -mt-2">
-                  {proposta.caixa.largura} × {proposta.caixa.altura} × {proposta.caixa.profundidade} cm · arraste para girar
+                  {[proposta.caixa.largura, proposta.caixa.altura, proposta.caixa.profundidade].map(n => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })).join(" × ")} cm · arraste para girar
                   {!proposta.caixa.arteUrl && " · a arte entra depois da aprovação"}
                 </p>
               </div>

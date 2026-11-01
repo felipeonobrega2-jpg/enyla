@@ -20,6 +20,8 @@ const TIPO_CAIXA: Record<string, string> = {
   simples: "Caixa cartucho", aviao: "Caixa avião", "fundo-automatico": "Caixa com fundo automático", americano: "Caixa fundo americano",
 }
 
+const cm = (mm: number) => (mm / 10).toLocaleString("pt-BR", { maximumFractionDigits: 1 })
+
 function especificar(card: KanbanCard, form?: FormData): string[] {
   if (!form) return [
     card.dimensoes && card.dimensoes !== "0×0×0" ? `Dimensões: ${card.dimensoes}` : null,
@@ -28,8 +30,9 @@ function especificar(card: KanbanCard, form?: FormData): string[] {
     card.acabamentos?.length ? `Acabamentos: ${card.acabamentos.join(", ")}` : null,
   ].filter(Boolean) as string[]
   return [
-    TIPO_CAIXA[form.tipoCaixa] ?? null,
-    form.frente ? `Dimensões: ${form.frente} × ${form.alturaBox} × ${form.lateral} cm (L × A × P)` : null,
+    form.caixaDxf?.modelo ?? (form.blankOverride ? null : TIPO_CAIXA[form.tipoCaixa] ?? null),
+    form.frente ? `Dimensões: ${form.frente} × ${form.alturaBox} × ${form.lateral} cm (L × A × P)`
+      : form.caixaDxf ? `Dimensões: ${[form.caixaDxf.largura, form.caixaDxf.altura, form.caixaDxf.profundidade].map(cm).join(" × ")} cm (L × A × P)` : null,
     form.materialNome ? `Material: ${form.materialNome}` : null,
     form.laminacao && form.laminacaoTipo ? `Laminação ${form.laminacaoTipo.toLowerCase()}` : null,
     form.incluirVerniz && form.vernizTipo ? `Verniz ${form.vernizTipo}` : null,
@@ -54,6 +57,7 @@ export async function carregarProposta(numero: string): Promise<PropostaPublica 
 
   // Caixa 3D: medidas do orçamento (ou do card) e a primeira imagem de arte/mockup do pedido, se houver
   const dims: number[] = form?.frente ? [form.frente, form.alturaBox, form.lateral]
+    : form?.caixaDxf ? [form.caixaDxf.largura / 10, form.caixaDxf.altura / 10, form.caixaDxf.profundidade / 10]
     : (card.dimensoes ?? "").split(/[×x]/).map((n: string) => parseFloat(n.replace(",", ".")))
   const { data: imgs } = await supabase.from("pedido_arquivos").select("url, nome, tipo").eq("card_id", card.id).in("tipo", ["arte", "mockup"])
   const arte = (imgs ?? []).find(a => /\.(png|jpe?g|webp)$/i.test(a.nome ?? a.url))

@@ -31,6 +31,7 @@ export type FormData = {
   qualidades: Record<number, "Digital" | "Offset">
   customPecasChapa: number | null
   blankOverride: { largura: number; altura: number } | null  // mm — importado do DXF Pacdora
+  caixaDxf?: { largura: number; altura: number; profundidade: number; modelo?: string } | null  // mm — caixa montada, do nome do arquivo ou dos vincos
   obsInterna: string
   obsCliente: string
   validadeDias: number

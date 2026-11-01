@@ -51,7 +51,7 @@ function Telas() {
       nomeCliente: "Cliente Teste", sinalPct: cfg.sinalPct ?? 50, validaAte: "2099-12-31", vencida: false, jaAprovado: false,
       especificacoes: ["Caixa cartucho", "Dimensões: 15 × 20 × 8 cm (L × A × P)", "Material: Cartão 300g", "Verniz UV Total"],
       opcoes: [{ quantidade: 1000, preco: 3890, unitario: 3.89 }, { quantidade: 3000, preco: 6540, unitario: 2.18 }],
-      caixa: { largura: 15, altura: 20, profundidade: 8, material: "Cartão 300g", verniz: true }, entregaSeAprovarHoje: "2026-11-24",
+      caixa: { largura: 5.2, altura: 19, profundidade: 5.2, material: "Cartão 300g", verniz: true }, entregaSeAprovarHoje: "2026-11-24",
     }} />
     case "mobile": return <MobilePage />
     case "portal": {

@@ -99,7 +99,7 @@ export function Caixa3D({ largura, altura, profundidade, material, verniz, lamin
       onPointerDown={inicio} onPointerMove={mover} onPointerUp={fim} onPointerCancel={fim}>
       <div style={{ width: W + 2 * D + 60, height: H + 2 * D + 60, perspective: 900, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", cursor: montada ? "grab" : "default" }}>
         {/* Sombra no chão: aparece quando a caixa fecha */}
-        <div style={{ position: "absolute", left: "50%", top: `calc(50% + ${H / 2 + 14}px)`, width: W * 1.3, height: 18, marginLeft: -W * 0.65, borderRadius: "50%", background: "radial-gradient(ellipse, rgba(40,30,80,0.22), rgba(40,30,80,0) 70%)", opacity: montada ? 1 : 0, transition: "opacity 1.3s" }} />
+        <div style={{ position: "absolute", left: "50%", top: `calc(50% + ${H / 2 + 6}px)`, width: W * 1.3, height: 18, marginLeft: -W * 0.65, borderRadius: "50%", background: "radial-gradient(ellipse, rgba(40,30,80,0.22), rgba(40,30,80,0) 70%)", opacity: montada ? 1 : 0, transition: "opacity 1.3s" }} />
         <div style={{
           position: "relative", width: 0, height: 0, transformStyle: "preserve-3d",
           transform: `rotateX(${montada ? rot.x : -8}deg) rotateY(${montada ? rot.y : 0}deg) scale(${montada ? 1 : 0.62})`,
