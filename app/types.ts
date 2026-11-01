@@ -269,6 +269,12 @@ export type PedidoArquivo = {
 }
 
 // Orçamento aprovado pelo cliente na página pública (gravado pelo servidor)
+// Cliente avaliou o pedido entregue pela página dele ("Chegou! Como ficou?")
+export type Avaliacao = { key: string; numero: string; nomeCliente: string; nota: number; comentario?: string; em: string }
+
+// Quando o cliente abriu a proposta (ISO) e quantas vezes
+export type VisitaProposta = { primeira: string; ultima: string; vezes: number }
+
 export type AprovacaoOnline = {
   numero: string
   cardId: string

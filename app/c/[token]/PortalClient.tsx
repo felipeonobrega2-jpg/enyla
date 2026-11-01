@@ -2,13 +2,13 @@
 
 import { useState } from "react"
 import Image from "next/image"
-import { Check, Package, FileImage, Camera, QrCode, CalendarDays, ChevronRight, Truck, RotateCw, X, CircleCheck } from "lucide-react"
+import { Star, Heart, Check, Package, FileImage, Camera, QrCode, CalendarDays, ChevronRight, Truck, RotateCw, X, CircleCheck } from "lucide-react"
 
 type Item = { numero: string; dimensoes: string; material: string; quantidade: number }
 type Arquivo = { id: string; nome: string; url: string; tipo: string; quando: string }
 type PedidoPortal = {
   key: string; numero: string; coluna: number; dataFechamento: string | null; dataEntregaPrevista: string | null; dataEntregaReal: string | null
-  venda: number; recebido: number; aReceber: number; quantidade: number
+  venda: number; recebido: number; aReceber: number; quantidade: number; nota: number | null
   itens: Item[]; etapas: { coluna: number; dataHora: string; tipo: string }[]; arquivos: Arquivo[]
 }
 export type DadosPortal = { nome: string; pedidos: PedidoPortal[] } | null
@@ -141,6 +141,73 @@ function CartaoPedido({ p, nome }: { p: PedidoPortal; nome: string }) {
   )
 }
 
+// "Chegou! Como ficou?": aparece no topo por 30 dias depois da entrega, até o cliente avaliar
+function ComoFicou({ p, token }: { p: PedidoPortal; token: string }) {
+  const [nota, setNota] = useState(0)
+  const [comentario, setComentario] = useState("")
+  const [enviando, setEnviando] = useState(false)
+  const [feito, setFeito] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const fotos = p.arquivos.filter(a => a.tipo === "foto" || a.tipo === "mockup")
+  async function enviar() {
+    setEnviando(true); setErro(null)
+    try {
+      const r = await fetch(`/api/c/${encodeURIComponent(token)}/avaliar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: p.key, nota, comentario }) })
+      if (r.ok) setFeito(true); else setErro((await r.json().catch(() => ({}))).erro ?? "Não deu para enviar agora.")
+    } catch { setErro("Sem conexão. Tente de novo.") }
+    setEnviando(false)
+  }
+  const rotulos = ["", "Não gostei", "Poderia ser melhor", "Ficou bom", "Ficou ótimo", "Amei!"]
+  return (
+    <div className="relative overflow-hidden rounded-2xl text-white shadow-[0_8px_24px_rgba(132,86,232,0.25)] animate-[apple-slide-up_.4s_ease-out]" style={{ background: "linear-gradient(135deg,#8456e8,#5b34c2)" }}>
+      <div className="relative p-5 space-y-4">
+        {feito ? (
+          <div className="text-center py-3 space-y-2 animate-[apple-slide-up_.3s_ease-out]">
+            <div className="w-14 h-14 rounded-full bg-white/15 grid place-items-center mx-auto"><Heart className="w-7 h-7 fill-white" /></div>
+            <p className="text-[18px] font-bold">Obrigado!</p>
+            <p className="text-[13.5px] text-white/80">{nota >= 4 ? "Ficamos muito felizes. Quando precisar de mais, é só tocar em Repetir." : "Obrigado pela sinceridade. Vamos olhar com carinho e falar com você."}</p>
+          </div>
+        ) : <>
+          <div>
+            <p className="text-[12px] font-semibold text-white/70 uppercase tracking-wide">{p.numero} · entregue{p.dataEntregaReal ? ` em ${curta(p.dataEntregaReal)}` : ""}</p>
+            <p className="text-[22px] font-bold tracking-[-0.02em] mt-0.5">Chegou! Como ficou?</p>
+            <p className="text-[13px] text-white/80">{num(p.quantidade)} embalagens. Conta pra gente o que achou.</p>
+          </div>
+          {fotos.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto -mx-1 px-1 [&::-webkit-scrollbar]:hidden">
+              {fotos.slice(-4).reverse().map(f => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={f.id} src={f.url} alt="" className="w-20 h-20 rounded-xl object-cover bg-white/10 shrink-0" />
+              ))}
+            </div>
+          )}
+          <div>
+            <div className="flex gap-1.5" role="radiogroup" aria-label="Nota">
+              {[1, 2, 3, 4, 5].map(n => (
+                <button key={n} onClick={() => setNota(n)} role="radio" aria-checked={nota === n} aria-label={`${n} de 5`}
+                  className="w-11 h-11 rounded-xl grid place-items-center bg-white/10 active:scale-90 transition-transform">
+                  <Star className={`w-6 h-6 transition-all duration-200 ${n <= nota ? "scale-110" : ""}`} style={n <= nota ? { fill: "#ffd34d", color: "#ffd34d" } : { color: "rgba(255,255,255,0.55)" }} />
+                </button>
+              ))}
+            </div>
+            <p className="text-[12.5px] text-white/80 mt-1.5 h-4">{rotulos[nota]}</p>
+          </div>
+          {nota > 0 && <>
+            <textarea value={comentario} onChange={e => setComentario(e.target.value)} rows={2} maxLength={600}
+              placeholder={nota >= 4 ? "Quer deixar um recado? (opcional)" : "O que podemos melhorar? (opcional)"}
+              className="w-full rounded-xl px-3.5 py-2.5 text-[14px] bg-white text-[#191625] placeholder:text-[#8E8E93] focus:outline-none animate-[apple-slide-up_.25s_ease-out]" />
+            {erro && <p className="text-[13px] text-[#ffd0d0]">{erro}</p>}
+            <button onClick={enviar} disabled={enviando}
+              className="h-11 w-full rounded-xl bg-white font-semibold text-[14.5px] disabled:opacity-60 active:scale-[0.98] transition-transform" style={{ color: "#5b34c2" }}>
+              {enviando ? "Enviando…" : "Enviar"}
+            </button>
+          </>}
+        </>}
+      </div>
+    </div>
+  )
+}
+
 // Repetir um pedido: mesma quantidade sai pelo mesmo preço; outra quantidade vai para orçamento
 function FolhaRepetir({ p, token, onFechar }: { p: PedidoPortal; token: string; onFechar: () => void }) {
   const [outra, setOutra] = useState(false)
@@ -226,6 +293,9 @@ export default function PortalClient({ dados, token }: { dados: DadosPortal; tok
     )
   }
   const andamento = dados.pedidos.filter(p => p.coluna >= 1 && p.coluna < 9)
+  const hojeMs = Date.now()
+  const paraAvaliar = dados.pedidos.filter(p => p.coluna === 9 && p.nota == null && p.dataEntregaReal
+    && hojeMs - new Date(p.dataEntregaReal.slice(0, 10) + "T12:00:00").getTime() <= 30 * 86_400_000)
   const entregues = dados.pedidos.filter(p => p.coluna === 9)
   const primeiro = dados.nome.split(" ")[0]
   return (
@@ -240,6 +310,8 @@ export default function PortalClient({ dados, token }: { dados: DadosPortal; tok
           <p className="text-[24px] font-bold text-[#191625] tracking-[-0.02em]">Olá, {primeiro}!</p>
           <p className="text-[14px] text-[#8E8E93]">{andamento.length ? `${andamento.length} ${andamento.length === 1 ? "pedido em andamento" : "pedidos em andamento"}` : "Seus pedidos com a Enyla"}</p>
         </div>
+
+        {paraAvaliar.slice(0, 1).map(p => <ComoFicou key={p.key} p={p} token={token} />)}
 
         {andamento.map(p => <CartaoPedido key={p.key} p={p} nome={dados.nome} />)}
 

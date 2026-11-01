@@ -9,6 +9,7 @@ import { normalizarProducao } from "./producao"
 export type TipoPendencia =
   | "aprovado" | "atrasado" | "fornecedor" | "cobrancaVencida" | "semCobranca"
   | "conferir" | "entregaProxima" | "orcamentoVencendo" | "semPrazo"
+  | "abriuProposta" | "comoFicou" | "avaliado"
 
 export type Pendencia = {
   id: string
@@ -77,6 +78,30 @@ export function pendencias(args: {
     .filter((x): x is { card: KanbanCard; dias: number } => !!x && x.dias >= 0 && x.dias <= 3)
     .sort((a, b) => a.dias - b.dias)
 
+  // Cliente abriu a proposta nos últimos 3 dias: bom momento para chamar (substitui o "vencendo" do mesmo orçamento)
+  const quandoFoi = (iso: string) => {
+    const d = new Date(iso)
+    const hora = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })
+    const dia = d.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
+    const ontem = new Date(hoje.getTime() - 86_400_000).toLocaleDateString("sv-SE")
+    return dia === hojeIso ? `hoje às ${hora}` : dia === ontem ? `ontem às ${hora}` : `${dataCurta(dia)} às ${hora}`
+  }
+  const abriram = kanban
+    .filter(c => (c.coluna === 0 || c.coluna === COL_HOT) && !isTerceirizado(c) && c.numero)
+    .map(c => ({ card: c, visita: config.visitasProposta?.[c.numero] }))
+    .filter((x): x is { card: KanbanCard; visita: NonNullable<typeof x.visita> } => !!x.visita && hoje.getTime() - new Date(x.visita.ultima).getTime() <= 3 * 86_400_000)
+    .sort((a, b) => b.visita.ultima.localeCompare(a.visita.ultima))
+  const abriuIds = new Set(abriram.map(x => x.card.id))
+
+  // Entregue há 1 a 7 dias e ainda sem avaliação: pedir o "Como ficou?"
+  const avaliacoes = config.avaliacoes ?? []
+  const pedirAvaliacao = pedidos.filter(p => {
+    if (!pedidoEntregue(p) || !p.dataEntregaReal || avaliacoes.some(a => a.key === p.key)) return false
+    const d = -diasAte(p.dataEntregaReal, hoje)
+    return d >= 1 && d <= 7
+  })
+  const avaliadosRecentes = avaliacoes.filter(a => hoje.getTime() - new Date(a.em).getTime() <= 3 * 86_400_000)
+
   // Só enquanto o pedido continua fechado (voltar para orçamento desfaz a aprovação)
   // Cliente de relacionamento: só cobra depois dos dias combinados após a entrega
   const dentroDoPrazoCombinado = (p: Pedido) => {
@@ -99,6 +124,19 @@ export function pendencias(args: {
         : a.tipo === "recompra_qtd" ? `quer repetir ${a.pedidoOrigem} com ${a.quantidade.toLocaleString("pt-BR")} un · faça o orçamento`
         : `aprovado online por ${a.aprovadoPor} · ${a.quantidade.toLocaleString("pt-BR")} un · ${new Date(a.em).toLocaleDateString("pt-BR")}`,
       valor: a.preco || undefined, card: kanban.find(k => k.id === a.cardId),
+    })),
+    ...avaliadosRecentes.map(a => ({
+      id: `aval-${a.key}`, tipo: "avaliado" as const, tom: a.nota >= 4 ? "sucesso" as const : "alerta" as const,
+      titulo: `${a.numero} · ${a.nomeCliente}`,
+      sub: `avaliou com nota ${a.nota} de 5${a.comentario ? ` · “${a.comentario.length > 70 ? a.comentario.slice(0, 70) + "…" : a.comentario}”` : ""}`,
+      card: kanban.find(k => k.numero === a.numero),
+    })),
+    ...abriram.map(({ card, visita }) => ({
+      id: `vis-${card.id}`, tipo: "abriuProposta" as const, tom: "info" as const,
+      titulo: `${card.numero} · ${card.nomeCliente}`,
+      sub: `abriu a proposta ${quandoFoi(visita.ultima)}${visita.vezes > 1 ? ` · ${visita.vezes} vezes` : ""} · bom momento para chamar`,
+      valor: card.preco, card,
+      whatsapp: linkWhatsApp(telefoneDe(card.nomeCliente), `Olá! Tudo bem? Passando para saber se conseguiu ver a proposta ${card.numero}. Ficou alguma dúvida sobre quantidade ou acabamento? Posso te ajudar a escolher.`),
     })),
     ...prod.atrasados.map(p => ({
       id: `atr-${p.key}`, tipo: "atrasado" as const, tom: "perigo" as const,
@@ -140,7 +178,17 @@ export function pendencias(args: {
       titulo: `${p.numero} · ${p.nomeCliente}`, sub: `${prazoTexto(p.dataEntregaPrevista, hoje)} · ${p.etapa}`,
       valor: p.valor, card: cardDoPedido(p),
     })),
-    ...vencendo.map(({ card, dias }) => ({
+    ...pedirAvaliacao.map(p => {
+      const c = cardDoPedido(p)
+      const tel = telefoneDe(p.nomeCliente)
+      return {
+        id: `cf-${p.key}`, tipo: "comoFicou" as const, tom: "info" as const,
+        titulo: `${p.numero} · ${p.nomeCliente}`, sub: `entregue ${dataCurta(p.dataEntregaReal)} · pergunte como ficou`,
+        card: c,
+        whatsapp: `/api/cliente/whatsapp?modelo=como-ficou&nome=${encodeURIComponent(p.nomeCliente)}&numero=${encodeURIComponent(p.numero)}${tel ? `&tel=${encodeURIComponent(tel)}` : ""}`,
+      }
+    }),
+    ...vencendo.filter(v => !abriuIds.has(v.card.id)).map(({ card, dias }) => ({
       id: `orc-${card.id}`, tipo: "orcamentoVencendo" as const, tom: "alerta" as const,
       titulo: `${card.numero} · ${card.nomeCliente}`,
       sub: `orçamento ${dias === 0 ? "vence hoje" : dias === 1 ? "vence amanhã" : `vence em ${dias} dias`} sem resposta`,

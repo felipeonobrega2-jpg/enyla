@@ -28,4 +28,24 @@ describe("Precisa de você", () => {
     const antigo = card({ numero: "MAU-V", nomeCliente: "Maurício", preco: 260, coluna: 9, dataEntregaReal: "2026-09-01" })
     expect(roda([antigo], rel).some(p => p.tipo === "semCobranca")).toBe(true)
   })
+
+  it("cliente abriu a proposta: aparece por 3 dias e no lugar do 'vencendo'", () => {
+    const c = card({ numero: "ORC-V", preco: 3890, coluna: 0, data: "01/11/2026, 10:00:00" })
+    const visita = (ultima: string) => config({ visitasProposta: { "ORC-V": { primeira: ultima, ultima, vezes: 2 } } })
+    const r = roda([c], visita("2026-11-02T13:10:00Z"))
+    expect(r.find(p => p.tipo === "abriuProposta")?.sub).toMatch(/hoje às 10:10 · 2 vezes/)
+    expect(r.some(p => p.tipo === "orcamentoVencendo")).toBe(false)
+    expect(roda([c], visita("2026-10-28T13:00:00Z")).some(p => p.tipo === "abriuProposta")).toBe(false)
+  })
+  it("entregue há poucos dias e sem avaliação: pedir o 'Como ficou?'", () => {
+    const c = card({ numero: "ANA-1", preco: 3000, coluna: 9, dataEntregaReal: "2026-10-30" })
+    const r = roda([c])
+    expect(r.find(p => p.tipo === "comoFicou")?.whatsapp).toMatch(/^\/api\/cliente\/whatsapp\?modelo=como-ficou/)
+    const key = montarPedidos([c], [])[0].key
+    const avaliado = config({ avaliacoes: [{ key, numero: "ANA-1", nomeCliente: "Cliente Teste", nota: 5, em: "2026-11-01T12:00:00Z" }] })
+    const r2 = roda([c], avaliado)
+    expect(r2.some(p => p.tipo === "comoFicou")).toBe(false)
+    expect(r2.find(p => p.tipo === "avaliado")?.tom).toBe("sucesso")
+    expect(roda([card({ numero: "ANA-2", preco: 3000, coluna: 9, dataEntregaReal: "2026-10-10" })]).some(p => p.tipo === "comoFicou")).toBe(false)
+  })
 })

@@ -7,21 +7,26 @@ import { auth } from "@/auth"
 import { somarDiasUteis, definirFeriadosLocais } from "@/app/lib/diasUteis"
 import { normalizarProducao } from "@/app/lib/producao"
 import { CONFIG_PADRAO } from "@/app/config"
+import type { VisitaProposta } from "@/app/types"
 
-// Registra que o cliente abriu a proposta (não quando é a Enyla logada; no máximo uma vez a cada 30 min)
+// Registra que o cliente abriu a proposta (não quando é a Enyla logada; no máximo uma vez a cada 30 min):
+// conta em config.visitasProposta (o Painel avisa) e deixa a marca no rastreio do pedido
 async function registrarVisita(numero: string) {
+  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const cfg = (cfgRow?.data ?? {}) as Record<string, unknown>
+  const visitas = { ...((cfg.visitasProposta as Record<string, VisitaProposta> | undefined) ?? {}) }
+  const agora = new Date()
+  const v = visitas[numero]
+  if (v && agora.getTime() - new Date(v.ultima).getTime() < 30 * 60_000) return
+  visitas[numero] = { primeira: v?.primeira ?? agora.toISOString(), ultima: agora.toISOString(), vezes: (v?.vezes ?? 0) + 1 }
+  // Esquece visitas de mais de 60 dias
+  for (const [n, x] of Object.entries(visitas)) if (agora.getTime() - new Date(x.ultima).getTime() > 60 * 86_400_000) delete visitas[n]
+  await supabase.from("AppConfig").update({ data: { ...cfg, visitasProposta: visitas } }).eq("id", 1)
+
   const { data: t } = await supabase.from("Tracking").select("etapas, colunaAtual").eq("numero", numero).maybeSingle()
   if (!t) return
-  const etapas = (t.etapas ?? []) as { tipo?: string; dataHora: string; coluna: number }[]
-  const ultima = [...etapas].reverse().find(e => e.tipo === "visualizacao")
-  const agora = new Date()
-  if (ultima) {
-    const [d, m, rest] = ultima.dataHora.split("/"); const [y, hm] = (rest ?? "").split(", ")
-    const quando = new Date(`${y}-${m}-${d}T${hm ?? "00:00:00"}-03:00`)
-    if (agora.getTime() - quando.getTime() < 30 * 60_000) return
-  }
   const dataHora = agora.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
-  await supabase.from("Tracking").update({ etapas: [...etapas, { coluna: t.colunaAtual ?? 0, nome: "Cliente abriu a proposta", dataHora, tipo: "visualizacao" }] }).eq("numero", numero)
+  await supabase.from("Tracking").update({ etapas: [...(t.etapas ?? []), { coluna: t.colunaAtual ?? 0, nome: "Cliente abriu a proposta", dataHora, tipo: "visualizacao" }] }).eq("numero", numero)
 }
 
 export const dynamic = "force-dynamic"

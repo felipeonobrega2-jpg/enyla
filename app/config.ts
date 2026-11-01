@@ -78,6 +78,8 @@ export type Configuracoes = {
   producao: ConfigProducao
   metas: ConfigMetas
   aprovacoesOnline?: import("./types").AprovacaoOnline[]   // gravado pelo servidor
+  avaliacoes?: import("./types").Avaliacao[]                // gravado pelo servidor (página do cliente)
+  visitasProposta?: Record<string, import("./types").VisitaProposta>  // gravado pelo servidor (link de aprovação)
   caixa?: import("./lib/caixa").ConfigCaixa                // pagamentos planejados das contas de fornecedor
   sinalPct?: number                                        // sinal pedido na aprovação online (%)
   feriados?: import("./lib/diasUteis").ConfigFeriados      // feriados locais nos prazos
