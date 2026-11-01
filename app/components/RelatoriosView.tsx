@@ -12,6 +12,9 @@ import {
 import { brl, num } from "../utils"
 import { CabecalhoPagina, Segmentado, Botao, Cartao, TituloCartao, ColunasDuplas, Colunas, ListaBarras, Vazio } from "./ds"
 import { gerarHtmlRelatorio } from "./DashboardView"
+import { PrevisaoCartao } from "./PrevisaoCartao"
+import { previsao } from "../lib/previsao"
+import { ritmoDosClientes } from "../lib/ritmo"
 
 // Relatórios: comparações que nenhuma outra tela faz (período × anterior × ano passado),
 // evolução mensal de venda e custo, origem dos clientes e materiais. Números de lib/negocio.
@@ -154,6 +157,7 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, 
     grupo("Preço sobre o custo do motor", (Object.keys(ROTULO_MARKUP) as FaixaMarkup[]).map(f => [ROTULO_MARKUP[f], (l: LinhaOrcamento) => l.faixaMarkup === f])),
   ]
   const geral = taxa(linhasOrc)
+  const prev = previsao({ kanban, pedidos, linhas: linhasOrc, ritmos: ritmoDosClientes(pedidos, kanban, hoje), hoje })
 
   // Por que perdemos: orçamentos do período que foram para Perdido, por motivo (os que venceram sem resposta à parte)
   const porMotivo = new Map<CategoriaPerda, { qtd: number; valor: number }>()
@@ -226,6 +230,8 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, 
             <Botao variante="secundario" icone={<FileDown className="w-4 h-4" />} onClick={abrirPdf}>Relatório em PDF</Botao>
           </>}
         />
+
+        <PrevisaoCartao p={prev} onAbrirCliente={onAbrirCliente} />
 
         <Cartao padding={false} className="ds-entrada">
           <div className="px-5 pt-5">
