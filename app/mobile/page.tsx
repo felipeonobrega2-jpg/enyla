@@ -73,7 +73,7 @@ function Titulo({ children, extra }: { children: React.ReactNode; extra?: React.
   )
 }
 
-function Kpi({ rotulo, valor, sub, cor = "#191625", onClick, compacto }: { rotulo: string; valor: string; sub?: string; cor?: string; onClick?: () => void; compacto?: boolean }) {
+function Kpi({ rotulo, valor, sub, cor = "var(--text-main)", onClick, compacto }: { rotulo: string; valor: string; sub?: string; cor?: string; onClick?: () => void; compacto?: boolean }) {
   const Comp = onClick ? "button" : "div"
   return (
     <Comp onClick={onClick} className="bg-white rounded-2xl p-3.5 text-left shadow-[0_1px_3px_rgba(0,0,0,0.04)] active:scale-[0.98] transition-transform">
@@ -91,7 +91,7 @@ function Linha({ titulo, sub, valor, valorSub, tom, icone, onClick, acao }: {
   return (
     <div className="flex items-center gap-3 px-4 py-3 active:bg-[rgba(116,116,128,0.06)] transition-colors">
       {icone && (
-        <span className="w-8 h-8 rounded-xl grid place-items-center shrink-0" style={{ color: tom ? COR[tom] : "#5e5c68", background: tom ? `${COR[tom]}14` : "rgba(116,116,128,0.08)" }}>{icone}</span>
+        <span className="w-8 h-8 rounded-xl grid place-items-center shrink-0" style={{ color: tom ? COR[tom] : "var(--text-sub)", background: tom ? `${COR[tom]}14` : "rgba(116,116,128,0.08)" }}>{icone}</span>
       )}
       <button onClick={onClick} disabled={!onClick} className="flex-1 min-w-0 text-left flex items-center gap-3">
         <span className="flex-1 min-w-0">
@@ -100,7 +100,7 @@ function Linha({ titulo, sub, valor, valorSub, tom, icone, onClick, acao }: {
         </span>
         {valor && (
           <span className="text-right shrink-0">
-            <span className="block text-[13.5px] font-semibold ds-num" style={{ color: tom && tom !== "info" ? COR[tom] : "#191625" }}>{valor}</span>
+            <span className="block text-[13.5px] font-semibold ds-num" style={{ color: tom && tom !== "info" ? COR[tom] : "var(--text-main)" }}>{valor}</span>
             {valorSub && <span className="block text-[10.5px] text-[#8E8E93]">{valorSub}</span>}
           </span>
         )}
@@ -210,7 +210,7 @@ export default function MobilePage() {
           <div className="flex gap-1.5 overflow-x-auto pb-2.5 -mx-1 px-1 [&::-webkit-scrollbar]:hidden">
             {PERIODOS.map(p => (
               <button key={p.v} onClick={() => setPeriodoId(p.v)}
-                className={`shrink-0 text-[12px] font-medium px-3.5 h-8 rounded-full transition-colors ${periodoId === p.v ? "bg-[#191625] text-white" : "bg-[rgba(116,116,128,0.1)] text-[#5e5c68]"}`}>{p.nome}</button>
+                className={`shrink-0 text-[12px] font-medium px-3.5 h-8 rounded-full transition-colors ${periodoId === p.v ? "bg-[var(--text-main)] text-[var(--bg-page)]" : "bg-[rgba(116,116,128,0.1)] text-[#5e5c68]"}`}>{p.nome}</button>
             ))}
           </div>
         )}
@@ -321,7 +321,7 @@ function Inicio({ saudacao, hoje, periodo, nomePeriodo, pedidos, lancamentos, co
     <div className="grid grid-cols-2 gap-2.5">
       <Kpi rotulo={`Vendido · ${nomePeriodo}`} valor={curto(vendas.receita)} sub={`${vendas.pedidos.length} pedidos · ${num(vendas.unidades)} un`} />
       <Kpi rotulo={`Recebido · ${nomePeriodo}`} valor={curto(caixa.recebido)} cor={COR.sucesso} sub="entrou no caixa" />
-      <Kpi rotulo="Clientes devem" valor={curto(rec.aReceber)} cor={rec.vencido > 0.5 ? COR.perigo : "#191625"}
+      <Kpi rotulo="Clientes devem" valor={curto(rec.aReceber)} cor={rec.vencido > 0.5 ? COR.perigo : "var(--text-main)"}
         sub={rec.vencido > 0.5 ? `${curto(rec.vencido)} vencido` : rec.semCobranca > 0.5 ? `${curto(rec.semCobranca)} sem cobrança` : "tudo em dia"} onClick={() => onAba("cobrancas")} />
       <Kpi rotulo="Margem" valor={margem.pct == null ? "—" : `${num(margem.pct, 1)}%`}
         cor={margem.pct == null ? "#8E8E93" : margem.pct >= 45 ? COR.sucesso : margem.pct >= 30 ? COR.alerta : COR.perigo}
@@ -368,8 +368,8 @@ function Cobrancas({ rec, telefoneDe, onAbrir }: {
   return <>
     <div className="grid grid-cols-3 gap-2.5">
       <Kpi compacto rotulo="A receber" valor={curto(rec.aReceber)} />
-      <Kpi compacto rotulo="Vencido" valor={curto(rec.vencido)} cor={rec.vencido > 0.5 ? COR.perigo : "#191625"} />
-      <Kpi compacto rotulo="Sem cobrança" valor={curto(rec.semCobranca)} cor={rec.semCobranca > 0.5 ? COR.alerta : "#191625"} />
+      <Kpi compacto rotulo="Vencido" valor={curto(rec.vencido)} cor={rec.vencido > 0.5 ? COR.perigo : "var(--text-main)"} />
+      <Kpi compacto rotulo="Sem cobrança" valor={curto(rec.semCobranca)} cor={rec.semCobranca > 0.5 ? COR.alerta : "var(--text-main)"} />
     </div>
 
     <div>
@@ -423,8 +423,8 @@ function Producao({ pedidos, config, hoje, onAbrir }: { pedidos: Pedido[]; confi
   return <>
     <div className="grid grid-cols-3 gap-2.5">
       <Kpi compacto rotulo="Em produção" valor={String(prod.emProducao.length)} sub={curto(prod.valorEmProducao)} />
-      <Kpi compacto rotulo="Atrasados" valor={String(prod.atrasados.length)} cor={prod.atrasados.length ? COR.perigo : "#191625"} />
-      <Kpi compacto rotulo="Em 3 dias" valor={String(prod.vencendo3d.length)} cor={prod.vencendo3d.length ? COR.alerta : "#191625"} />
+      <Kpi compacto rotulo="Atrasados" valor={String(prod.atrasados.length)} cor={prod.atrasados.length ? COR.perigo : "var(--text-main)"} />
+      <Kpi compacto rotulo="Em 3 dias" valor={String(prod.vencendo3d.length)} cor={prod.vencendo3d.length ? COR.alerta : "var(--text-main)"} />
     </div>
 
     {prod.porEtapa.length > 0 && (
