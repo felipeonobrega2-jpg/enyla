@@ -4,8 +4,11 @@ import { supabase } from "./supabase"
 import { validaAte } from "./aprovacao"
 import { KanbanCard, KanbanOpcao, FormData } from "../types"
 
+export type CaixaProposta = { largura: number; altura: number; profundidade: number; material?: string; verniz?: boolean; laminacao?: string | null; arteUrl?: string | null }
+
 export type PropostaPublica = {
   card: KanbanCard
+  caixa: CaixaProposta | null
   opcoes: KanbanOpcao[]
   especificacoes: string[]
   observacao?: string
@@ -48,9 +51,19 @@ export async function carregarProposta(numero: string): Promise<PropostaPublica 
   opcoes.sort((a, b) => a.quantidade - b.quantidade)
 
   const limite = validaAte(card.data ?? card.createdAt, form?.validadeDias ?? 15)
+
+  // Caixa 3D: medidas do orçamento (ou do card) e a primeira imagem de arte/mockup do pedido, se houver
+  const dims: number[] = form?.frente ? [form.frente, form.alturaBox, form.lateral]
+    : (card.dimensoes ?? "").split(/[×x]/).map((n: string) => parseFloat(n.replace(",", ".")))
+  const { data: imgs } = await supabase.from("pedido_arquivos").select("url, nome, tipo").eq("card_id", card.id).in("tipo", ["arte", "mockup"])
+  const arte = (imgs ?? []).find(a => /\.(png|jpe?g|webp)$/i.test(a.nome ?? a.url))
+  const caixa = dims.length === 3 && dims.every(n => n > 0) ? {
+    largura: dims[0], altura: dims[1], profundidade: dims[2], material: form?.materialNome ?? card.materialNome,
+    verniz: !!form?.incluirVerniz, laminacao: form?.laminacao ? form.laminacaoTipo : null, arteUrl: arte?.url ?? null,
+  } : null
   const hoje = new Date().toLocaleDateString("sv-SE")
   return {
-    card: card as KanbanCard, opcoes, especificacoes: especificar(card as KanbanCard, form),
+    card: card as KanbanCard, caixa, opcoes, especificacoes: especificar(card as KanbanCard, form),
     observacao: form?.obsCliente || undefined,
     validaAte: limite, vencida: !!limite && hoje > limite,
   }

@@ -1164,7 +1164,7 @@ export default function Home() {
       form.obsCliente ? `\n📝 ${form.obsCliente}` : null,
       ``,
       `⏳ Proposta válida por ${form.validadeDias} dias.`,
-      aprovar ? `\n✅ *Para aprovar online:* ${aprovar}` : null,
+      aprovar ? `\n👉 *Veja sua proposta em 3D e aprove:* ${aprovar}` : null,
       ``,
       `Qualquer dúvida, é só falar! 😊`,
     ].filter(l => l !== null).join("\n")

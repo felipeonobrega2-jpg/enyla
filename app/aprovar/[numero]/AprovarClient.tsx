@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import Image from "next/image"
-import { Check, CircleCheck, Clock, FileText, QrCode, Truck, AlertCircle } from "lucide-react"
+import { Check, CircleCheck, Clock, FileText, QrCode, Truck, AlertCircle, CalendarCheck } from "lucide-react"
+import { Caixa3D } from "@/app/components/Caixa3D"
 
 type Opcao = { quantidade: number; preco: number; unitario: number }
 type Proposta = {
@@ -14,6 +15,8 @@ type Proposta = {
   vencida: boolean
   jaAprovado: boolean
   sinalPct: number
+  caixa?: { largura: number; altura: number; profundidade: number; material?: string; verniz?: boolean; laminacao?: string | null; arteUrl?: string | null } | null
+  entregaSeAprovarHoje?: string | null
 }
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -108,8 +111,18 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
               <p className="text-sm text-[#8E8E93] mt-0.5">Confira a proposta e aprove em poucos segundos.</p>
             </div>
 
+            {proposta.caixa && (
+              <div className="bg-white rounded-2xl pt-4 pb-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+                <Caixa3D {...proposta.caixa} tamanho={150} />
+                <p className="text-center text-[11px] text-[#8E8E93] -mt-2">
+                  {proposta.caixa.largura} × {proposta.caixa.altura} × {proposta.caixa.profundidade} cm · arraste para girar
+                  {!proposta.caixa.arteUrl && " · a arte entra depois da aprovação"}
+                </p>
+              </div>
+            )}
+
             <div className="bg-white rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8E8E93] flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Embalagem personalizada</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8E8E93] flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> O que está incluso</p>
               <ul className="mt-3 space-y-1.5">
                 {proposta.especificacoes.map(e => (
                   <li key={e} className="text-[13.5px] text-[#191625] flex items-start gap-2"><Check className="w-4 h-4 text-[#8456e8] mt-0.5 shrink-0" />{e}</li>
@@ -131,6 +144,12 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
                     <span className="flex-1 min-w-0">
                       <span className="block text-[16px] font-semibold text-[#191625] ds-num">{num(o.quantidade)} unidades</span>
                       <span className="block text-[12.5px] text-[#8E8E93] ds-num">{brl(o.unitario || o.preco / o.quantidade)} por unidade</span>
+                      {(() => {
+                        // Economia por unidade em relação à menor quantidade
+                        const menor = proposta.opcoes[0], uMenor = menor.unitario || menor.preco / menor.quantidade, u = o.unitario || o.preco / o.quantidade
+                        const pct = uMenor > 0 ? (1 - u / uMenor) * 100 : 0
+                        return o !== menor && pct >= 1 ? <span className="block text-[11.5px] font-medium text-[#009351]">{Math.round(pct)}% mais barato por unidade</span> : null
+                      })()}
                     </span>
                     <span className="text-[17px] font-bold text-[#191625] ds-num">{brl(o.preco)}</span>
                   </button>
@@ -155,6 +174,9 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
                 className="h-12 w-full rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-all disabled:opacity-35 disabled:cursor-not-allowed">
                 {enviando ? "Aprovando…" : <><Check className="w-5 h-5" /> Aprovar pedido</>}
               </button>
+              {proposta.entregaSeAprovarHoje && (
+                <p className="text-[12.5px] text-[#191625] text-center flex items-center justify-center gap-1.5"><CalendarCheck className="w-4 h-4 text-[#8456e8]" />Aprovando hoje, entrega prevista até <strong>{dataBR(proposta.entregaSeAprovarHoje)}</strong></p>
+              )}
               {proposta.validaAte && <p className="text-[12px] text-[#8E8E93] text-center">Proposta válida até {dataBR(proposta.validaAte)}</p>}
             </div>
           </>
