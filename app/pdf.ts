@@ -210,6 +210,63 @@ const LOGO_LIGHT_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABTcAAAFICA
 function estiloPropostaCliente(): string {
   return `
     *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{font-family:system-ui,-apple-system,sans-serif;font-size:11.5px;color:#1e293b;background:#fff}
+    .page{padding:30px 38px;min-height:100vh}
+    .page-break{break-before:page;page-break-before:always}
+
+    .doc-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:10px;border-bottom:2px solid #5009c4;margin-bottom:16px}
+    .doc-header .titulo{font-size:13px;font-weight:800;color:#0f172a;text-align:right}
+    .doc-header .titulo span{color:#64748b;font-weight:500}
+
+    .client-row{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:6px;font-size:11.5px}
+    .client-row .bloco{line-height:1.6}
+    .client-row .lbl{font-weight:700;color:#0f172a}
+    .client-row .val{color:#334155}
+
+    .section-bar{background:#5009c4;color:#fff;font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;text-align:center;padding:5px 0;margin:16px 0 9px}
+
+    .kv-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 24px;font-size:11.5px;margin-bottom:2px}
+    .kv{display:flex;gap:6px}
+    .kv .lbl{font-weight:700;color:#0f172a;white-space:nowrap}
+    .kv .val{color:#334155}
+
+    .valores-table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:2px}
+    .valores-table th{font-weight:700;color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.06em;padding:5px 8px;border-bottom:2px solid #e2e8f0;text-align:left}
+    .valores-table th:not(:first-child){text-align:right}
+    .valores-table td{padding:7px 8px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+    .valores-table td:not(:first-child){text-align:right;white-space:nowrap}
+    .v-qtd{display:flex;align-items:center;gap:5px;font-weight:800}
+    .v-unit{color:#334155;font-weight:600}
+    .v-parc{color:#94a3b8;font-size:9.5px}
+    .v-total{font-weight:800;color:#5009c4}
+    .tag{font-size:8px;font-weight:700;padding:1px 6px;border-radius:9999px;color:#fff;white-space:nowrap}
+
+
+.footnotes{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:10px;color:#64748b;margin-top:8px;font-style:italic}
+
+    .obs-bar-list{font-size:11px;color:#334155;line-height:1.75}
+    .obs-bar-list .item{margin-bottom:2px}
+
+    .doc-footer{margin-top:22px;padding-top:9px;border-top:1px solid #e2e8f0;font-size:9.5px;color:#94a3b8;text-align:center;line-height:1.5}
+
+    .cond-titulo{font-size:14px;font-weight:800;color:#0f172a;text-align:center;margin:4px 0 22px;text-transform:uppercase;letter-spacing:.04em}
+    .cond-item{margin-bottom:13px}
+    .cond-item .cond-num-titulo{font-size:11.5px;font-weight:700;color:#0f172a;margin-bottom:3px}
+    .cond-item .cond-texto{font-size:11px;color:#475569;line-height:1.7}
+
+    @media print{
+      *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+      .page{padding:16px 20px}
+      @page{margin:1cm}
+    }
+  `
+}
+
+
+// Visual novo (documentos internos: OS)
+function estiloDocumento(): string {
+  return `
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",system-ui,sans-serif;font-size:11.5px;color:#191625;background:#fff;-webkit-font-smoothing:antialiased}
     .page{padding:34px 40px;min-height:100vh}
     .page-break{break-before:page;page-break-before:always}
@@ -316,7 +373,7 @@ function paginaVisualizacao3D(
   // Hero: 3 frames grandes, perspectiva dramática
   const hero = (rotX: number, rotY: number, label: string) => `
     <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:1">
-      <div style="background:#f8f9fb;border-radius:14px;border:1px solid rgba(132,86,232,0.08);padding:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(132,86,232,0.06),0 1px 3px rgba(0,0,0,0.05)">
+      <div style="background:#f8f9fb;border-radius:14px;border:1px solid rgba(80,9,196,0.08);padding:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(80,9,196,0.06),0 1px 3px rgba(0,0,0,0.05)">
         ${buildBox3D(largura, altura, profundidade, incluirVerniz, 110, 900, rotX, rotY)}
       </div>
       <span style="font-size:8.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">${label}</span>
@@ -325,7 +382,7 @@ function paginaVisualizacao3D(
   // Thumb: 5 frames menores, abaixo
   const thumb = (rotX: number, rotY: number, label: string) => `
     <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1">
-      <div style="background:#f8f9fb;border-radius:10px;border:1px solid rgba(132,86,232,0.07);padding:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 6px rgba(0,0,0,0.05)">
+      <div style="background:#f8f9fb;border-radius:10px;border:1px solid rgba(80,9,196,0.07);padding:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 6px rgba(0,0,0,0.05)">
         ${buildBox3D(largura, altura, profundidade, incluirVerniz, 58, 700, rotX, rotY)}
       </div>
       <span style="font-size:7.5px;font-weight:600;color:#b0b8c8;text-transform:uppercase;letter-spacing:.09em">${label}</span>
@@ -337,9 +394,12 @@ function paginaVisualizacao3D(
 <div class="page" style="padding:28px 36px">
 
   <!-- Cabeçalho -->
-  <div class="doc-header">
-    <img src="${LOGO_DARK_B64}" alt="Enyla" style="height:26px;display:block" />
-    <div class="titulo">Visualização 3D</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:2px solid #5009c4;margin-bottom:24px">
+    <img src="${LOGO_DARK_B64}" alt="Enyla" style="height:24px;display:block" />
+    <div style="text-align:right">
+      <div style="font-size:13px;font-weight:800;color:#0f172a">Visualização 3D</div>
+      <div style="font-size:10px;font-weight:500;color:#64748b;margin-top:1px">Prévia estrutural da embalagem</div>
+    </div>
   </div>
 
   <!-- Hero: 3 ângulos principais -->
@@ -367,16 +427,16 @@ function paginaVisualizacao3D(
 
   <!-- QR + Link -->
   ${qrDataUrl && previewUrl ? `
-  <div style="display:flex;align-items:center;gap:20px;background:#fff;border-radius:14px;border:1.5px solid rgba(132,86,232,0.14);padding:18px 22px">
-    <div style="flex-shrink:0;background:rgba(132,86,232,0.04);border-radius:10px;padding:8px;border:1px solid rgba(132,86,232,0.10)">
+  <div style="display:flex;align-items:center;gap:20px;background:#fff;border-radius:14px;border:1.5px solid rgba(80,9,196,0.14);padding:18px 22px">
+    <div style="flex-shrink:0;background:rgba(80,9,196,0.04);border-radius:10px;padding:8px;border:1px solid rgba(80,9,196,0.10)">
       <img src="${qrDataUrl}" alt="QR Code" style="width:82px;height:82px;display:block;border-radius:5px" />
     </div>
     <div style="flex:1">
       <p style="font-size:8px;font-weight:700;color:#8456e8;text-transform:uppercase;letter-spacing:.12em;margin:0 0 4px">Experiência interativa</p>
       <p style="font-size:13.5px;font-weight:800;color:#0f172a;margin:0 0 4px;letter-spacing:-.01em;line-height:1.3">Gire a sua caixa em 3D</p>
       <p style="font-size:10px;color:#64748b;margin:0 0 8px;line-height:1.55">Aponte a câmera do celular para o QR code e explore a embalagem em todos os ângulos, de forma interativa.</p>
-      <div style="background:rgba(132,86,232,0.04);border-radius:6px;padding:5px 10px;display:inline-block;border:1px solid rgba(132,86,232,0.08)">
-        <span style="font-size:8.5px;color:#8456e8;font-weight:500;word-break:break-all">${previewUrl}</span>
+      <div style="background:rgba(80,9,196,0.04);border-radius:6px;padding:5px 10px;display:inline-block;border:1px solid rgba(80,9,196,0.08)">
+        <span style="font-size:8.5px;color:#5009c4;font-weight:500;word-break:break-all">${previewUrl}</span>
       </div>
     </div>
   </div>` : ""}
@@ -403,7 +463,7 @@ function paginaCondicoesGerais(item: { dataRodape: string }): string {
 
   <div class="doc-header">
     <img src="${LOGO_DARK_B64}" alt="Enyla" style="height:26px;display:block" />
-    <div class="titulo">Condições gerais de contratação</div>
+    <div class="titulo">Condições Gerais <span>de Contratação</span></div>
   </div>
 
   <div class="cond-item">
@@ -488,16 +548,17 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
   const tabelaValida = tabela.filter(l => l.quantidade > 0 && (l[unitKey as keyof typeof l] as number) > 0)
 
   const linhasHtml = tabelaValida.map(l => {
-    const isIdeal = l.quantidade === sweetSpotIdealQtd && tabelaValida.length > 1
+    const isIdeal = l.quantidade === sweetSpotIdealQtd
     const isMin   = l.quantidade === sweetSpotMinimoQtd && !isIdeal
     const preco = l[precoKey as keyof typeof l] as number
     const unit  = l[unitKey as keyof typeof l] as number
     const parc  = l[parc12Key as keyof typeof l] as number
     const qual  = (form.qualidades ?? {})[l.quantidade] ?? (l.quantidade < 1000 ? "Digital" : "Offset")
+    const qualColor = qual === "Digital" ? "#64748b" : "#5009c4"
     return `
-      <tr class="${isIdeal ? "ideal" : ""}">
+      <tr>
         <td><div class="v-qtd">${num(l.quantidade)}
-          ${isIdeal ? `<span class="tag tag-ideal">Recomendado</span>` : ""}<span class="tag">${qual}</span>
+          <span class="tag" style="background:${qualColor}">${qual}</span>
         </div></td>
         <td class="v-unit">${brl(unit)}</td>
         <td class="v-total">${brl(preco)}</td>
@@ -544,7 +605,7 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
 
   <div class="section-bar">Informações Técnicas</div>
   <div class="kv-grid">
-    <div class="kv"><span class="lbl">Produto:</span><span class="val">${form.caixaDxf?.modelo ?? (form.blankOverride ? "Embalagem personalizada" : TIPO_CAIXA_PDF[form.tipoCaixa] ?? "Embalagem personalizada")}</span></div>
+    <div class="kv"><span class="lbl">Produto:</span><span class="val">${form.caixaDxf?.modelo ?? (form.blankOverride ? "Embalagem Personalizada" : TIPO_CAIXA_PDF[form.tipoCaixa] ?? "Embalagem Personalizada")}</span></div>
     <div class="kv"><span class="lbl">Material:</span><span class="val">${form.materialNome || "—"}</span></div>
     ${!temDims3D && form.caixaDxf
       ? `<div class="kv"><span class="lbl">Medidas (L × A × P):</span><span class="val">${[form.caixaDxf.largura, form.caixaDxf.altura, form.caixaDxf.profundidade].map(n => (n / 10).toLocaleString("pt-BR", { maximumFractionDigits: 1 })).join(" × ")} cm</span></div>`
@@ -577,13 +638,13 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
 
   <div class="section-bar">Condições e Observações</div>
   <div class="obs-bar-list">
-    <div class="item">Prazo de produção: <strong>${PRAZO_ENTREGA_PADRAO}</strong> após aprovação da arte.</div>
-    <div class="item">Contamos com designer próprio — desenvolvimento de arte incluso sem custo adicional.</div>
-    <div class="item">A quantidade final do lote pode variar <strong>até 10%</strong> para mais ou para menos.</div>
-    <div class="item">Pedido mínimo: <strong>${num(sweetMin.quantidade)} unidades</strong>.</div>
-    <div class="item">Os valores desta proposta são válidos <strong>até a data de vencimento</strong> indicada. Após esse prazo, os preços poderão ser reajustados sem aviso prévio.</div>
-    <div class="item">Recebeu uma proposta mais em conta? Apresente-nos — <strong>cobrimos qualquer oferta</strong> do mercado.</div>
-    <div class="item">Após o fechamento, você receberá um <strong>link de rastreamento exclusivo</strong> para acompanhar cada etapa da produção da sua embalagem em tempo real.</div>
+    <div class="item">* Prazo de produção: <strong>${PRAZO_ENTREGA_PADRAO}</strong> após aprovação da arte.</div>
+    <div class="item">* Contamos com designer próprio — desenvolvimento de arte incluso sem custo adicional.</div>
+    <div class="item">* A quantidade final do lote pode variar <strong>até 10%</strong> para mais ou para menos.</div>
+    <div class="item">* Pedido mínimo: <strong>${num(sweetMin.quantidade)} unidades</strong>.</div>
+    <div class="item">* Os valores desta proposta são válidos <strong>até a data de vencimento</strong> indicada. Após esse prazo, os preços poderão ser reajustados sem aviso prévio.</div>
+    <div class="item">* Recebeu uma proposta mais em conta? Apresente-nos — <strong>cobrimos qualquer oferta</strong> do mercado.</div>
+    <div class="item">* Após o fechamento, você receberá um <strong>link de rastreamento exclusivo</strong> para acompanhar cada etapa da produção da sua embalagem em tempo real.</div>
     ${form.obsCliente ? `<div class="item" style="margin-top:6px">${form.obsCliente.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</div>` : ""}
   </div>
 
@@ -621,10 +682,9 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom, telefoneCliente?: str
   const linhasHtml = linhasAtivas.map(l => {
     const total = l.unitario * l.quantidade
     const parc  = (total * (p.parcFator ?? 0)) / 12
-    const destaque = linhasAtivas.length > 1 && l === ideal
     return `
-      <tr class="${destaque ? "ideal" : ""}">
-        <td><div class="v-qtd">${num(l.quantidade)}${destaque ? ` <span class="tag tag-ideal">Recomendado</span>` : ""}</div></td>
+      <tr>
+        <td><div class="v-qtd">${num(l.quantidade)}</div></td>
         <td class="v-unit">${brl(l.unitario)}</td>
         <td class="v-total">${brl(total)}</td>
         ${temParc ? `<td class="v-parc">${brl(parc)}/mês</td>` : ""}
@@ -691,13 +751,13 @@ export function gerarHtmlPropostaCustom(p: PropostaCustom, telefoneCliente?: str
 
   <div class="section-bar">Condições e Observações</div>
   <div class="obs-bar-list">
-    <div class="item">Prazo de produção: <strong>${PRAZO_ENTREGA_PADRAO}</strong> após aprovação da arte.</div>
-    <div class="item">Contamos com designer próprio — desenvolvimento de arte incluso sem custo adicional.</div>
-    <div class="item">A quantidade final do lote pode variar <strong>até 10%</strong> para mais ou para menos.</div>
-    ${minLinha && ideal && minLinha !== ideal ? `<div class="item">Pedido mínimo: <strong>${num(minLinha.quantidade)} unidades</strong>.</div>` : ""}
-    <div class="item">Os valores desta proposta são válidos <strong>até a data de vencimento</strong> indicada. Após esse prazo, os preços poderão ser reajustados sem aviso prévio.</div>
-    <div class="item">Recebeu uma proposta mais em conta? Apresente-nos — <strong>cobrimos qualquer oferta</strong> do mercado.</div>
-    <div class="item">Após o fechamento, você receberá um <strong>link de rastreamento exclusivo</strong> para acompanhar cada etapa da produção da sua embalagem em tempo real.</div>
+    <div class="item">* Prazo de produção: <strong>${PRAZO_ENTREGA_PADRAO}</strong> após aprovação da arte.</div>
+    <div class="item">* Contamos com designer próprio — desenvolvimento de arte incluso sem custo adicional.</div>
+    <div class="item">* A quantidade final do lote pode variar <strong>até 10%</strong> para mais ou para menos.</div>
+    ${minLinha && ideal && minLinha !== ideal ? `<div class="item">* Pedido mínimo: <strong>${num(minLinha.quantidade)} unidades</strong>.</div>` : ""}
+    <div class="item">* Os valores desta proposta são válidos <strong>até a data de vencimento</strong> indicada. Após esse prazo, os preços poderão ser reajustados sem aviso prévio.</div>
+    <div class="item">* Recebeu uma proposta mais em conta? Apresente-nos — <strong>cobrimos qualquer oferta</strong> do mercado.</div>
+    <div class="item">* Após o fechamento, você receberá um <strong>link de rastreamento exclusivo</strong> para acompanhar cada etapa da produção da sua embalagem em tempo real.</div>
     ${p.obsCliente ? `<div class="item" style="margin-top:6px">${p.obsCliente.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</div>` : ""}
   </div>
 
@@ -782,7 +842,7 @@ export function gerarHtmlOS(card: KanbanCard, form: FormData | null, refAnterior
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Pedido ${card.numero} — ${card.nomeCliente}</title>
-  <style>${estiloPropostaCliente()}</style>
+  <style>${estiloDocumento()}</style>
   <style>${osStyles}</style>
 </head>
 <body>
