@@ -20,5 +20,5 @@ export default async function PaginaCliente({ params }: { params: Promise<{ toke
       arquivos: p.arquivos.filter(a => ["arte", "mockup", "foto"].includes(a.tipo as string)).map(a => ({ id: a.id, nome: a.nome, url: a.url, tipo: a.tipo as string, quando: a.created_at })),
     })),
   }
-  return <PortalClient dados={dados} />
+  return <PortalClient dados={dados} token={token} />
 }

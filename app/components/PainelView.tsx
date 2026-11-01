@@ -106,7 +106,7 @@ export function PainelView({
     ir: x.tipo === "fornecedor" ? () => onNavegar("fornecedores") : x.tipo === "conferir" ? () => abrirCaixa() : () => { if (x.card) onAbrirCard(x.card) },
     whatsapp: x.tipo === "orcamentoVencendo" ? x.whatsapp : undefined,
     cobrar: x.cobrar,
-    botao: x.aprovacao && onAprovacaoOnline ? { rotulo: "Lançar sinal", onClick: () => onAprovacaoOnline(x.aprovacao!) } : undefined,
+    botao: x.aprovacao && onAprovacaoOnline ? { rotulo: x.aprovacao.tipo === "recompra_qtd" ? "Orçar" : "Lançar sinal", onClick: () => onAprovacaoOnline(x.aprovacao!) } : undefined,
   }))
   const [verTodas, setVerTodas] = React.useState(false)
   const acoesVisiveis = verTodas ? acoes : acoes.slice(0, 7)

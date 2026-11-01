@@ -95,8 +95,10 @@ export function pendencias(args: {
     ...aprovados.map(a => ({
       id: `apr-${a.numero}`, tipo: "aprovado" as const, tom: "sucesso" as const, aprovacao: a,
       titulo: `${a.numero} · ${a.nomeCliente}`,
-      sub: `aprovado online por ${a.aprovadoPor} · ${a.quantidade.toLocaleString("pt-BR")} un · ${new Date(a.em).toLocaleDateString("pt-BR")}`,
-      valor: a.preco, card: kanban.find(k => k.id === a.cardId),
+      sub: a.tipo === "recompra" ? `repetiu ${a.pedidoOrigem} pela página do cliente · ${a.quantidade.toLocaleString("pt-BR")} un · mesmo preço`
+        : a.tipo === "recompra_qtd" ? `quer repetir ${a.pedidoOrigem} com ${a.quantidade.toLocaleString("pt-BR")} un · faça o orçamento`
+        : `aprovado online por ${a.aprovadoPor} · ${a.quantidade.toLocaleString("pt-BR")} un · ${new Date(a.em).toLocaleDateString("pt-BR")}`,
+      valor: a.preco || undefined, card: kanban.find(k => k.id === a.cardId),
     })),
     ...prod.atrasados.map(p => ({
       id: `atr-${p.key}`, tipo: "atrasado" as const, tom: "perigo" as const,

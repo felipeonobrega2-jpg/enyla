@@ -60,8 +60,8 @@ function Telas() {
         "ORC-002": [1, 2, 3, 4, 5, 6, 7].map((c, i) => ({ coluna: c, dataHora: br(10 - i), tipo: "coluna" })),
         "ORC-003": [1, 2, 3, 4, 5].map((c, i) => ({ coluna: c, dataHora: br(5 - i), tipo: "coluna" })),
       }
-      const pedidos = montarPedidos(dados.kanban, lancs).filter(p => ["Ana Cosméticos", "Bruno Perfumes", "Cliente Relacionamento"].includes(p.nomeCliente))
-      return <PortalClient dados={{ nome: "Ana Cosméticos", pedidos: pedidos.map(p => ({
+      const pedidos = montarPedidos(dados.kanban, lancs).filter(p => ["Ana Cosméticos", "Bruno Perfumes", "Cliente Relacionamento", "Davi Chás"].includes(p.nomeCliente))
+      return <PortalClient token="exemplo" dados={{ nome: "Ana Cosméticos", pedidos: pedidos.map(p => ({
         key: p.key, numero: p.numero, coluna: p.coluna, dataFechamento: p.dataFechamento ?? null, dataEntregaPrevista: p.dataEntregaPrevista ?? null, dataEntregaReal: p.dataEntregaReal ?? null,
         venda: p.venda, recebido: p.venda - p.aReceber, aReceber: p.aReceber, quantidade: p.quantidade,
         itens: p.cards.map(c => ({ numero: c.numero, dimensoes: c.dimensoes, material: c.materialNome, quantidade: c.quantidade })),

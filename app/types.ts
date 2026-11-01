@@ -279,6 +279,9 @@ export type AprovacaoOnline = {
   em: string            // ISO
   visto?: boolean
   desfeita?: boolean    // o pedido voltou para orçamento depois da aprovação
+  // recompra: cliente repetiu um pedido pela página dele (mesmo preço); recompra_qtd: quer outra quantidade (precisa de orçamento)
+  tipo?: "aprovacao" | "recompra" | "recompra_qtd"
+  pedidoOrigem?: string
 }
 
 export type Lote = {

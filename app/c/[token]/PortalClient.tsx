@@ -1,7 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import Image from "next/image"
-import { Check, Package, FileImage, Camera, QrCode, CalendarDays, ChevronRight, Truck } from "lucide-react"
+import { Check, Package, FileImage, Camera, QrCode, CalendarDays, ChevronRight, Truck, RotateCw, X, CircleCheck } from "lucide-react"
 
 type Item = { numero: string; dimensoes: string; material: string; quantidade: number }
 type Arquivo = { id: string; nome: string; url: string; tipo: string; quando: string }
@@ -140,7 +141,83 @@ function CartaoPedido({ p, nome }: { p: PedidoPortal; nome: string }) {
   )
 }
 
-export default function PortalClient({ dados }: { dados: DadosPortal }) {
+// Repetir um pedido: mesma quantidade sai pelo mesmo preço; outra quantidade vai para orçamento
+function FolhaRepetir({ p, token, onFechar }: { p: PedidoPortal; token: string; onFechar: () => void }) {
+  const [outra, setOutra] = useState(false)
+  const [qtd, setQtd] = useState(String(p.quantidade))
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const [feito, setFeito] = useState<{ tipo: "pedido"; numero: string; total: number; sinal: number; pix: string } | { tipo: "orcamento" } | null>(null)
+  const quantidade = outra ? Math.round(Number(qtd.replace(/\D/g, "")) || 0) : p.quantidade
+  async function enviar() {
+    if (quantidade <= 0) return
+    setEnviando(true); setErro(null)
+    try {
+      const r = await fetch(`/api/c/${encodeURIComponent(token)}/repetir`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: p.key, quantidade }) })
+      const d = await r.json()
+      if (!r.ok) setErro(d.erro ?? "Não deu para registrar agora.")
+      else setFeito(d)
+    } catch { setErro("Sem conexão. Tente de novo.") }
+    setEnviando(false)
+  }
+  return (
+    <div className="fixed inset-0 z-40">
+      <div onClick={onFechar} className="absolute inset-0 bg-black/30 animate-[apple-backdrop-in_.2s_ease-out]" />
+      <div className="absolute left-0 right-0 bottom-0 bg-[#F2F2F7] rounded-t-3xl animate-[apple-slide-up_.3s_ease-out]" style={{ paddingBottom: "max(env(safe-area-inset-bottom),16px)" }}>
+        <div className="max-w-xl mx-auto px-5 pt-3 space-y-4">
+          <div className="flex justify-center"><span className="w-10 h-1.5 rounded-full bg-[rgba(60,60,67,0.2)]" /></div>
+          {feito ? (
+            <div className="text-center space-y-3 py-2">
+              <div className="w-14 h-14 rounded-full bg-[#009351]/10 grid place-items-center mx-auto"><CircleCheck className="w-8 h-8 text-[#009351]" /></div>
+              {feito.tipo === "pedido" ? <>
+                <p className="text-[18px] font-bold text-[#191625]">Pedido {feito.numero} feito!</p>
+                <p className="text-[13.5px] text-[#5e5c68]">{num(p.quantidade)} embalagens por {brl(feito.total)}, o mesmo preço da última vez. Para começar a produção, pague o sinal de {brl(feito.sinal)}.</p>
+                <a href={feito.pix} className="h-12 w-full rounded-xl bg-[#8456e8] text-white font-semibold text-[15px] flex items-center justify-center gap-2"><QrCode className="w-5 h-5" />Pagar sinal via Pix</a>
+              </> : <>
+                <p className="text-[18px] font-bold text-[#191625]">Recebemos seu pedido</p>
+                <p className="text-[13.5px] text-[#5e5c68]">Vamos calcular {num(quantidade)} embalagens e te mandar o valor com o link para aprovar.</p>
+              </>}
+              <button onClick={() => { onFechar(); if (feito.tipo === "pedido") location.reload() }} className="h-11 w-full rounded-xl bg-white text-[#191625] font-medium">Fechar</button>
+            </div>
+          ) : <>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[18px] font-bold text-[#191625]">Repetir {p.numero}</p>
+                <p className="text-[12.5px] text-[#8E8E93]">{p.itens.length > 1 ? `${p.itens.length} itens · ` : ""}{p.itens[0]?.dimensoes && p.itens[0].dimensoes !== "0×0×0" ? `${p.itens[0].dimensoes} cm · ` : ""}{p.itens[0]?.material}</p>
+              </div>
+              <button onClick={onFechar} aria-label="Fechar" className="w-8 h-8 rounded-full grid place-items-center bg-[rgba(116,116,128,0.12)] text-[#5e5c68]"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="bg-white rounded-2xl divide-y divide-[rgba(60,60,67,0.08)]">
+              <button onClick={() => setOutra(false)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
+                <span className={`w-5 h-5 rounded-full grid place-items-center shrink-0 ${!outra ? "bg-[#8456e8]" : "ring-2 ring-[rgba(60,60,67,0.25)]"}`}>{!outra && <Check className="w-3 h-3 text-white" strokeWidth={3} />}</span>
+                <span className="flex-1"><span className="block text-[15px] font-semibold text-[#191625]">{num(p.quantidade)} embalagens</span><span className="block text-[12px] text-[#8E8E93]">mesmo preço do último pedido</span></span>
+                <span className="text-[15px] font-bold text-[#191625] ds-num">{brl(p.venda)}</span>
+              </button>
+              <div className="px-4 py-3.5">
+                <button onClick={() => setOutra(true)} className="w-full flex items-center gap-3 text-left">
+                  <span className={`w-5 h-5 rounded-full grid place-items-center shrink-0 ${outra ? "bg-[#8456e8]" : "ring-2 ring-[rgba(60,60,67,0.25)]"}`}>{outra && <Check className="w-3 h-3 text-white" strokeWidth={3} />}</span>
+                  <span className="flex-1 text-[15px] font-semibold text-[#191625]">Outra quantidade</span>
+                </button>
+                {outra && <input autoFocus value={qtd} onChange={e => setQtd(e.target.value)} inputMode="numeric" placeholder="Quantas embalagens?"
+                  className="mt-2.5 w-full h-11 rounded-xl px-4 text-[15px] bg-[rgba(116,116,128,0.08)] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/30" />}
+                {outra && <p className="text-[11.5px] text-[#8E8E93] mt-1.5">Calculamos o valor e te mandamos para aprovar.</p>}
+              </div>
+            </div>
+            <p className="text-[12px] text-[#5e5c68] px-1 flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-[#009351]" />Arte e faca já são suas: nada de refazer.</p>
+            {erro && <p className="text-[13px] text-[#d33a3c] px-1">{erro}</p>}
+            <button onClick={enviar} disabled={enviando || quantidade <= 0}
+              className="h-12 w-full rounded-xl bg-[#8456e8] text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40">
+              <RotateCw className="w-4 h-4" />{enviando ? "Enviando…" : outra ? "Pedir orçamento" : `Repetir por ${brl(p.venda)}`}
+            </button>
+          </>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function PortalClient({ dados, token }: { dados: DadosPortal; token: string }) {
+  const [repetindo, setRepetindo] = useState<PedidoPortal | null>(null)
   if (!dados) {
     return (
       <div className="min-h-screen bg-[#F2F2F7] grid place-items-center px-6 text-center">
@@ -179,7 +256,7 @@ export default function PortalClient({ dados }: { dados: DadosPortal }) {
                   </div>
                   {p.aReceber > 0.5
                     ? <a href={`/pix/${encodeURIComponent(p.numero)}?v=${p.aReceber.toFixed(2)}&c=${encodeURIComponent(dados.nome)}`} className="text-[12px] font-semibold text-[#8456e8] flex items-center gap-0.5">Pagar {brl(p.aReceber)}<ChevronRight className="w-3.5 h-3.5" /></a>
-                    : <span className="text-[12.5px] font-semibold text-[#191625] ds-num">{brl(p.venda)}</span>}
+                    : <button onClick={() => setRepetindo(p)} className="h-8 px-3 rounded-full bg-[#8456e8]/10 text-[#8456e8] text-[12.5px] font-semibold flex items-center gap-1.5 active:scale-95 transition-transform"><RotateCw className="w-3.5 h-3.5" />Repetir</button>}
                 </div>
               ))}
             </div>
@@ -188,6 +265,7 @@ export default function PortalClient({ dados }: { dados: DadosPortal }) {
 
         {!dados.pedidos.length && <p className="text-center text-[13px] text-[#8E8E93] py-10">Nenhum pedido ainda.</p>}
       </div>
+      {repetindo && <FolhaRepetir p={repetindo} token={token} onFechar={() => setRepetindo(null)} />}
     </div>
   )
 }

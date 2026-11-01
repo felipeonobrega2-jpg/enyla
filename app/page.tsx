@@ -1113,6 +1113,14 @@ export default function Home() {
   function concluirAprovacaoOnline(a: AprovacaoOnline) {
     const card = kanban.find(c => c.id === a.cardId)
     if (!card) return
+    // Recompra com outra quantidade: abre o pedido de origem para orçar
+    if (a.tipo === "recompra_qtd") {
+      setConfig(c => ({ ...c, aprovacoesOnline: (c.aprovacoesOnline ?? []).map(x => x.em === a.em ? { ...x, visto: true } : x) }))
+      fetch("/api/aprovacao/visto", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ numeros: [a.numero] }) }).catch(() => {})
+      abrirDetalheCard(card)
+      showToast(`${a.nomeCliente} quer ${a.quantidade.toLocaleString("pt-BR")} un de ${a.pedidoOrigem}. Faça o orçamento e mande o link de aprovação.`)
+      return
+    }
     const abrirSinal = (loteId?: string, loteNumero?: string) =>
       setModalSinal({ cardId: card.id, nomeCliente: card.nomeCliente, cardNumero: card.numero, loteId, loteNumero, preco: a.preco })
     if (card.loteId) abrirSinal(card.loteId, card.loteNumero)
