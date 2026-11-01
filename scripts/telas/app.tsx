@@ -22,6 +22,7 @@ import { origemDoCliente } from "@/app/lib/coleta"
 import { PrecoQueFecha } from "@/app/components/PrecoQueFecha"
 import { ModalLancamento } from "@/app/components/FinanceiroView"
 import { PainelToken } from "@/app/components/MetaAdsView"
+import { ConexaoWhats } from "@/app/components/WhatsAppView"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
 // Abas do Financeiro: "financeiro-receber" abre a aba "receber"
@@ -51,6 +52,8 @@ function Telas() {
       <PainelToken status={{ hasToken: true, valido: true, daysLeft: 5, canAutoRefresh: false }} expirou={false} novo="" setNovo={() => {}} salvando={false} onSalvar={() => {}} msg={null} />
       <PainelToken status={{ hasToken: true, valido: true, permanente: true, tipo: "SYSTEM_USER", canAutoRefresh: false }} expirou={false} novo="" setNovo={() => {}} salvando={false} onSalvar={() => {}} msg="ok:Token permanente salvo. Não vai mais vencer." />
     </div>)
+    case "whats": return pagina(<ConexaoWhats onAtualizar={() => {}} status={{ segredoConfigurado: true, totalConversas: 0,
+      evolution: { configurado: true, alcancavel: true, autorizado: true, conectado: true, estado: "open", webhookOk: false, webhookDestino: "evolution-api-production.up.railway.app/webhook", host: "evo.enyla.com.br" } }} />)
     case "calibragem": return pagina(<CalibragemView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onAtualizarConfig={setCfg} onDividir={() => {}} />)
     case "rotas": {
       const r = calcular(form, cfg)

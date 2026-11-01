@@ -1,6 +1,6 @@
 "use client"
 
-import { Image as ImageIcon, FileText, Smile } from "lucide-react"
+import { Image as ImageIcon, FileText, Smile, Check, X } from "lucide-react"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { brl } from "../utils"
 
@@ -68,7 +68,7 @@ export default function WhatsAppView({
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
   const [loadingConvs, setLoadingConvs] = useState(true)
   const [loadingMsgs, setLoadingMsgs] = useState(false)
-  const [status, setStatus] = useState<{ segredoConfigurado: boolean; totalConversas: number } | null>(null)
+  const [status, setStatus] = useState<StatusWhats | null>(null)
   useEffect(() => { fetch("/api/whatsapp/status").then(r => r.json()).then(setStatus).catch(() => {}) }, [])
   const [busca, setBusca] = useState("")
   const threadRef = useRef<HTMLDivElement>(null)
@@ -177,26 +177,7 @@ export default function WhatsAppView({
                   {busca ? "Nenhuma conversa encontrada" : "Aguardando mensagens…"}
                 </p>
               ) : (
-                <div className="text-left max-w-[300px] space-y-2">
-                  <p className="text-[13px] font-semibold text-[#191625]">WhatsApp ainda não está conectado</p>
-                  <p className="text-[12px] text-[#5e5c68] leading-relaxed">
-                    Nenhuma mensagem chegou até hoje. Para as conversas aparecerem aqui:
-                  </p>
-                  <ol className="text-[12px] text-[#5e5c68] leading-relaxed list-decimal pl-4 space-y-1">
-                    <li className={status?.segredoConfigurado ? "text-[#009351]" : ""}>
-                      Defina <code className="text-[11px] bg-[rgba(116,116,128,0.1)] px-1 rounded">WHATSAPP_WEBHOOK_SECRET</code> nas variáveis da Vercel
-                      {status?.segredoConfigurado ? " (feito)" : ""}.
-                    </li>
-                    <li>
-                      No Evolution API, aponte o webhook global para
-                      <code className="block text-[11px] bg-[rgba(116,116,128,0.1)] px-1.5 py-1 rounded mt-1 break-all">{typeof window !== "undefined" ? window.location.origin : ""}/api/whatsapp/webhook?token=SEU_SEGREDO</code>
-                      com o evento <strong>messages.upsert</strong>.
-                    </li>
-                  </ol>
-                  <p className="text-[11.5px] text-[#898892] leading-relaxed">
-                    Enquanto isso, os botões de WhatsApp do Painel, de Clientes e de Parceiros já abrem a conversa com a mensagem pronta no seu WhatsApp.
-                  </p>
-                </div>
+                <ConexaoWhats status={status} onAtualizar={setStatus} />
               )}
             </div>
           )}
@@ -324,6 +305,60 @@ export default function WhatsAppView({
           </>
         )}
       </div>
+    </div>
+  )
+}
+
+type DiagEvo = { configurado: boolean; alcancavel: boolean; autorizado: boolean; conectado: boolean; estado: string | null; webhookOk: boolean; webhookDestino: string | null; host: string | null }
+type StatusWhats = { segredoConfigurado: boolean; totalConversas: number; evolution?: DiagEvo }
+
+// Checklist da integração com o Evolution (situação real, lida no servidor) e o botão que acerta o webhook
+export function ConexaoWhats({ status, onAtualizar }: { status: StatusWhats | null; onAtualizar: (s: StatusWhats) => void }) {
+  const [configurando, setConfigurando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const e = status?.evolution
+  const itens: { ok: boolean; txt: string; dica?: string }[] = !status ? [] : [
+    { ok: !!e?.configurado, txt: "Endereço, chave e instância do Evolution na Vercel", dica: "EVOLUTION_API_URL, EVOLUTION_API_KEY e EVOLUTION_INSTANCE" },
+    { ok: !!e?.alcancavel, txt: `Servidor do Evolution respondendo${e?.host ? ` (${e.host})` : ""}`, dica: "Confira se a VPS e o contêiner do Evolution estão no ar" },
+    { ok: !!e?.autorizado, txt: "Chave aceita pelo Evolution", dica: "A EVOLUTION_API_KEY não confere com a da VPS" },
+    { ok: !!e?.conectado, txt: `Seu número conectado${e?.estado && e.estado !== "open" ? ` (estado: ${e.estado})` : ""}`, dica: "No painel do Evolution, leia o QR code com o WhatsApp do celular" },
+    { ok: status.segredoConfigurado, txt: "Senha do webhook definida", dica: "WHATSAPP_WEBHOOK_SECRET na Vercel" },
+    { ok: !!e?.webhookOk, txt: "Webhook apontando para o sistema", dica: e?.webhookDestino ? `Hoje aponta para ${e.webhookDestino}` : "Ainda não configurado" },
+  ]
+  const podeConfigurar = !!e?.autorizado && status?.segredoConfigurado && !e?.webhookOk
+  async function configurar() {
+    setConfigurando(true); setErro(null)
+    const r = await fetch("/api/whatsapp/configurar", { method: "POST" }).then(r => r.json()).catch(() => null)
+    if (!r?.ok) setErro(r?.erro ?? "Não deu para configurar agora.")
+    if (r?.evolution && status) onAtualizar({ ...status, evolution: r.evolution })
+    setConfigurando(false)
+  }
+  return (
+    <div className="text-left max-w-[320px] space-y-3">
+      <p className="text-[13px] font-semibold" style={{ color: "var(--text-main)" }}>WhatsApp ainda não está recebendo mensagens</p>
+      {!status ? <p className="text-[12px]" style={{ color: "var(--text-faint)" }}>Verificando a conexão…</p> : (
+        <ul className="space-y-2">
+          {itens.map(i => (
+            <li key={i.txt} className="flex gap-2 text-[12px] leading-snug">
+              <span className="mt-[2px] w-4 h-4 rounded-full shrink-0 grid place-items-center text-white" style={{ background: i.ok ? "#009351" : "#d33a3c" }}>{i.ok ? <Check className="w-2.5 h-2.5" strokeWidth={3.5} /> : <X className="w-2.5 h-2.5" strokeWidth={3.5} />}</span>
+              <span>
+                <span style={{ color: i.ok ? "var(--text-main)" : "#d33a3c", fontWeight: i.ok ? 400 : 600 }}>{i.txt}</span>
+                {!i.ok && i.dica && <span className="block text-[11px]" style={{ color: "var(--text-faint)" }}>{i.dica}</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {podeConfigurar && (
+        <button onClick={configurar} disabled={configurando}
+          className="h-9 px-4 rounded-xl text-[12.5px] font-semibold text-white disabled:opacity-50" style={{ background: "#8456e8" }}>
+          {configurando ? "Configurando…" : "Configurar webhook"}
+        </button>
+      )}
+      {erro && <p className="text-[12px] text-[#d33a3c]">{erro}</p>}
+      <p className="text-[11.5px] leading-relaxed" style={{ color: "var(--text-faint)" }}>
+        Enquanto isso, os botões de WhatsApp do Painel, de Clientes e de Parceiros já abrem a conversa com a mensagem pronta no seu WhatsApp.
+      </p>
     </div>
   )
 }
