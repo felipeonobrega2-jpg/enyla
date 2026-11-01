@@ -18,9 +18,11 @@ type Ordem = "ltv" | "valor" | "nome" | "orcamentos" | "recente"
 const DIAS_REATIVAR = 90
 const diasDesde = (d?: string) => { const x = parseData(d); return x ? Math.floor((Date.now() - x.getTime()) / 86_400_000) : null }
 
+import { origemDoCliente, textoOrigem, OrigensClientes, OrigemCliente } from "../lib/coleta"
+
 export function ClientesView({
   historico, kanban, propostasCustom, lancamentos, cadastro,
-  onReplicar, onWhatsApp, onSaveCliente, initialPerfil,
+  onReplicar, onWhatsApp, onSaveCliente, initialPerfil, origens, onSalvarOrigem,
 }: {
   historico: HistItem[]
   kanban: KanbanCard[]
@@ -31,6 +33,8 @@ export function ClientesView({
   onWhatsApp: (item: HistItem) => void
   onSaveCliente?: (id: string, updates: Partial<Cliente>) => void
   initialPerfil?: string | null
+  origens?: OrigensClientes
+  onSalvarOrigem?: (nome: string, origem: OrigemCliente | null) => void
 }) {
   const [tab, setTab]         = useState<Tab>("clientes")
   const [soReativar, setSoReativar] = useState(false)
@@ -190,6 +194,7 @@ export function ClientesView({
               setPerfilAberto={setPerfilAberto}
               kanban={kanban}
               cadastro={cadastro}
+              origens={origens}
               onReplicar={onReplicar}
               onWhatsApp={onWhatsApp}
             />
@@ -211,6 +216,8 @@ export function ClientesView({
             onClose={() => setPerfilAberto(null)}
             onReplicar={onReplicar}
             onWhatsApp={onWhatsApp}
+            origem={origemDoCliente(c.nome, origens, cadastro)}
+            onSalvarOrigem={onSalvarOrigem ? o => onSalvarOrigem(c.nome, o) : undefined}
             onSave={onSaveCliente
               ? updates => {
                   const cad = cadastro.find(cl => cl.nome.trim().toLowerCase() === c.nome.toLowerCase())
@@ -290,7 +297,7 @@ function DashboardTab({ metrics, listaClientes, onPerfil }: {
 
 // ── Lista ──────────────────────────────────────────────────────────────────────
 
-function ListaTab({ lista, busca, isLeads, expandido, setExpandido, setPerfilAberto, kanban, cadastro, onReplicar, onWhatsApp }: {
+function ListaTab({ lista, busca, isLeads, expandido, setExpandido, setPerfilAberto, kanban, cadastro, origens, onReplicar, onWhatsApp }: {
   lista: ClienteItem[]
   busca: string
   isLeads: boolean
@@ -299,6 +306,7 @@ function ListaTab({ lista, busca, isLeads, expandido, setExpandido, setPerfilAbe
   setPerfilAberto: (n: string | null) => void
   kanban: KanbanCard[]
   cadastro: Cliente[]
+  origens?: OrigensClientes
   onReplicar: (item: HistItem) => void
   onWhatsApp: (item: HistItem) => void
 }) {
@@ -329,7 +337,7 @@ function ListaTab({ lista, busca, isLeads, expandido, setExpandido, setPerfilAbe
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-[13.5px] font-semibold text-[#191625] leading-snug">{nome}</span>
                   {reativar && <Selo tom="alerta">sem pedir há {dias} dias</Selo>}
-                  {cad?.origemCampanhaNome && <Selo tom="acento">{cad.origemCampanhaNome.length > 28 ? cad.origemCampanhaNome.slice(0, 28) + "…" : cad.origemCampanhaNome}</Selo>}
+                  {(() => { const o = origemDoCliente(nome, origens, cadastro); if (!o) return null; const t = textoOrigem(o); return <Selo tom="acento">{t.length > 28 ? t.slice(0, 28) + "…" : t}</Selo> })()}
                 </div>
                 <p className="text-[11px] text-[#898892] mt-1 truncate">
                   {numPedidos > 0 ? `${numPedidos} ${numPedidos === 1 ? "pedido" : "pedidos"}` : `${numOrcamentos} ${numOrcamentos === 1 ? "orçamento" : "orçamentos"}`}

@@ -18,6 +18,7 @@ import { IdeiasView } from "@/app/components/IdeiasView"
 import PortalClient from "@/app/c/[token]/PortalClient"
 import { ClientePerfilModal } from "@/app/components/ClientePerfilModal"
 import { dados, config } from "./dados"
+import { origemDoCliente } from "@/app/lib/coleta"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
 // Abas do Financeiro: "financeiro-receber" abre a aba "receber"
@@ -76,9 +77,12 @@ function Telas() {
     }
     case "perfil":
       return <ClientePerfilModal nome="Ana Cosméticos" cadastro={{ id: "x", nome: "Ana Cosméticos", telefone: "11999990000", criadoEm: "" }}
-        itens={[]} propostas={[]} kanban={dados.kanban} lancamentos={lancs} onClose={() => {}} onReplicar={() => {}} onWhatsApp={() => {}} onSave={() => {}} />
+        itens={[]} propostas={[]} kanban={dados.kanban} lancamentos={lancs} onClose={() => {}} onReplicar={() => {}} onWhatsApp={() => {}} onSave={() => {}}
+        origem={origemDoCliente("Ana Cosméticos", cfg.origensClientes, [])}
+        onSalvarOrigem={o => setCfg({ ...cfg, origensClientes: o ? { "ana cosmeticos": o } : {} })} />
     case "ideias": return <div style={{ height: "100vh" }}><IdeiasView config={cfg} onSalvar={setCfg} /></div>
-    case "relatorios": return <div style={{ height: "100vh" }}><RelatoriosView kanban={dados.kanban} lancamentos={lancs} clientes={[]} onAbrirCliente={() => {}} /></div>
+    case "relatorios": return <div style={{ height: "100vh" }}><RelatoriosView kanban={dados.kanban} lancamentos={lancs} clientes={[]} onAbrirCliente={() => {}}
+      origensClientes={{ "ana cosmeticos": { canal: "indicacao", detalhe: "Bruno" }, "bruno perfumes": { canal: "instagram" } }} /></div>
     case "detalhe": {
       const c = dados.kanban.find(k => k.id === "c1")!
       return <ModalDetalhe data={{ tipo: "kanban", card: c }} parcFator={1.2} onClose={() => {}} lancamentos={lancs}

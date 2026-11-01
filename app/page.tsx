@@ -42,7 +42,9 @@ import { ParceriasView } from "./components/ParceriasView"
 import { RelatoriosView } from "./components/RelatoriosView"
 import { normalizarProducao, movimentosPorEtapa, desfazerMovimentosAteColuna, Servico } from "./lib/producao"
 import { somarDiasUteis, definirFeriadosLocais } from "./lib/diasUteis"
-import { montarPedidos } from "./lib/negocio"
+import { montarPedidos, nomeChave } from "./lib/negocio"
+import { origemDoCliente } from "./lib/coleta"
+import { EditorOrigem } from "./components/EditorOrigem"
 import { normalizarMetas } from "./lib/metas"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
 import FormaView from "./FormaView"
@@ -1637,6 +1639,24 @@ export default function Home() {
                 }
               />
             )}
+            {/* Primeira vez: pergunta como o cliente chegou (fica salvo no cliente) */}
+            {form.nomeCliente.trim().length >= 3 && (() => {
+              const nome = form.nomeCliente.trim()
+              const origem = origemDoCliente(nome, config.origensClientes, clientes)
+              // Some quando a origem está completa (indicação/outro esperam o detalhe) ou veio da campanha do cadastro
+              const pedeDetalhe = origem && (origem.canal === "indicacao" || origem.canal === "outro") && !origem.detalhe
+              if (origem && !pedeDetalhe) return null
+              return (
+                <div className="mt-2.5">
+                  <p className="text-[11px] font-semibold text-[#5e5c68]">Como chegou?</p>
+                  <EditorOrigem compacto origem={origem} onSalvar={o => {
+                    const origens = { ...(config.origensClientes ?? {}) }
+                    if (o) origens[nomeChave(nome)] = o; else delete origens[nomeChave(nome)]
+                    salvarConfigTudo({ ...config, origensClientes: origens })
+                  }} />
+                </div>
+              )
+            })()}
           </FormSection>
 
           {/* Seção: Dieline Pacdora */}
@@ -2023,7 +2043,7 @@ export default function Home() {
               onAprovacaoOnline={concluirAprovacaoOnline}
             />
           ) : view === "dashboard" ? (
-            <RelatoriosView kanban={kanban} lancamentos={lancamentos} clientes={clientes}
+            <RelatoriosView kanban={kanban} lancamentos={lancamentos} clientes={clientes} origensClientes={config.origensClientes}
               onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }} />
           ) : view === "config" ? (
             <ConfigView
@@ -2077,6 +2097,12 @@ export default function Home() {
               onWhatsApp={(item) => compartilharWhatsApp(item.form, item.calculo, item.numero)}
               onSaveCliente={atualizarCliente}
               initialPerfil={perfilClienteExterno}
+              origens={config.origensClientes}
+              onSalvarOrigem={(nome, o) => {
+                const origens = { ...(config.origensClientes ?? {}) }
+                if (o) origens[nomeChave(nome)] = o; else delete origens[nomeChave(nome)]
+                salvarConfigTudo({ ...config, origensClientes: origens })
+              }}
             />
           ) : view === "pedidos" ? (
             <PedidosUnificadoView

@@ -1,7 +1,8 @@
 "use client"
 
 import React from "react"
-import { FileDown, TrendingUp, Megaphone, Layers, ArrowUpRight, ArrowDownRight, Minus, CalendarRange, Package } from "lucide-react"
+import { FileDown, TrendingUp, Megaphone, Layers, ArrowUpRight, ArrowDownRight, Minus, CalendarRange, Package, CircleSlash } from "lucide-react"
+import { origemDoCliente, rotuloCanal, categoriaPerda, rotuloPerda, OrigensClientes, CategoriaPerda } from "../lib/coleta"
 import { KanbanCard, LancamentoFinanceiro, Cliente } from "../types"
 import {
   Periodo, montarPedidos, vendasDoPeriodo, caixaDoPeriodo, conversao, orcamentosDoPeriodo, margemContribuicao,
@@ -69,7 +70,8 @@ function Delta({ atual, base, menorMelhor }: { atual: number | null; base: numbe
   )
 }
 
-export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente }: {
+export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, origensClientes }: {
+  origensClientes?: OrigensClientes
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
   clientes: Cliente[]
@@ -128,8 +130,8 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente }
       unidades: vendasDoPeriodo(pedidos, lancamentos, p).unidades }
   })
 
-  // Origem dos clientes (campanha informada no cadastro) × valor comprado no período
-  const origemDe = (nome: string) => clientes.find(cl => nomeChave(cl.nome) === nomeChave(nome))?.origemCampanhaNome || "Sem origem informada"
+  // Origem dos clientes (canal informado no perfil ou deduzido da campanha) × valor comprado no período
+  const origemDe = (nome: string) => { const o = origemDoCliente(nome, origensClientes, clientes); return o ? rotuloCanal(o.canal) : "Sem origem informada" }
   const porOrigem = new Map<string, { valor: number; clientes: Set<string> }>()
   for (const p of pedidos.filter(x => noPeriodo(x.dataFechamento, per.atual))) {
     const o = origemDe(p.nomeCliente)
@@ -138,6 +140,19 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente }
     porOrigem.set(o, atual)
   }
   const origens = [...porOrigem.entries()].sort((x, y) => y[1].valor - x[1].valor)
+
+  // Por que perdemos: orçamentos do período que foram para Perdido, por motivo (os que venceram sem resposta à parte)
+  const porMotivo = new Map<CategoriaPerda, { qtd: number; valor: number }>()
+  let venceram = 0
+  for (const c of orcamentosDoPeriodo(kanban, per.atual)) {
+    const cat = categoriaPerda(c)
+    if (!cat) continue
+    if (cat === "expirado") { venceram++; continue }
+    const atual = porMotivo.get(cat) ?? { qtd: 0, valor: 0 }
+    atual.qtd++; atual.valor += c.preco
+    porMotivo.set(cat, atual)
+  }
+  const motivos = [...porMotivo.entries()].sort((x, y) => y[1].qtd - x[1].qtd || y[1].valor - x[1].valor)
 
   // Materiais dos pedidos fechados no período (para planejar compra de papel)
   const porMaterial = new Map<string, { qtd: number; valor: number }>()
@@ -250,15 +265,27 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente }
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
           <Cartao className="ds-entrada">
             <TituloCartao titulo="De onde vêm os clientes" icone={<Megaphone className="w-4 h-4" />}
-              sub={`Valor dos pedidos de ${per.nome} por origem informada no cadastro do cliente`} />
+              sub={`Valor dos pedidos de ${per.nome} por canal de origem do cliente`} />
             {origens.length === 0
               ? <Vazio icone={<Megaphone className="w-8 h-8" />} titulo="Nenhum pedido no período" />
               : <ListaBarras formatoValor={brl} onClick={k => { const o = origens[Number(k)]; const nome = [...o[1].clientes][0]; if (nome) onAbrirCliente(pedidos.find(p => nomeChave(p.nomeCliente) === nome)?.nomeCliente ?? nome) }}
                   itens={origens.map(([nome, o], i) => ({ chave: i, rotulo: nome, qtd: o.clientes.size, valor: o.valor, peso: o.valor, tom: nome === "Sem origem informada" ? "neutro" as const : "acento" as const }))} />}
             {origens.some(([n]) => n === "Sem origem informada") && (
-              <p className="text-[11px] text-[#898892] mt-3">Informe a origem no perfil do cliente para saber quais campanhas trazem venda. O número em negrito é a quantidade de clientes.</p>
+              <p className="text-[11px] text-[#898892] mt-3">Informe como o cliente chegou no perfil dele (ou no orçamento, na primeira vez) para saber o que traz venda. O número em negrito é a quantidade de clientes.</p>
             )}
           </Cartao>
+          <Cartao className="ds-entrada">
+            <TituloCartao titulo="Por que perdemos" icone={<CircleSlash className="w-4 h-4" />}
+              sub={`Orçamentos de ${per.nome} marcados como perdidos, por motivo; o número em negrito é a quantidade`} />
+            {motivos.length === 0
+              ? <Vazio icone={<CircleSlash className="w-8 h-8" />} titulo="Nenhuma perda com motivo no período" />
+              : <ListaBarras formatoValor={brl}
+                  itens={motivos.map(([cat, m]) => ({ chave: cat, rotulo: rotuloPerda(cat), qtd: m.qtd, valor: m.valor, peso: m.qtd, tom: cat === "outraOpcao" ? "neutro" as const : "perigo" as const }))} />}
+            {venceram > 0 && <p className="text-[11px] text-[#898892] mt-3">Mais {venceram} {venceram === 1 ? "orçamento venceu" : "orçamentos venceram"} sem resposta (não entram na lista).</p>}
+          </Cartao>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
           <Cartao className="ds-entrada">
             <TituloCartao titulo="Materiais vendidos" icone={<Layers className="w-4 h-4" />}
               sub={`Pedidos de ${per.nome}: valor por material; o número em negrito é a quantidade de unidades`} />

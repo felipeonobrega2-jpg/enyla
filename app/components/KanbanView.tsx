@@ -5,6 +5,7 @@ import { Flame, X, ChevronDown } from "lucide-react"
 import { KanbanCard, KanbanOpcao, Lote, LancamentoFinanceiro, NegocioParceiro, StatusLoteParceiro, COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO, COL_HOT } from "../types"
 import { brl, num } from "../utils"
 import { COL_COLORS } from "./kanban-colors"
+import { MOTIVOS_PERDA, CategoriaPerda, textoMotivo } from "../lib/coleta"
 
 // HOT é renderizado entre col 0 e col 1, mas usa índice 11 para não deslocar os existentes no DB
 const BOARD_ORDER = [0, COL_HOT, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const
@@ -683,6 +684,7 @@ function KanbanCardItem({
   const [isOpen,        setIsOpen]        = useState(false)
   const [confirmando,   setConfirmando]   = useState(false)
   const [motivoRascunho, setMotivoRascunho] = useState("")
+  const [motivoCat, setMotivoCat] = useState<CategoriaPerda | null>(null)
   const [copiedId,       setCopiedId]       = useState(false)
   const [copiedLoteLink, setCopiedLoteLink] = useState<"track" | null>(null)
   const [showLotePanel,  setShowLotePanel]  = useState(false)
@@ -755,12 +757,13 @@ function KanbanCardItem({
   function iniciarPerda() {
     setConfirmando(true)
     setMotivoRascunho("")
-    setTimeout(() => motivoRef.current?.focus(), 50)
+    setMotivoCat(null)
   }
 
   function confirmarPerda() {
-    onMove(card.id, COL_PERDIDO)
-    if (motivoRascunho.trim()) onSetMotivo(card.id, motivoRascunho.trim())
+    if (!motivoCat) return
+    if (card.coluna !== COL_PERDIDO) onMove(card.id, COL_PERDIDO)
+    onSetMotivo(card.id, textoMotivo(motivoCat, motivoRascunho))
     setConfirmando(false)
   }
 
@@ -1175,14 +1178,24 @@ function KanbanCardItem({
         {/* ── Loss confirmation ── */}
         {confirmando && (
           <div className="border-t border-[#FF3B30]/20 px-3 pb-3 pt-2.5 space-y-2" onClick={e => e.stopPropagation()}>
-            <p className="text-[10.5px] font-semibold" style={{ color: "#FF3B30" }}>Confirmar perda?</p>
+            <p className="text-[10.5px] font-semibold" style={{ color: "#FF3B30" }}>Por que perdeu?</p>
+            <div className="flex flex-wrap gap-1">
+              {MOTIVOS_PERDA.map(m => (
+                <button key={m.id} type="button" title={m.dica}
+                  onClick={() => { setMotivoCat(m.id); setTimeout(() => motivoRef.current?.focus(), 30) }}
+                  className="px-2 py-1 rounded-lg text-[10px] font-medium transition-colors"
+                  style={motivoCat === m.id ? { background: "#FF3B30", color: "#fff" } : { background: "rgba(116,116,128,0.1)", color: "#3a3a44" }}>
+                  {m.rotulo}
+                </button>
+              ))}
+            </div>
             <input
               ref={motivoRef}
               type="text"
               value={motivoRascunho}
               onChange={e => setMotivoRascunho(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") confirmarPerda(); if (e.key === "Escape") setConfirmando(false) }}
-              placeholder="Motivo (opcional)…"
+              placeholder="Detalhe (opcional)…"
               className="w-full text-[10px] text-[#1C1C1E] bg-white border border-[rgba(0,0,0,0.12)] rounded-xl px-2.5 py-1.5 placeholder:text-[rgba(60,60,67,0.36)] focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25 focus:border-[#8456e8] cursor-text select-text"
             />
             <div className="flex gap-1.5">
@@ -1190,8 +1203,8 @@ function KanbanCardItem({
                 className="flex-1 py-2 text-[10px] font-medium text-[#8E8E93] hover:bg-[rgba(0,0,0,0.04)] rounded-xl transition-colors">
                 Cancelar
               </button>
-              <button onClick={confirmarPerda}
-                className="flex-1 py-2 text-[10px] font-bold text-white rounded-xl transition-colors"
+              <button onClick={confirmarPerda} disabled={!motivoCat}
+                className="flex-1 py-2 text-[10px] font-bold text-white rounded-xl transition-colors disabled:opacity-40"
                 style={{ background: "#FF3B30" }}>
                 Confirmar
               </button>
@@ -1200,8 +1213,15 @@ function KanbanCardItem({
         )}
 
         {/* ── Reopen lost ── */}
-        {isPerdido && (
+        {isPerdido && !confirmando && (
           <div className="border-t border-[#FF3B30]/20 px-2.5 pb-2.5 pt-0" onClick={e => e.stopPropagation()}>
+            {!card.motivoPerdido && (
+              <button onClick={iniciarPerda}
+                className="w-full py-2 text-[10px] font-semibold rounded-xl transition-colors hover:bg-[#FF3B30]/5"
+                style={{ color: "#FF3B30" }}>
+                Por que perdeu?
+              </button>
+            )}
             <button onClick={() => onMove(card.id, 0)}
               className="w-full py-2 text-[10px] font-medium rounded-xl transition-colors hover:bg-[#FF3B30]/5"
               style={{ color: "#FF3B30" }}>

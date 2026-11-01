@@ -32,9 +32,12 @@ function isFechado(card: KanbanCard) {
   return card.coluna >= COL_FECHADO && card.coluna !== COL_PERDIDO
 }
 
+import { OrigemCliente } from "../lib/coleta"
+import { EditorOrigem } from "./EditorOrigem"
+
 export function ClientePerfilModal({
   nome, cadastro, itens, propostas, kanban, lancamentos,
-  onClose, onReplicar, onWhatsApp, onSave,
+  onClose, onReplicar, onWhatsApp, onSave, origem, onSalvarOrigem,
 }: {
   nome: string
   cadastro?: Cliente | null
@@ -46,6 +49,8 @@ export function ClientePerfilModal({
   onReplicar: (item: HistItem) => void
   onWhatsApp: (item: HistItem) => void
   onSave?: (updates: Partial<Cliente>) => void
+  origem?: (OrigemCliente & { deduzida?: boolean }) | null
+  onSalvarOrigem?: (o: OrigemCliente | null) => void
 }) {
   const [campanhas, setCampanhas]     = useState<MetaCampanha[]>([])
   const [loadingCamp, setLoadingCamp] = useState(false)
@@ -247,10 +252,12 @@ export function ClientePerfilModal({
               sub={frequenciaDias !== null ? "entre pedidos" : vendas > 0 ? "1º pedido" : undefined} />
           </div>
 
-          {/* Origem (campanha Meta Ads) */}
-          {onSave && cadastro && (
+          {/* Como chegou: canal (anúncio, indicação…); no anúncio, a campanha do Meta */}
+          {(onSalvarOrigem || (onSave && cadastro)) && (
             <div className="px-6 pt-4">
-              <SectionLabel>Origem</SectionLabel>
+              <SectionLabel>Como chegou</SectionLabel>
+              {onSalvarOrigem && <EditorOrigem origem={origem ?? null} onSalvar={onSalvarOrigem} />}
+              {onSave && cadastro && (origem?.canal === "anuncio" || cadastro.origemCampanhaId) && (
               <div className="relative flex-1 mt-2">
                 <select
                   value={cadastro.origemCampanhaId ?? ""}
@@ -271,7 +278,7 @@ export function ClientePerfilModal({
                     border: "1px solid var(--border)",
                     color: "var(--text-main)",
                   }}>
-                  <option value="">Sem origem definida</option>
+                  <option value="">Qual campanha?</option>
                   {campanhas.map(c => (
                     <option key={c.id} value={c.id}>{c.nome}</option>
                   ))}
@@ -281,6 +288,7 @@ export function ClientePerfilModal({
                   <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
+              )}
             </div>
           )}
 
@@ -612,3 +620,4 @@ function PaginaDoCliente({ nome }: { nome: string }) {
     </div>
   )
 }
+
