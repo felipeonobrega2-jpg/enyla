@@ -383,12 +383,15 @@ const GRUPOS_PERIODO: { label: string; items: { id: Periodo; label: string }[] }
 
 // ─── Gerador de relatório mensal ─────────────────────────────────────────────
 
+import { LOGO_DARK_B64 } from "../pdf"
+
 export function gerarHtmlRelatorio({
   periodoLabel, dreRec, dreDesp,
   kpisData, topClientesData, materiaisData,
   aReceber, aReceberCount, vencidos, vencidosCount,
-  dataGeracao,
+  dataGeracao, materiaisEmPedidos = false,
 }: {
+  materiaisEmPedidos?: boolean
   periodoLabel: string
   dreRec: number; dreDesp: number
   kpisData: { receita: number; vendas: number; ticket: number; conversao: number; pipelineGlobal: number; total: number; clientesUnicos: number }
@@ -422,7 +425,7 @@ export function gerarHtmlRelatorio({
   const matRows = materiaisData.slice(0, 6).map(m => `
     <tr>
       <td>${m.nome}</td>
-      <td class="right">${m.count} pedido${m.count !== 1 ? "s" : ""}</td>
+      <td class="right">${m.count.toLocaleString("pt-BR")} ${materiaisEmPedidos ? (m.count === 1 ? "pedido" : "pedidos") : "un"}</td>
       <td class="right muted">${brl(m.value)}</td>
     </tr>`).join("") || `<tr><td colspan="3" class="muted" style="text-align:center;padding:12px">Sem dados</td></tr>`
 
@@ -435,60 +438,62 @@ export function gerarHtmlRelatorio({
   @page { margin: 18mm 16mm; size: A4 portrait; }
   @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; font-size: 10px; color: #111; line-height: 1.45; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif; font-size: 10px; color: #191625; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+  @media screen { body { padding: 34px 40px; max-width: 900px; margin: 0 auto; } }
 
-  .header { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 10px; border-bottom: 2px solid #111; margin-bottom: 16px; }
+  .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 14px; border-bottom: 1px solid #ebe9f5; margin-bottom: 18px; }
   .brand { font-size: 22px; font-weight: 800; letter-spacing: -0.04em; }
   .header-right { text-align: right; }
-  .period { font-size: 13px; font-weight: 700; }
-  .gen-date { font-size: 8.5px; color: #888; margin-top: 2px; }
+  .period { font-size: 13px; font-weight: 700; color: #191625; }
+  .gen-date { font-size: 8.5px; color: #898892; margin-top: 2px; }
 
-  h2 { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #888; margin-bottom: 7px; }
+  h2 { display: flex; align-items: center; gap: 8px; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: #898892; margin-bottom: 8px; }
+  h2::after { content: ""; flex: 1; height: 1px; background: #ebe9f5; }
   section { margin-bottom: 15px; }
 
-  .dre { background: #f7f7f7; border-radius: 6px; padding: 11px 14px; }
+  .dre { background: #f8f7fc; border-radius: 12px; padding: 12px 16px; }
   .dre-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; }
-  .dre-sep { border-top: 1px solid #ddd; margin: 7px 0 5px; }
+  .dre-sep { border-top: 1px solid #ebe9f5; margin: 7px 0 5px; }
   .dre-total { display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; }
-  .green { color: #166534; }
-  .red   { color: #991b1b; }
+  .green { color: #009351; }
+  .red   { color: #d33a3c; }
   .tn    { font-variant-numeric: ds-num; }
 
   .kpi-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; }
-  .kpi-box  { border: 1px solid #e5e5e5; border-radius: 6px; padding: 8px 10px; }
-  .kpi-label { font-size: 7.5px; color: #888; text-transform: uppercase; letter-spacing: 0.06em; }
+  .kpi-box  { background: #f8f7fc; border-radius: 10px; padding: 9px 11px; }
+  .kpi-label { font-size: 7.5px; color: #898892; text-transform: uppercase; letter-spacing: 0.06em; }
   .kpi-val  { font-size: 16px; font-weight: 700; margin: 3px 0 2px; font-variant-numeric: ds-num; }
-  .kpi-sub  { font-size: 7.5px; color: #aaa; }
+  .kpi-sub  { font-size: 7.5px; color: #898892; }
 
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   table { width: 100%; border-collapse: collapse; font-size: 10px; }
-  th { text-align: left; padding: 4px 8px; background: #f3f3f3; font-size: 7.5px; text-transform: uppercase; letter-spacing: 0.06em; color: #888; font-weight: 700; }
-  td { padding: 5px 8px; border-bottom: 1px solid #f0f0f0; }
+  th { text-align: left; padding: 5px 8px; background: #f8f7fc; font-size: 7.5px; text-transform: uppercase; letter-spacing: 0.06em; color: #898892; font-weight: 700; }
+  td { padding: 6px 8px; border-bottom: 1px solid #ebe9f5; }
   td.right { text-align: right; font-variant-numeric: ds-num; font-weight: 600; }
-  td.muted { color: #888; }
+  td.muted { color: #898892; }
 
   .fin-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
-  .fin-box  { border-radius: 6px; padding: 10px 12px; }
-  .fin-green { background: #f0fdf4; border: 1px solid #bbf7d0; }
-  .fin-amber { background: #fffbeb; border: 1px solid #fde68a; }
-  .fin-red   { background: #fef2f2; border: 1px solid #fecaca; }
-  .fin-label { font-size: 7.5px; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+  .fin-box  { border-radius: 12px; padding: 11px 13px; }
+  .fin-green { background: #ebf8f0; }
+  .fin-amber { background: #fff6e8; }
+  .fin-red   { background: #fdeeed; }
+  .fin-label { font-size: 7.5px; color: #898892; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
   .fin-val   { font-size: 16px; font-weight: 700; font-variant-numeric: ds-num; }
-  .fin-green .fin-val { color: #166534; }
-  .fin-amber .fin-val { color: #92400e; }
-  .fin-red   .fin-val { color: #991b1b; }
+  .fin-green .fin-val { color: #009351; }
+  .fin-amber .fin-val { color: #c57800; }
+  .fin-red   .fin-val { color: #d33a3c; }
   .fin-sub   { font-size: 8px; margin-top: 3px; }
-  .fin-green .fin-sub { color: #4ade80; }
-  .fin-amber .fin-sub { color: #f59e0b; }
-  .fin-red   .fin-sub { color: #f87171; }
+  .fin-green .fin-sub { color: #5e5c68; }
+  .fin-amber .fin-sub { color: #5e5c68; }
+  .fin-red   .fin-sub { color: #5e5c68; }
 
-  .footer { border-top: 1px solid #e5e5e5; margin-top: 16px; padding-top: 7px; font-size: 8px; color: #aaa; display: flex; justify-content: space-between; }
+  .footer { border-top: 1px solid #ebe9f5; margin-top: 18px; padding-top: 8px; font-size: 8px; color: #898892; display: flex; justify-content: space-between; }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <div class="brand">Enyla.</div>
+  <img src="${LOGO_DARK_B64}" alt="Enyla" style="height:24px;display:block" />
   <div class="header-right">
     <div class="period">Relatório · ${periodoLabel}</div>
     <div class="gen-date">Gerado em ${dataGeracao}</div>
@@ -1188,7 +1193,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
       dreRec, dreDesp,
       kpisData: kpis,
       topClientesData: topClientes.clientes,
-      materiaisData: materiais.materiais,
+      materiaisData: materiais.materiais, materiaisEmPedidos: true,
       aReceber:      pendentes.reduce((s, l) => s + l.valor, 0),
       aReceberCount: pendentes.length,
       vencidos:      vencidosArr.reduce((s, l) => s + l.valor, 0),
