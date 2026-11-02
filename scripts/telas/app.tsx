@@ -64,6 +64,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       c("4@lid", "Hassan", "Bora, bora", 2, 1.5),
       c("5@lid", "Ana Cosméticos", "Perfeito, pode seguir", 3, 2.5, { campanha: JSON.stringify({ canal: "site" }) }),
       c("6@lid", "Juliana", "ok", 4, 3.5),
+      c("5511977776666@s.whatsapp.net", "Raniere Péricles", "Bom dia, chegou?", 0.02, 0.5),
     ]))
   }
   if (u.startsWith("/api/whatsapp/pendentes")) {

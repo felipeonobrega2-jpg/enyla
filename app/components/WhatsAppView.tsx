@@ -1,6 +1,6 @@
 "use client"
 
-import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag, ChevronRight, Reply, Keyboard, Sparkles, Laptop, Smartphone, Trash2, Square } from "lucide-react"
+import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag, ChevronRight, Reply, Keyboard, Sparkles, Laptop, Smartphone, Trash2, Square, Merge } from "lucide-react"
 import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, nomeChave } from "../lib/negocio"
@@ -234,6 +234,26 @@ export default function WhatsAppView({
     (filtro === "todas" || filtro === "fechadas" || filtro === "responder" || (filtro === "clientes" ? !!clienteDe(c) : lerOrigem(c.campanha)?.canal === filtro)) &&
     (c.nome.toLowerCase().includes(busca.toLowerCase()) || (c.ultima_msg ?? "").toLowerCase().includes(busca.toLowerCase()))
   )
+
+  // Mesma pessoa em duas conversas (número e @lid com o mesmo nome): oferece juntar
+  const gemea = ativa && ativa.nome && !/^\d+$/.test(ativa.nome)
+    ? conversas.find(c => c.jid !== ativa.jid && c.nome === ativa.nome && (c.jid.endsWith("@lid") !== ativa.jid.endsWith("@lid")))
+    : undefined
+  const [juntando, setJuntando] = useState(false)
+  async function juntarComGemea() {
+    if (!ativa || !gemea) return
+    setJuntando(true)
+    const r = await fetch("/api/whatsapp/juntar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ a: ativa.jid, b: gemea.jid }) }).catch(() => null)
+    const d = r ? await r.json().catch(() => null) : null
+    setJuntando(false)
+    if (!r?.ok) { alert(d?.erro ?? "Não juntou."); return }
+    cache.current.delete(ativa.jid); cache.current.delete(gemea.jid)
+    const res = await fetch("/api/whatsapp/conversas").then(x => x.json()).catch(() => null)
+    const lista: Conversa[] = Array.isArray(res) ? res : conversas
+    setConversas(lista)
+    const fica = lista.find(c => c.jid === d.fica)
+    if (fica) abrirConversa(fica)
+  }
 
   const totalNaoLidas = conversas.reduce((s, c) => s + c.nao_lidas, 0)
   const totalAguardando = conversas.filter(aguardando).length
@@ -490,6 +510,12 @@ export default function WhatsAppView({
                 <ClienteDaConversa cliente={clienteDe(ativa)} resumo={resumo} clientes={nomesClientes}
                   onVincular={onVincular ? nome => onVincular(ativa.jid, nome) : undefined} onAbrir={onAbrirCliente} />
               </div>
+              {gemea && (
+                <button onClick={juntarComGemea} disabled={juntando} title={`Mesma pessoa em duas conversas (${gemea.jid.endsWith("@lid") ? "identificador novo" : "número"}). Junta tudo numa só.`}
+                  className="flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-xl transition-colors disabled:opacity-50" style={{ background: "rgba(197,120,0,0.12)", color: "#b26b00" }}>
+                  <Merge className="w-4 h-4" />{juntando ? "Juntando…" : `Juntar com a outra conversa de ${ativa.nome.split(" ")[0]}`}
+                </button>
+              )}
               <EtiquetasDaConversa selecionadas={ativa.etiquetas ?? []} definicoes={etiquetasDef}
                 onMudar={lista => { alterar([ativa.jid], { etiquetas: lista }); setAtiva(a => a ? { ...a, etiquetas: lista } : a) }}
                 onCriar={onCriarEtiqueta} />

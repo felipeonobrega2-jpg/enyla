@@ -2,6 +2,7 @@
 // Grava em lote: o histórico chega com milhares de mensagens de uma vez e, uma a uma, estourava o tempo da Vercel.
 
 import { supabase } from "./supabase"
+import { lerApelidos, juntarConversas } from "./juntarConversas"
 
 // ── Tipos Evolution API ────────────────────────────────────────────────────
 
@@ -73,9 +74,26 @@ const tsDe = (m: WaMessage) => new Date((Number(m.messageTimestamp) || Date.now(
  *   contarNaoLidas: só para mensagem nova em tempo real (histórico não vira "não lida")
  *   nomes: nome por jid vindo dos contatos (completa quem só tem o número)
  */
+// Os dois identificadores da mesma pessoa numa mensagem (o número e o @lid), quando o WhatsApp manda os dois
+export function parDaMensagem(key: WaKey): { lid: string; pn: string } | null {
+  const js = [key.remoteJid, key.remoteJidAlt, key.senderPn].filter(Boolean) as string[]
+  const lid = js.find(j => j.endsWith("@lid")), pn = js.find(j => j.endsWith("@s.whatsapp.net"))
+  return lid && pn ? { lid, pn } : null
+}
+
 export async function gravarLote(msgs: WaMessage[], opts: { contarNaoLidas?: boolean; nomes?: Map<string, string> } = {}) {
-  const validas = msgs.filter(m => m?.key?.remoteJid && m.key.id && !deveIgnorar(m.key.remoteJid))
-  if (!validas.length) return 0
+  const brutas = msgs.filter(m => m?.key?.remoteJid && m.key.id && !deveIgnorar(m.key.remoteJid))
+  if (!brutas.length) return 0
+
+  // Mesma pessoa, dois identificadores: tudo vai para a conversa do número (e aprende pares novos)
+  const apelidos = await lerApelidos()
+  const novos: { sai: string; fica: string }[] = []
+  for (const m of brutas) {
+    const par = parDaMensagem(m.key)
+    if (par && !apelidos[par.lid] && !novos.some(n => n.sai === par.lid)) novos.push({ sai: par.lid, fica: par.pn })
+  }
+  const destino = (jid: string) => apelidos[jid] ?? novos.find(n => n.sai === jid)?.fica ?? jid
+  const validas = brutas.map(m => destino(m.key.remoteJid) === m.key.remoteJid ? m : { ...m, key: { ...m.key, remoteJid: destino(m.key.remoteJid) } })
 
   // Conversas: a última mensagem só avança (histórico antigo não sobrescreve a mais nova)
   const porJid = new Map<string, { ts: string; corpo: string; nome?: string; telefone?: string | null; recebida?: string; enviada?: string }>()
@@ -125,5 +143,7 @@ export async function gravarLote(msgs: WaMessage[], opts: { contarNaoLidas?: boo
 
   if (opts.contarNaoLidas)
     for (const m of validas) if (!m.key.fromMe) await supabase.rpc("incrementar_nao_lidas", { p_jid: m.key.remoteJid })
+  // Par aprendido agora: a conversa antiga do @lid (se houver) se junta à do número
+  for (const n of novos) await juntarConversas(n.sai, n.fica).catch(() => null)
   return validas.length
 }
