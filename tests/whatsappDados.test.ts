@@ -5,7 +5,7 @@ const upserts: Record<string, unknown>[][] = []
 vi.mock("@/app/lib/supabase", () => ({
   supabase: {
     from: (t: string) => ({
-      select: () => ({ in: async () => ({ data: t === "whatsapp_conversas" ? [{ jid: "a@lid", ultima_at: "2026-10-01T00:00:00.000Z", ultima_msg: "mais nova", nome: "Ana", telefone: null }] : [] }) }),
+      select: () => ({ in: async () => ({ data: t === "whatsapp_conversas" ? [{ jid: "a@lid", ultima_at: "2026-10-01T00:00:00.000Z", ultima_msg: "mais nova", nome: "Ana", telefone: null, ultima_recebida_at: "2026-10-01T00:00:00.000Z", ultima_enviada_at: null }] : [] }) }),
       upsert: async (linhas: Record<string, unknown>[]) => { if (t === "whatsapp_conversas") upserts.push(linhas); return {} },
     }),
     rpc: async () => ({}),

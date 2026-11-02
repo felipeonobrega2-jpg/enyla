@@ -22,7 +22,7 @@ import { origemDoCliente } from "@/app/lib/coleta"
 import { PrecoQueFecha } from "@/app/components/PrecoQueFecha"
 import { ModalLancamento } from "@/app/components/FinanceiroView"
 import { PainelToken } from "@/app/components/MetaAdsView"
-import { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa } from "@/app/components/WhatsAppView"
+import { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas } from "@/app/components/WhatsAppView"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
 // Abas do Financeiro: "financeiro-receber" abre a aba "receber"
@@ -63,6 +63,26 @@ function Telas() {
         <div className="flex gap-2 items-center"><span className="text-[13px] font-semibold">Camilo</span><SeloOrigem campanha={JSON.stringify({ canal: "anuncio", campanhaNome: "(JEROGRAF) - TESTAR NOVAMENTE Campanha" })} /><SeloOrigem campanha={JSON.stringify({ canal: "site" })} /></div>
         <OrigemDaConversa campanha={JSON.stringify({ canal: "anuncio", campanhaNome: "(JEROGRAF) - TESTAR NOVAMENTE Campanha", provavel: true })} />
       </div>)
+    }
+    case "funil": {
+      const hj = new Date("2026-11-02T12:00:00Z"), h = (d: number) => new Date(hj.getTime() - d * 86_400_000).toISOString()
+      const anuncio = JSON.stringify({ canal: "anuncio", campanhaNome: "TESTAR NOVAMENTE" }), site = JSON.stringify({ canal: "site" })
+      const cv = (jid: string, nome: string, msg: string, rec: number, env: number | null, campanha?: string, extra = {}) =>
+        ({ jid, nome, ultima_msg: msg, ultima_at: h(Math.min(rec, env ?? 99)), nao_lidas: 0, foto_url: null, campanha, ultima_recebida_at: h(rec), ultima_enviada_at: env == null ? null : h(env), ...extra })
+      const conversas = [
+        cv("1@lid", "Camilo", "Olá, Gostaria se saber mais sobre as caixinhas.", 0.1, null, anuncio),
+        cv("2@lid", "Bia Doces", "Quanto fica 500?", 0.3, 1, site),
+        cv("3@lid", "Marcos", "[audioMessage]", 2, 1.5, anuncio),
+        cv("4@lid", "Juliana", "Vou ver com meu sócio", 5, 4, anuncio),
+        cv("5@lid", "Ana Cosméticos", "Perfeito, pode seguir", 1, 0.5, undefined),
+        cv("6@lid", "Carla Velas", "Recebi a proposta", 0.2, 1, anuncio),
+        cv("7@lid", "Pedro", "ok", 20, 19, site),
+        cv("8@lid", "Rafa", "Fechado então", 3, 2, anuncio, { status_lead: "negociando", ultima_classificacao_at: h(2) }),
+      ]
+      const nomes = ["Ana Cosméticos", "Carla Velas"]
+      return <div style={{ height: "100vh" }}><FunilConversas hoje={hj} conversas={conversas} onAbrir={() => {}} onMover={() => {}} onVoltar={() => {}}
+        clienteDe={c => nomes.includes(c.nome) ? { nome: c.nome } : null}
+        cardsDe={c => dados.kanban.filter(k => k.nomeCliente === c.nome)} /></div>
     }
     case "calibragem": return pagina(<CalibragemView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onAtualizarConfig={setCfg} onDividir={() => {}} />)
     case "rotas": {

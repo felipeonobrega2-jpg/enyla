@@ -65,6 +65,7 @@ function telefoneDe(key: WaKey): string | null {
   return null
 }
 
+const maisNova = (a?: string | null, b?: string) => !a ? b ?? null : !b ? a : new Date(b) > new Date(a) ? b : a
 const tsDe = (m: WaMessage) => new Date((Number(m.messageTimestamp) || Date.now() / 1000) * 1000).toISOString()
 
 /**
@@ -77,19 +78,22 @@ export async function gravarLote(msgs: WaMessage[], opts: { contarNaoLidas?: boo
   if (!validas.length) return 0
 
   // Conversas: a última mensagem só avança (histórico antigo não sobrescreve a mais nova)
-  const porJid = new Map<string, { ts: string; corpo: string; nome?: string; telefone?: string | null }>()
+  const porJid = new Map<string, { ts: string; corpo: string; nome?: string; telefone?: string | null; recebida?: string; enviada?: string }>()
   for (const m of validas) {
     const { corpo, tipo } = extractBody(m)
     const ts = tsDe(m)
     const atual = porJid.get(m.key.remoteJid)
     const nome = !m.key.fromMe && m.pushName ? m.pushName : undefined
-    if (!atual || ts > atual.ts) porJid.set(m.key.remoteJid, { ts, corpo: corpo ?? `[${tipo}]`, nome: nome ?? atual?.nome, telefone: telefoneDe(m.key) ?? atual?.telefone })
+    if (!atual || ts > atual.ts) porJid.set(m.key.remoteJid, { ts, corpo: corpo ?? `[${tipo}]`, nome: nome ?? atual?.nome, telefone: telefoneDe(m.key) ?? atual?.telefone, recebida: atual?.recebida, enviada: atual?.enviada })
     else if (nome && !atual.nome) atual.nome = nome
+    // Última recebida e última enviada (funil: quem espera resposta, quem esfriou)
+    const r = porJid.get(m.key.remoteJid)!
+    if (m.key.fromMe) { if (!r.enviada || ts > r.enviada) r.enviada = ts } else if (!r.recebida || ts > r.recebida) r.recebida = ts
   }
   const jids = [...porJid.keys()]
-  const existentes = new Map<string, { ultima_at: string | null; ultima_msg: string | null; nome: string | null; telefone: string | null }>()
+  const existentes = new Map<string, { ultima_at: string | null; ultima_msg: string | null; nome: string | null; telefone: string | null; ultima_recebida_at: string | null; ultima_enviada_at: string | null }>()
   for (let i = 0; i < jids.length; i += 300) {
-    const { data } = await supabase.from("whatsapp_conversas").select("jid, ultima_at, ultima_msg, nome, telefone").in("jid", jids.slice(i, i + 300))
+    const { data } = await supabase.from("whatsapp_conversas").select("jid, ultima_at, ultima_msg, nome, telefone, ultima_recebida_at, ultima_enviada_at").in("jid", jids.slice(i, i + 300))
     for (const c of data ?? []) existentes.set(c.jid, c)
   }
   const numero = (s?: string | null) => !!s && /^\d+$/.test(s)
@@ -105,6 +109,8 @@ export async function gravarLote(msgs: WaMessage[], opts: { contarNaoLidas?: boo
       // Toda linha do lote leva todos os campos: campo ausente num upsert em lote vira vazio no banco
       ultima_msg: avanca ? n.corpo : e?.ultima_msg ?? n.corpo,
       ultima_at: avanca ? n.ts : e?.ultima_at ?? n.ts,
+      ultima_recebida_at: maisNova(e?.ultima_recebida_at, n.recebida),
+      ultima_enviada_at: maisNova(e?.ultima_enviada_at, n.enviada),
     }
   })
   for (let i = 0; i < conversas.length; i += 500)

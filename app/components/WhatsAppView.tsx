@@ -1,11 +1,12 @@
 "use client"
 
-import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video } from "lucide-react"
+import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Columns3, List, Pin } from "lucide-react"
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, nomeChave } from "../lib/negocio"
 import { clienteDaConversa, Vinculos } from "../lib/vinculoWhatsapp"
 import { lerOrigem } from "../lib/origemWhatsapp"
+import { ETAPAS, Etapa, posicaoNoFunil } from "../lib/funilWhatsapp"
 import { brl } from "../utils"
 
 type Conversa = {
@@ -16,6 +17,10 @@ type Conversa = {
   nao_lidas: number
   foto_url: string | null
   campanha?: string | null
+  ultima_recebida_at?: string | null
+  ultima_enviada_at?: string | null
+  status_lead?: string | null
+  ultima_classificacao_at?: string | null
 }
 
 type Mensagem = {
@@ -97,6 +102,7 @@ export default function WhatsAppView({
   useEffect(() => { fetch("/api/whatsapp/status").then(r => r.json()).then(setStatus).catch(() => {}) }, [])
   const [busca, setBusca] = useState("")
   const [filtro, setFiltro] = useState<"todas" | "anuncio" | "site" | "clientes">("todas")
+  const [modo, setModo] = useState<"lista" | "funil">("lista")
   const threadRef = useRef<HTMLDivElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -170,6 +176,17 @@ export default function WhatsAppView({
 
   const totalNaoLidas = conversas.reduce((s, c) => s + c.nao_lidas, 0)
 
+  if (modo === "funil") return (
+    <FunilConversas conversas={conversas} cardsDe={c => { const cl = clienteDe(c); return cl ? kanban.filter(k => nomeChave(k.nomeCliente) === nomeChave(cl.nome)) : [] }}
+      clienteDe={clienteDe}
+      onAbrir={c => { setModo("lista"); abrirConversa(c) }}
+      onMover={async (jid, etapa) => {
+        setConversas(prev => prev.map(c => c.jid === jid ? { ...c, status_lead: etapa, ultima_classificacao_at: etapa ? new Date().toISOString() : null } : c))
+        await fetch("/api/whatsapp/conversas", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid, etapa }) }).catch(() => {})
+      }}
+      onVoltar={() => setModo("lista")} />
+  )
+
   return (
     <div className="flex h-full" style={{ background: "var(--bg-page)" }}>
 
@@ -184,6 +201,9 @@ export default function WhatsAppView({
               <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.532 5.862L.057 23.929a.5.5 0 0 0 .614.614l6.067-1.475A11.944 11.944 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.933 0-3.742-.523-5.289-1.433l-.378-.225-3.924.953.953-3.924-.225-.378A9.956 9.956 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
             </svg>
             <span className="text-[15px] font-semibold" style={{ color: "var(--text-main)" }}>WhatsApp</span>
+            <button onClick={() => setModo("funil")} className="ml-2 h-7 px-2.5 rounded-lg text-[11.5px] font-semibold flex items-center gap-1" style={{ background: "rgba(132,86,232,0.1)", color: "#8456e8" }}>
+              <Columns3 className="w-3.5 h-3.5" />Funil
+            </button>
             {totalNaoLidas > 0 && (
               <span className="ml-auto text-[11px] font-bold text-white bg-[#25D366] rounded-full px-2 py-0.5">
                 {totalNaoLidas}
@@ -719,5 +739,106 @@ export function OrigemDaConversa({ campanha }: { campanha?: string | null }) {
     <p className="text-[11px]" style={{ color: "var(--text-faint)" }}>
       {o.canal === "anuncio" ? <>veio do anúncio{o.campanhaNome ? <> · <b style={{ color: "#c57800" }}>{o.campanhaNome}</b>{o.provavel ? " (provável)" : ""}</> : ""}</> : o.canal === "site" ? "veio pelo botão do site" : "veio do Instagram"}
     </p>
+  )
+}
+
+// Funil de conversas (antes da venda): leads por etapa, arrastáveis; "responder" = cliente falou por último
+const PERIODOS = [{ dias: 30, nome: "30 dias" }, { dias: 60, nome: "60 dias" }, { dias: 90, nome: "90 dias" }, { dias: 0, nome: "Tudo" }] as const
+
+export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover, onVoltar, hoje = new Date() }: {
+  conversas: Conversa[]
+  cardsDe: (c: Conversa) => KanbanCard[]
+  clienteDe: (c: Conversa) => { nome: string } | null
+  onAbrir: (c: Conversa) => void
+  onMover: (jid: string, etapa: Etapa | null) => void
+  onVoltar: () => void
+  hoje?: Date
+}) {
+  const [periodo, setPeriodo] = useState<number>(30)
+  const [origem, setOrigem] = useState<"todas" | "anuncio" | "site">("todas")
+  const [arrastando, setArrastando] = useState<string | null>(null)
+  const [sobre, setSobre] = useState<Etapa | null>(null)
+  const limite = periodo ? hoje.getTime() - periodo * 86_400_000 : 0
+  const itens = conversas
+    .filter(c => !c.jid.endsWith("@g.us") && c.ultima_recebida_at && new Date(c.ultima_at ?? 0).getTime() >= limite)
+    .filter(c => origem === "todas" || lerOrigem(c.campanha)?.canal === origem)
+    .map(c => ({ c, p: posicaoNoFunil(c, cardsDe(c), hoje) }))
+  const porEtapa = (e: Etapa) => itens.filter(i => i.p.etapa === e)
+    .sort((a, b) => Number(b.p.responder) - Number(a.p.responder) || (b.c.ultima_at ?? "").localeCompare(a.c.ultima_at ?? ""))
+  const brl0 = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
+  return (
+    <div className="h-full flex flex-col" style={{ background: "var(--bg-page)" }}>
+      <div className="px-5 py-3 border-b flex items-center gap-3 flex-wrap" style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
+        <span className="text-[15px] font-semibold" style={{ color: "var(--text-main)" }}>Funil de conversas</span>
+        <button onClick={onVoltar} className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold flex items-center gap-1" style={{ background: "rgba(132,86,232,0.1)", color: "#8456e8" }}>
+          <List className="w-3.5 h-3.5" />Lista
+        </button>
+        <div className="flex gap-1 ml-auto flex-wrap">
+          {(["todas", "anuncio", "site"] as const).map(o => (
+            <button key={o} onClick={() => setOrigem(o)} className="h-7 px-2.5 rounded-full text-[11.5px] font-medium"
+              style={origem === o ? { background: "#191625", color: "#fff" } : { background: "var(--bg-page)", color: "var(--text-sub)", border: "1px solid var(--border)" }}>
+              {o === "todas" ? "Todas origens" : o === "anuncio" ? "Anúncio" : "Site"}
+            </button>
+          ))}
+          <span className="w-px mx-1" style={{ background: "var(--border)" }} />
+          {PERIODOS.map(p => (
+            <button key={p.dias} onClick={() => setPeriodo(p.dias)} className="h-7 px-2.5 rounded-full text-[11.5px] font-medium"
+              style={periodo === p.dias ? { background: "#191625", color: "#fff" } : { background: "var(--bg-page)", color: "var(--text-sub)", border: "1px solid var(--border)" }}>
+              {p.nome}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex-1 overflow-x-auto overflow-y-hidden">
+        <div className="flex gap-3 p-4 h-full min-w-full w-max">
+          {ETAPAS.map(e => {
+            const lista = porEtapa(e.id)
+            const valor = lista.reduce((t, i) => t + (i.p.valor ?? 0), 0)
+            return (
+              <div key={e.id} className="flex-1 min-w-[210px] max-w-[320px] flex flex-col rounded-2xl transition-colors"
+                style={{ background: sobre === e.id ? "rgba(132,86,232,0.08)" : "rgba(116,116,128,0.06)" }}
+                onDragOver={ev => { ev.preventDefault(); setSobre(e.id) }} onDragLeave={() => setSobre(null)}
+                onDrop={ev => { ev.preventDefault(); setSobre(null); if (arrastando) onMover(arrastando, e.id); setArrastando(null) }}>
+                <div className="px-3.5 pt-3 pb-2">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[12.5px] font-semibold" style={{ color: "var(--text-main)" }}>{e.nome}</span>
+                    <span className="text-[11.5px] font-semibold" style={{ color: "var(--text-faint)" }}>{lista.length}</span>
+                  </div>
+                  {valor > 0 && <p className="text-[11px] ds-num" style={{ color: "var(--text-sub)" }}>{brl0(valor)}</p>}
+                </div>
+                <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2">
+                  {lista.map(({ c, p }) => {
+                    const cli = clienteDe(c)
+                    return (
+                      <div key={c.jid} draggable onDragStart={() => setArrastando(c.jid)} onDragEnd={() => setArrastando(null)}
+                        onClick={() => onAbrir(c)}
+                        className="rounded-xl p-3 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow"
+                        style={{ background: "var(--bg-surface)", opacity: arrastando === c.jid ? 0.5 : 1 }}>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-[12.5px] font-semibold truncate" style={{ color: "var(--text-main)" }}>{cli?.nome ?? c.nome}</span>
+                          <SeloOrigem campanha={c.campanha} />
+                          {p.manual && <span title="Etapa escolhida à mão"><Pin className="w-3 h-3 shrink-0" style={{ color: "var(--text-faint)" }} /></span>}
+                        </div>
+                        <p className="text-[11.5px] truncate mt-0.5 flex items-center gap-1 min-w-0" style={{ color: "var(--text-sub)" }}><Previa texto={c.ultima_msg} /></p>
+                        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                          {p.responder && <span className="text-[10px] font-bold uppercase px-1.5 py-px rounded" style={{ background: "rgba(37,163,90,0.14)", color: "#1e8a4c" }}>responder</span>}
+                          {p.esfriando && <span className="text-[10px] font-bold uppercase px-1.5 py-px rounded" style={{ background: "rgba(197,120,0,0.12)", color: "#c57800" }}>esfriando</span>}
+                          {p.valor ? <span className="text-[11px] font-semibold ds-num" style={{ color: "var(--text-main)" }}>{brl0(p.valor)}</span> : null}
+                          <span className="ml-auto text-[10.5px]" style={{ color: "var(--text-faint)" }}>{fmtHora(c.ultima_at)}</span>
+                        </div>
+                        {p.manual && (
+                          <button onClick={ev => { ev.stopPropagation(); onMover(c.jid, null) }} className="text-[10.5px] mt-1.5 underline" style={{ color: "var(--text-faint)" }}>voltar ao automático</button>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {!lista.length && <p className="text-[11.5px] text-center py-6" style={{ color: "var(--text-faint)" }}>Nenhuma conversa</p>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
   )
 }
