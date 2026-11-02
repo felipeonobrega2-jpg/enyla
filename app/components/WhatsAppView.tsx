@@ -322,8 +322,10 @@ export function ConexaoWhats({ status, onAtualizar }: { status: StatusWhats | nu
   useEffect(() => {
     if (!pareando) return
     let vivo = true
+    let primeira = true
     const buscar = async () => {
-      const r = await fetch("/api/whatsapp/qr").then(r => r.json()).catch(() => null)
+      const r = await fetch(`/api/whatsapp/qr${primeira ? "?novo=1" : ""}`).then(r => r.json()).catch(() => null)
+      primeira = false
       if (!vivo || !r) return
       if (r.evolution && status) onAtualizar({ ...status, evolution: r.evolution })
       if (r.conectado) { setPareando(false); setQr(null); return }
