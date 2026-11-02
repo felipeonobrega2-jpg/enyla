@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { transcreverPendentes } from "@/app/lib/transcricao"
+import { registrarConexao, registrarRecibos, registrarContatos } from "@/app/lib/whatsappEventos"
 import { gravarLote, WaMessage } from "@/app/lib/whatsappDados"
 
 // ── Handler principal ─────────────────────────────────────────────────────
@@ -40,6 +41,25 @@ export async function POST(req: NextRequest) {
       // Em lote (histórico não conta como "não lida")
       const processed = await gravarLote(msgs)
       return NextResponse.json({ ok: true, processed })
+    }
+
+    // ── connection.update — o número conectou ou caiu (Painel avisa)
+    if (event === "connection.update") {
+      const estado = (body.data?.state ?? body.data?.connection) as string | undefined
+      if (estado) await registrarConexao(estado)
+      return NextResponse.json({ ok: true })
+    }
+
+    // ── messages.update — entregue / lida
+    if (event === "messages.update") {
+      await registrarRecibos(Array.isArray(body.data) ? body.data : [body.data]).catch(() => {})
+      return NextResponse.json({ ok: true })
+    }
+
+    // ── contacts.upsert / contacts.update — nomes dos contatos
+    if (event === "contacts.upsert" || event === "contacts.update") {
+      await registrarContatos(Array.isArray(body.data) ? body.data : [body.data]).catch(() => {})
+      return NextResponse.json({ ok: true })
     }
 
     // Outros eventos ignorados silenciosamente

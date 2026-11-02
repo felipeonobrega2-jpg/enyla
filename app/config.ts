@@ -88,6 +88,7 @@ export type Configuracoes = {
   sinalPct?: number                                        // sinal pedido na aprovação online (%)
   feriados?: import("./lib/diasUteis").ConfigFeriados      // feriados locais nos prazos
   clientesRelacionamento?: ClienteRelacionamento[]         // pagam depois da entrega
+  whatsappConexao?: { estado: string; em: string }            // último estado da conexão do número (gravado pelo servidor)
   groqConfigurado?: boolean                                // transcrição de áudios (a chave fica só no servidor)
   vinculosWhatsapp?: import("./lib/vinculoWhatsapp").Vinculos   // conversa (jid) → cliente, escolhido na tela do WhatsApp
   origensClientes?: import("./lib/coleta").OrigensClientes   // como cada cliente chegou (nomeChave → canal)

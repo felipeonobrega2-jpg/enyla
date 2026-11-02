@@ -10,7 +10,7 @@ import { ritmoDosClientes, hojeDeLembrar, textoRitmo } from "./ritmo"
 export type TipoPendencia =
   | "aprovado" | "atrasado" | "fornecedor" | "cobrancaVencida" | "semCobranca"
   | "conferir" | "entregaProxima" | "orcamentoVencendo" | "semPrazo"
-  | "abriuProposta" | "comoFicou" | "avaliado" | "reposicao" | "meta"
+  | "abriuProposta" | "comoFicou" | "avaliado" | "reposicao" | "meta" | "whatsapp"
 
 export type Pendencia = {
   id: string
@@ -128,7 +128,12 @@ export function pendencias(args: {
     : diasMeta != null && diasMeta <= 7 ? { sub: `o token vence em ${Math.max(0, diasMeta)} ${diasMeta === 1 ? "dia" : "dias"} · troque pelo permanente`, tom: "alerta" as const }
     : null
 
+  // WhatsApp: número desconectado = mensagens deixam de chegar ao sistema
+  const whats = config.whatsappConexao && config.whatsappConexao.estado !== "open" ? config.whatsappConexao : null
+
   return [
+    ...(whats ? [{ id: "whatsapp", tipo: "whatsapp" as const, tom: "perigo" as const, titulo: "WhatsApp desconectado",
+      sub: `desde ${dataCurta(whats.em)} (${whats.estado}) · as mensagens não estão chegando ao sistema; reconecte pela tela do WhatsApp` }] : []),
     ...(meta ? [{ id: "meta", tipo: "meta" as const, tom: meta.tom, titulo: "Anúncios da Meta desconectados", sub: meta.sub }] : []),
     ...aprovados.map(a => ({
       id: `apr-${a.numero}`, tipo: "aprovado" as const, tom: "sucesso" as const, aprovacao: a,

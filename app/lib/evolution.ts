@@ -17,6 +17,8 @@ export async function evo<T = unknown>(caminho: string, init?: RequestInit): Pro
   }
 }
 
+export const EVENTOS_WEBHOOK = ["MESSAGES_UPSERT", "MESSAGES_SET", "MESSAGES_UPDATE", "CONTACTS_UPSERT", "CONTACTS_UPDATE", "CONNECTION_UPDATE"]
+
 export type DiagnosticoEvolution = {
   configurado: boolean
   alcancavel: boolean
@@ -35,7 +37,7 @@ export async function diagnosticar(origem: string): Promise<DiagnosticoEvolution
   if (!configurado) return { configurado, alcancavel: false, autorizado: false, conectado: false, estado: null, webhookOk: false, webhookDestino: null, host }
   const st = await evo<{ instance?: { state?: string } }>("/instance/connectionState/{i}")
   const estado = st.corpo?.instance?.state ?? null
-  const wh = await evo<{ enabled?: boolean; url?: string; webhook?: { enabled?: boolean; url?: string } }>("/webhook/find/{i}")
+  const wh = await evo<{ enabled?: boolean; url?: string; events?: string[]; webhook?: { enabled?: boolean; url?: string; events?: string[] } }>("/webhook/find/{i}")
   const w = wh.corpo?.webhook ?? wh.corpo
   let webhookDestino: string | null = null
   try { webhookDestino = w?.url ? `${new URL(w.url).host}${new URL(w.url).pathname}` : null } catch { webhookDestino = null }
@@ -46,7 +48,8 @@ export async function diagnosticar(origem: string): Promise<DiagnosticoEvolution
     autorizado: st.status !== 401 && st.status !== 403 && st.status !== 0,
     conectado: estado === "open",
     estado,
-    webhookOk: !!w?.enabled && webhookDestino === esperado && !!w?.url?.includes("token="),
+    // Também exige os eventos novos (conexão, entrega/leitura): sem eles o botão "Configurar webhook" reaparece
+    webhookOk: !!w?.enabled && webhookDestino === esperado && !!w?.url?.includes("token=") && EVENTOS_WEBHOOK.every(e => (w?.events ?? []).includes(e)),
     webhookDestino,
   }
 }
@@ -57,7 +60,8 @@ export async function configurarWebhook(origem: string) {
   const segredo = process.env.WHATSAPP_WEBHOOK_SECRET
   if (!segredo) return { ok: false, erro: "Falta WHATSAPP_WEBHOOK_SECRET na Vercel." }
   const url = `${origem}/api/whatsapp/webhook?token=${encodeURIComponent(segredo)}`
-  const events = ["MESSAGES_UPSERT", "MESSAGES_SET"]
+  // Mensagens novas e histórico, confirmações de entrega/leitura, contatos (nomes e telefones) e quedas de conexão
+  const events = EVENTOS_WEBHOOK
   const formatos = [
     { webhook: { enabled: true, url, byEvents: false, base64: false, events } },
     { enabled: true, url, webhookByEvents: false, webhookBase64: false, events },

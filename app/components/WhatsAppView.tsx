@@ -1,6 +1,6 @@
 "use client"
 
-import { Image as ImageIcon, FileText, Smile, Check, X, Paperclip, SendHorizontal, Mic, Video } from "lucide-react"
+import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video } from "lucide-react"
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, nomeChave } from "../lib/negocio"
@@ -25,6 +25,7 @@ type Mensagem = {
   media_url: string | null
   ts: string
   kanban_card_id: string | null
+  status?: string | null
 }
 
 function fmtHora(iso: string | null) {
@@ -341,9 +342,9 @@ export default function WhatsAppView({
                         ) : m.corpo && m.tipo !== "document" && (
                           <p className="text-[13.5px] leading-snug whitespace-pre-wrap" style={{ color: "#111b21" }}>{m.corpo}</p>
                         )}
-                        <p className="text-[10.5px] mt-1 text-right" style={{ color: "#8696a0" }}>
+                        <p className="text-[10.5px] mt-1 flex items-center justify-end gap-1" style={{ color: "#8696a0" }}>
                           {new Date(m.ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                          {m.from_me && " ✓✓"}
+                          {m.from_me && <Recibo status={m.status} />}
                         </p>
                       </div>
                     </div>
@@ -675,4 +676,11 @@ function CarregarAnteriores({ jid, primeira, onCarregar }: { jid: string; primei
       </button>
     </div>
   )
+}
+
+// ✓ enviada · ✓✓ entregue · ✓✓ azul lida (sem informação ainda: ✓)
+function Recibo({ status }: { status?: string | null }) {
+  if (status === "lida") return <CheckCheck className="w-3.5 h-3.5" style={{ color: "#53bdeb" }} aria-label="lida" />
+  if (status === "entregue") return <CheckCheck className="w-3.5 h-3.5" aria-label="entregue" />
+  return <Check className="w-3.5 h-3.5" aria-label="enviada" />
 }

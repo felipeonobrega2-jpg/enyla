@@ -55,7 +55,7 @@ const ICONE: Record<TipoPendencia, React.ReactNode> = {
   aprovado: <CircleCheck className="w-4 h-4" />, atrasado: <CalendarX2 className="w-4 h-4" />, fornecedor: <Factory className="w-4 h-4" />,
   cobrancaVencida: <Receipt className="w-4 h-4" />, semCobranca: <Receipt className="w-4 h-4" />, conferir: <Receipt className="w-4 h-4" />,
   entregaProxima: <CalendarClock className="w-4 h-4" />, orcamentoVencendo: <Hourglass className="w-4 h-4" />, semPrazo: <Clock className="w-4 h-4" />,
-  abriuProposta: <Eye className="w-4 h-4" />, comoFicou: <MessageCircleHeart className="w-4 h-4" />, avaliado: <Star className="w-4 h-4" />, reposicao: <RotateCcw className="w-4 h-4" />, meta: <Megaphone className="w-4 h-4" />,
+  abriuProposta: <Eye className="w-4 h-4" />, comoFicou: <MessageCircleHeart className="w-4 h-4" />, avaliado: <Star className="w-4 h-4" />, reposicao: <RotateCcw className="w-4 h-4" />, meta: <Megaphone className="w-4 h-4" />, whatsapp: <MessageCircle className="w-4 h-4" />,
 }
 
 // ── Peças ─────────────────────────────────────────────────────────────────────
