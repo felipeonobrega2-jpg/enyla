@@ -24,9 +24,15 @@ export async function atualizarFrete(orderId: string): Promise<Frete | null> {
   }
   const mudou = p.status !== atual.status || (p.shareLink && p.shareLink !== atual.share_link) || JSON.stringify(motorista) !== JSON.stringify(atual.motorista)
   if (!mudou) return atual as Frete
+  const agora = new Date().toISOString()
   const { data } = await supabase.from("fretes").update({
-    status: p.status, share_link: p.shareLink ?? atual.share_link, motorista, atualizado_em: new Date().toISOString(),
+    status: p.status, share_link: p.shareLink ?? atual.share_link, motorista, atualizado_em: agora,
   }).eq("order_id", orderId).select("*").maybeSingle()
+  // Linha do tempo (quanto demorou para aceitar, buscar, entregar): coluna própria, sem travar o resto se ainda não existir
+  if (p.status !== atual.status) {
+    const eventos = [...((atual as { eventos?: { status: string; em: string }[] }).eventos ?? []), { status: p.status, em: agora }]
+    await supabase.from("fretes").update({ eventos }).eq("order_id", orderId).then(() => null, () => null)
+  }
   return (data ?? atual) as Frete
 }
 
@@ -39,4 +45,20 @@ export async function fretesDoPedido(f: { numero?: string | null; cardId?: strin
   else return []
   const { data } = await q
   return Promise.all(((data ?? []) as Frete[]).map(fr => statusFinal(fr.status) ? fr : atualizarFrete(fr.order_id).then(x => x ?? fr)))
+}
+
+// Médias das suas corridas (minutos): até um motorista aceitar e do aceite até coletar. Base da hora de chegada estimada.
+export async function mediasDasCorridas(): Promise<{ aceitar?: number; buscar?: number; amostras: number }> {
+  const { data, error } = await supabase.from("fretes").select("criado_em, eventos").order("criado_em", { ascending: false }).limit(60)
+  if (error) return { amostras: 0 }
+  const aceitar: number[] = [], buscar: number[] = []
+  for (const f of (data ?? []) as { criado_em: string; eventos?: { status: string; em: string }[] }[]) {
+    const ev = f.eventos ?? []
+    const aceito = ev.find(e => e.status === "ON_GOING")?.em, coletado = ev.find(e => e.status === "PICKED_UP")?.em
+    const min = (a: string, b: string) => (new Date(b).getTime() - new Date(a).getTime()) / 60_000
+    if (aceito) aceitar.push(min(f.criado_em, aceito))
+    if (aceito && coletado) buscar.push(min(aceito, coletado))
+  }
+  const media = (l: number[]) => l.length >= 3 ? l.reduce((s, x) => s + x, 0) / l.length : undefined
+  return { aceitar: media(aceitar), buscar: media(buscar), amostras: aceitar.length }
 }

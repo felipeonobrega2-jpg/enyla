@@ -37,7 +37,8 @@ for (const [tela, largura] of telas.filter(([t]) => !so || so.includes(t))) {
   if (tela.startsWith("pedidos-aberto")) { await p.getByText("Ana Cosméticos").first().click(); await p.waitForTimeout(600) }
   if (tela === "pedidos-quadro-escuro") { await p.getByText("Quadro", { exact: true }).click(); await p.waitForTimeout(600) }
   if (tela === "pedidos-visao-escuro") { await p.getByText("Visão geral", { exact: true }).click(); await p.waitForTimeout(600) }
-  if (tela.startsWith("entregas")) { await p.waitForTimeout(1500); await p.getByText("Cotar", { exact: true }).click(); await p.waitForTimeout(1200) }
+  if (tela === "entregas-escuro") { await p.waitForTimeout(1800) }
+  else if (tela.startsWith("entregas")) { await p.waitForTimeout(1500); await p.getByText("Utilitário (Fiorino)").first().click(); await p.getByText("Motorista ajuda na carga e descarga").click(); await p.getByText("Cotar", { exact: true }).click(); await p.waitForTimeout(1500) }
   if (tela === "entregas-corrida") { await p.getByText("Fornecedor Papel → Gráfica").first().click(); await p.waitForTimeout(2500) }
   if (tela.startsWith("aviso")) { await p.waitForTimeout(800); await p.getByText("para responder").click(); await p.waitForTimeout(600); await p.getByText("Camilo").first().click(); await p.waitForTimeout(1200) }
   if (tela.startsWith("compositor-")) { await p.getByLabel("Gravar áudio").click(); await p.waitForTimeout(400) }

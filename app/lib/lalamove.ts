@@ -58,7 +58,7 @@ export type Parada = { coordinates: { lat: string; lng: string }; address: strin
 export type Cotacao = {
   quotationId: string; expiresAt: string; serviceType: string
   stops: (Parada & { stopId: string })[]
-  priceBreakdown: { total: string; currency: string; base?: string }
+  priceBreakdown: { total: string; currency: string; base?: string; totalExcludePriorityFee?: string; priorityFee?: string }
   distance?: { value: string; unit: string }
 }
 export type PedidoLalamove = {
@@ -67,11 +67,19 @@ export type PedidoLalamove = {
   distance?: { value: string; unit: string }
 }
 export type Motorista = { driverId: string; name?: string; phone?: string; plateNumber?: string; photo?: string; coordinates?: { lat: string; lng: string; updatedAt?: string } }
-export type Cidade = { locode: string; name: string; services: { key: string; description?: string; dimensions?: unknown; load?: { value: string; unit: string } }[] }
+type Medida = { value: string; unit: string }
+export type PedidoEspecial = { name: string; description?: string; parent_type?: string; max_selection?: number; offline_time?: string }
+export type ServicoCidade = { key: string; description?: string; dimensions?: { length?: Medida; width?: Medida; height?: Medida }; load?: Medida; specialRequests?: PedidoEspecial[] }
+export type Cidade = { locode: string; name: string; services: ServicoCidade[] }
 
 export const cidades = () => lalamove<Cidade[]>("GET", "/v3/cities")
-export const cotar = (servico: string, paradas: Parada[]) =>
-  lalamove<Cotacao>("POST", "/v3/quotations", { serviceType: servico, language: "pt_BR", stops: paradas, isRouteOptimized: false })
+// prioridade: tarifa "2" (motorista encontrado mais rápido); adicionais: pedidos especiais do veículo (ajuda na carga etc.)
+export const cotar = (servico: string, paradas: Parada[], opcoes: { prioridade?: boolean; adicionais?: string[] } = {}) =>
+  lalamove<Cotacao>("POST", "/v3/quotations", {
+    serviceType: servico, language: "pt_BR", stops: paradas, isRouteOptimized: false,
+    ...(opcoes.adicionais?.length ? { specialRequests: opcoes.adicionais } : {}),
+    ...(opcoes.prioridade ? { pricingTierCode: "2" } : {}),
+  })
 export const criarPedido = (dados: { quotationId: string; sender: { stopId: string; name: string; phone: string }; recipients: { stopId: string; name: string; phone: string; remarks?: string }[]; metadata?: Record<string, string> }) =>
   lalamove<PedidoLalamove>("POST", "/v3/orders", { ...dados, isPODEnabled: true })
 export const consultarPedido = (orderId: string) => lalamove<PedidoLalamove>("GET", `/v3/orders/${encodeURIComponent(orderId)}`)

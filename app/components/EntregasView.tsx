@@ -5,10 +5,10 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import dynamic from "next/dynamic"
-import { Truck, Plus, X, Search, MapPin, Factory, Home, User, Loader2, ExternalLink, SendHorizontal, Check, ChevronDown } from "lucide-react"
+import { Truck, Plus, X, Search, MapPin, Factory, Home, User, Loader2, ExternalLink, SendHorizontal, Check, ChevronDown, Wallet } from "lucide-react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import type { Configuracoes } from "../config"
-import { Endereco, Frete, LocalRetirada, STATUS_FRETE, statusFinal, textoRastreio, telefoneE164 } from "../lib/frete"
+import { Endereco, Frete, LocalRetirada, STATUS_FRETE, statusFinal, textoRastreio, telefoneE164, estimarChegada } from "../lib/frete"
 import { normalizarProducao } from "../lib/producao"
 import { montarPedidos, nomeChave, pedidoEntregue } from "../lib/negocio"
 import { Selo, Botao } from "./ds"
@@ -20,8 +20,14 @@ const MapaEntregas = dynamic(() => import("./MapaEntregas").then(m => m.MapaEntr
 type TipoLugar = "local" | "fornecedor" | "cliente" | "busca"
 type Lugar = { chave: string; tipo: TipoLugar; nome: string; endereco: Endereco; contato?: string; telefone?: string }
 type Parada = { lugar: Lugar | null; pessoa: string; telefone: string; obs: string }
-type Servico = { key: string; nome: string; descricao: string; carga: string }
-type Cotacao = { quotationId: string; expiraEm: string; valor: number; distanciaKm: number | null; paradas: string[] }
+type Adicional = { key: string; nome: string; grupo: string | null; max: number }
+type Servico = { key: string; nome: string; periodo: number | null; carga: string; medidas: string; adicionais: Adicional[] }
+type Cotacao = { quotationId: string; expiraEm: string; valor: number; valorSemPrioridade: number | null; distanciaKm: number | null; paradas: string[] }
+type Rota = { linha: [number, number][] | null; km?: number; minutos?: number }
+type Resumo = { carteira: { saldo: number; moeda: string; em: string } | null; medias: { aceitar?: number; buscar?: number; amostras: number } }
+const SALDO_BAIXO = 100
+const hora = (min: number) => new Date(Date.now() + min * 60_000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+const desde = (iso: string) => { const m = Math.round((Date.now() - new Date(iso).getTime()) / 60_000); return m < 60 ? `há ${m} min` : m < 1440 ? `há ${Math.round(m / 60)} h` : `há ${Math.round(m / 1440)} dias` }
 export type PrefillEntrega = { pedido: { numero?: string; cardId?: string; loteId?: string; cliente: string } }
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -75,32 +81,49 @@ export function EntregasView({ config, kanban, lancamentos, clientes, isDark, pr
   const [servicos, setServicos] = useState<Servico[] | null>(null)
   const [estado, setEstado] = useState<{ configurada: boolean; ambiente: string; erro?: string } | null>(null)
   const [servico, setServico] = useState("")
+  const [verPeriodo, setVerPeriodo] = useState(false)
+  const [prioridade, setPrioridade] = useState(false)
+  const [adicionais, setAdicionais] = useState<string[]>([])
   const [cobrar, setCobrar] = useState(false)
-  const [cot, setCot] = useState<Cotacao | null>(null)
+  // Cotação de todos os veículos de uma vez (preço de cada um ao lado do nome)
+  const [cotacoes, setCotacoes] = useState<Record<string, Cotacao | { erro: string }>>({})
   const [cotando, setCotando] = useState(false)
   const [chamando, setChamando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [agora, setAgora] = useState(() => Date.now())
+  const [resumo, setResumo] = useState<Resumo | null>(null)
+  const carregarResumo = useCallback(() => { fetch("/api/frete/resumo").then(r => r.json()).then(setResumo).catch(() => {}) }, [])
   useEffect(() => {
+    carregarResumo()
     fetch("/api/frete/servicos").then(r => r.json()).then(d => {
       setEstado({ configurada: !!d.configurada, ambiente: d.ambiente, erro: d.erro })
       const l: Servico[] = d.servicos ?? []
       setServicos(l)
-      setServico(s => s || (l.find(x => /LALAGO|MOTO/i.test(x.key)) ?? l[0])?.key || "")
+      setServico(s => s || (l.find(x => !x.periodo && /^LALAGO/i.test(x.key)) ?? l.find(x => !x.periodo) ?? l[0])?.key || "")
     }).catch(() => setServicos([]))
-  }, [])
-  useEffect(() => { if (!cot) return; const t = setInterval(() => setAgora(Date.now()), 1000); return () => clearInterval(t) }, [cot])
+  }, [carregarResumo])
+  const cotVal = cotacoes[servico]
+  const cot = cotVal && "quotationId" in cotVal ? cotVal : null
+  const temCotacao = Object.keys(cotacoes).length > 0
+  useEffect(() => { if (!temCotacao) return; const t = setInterval(() => setAgora(Date.now()), 1000); return () => clearInterval(t) }, [temCotacao])
   const restante = cot ? Math.max(0, Math.round((new Date(cot.expiraEm).getTime() - agora) / 1000)) : 0
+  const servicoSel = servicos?.find(x => x.key === servico)
+  const visiveis = (servicos ?? []).filter(x => !x.periodo || verPeriodo || x.key === servico)
+  const limpar = () => setCotacoes({})
 
-  const mudar = (i: number, p: Partial<Parada>) => { setParadas(ps => ps.map((x, j) => j === i ? { ...x, ...p } : x)); setCot(null) }
+  const mudar = (i: number, p: Partial<Parada>) => { setParadas(ps => ps.map((x, j) => j === i ? { ...x, ...p } : x)); limpar() }
   const prontas = paradas.every(p => p.lugar)
+  const paradasApi = () => paradas.map(p => ({ nome: p.lugar!.nome, texto: p.lugar!.endereco.texto, lat: p.lugar!.endereco.lat, lng: p.lugar!.endereco.lng }))
 
-  async function cotar() {
-    setCotando(true); setErro(null); setCot(null)
+  async function cotarUm(key: string) {
     const r = await fetch("/api/frete/cotar", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ servico, paradas: paradas.map(p => ({ nome: p.lugar!.nome, texto: p.lugar!.endereco.texto, lat: p.lugar!.endereco.lat, lng: p.lugar!.endereco.lng })) }) }).catch(() => null)
+      body: JSON.stringify({ servico: key, paradas: paradasApi(), prioridade, adicionais: key === servico ? adicionais : [] }) }).catch(() => null)
     const d = r ? await r.json().catch(() => null) : null
-    if (r?.ok) { setCot(d); setAgora(Date.now()) } else setErro(d?.erro ?? "Não cotou.")
+    setCotacoes(c => ({ ...c, [key]: r?.ok ? d : { erro: d?.erro ?? "Não cotou." } }))
+  }
+  async function cotar() {
+    setCotando(true); setErro(null); setCotacoes({})
+    await Promise.all(visiveis.map(v => cotarUm(v.key)))
     setCotando(false)
   }
   async function chamar() {
@@ -110,8 +133,7 @@ export function EntregasView({ config, kanban, lancamentos, clientes, isDark, pr
     const salvarCliente = pedidoSel?.cliente && ultima.lugar?.tipo === "busca"
       ? { cliente: pedidoSel.cliente, endereco: ultima.lugar.endereco, recebedor: ultima.pessoa, telefone: ultima.telefone } : null
     const r = await fetch("/api/frete/chamar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-      quotationId: cot.quotationId, stopIds: cot.paradas, valor: cot.valor, veiculo: servico,
-      paradas: paradas.map(p => ({ nome: p.lugar!.nome, texto: p.lugar!.endereco.texto, lat: p.lugar!.endereco.lat, lng: p.lugar!.endereco.lng })),
+      quotationId: cot.quotationId, stopIds: cot.paradas, valor: cot.valor, veiculo: servico, paradas: paradasApi(),
       remetente: { nome: paradas[0].pessoa, telefone: paradas[0].telefone },
       destinatarios: paradas.slice(1).map(p => ({ nome: p.pessoa, telefone: p.telefone, observacao: p.obs })),
       pedido: pedidoSel, cobrarCliente: cobrar, salvarCliente,
@@ -121,7 +143,7 @@ export function EntregasView({ config, kanban, lancamentos, clientes, isDark, pr
     if (r?.ok && d?.frete) {
       onLancamentos(d.lancamentos ?? [])
       if (d.avisoLancamento) alert(d.avisoLancamento)
-      setCot(null); setSelecionada(d.frete.order_id); carregar()
+      limpar(); setSelecionada(d.frete.order_id); carregar(); carregarResumo()
     } else setErro(d?.erro ?? "Não chamou.")
   }
 
@@ -155,6 +177,35 @@ export function EntregasView({ config, kanban, lancamentos, clientes, isDark, pr
     : paradas.flatMap((p, i) => p.lugar ? [{ lat: p.lugar.endereco.lat, lng: p.lugar.endereco.lng, rotulo: LETRAS[i], nome: p.lugar.nome, cor: COR_PONTO(i) }] : [])
   const motorista = sel?.motorista?.lat != null && !statusFinal(sel.status) ? { lat: sel.motorista.lat, lng: sel.motorista.lng! } : null
 
+  // Traçado pelas ruas e tempo de percurso (o mesmo do mapa); com motorista andando, quanto falta a partir dele
+  // Guardadas com a chave dos pontos: mudou o trajeto, a rota antiga deixa de valer sem precisar apagar
+  const [rotaGuardada, setRota] = useState<{ chave: string; rota: Rota } | null>(null)
+  const [rotaMotGuardada, setRotaMot] = useState<{ chave: string; rota: Rota } | null>(null)
+  const chavePts = pontos.map(p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join(";")
+  useEffect(() => {
+    if (pontos.length < 2) return
+    let vivo = true
+    fetch(`/api/frete/rota?pts=${encodeURIComponent(pontos.map(p => `${p.lat},${p.lng}`).join(";"))}`).then(r => r.json())
+      .then(d => { if (vivo) setRota({ chave: chavePts, rota: d }) }).catch(() => vivo && setRota({ chave: chavePts, rota: { linha: null } }))
+    return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chavePts])
+  const faltam = sel?.paradas?.length ? (sel.status === "PICKED_UP" ? sel.paradas.slice(1) : sel.paradas) : []
+  const chaveMot = motorista ? `${motorista.lat.toFixed(4)},${motorista.lng.toFixed(4)}|${sel?.status}` : ""
+  useEffect(() => {
+    if (!motorista || !faltam.length) return
+    let vivo = true
+    const pts = [motorista, ...faltam].map(p => `${p.lat},${p.lng}`).join(";")
+    fetch(`/api/frete/rota?pts=${encodeURIComponent(pts)}`).then(r => r.json()).then(d => { if (vivo) setRotaMot({ chave: chaveMot, rota: d }) }).catch(() => {})
+    return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveMot])
+  const rota = pontos.length >= 2 && rotaGuardada?.chave === chavePts ? rotaGuardada.rota : null
+  const rotaMot = chaveMot && rotaMotGuardada?.chave === chaveMot ? rotaMotGuardada.rota : null
+  const chegada = !sel && rota?.minutos != null && pontos.length >= 2
+    ? estimarChegada({ minutosPercurso: rota.minutos, paradas: paradas.length, prioridade, veiculo: servico, media: resumo?.medias })
+    : null
+
   const [verLocais, setVerLocais] = useState(false)
 
   return (
@@ -166,6 +217,22 @@ export function EntregasView({ config, kanban, lancamentos, clientes, isDark, pr
           <h1 className="text-[17px] font-semibold" style={{ color: "var(--text-main)" }}>Entregas</h1>
           {estado?.ambiente === "sandbox" && estado.configurada && <Selo tom="alerta">modo teste</Selo>}
         </div>
+
+        {/* Carteira da Lalamove: a API não tem consulta de saldo; o valor chega pelo aviso de cada movimentação */}
+        {estado?.configurada && (
+          <div className="mx-5 mb-3 rounded-xl px-3.5 py-2.5 flex items-center gap-3" style={{ background: resumo?.carteira && resumo.carteira.saldo < SALDO_BAIXO ? "rgba(211,58,60,0.08)" : "var(--bg-page)", border: "1px solid var(--border)" }}>
+            <Wallet className="w-4 h-4 shrink-0" style={{ color: resumo?.carteira && resumo.carteira.saldo < SALDO_BAIXO ? "#d33a3c" : "#f16622" }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-faint)" }}>Carteira Lalamove</p>
+              {resumo?.carteira ? (
+                <p className="text-[14px] font-bold ds-num" style={{ color: resumo.carteira.saldo < SALDO_BAIXO ? "#d33a3c" : "var(--text-main)" }}>
+                  {brl(resumo.carteira.saldo)} <span className="text-[10.5px] font-normal" style={{ color: "var(--text-faint)" }}>{desde(resumo.carteira.em)}{resumo.carteira.saldo < SALDO_BAIXO ? " · saldo baixo, recarregue" : ""}</span>
+                </p>
+              ) : <p className="text-[11.5px]" style={{ color: "var(--text-sub)" }}>Aparece na próxima movimentação (a Lalamove avisa o saldo quando ele muda).</p>}
+            </div>
+            <a href="https://partnerportal.lalamove.com" target="_blank" rel="noreferrer" className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold inline-flex items-center gap-1 shrink-0 text-white" style={{ background: "#f16622" }}>Recarregar<ExternalLink className="w-3 h-3" /></a>
+          </div>
+        )}
 
         {estado && !estado.configurada && (
           <p className="mx-5 mb-3 text-[12px] rounded-xl p-3" style={{ background: "rgba(197,120,0,0.1)", color: "#b26b00" }}>
@@ -199,25 +266,68 @@ export function EntregasView({ config, kanban, lancamentos, clientes, isDark, pr
             {paradas.map((p, i) => (
               <ParadaEditor key={i} i={i} parada={p} catalogo={catalogo} total={paradas.length}
                 onLugar={l => mudar(i, paradaDe(l))} onMudar={x => mudar(i, x)}
-                onRemover={paradas.length > 2 ? () => { setParadas(ps => ps.filter((_, j) => j !== i)); setCot(null) } : undefined} />
+                onRemover={paradas.length > 2 ? () => { setParadas(ps => ps.filter((_, j) => j !== i)); limpar() } : undefined} />
             ))}
             {paradas.length < 16 && (
-              <button onClick={() => { setParadas(ps => [...ps, vazia()]); setCot(null) }} className="ml-9 text-[12px] font-semibold text-[#8456e8] flex items-center gap-1"><Plus className="w-3.5 h-3.5" />Adicionar parada</button>
+              <button onClick={() => { setParadas(ps => [...ps, vazia()]); limpar() }} className="ml-9 text-[12px] font-semibold text-[#8456e8] flex items-center gap-1"><Plus className="w-3.5 h-3.5" />Adicionar parada</button>
             )}
           </div>
 
-          {/* Veículo */}
+          {/* Veículo: lista com preço de cada um depois de cotar */}
           <div>
-            <p className="text-[11px] font-semibold mb-1" style={{ color: "var(--text-sub)" }}>Veículo</p>
-            <div className="flex gap-1.5 flex-wrap">
-              {(servicos ?? []).map(s => (
-                <button key={s.key} onClick={() => { setServico(s.key); setCot(null) }} title={[s.descricao, s.carga].filter(Boolean).join(" · ")}
-                  className="h-8 px-3 rounded-lg text-[12px] font-medium transition-colors"
-                  style={servico === s.key ? { background: "#8456e8", color: "#fff" } : { background: "var(--bg-page)", color: "var(--text-sub)", border: "1px solid var(--border)" }}>{s.nome}</button>
-              ))}
-              {servicos && !servicos.length && <span className="text-[11.5px]" style={{ color: "var(--text-faint)" }}>{estado?.erro ?? "Disponível depois das chaves."}</span>}
+            <div className="flex items-center mb-1">
+              <p className="text-[11px] font-semibold" style={{ color: "var(--text-sub)" }}>Veículo</p>
+              {(servicos ?? []).some(x => x.periodo) && (
+                <button onClick={() => { setVerPeriodo(v => !v); limpar() }} className="ml-auto text-[11px] font-semibold text-[#8456e8]">
+                  {verPeriodo ? "Esconder aluguel por período" : "Ver aluguel por período (4h/6h)"}
+                </button>
+              )}
+            </div>
+            <div className="rounded-xl overflow-hidden ds-borda">
+              {visiveis.map((v, k) => {
+                const c = cotacoes[v.key], ativo = servico === v.key
+                return (
+                  <button key={v.key} onClick={() => { setServico(v.key); setAdicionais([]); if (adicionais.length) setCotacoes(cc => { const n = { ...cc }; delete n[servico]; return n }) }}
+                    className="w-full text-left px-3 py-2 flex items-center gap-3 transition-colors"
+                    style={{ background: ativo ? "rgba(132,86,232,0.08)" : undefined, borderTop: k ? "1px solid var(--border)" : undefined }}>
+                    <span className="w-4 h-4 rounded-full shrink-0 grid place-items-center" style={{ border: `2px solid ${ativo ? "#8456e8" : "var(--border)"}` }}>{ativo && <span className="w-2 h-2 rounded-full bg-[#8456e8]" />}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[12.5px] font-semibold" style={{ color: "var(--text-main)" }}>{v.nome}</span>
+                      {(v.carga || v.medidas) && <span className="block text-[10.5px] truncate" style={{ color: "var(--text-faint)" }}>{[v.carga, v.medidas].filter(Boolean).join(" · ")}</span>}
+                    </span>
+                    <span className="text-[12.5px] font-semibold ds-num shrink-0" style={{ color: c && "erro" in c ? "#d33a3c" : "var(--text-main)" }}>
+                      {c ? ("erro" in c ? "indisponível" : brl(c.valor)) : cotando ? <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "var(--text-faint)" }} /> : ""}
+                    </span>
+                  </button>
+                )
+              })}
+              {servicos && !servicos.length && <p className="px-3 py-2 text-[11.5px]" style={{ color: "var(--text-faint)" }}>{estado?.erro ?? "Disponível depois das chaves."}</p>}
             </div>
           </div>
+
+          {/* Adicionais do veículo e prioridade */}
+          {!!servicoSel?.adicionais.length && (
+            <div>
+              <p className="text-[11px] font-semibold mb-1" style={{ color: "var(--text-sub)" }}>Serviços adicionais</p>
+              <div className="flex flex-wrap gap-1.5">
+                {servicoSel.adicionais.map(a => {
+                  const on = adicionais.includes(a.key)
+                  return (
+                    <button key={a.key} onClick={() => {
+                      // No mesmo grupo (ex.: tipo de ajuda) só vale um
+                      setAdicionais(l => on ? l.filter(x => x !== a.key) : [...l.filter(x => !a.grupo || servicoSel.adicionais.find(y => y.key === x)?.grupo !== a.grupo || a.max > 1), a.key])
+                      setCotacoes(cc => { const n = { ...cc }; delete n[servico]; return n })
+                    }} className="h-7 px-2.5 rounded-lg text-[11.5px] font-medium transition-colors"
+                      style={on ? { background: "#8456e8", color: "#fff" } : { background: "var(--bg-page)", color: "var(--text-sub)", border: "1px solid var(--border)" }}>{a.nome}</button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+          <label className="flex items-center gap-2 text-[12.5px] cursor-pointer" style={{ color: "var(--text-main)" }}>
+            <input type="checkbox" checked={prioridade} onChange={e => { setPrioridade(e.target.checked); limpar() }} />
+            <span><span className="font-semibold">Prioridade</span> <span style={{ color: "var(--text-faint)" }}>· paga um pouco mais para achar motorista mais rápido</span></span>
+          </label>
 
           {pedidoSel && (
             <div className="flex items-center gap-4 text-[12.5px]" style={{ color: "var(--text-main)" }}>
@@ -228,16 +338,21 @@ export function EntregasView({ config, kanban, lancamentos, clientes, isDark, pr
 
           {cot && (
             <div className="rounded-xl p-3 ds-entrada" style={{ background: "rgba(241,102,34,0.08)", border: "1px solid rgba(241,102,34,0.25)" }}>
-              <p className="text-[20px] font-bold ds-num" style={{ color: "var(--text-main)" }}>{brl(cot.valor)}</p>
+              <div className="flex items-baseline gap-2">
+                <p className="text-[20px] font-bold ds-num" style={{ color: "var(--text-main)" }}>{brl(cot.valor)}</p>
+                {cot.valorSemPrioridade != null && cot.valorSemPrioridade < cot.valor && <span className="text-[11px]" style={{ color: "var(--text-sub)" }}>+{brl(cot.valor - cot.valorSemPrioridade)} de prioridade</span>}
+              </div>
               <p className="text-[11.5px]" style={{ color: "var(--text-sub)" }}>
-                {cot.distanciaKm != null ? `${cot.distanciaKm.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} km · ` : ""}
+                {servicoSel?.nome} · {cot.distanciaKm != null ? `${cot.distanciaKm.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} km · ` : ""}
                 {restante > 0 ? `cotação vale mais ${Math.floor(restante / 60)}:${String(restante % 60).padStart(2, "0")}` : "cotação expirou, cote de novo"}
               </p>
+              {chegada && <p className="text-[11.5px] mt-1 font-semibold" style={{ color: "#c2410c" }}>Chega por volta de {hora(chegada.total)} (≈ {chegada.total} min)</p>}
+              {resumo?.carteira && resumo.carteira.saldo < cot.valor && <p className="text-[11.5px] mt-1 font-semibold text-[#d33a3c]">Saldo da carteira ({brl(resumo.carteira.saldo)}) não cobre esta corrida.</p>}
             </div>
           )}
           {erro && <p className="text-[12px] text-[#d33a3c]">{erro}</p>}
           <div className="flex gap-2">
-            <Botao onClick={cotar} disabled={cotando || !prontas || !servico || !estado?.configurada} icone={cotando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : undefined}>{cot ? "Cotar de novo" : "Cotar"}</Botao>
+            <Botao onClick={cotar} disabled={cotando || !prontas || !servico || !estado?.configurada} icone={cotando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : undefined}>{temCotacao ? "Cotar de novo" : "Cotar"}</Botao>
             <button onClick={chamar} disabled={!cot || restante <= 0 || chamando}
               className="flex-1 h-9 rounded-lg text-white text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-40" style={{ background: "#f16622" }}>
               <Truck className="w-4 h-4" />{chamando ? "Chamando…" : "Chamar motorista"}
@@ -294,7 +409,24 @@ export function EntregasView({ config, kanban, lancamentos, clientes, isDark, pr
 
       {/* ── Mapa ── */}
       <div className="flex-1 min-h-[360px] relative">
-        <MapaEntregas pontos={pontos} motorista={motorista} escuro={isDark} />
+        <MapaEntregas pontos={pontos} linha={sel && motorista ? rotaMot?.linha ?? rota?.linha : rota?.linha} motorista={motorista} escuro={isDark} animar={!sel && !!rota?.linha} />
+        {/* Tempo de percurso, estilo Waze */}
+        {!sel && rota?.minutos != null && (
+          <div className="absolute top-4 left-4 right-4 sm:right-auto sm:w-[330px] rounded-2xl px-4 py-3 shadow-xl z-[500] ds-entrada" style={{ background: "var(--bg-surface)" }}>
+            <div className="flex items-baseline gap-2">
+              <span className="text-[26px] font-bold ds-num leading-none" style={{ color: "var(--text-main)" }}>{Math.round(rota.minutos)} min</span>
+              <span className="text-[12px]" style={{ color: "var(--text-sub)" }}>de percurso · {rota.km?.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} km</span>
+            </div>
+            <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-alt)" }}><div className="h-full rounded-full mapa-faixa" /></div>
+            {chegada && (<>
+              <p className="text-[12.5px] font-semibold mt-2" style={{ color: "#c2410c" }}>Material chega por volta de {hora(chegada.total)}</p>
+              <p className="text-[10.5px] mt-0.5" style={{ color: "var(--text-faint)" }}>
+                ≈ {chegada.aceitar} min para um motorista aceitar · {chegada.buscar} até a retirada · {chegada.carregar} carga · {chegada.percurso} percurso
+                {resumo?.medias.amostras ? ` · média das suas ${resumo.medias.amostras} corridas` : " · estimativa padrão, melhora com as suas corridas"}
+              </p>
+            </>)}
+          </div>
+        )}
         {sel && (
           <div className="absolute top-4 left-4 right-4 sm:right-auto sm:max-w-sm rounded-2xl px-4 py-3 shadow-xl z-[500] ds-entrada" style={{ background: "var(--bg-surface)" }}>
             <div className="flex items-center gap-2">
@@ -302,6 +434,12 @@ export function EntregasView({ config, kanban, lancamentos, clientes, isDark, pr
               <button onClick={() => setSelecionada(null)} aria-label="Fechar" className="ml-auto w-6 h-6 rounded-md grid place-items-center hover:bg-black/5" style={{ color: "var(--text-faint)" }}><X className="w-3.5 h-3.5" /></button>
             </div>
             <p className="text-[12.5px] font-semibold mt-1.5" style={{ color: "var(--text-main)" }}>{sel.descricao}</p>
+            {rotaMot?.minutos != null && !statusFinal(sel.status) && (
+              <div className="mt-2">
+                <p className="text-[20px] font-bold ds-num leading-none" style={{ color: "var(--text-main)" }}>{Math.round(rotaMot.minutos)} min <span className="text-[12px] font-normal" style={{ color: "var(--text-sub)" }}>{sel.status === "PICKED_UP" ? "até a entrega" : "até a retirada e entrega"} · chega {hora(rotaMot.minutos)}</span></p>
+                <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-alt)" }}><div className="h-full rounded-full mapa-faixa" /></div>
+              </div>
+            )}
             {sel.motorista?.nome && <p className="text-[11.5px] mt-0.5" style={{ color: "var(--text-sub)" }}>{sel.motorista.nome}{sel.motorista.placa ? ` · ${sel.motorista.placa}` : ""}{sel.motorista.em ? ` · posição de ${new Date(sel.motorista.em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : ""}</p>}
           </div>
         )}

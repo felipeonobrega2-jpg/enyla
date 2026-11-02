@@ -26,3 +26,6 @@ create index if not exists fretes_lote on fretes (lote_id);
 -- Várias paradas por corrida (página Entregas): [{ nome, texto, lat, lng }] na ordem da rota
 alter table fretes add column if not exists paradas jsonb;
 alter table fretes add column if not exists descricao text;
+
+-- Linha do tempo de cada corrida (aceite, coleta, entrega): base da hora de chegada estimada
+alter table fretes add column if not exists eventos jsonb not null default '[]';

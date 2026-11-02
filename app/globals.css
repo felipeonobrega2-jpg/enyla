@@ -250,3 +250,7 @@ html.dark .leaflet-control-zoom a { background: #161421; color: #eeedf5; border-
 html.dark .leaflet-control-attribution { background: rgba(22,20,33,.7); color: #72707d; }
 html.dark .leaflet-control-attribution a { color: #a5a2b0; }
 @media (prefers-reduced-motion: reduce) { .mapa-motorista { animation: none; } }
+/* Faixa de percurso andando (card de tempo no mapa de Entregas) */
+@keyframes mapa-faixa { from { background-position: 0 0; } to { background-position: 28px 0; } }
+.mapa-faixa { width: 100%; background: repeating-linear-gradient(90deg, #f16622 0 14px, #ff9a62 14px 28px); animation: mapa-faixa .9s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .mapa-faixa { animation: none; } }

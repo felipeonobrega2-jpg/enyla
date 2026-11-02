@@ -76,9 +76,25 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     ]))
   }
   if (u.startsWith("/api/frete/servicos")) return new Response(JSON.stringify({ configurada: true, ambiente: "sandbox", cidade: "São Paulo", servicos: [
-    { key: "LALAGO", nome: "Moto", descricao: "Até 20 kg", carga: "20 kg" }, { key: "CAR", nome: "Carro", descricao: "", carga: "200 kg" }, { key: "UV_FIORINO", nome: "Utilitário (Fiorino)", descricao: "", carga: "600 kg" }] }))
-  if (u.startsWith("/api/frete/cotar")) return new Response(JSON.stringify({ quotationId: "q1", expiraEm: new Date(Date.now() + 272_000).toISOString(), valor: 38.9, moeda: "BRL", distanciaKm: 7.4, paradas: ["s1", "s2"], servico: "LALAGO" }))
-  if (u.startsWith("/api/frete/rota")) return new Response(JSON.stringify({ linha: null }))
+    { key: "LALAGO", nome: "Moto", periodo: null, carga: "até 20 kg", medidas: "0.4 × 0.4 × 0.4 m", adicionais: [] },
+    { key: "MOTORCYCLE", nome: "Moto com baú", periodo: null, carga: "até 25 kg", medidas: "0.5 × 0.4 × 0.5 m", adicionais: [] },
+    { key: "CAR", nome: "Carro", periodo: null, carga: "até 200 kg", medidas: "1 × 0.8 × 0.7 m", adicionais: [{ key: "DOOR_TO_DOOR_DRIVER", nome: "Motorista ajuda na carga e descarga", grupo: "Ajuda", max: 1 }] },
+    { key: "UV_FIORINO", nome: "Utilitário (Fiorino)", periodo: null, carga: "até 600 kg", medidas: "1.8 × 1.2 × 1.1 m", adicionais: [{ key: "DOOR_TO_DOOR_DRIVER", nome: "Motorista ajuda na carga e descarga", grupo: "Ajuda", max: 1 }, { key: "DOOR_TO_DOOR_1DRIVER_1HELPER", nome: "Motorista + ajudante (carga e descarga)", grupo: "Ajuda", max: 1 }, { key: "ROUND_TRIP", nome: "Ida e volta", grupo: null, max: 1 }] },
+    { key: "VAN", nome: "Van", periodo: null, carga: "até 1.500 kg", medidas: "3 × 1.6 × 1.5 m", adicionais: [] },
+    { key: "CAR_4H", nome: "Carro por 4h", periodo: 4, carga: "", medidas: "", adicionais: [] },
+  ] }))
+  if (u.startsWith("/api/frete/cotar")) {
+    const b = JSON.parse(String(o?.body ?? "{}")); const base: Record<string, number> = { LALAGO: 22.9, MOTORCYCLE: 27.5, CAR: 38.9, UV_FIORINO: 64.4, VAN: 112, CAR_4H: 180 }
+    const v = (base[b.servico] ?? 50) * (b.prioridade ? 1.15 : 1)
+    return new Response(JSON.stringify({ quotationId: "q" + b.servico, expiraEm: new Date(Date.now() + 272_000).toISOString(), valor: Math.round(v * 100) / 100, valorSemPrioridade: base[b.servico], distanciaKm: 7.4, paradas: ["s1", "s2"] }))
+  }
+  if (u.startsWith("/api/frete/resumo")) return new Response(JSON.stringify({ carteira: { saldo: 86.4, moeda: "BRL", em: new Date(Date.now() - 3 * 3600_000).toISOString() }, medias: { amostras: 0 } }))
+  if (u.startsWith("/api/frete/rota")) {
+    const pts = decodeURIComponent(u.split("pts=")[1] ?? "").split(";").map(x => x.split(",").map(Number))
+    const linha: number[][] = []
+    for (let k = 1; k < pts.length; k++) for (let t = 0; t <= 20; t++) { const f = t / 20; linha.push([pts[k - 1][0] + (pts[k][0] - pts[k - 1][0]) * f + Math.sin(f * 6) * 0.003, pts[k - 1][1] + (pts[k][1] - pts[k - 1][1]) * f]) }
+    return new Response(JSON.stringify({ linha, km: 7.4, minutos: 23 }))
+  }
   if (u.startsWith("/api/frete/lista")) return new Response(JSON.stringify([
     { order_id: "1", status: "PICKED_UP", valor: 38.9, cobrar_cliente: false, share_link: "https://share.lalamove.com/x", criado_em: new Date().toISOString(), descricao: "Fornecedor Papel → Gráfica", pedido_numero: "ORC-003", cliente: "Cliente Relacionamento",
       paradas: [{ nome: "Fornecedor Papel", texto: "Rua Oriente, 500 · Brás", lat: -23.5379, lng: -46.6172 }, { nome: "Gráfica", texto: "Rua Correia de Andrade, 50", lat: -23.5427, lng: -46.6199 }],

@@ -35,3 +35,28 @@ describe("frete Lalamove", () => {
     expect(statusFinal("ON_GOING")).toBe(false)
   })
 })
+
+describe("veículos e adicionais em português", async () => {
+  const { infoVeiculo, nomeAdicional, estimarChegada } = await import("@/app/lib/frete")
+  it("veículos e períodos", () => {
+    expect(infoVeiculo("LALAGO", "")).toMatchObject({ nome: "Moto", periodo: null })
+    expect(infoVeiculo("MOTORCYCLE", 'Bikes with trunk. Additional space compared to the "Lalago"').nome).toBe("Moto com baú")
+    expect(infoVeiculo("CAR", "").nome).toBe("Carro")
+    expect(infoVeiculo("TRUCK330", "").nome).toBe("Caminhão 3,3 t")
+    expect(infoVeiculo("UV_FIORINO_4H", "Unlimited UV deliveries within 4h period")).toMatchObject({ nome: "Utilitário por 4h", periodo: 4 })
+    expect(infoVeiculo("TRUCK330_6H", "Unlimited truck deliveries within 6 hours")).toMatchObject({ periodo: 6 })
+    expect(infoVeiculo("X", "Perfect for market purchases and medium packages.").nome).toBe("Carro compacto")
+    expect(infoVeiculo("CAR", "").ordem).toBeLessThan(infoVeiculo("CAR_4H", "Unlimited deliveries within 4h period").ordem)
+  })
+  it("adicionais", () => {
+    expect(nomeAdicional("DOOR_TO_DOOR_1DRIVER_1HELPER")).toBe("Motorista + ajudante (carga e descarga)")
+    expect(nomeAdicional("DOOR_TO_DOOR_DRIVER")).toBe("Motorista ajuda na carga e descarga")
+    expect(nomeAdicional("ROUND_TRIP")).toBe("Ida e volta")
+  })
+  it("chegada estimada soma as etapas; prioridade encurta a espera", () => {
+    const n = estimarChegada({ minutosPercurso: 25, paradas: 2, veiculo: "LALAGO" })
+    expect(n.total).toBe(n.aceitar + n.buscar + n.carregar + 25)
+    expect(estimarChegada({ minutosPercurso: 25, paradas: 2, veiculo: "LALAGO", prioridade: true }).aceitar).toBeLessThan(n.aceitar)
+    expect(estimarChegada({ minutosPercurso: 25, paradas: 2, media: { aceitar: 3, buscar: 9 } })).toMatchObject({ aceitar: 3, buscar: 9 })
+  })
+})

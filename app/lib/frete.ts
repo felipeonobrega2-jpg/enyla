@@ -60,7 +60,7 @@ export const statusFinal = (s: string) => !!STATUS_FRETE[s]?.final
 
 // Nomes dos veículos (a chave vem da API e pode mudar; sem tradução, mostra a descrição da Lalamove)
 export const NOME_VEICULO: Record<string, string> = {
-  LALAGO: "Moto", MOTORCYCLE: "Moto", CAR: "Carro", UV_FIORINO: "Utilitário (Fiorino)", VAN: "Van",
+  LALAGO: "Moto", MOTORCYCLE: "Moto com baú", CAR: "Carro", UV_FIORINO: "Utilitário (Fiorino)", VAN: "Van",
   TRUCK175: "Caminhão 1,75 t", TRUCK330: "Caminhão 3,3 t", TRUCK550: "Caminhão 5,5 t",
 }
 
@@ -84,3 +84,54 @@ export function lancamentosDoFrete(f: {
 
 // Mensagem de rastreio para o cliente (a sua frase de sempre)
 export const textoRastreio = (link: string) => `A Lalamove está cuidando da sua entrega! Você pode rastrear a rota em tempo real aqui: ${link}`
+
+// ── Veículos e adicionais da Lalamove em português ─────────────────────────────
+// A lista vem da API (chave + descrição em inglês). Os "Unlimited … within 4h" são aluguel por período, não veículo.
+export type InfoVeiculo = { nome: string; periodo: number | null; ordem: number }
+const BASE_VEICULO: { teste: RegExp; nome: string; ordem: number }[] = [
+  { teste: /^LALAGO|^MOTO(?!RCYCLE)/i, nome: "Moto", ordem: 1 },
+  { teste: /^MOTORCYCLE|bikes? with (a )?trunk/i, nome: "Moto com baú", ordem: 2 },
+  { teste: /market purchases|medium packages|^SEDAN|^HATCH/i, nome: "Carro compacto", ordem: 4 },
+  { teste: /^CAR|\bcar\b/i, nome: "Carro", ordem: 3 },
+  { teste: /^UV|\bUV\b|fiorino|utility/i, nome: "Utilitário (Fiorino)", ordem: 5 },
+  { teste: /^VAN|\bvan\b/i, nome: "Van", ordem: 6 },
+  { teste: /^TRUCK|\btruck\b/i, nome: "Caminhão", ordem: 7 },
+]
+export function infoVeiculo(key: string, descricao = ""): InfoVeiculo {
+  const periodo = Number(descricao.match(/within\s*(\d+)\s*h/i)?.[1] ?? key.match(/(\d+)H\b/i)?.[1] ?? NaN)
+  const ehPeriodo = Number.isFinite(periodo) && /unlimited|within|hour|\d+H\b/i.test(descricao + " " + key)
+  // Chave conhecida primeiro (a descrição dos de período é genérica), depois a descrição
+  const base = BASE_VEICULO.find(b => b.teste.test(key)) ?? BASE_VEICULO.find(b => b.teste.test(descricao))
+  let nome = NOME_VEICULO[key] ?? base?.nome ?? key.toLowerCase().replace(/_/g, " ").replace(/^./, c => c.toUpperCase())
+  const tons = key.match(/^TRUCK(\d{3})/i)?.[1]   // TRUCK330 = 3,3 t
+  if (tons) nome = `Caminhão ${(Number(tons) / 100).toLocaleString("pt-BR")} t`
+  return { nome: ehPeriodo ? `${nome.replace(/ \(Fiorino\)/, "")} por ${periodo}h` : nome, periodo: ehPeriodo ? periodo : null, ordem: (base?.ordem ?? 9) + (ehPeriodo ? 10 : 0) }
+}
+
+const ADICIONAIS: { teste: RegExp; nome: string }[] = [
+  { teste: /door.?to.?door.*helper|1.?helper|extra helper|additional helper/i, nome: "Motorista + ajudante (carga e descarga)" },
+  { teste: /door.?to.?door|loading|unloading|carry/i, nome: "Motorista ajuda na carga e descarga" },
+  { teste: /helper/i, nome: "Ajudante extra" },
+  { teste: /round.?trip|return trip/i, nome: "Ida e volta" },
+  { teste: /queue|wait/i, nome: "Tempo de espera" },
+  { teste: /insulated|thermal|cool/i, nome: "Bolsa térmica" },
+  { teste: /cash|cod\b|collect/i, nome: "Cobrar na entrega" },
+  { teste: /purchase|buy/i, nome: "Compra pelo motorista" },
+  { teste: /extra.?length/i, nome: "Comprimento extra" },
+  { teste: /tail.?lift|hydraulic/i, nome: "Plataforma elevatória" },
+  { teste: /fragile/i, nome: "Carga frágil" },
+  { teste: /pet/i, nome: "Transporte de animal" },
+]
+export const nomeAdicional = (name: string, descricao = "") =>
+  ADICIONAIS.find(a => a.teste.test(name) || a.teste.test(descricao))?.nome ?? (descricao || name.toLowerCase().replace(/_/g, " "))
+
+// Hora de chegada estimada: aceitar + ir até a retirada + carregar + percurso.
+// Aceitar e chegar à retirada vêm da média das suas corridas quando houver; senão, o padrão do veículo.
+export function estimarChegada(f: { minutosPercurso: number; paradas: number; prioridade?: boolean; veiculo?: string; media?: { aceitar?: number; buscar?: number } }) {
+  const grande = /UV|VAN|TRUCK/i.test(f.veiculo ?? "")
+  const aceitar = Math.round((f.media?.aceitar ?? (grande ? 12 : 6)) * (f.prioridade ? 0.6 : 1))
+  const buscar = Math.round(f.media?.buscar ?? (grande ? 25 : 15))
+  const carregar = (grande ? 15 : 5) + Math.max(0, f.paradas - 2) * 5
+  const total = aceitar + buscar + carregar + Math.round(f.minutosPercurso)
+  return { aceitar, buscar, carregar, percurso: Math.round(f.minutosPercurso), total }
+}
