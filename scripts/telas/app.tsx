@@ -22,7 +22,7 @@ import { origemDoCliente } from "@/app/lib/coleta"
 import { PrecoQueFecha } from "@/app/components/PrecoQueFecha"
 import { ModalLancamento } from "@/app/components/FinanceiroView"
 import { PainelToken } from "@/app/components/MetaAdsView"
-import { ConexaoWhats, Compositor } from "@/app/components/WhatsAppView"
+import { ConexaoWhats, Compositor, ClienteDaConversa } from "@/app/components/WhatsAppView"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
 // Abas do Financeiro: "financeiro-receber" abre a aba "receber"
@@ -55,6 +55,13 @@ function Telas() {
     case "whats": return pagina(<ConexaoWhats onAtualizar={() => {}} status={{ segredoConfigurado: true, totalConversas: 0,
       evolution: { configurado: true, alcancavel: true, autorizado: true, conectado: false, estado: "close", webhookOk: false, webhookDestino: "evolution-api-production.up.railway.app/webhook", host: "evo.enyla.com.br" } }} />)
     case "compositor": return <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#efeae2" }}><div style={{ flex: 1 }} /><Compositor jid="x" onEnviado={() => {}} /></div>
+    case "wacliente": {
+      const resumo = new Map([["raniere pericles", { pedidos: 5, vendido: 27561, deve: 9540 }]])
+      return pagina(<div className="space-y-8 bg-white p-6 rounded-xl">
+        <ClienteDaConversa cliente={{ nome: "Raniere Péricles", manual: false }} resumo={resumo} clientes={["Raniere Péricles", "Ana"]} onVincular={() => {}} onAbrir={() => {}} />
+        <ClienteDaConversa cliente={null} resumo={resumo} clientes={["Raniere Péricles", "Ana"]} onVincular={() => {}} />
+      </div>)
+    }
     case "calibragem": return pagina(<CalibragemView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onAtualizarConfig={setCfg} onDividir={() => {}} />)
     case "rotas": {
       const r = calcular(form, cfg)

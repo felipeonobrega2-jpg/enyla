@@ -5,7 +5,7 @@ import { supabase } from "./supabase"
 
 // ── Tipos Evolution API ────────────────────────────────────────────────────
 
-export type WaKey = { remoteJid: string; fromMe: boolean; id: string; remoteJidAlt?: string }
+export type WaKey = { remoteJid: string; fromMe: boolean; id: string; remoteJidAlt?: string; senderPn?: string }
 
 export type WaMessage = {
   key: WaKey
@@ -61,7 +61,7 @@ export function deveIgnorar(jid: string): boolean {
 
 // Telefone do contato: o jid antigo já é o número; o novo (@lid) traz o número em remoteJidAlt, quando o WhatsApp informa
 function telefoneDe(key: WaKey): string | null {
-  for (const j of [key.remoteJid, key.remoteJidAlt]) if (j?.endsWith("@s.whatsapp.net")) return j.split("@")[0]
+  for (const j of [key.remoteJid, key.remoteJidAlt, key.senderPn]) if (j?.endsWith("@s.whatsapp.net")) return j.split("@")[0]
   return null
 }
 

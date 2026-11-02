@@ -2441,6 +2441,9 @@ export default function Home() {
               />
           ) : view === "whatsapp" ? (
             <WhatsAppView
+              kanban={kanban} lancamentos={lancamentos} vinculos={config.vinculosWhatsapp}
+              onVincular={(jid, nome) => salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [jid]: nome ?? "" } })}
+              onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }}
               onCriarCard={(nome, _jid) => {
                 navigate("pedidos")
                 // Salva nome do lead WA para pré-preencher o próximo card

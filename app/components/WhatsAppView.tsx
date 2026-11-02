@@ -1,7 +1,10 @@
 "use client"
 
 import { Image as ImageIcon, FileText, Smile, Check, X, Paperclip, SendHorizontal } from "lucide-react"
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import type { KanbanCard, LancamentoFinanceiro } from "../types"
+import { montarPedidos, nomeChave } from "../lib/negocio"
+import { clienteDaConversa, Vinculos } from "../lib/vinculoWhatsapp"
 import { brl } from "../utils"
 
 type Conversa = {
@@ -59,10 +62,26 @@ function TypingBubble() {
 }
 
 export default function WhatsAppView({
-  onCriarCard,
+  onCriarCard, kanban = [], lancamentos = [], vinculos, onVincular, onAbrirCliente,
 }: {
   onCriarCard: (nome: string, jid: string) => void
+  kanban?: KanbanCard[]
+  lancamentos?: LancamentoFinanceiro[]
+  vinculos?: Vinculos
+  onVincular?: (jid: string, cliente: string | null) => void
+  onAbrirCliente?: (nome: string) => void
 }) {
+  // Clientes do cadastro (quem tem orçamento/pedido) e o resumo de cada um, para ligar às conversas
+  const nomesClientes = useMemo(() => [...new Set(kanban.filter(c => !c.isTerceirizado && c.nomeCliente).map(c => c.nomeCliente))].sort(), [kanban])
+  const resumo = useMemo(() => {
+    const m = new Map<string, { pedidos: number; vendido: number; deve: number }>()
+    for (const p of montarPedidos(kanban, lancamentos).filter(p => p.dataFechamento)) {
+      const k = nomeChave(p.nomeCliente), r = m.get(k) ?? { pedidos: 0, vendido: 0, deve: 0 }
+      m.set(k, { pedidos: r.pedidos + 1, vendido: r.vendido + p.venda, deve: r.deve + p.aReceber })
+    }
+    return m
+  }, [kanban, lancamentos])
+  const clienteDe = (c: { jid: string; nome: string | null }) => clienteDaConversa(c, nomesClientes, vinculos)
   const [conversas, setConversas] = useState<Conversa[]>([])
   const [ativa, setAtiva] = useState<Conversa | null>(null)
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
@@ -196,7 +215,10 @@ export default function WhatsAppView({
               <Avatar nome={c.nome} foto={c.foto_url} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[13.5px] font-semibold truncate" style={{ color: "var(--text-main)" }}>{c.nome}</span>
+                  <span className="text-[13.5px] font-semibold truncate flex items-center gap-1.5 min-w-0" style={{ color: "var(--text-main)" }}>
+                    <span className="truncate">{c.nome}</span>
+                    {clienteDe(c) && <span className="shrink-0 text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-px rounded" style={{ background: "rgba(132,86,232,0.12)", color: "#8456e8" }}>cliente</span>}
+                  </span>
                   <span className="text-[11px] shrink-0" style={{ color: "var(--text-faint)" }}>{fmtHora(c.ultima_at)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-0.5">
@@ -235,7 +257,8 @@ export default function WhatsAppView({
               <Avatar nome={ativa.nome} foto={ativa.foto_url} />
               <div className="flex-1 min-w-0">
                 <p className="text-[14px] font-semibold truncate" style={{ color: "var(--text-main)" }}>{ativa.nome}</p>
-                <p className="text-[11.5px]" style={{ color: "var(--text-faint)" }}>{ativa.jid.split("@")[0]}</p>
+                <ClienteDaConversa cliente={clienteDe(ativa)} resumo={resumo} clientes={nomesClientes}
+                  onVincular={onVincular ? nome => onVincular(ativa.jid, nome) : undefined} onAbrir={onAbrirCliente} />
               </div>
               <button
                 onClick={() => onCriarCard(ativa.nome, ativa.jid)}
@@ -506,5 +529,49 @@ export function Compositor({ jid, onEnviado }: { jid: string; onEnviado: () => v
         </button>
       </div>
     </div>
+  )
+}
+
+const brlCurto = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
+
+// Linha abaixo do nome na conversa: cliente ligado (com resumo) ou "Vincular cliente"
+export function ClienteDaConversa({ cliente, resumo, clientes, onVincular, onAbrir }: {
+  cliente: { nome: string; manual: boolean } | null
+  resumo: Map<string, { pedidos: number; vendido: number; deve: number }>
+  clientes: string[]
+  onVincular?: (nome: string | null) => void
+  onAbrir?: (nome: string) => void
+}) {
+  const [escolhendo, setEscolhendo] = useState(false)
+  const [busca, setBusca] = useState("")
+  if (escolhendo && onVincular) {
+    const lista = clientes.filter(c => nomeChave(c).includes(nomeChave(busca))).slice(0, 8)
+    return (
+      <div className="relative mt-1">
+        <input autoFocus value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar cliente do cadastro…"
+          onKeyDown={e => { if (e.key === "Escape") setEscolhendo(false) }}
+          className="w-64 text-[12px] px-2.5 py-1.5 rounded-lg outline-none" style={{ background: "var(--bg-page)", color: "var(--text-main)", border: "1px solid var(--border)" }} />
+        <div className="absolute z-20 mt-1 w-64 rounded-lg shadow-lg overflow-hidden" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+          {lista.map(c => (
+            <button key={c} onClick={() => { onVincular(c); setEscolhendo(false); setBusca("") }}
+              className="block w-full text-left text-[12px] px-3 py-1.5 hover:bg-black/5" style={{ color: "var(--text-main)" }}>{c}</button>
+          ))}
+          {cliente && <button onClick={() => { onVincular(null); setEscolhendo(false) }} className="block w-full text-left text-[12px] px-3 py-1.5 hover:bg-black/5 text-[#d33a3c]">Não é cliente</button>}
+          <button onClick={() => setEscolhendo(false)} className="block w-full text-left text-[11.5px] px-3 py-1.5 hover:bg-black/5" style={{ color: "var(--text-faint)" }}>Cancelar</button>
+        </div>
+      </div>
+    )
+  }
+  if (!cliente) return onVincular
+    ? <button onClick={() => setEscolhendo(true)} className="text-[11.5px] font-semibold text-[#8456e8]">Vincular cliente</button>
+    : null
+  const r = resumo.get(nomeChave(cliente.nome))
+  return (
+    <p className="text-[11.5px] flex items-center gap-1.5 flex-wrap" style={{ color: "var(--text-sub)" }}>
+      <button onClick={() => onAbrir?.(cliente.nome)} className="font-semibold text-[#8456e8] hover:underline">{cliente.nome}</button>
+      <span>· {r ? `${r.pedidos} ${r.pedidos === 1 ? "pedido" : "pedidos"} · ${brlCurto(r.vendido)}` : "só orçamentos"}</span>
+      {r && r.deve > 0.5 && <span className="font-semibold text-[#d33a3c]">· deve {brlCurto(r.deve)}</span>}
+      {onVincular && <button onClick={() => setEscolhendo(true)} className="ml-1 underline" style={{ color: "var(--text-faint)" }}>{cliente.manual ? "trocar" : "não é ele?"}</button>}
+    </p>
   )
 }

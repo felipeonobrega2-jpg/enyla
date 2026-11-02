@@ -88,6 +88,7 @@ export type Configuracoes = {
   sinalPct?: number                                        // sinal pedido na aprovação online (%)
   feriados?: import("./lib/diasUteis").ConfigFeriados      // feriados locais nos prazos
   clientesRelacionamento?: ClienteRelacionamento[]         // pagam depois da entrega
+  vinculosWhatsapp?: import("./lib/vinculoWhatsapp").Vinculos   // conversa (jid) → cliente, escolhido na tela do WhatsApp
   origensClientes?: import("./lib/coleta").OrigensClientes   // como cada cliente chegou (nomeChave → canal)
   ideias?: Ideia[]                                         // anotações para implementar depois
   conciliacao?: import("./lib/conciliacao").MemoriaConciliacao  // quem paga por quem e entradas ignoradas
