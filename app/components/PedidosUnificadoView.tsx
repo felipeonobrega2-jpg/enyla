@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import {
   Package, TrendingUp, CheckCircle2,
   DollarSign, BarChart3, Factory, User, Users, Home, Building2, Megaphone, Wrench, ClipboardList,
-  CalendarDays, Search, X, Copy, ChevronDown, Check, Lock, Plus, Wallet, CalendarX2, CalendarClock, Truck,
+  CalendarDays, Search, X, Copy, ChevronDown, Check, Lock, Plus, Wallet, CalendarX2, CalendarClock, Truck, Pencil,
 } from "lucide-react"
 import {
   KanbanCard, KanbanOpcao, Lote, LancamentoFinanceiro,
@@ -104,6 +104,7 @@ type Props = {
   onChamarFrete?: (p: PedidoFrete) => void
   fretesVersao?: number
   onLancamentosRemovidos?: (ids: string[]) => void
+  onEditarLancamento?: (l: LancamentoFinanceiro) => void
 }
 
 // Pedido → identificação para o frete (lote inteiro quando houver)
@@ -119,7 +120,7 @@ export function PedidosUnificadoView(props: Props) {
     onMove, onDelete, onSetMotivo, onFechamento, onHotOpcao, onKanbanDetalhes,
     lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge, onLoteRename,
     negocios, onUpdateNegocio, onAddLancamento, onBulkUpdate, onCopiarPedido,
-    onChamarFrete, fretesVersao, onLancamentosRemovidos,
+    onChamarFrete, fretesVersao, onLancamentosRemovidos, onEditarLancamento,
   } = props
 
   const [tab, setTab]     = useState<Tab>("lista")
@@ -330,7 +331,7 @@ export function PedidosUnificadoView(props: Props) {
             kpiConcluidos={kpiConcluidos}
             toggle={toggle} toggleConcluido={toggleConcluido}
             onDetalhes={onDetalhes} onNovoLancamento={onNovoLancamento} onSalvarData={onSalvarData}
-            onChamarFrete={onChamarFrete} fretesVersao={fretesVersao} onLancamentosRemovidos={onLancamentosRemovidos}
+            onChamarFrete={onChamarFrete} fretesVersao={fretesVersao} onLancamentosRemovidos={onLancamentosRemovidos} onEditarLancamento={onEditarLancamento}
             onMarcarEntregue={ids => ids.forEach(id => onMove(id, 9))}
             onSavePrazos={onSavePrazos} onSalvarPrazoRecebimentoInterno={onSalvarPrazoRecebimentoInterno}
             selectedCardIds={selectedCardIds} onSelectCard={toggleSelectCard}
@@ -689,7 +690,8 @@ function DashboardTab({ entries, onDetalhes }: {
 
 // ── Lista Tab ─────────────────────────────────────────────────────────────────
 
-function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, custoFixoTotal, kpiConcluidos, toggle, toggleConcluido, onDetalhes, onNovoLancamento, onSalvarData, onSavePrazos, onSalvarPrazoRecebimentoInterno, selectedCardIds, onSelectCard, onCopiarPedido, onChamarFrete, fretesVersao, onLancamentosRemovidos, onMarcarEntregue }: {
+function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, custoFixoTotal, kpiConcluidos, toggle, toggleConcluido, onDetalhes, onNovoLancamento, onSalvarData, onSavePrazos, onSalvarPrazoRecebimentoInterno, selectedCardIds, onSelectCard, onCopiarPedido, onChamarFrete, fretesVersao, onLancamentosRemovidos, onMarcarEntregue, onEditarLancamento }: {
+  onEditarLancamento?: (l: LancamentoFinanceiro) => void
   onChamarFrete?: (p: PedidoFrete) => void
   fretesVersao?: number
   onLancamentosRemovidos?: (ids: string[]) => void
@@ -947,12 +949,14 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
                     </div>
                     <div className="space-y-0.5">
                       {entry.receitas.filter(l => l.status === "pago").map(l => (
-                        <div key={l.id} className="flex items-center gap-2.5 py-1.5">
+                        <div key={l.id} onClick={onEditarLancamento ? e => { e.stopPropagation(); onEditarLancamento(l) } : undefined} title={onEditarLancamento ? "Editar lançamento" : undefined}
+                          className={`group/lanc flex items-center gap-2.5 py-1.5 px-1.5 -mx-1.5 rounded-lg ${onEditarLancamento ? "cursor-pointer hover:bg-black/[0.03]" : ""}`}>
                           <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-[#30D158]" />
                           <span className="flex-1 text-[11.5px] truncate" style={{ color: txt }}>{l.descricao || "Recebimento"}</span>
                           <span className="text-[11.5px] font-bold ds-num shrink-0 text-[#30D158]">{brl(l.valor)}</span>
                           {l.dataPagamento && <span className="text-[10px] shrink-0" style={{ color: sub }}>{fmt(l.dataPagamento)}</span>}
                           {l.formaPagamento && <span className="text-[10px] shrink-0" style={{ color: sub }}>{formaPagLabel(l.formaPagamento)}</span>}
+                          {onEditarLancamento && <Pencil className="w-3 h-3 shrink-0 opacity-0 group-hover/lanc:opacity-100 transition-opacity" style={{ color: sub }} />}
                         </div>
                       ))}
                     </div>
@@ -967,7 +971,8 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
                     </div>
                     <div className="space-y-0.5">
                       {entry.despesas.filter(l => l.status === "pago" || l.formaPagamento === "conta").map(l => (
-                        <div key={l.id} className="flex items-center gap-2.5 py-1.5">
+                        <div key={l.id} onClick={onEditarLancamento ? e => { e.stopPropagation(); onEditarLancamento(l) } : undefined} title={onEditarLancamento ? "Editar lançamento" : undefined}
+                          className={`group/lanc flex items-center gap-2.5 py-1.5 px-1.5 -mx-1.5 rounded-lg ${onEditarLancamento ? "cursor-pointer hover:bg-black/[0.03]" : ""}`}>
                           <CatIcon cat={l.categoria} className="w-3 h-3 shrink-0 text-[#9ca3af]" />
                           <span className="flex-1 text-[11.5px] truncate" style={{ color: txt }}>{l.descricao || "Despesa"}</span>
                           <span className="text-[11.5px] font-bold ds-num shrink-0 text-[#d33a3c]">−{brl(l.valor)}</span>
@@ -975,6 +980,7 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
                             ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 shrink-0">conta</span>
                             : l.dataPagamento && <span className="text-[10px] shrink-0" style={{ color: sub }}>{fmt(l.dataPagamento)}</span>
                           }
+                          {onEditarLancamento && <Pencil className="w-3 h-3 shrink-0 opacity-0 group-hover/lanc:opacity-100 transition-opacity" style={{ color: sub }} />}
                         </div>
                       ))}
                     </div>

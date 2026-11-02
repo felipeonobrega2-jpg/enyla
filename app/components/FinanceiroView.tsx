@@ -1110,6 +1110,8 @@ export function FinanceiroView({
   const [bulkFornecedor, setBulkFornecedor]   = useState("")
   const [filtroCategoria, setFiltroCategoria] = useState("")
   const [filtroRevisar, setFiltroRevisar]     = useState(false)
+  // Custos lançados na conta do fornecedor (Jerograf etc.) ficam fora do fluxo de caixa, mas precisam ser achados para editar
+  const [filtroForma, setFiltroForma]         = useState<"caixa" | "conta" | "tudo">("caixa")
   const [buscaLanc, setBuscaLanc]             = useState("")
   const [buscaReceber, setBuscaReceber]       = useState("")
   const [filtroReceber, setFiltroReceber] = useState<"aberto" | "pendente" | "parcial" | "todos">("aberto")
@@ -1152,7 +1154,7 @@ export function FinanceiroView({
       return true
     }
     return lancamentos
-      .filter(l => l.formaPagamento !== "conta") // custos na conta do fornecedor não aparecem no fluxo de caixa
+      .filter(l => filtroForma === "tudo" || (filtroForma === "conta") === (l.formaPagamento === "conta")) // conta do fornecedor: fora do fluxo de caixa
       .filter(inMes)
       .filter(l => !filtroTipo     || l.tipo === filtroTipo)
       .filter(l => !filtroStatus   || statusEfetivo(l) === filtroStatus)
@@ -1167,7 +1169,7 @@ export function FinanceiroView({
       })
       .sort((a, b) => ref(b).localeCompare(ref(a)))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lancamentos, periodo, mesOffset, fromStr, toStr, filtroTipo, filtroStatus, filtroCategoria, filtroRevisar, buscaLanc])
+  }, [lancamentos, periodo, mesOffset, fromStr, toStr, filtroTipo, filtroStatus, filtroCategoria, filtroRevisar, buscaLanc, filtroForma])
 
   // Parcerias — comissão e ganho são AMBOS receita do usuário
   const negociosInPeriodo = (n: NegocioParceiro) => {
@@ -1899,6 +1901,12 @@ export function FinanceiroView({
                 <option value="">Todos os tipos</option>
                 <option value="receita">Receitas</option>
                 <option value="despesa">Despesas</option>
+              </select>
+              <select value={filtroForma} onChange={e => setFiltroForma(e.target.value as typeof filtroForma)} title="Custos lançados na conta do fornecedor não entram no caixa"
+                className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[#72707d] bg-white focus:outline-none">
+                <option value="caixa">Fluxo de caixa</option>
+                <option value="conta">Só conta de fornecedor</option>
+                <option value="tudo">Caixa + conta de fornecedor</option>
               </select>
               <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value as StatusLancamento | "")}
                 className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[#72707d] bg-white focus:outline-none">

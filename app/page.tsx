@@ -2131,6 +2131,7 @@ export default function Home() {
               lancamentos={lancamentos}
               onDetalhes={card => setDetalheModal({ tipo: "kanban", card })}
               onNovoLancamento={prefill => setModalLancPedidos(prefill)}
+              onEditarLancamento={l => setModalLancPedidos(l)}
               onChamarFrete={p => { setEntregasPrefill({ pedido: p }); navigate("entregas") }}
               fretesVersao={fretesVersao}
               onLancamentosRemovidos={ids => setLancamentos(prev => prev.filter(l => !ids.includes(l.id)))}
@@ -2832,10 +2833,19 @@ export default function Home() {
           contas={config?.contas}
           fornecedores={config?.fornecedores}
           onSave={l => {
-            setLancamentos(prev => [l, ...prev])
-            fetch("/api/lancamentos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(l) })
-              .then(r => { if (!r.ok) r.json().then(d => { alert(`Erro ao salvar lançamento: ${d.error ?? r.status}`) }) })
-              .catch(e => alert(`Erro de rede: ${e}`))
+            // Editando (aberto pelo custo/entrada do pedido): atualiza o original; partes novas (divisão por etapa) são criadas
+            const editId = modalLancPedidos.id
+            if (editId && l.id === editId) {
+              setLancamentos(prev => prev.map(x => x.id === editId ? { ...x, ...l } : x))
+              fetch(`/api/lancamentos/${editId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(l) })
+                .then(r => { if (!r.ok) r.json().then(d => { alert(`Erro ao atualizar lançamento: ${d.error ?? r.status}`) }) })
+                .catch(e => alert(`Erro de rede: ${e}`))
+            } else {
+              setLancamentos(prev => [l, ...prev])
+              fetch("/api/lancamentos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(l) })
+                .then(r => { if (!r.ok) r.json().then(d => { alert(`Erro ao salvar lançamento: ${d.error ?? r.status}`) }) })
+                .catch(e => alert(`Erro de rede: ${e}`))
+            }
             setModalLancPedidos(null)
           }}
           onClose={() => setModalLancPedidos(null)}

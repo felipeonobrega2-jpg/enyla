@@ -34,7 +34,7 @@ const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
 const escuro = tela.endsWith("-escuro")
 if (escuro) document.documentElement.classList.add("dark")
 // Abas do Financeiro: "financeiro-receber" abre a aba "receber"
-if (tela.startsWith("financeiro-")) sessionStorage.setItem("fin:tab", tela.slice(11))
+if (tela.startsWith("financeiro-")) sessionStorage.setItem("fin:tab", tela.slice(11).replace(/-conta$/, ""))
 
 // Microfones: simula um Mac com o iPhone por perto (Continuidade)
 if (tela === "compositor-mic" && navigator.mediaDevices) navigator.mediaDevices.enumerateDevices = async () => [
