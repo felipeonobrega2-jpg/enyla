@@ -1,18 +1,17 @@
 "use client"
 
-import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag } from "lucide-react"
-import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag, ChevronRight, Reply, Keyboard } from "lucide-react"
+import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, nomeChave } from "../lib/negocio"
 import { clienteDaConversa, Vinculos } from "../lib/vinculoWhatsapp"
 import { lerOrigem } from "../lib/origemWhatsapp"
-import { ETAPAS, Etapa, posicaoNoFunil, estaFechada } from "../lib/funilWhatsapp"
+import { ETAPAS, Etapa, posicaoNoFunil, estaFechada, DIAS_PERDIDO } from "../lib/funilWhatsapp"
 import { Segmentado } from "./ds"
 import { FilaMensagens } from "./FilaMensagens"
 import { montarFila, AvisoPedido } from "../lib/filaMensagens"
 import { filtrar, preencher, Rapida } from "../lib/mensagensRapidas"
 import { COL_HOT } from "../types"
-import { brl } from "../utils"
 
 type Conversa = {
   jid: string
@@ -117,7 +116,7 @@ export default function WhatsAppView({
   const [status, setStatus] = useState<StatusWhats | null>(null)
   useEffect(() => { fetch("/api/whatsapp/status").then(r => r.json()).then(setStatus).catch(() => {}) }, [])
   const [busca, setBusca] = useState("")
-  const [filtro, setFiltro] = useState<"todas" | "anuncio" | "site" | "clientes" | "fechadas">("todas")
+  const [filtro, setFiltro] = useState<"todas" | "responder" | "anuncio" | "site" | "clientes" | "fechadas">("todas")
   const [modo, setModo] = useState<"lista" | "funil" | "fila">("lista")
   const [etiquetaFiltro, setEtiquetaFiltro] = useState<string | null>(null)
   // Fecha/reabre ou troca etiquetas: atualiza a tela na hora e grava em seguida
@@ -132,13 +131,30 @@ export default function WhatsAppView({
     await fetch("/api/whatsapp/conversas", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jids, ...campos }) }).catch(() => {})
   }
   const threadRef = useRef<HTMLDivElement>(null)
+  const listaRef = useRef<HTMLDivElement>(null)
+  const buscaRef = useRef<HTMLInputElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Conversas já abertas ficam guardadas: voltar a uma delas é instantâneo (atualiza por trás)
+  const cache = useRef(new Map<string, Mensagem[]>())
+  // Mensagens que já estavam na tela ao abrir não animam; só as que chegam depois
+  const [base, setBase] = useState<Set<string>>(new Set())
+  const [agora, setAgora] = useState(() => Date.now())
+  // Linha brilha quando chega mensagem nova
+  const anteriores = useRef<Conversa[]>([])
+  const [brilho, setBrilho] = useState<Set<string>>(new Set())
 
   const carregarConversas = useCallback(async () => {
     const res = await fetch("/api/whatsapp/conversas")
     if (res.ok) {
       const d: unknown = await res.json()
       const novas = Array.isArray(d) ? d as Conversa[] : []
+      const antes = anteriores.current
+      if (antes.length) {
+        const mudou = novas.filter(n => antes.find(a => a.jid === n.jid)?.ultima_at !== n.ultima_at).map(n => n.jid)
+        if (mudou.length && mudou.length < 20) { setBrilho(new Set(mudou)); setTimeout(() => setBrilho(new Set()), 1700) }
+      }
+      anteriores.current = novas
+      setAgora(Date.now())
       setConversas(prev => JSON.stringify(prev) === JSON.stringify(novas) ? prev : novas)
     }
     setLoadingConvs(false)
@@ -151,6 +167,7 @@ export default function WhatsAppView({
     if (res?.ok) {
       const d: unknown = await res.json()
       const novas = Array.isArray(d) ? d as Mensagem[] : []
+      if (primeira) setBase(new Set(novas.map(m => m.id)))
       setMensagens(prev => {
         if (primeira || !prev.length) return novas
         if (prev[prev.length - 1]?.id === novas[novas.length - 1]?.id) return prev
@@ -160,7 +177,7 @@ export default function WhatsAppView({
       })
     }
     if (primeira) setLoadingMsgs(false)
-  }, [])
+  }, [setBase])
 
   useEffect(() => {
     carregarConversas()
@@ -170,7 +187,7 @@ export default function WhatsAppView({
 
   useEffect(() => {
     if (!ativa) return
-    carregarMensagens(ativa.jid, true)
+    carregarMensagens(ativa.jid, !cache.current.has(ativa.jid))
     const t = setInterval(() => carregarMensagens(ativa.jid), 5000)
     return () => clearInterval(t)
   }, [ativa, carregarMensagens])
@@ -178,15 +195,22 @@ export default function WhatsAppView({
   // Desce para o fim ao abrir e quando chega mensagem nova, a menos que você esteja lendo lá em cima
   const ultimaId = mensagens[mensagens.length - 1]?.id
   const rolouParaCima = useRef(false)
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = threadRef.current
     if (el && !rolouParaCima.current) el.scrollTop = el.scrollHeight
-  }, [ultimaId])
+  }, [ultimaId, ativa?.jid])
+
+  useEffect(() => { if (ativa && mensagens.length) cache.current.set(ativa.jid, mensagens) }, [ativa, mensagens])
 
   async function abrirConversa(c: Conversa) {
     rolouParaCima.current = false
+    limparTimers()
+    setEspiada(null)
+    const guardadas = cache.current.get(c.jid) ?? []
+    setBase(new Set(guardadas.map(m => m.id)))
     setAtiva(c)
-    setMensagens([])
+    setMensagens(guardadas)
+    requestAnimationFrame(() => listaRef.current?.querySelector(`[data-linha="${CSS.escape(c.jid)}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }))
     if (c.nao_lidas > 0) {
       await fetch("/api/whatsapp/conversas", {
         method: "PATCH",
@@ -197,14 +221,76 @@ export default function WhatsAppView({
     }
   }
 
+  // Esperando você: o cliente falou por último (nos últimos 14 dias)
+  const aguardando = (c: Conversa) => !estaFechada(c) && !!c.ultima_recebida_at && (!c.ultima_enviada_at || c.ultima_recebida_at > c.ultima_enviada_at)
+    && agora - new Date(c.ultima_recebida_at).getTime() < DIAS_PERDIDO * 86_400_000
   const filtradas = conversas.filter(c =>
     (filtro === "fechadas" ? estaFechada(c) : !estaFechada(c)) &&
+    (filtro !== "responder" || aguardando(c)) &&
     (!etiquetaFiltro || (c.etiquetas ?? []).includes(etiquetaFiltro)) &&
-    (filtro === "todas" || filtro === "fechadas" || (filtro === "clientes" ? !!clienteDe(c) : lerOrigem(c.campanha)?.canal === filtro)) &&
+    (filtro === "todas" || filtro === "fechadas" || filtro === "responder" || (filtro === "clientes" ? !!clienteDe(c) : lerOrigem(c.campanha)?.canal === filtro)) &&
     (c.nome.toLowerCase().includes(busca.toLowerCase()) || (c.ultima_msg ?? "").toLowerCase().includes(busca.toLowerCase()))
   )
 
   const totalNaoLidas = conversas.reduce((s, c) => s + c.nao_lidas, 0)
+  const totalAguardando = conversas.filter(aguardando).length
+
+  // Próxima conversa esperando você (depois de responder uma, vai direto para a seguinte)
+  function abrirProxima() {
+    const fila = filtradas.filter(c => aguardando(c) && c.jid !== ativa?.jid)
+    const idx = ativa ? filtradas.findIndex(c => c.jid === ativa.jid) : -1
+    const prox = fila.find(c => filtradas.indexOf(c) > idx) ?? fila[0]
+    if (prox) abrirConversa(prox)
+  }
+  // Depois de enviar: a linha sobe e deixa de "esperar você" na hora, sem esperar a atualização
+  function marcarEnviada(jid: string, texto: string) {
+    const agora = new Date().toISOString()
+    setConversas(prev => prev.map(c => c.jid === jid ? { ...c, ultima_msg: texto || c.ultima_msg, ultima_at: agora, ultima_enviada_at: agora, nao_lidas: 0 } : c)
+      .sort((a, b) => (b.ultima_at ?? "").localeCompare(a.ultima_at ?? "")))
+  }
+  async function marcarLida(c: Conversa) {
+    setConversas(prev => prev.map(x => x.jid === c.jid ? { ...x, nao_lidas: 0 } : x))
+    await fetch("/api/whatsapp/conversas", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid: c.jid }) }).catch(() => {})
+  }
+
+  // Espiada: parar o mouse numa linha mostra as últimas mensagens e deixa responder dali
+  const [espiada, setEspiada] = useState<{ conversa: Conversa; topo: number; esquerda: number; fixa: boolean } | null>(null)
+  const timerEspiar = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const timerFechar = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const limparTimers = () => { if (timerEspiar.current) clearTimeout(timerEspiar.current); if (timerFechar.current) clearTimeout(timerFechar.current) }
+  function espiar(c: Conversa, el: HTMLElement, fixa = false) {
+    limparTimers()
+    if (c.jid === ativa?.jid && !fixa) return
+    const abrir = () => setEspiada(e => e?.fixa && !fixa ? e : { conversa: c, topo: el.getBoundingClientRect().top, esquerda: (listaRef.current?.getBoundingClientRect().right ?? 320) + 8, fixa })
+    if (fixa) { abrir(); if (c.nao_lidas) marcarLida(c) } else timerEspiar.current = setTimeout(abrir, 450)
+  }
+  function soltarEspiada() {
+    limparTimers()
+    timerFechar.current = setTimeout(() => setEspiada(e => e?.fixa ? e : null), 220)
+  }
+  const fecharEspiada = useCallback(() => { limparTimers(); setEspiada(null) }, [])
+  useEffect(() => () => limparTimers(), [])
+
+  useReordenacaoSuave(listaRef, filtradas.map(c => c.jid).join("|"))
+
+  // Teclado: ↑↓ (ou J/K) navega, / busca, R responde, N vai para a próxima esperando você, E fecha a conversa
+  useEffect(() => {
+    if (modo !== "lista") return
+    const tecla = (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement
+      if (alvo?.closest?.("input, textarea, select, [contenteditable=true]") || e.metaKey || e.ctrlKey || e.altKey) return
+      const idx = ativa ? filtradas.findIndex(c => c.jid === ativa.jid) : -1
+      const k = e.key.toLowerCase()
+      if (k === "arrowdown" || k === "j") { e.preventDefault(); const c = filtradas[Math.min(filtradas.length - 1, idx + 1)]; if (c) abrirConversa(c) }
+      else if (k === "arrowup" || k === "k") { e.preventDefault(); const c = filtradas[Math.max(0, idx - 1)]; if (c) abrirConversa(c) }
+      else if (k === "/") { e.preventDefault(); buscaRef.current?.focus() }
+      else if (k === "r" || k === "enter") { e.preventDefault(); (document.querySelector('[data-compositor="principal"]') as HTMLTextAreaElement | null)?.focus() }
+      else if (k === "n") { e.preventDefault(); abrirProxima() }
+      else if (k === "e" && ativa) { e.preventDefault(); alterar([ativa.jid], { fechar: !estaFechada(ativa) }) }
+    }
+    window.addEventListener("keydown", tecla)
+    return () => window.removeEventListener("keydown", tecla)
+  })
 
   const naFila = useMemo(() => montarFila({ conversas, kanban, lancamentos, vinculos, avisos, dispensados }).length, [conversas, kanban, lancamentos, vinculos, avisos, dispensados])
 
@@ -223,14 +309,14 @@ export default function WhatsAppView({
   )
 
   if (modo === "fila") return (
-    <div className="flex flex-col h-full">{topo}<div className="flex-1 min-h-0"><FilaMensagens conversas={conversas} kanban={kanban} lancamentos={lancamentos}
+    <div className="flex flex-col h-full">{topo}<div className="flex-1 min-h-0 ds-troca-tela"><FilaMensagens conversas={conversas} kanban={kanban} lancamentos={lancamentos}
       vinculos={vinculos} avisos={avisos} dispensados={dispensados}
       onAvisado={(k, a) => onAvisado?.(k, a)} onDispensar={id => onDispensar?.(id)}
       onAbrirConversa={jid => { const c = conversas.find(x => x.jid === jid); if (c) { setModo("lista"); abrirConversa(c) } }} /></div></div>
   )
 
   if (modo === "funil") return (
-    <div className="flex flex-col h-full">{topo}<div className="flex-1 min-h-0"><FunilConversas conversas={conversas.filter(c => !estaFechada(c))}
+    <div className="flex flex-col h-full">{topo}<div className="flex-1 min-h-0 ds-troca-tela"><FunilConversas conversas={conversas.filter(c => !estaFechada(c))}
       etiquetasDef={etiquetasDef} onFechar={jids => alterar(jids, { fechar: true })} cardsDe={c => { const cl = clienteDe(c); return cl ? kanban.filter(k => nomeChave(k.nomeCliente) === nomeChave(cl.nome)) : [] }}
       clienteDe={clienteDe}
       onAbrir={c => { setModo("lista"); abrirConversa(c) }}
@@ -243,7 +329,7 @@ export default function WhatsAppView({
 
   return (
     <div className="flex flex-col h-full">{topo}
-    <div className="flex flex-1 min-h-0" style={{ background: "var(--bg-page)" }}>
+    <div className="flex flex-1 min-h-0 ds-troca-tela" style={{ background: "var(--bg-page)" }}>
 
       {/* ── Coluna esquerda: lista de conversas ─── */}
       <div className="w-80 shrink-0 flex flex-col border-r" style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
@@ -251,13 +337,19 @@ export default function WhatsAppView({
         {/* Header */}
         <div className="px-4 pt-5 pb-3 border-b" style={{ borderColor: "var(--border)" }}>
           <input
+            ref={buscaRef}
             value={busca}
             onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar conversa…"
+            placeholder="Buscar conversa…  ( / )"
             className="w-full text-[13px] px-3 py-2 rounded-xl outline-none"
             style={{ background: "var(--bg-page)", color: "var(--text-main)", border: "1px solid var(--border)" }}
           />
           <div className="flex gap-1 mt-2 flex-wrap">
+            <button onClick={() => setFiltro(f => f === "responder" ? "todas" : "responder")} className="h-7 px-2.5 rounded-full text-[11.5px] font-semibold transition-colors flex items-center gap-1"
+              title="Clientes que falaram por último (N abre a próxima)"
+              style={filtro === "responder" ? { background: "#25a35a", color: "#fff" } : { background: "rgba(37,163,90,0.1)", color: "#1d8a4b" }}>
+              <Reply className="w-3.5 h-3.5" />Responder {totalAguardando}
+            </button>
             {([["todas", "Todas"], ["anuncio", "Anúncio"], ["site", "Site"], ["clientes", "Clientes"], ["fechadas", "Fechadas"]] as const).map(([v, n]) => (
               <button key={v} onClick={() => setFiltro(v)} className="h-7 px-2.5 rounded-full text-[11.5px] font-medium transition-colors"
                 style={filtro === v ? { background: "#191625", color: "#fff" } : { background: "var(--bg-page)", color: "var(--text-sub)", border: "1px solid var(--border)" }}>
@@ -279,7 +371,7 @@ export default function WhatsAppView({
         </div>
 
         {/* Lista */}
-        <div className="flex-1 overflow-y-auto">
+        <div ref={listaRef} className="flex-1 overflow-y-auto" onScroll={() => { if (!espiada?.fixa) fecharEspiada() }}>
           {loadingConvs && (
             <div className="flex flex-col gap-3 p-4">
               {[1, 2, 3].map(i => (
@@ -308,13 +400,17 @@ export default function WhatsAppView({
           )}
 
           {filtradas.map(c => (
-            <button
+            <div
               key={c.jid}
+              data-linha={c.jid}
+              role="button" tabIndex={-1}
               onClick={() => abrirConversa(c)}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-black/[0.03]"
+              onMouseEnter={e => espiar(c, e.currentTarget)}
+              onMouseLeave={soltarEspiada}
+              className={`group relative w-full flex items-center gap-3 px-4 py-3 text-left cursor-pointer transition-colors hover:bg-black/[0.03] ${brilho.has(c.jid) ? "wa-brilho" : ""}`}
               style={{
-                background: ativa?.jid === c.jid ? "rgba(132,86,232,0.06)" : undefined,
-                borderLeft: ativa?.jid === c.jid ? "2px solid #8456e8" : "2px solid transparent",
+                background: ativa?.jid === c.jid ? "rgba(132,86,232,0.06)" : espiada?.conversa.jid === c.jid ? "rgba(116,116,128,0.06)" : undefined,
+                borderLeft: ativa?.jid === c.jid ? "2px solid #8456e8" : aguardando(c) ? "2px solid rgba(37,163,90,0.55)" : "2px solid transparent",
               }}
             >
               <Avatar nome={c.nome} jid={c.jid} />
@@ -326,21 +422,43 @@ export default function WhatsAppView({
                     <SeloOrigem campanha={c.campanha} />
                     {(c.etiquetas ?? []).slice(0, 2).map(n => <EtiquetaChip key={n} def={defDe(n)} mini />)}
                   </span>
-                  <span className="text-[11px] shrink-0" style={{ color: "var(--text-faint)" }}>{fmtHora(c.ultima_at)}</span>
+                  <span className="text-[11px] shrink-0 group-hover:hidden" style={{ color: aguardando(c) ? "#1d8a4b" : "var(--text-faint)", fontWeight: aguardando(c) ? 600 : undefined }}>{fmtHora(c.ultima_at)}</span>
+                  {/* Ações no hover: responder aqui mesmo, marcar como lida, fechar */}
+                  <span className="hidden group-hover:flex wa-acoes items-center gap-0.5 shrink-0 -my-1" onClick={e => e.stopPropagation()}>
+                    <button title="Responder sem abrir" onClick={e => espiar(c, e.currentTarget.closest("[data-linha]") as HTMLElement, true)}
+                      className="w-7 h-7 rounded-lg grid place-items-center hover:bg-[#25a35a]/15 text-[#1d8a4b]"><Reply className="w-4 h-4" /></button>
+                    {c.nao_lidas > 0 && <button title="Marcar como lida" onClick={() => marcarLida(c)}
+                      className="w-7 h-7 rounded-lg grid place-items-center hover:bg-black/5" style={{ color: "var(--text-sub)" }}><CheckCheck className="w-4 h-4" /></button>}
+                    <button title={estaFechada(c) ? "Reabrir" : "Fechar conversa"} onClick={() => { alterar([c.jid], { fechar: !estaFechada(c) }); fecharEspiada() }}
+                      className="w-7 h-7 rounded-lg grid place-items-center hover:bg-black/5" style={{ color: "var(--text-sub)" }}><Archive className="w-4 h-4" /></button>
+                  </span>
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-0.5">
                   <span className="text-[12px] truncate flex items-center gap-1 min-w-0" style={{ color: "var(--text-sub)" }}><Previa texto={c.ultima_msg} /></span>
                   {c.nao_lidas > 0 && (
-                    <span className="shrink-0 text-[10px] font-bold text-white bg-[#25D366] rounded-full w-4 h-4 flex items-center justify-center">
+                    <span key={c.nao_lidas} className="shrink-0 text-[10px] font-bold text-white bg-[#25D366] rounded-full w-4 h-4 flex items-center justify-center wa-enviada">
                       {c.nao_lidas > 9 ? "9+" : c.nao_lidas}
                     </span>
                   )}
                 </div>
               </div>
-            </button>
+            </div>
           ))}
         </div>
+        <p className="hidden md:flex items-center gap-1.5 px-4 py-2 border-t text-[10.5px] shrink-0" style={{ borderColor: "var(--border)", color: "var(--text-faint)" }}>
+          <Keyboard className="w-3.5 h-3.5 shrink-0" />↑↓ navegar · R responder · N próxima · E fechar · ⌘↵ envia e vai para a próxima
+        </p>
       </div>
+
+      {espiada && (
+        <Espiada key={espiada.conversa.jid} conversa={espiada.conversa} topo={espiada.topo} fixa={espiada.fixa}
+          esquerda={espiada.esquerda}
+          onFixar={() => { limparTimers(); setEspiada(e => e && !e.fixa ? { ...e, fixa: true } : e) }}
+          onFechar={fecharEspiada}
+          onAbrir={() => abrirConversa(espiada.conversa)}
+          onEnviada={t => marcarEnviada(espiada.conversa.jid, t)}
+          onMouseEnter={limparTimers} onMouseLeave={soltarEspiada} />
+      )}
 
       {/* ── Painel direito: thread ─────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -388,13 +506,14 @@ export default function WhatsAppView({
             </div>
 
             {/* Thread */}
-            <div ref={threadRef} onScroll={e => { const el = e.currentTarget; rolouParaCima.current = el.scrollHeight - el.scrollTop - el.clientHeight > 200 }}
-              className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2" style={{ background: "#efeae2" }}>
+            <div key={ativa.jid} ref={threadRef} onScroll={e => { const el = e.currentTarget; rolouParaCima.current = el.scrollHeight - el.scrollTop - el.clientHeight > 200 }}
+              className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2 wa-thread" style={{ background: "#efeae2" }}>
               {loadingMsgs && <div className="flex justify-center py-8"><TypingBubble /></div>}
               {!loadingMsgs && mensagens.length >= 300 && <CarregarAnteriores key={ativa.jid} jid={ativa.jid} primeira={mensagens[0]?.ts}
                 onCarregar={antigas => {
                   const el = threadRef.current, alturaAntes = el?.scrollHeight ?? 0
                   rolouParaCima.current = true
+                  setBase(b => new Set([...b, ...antigas.map(m => m.id)]))
                   setMensagens(prev => { const ids = new Set(prev.map(m => m.id)); return [...antigas.filter(m => !ids.has(m.id)), ...prev] })
                   // Mantém a posição de leitura depois de acrescentar mensagens em cima
                   requestAnimationFrame(() => { if (el) el.scrollTop = el.scrollHeight - alturaAntes })
@@ -416,7 +535,7 @@ export default function WhatsAppView({
                         </span>
                       </div>
                     )}
-                    <div className={`flex ${m.from_me ? "justify-end" : "justify-start"}`}>
+                    <div className={`flex ${m.from_me ? "justify-end" : "justify-start"} ${base.has(m.id) ? "" : m.from_me ? "wa-bolha-eu" : "wa-bolha-ele"}`}>
                       <div
                         className="max-w-[70%] px-3 py-2 rounded-2xl shadow-sm"
                         style={{
@@ -446,10 +565,11 @@ export default function WhatsAppView({
 
             <Compositor jid={ativa.jid} contato={ativa.nome} cliente={clienteDe(ativa)?.nome ?? null}
               orcamento={(() => { const cl = clienteDe(ativa); return cl ? kanban.filter(k => nomeChave(k.nomeCliente) === nomeChave(cl.nome) && (k.coluna === 0 || k.coluna === COL_HOT)).map(k => k.numero).pop() ?? null : null })()}
-              onOtimista={m => { rolouParaCima.current = false; setMensagens(prev => [...prev, m]) }}
-              onResultado={(tmp, real) => setMensagens(prev => real && prev.some(x => x.id === real)
+              onEnviarEProxima={abrirProxima}
+              onOtimista={m => { rolouParaCima.current = false; setMensagens(prev => [...prev, m]); marcarEnviada(ativa.jid, m.corpo ?? "") }}
+              onResultado={(tmp, real) => { if (real) setBase(b => new Set(b).add(real)); setMensagens(prev => real && prev.some(x => x.id === real)
                 ? prev.filter(x => x.id !== tmp)   // a atualização automática já trouxe a confirmada
-                : prev.map(x => x.id !== tmp ? x : real ? { ...x, id: real, status: "enviada" } : { ...x, status: "erro" }))} />
+                : prev.map(x => x.id !== tmp ? x : real ? { ...x, id: real, status: "enviada" } : { ...x, status: "erro" })) }} />
           </>
         )}
       </div>
@@ -626,8 +746,12 @@ function MidiaMensagem({ id, tipo: bruto, nome }: { id: string; tipo: string; no
 
 // Caixa de resposta: Enter envia, Shift+Enter pula linha; clipe anexa foto/arquivo (com legenda).
 // A mensagem aparece na hora (reloginho) e vira ✓ quando o WhatsApp confirma, sem travar a digitação.
-export function Compositor({ jid, contato = "", cliente = null, orcamento = null, onOtimista, onResultado }: {
+export function Compositor({ jid, contato = "", cliente = null, orcamento = null, onOtimista, onResultado, onEnviarEProxima, autoFoco, compacto, onEnviou }: {
   jid: string
+  onEnviarEProxima?: () => void   // ⌘/Ctrl+Enter: envia e já abre a próxima conversa esperando você
+  onEnviou?: () => void
+  autoFoco?: boolean
+  compacto?: boolean              // dentro da espiada da lista
   contato?: string
   cliente?: string | null
   orcamento?: string | null
@@ -644,6 +768,7 @@ export function Compositor({ jid, contato = "", cliente = null, orcamento = null
   const [sel, setSel] = useState(0)
   const [fechou, setFechou] = useState(false)
   useEffect(() => { fetch("/api/whatsapp/rapidas").then(r => r.json()).then(d => setRapidas(Array.isArray(d) ? d : [])).catch(() => {}) }, [])
+  useEffect(() => { if (autoFoco) areaRef.current?.focus() }, [autoFoco, jid])
   const sugestoes = texto.startsWith("/") && !/\s/.test(texto) && !fechou ? filtrar(rapidas, texto) : []
   async function inserir(r: Rapida) {
     const t = await preencher(r.corpo ?? "", {
@@ -661,6 +786,7 @@ export function Compositor({ jid, contato = "", cliente = null, orcamento = null
     const tmp = `tmp-${Date.now()}`
     onOtimista({ id: tmp, jid, from_me: true, corpo: a ? (t || `Enviando ${a.name}…`) : t, tipo: "text", media_url: null, ts: new Date().toISOString(), kanban_card_id: null, status: "enviando" })
     setTexto(""); setArquivo(null); setErro(null); areaRef.current?.focus()
+    onEnviou?.()
     let req: Promise<Response>
     if (a) {
       const f = new FormData()
@@ -676,7 +802,7 @@ export function Compositor({ jid, contato = "", cliente = null, orcamento = null
     }).catch(() => { onResultado(tmp, null); setErro("Sem conexão: a mensagem não foi enviada.") })
   }
   return (
-    <div className="shrink-0 border-t px-4 py-3" style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
+    <div className={`shrink-0 border-t ${compacto ? "px-3 py-2.5" : "px-4 py-3"}`} style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
       {arquivo && (
         <div className="mb-2 flex items-center gap-2 text-[12px] px-3 py-1.5 rounded-lg w-fit max-w-full" style={{ background: "var(--bg-alt)", color: "var(--text-main)" }}>
           <Paperclip className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{arquivo.name}</span>
@@ -710,9 +836,12 @@ export function Compositor({ jid, contato = "", cliente = null, orcamento = null
               if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); inserir(sugestoes[Math.min(sel, sugestoes.length - 1)]); return }
               if (e.key === "Escape") { setFechou(true); return }
             }
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && onEnviarEProxima) { e.preventDefault(); if (texto.trim() || arquivo) enviar(); onEnviarEProxima(); return }
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar() }
+            if (e.key === "Escape") areaRef.current?.blur()
           }}
-          placeholder={arquivo ? "Legenda (opcional)" : "Escreva uma mensagem"}
+          data-compositor={compacto ? "espiada" : "principal"}
+          placeholder={arquivo ? "Legenda (opcional)" : compacto ? "Responder… (Enter envia, / mensagens rápidas)" : "Escreva uma mensagem"}
           className="flex-1 resize-none rounded-xl px-3.5 py-2.5 text-[13.5px] outline-none max-h-40"
           style={{ background: "var(--bg-page)", color: "var(--text-main)", border: "1px solid var(--border)", fieldSizing: "content" } as React.CSSProperties} />
         <button onClick={enviar} disabled={!texto.trim() && !arquivo} aria-label="Enviar"
@@ -1021,6 +1150,105 @@ function EtiquetasDaConversa({ selecionadas, definicoes, onMudar, onCriar }: {
           <button onClick={() => setAberto(false)} className="w-full text-[11.5px] mt-1.5 py-1" style={{ color: "var(--text-faint)" }}>Fechar</button>
         </div>
       )}
+    </div>
+  )
+}
+
+// Reordenação suave da lista: cada linha desliza da posição antiga para a nova (conversa que recebeu mensagem sobe)
+function useReordenacaoSuave(ref: React.RefObject<HTMLDivElement | null>, chave: string) {
+  const posicoes = useRef(new Map<string, number>())
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const calmo = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    const novas = new Map<string, number>()
+    for (const filho of Array.from(el.children) as HTMLElement[]) {
+      const k = filho.dataset.linha
+      if (!k) continue
+      const topo = filho.offsetTop
+      novas.set(k, topo)
+      const antes = posicoes.current.get(k)
+      if (!calmo && antes !== undefined && antes !== topo && Math.abs(antes - topo) < 1500 && filho.animate)
+        filho.animate([{ transform: `translateY(${antes - topo}px)` }, { transform: "none" }], { duration: 340, easing: "cubic-bezier(.3,.9,.3,1)" })
+    }
+    posicoes.current = novas
+  }, [ref, chave])
+}
+
+// Espiada: últimas mensagens + resposta, sem abrir a conversa. Abre parando o mouse na linha (ou no botão Responder).
+function Espiada({ conversa, topo, esquerda, fixa, onFixar, onFechar, onAbrir, onEnviada, onMouseEnter, onMouseLeave }: {
+  conversa: Conversa
+  topo: number
+  esquerda: number
+  fixa: boolean
+  onFixar: () => void
+  onFechar: () => void
+  onAbrir: () => void
+  onEnviada: (texto: string) => void
+  onMouseEnter: () => void
+  onMouseLeave: () => void
+}) {
+  const [msgs, setMsgs] = useState<Mensagem[] | null>(null)
+  const [base, setBase] = useState<Set<string>>(new Set())
+  const fimRef = useRef<HTMLDivElement>(null)
+  const caixaRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    let vivo = true
+    fetch(`/api/whatsapp/mensagens/${encodeURIComponent(conversa.jid)}?limite=8`).then(r => r.json())
+      .then((d: unknown) => { if (!vivo) return; const l = Array.isArray(d) ? d as Mensagem[] : []; setMsgs(l); setBase(new Set(l.map(m => m.id))) })
+      .catch(() => vivo && setMsgs([]))
+    return () => { vivo = false }
+  }, [conversa.jid])
+  useEffect(() => { fimRef.current?.scrollIntoView({ block: "end" }) }, [msgs])
+  // Fixa: fecha com Esc ou clicando fora
+  useEffect(() => {
+    if (!fixa) return
+    const fora = (e: MouseEvent) => { if (caixaRef.current && !caixaRef.current.contains(e.target as Node)) onFechar() }
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onFechar() }
+    document.addEventListener("mousedown", fora); document.addEventListener("keydown", esc)
+    return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc) }
+  }, [fixa, onFechar])
+  const altura = 440
+  const top = Math.max(64, Math.min(topo - 24, (typeof window !== "undefined" ? window.innerHeight : 900) - altura - 12))
+  return (
+    <div ref={caixaRef} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} onFocusCapture={onFixar} onMouseDown={onFixar}
+      className="wa-espiar fixed z-[60] w-[400px] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+      style={{ top, left: esquerda, height: altura, background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5 border-b shrink-0" style={{ borderColor: "var(--border)" }}>
+        <Avatar nome={conversa.nome} jid={conversa.jid} pequeno />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-main)" }}>{conversa.nome}</p>
+          <p className="text-[10.5px]" style={{ color: "var(--text-faint)" }}>{fixa ? "Esc fecha" : "clique para responder aqui"}</p>
+        </div>
+        <button onClick={onAbrir} className="text-[11.5px] font-semibold px-2.5 h-7 rounded-lg hover:bg-black/5 flex items-center gap-1" style={{ color: "#8456e8" }}>
+          Abrir<ChevronRight className="w-3.5 h-3.5" />
+        </button>
+        <button onClick={onFechar} aria-label="Fechar" className="w-7 h-7 rounded-lg grid place-items-center hover:bg-black/5" style={{ color: "var(--text-sub)" }}><X className="w-4 h-4" /></button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-1.5" style={{ background: "#efeae2" }}>
+        {!msgs && <div className="flex justify-center py-8"><TypingBubble /></div>}
+        {msgs?.map(m => (
+          <div key={m.id} className={`flex ${m.from_me ? "justify-end" : "justify-start"} ${base.has(m.id) ? "" : m.from_me ? "wa-bolha-eu" : "wa-bolha-ele"}`}>
+            <div className="max-w-[85%] px-2.5 py-1.5 shadow-sm" style={{ background: m.from_me ? "#d9fdd3" : "#fff", borderRadius: m.from_me ? "14px 14px 4px 14px" : "14px 14px 14px 4px" }}>
+              <MidiaMensagem id={m.id} tipo={m.tipo} nome={m.corpo} />
+              {m.corpo && m.tipo !== "document" && (
+                <p className={`text-[12.5px] leading-snug whitespace-pre-wrap ${m.tipo === "audio" || m.tipo === "audioMessage" ? "italic" : ""}`} style={{ color: "#111b21" }}>{m.corpo}</p>
+              )}
+              <p className="text-[10px] mt-0.5 flex items-center justify-end gap-1" style={{ color: "#8696a0" }}>
+                {new Date(m.ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                {m.from_me && <Recibo status={m.status} />}
+              </p>
+            </div>
+          </div>
+        ))}
+        <div ref={fimRef} />
+      </div>
+      <Compositor compacto autoFoco={fixa} jid={conversa.jid} contato={conversa.nome}
+        onOtimista={m => { setMsgs(prev => [...(prev ?? []), m]); onEnviada(m.corpo ?? "") }}
+        onResultado={(tmp, real) => {
+          if (real) setBase(b => new Set(b).add(real))
+          setMsgs(prev => (prev ?? []).map(x => x.id !== tmp ? x : real ? { ...x, id: real, status: "enviada" } : { ...x, status: "erro" }))
+        }} />
     </div>
   )
 }

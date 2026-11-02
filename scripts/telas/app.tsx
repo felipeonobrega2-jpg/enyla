@@ -42,6 +42,27 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     { id: "2", atalho: "/pix", quando_usar: "Cobrar sinal", corpo: "Oi {{nome}}! Segue sua página com o Pix: {{pagina_cliente}}", ativa: true, ordem: 2 },
     { id: "3", atalho: "/m4", quando_usar: "Lead frio", corpo: "Olá {{nome}}! Passando pra saber se ainda tem interesse nas embalagens.", ativa: false, ordem: 4 },
   ]))
+  if (u.startsWith("/api/whatsapp/conversas")) {
+    const h = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString()
+    const c = (jid: string, nome: string, msg: string, rec: number, env: number | null, extra = {}) => ({ jid, nome, ultima_msg: msg, ultima_at: h(Math.min(rec, env ?? 99)), nao_lidas: 0, foto_url: null, ultima_recebida_at: h(rec), ultima_enviada_at: env == null ? null : h(env), ...extra })
+    return new Response(JSON.stringify([
+      c("1@lid", "Camilo", "Quanto fica 2 mil caixinhas de 100ml?", 0.01, 0.2, { nao_lidas: 2, campanha: JSON.stringify({ canal: "anuncio" }) }),
+      c("2@lid", "Raniere Péricles", "Fechou, manda o pix", 0.05, 0.1, { nao_lidas: 1 }),
+      c("3@lid", "Bia Doces", "Vou ver com meu sócio", 1.2, 1),
+      c("4@lid", "Hassan", "Bora, bora", 2, 1.5),
+      c("5@lid", "Ana Cosméticos", "Perfeito, pode seguir", 3, 2.5, { campanha: JSON.stringify({ canal: "site" }) }),
+      c("6@lid", "Juliana", "ok", 4, 3.5),
+    ]))
+  }
+  if (u.startsWith("/api/whatsapp/mensagens/")) {
+    const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
+    const m = (id: string, eu: boolean, corpo: string, min: number) => ({ id, jid: "1@lid", from_me: eu, corpo, tipo: "text", media_url: null, ts: h(min), kanban_card_id: null, status: eu ? "lida" : null })
+    return new Response(JSON.stringify([
+      m("a", false, "Olá, Gostaria se saber mais sobre as caixinhas.", 400), m("b", true, "Olá, tudo bem? Aqui é o Felipe, Gerente Comercial da Jerograf 👋 Vou cuidar pessoalmente do seu pedido.", 395),
+      m("c", true, "Você já tá vendendo seu produto ou tá lançando agora? E que volume você precisa?", 394),
+      m("d", false, "Já vendo, perfume árabe 100ml", 30), m("e", false, "Quanto fica 2 mil caixinhas de 100ml?", 15),
+    ]))
+  }
   if (u.startsWith("/api/")) return new Response("{}", { status: 404 })
   return orig(url, o)
 }
@@ -102,7 +123,7 @@ function Telas() {
       return <div style={{ height: "100vh" }}><FilaMensagens kanban={kanban} lancamentos={lancs} onAvisado={() => {}} onDispensar={() => {}} onAbrirConversa={() => {}}
         conversas={[cv("1@lid", "Juliana", 5, 4), cv("2@lid", "rafael souza", 10, 8), cv("3@lid", "Bia Doces", 6, 3.5), cv("4@lid", "Maria Perfumes", 6, 5)]} /></div>
     }
-    case "whatsview": return <div style={{ height: "100vh" }}><WhatsAppView onCriarCard={() => {}} kanban={dados.kanban} lancamentos={lancs} /></div>
+    case "whatsview": case "whatsview-espiar": return <div style={{ height: "100vh" }}><WhatsAppView onCriarCard={() => {}} kanban={dados.kanban} lancamentos={lancs} /></div>
     case "enviar": return <div style={{ height: "100vh" }}><EnviarWhatsapp envio={{ cliente: "Raniere Péricles", texto: "Olá! Tudo bem? Passando para saber se conseguiu ver a proposta ORC-2026-233. Ficou alguma dúvida sobre quantidade ou acabamento? Posso te ajudar a escolher." }} linkWhatsapp="https://wa.me/" onFechar={() => {}} /></div>
     case "calibragem": return pagina(<CalibragemView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onAtualizarConfig={setCfg} onDividir={() => {}} />)
     case "rotas": {

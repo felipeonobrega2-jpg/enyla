@@ -221,7 +221,23 @@ html.dark .ds-borda  { border-color: #312e3e; }
 .ds-cresce-y { transform-origin: bottom center; animation: ds-cresce-y .6s cubic-bezier(.3,.9,.3,1) backwards; }
 .ds-gaveta   { animation: ds-gaveta .26s cubic-bezier(.3,.9,.3,1) backwards; }
 
+
+/* WhatsApp: mensagem nova sobe do canto, espiada abre da lista, linha brilha quando chega mensagem */
+@keyframes wa-bolha   { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes wa-espiar  { from { opacity: 0; transform: translateX(-10px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes wa-brilho  { 0% { background: rgba(37,211,102,0.16); } 100% { background: transparent; } }
+@keyframes wa-acoes   { from { opacity: 0; transform: translateX(6px); } to { opacity: 1; transform: none; } }
+@keyframes wa-enviada { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+.wa-bolha-eu   { transform-origin: bottom right; animation: wa-bolha .26s cubic-bezier(.3,.9,.3,1) backwards; }
+.wa-bolha-ele  { transform-origin: bottom left;  animation: wa-bolha .26s cubic-bezier(.3,.9,.3,1) backwards; }
+.wa-espiar     { transform-origin: left center;  animation: wa-espiar .18s cubic-bezier(.3,.9,.3,1) backwards; }
+.wa-brilho     { animation: wa-brilho 1.6s ease-out; }
+.wa-acoes      { animation: wa-acoes .14s ease-out backwards; }
+.wa-enviada    { animation: wa-enviada .4s cubic-bezier(.3,.9,.3,1) backwards; }
+.wa-thread     { animation: ds-surge .16s ease-out backwards; }
+
 @media (prefers-reduced-motion: reduce) {
+  .wa-bolha-eu, .wa-bolha-ele, .wa-espiar, .wa-brilho, .wa-acoes, .wa-enviada, .wa-thread { animation: none !important; }
   .ds-entrada, .ds-escalonado > *, .ds-cresce-x, .ds-cresce-y, .ds-gaveta, .ds-troca-tela { animation: none !important; }
   .ds-clicavel:hover { transform: none; }
 }

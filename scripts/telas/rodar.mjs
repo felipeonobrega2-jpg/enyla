@@ -17,10 +17,12 @@ await build({
 })
 writeFileSync(path.join(saida, "index.html"), '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="app.css"><body><div id="root"></div><script src="app.js"></script>')
 
-const telas = [["caixa", 1440], ["config", 1440], ["calibragem", 1440], ["rotas", 1440], ["aprovar", 390], ["portal", 390], ["mobile", 390], ["relatorios", 1440], ["precofecha", 1100], ["lancamento", 900], ["metatoken", 1100], ["whats", 700], ["compositor", 900], ["wacliente", 700], ["funil", 1600], ["whatsview", 1440], ["fila", 1440], ["fila-m", 390], ["enviar", 1100], ["ideias", 1440], ["perfil", 1440], ["detalhe", 1440], ["detalhe-orcamento", 1440], ["financeiro-conciliacao", 1440], ["financeiro-dash", 1440], ["financeiro-receber", 1440], ["financeiro-lancamentos", 1440], ["financeiro-dre", 1440], ["financeiro-pix", 1440], ["financeiro-contas", 1440], ["financeiro-fixas", 1440], ["financeiro-fornecedores", 1440]]
+const telas = [["caixa", 1440], ["config", 1440], ["calibragem", 1440], ["rotas", 1440], ["aprovar", 390], ["portal", 390], ["mobile", 390], ["relatorios", 1440], ["precofecha", 1100], ["lancamento", 900], ["metatoken", 1100], ["whats", 700], ["compositor", 900], ["wacliente", 700], ["funil", 1600], ["whatsview", 1440], ["whatsview-espiar", 1440], ["fila", 1440], ["fila-m", 390], ["enviar", 1100], ["ideias", 1440], ["perfil", 1440], ["detalhe", 1440], ["detalhe-orcamento", 1440], ["financeiro-conciliacao", 1440], ["financeiro-dash", 1440], ["financeiro-receber", 1440], ["financeiro-lancamentos", 1440], ["financeiro-dre", 1440], ["financeiro-pix", 1440], ["financeiro-contas", 1440], ["financeiro-fixas", 1440], ["financeiro-fornecedores", 1440]]
 const navegador = await chromium.launch()
 let erros = 0
-for (const [tela, largura] of telas) {
+// TELAS=a,b roda só essas
+const so = process.env.TELAS?.split(",")
+for (const [tela, largura] of telas.filter(([t]) => !so || so.includes(t))) {
   const p = await navegador.newPage({ viewport: { width: largura, height: 900 }, deviceScaleFactor: largura < 500 ? 2 : 1 })
   const falhas = []
   p.on("pageerror", e => falhas.push(String(e)))
@@ -28,6 +30,9 @@ for (const [tela, largura] of telas) {
   await p.waitForTimeout(1200)
   // Conciliação: importa o extrato de exemplo
   if (tela === "financeiro-conciliacao") { await p.setInputFiles("input[type=file]", path.join(dir, "extrato-exemplo.ofx")); await p.waitForTimeout(800) }
+  // WhatsApp: abre uma conversa e para o mouse em outra linha (espiada + ações)
+  if (tela === "whatsview") { await p.click("[data-linha='2@lid']"); await p.waitForTimeout(500) }
+  if (tela === "whatsview-espiar") { await p.click("[data-linha='3@lid']"); await p.hover("[data-linha='1@lid']"); await p.waitForTimeout(900) }
   await p.screenshot({ path: path.join(saida, `${tela}.png`), fullPage: true })
   console.log(`${falhas.length ? "ERRO" : "ok  "} ${tela}${falhas.length ? ": " + falhas.join(" | ") : ""}`)
   erros += falhas.length
