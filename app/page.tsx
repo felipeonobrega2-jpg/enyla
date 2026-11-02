@@ -2927,7 +2927,8 @@ export default function Home() {
       )}
 
       {/* ── Forma — assistente flutuante ────────────────────────────────────── */}
-      <FormaBubble apiKey={config.apiKey} />
+      {/* Na tela do WhatsApp o botão flutuante cobriria o "enviar" */}
+      {view !== "whatsapp" && <FormaBubble apiKey={config.apiKey} />}
     </div>
   )
 }

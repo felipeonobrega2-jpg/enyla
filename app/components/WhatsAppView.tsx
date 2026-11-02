@@ -1,12 +1,13 @@
 "use client"
 
-import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Columns3, List, Pin } from "lucide-react"
+import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle } from "lucide-react"
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, nomeChave } from "../lib/negocio"
 import { clienteDaConversa, Vinculos } from "../lib/vinculoWhatsapp"
 import { lerOrigem } from "../lib/origemWhatsapp"
 import { ETAPAS, Etapa, posicaoNoFunil } from "../lib/funilWhatsapp"
+import { Segmentado } from "./ds"
 import { brl } from "../utils"
 
 type Conversa = {
@@ -176,40 +177,39 @@ export default function WhatsAppView({
 
   const totalNaoLidas = conversas.reduce((s, c) => s + c.nao_lidas, 0)
 
+  // Barra do topo, igual na lista e no funil (alternância padrão do sistema)
+  const topo = (
+    <div className="px-5 py-2.5 border-b flex items-center gap-3 shrink-0" style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
+      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#25D366">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.532 5.862L.057 23.929a.5.5 0 0 0 .614.614l6.067-1.475A11.944 11.944 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.933 0-3.742-.523-5.289-1.433l-.378-.225-3.924.953.953-3.924-.225-.378A9.956 9.956 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+                  </svg>
+      <span className="text-[15px] font-semibold" style={{ color: "var(--text-main)" }}>WhatsApp</span>
+      {totalNaoLidas > 0 && <span className="text-[11px] font-bold text-white bg-[#25D366] rounded-full px-2 py-0.5">{totalNaoLidas}</span>}
+      <div className="ml-auto"><Segmentado<"lista" | "funil"> valor={modo} onChange={setModo} opcoes={[{ v: "lista", nome: "Conversas" }, { v: "funil", nome: "Funil" }]} /></div>
+    </div>
+  )
+
   if (modo === "funil") return (
-    <FunilConversas conversas={conversas} cardsDe={c => { const cl = clienteDe(c); return cl ? kanban.filter(k => nomeChave(k.nomeCliente) === nomeChave(cl.nome)) : [] }}
+    <div className="flex flex-col h-full">{topo}<div className="flex-1 min-h-0"><FunilConversas conversas={conversas} cardsDe={c => { const cl = clienteDe(c); return cl ? kanban.filter(k => nomeChave(k.nomeCliente) === nomeChave(cl.nome)) : [] }}
       clienteDe={clienteDe}
       onAbrir={c => { setModo("lista"); abrirConversa(c) }}
       onMover={async (jid, etapa) => {
         setConversas(prev => prev.map(c => c.jid === jid ? { ...c, status_lead: etapa, ultima_classificacao_at: etapa ? new Date().toISOString() : null } : c))
         await fetch("/api/whatsapp/conversas", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid, etapa }) }).catch(() => {})
       }}
-      onVoltar={() => setModo("lista")} />
+      /></div></div>
   )
 
   return (
-    <div className="flex h-full" style={{ background: "var(--bg-page)" }}>
+    <div className="flex flex-col h-full">{topo}
+    <div className="flex flex-1 min-h-0" style={{ background: "var(--bg-page)" }}>
 
       {/* ── Coluna esquerda: lista de conversas ─── */}
       <div className="w-80 shrink-0 flex flex-col border-r" style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
 
         {/* Header */}
         <div className="px-4 pt-5 pb-3 border-b" style={{ borderColor: "var(--border)" }}>
-          <div className="flex items-center gap-2 mb-3">
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#25D366">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-              <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.532 5.862L.057 23.929a.5.5 0 0 0 .614.614l6.067-1.475A11.944 11.944 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.933 0-3.742-.523-5.289-1.433l-.378-.225-3.924.953.953-3.924-.225-.378A9.956 9.956 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
-            </svg>
-            <span className="text-[15px] font-semibold" style={{ color: "var(--text-main)" }}>WhatsApp</span>
-            <button onClick={() => setModo("funil")} className="ml-2 h-7 px-2.5 rounded-lg text-[11.5px] font-semibold flex items-center gap-1" style={{ background: "rgba(132,86,232,0.1)", color: "#8456e8" }}>
-              <Columns3 className="w-3.5 h-3.5" />Funil
-            </button>
-            {totalNaoLidas > 0 && (
-              <span className="ml-auto text-[11px] font-bold text-white bg-[#25D366] rounded-full px-2 py-0.5">
-                {totalNaoLidas}
-              </span>
-            )}
-          </div>
           <input
             value={busca}
             onChange={e => setBusca(e.target.value)}
@@ -386,10 +386,15 @@ export default function WhatsAppView({
               })}
             </div>
 
-            <Compositor jid={ativa.jid} onEnviado={() => carregarMensagens(ativa.jid)} />
+            <Compositor jid={ativa.jid}
+              onOtimista={m => { rolouParaCima.current = false; setMensagens(prev => [...prev, m]) }}
+              onResultado={(tmp, real) => setMensagens(prev => real && prev.some(x => x.id === real)
+                ? prev.filter(x => x.id !== tmp)   // a atualização automática já trouxe a confirmada
+                : prev.map(x => x.id !== tmp ? x : real ? { ...x, id: real, status: "enviada" } : { ...x, status: "erro" }))} />
           </>
         )}
       </div>
+    </div>
     </div>
   )
 }
@@ -560,27 +565,37 @@ function MidiaMensagem({ id, tipo: bruto, nome }: { id: string; tipo: string; no
   return null
 }
 
-// Caixa de resposta: Enter envia, Shift+Enter pula linha; clipe anexa foto/arquivo (com legenda)
-export function Compositor({ jid, onEnviado }: { jid: string; onEnviado: () => void }) {
+// Caixa de resposta: Enter envia, Shift+Enter pula linha; clipe anexa foto/arquivo (com legenda).
+// A mensagem aparece na hora (reloginho) e vira ✓ quando o WhatsApp confirma, sem travar a digitação.
+export function Compositor({ jid, onOtimista, onResultado }: {
+  jid: string
+  onOtimista: (m: Mensagem) => void
+  onResultado: (tmpId: string, realId: string | null) => void
+}) {
   const [texto, setTexto] = useState("")
   const [arquivo, setArquivo] = useState<File | null>(null)
-  const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  async function enviar() {
-    if (enviando || (!texto.trim() && !arquivo)) return
-    setEnviando(true); setErro(null)
-    let r: Response | null
-    if (arquivo) {
+  const areaRef = useRef<HTMLTextAreaElement>(null)
+  function enviar() {
+    const t = texto.trim(), a = arquivo
+    if (!t && !a) return
+    const tmp = `tmp-${Date.now()}`
+    onOtimista({ id: tmp, jid, from_me: true, corpo: a ? (t || `Enviando ${a.name}…`) : t, tipo: "text", media_url: null, ts: new Date().toISOString(), kanban_card_id: null, status: "enviando" })
+    setTexto(""); setArquivo(null); setErro(null); areaRef.current?.focus()
+    let req: Promise<Response>
+    if (a) {
       const f = new FormData()
-      f.set("jid", jid); f.set("arquivo", arquivo); f.set("legenda", texto.trim())
-      r = await fetch("/api/whatsapp/enviar", { method: "POST", body: f }).catch(() => null)
+      f.set("jid", jid); f.set("arquivo", a); f.set("legenda", t)
+      req = fetch("/api/whatsapp/enviar", { method: "POST", body: f })
     } else {
-      r = await fetch("/api/whatsapp/enviar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid, texto }) }).catch(() => null)
+      req = fetch("/api/whatsapp/enviar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid, texto: t }) })
     }
-    const d = r ? await r.json().catch(() => null) : null
-    if (r?.ok) { setTexto(""); setArquivo(null); onEnviado() } else setErro(d?.erro ?? "Sem conexão. Tente de novo.")
-    setEnviando(false)
+    req.then(async r => {
+      const d = await r.json().catch(() => null)
+      if (r.ok && d?.id) onResultado(tmp, d.id)
+      else { onResultado(tmp, null); setErro(d?.erro ?? "Não enviou.") }
+    }).catch(() => { onResultado(tmp, null); setErro("Sem conexão: a mensagem não foi enviada.") })
   }
   return (
     <div className="shrink-0 border-t px-4 py-3" style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
@@ -597,12 +612,12 @@ export function Compositor({ jid, onEnviado }: { jid: string; onEnviado: () => v
           <Paperclip className="w-5 h-5" />
         </button>
         <input ref={inputRef} type="file" className="hidden" onChange={e => { setArquivo(e.target.files?.[0] ?? null); e.target.value = "" }} />
-        <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={1}
+        <textarea ref={areaRef} value={texto} onChange={e => setTexto(e.target.value)} rows={1}
           onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar() } }}
           placeholder={arquivo ? "Legenda (opcional)" : "Escreva uma mensagem"}
           className="flex-1 resize-none rounded-xl px-3.5 py-2.5 text-[13.5px] outline-none max-h-40"
           style={{ background: "var(--bg-page)", color: "var(--text-main)", border: "1px solid var(--border)", fieldSizing: "content" } as React.CSSProperties} />
-        <button onClick={enviar} disabled={enviando || (!texto.trim() && !arquivo)} aria-label="Enviar"
+        <button onClick={enviar} disabled={!texto.trim() && !arquivo} aria-label="Enviar"
           className="w-10 h-10 rounded-xl grid place-items-center shrink-0 text-white disabled:opacity-40 transition-opacity" style={{ background: "#25a35a" }}>
           <SendHorizontal className="w-5 h-5" />
         </button>
@@ -719,6 +734,8 @@ function CarregarAnteriores({ jid, primeira, onCarregar }: { jid: string; primei
 
 // ✓ enviada · ✓✓ entregue · ✓✓ azul lida (sem informação ainda: ✓)
 function Recibo({ status }: { status?: string | null }) {
+  if (status === "enviando") return <Clock3 className="w-3 h-3" aria-label="enviando" />
+  if (status === "erro") return <span className="flex items-center gap-0.5 text-[#d33a3c]"><AlertCircle className="w-3.5 h-3.5" />não enviada</span>
   if (status === "lida") return <CheckCheck className="w-3.5 h-3.5" style={{ color: "#53bdeb" }} aria-label="lida" />
   if (status === "entregue") return <CheckCheck className="w-3.5 h-3.5" aria-label="entregue" />
   return <Check className="w-3.5 h-3.5" aria-label="enviada" />
@@ -745,13 +762,12 @@ export function OrigemDaConversa({ campanha }: { campanha?: string | null }) {
 // Funil de conversas (antes da venda): leads por etapa, arrastáveis; "responder" = cliente falou por último
 const PERIODOS = [{ dias: 30, nome: "30 dias" }, { dias: 60, nome: "60 dias" }, { dias: 90, nome: "90 dias" }, { dias: 0, nome: "Tudo" }] as const
 
-export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover, onVoltar, hoje = new Date() }: {
+export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover, hoje = new Date() }: {
   conversas: Conversa[]
   cardsDe: (c: Conversa) => KanbanCard[]
   clienteDe: (c: Conversa) => { nome: string } | null
   onAbrir: (c: Conversa) => void
   onMover: (jid: string, etapa: Etapa | null) => void
-  onVoltar: () => void
   hoje?: Date
 }) {
   const [periodo, setPeriodo] = useState<number>(30)
@@ -769,11 +785,7 @@ export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover
   return (
     <div className="h-full flex flex-col" style={{ background: "var(--bg-page)" }}>
       <div className="px-5 py-3 border-b flex items-center gap-3 flex-wrap" style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
-        <span className="text-[15px] font-semibold" style={{ color: "var(--text-main)" }}>Funil de conversas</span>
-        <button onClick={onVoltar} className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold flex items-center gap-1" style={{ background: "rgba(132,86,232,0.1)", color: "#8456e8" }}>
-          <List className="w-3.5 h-3.5" />Lista
-        </button>
-        <div className="flex gap-1 ml-auto flex-wrap">
+        <div className="flex gap-1 flex-wrap">
           {(["todas", "anuncio", "site"] as const).map(o => (
             <button key={o} onClick={() => setOrigem(o)} className="h-7 px-2.5 rounded-full text-[11.5px] font-medium"
               style={origem === o ? { background: "#191625", color: "#fff" } : { background: "var(--bg-page)", color: "var(--text-sub)", border: "1px solid var(--border)" }}>
