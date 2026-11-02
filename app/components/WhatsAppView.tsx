@@ -151,6 +151,7 @@ export default function WhatsAppView({
             className="w-full text-[13px] px-3 py-2 rounded-xl outline-none"
             style={{ background: "var(--bg-page)", color: "var(--text-main)", border: "1px solid var(--border)" }}
           />
+          {status?.evolution?.conectado && <ImportarHistorico onFim={carregarConversas} />}
         </div>
 
         {/* Lista */}
@@ -398,6 +399,38 @@ export function ConexaoWhats({ status, onAtualizar }: { status: StatusWhats | nu
       <p className="text-[11.5px] leading-relaxed" style={{ color: "var(--text-faint)" }}>
         Enquanto isso, os botões de WhatsApp do Painel, de Clientes e de Parceiros já abrem a conversa com a mensagem pronta no seu WhatsApp.
       </p>
+    </div>
+  )
+}
+
+// Busca no Evolution (banco da VPS) o histórico completo, página por página, e completa nomes e telefones
+function ImportarHistorico({ onFim }: { onFim: () => void }) {
+  const [prog, setProg] = useState<{ pagina: number; paginas: number; total: number } | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [rodando, setRodando] = useState(false)
+  async function importar() {
+    setRodando(true); setMsg(null)
+    let pagina = 1
+    for (;;) {
+      const r = await fetch("/api/whatsapp/importar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pagina }) })
+        .then(r => r.json()).catch(() => null)
+      if (!r || r.erro) { setMsg(r?.erro ?? "Parou no meio (sem conexão). Toque de novo: continua sem duplicar."); break }
+      setProg({ pagina, paginas: r.paginas, total: r.total })
+      if (r.fim || !r.paginas) { setMsg(`Histórico importado: ${r.total.toLocaleString("pt-BR")} mensagens.`); break }
+      pagina++
+    }
+    setRodando(false); onFim()
+  }
+  const pct = prog?.paginas ? Math.round(prog.pagina / prog.paginas * 100) : 0
+  return (
+    <div className="mt-2">
+      <button onClick={importar} disabled={rodando}
+        className="w-full h-8 rounded-xl text-[12px] font-semibold disabled:opacity-70 transition-colors"
+        style={{ background: "rgba(37,163,90,0.1)", color: "#1e8a4c" }}>
+        {rodando ? `Importando histórico… ${pct}%` : "Importar histórico do WhatsApp"}
+      </button>
+      {rodando && <div className="h-1 mt-1.5 rounded-full overflow-hidden" style={{ background: "var(--border)" }}><div className="h-full bg-[#25a35a] transition-[width]" style={{ width: `${pct}%` }} /></div>}
+      {msg && <p className="text-[11px] mt-1.5" style={{ color: "var(--text-sub)" }}>{msg}</p>}
     </div>
   )
 }
