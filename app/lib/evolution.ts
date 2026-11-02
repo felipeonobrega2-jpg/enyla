@@ -51,14 +51,24 @@ export async function diagnosticar(origem: string): Promise<DiagnosticoEvolution
   }
 }
 
-// Aponta o webhook da instância para este sistema (mensagens novas e o histórico na conexão)
+// Aponta o webhook da instância para este sistema (mensagens novas e o histórico na conexão).
+// O formato do corpo mudou entre versões do Evolution: tenta o aninhado (v2.2/2.3) e o plano (v2.4).
 export async function configurarWebhook(origem: string) {
   const segredo = process.env.WHATSAPP_WEBHOOK_SECRET
   if (!segredo) return { ok: false, erro: "Falta WHATSAPP_WEBHOOK_SECRET na Vercel." }
   const url = `${origem}/api/whatsapp/webhook?token=${encodeURIComponent(segredo)}`
-  const r = await evo("/webhook/set/{i}", {
-    method: "POST",
-    body: JSON.stringify({ webhook: { enabled: true, url, byEvents: false, base64: false, events: ["MESSAGES_UPSERT", "MESSAGES_SET"] } }),
-  })
-  return r.ok ? { ok: true } : { ok: false, erro: `O Evolution recusou (${r.status}).` }
+  const events = ["MESSAGES_UPSERT", "MESSAGES_SET"]
+  const formatos = [
+    { webhook: { enabled: true, url, byEvents: false, base64: false, events } },
+    { enabled: true, url, webhookByEvents: false, webhookBase64: false, events },
+  ]
+  let ultimo: { status: number; corpo: unknown } = { status: 0, corpo: null }
+  for (const corpo of formatos) {
+    const r = await evo("/webhook/set/{i}", { method: "POST", body: JSON.stringify(corpo) })
+    if (r.ok) return { ok: true }
+    ultimo = r
+  }
+  // Mensagem do próprio Evolution (sem a URL, que leva o segredo)
+  const msg = JSON.stringify(ultimo.corpo ?? "").replaceAll(segredo, "***").slice(0, 300)
+  return { ok: false, erro: `O Evolution recusou (${ultimo.status}): ${msg}` }
 }
