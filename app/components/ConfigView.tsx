@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef } from "react"
-import { Percent, Layers, Target, Palette, Sparkles, Database, Download, Upload, Plus, X, Check, Save, RotateCcw, Info, KeyRound, CalendarOff, Handshake } from "lucide-react"
+import { Percent, Layers, Target, Palette, Sparkles, Database, Download, Upload, Plus, X, Check, Save, RotateCcw, Info, KeyRound, CalendarOff, Handshake, Mic } from "lucide-react"
 import { Configuracoes, Material, CONFIG_PADRAO } from "../config"
 import { FERIADOS_SP } from "../lib/diasUteis"
 import { nomeChave } from "../lib/negocio"
@@ -206,6 +206,8 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
             </Campo>
           </Cartao>
 
+          <ChaveGroq configurada={!!draft.groqConfigurado} />
+
           {/* Backup */}
           <Cartao className="ds-entrada">
             <TituloCartao titulo="Backup" icone={<Database className="w-4 h-4" />} sub="Histórico, clientes, quadro e configurações em um arquivo JSON." />
@@ -373,6 +375,37 @@ function RelacionamentoCartao({ config, clientes, onChange }: {
         <input value={dias} onChange={e => setDias(e.target.value)} inputMode="numeric" className={`${inputCls} w-[64px] text-center ds-num`} aria-label="Dias após a entrega" />
         <Botao icone={<Plus className="w-3.5 h-3.5" />} onClick={() => adicionar()} disabled={!nome.trim()}>Adicionar</Botao>
       </div>
+    </Cartao>
+  )
+}
+
+// Chave do Groq (transcrição dos áudios do WhatsApp): enviada direto ao servidor, que confere e guarda; nunca volta para a tela
+function ChaveGroq({ configurada }: { configurada: boolean }) {
+  const [ok, setOk] = useState(configurada)
+  const [chave, setChave] = useState("")
+  const [msg, setMsg] = useState<string | null>(null)
+  const [salvando, setSalvando] = useState(false)
+  async function salvar() {
+    setSalvando(true); setMsg(null)
+    const r = await fetch("/api/config/groq", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chave }) }).catch(() => null)
+    const d = r ? await r.json().catch(() => null) : null
+    if (r?.ok) { setOk(true); setChave(""); setMsg("Chave conferida e guardada.") } else setMsg(d?.erro ?? "Sem conexão.")
+    setSalvando(false)
+  }
+  return (
+    <Cartao className="ds-entrada">
+      <TituloCartao titulo="Transcrição de áudios" icone={<Mic className="w-4 h-4" />}
+        sub="Chave do Groq: transcreve os áudios do WhatsApp. Fica guardada só no servidor; aqui aparece apenas se está configurada." />
+      <p className="text-[12.5px] mb-2 font-medium" style={{ color: ok ? "#009351" : "#c57800" }}>{ok ? "Configurada" : "Não configurada"}</p>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <KeyRound className="w-3.5 h-3.5 text-[#898892] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input type="password" value={chave} autoComplete="off" placeholder={ok ? "Colar uma chave nova para trocar" : "gsk_…"}
+            onChange={e => setChave(e.target.value)} className={`${inputCls} w-full pl-8 font-mono`} />
+        </div>
+        <Botao onClick={salvar} disabled={salvando || !chave.trim()}>{salvando ? "Conferindo…" : "Salvar"}</Botao>
+      </div>
+      {msg && <p className="text-[12px] mt-2" style={{ color: msg.startsWith("Chave conferida") ? "#009351" : "#d33a3c" }}>{msg}</p>}
     </Cartao>
   )
 }

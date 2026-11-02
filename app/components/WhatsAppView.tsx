@@ -293,6 +293,8 @@ export default function WhatsAppView({
             <div ref={threadRef} onScroll={e => { const el = e.currentTarget; rolouParaCima.current = el.scrollHeight - el.scrollTop - el.clientHeight > 200 }}
               className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2" style={{ background: "#efeae2" }}>
               {loadingMsgs && <div className="flex justify-center py-8"><TypingBubble /></div>}
+              {!loadingMsgs && <TranscreverConversa jid={ativa.jid} pendentes={mensagens.filter(m => (m.tipo === "audio" || m.tipo === "audioMessage") && !m.corpo).length}
+                onFim={() => carregarMensagens(ativa.jid)} />}
 
               {!loadingMsgs && mensagens.map((m, i) => {
                 const prevDate = i > 0 ? new Date(mensagens[i - 1].ts).toDateString() : null
@@ -317,7 +319,12 @@ export default function WhatsAppView({
                         }}
                       >
                         <MidiaMensagem id={m.id} tipo={m.tipo} nome={m.corpo} />
-                        {m.corpo && m.tipo !== "document" && (
+                        {m.corpo && (m.tipo === "audio" || m.tipo === "audioMessage") ? (
+                          <p className="text-[12.5px] leading-snug whitespace-pre-wrap italic mt-1 max-w-[320px]" style={{ color: m.corpo.startsWith("[") ? "#8696a0" : "#3b4a54" }}>
+                            {!m.corpo.startsWith("[") && <span className="not-italic text-[10px] font-semibold uppercase tracking-wide mr-1" style={{ color: "#8696a0" }}>Transcrição</span>}
+                            {m.corpo}
+                          </p>
+                        ) : m.corpo && m.tipo !== "document" && (
                           <p className="text-[13.5px] leading-snug whitespace-pre-wrap" style={{ color: "#111b21" }}>{m.corpo}</p>
                         )}
                         <p className="text-[10.5px] mt-1 text-right" style={{ color: "#8696a0" }}>
@@ -605,4 +612,31 @@ function Previa({ texto }: { texto: string | null }) {
   if (!m) return <span className="truncate">{texto ?? ""}</span>
   const [rotulo, Icone] = PREVIAS[m[1]] ?? ["Mensagem", FileText]
   return <><Icone className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{rotulo}</span></>
+}
+
+// Transcreve os áudios ainda sem texto da conversa aberta (alguns por vez, até acabar)
+function TranscreverConversa({ jid, pendentes, onFim }: { jid: string; pendentes: number; onFim: () => void }) {
+  const [rodando, setRodando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  if (!pendentes && !erro) return null
+  async function rodar() {
+    setRodando(true); setErro(null)
+    for (;;) {
+      const r = await fetch("/api/whatsapp/transcrever", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid }) })
+        .then(r => r.json()).catch(() => null)
+      onFim()
+      if (!r || r.erro) { setErro(r?.erro ?? "Parou (sem conexão). Toque de novo para continuar."); break }
+      if (!r.restantes) break
+    }
+    setRodando(false)
+  }
+  return (
+    <div className="sticky top-0 z-10 flex justify-center mb-1">
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full shadow-sm text-[12px]" style={{ background: "#ffffff", color: "#54656f" }}>
+        <Mic className="w-3.5 h-3.5" />
+        {erro ? <span className="text-[#d33a3c]">{erro}</span> : <span>{pendentes} {pendentes === 1 ? "áudio sem transcrição" : "áudios sem transcrição"}</span>}
+        <button onClick={rodar} disabled={rodando} className="font-semibold text-[#1e8a4c] disabled:opacity-60">{rodando ? "Transcrevendo…" : "Transcrever"}</button>
+      </div>
+    </div>
+  )
 }

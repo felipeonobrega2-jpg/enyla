@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
+import { transcreverPendentes } from "@/app/lib/transcricao"
 import { gravarLote, WaMessage } from "@/app/lib/whatsappDados"
 
 // ── Handler principal ─────────────────────────────────────────────────────
@@ -18,6 +19,8 @@ export async function POST(req: NextRequest) {
     if (event === "messages.upsert") {
       const data = body.data as WaMessage
       await gravarLote([data], { contarNaoLidas: true })
+      // Áudio novo: transcreve depois de responder ao Evolution (não atrasa o recebimento)
+      if (data?.message?.audioMessage && data.key?.id) after(() => transcreverPendentes({ ids: [data.key.id] }).catch(() => {}))
       return NextResponse.json({ ok: true })
     }
 
