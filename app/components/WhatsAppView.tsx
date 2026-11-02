@@ -318,7 +318,7 @@ export default function WhatsAppView({
 
   return (
     <div className="flex flex-col h-full">{topo}
-    <div className="flex flex-1 min-h-0 ds-troca-tela" style={{ background: "var(--bg-page)" }}>
+    <div className="flex flex-1 min-h-0" style={{ background: "var(--bg-page)" }}>
 
       {/* ── Coluna esquerda: lista de conversas ─── */}
       <div className="w-80 shrink-0 flex flex-col border-r" style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
@@ -496,8 +496,8 @@ export default function WhatsAppView({
             </div>
 
             {/* Thread */}
-            <div key={ativa.jid} ref={threadRef} onScroll={e => { const el = e.currentTarget; rolouParaCima.current = el.scrollHeight - el.scrollTop - el.clientHeight > 200 }}
-              className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2 wa-thread" style={{ background: "#efeae2" }}>
+            <div ref={threadRef} onScroll={e => { const el = e.currentTarget; rolouParaCima.current = el.scrollHeight - el.scrollTop - el.clientHeight > 200 }}
+              className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2" style={{ background: "#efeae2" }}>
               {loadingMsgs && <div className="flex justify-center py-8"><TypingBubble /></div>}
               {!loadingMsgs && mensagens.length >= 300 && <CarregarAnteriores key={ativa.jid} jid={ativa.jid} primeira={mensagens[0]?.ts}
                 onCarregar={antigas => {

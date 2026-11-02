@@ -234,10 +234,9 @@ html.dark .ds-borda  { border-color: #312e3e; }
 .wa-brilho     { animation: wa-brilho 1.6s ease-out; }
 .wa-acoes      { animation: wa-acoes .14s ease-out backwards; }
 .wa-enviada    { animation: wa-enviada .4s cubic-bezier(.3,.9,.3,1) backwards; }
-.wa-thread     { animation: ds-surge .16s ease-out backwards; }
 
 @media (prefers-reduced-motion: reduce) {
-  .wa-bolha-eu, .wa-bolha-ele, .wa-espiar, .wa-brilho, .wa-acoes, .wa-enviada, .wa-thread { animation: none !important; }
+  .wa-bolha-eu, .wa-bolha-ele, .wa-espiar, .wa-brilho, .wa-acoes, .wa-enviada { animation: none !important; }
   .ds-entrada, .ds-escalonado > *, .ds-cresce-x, .ds-cresce-y, .ds-gaveta, .ds-troca-tela { animation: none !important; }
   .ds-clicavel:hover { transform: none; }
 }
