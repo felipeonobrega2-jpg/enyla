@@ -29,7 +29,7 @@ services:
 
   # ── Evolution API ────────────────────────────────────────────────────────
   #
-  # Versão: v2.3.7 — última estável no Docker Hub (out/2026).
+  # Versão: 2.4.0-rc2 desde 01/11/2026 (a v2.3.7, última estável, já não sincronizava com o WhatsApp).
   #
   # ATENÇÃO — @lid: os PRs #2663 e #2673 (evolution-foundation/evolution-api)
   # que corrigem resolução de @lid estão ABERTOS (draft) e não foram mesclados
@@ -38,7 +38,7 @@ services:
   # até a correção ser publicada numa release estável.
   # Monitore: https://github.com/EvolutionAPI/evolution-api/releases
   evolution:
-    image: evoapicloud/evolution-api:v2.3.7
+    image: evoapicloud/evolution-api:2.4.0-rc2   # 01/11/2026: a v2.3.7 pareava mas não sincronizava (biblioteca do WhatsApp antiga)
     restart: unless-stopped
     ports:
       - "127.0.0.1:8080:8080"   # NÃO exposto publicamente
