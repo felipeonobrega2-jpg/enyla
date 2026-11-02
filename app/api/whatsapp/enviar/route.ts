@@ -3,11 +3,13 @@ import { supabase } from "@/app/lib/supabase"
 import { evo } from "@/app/lib/evolution"
 import { gravarLote, WaMessage } from "@/app/lib/whatsappDados"
 import { obterMidia } from "@/app/lib/midiaWhatsapp"
+import { enviarVoz } from "@/app/lib/enviarAudio"
 
 export const maxDuration = 60
 
 // Envia pelo seu número (Evolution). Texto: JSON { jid, texto }. Arquivo: multipart { jid, arquivo, legenda }.
 // Mídia que você já mandou antes (vídeo de produção no follow-up): JSON { jid, texto, midiaId }.
+// Áudio gravado no navegador: multipart { jid, arquivo, voz: "1" } → sai como mensagem de voz.
 // Grava a mensagem enviada na hora, para aparecer na conversa sem esperar o webhook. (Rota protegida pelo login.)
 export async function POST(req: NextRequest) {
   const multipart = req.headers.get("content-type")?.includes("multipart/form-data")
@@ -15,6 +17,10 @@ export async function POST(req: NextRequest) {
   if (multipart) {
     const f = await req.formData()
     jid = String(f.get("jid") ?? ""); texto = String(f.get("legenda") ?? ""); arquivo = f.get("arquivo") as File | null
+    if (f.get("voz") === "1" && arquivo && jid) {
+      const r = await enviarVoz(jid, Buffer.from(await arquivo.arrayBuffer()))
+      return r.ok ? NextResponse.json({ ok: true, id: r.id }) : NextResponse.json({ erro: r.erro }, { status: 502 })
+    }
   } else {
     const b = await req.json().catch(() => ({})) as { jid?: string; texto?: string; midiaId?: string }
     jid = b.jid ?? ""; texto = (b.texto ?? "").trim(); midiaId = b.midiaId ?? ""

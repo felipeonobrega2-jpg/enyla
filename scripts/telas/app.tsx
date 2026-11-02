@@ -26,6 +26,7 @@ import { PainelToken } from "@/app/components/MetaAdsView"
 import { FilaMensagens } from "@/app/components/FilaMensagens"
 import { EntregasView } from "@/app/components/EntregasView"
 import { AvisoWhatsapp } from "@/app/components/AvisoWhatsapp"
+import { GravarClient } from "@/app/gravar/GravarClient"
 import { PedidosUnificadoView } from "@/app/components/PedidosUnificadoView"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas } from "@/app/components/WhatsAppView"
 
@@ -60,6 +61,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       c("6@lid", "Juliana", "ok", 4, 3.5),
     ]))
   }
+  if (u.startsWith("/api/whatsapp/gravar-celular")) return new Response(JSON.stringify(o?.method === "POST" ? { id: "g1", url: "https://app.enyla.com.br/gravar?t=x", expira: Date.now() + 600000 } : { id: "g1", estado: "aberto" }))
   if (u.startsWith("/api/whatsapp/pendentes")) {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
     return new Response(JSON.stringify([
@@ -155,6 +157,8 @@ function Telas() {
       config={{ ...cfg, locaisRetirada: [{ id: "g", nome: "Gráfica", contato: "Alanno", telefone: "11999990000", endereco: { texto: "Rua Correia de Andrade, 50 · Brás · São Paulo - SP", lat: -23.5427, lng: -46.6199 } }],
         enderecosClientes: { "ana cosmeticos": { texto: "Avenida Paulista, 1000 · Bela Vista · São Paulo - SP · 01310-100", lat: -23.5648, lng: -46.6519, recebedor: "Ana", telefone: "11988887777" } } }}
       prefill={{ pedido: { loteId: "l1", numero: "ANA-001", cliente: "Ana Cosméticos" } }} /></div>
+    case "gravar-celular": return <GravarClient token="x" nome="Camilo" expira={Date.now() + 540_000} onFechar={() => {}} />
+    case "compositor-mic": case "compositor-celular": return <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#efeae2" }}><div style={{ flex: 1 }} /><Compositor jid="x" contato="Camilo" onOtimista={() => {}} onResultado={() => {}} /></div>
     case "aviso": case "aviso-escuro": return <div style={{ height: "100vh", background: "var(--bg-page)" }}><AvisoWhatsapp onAbrir={() => {}} /></div>
     case "fila": case "fila-m": {
       const h = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString()

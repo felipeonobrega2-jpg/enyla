@@ -16,6 +16,7 @@ import {
   margemContribuicao, conversao, orcamentosDoPeriodo, parseData, nomeChave, isTerceirizado, isAberto,
 } from "../lib/negocio"
 import { EnviarWhatsapp, Envio } from "../components/EnviarWhatsapp"
+import { GravacaoDoComputador } from "./GravacaoDoComputador"
 import { pendencias, Pendencia, TipoPendencia, cardDoPedido, prazoTexto, linkWhatsApp } from "../lib/pendencias"
 import { normalizarProducao, nomeServicos } from "../lib/producao"
 import { normalizarMetas } from "../lib/metas"
@@ -236,6 +237,8 @@ export default function MobilePage() {
           <Orcamentos kanban={kanban} hoje={hoje} historico={historico} propostas={propostas} telefoneDe={telefoneDe} onAbrir={abrir} />
         )}
       </main>
+
+      <GravacaoDoComputador />
 
       <Folha aberta={folhaAberta} onFechar={() => setFolhaAberta(false)}>
         {aberto && <Detalhe card={aberto} pedido={pedidos.find(p => p.cards.some(c => c.id === aberto.id))} telefone={telefoneDe(aberto.nomeCliente)} onFechar={() => setFolhaAberta(false)} />}

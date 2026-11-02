@@ -1,6 +1,6 @@
 "use client"
 
-import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag, ChevronRight, Reply, Keyboard, Sparkles } from "lucide-react"
+import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag, ChevronRight, Reply, Keyboard, Sparkles, Laptop, Smartphone, Trash2, Square } from "lucide-react"
 import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, nomeChave } from "../lib/negocio"
@@ -11,6 +11,8 @@ import { Segmentado } from "./ds"
 import { FilaMensagens } from "./FilaMensagens"
 import { montarFila, AvisoPedido } from "../lib/filaMensagens"
 import { Atendimento, DadosPedido, ROTULO_ALERTA, temDados } from "../lib/atendente"
+import { useGravador, tempo, extensaoAudio } from "../lib/gravador"
+import QRCode from "qrcode"
 import { filtrar, preencher, Rapida } from "../lib/mensagensRapidas"
 import { COL_HOT } from "../types"
 
@@ -733,6 +735,9 @@ function MidiaMensagem({ id, tipo: bruto, nome }: { id: string; tipo: string; no
     // eslint-disable-next-line @next/next/no-img-element
     <img src={src} alt="Figurinha" loading="lazy" onError={() => setFalhou(true)} className="w-28 h-28 object-contain" />
   )
+  if (tipo === "audio" && id.startsWith("tmp-")) return (
+    <div className="flex items-center gap-2 text-[12px] italic mb-1 px-1" style={{ color: "#54656f" }}><Mic className="w-4 h-4" />Enviando áudio…</div>
+  )
   if (tipo === "audio") return falhou ? indisponivel("Áudio") : (
     <audio controls preload="none" src={src} onError={() => setFalhou(true)} className="w-[240px] max-w-full h-10" />
   )
@@ -795,6 +800,28 @@ export function Compositor({ jid, contato = "", cliente = null, orcamento = null
     })
     setTexto(t); setSel(0); areaRef.current?.focus()
   }
+  // Áudio: gravar no notebook ou pelo celular (QR code)
+  const grav = useGravador()
+  const [menuMic, setMenuMic] = useState(false)
+  const [celular, setCelular] = useState(false)
+  function enviarAudio(blob: Blob) {
+    const tmp = `tmp-${Date.now()}`
+    onOtimista({ id: tmp, jid, from_me: true, corpo: null, tipo: "audio", media_url: null, ts: new Date().toISOString(), kanban_card_id: null, status: "enviando" })
+    onEnviou?.()
+    const f = new FormData()
+    f.set("jid", jid); f.set("voz", "1"); f.set("arquivo", new File([blob], `voz.${extensaoAudio(blob.type)}`, { type: blob.type }))
+    fetch("/api/whatsapp/enviar", { method: "POST", body: f }).then(async r => {
+      const d = await r.json().catch(() => null)
+      if (r.ok && d?.id) onResultado(tmp, d.id)
+      else { onResultado(tmp, null); setErro(d?.erro ?? "Não enviou o áudio.") }
+    }).catch(() => { onResultado(tmp, null); setErro("Sem conexão: o áudio não foi enviado.") })
+  }
+  async function enviarGravacao() {
+    const b = await grav.parar()
+    if (b) enviarAudio(b)
+    grav.cancelar()
+  }
+
   function enviar() {
     const t = texto.trim(), a = arquivo
     if (!t && !a) return
@@ -824,7 +851,8 @@ export function Compositor({ jid, contato = "", cliente = null, orcamento = null
           <button onClick={() => setArquivo(null)} aria-label="Remover anexo" className="shrink-0"><X className="w-3.5 h-3.5" /></button>
         </div>
       )}
-      {erro && <p className="mb-2 text-[12px] text-[#d33a3c]">{erro}</p>}
+      {(erro || grav.erro) && <p className="mb-2 text-[12px] text-[#d33a3c]">{erro || grav.erro}</p>}
+      {celular && <GravarNoCelular jid={jid} nome={contato} onFechar={() => setCelular(false)} />}
       {sugestoes.length > 0 && (
         <div className="mb-2 rounded-xl overflow-hidden shadow-lg max-w-xl" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
           {sugestoes.map((r, i) => (
@@ -837,6 +865,9 @@ export function Compositor({ jid, contato = "", cliente = null, orcamento = null
           <p className="px-3 py-1.5 text-[10.5px] border-t" style={{ color: "var(--text-faint)", borderColor: "var(--border)" }}>↑↓ escolher · Enter inserir · Esc fechar · edite em Configurações → Mensagens rápidas</p>
         </div>
       )}
+      {grav.estado === "gravando" || grav.estado === "pedindo" || grav.estado === "pronto" ? (
+        <BarraGravacao grav={grav} onEnviar={enviarGravacao} />
+      ) : (
       <div className="flex items-end gap-2">
         <button onClick={() => inputRef.current?.click()} aria-label="Anexar foto ou arquivo" title="Anexar foto ou arquivo"
           className="w-10 h-10 rounded-xl grid place-items-center shrink-0 transition-colors hover:bg-black/5" style={{ color: "var(--text-sub)" }}>
@@ -860,11 +891,36 @@ export function Compositor({ jid, contato = "", cliente = null, orcamento = null
           placeholder={arquivo ? "Legenda (opcional)" : sugestao ? "Tab usa a sugestão · Enter envia" : compacto ? "Responder… (Enter envia, / mensagens rápidas)" : "Escreva uma mensagem"}
           className="flex-1 resize-none rounded-xl px-3.5 py-2.5 text-[13.5px] outline-none max-h-40"
           style={{ background: "var(--bg-page)", color: "var(--text-main)", border: "1px solid var(--border)", fieldSizing: "content" } as React.CSSProperties} />
-        <button onClick={enviar} disabled={!texto.trim() && !arquivo} aria-label="Enviar"
-          className="w-10 h-10 rounded-xl grid place-items-center shrink-0 text-white disabled:opacity-40 transition-opacity" style={{ background: "#25a35a" }}>
-          <SendHorizontal className="w-5 h-5" />
-        </button>
+        {!texto.trim() && !arquivo ? (
+          <div className="relative shrink-0">
+            <button onClick={() => setMenuMic(m => !m)} aria-label="Gravar áudio" title="Gravar áudio"
+              className="w-10 h-10 rounded-xl grid place-items-center text-white transition-transform active:scale-95" style={{ background: "#25a35a" }}>
+              <Mic className="w-5 h-5" />
+            </button>
+            {menuMic && (
+              <div className="absolute bottom-12 right-0 z-30 w-64 rounded-xl shadow-xl overflow-hidden wa-espiar" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)", transformOrigin: "bottom right" }}
+                onMouseLeave={() => setMenuMic(false)}>
+                <button onClick={() => { setMenuMic(false); grav.iniciar() }} className="w-full text-left px-3.5 py-2.5 flex items-center gap-3 hover:bg-[#25a35a]/[0.08]">
+                  <Laptop className="w-4 h-4 text-[#1d8a4b]" />
+                  <span><span className="block text-[12.5px] font-semibold" style={{ color: "var(--text-main)" }}>Gravar aqui</span>
+                    <span className="block text-[11px]" style={{ color: "var(--text-faint)" }}>microfone deste computador</span></span>
+                </button>
+                <button onClick={() => { setMenuMic(false); setCelular(true) }} className="w-full text-left px-3.5 py-2.5 flex items-center gap-3 border-t hover:bg-[#25a35a]/[0.08]" style={{ borderColor: "var(--border)" }}>
+                  <Smartphone className="w-4 h-4 text-[#1d8a4b]" />
+                  <span><span className="block text-[12.5px] font-semibold" style={{ color: "var(--text-main)" }}>Gravar no celular</span>
+                    <span className="block text-[11px]" style={{ color: "var(--text-faint)" }}>abre sozinho no celular com o sistema aberto</span></span>
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button onClick={enviar} aria-label="Enviar"
+            className="w-10 h-10 rounded-xl grid place-items-center shrink-0 text-white transition-opacity" style={{ background: "#25a35a" }}>
+            <SendHorizontal className="w-5 h-5" />
+          </button>
+        )}
       </div>
+      )}
     </div>
   )
 }
@@ -1424,4 +1480,89 @@ function RespostaComSugestao({ jid, ultima, auto, compacto, onOrcamento, ...prop
     <Compositor {...props} jid={jid} compacto={compacto} colado={!!(estado.at || estado.carregando || estado.erro)}
       sugestao={estado.at?.resposta || undefined} usarTexto={usar} onEnviou={() => { estado.descartar(); props.onEnviou?.() }} />
   </>
+}
+
+// Gravando pelo microfone deste computador: tempo, barrinhas do volume, cancelar, parar para ouvir e enviar
+function BarraGravacao({ grav, onEnviar }: { grav: ReturnType<typeof useGravador>; onEnviar: () => void }) {
+  const gravando = grav.estado === "gravando"
+  return (
+    <div className="flex items-center gap-2 wa-espiar">
+      <button onClick={grav.cancelar} aria-label="Descartar áudio" title="Descartar"
+        className="w-10 h-10 rounded-xl grid place-items-center shrink-0 hover:bg-[#d33a3c]/10 text-[#d33a3c]"><Trash2 className="w-5 h-5" /></button>
+      <div className="flex-1 min-w-0 h-10 rounded-xl px-3 flex items-center gap-3" style={{ background: "var(--bg-page)", border: "1px solid var(--border)" }}>
+        {grav.estado === "pronto" && grav.audio ? (
+          <audio controls src={grav.audio.url} className="h-8 w-full" />
+        ) : (<>
+          <span className={`w-2.5 h-2.5 rounded-full bg-[#d33a3c] shrink-0 ${gravando ? "animate-pulse" : "opacity-40"}`} />
+          <span className="text-[13px] font-semibold ds-num shrink-0" style={{ color: "var(--text-main)" }}>{grav.estado === "pedindo" ? "Liberando o microfone…" : tempo(grav.segundos)}</span>
+          <span className="flex-1 flex items-center justify-end gap-[2px] h-6 overflow-hidden">
+            {grav.niveis.map((n, i) => <span key={i} className="w-[3px] rounded-full bg-[#25a35a] shrink-0" style={{ height: `${Math.max(12, n * 100)}%`, opacity: 0.45 + n * 0.55 }} />)}
+          </span>
+        </>)}
+      </div>
+      {gravando && (
+        <button onClick={() => grav.parar()} aria-label="Parar e ouvir" title="Parar e ouvir antes de enviar"
+          className="w-10 h-10 rounded-xl grid place-items-center shrink-0 hover:bg-black/5" style={{ color: "var(--text-sub)" }}><Square className="w-4 h-4 fill-current" /></button>
+      )}
+      <button onClick={onEnviar} disabled={grav.estado === "pedindo"} aria-label="Enviar áudio" title="Enviar"
+        className="w-10 h-10 rounded-xl grid place-items-center shrink-0 text-white disabled:opacity-40" style={{ background: "#25a35a" }}><SendHorizontal className="w-5 h-5" /></button>
+    </div>
+  )
+}
+
+// Gravar pelo celular: o pedido vai para o sistema aberto no celular, que abre o gravador sozinho em ~2 s.
+// Acompanha o andamento (abriu, enviou). Plano B: QR code com o mesmo link (vale 10 min, só para esta conversa).
+function GravarNoCelular({ jid, nome, onFechar }: { jid: string; nome: string; onFechar: () => void }) {
+  const [pedido, setPedido] = useState<{ id: string; url: string } | null>(null)
+  const [estado, setEstado] = useState<"aguardando" | "aberto" | "enviado" | "cancelado">("aguardando")
+  const [erro, setErro] = useState<string | null>(null)
+  const [qr, setQr] = useState<string | null>(null)
+  const [segundos, setSegundos] = useState(0)
+  useEffect(() => {
+    let vivo = true
+    fetch("/api/whatsapp/gravar-celular", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid, nome }) })
+      .then(r => r.json()).then(d => { if (vivo) { if (d?.id) setPedido(d); else setErro(d?.erro ?? "Não pediu.") } })
+      .catch(() => vivo && setErro("Sem conexão."))
+    return () => { vivo = false }
+  }, [jid, nome])
+  // Acompanha o celular
+  useEffect(() => {
+    if (!pedido || estado === "enviado" || estado === "cancelado") return
+    const t = setInterval(async () => {
+      setSegundos(x => x + 1.5)
+      const g = await fetch("/api/whatsapp/gravar-celular").then(r => r.json()).catch(() => null) as { id: string; estado: typeof estado } | null
+      if (g?.id === pedido.id && g.estado !== estado) setEstado(g.estado)
+    }, 1500)
+    return () => clearInterval(t)
+  }, [pedido, estado])
+  useEffect(() => { if (estado !== "enviado") return; const t = setTimeout(onFechar, 1800); return () => clearTimeout(t) }, [estado, onFechar])
+  async function mostrarQr() {
+    if (pedido) setQr(await QRCode.toDataURL(pedido.url, { margin: 1, width: 300, color: { dark: "#191625", light: "#ffffff" } }))
+  }
+  const demorando = estado === "aguardando" && segundos > 8
+  return (
+    <div className="mb-2 rounded-xl p-3 flex gap-3 items-center wa-espiar" style={{ background: "var(--bg-page)", border: "1px solid var(--border)" }}>
+      <span className="w-10 h-10 rounded-full grid place-items-center shrink-0" style={{ background: estado === "enviado" ? "rgba(0,147,81,0.12)" : "rgba(37,163,90,0.1)" }}>
+        {estado === "enviado" ? <Check className="w-5 h-5 text-[#009351]" /> : estado === "aberto" ? <Mic className="w-5 h-5 text-[#d33a3c] animate-pulse" /> : <Smartphone className="w-5 h-5 text-[#1d8a4b] animate-pulse" />}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-semibold" style={{ color: "var(--text-main)" }}>
+          {erro ? "Não deu certo" : estado === "enviado" ? "Áudio enviado" : estado === "aberto" ? "Gravando no celular…" : estado === "cancelado" ? "Cancelado no celular" : "Abrindo o gravador no celular…"}
+        </p>
+        <p className="text-[11.5px] leading-snug" style={{ color: erro ? "#d33a3c" : "var(--text-faint)" }}>
+          {erro ?? (estado === "enviado" ? "Ele aparece aqui na conversa." : estado === "aberto" ? `Grave e toque em enviar no celular. Vai para ${nome || "esta conversa"}.` : demorando
+            ? "O celular precisa estar com o sistema aberto (app.enyla.com.br/mobile). Ou use o QR code."
+            : "Deixe o sistema aberto no celular: o gravador aparece sozinho.")}
+        </p>
+        {qr && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={qr} alt="QR code para gravar no celular" className="w-28 h-28 rounded-lg bg-white p-1 mt-2" />
+        )}
+      </div>
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        {pedido && !qr && estado === "aguardando" && <button onClick={mostrarQr} className="h-7 px-2 rounded-lg text-[11.5px] font-semibold hover:bg-black/5" style={{ color: "var(--text-sub)" }}>Usar QR code</button>}
+        <button onClick={onFechar} className="h-7 px-2 rounded-lg text-[11.5px] font-semibold hover:bg-black/5" style={{ color: "var(--text-sub)" }}>{estado === "enviado" ? "Fechar" : "Cancelar"}</button>
+      </div>
+    </div>
+  )
 }
