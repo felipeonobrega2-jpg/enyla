@@ -6,7 +6,7 @@ import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, nomeChave } from "../lib/negocio"
 import { clienteDaConversa, Vinculos } from "../lib/vinculoWhatsapp"
 import { lerOrigem } from "../lib/origemWhatsapp"
-import { ETAPAS, Etapa, posicaoNoFunil, estaFechada, DIAS_PERDIDO } from "../lib/funilWhatsapp"
+import { ETAPAS, Etapa, posicaoNoFunil, estaFechada, aguardandoResposta } from "../lib/funilWhatsapp"
 import { Segmentado } from "./ds"
 import { FilaMensagens } from "./FilaMensagens"
 import { montarFila, AvisoPedido } from "../lib/filaMensagens"
@@ -14,7 +14,7 @@ import { Atendimento, DadosPedido, ROTULO_ALERTA, temDados } from "../lib/atende
 import { filtrar, preencher, Rapida } from "../lib/mensagensRapidas"
 import { COL_HOT } from "../types"
 
-type Conversa = {
+export type Conversa = {
   jid: string
   nome: string
   ultima_msg: string | null
@@ -54,7 +54,7 @@ function fmtHora(iso: string | null) {
 }
 
 // Foto de perfil buscada pelo sistema (cópia guardada); sem foto, as iniciais
-function Avatar({ nome, jid, pequeno }: { nome: string; jid: string; pequeno?: boolean }) {
+export function Avatar({ nome, jid, pequeno }: { nome: string; jid: string; pequeno?: boolean }) {
   const tam = pequeno ? "w-7 h-7 text-[10.5px]" : "w-10 h-10 text-[13px]"
   const [semFoto, setSemFoto] = useState(false)
   const initials = nome.split(" ").slice(0, 2).map(w => w[0] ?? "").join("").toUpperCase() || "?"
@@ -82,8 +82,9 @@ function TypingBubble() {
 
 export default function WhatsAppView({
   onCriarCard, kanban = [], lancamentos = [], vinculos, onVincular, onAbrirCliente, etiquetasDef = [], onCriarEtiqueta,
-  avisos, dispensados, onAvisado, onDispensar,
+  avisos, dispensados, onAvisado, onDispensar, abrirJid,
 }: {
+  abrirJid?: { jid: string; vez: number }   // vindo do aviso de mensagens: abre esta conversa
   avisos?: Record<string, AvisoPedido>
   dispensados?: Record<string, string>
   onAvisado?: (pedidoKey: string, aviso: AvisoPedido) => void
@@ -203,6 +204,7 @@ export default function WhatsAppView({
 
   useEffect(() => { if (ativa && mensagens.length) cache.current.set(ativa.jid, mensagens) }, [ativa, mensagens])
 
+
   async function abrirConversa(c: Conversa) {
     rolouParaCima.current = false
     fecharEspiada()
@@ -221,9 +223,9 @@ export default function WhatsAppView({
     }
   }
 
+
   // Esperando você: o cliente falou por último (nos últimos 14 dias)
-  const aguardando = (c: Conversa) => !estaFechada(c) && !!c.ultima_recebida_at && (!c.ultima_enviada_at || c.ultima_recebida_at > c.ultima_enviada_at)
-    && agora - new Date(c.ultima_recebida_at).getTime() < DIAS_PERDIDO * 86_400_000
+  const aguardando = (c: Conversa) => aguardandoResposta(c, agora)
   const filtradas = conversas.filter(c =>
     (filtro === "fechadas" ? estaFechada(c) : !estaFechada(c)) &&
     (filtro !== "responder" || aguardando(c)) &&
@@ -258,6 +260,17 @@ export default function WhatsAppView({
   const { espiada, fechar: fecharEspiada, limpar: limparTimers } = esp
   const espiar = (c: Conversa, el: HTMLElement, fixa = false) => { if (c.jid === ativa?.jid && !fixa) { limparTimers(); return } esp.espiar(c, el, fixa) }
   const soltarEspiada = esp.soltar
+
+  // Pedido de fora (aviso de mensagens): abre a conversa quando a lista estiver carregada
+  const abertoPorFora = useRef<number | null>(null)
+  useEffect(() => {
+    if (!abrirJid || abertoPorFora.current === abrirJid.vez) return
+    const c = conversas.find(x => x.jid === abrirJid.jid)
+    if (!c) return
+    abertoPorFora.current = abrirJid.vez
+    queueMicrotask(() => { setModo("lista"); abrirConversa(c) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abrirJid, conversas])
 
   useReordenacaoSuave(listaRef, filtradas.map(c => c.jid).join("|"))
 
@@ -1228,7 +1241,7 @@ function useEspiada(aoFixar?: (c: Conversa) => void) {
 }
 
 // Espiada: últimas mensagens + resposta, sem abrir a conversa. Abre parando o mouse na linha (ou no botão Responder).
-function Espiada({ conversa, topo, esquerda, fixa, onFixar, onFechar, onAbrir, onEnviada, onMouseEnter, onMouseLeave, onOrcamento }: {
+export function Espiada({ conversa, topo, esquerda, fixa, onFixar, onFechar, onAbrir, onEnviada, onMouseEnter, onMouseLeave, onOrcamento }: {
   conversa: Conversa
   onOrcamento?: (d: DadosPedido) => void
   topo: number
@@ -1261,7 +1274,7 @@ function Espiada({ conversa, topo, esquerda, fixa, onFixar, onFechar, onAbrir, o
     document.addEventListener("mousedown", fora); document.addEventListener("keydown", esc)
     return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc) }
   }, [fixa, onFechar])
-  const altura = 440
+  const altura = typeof window !== "undefined" ? Math.max(440, Math.min(560, window.innerHeight - 80)) : 440
   const top = Math.max(64, Math.min(topo - 24, (typeof window !== "undefined" ? window.innerHeight : 900) - altura - 12))
   return (
     <div ref={caixaRef} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} onFocusCapture={onFixar} onMouseDown={onFixar}

@@ -6,7 +6,8 @@ import { IdeiasView } from "./components/IdeiasView"
 import { signOut } from "next-auth/react"
 import WhatsAppView from "./components/WhatsAppView"
 import { podarDispensados } from "./lib/filaMensagens"
-import { formDoAtendimento } from "./lib/atendente"
+import { formDoAtendimento, DadosPedido } from "./lib/atendente"
+import { AvisoWhatsapp } from "./components/AvisoWhatsapp"
 import { EntregasView, PrefillEntrega } from "./components/EntregasView"
 import Image from "next/image"
 import { useTheme } from "./components/ThemeProvider"
@@ -122,8 +123,9 @@ const TIPOS_LAMINACAO = ["Fosca", "Brilhante", "Soft Touch", "Holográfica"] as 
 const ACOMPANHAMENTOS = ["Berço interno", "Tampa separada", "Divisória", "Calço", "Gaveta interna"] as const
 const OUTROS_ACABAMENTOS = ["Hot Stamping", "Alto Relevo", "Baixo Relevo", "Janela PVC", "Vinco especial", "Corte e vinco"] as const
 
-function NavItem({ active, onClick, icon, label, badge, accent }: {
+function NavItem({ active, onClick, icon, label, badge, accent, badgeVerde }: {
   active: boolean
+  badgeVerde?: number   // conversas esperando resposta
   onClick: () => void
   icon: React.ReactNode
   label: string
@@ -149,6 +151,11 @@ function NavItem({ active, onClick, icon, label, badge, accent }: {
         {icon}
       </span>
       <span className="flex-1 text-left truncate">{label}</span>
+      {!!badgeVerde && (
+        <span key={badgeVerde} className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full ds-num min-w-[18px] text-center text-white bg-[#25a35a] wa-enviada">
+          {badgeVerde}
+        </span>
+      )}
       {badge !== undefined && badge > 0 && (
         <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full ds-num min-w-[18px] text-center"
           style={{ background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}>
@@ -206,6 +213,8 @@ export default function Home() {
   const [modalSobra, setModalSobra] = useState<{ card: KanbanCard; loteCards: KanbanCard[] } | null>(null)
   const [modalLancPedidos, setModalLancPedidos] = useState<Partial<LancamentoFinanceiro> | null>(null)
   const [entregasPrefill, setEntregasPrefill] = useState<PrefillEntrega | null>(null)
+  const [whatsPendentes, setWhatsPendentes] = useState(0)
+  const [whatsAbrir, setWhatsAbrir] = useState<{ jid: string; vez: number } | undefined>()
   const fretesVersao = 0
   const [buscaAberta, setBuscaAberta] = useState(false)
   const [orcTab, setOrcTab] = useState<"padrao" | "digital">("padrao")
@@ -291,6 +300,13 @@ export default function Home() {
     if (saved === "conquistas") setView("painel")
     else if (saved && valid.includes(saved)) setView(saved as typeof view)
   }, [])
+
+  // Orçamento novo já com o cliente (e o que ele contou na conversa); a conversa fica ligada a ele
+  function orcamentoDaConversa(nome: string, jid: string, dados?: DadosPedido) {
+    setForm({ ...FORM_INICIAL, nomeCliente: nome, ...(dados ? formDoAtendimento(dados) : {}) }); setResult(null); setDxfNome(null)
+    if (config.vinculosWhatsapp?.[jid] !== nome) salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [jid]: nome } })
+    navigate("orcamento")
+  }
 
   function navigate(v: typeof view) {
     setView(v)
@@ -1446,7 +1462,7 @@ export default function Home() {
           <NavGroup label="Ferramentas" />
           <NavItem active={view === "meta"} onClick={() => navigate("meta")} label="Campanhas"
             icon={<Megaphone className="w-4 h-4" strokeWidth={1.8} />} />
-          <NavItem active={view === "whatsapp"} onClick={() => navigate("whatsapp")} label="WhatsApp"
+          <NavItem active={view === "whatsapp"} onClick={() => navigate("whatsapp")} label="WhatsApp" badgeVerde={whatsPendentes}
             icon={<MessageCircle className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "forma"} onClick={() => navigate("forma")} label="Forma IA"
             icon={<Box className="w-4 h-4" strokeWidth={1.8} />} />
@@ -2465,12 +2481,8 @@ export default function Home() {
               onCriarEtiqueta={e => salvarConfigTudo({ ...config, etiquetasWhatsapp: [...(config.etiquetasWhatsapp ?? []).filter(x => x.nome !== e.nome), e] })}
               onVincular={(jid, nome) => salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [jid]: nome ?? "" } })}
               onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }}
-              onCriarCard={(nome, jid, dados) => {
-                // Orçamento novo já com o cliente (e o que ele contou na conversa); a conversa fica ligada a ele
-                setForm({ ...FORM_INICIAL, nomeCliente: nome, ...(dados ? formDoAtendimento(dados) : {}) }); setResult(null); setDxfNome(null)
-                if (config.vinculosWhatsapp?.[jid] !== nome) salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [jid]: nome } })
-                navigate("orcamento")
-              }}
+              onCriarCard={orcamentoDaConversa}
+              abrirJid={whatsAbrir}
             />
           ) : view === "conquistas" ? (
             <GamificacaoView
@@ -2955,6 +2967,9 @@ export default function Home() {
       {/* ── Forma — assistente flutuante ────────────────────────────────────── */}
       {/* Na tela do WhatsApp o botão flutuante cobriria o "enviar" */}
       {view !== "whatsapp" && <FormaBubble apiKey={config.apiKey} />}
+      <AvisoWhatsapp oculto={view === "whatsapp"} onContagem={setWhatsPendentes}
+        onAbrir={jid => { setWhatsAbrir({ jid, vez: Date.now() }); navigate("whatsapp") }}
+        onOrcamento={orcamentoDaConversa} />
     </div>
   )
 }

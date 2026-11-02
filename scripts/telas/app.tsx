@@ -25,6 +25,7 @@ import { EnviarWhatsapp } from "@/app/components/EnviarWhatsapp"
 import { PainelToken } from "@/app/components/MetaAdsView"
 import { FilaMensagens } from "@/app/components/FilaMensagens"
 import { EntregasView } from "@/app/components/EntregasView"
+import { AvisoWhatsapp } from "@/app/components/AvisoWhatsapp"
 import { PedidosUnificadoView } from "@/app/components/PedidosUnificadoView"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas } from "@/app/components/WhatsAppView"
 
@@ -57,6 +58,14 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       c("4@lid", "Hassan", "Bora, bora", 2, 1.5),
       c("5@lid", "Ana Cosméticos", "Perfeito, pode seguir", 3, 2.5, { campanha: JSON.stringify({ canal: "site" }) }),
       c("6@lid", "Juliana", "ok", 4, 3.5),
+    ]))
+  }
+  if (u.startsWith("/api/whatsapp/pendentes")) {
+    const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
+    return new Response(JSON.stringify([
+      { jid: "1@lid", nome: "Camilo", ultima_msg: "Quanto fica 2 mil caixinhas de 100ml? Preciso pra semana que vem", ultima_at: h(2), ultima_recebida_at: h(2), nao_lidas: 2 },
+      { jid: "2@lid", nome: "Raniere Péricles", ultima_msg: "Fechou, manda o pix", ultima_at: h(25), ultima_recebida_at: h(25), nao_lidas: 1 },
+      { jid: "3@lid", nome: "Bia Doces", ultima_msg: "[audioMessage]", ultima_at: h(180), ultima_recebida_at: h(180), nao_lidas: 0 },
     ]))
   }
   if (u.startsWith("/api/frete/servicos")) return new Response(JSON.stringify({ configurada: true, ambiente: "sandbox", cidade: "São Paulo", servicos: [
@@ -146,6 +155,7 @@ function Telas() {
       config={{ ...cfg, locaisRetirada: [{ id: "g", nome: "Gráfica", contato: "Alanno", telefone: "11999990000", endereco: { texto: "Rua Correia de Andrade, 50 · Brás · São Paulo - SP", lat: -23.5427, lng: -46.6199 } }],
         enderecosClientes: { "ana cosmeticos": { texto: "Avenida Paulista, 1000 · Bela Vista · São Paulo - SP · 01310-100", lat: -23.5648, lng: -46.6519, recebedor: "Ana", telefone: "11988887777" } } }}
       prefill={{ pedido: { loteId: "l1", numero: "ANA-001", cliente: "Ana Cosméticos" } }} /></div>
+    case "aviso": case "aviso-escuro": return <div style={{ height: "100vh", background: "var(--bg-page)" }}><AvisoWhatsapp onAbrir={() => {}} /></div>
     case "fila": case "fila-m": {
       const h = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString()
       const cv = (jid: string, nome: string, rec: number, env: number, extra = {}) => ({ jid, nome, ultima_recebida_at: h(rec), ultima_enviada_at: h(env), ...extra })

@@ -69,3 +69,8 @@ export function posicaoNoFunil(c: ConversaFunil, cardsDoCliente: KanbanCard[], h
 // Conversa fechada: some da lista e do funil até o cliente escrever depois de fechada
 export const estaFechada = (c: { fechada_em?: string | null; ultima_recebida_at?: string | null }) =>
   !!c.fechada_em && !(c.ultima_recebida_at && c.ultima_recebida_at > c.fechada_em)
+
+// Esperando você: o cliente falou por último, nos últimos 14 dias, conversa aberta (não vale para grupos)
+export const aguardandoResposta = (c: { jid?: string; fechada_em?: string | null; ultima_recebida_at?: string | null; ultima_enviada_at?: string | null }, agora = Date.now()) =>
+  !c.jid?.endsWith("@g.us") && !estaFechada(c) && !!c.ultima_recebida_at && (!c.ultima_enviada_at || c.ultima_recebida_at > c.ultima_enviada_at)
+  && agora - new Date(c.ultima_recebida_at).getTime() < DIAS_PERDIDO * 86_400_000

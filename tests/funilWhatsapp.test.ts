@@ -32,3 +32,15 @@ describe("fechar conversa", () => {
     expect(estaFechada({ fechada_em: null })).toBe(false)
   })
 })
+
+describe("esperando resposta", () => {
+  const agora = HOJE.getTime()
+  it("cliente falou por último, há menos de 14 dias, conversa aberta e não é grupo", async () => {
+    const { aguardandoResposta } = await import("@/app/lib/funilWhatsapp")
+    expect(aguardandoResposta({ jid: "1@lid", ultima_recebida_at: h(0.1), ultima_enviada_at: h(1) }, agora)).toBe(true)
+    expect(aguardandoResposta({ jid: "1@lid", ultima_recebida_at: h(1), ultima_enviada_at: h(0.1) }, agora)).toBe(false)
+    expect(aguardandoResposta({ jid: "1@lid", ultima_recebida_at: h(20) }, agora)).toBe(false)
+    expect(aguardandoResposta({ jid: "1@g.us", ultima_recebida_at: h(0.1) }, agora)).toBe(false)
+    expect(aguardandoResposta({ jid: "1@lid", ultima_recebida_at: h(1), fechada_em: h(0.5) }, agora)).toBe(false)
+  })
+})
