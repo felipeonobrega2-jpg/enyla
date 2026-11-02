@@ -93,6 +93,9 @@ export type Configuracoes = {
   etiquetasWhatsapp?: { nome: string; cor: string }[]          // etiquetas das conversas do WhatsApp
   vinculosWhatsapp?: import("./lib/vinculoWhatsapp").Vinculos   // conversa (jid) → cliente, escolhido na tela do WhatsApp
   origensClientes?: import("./lib/coleta").OrigensClientes   // como cada cliente chegou (nomeChave → canal)
+  guiaAtendimento?: string                                 // como você conversa: a IA lê antes de sugerir mensagens
+  avisosPedido?: Record<string, import("./lib/filaMensagens").AvisoPedido>  // último aviso de produção mandado por pedido
+  filaDispensados?: Record<string, string>                 // itens da fila já enviados/dispensados (id → quando)
   ideias?: Ideia[]                                         // anotações para implementar depois
   conciliacao?: import("./lib/conciliacao").MemoriaConciliacao  // quem paga por quem e entradas ignoradas
 }

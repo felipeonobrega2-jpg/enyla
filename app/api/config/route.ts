@@ -6,6 +6,9 @@ import { supabase } from "@/app/lib/supabase"
 // um token antigo por cima do renovado.
 const CAMPOS_DO_SERVIDOR = ["metaToken", "metaTokenExpiry", "metaTokenTipo", "metaTokenValido", "metaTokenErro", "metaTokenVerificadoEm", "metaContaId", "metaContaEscolhida", "metaContas", "aprovacoesOnline", "avaliacoes", "visitasProposta", "groqKey", "whatsappConexao"] as const
 
+// Campos novos que uma aba aberta antes deles existirem não conhece: se não vierem, mantém o que está salvo
+const MANTER_SE_AUSENTE = ["guiaAtendimento", "avisosPedido", "filaDispensados"] as const
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as Record<string, unknown>
@@ -16,6 +19,7 @@ export async function POST(req: NextRequest) {
       if (k in salvo) proximo[k] = salvo[k]
       else delete proximo[k]
     }
+    for (const k of MANTER_SE_AUSENTE) if (!(k in body) && k in salvo) proximo[k] = salvo[k]
     await supabase.from("AppConfig").upsert({ id: 1, data: proximo }, { onConflict: "id" })
     return NextResponse.json({ ok: true })
   } catch (e) {

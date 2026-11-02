@@ -2,7 +2,7 @@
 
 import { VARIAVEIS, Rapida } from "../lib/mensagensRapidas"
 import React, { useState, useRef } from "react"
-import { Percent, Layers, Target, Palette, Sparkles, Database, Download, Upload, Plus, X, Check, Save, RotateCcw, Info, KeyRound, CalendarOff, Handshake, Mic, Zap } from "lucide-react"
+import { Percent, Layers, Target, Palette, Sparkles, Database, Download, Upload, Plus, X, Check, Save, RotateCcw, Info, KeyRound, CalendarOff, Handshake, Mic, Zap, BookOpen } from "lucide-react"
 import { Configuracoes, Material, CONFIG_PADRAO } from "../config"
 import { FERIADOS_SP } from "../lib/diasUteis"
 import { nomeChave } from "../lib/negocio"
@@ -210,6 +210,16 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
           <ChaveGroq configurada={!!draft.groqConfigurado} />
 
           <MensagensRapidas />
+
+          {/* Guia de atendimento: a IA lê antes de sugerir qualquer mensagem */}
+          <Cartao className="ds-entrada">
+            <TituloCartao titulo="Guia de atendimento" icone={<BookOpen className="w-4 h-4" />}
+              sub="Como você conversa: tom, frases, etapas e regras. A IA lê antes de escrever na fila de mensagens. Edite à vontade." />
+            <textarea value={draft.guiaAtendimento ?? ""} onChange={e => setDraft(d => ({ ...d, guiaAtendimento: e.target.value }))}
+              rows={18} placeholder="Ainda sem guia."
+              className="w-full rounded-lg px-3 py-2.5 text-[12.5px] leading-relaxed font-mono text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] ds-borda resize-y" />
+            <p className="text-[11px] text-[#898892] mt-1.5">{(draft.guiaAtendimento ?? "").split(/\s+/).filter(Boolean).length} palavras · salva com o botão Salvar da página</p>
+          </Cartao>
 
           {/* Backup */}
           <Cartao className="ds-entrada">

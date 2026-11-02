@@ -23,6 +23,7 @@ import { PrecoQueFecha } from "@/app/components/PrecoQueFecha"
 import { ModalLancamento } from "@/app/components/FinanceiroView"
 import { EnviarWhatsapp } from "@/app/components/EnviarWhatsapp"
 import { PainelToken } from "@/app/components/MetaAdsView"
+import { FilaMensagens } from "@/app/components/FilaMensagens"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas } from "@/app/components/WhatsAppView"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
@@ -92,6 +93,14 @@ function Telas() {
         etiquetasDef={[{ nome: "Atacado", cor: "#2f7cf6" }, { nome: "VIP", cor: "#c57800" }, { nome: "Amostra enviada", cor: "#009351" }]}
         clienteDe={c => nomes.includes(c.nome) ? { nome: c.nome } : null}
         cardsDe={c => dados.kanban.filter(k => k.nomeCliente === c.nome)} /></div>
+    }
+    case "fila": case "fila-m": {
+      const h = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString()
+      const cv = (jid: string, nome: string, rec: number, env: number, extra = {}) => ({ jid, nome, ultima_recebida_at: h(rec), ultima_enviada_at: h(env), ...extra })
+      const kanban = [...dados.kanban, { ...dados.kanban[0], id: "kx", numero: "ORC-2026-301", nomeCliente: "Maria Perfumes", coluna: 5, dataFechamento: h(5).slice(0, 10), dataEntregaReal: undefined },
+        { ...dados.kanban[0], id: "ky", numero: "ORC-2026-298", nomeCliente: "Ana Cosméticos", coluna: 8, dataFechamento: h(9).slice(0, 10), dataEntregaReal: undefined }]
+      return <div style={{ height: "100vh" }}><FilaMensagens kanban={kanban} lancamentos={lancs} onAvisado={() => {}} onDispensar={() => {}} onAbrirConversa={() => {}}
+        conversas={[cv("1@lid", "Juliana", 5, 4), cv("2@lid", "rafael souza", 10, 8), cv("3@lid", "Bia Doces", 6, 3.5), cv("4@lid", "Maria Perfumes", 6, 5)]} /></div>
     }
     case "whatsview": return <div style={{ height: "100vh" }}><WhatsAppView onCriarCard={() => {}} kanban={dados.kanban} lancamentos={lancs} /></div>
     case "enviar": return <div style={{ height: "100vh" }}><EnviarWhatsapp envio={{ cliente: "Raniere Péricles", texto: "Olá! Tudo bem? Passando para saber se conseguiu ver a proposta ORC-2026-233. Ficou alguma dúvida sobre quantidade ou acabamento? Posso te ajudar a escolher." }} linkWhatsapp="https://wa.me/" onFechar={() => {}} /></div>

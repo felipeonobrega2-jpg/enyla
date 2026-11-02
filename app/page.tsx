@@ -5,6 +5,7 @@ import { Ruler, Check, Factory, LayoutDashboard, FileText, Package, Users, Walle
 import { IdeiasView } from "./components/IdeiasView"
 import { signOut } from "next-auth/react"
 import WhatsAppView from "./components/WhatsAppView"
+import { podarDispensados } from "./lib/filaMensagens"
 import Image from "next/image"
 import { useTheme } from "./components/ThemeProvider"
 import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, CustoSnapshot, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO, COL_HOT, COLUNAS_KANBAN, Parceiro, NegocioParceiro, LancamentoFinanceiro, Lote, TipoCaixa, PrazoEtapas, AprovacaoOnline } from "./types"
@@ -2443,6 +2444,9 @@ export default function Home() {
             <WhatsAppView
               kanban={kanban} lancamentos={lancamentos} vinculos={config.vinculosWhatsapp}
               etiquetasDef={config.etiquetasWhatsapp ?? []}
+              avisos={config.avisosPedido} dispensados={config.filaDispensados}
+              onAvisado={(k, a) => salvarConfigTudo({ ...config, avisosPedido: { ...(config.avisosPedido ?? {}), [k]: a } })}
+              onDispensar={id => salvarConfigTudo({ ...config, filaDispensados: { ...podarDispensados(config.filaDispensados), [id]: new Date().toISOString() } })}
               onCriarEtiqueta={e => salvarConfigTudo({ ...config, etiquetasWhatsapp: [...(config.etiquetasWhatsapp ?? []).filter(x => x.nome !== e.nome), e] })}
               onVincular={(jid, nome) => salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [jid]: nome ?? "" } })}
               onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }}

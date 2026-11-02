@@ -8,6 +8,8 @@ import { clienteDaConversa, Vinculos } from "../lib/vinculoWhatsapp"
 import { lerOrigem } from "../lib/origemWhatsapp"
 import { ETAPAS, Etapa, posicaoNoFunil, estaFechada } from "../lib/funilWhatsapp"
 import { Segmentado } from "./ds"
+import { FilaMensagens } from "./FilaMensagens"
+import { montarFila, AvisoPedido } from "../lib/filaMensagens"
 import { filtrar, preencher, Rapida } from "../lib/mensagensRapidas"
 import { COL_HOT } from "../types"
 import { brl } from "../utils"
@@ -80,7 +82,12 @@ function TypingBubble() {
 
 export default function WhatsAppView({
   onCriarCard, kanban = [], lancamentos = [], vinculos, onVincular, onAbrirCliente, etiquetasDef = [], onCriarEtiqueta,
+  avisos, dispensados, onAvisado, onDispensar,
 }: {
+  avisos?: Record<string, AvisoPedido>
+  dispensados?: Record<string, string>
+  onAvisado?: (pedidoKey: string, aviso: AvisoPedido) => void
+  onDispensar?: (id: string) => void
   etiquetasDef?: EtiquetaDef[]
   onCriarEtiqueta?: (e: EtiquetaDef) => void
   onCriarCard: (nome: string, jid: string) => void
@@ -111,7 +118,7 @@ export default function WhatsAppView({
   useEffect(() => { fetch("/api/whatsapp/status").then(r => r.json()).then(setStatus).catch(() => {}) }, [])
   const [busca, setBusca] = useState("")
   const [filtro, setFiltro] = useState<"todas" | "anuncio" | "site" | "clientes" | "fechadas">("todas")
-  const [modo, setModo] = useState<"lista" | "funil">("lista")
+  const [modo, setModo] = useState<"lista" | "funil" | "fila">("lista")
   const [etiquetaFiltro, setEtiquetaFiltro] = useState<string | null>(null)
   // Fecha/reabre ou troca etiquetas: atualiza a tela na hora e grava em seguida
   async function alterar(jids: string[], campos: { fechar?: boolean; etiquetas?: string[] }) {
@@ -199,6 +206,8 @@ export default function WhatsAppView({
 
   const totalNaoLidas = conversas.reduce((s, c) => s + c.nao_lidas, 0)
 
+  const naFila = useMemo(() => montarFila({ conversas, kanban, lancamentos, vinculos, avisos, dispensados }).length, [conversas, kanban, lancamentos, vinculos, avisos, dispensados])
+
   // Barra do topo, igual na lista e no funil (alternância padrão do sistema)
   const topo = (
     <div className="px-5 py-2.5 border-b flex items-center gap-3 shrink-0" style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
@@ -208,8 +217,16 @@ export default function WhatsAppView({
                   </svg>
       <span className="text-[15px] font-semibold" style={{ color: "var(--text-main)" }}>WhatsApp</span>
       {totalNaoLidas > 0 && <span className="text-[11px] font-bold text-white bg-[#25D366] rounded-full px-2 py-0.5">{totalNaoLidas}</span>}
-      <div className="ml-auto"><Segmentado<"lista" | "funil"> valor={modo} onChange={setModo} opcoes={[{ v: "lista", nome: "Conversas" }, { v: "funil", nome: "Funil" }]} /></div>
+      <div className="ml-auto"><Segmentado<"lista" | "funil" | "fila"> valor={modo} onChange={setModo}
+        opcoes={[{ v: "lista", nome: "Conversas" }, { v: "funil", nome: "Funil" }, { v: "fila", nome: naFila ? `Fila (${naFila})` : "Fila" }]} /></div>
     </div>
+  )
+
+  if (modo === "fila") return (
+    <div className="flex flex-col h-full">{topo}<div className="flex-1 min-h-0"><FilaMensagens conversas={conversas} kanban={kanban} lancamentos={lancamentos}
+      vinculos={vinculos} avisos={avisos} dispensados={dispensados}
+      onAvisado={(k, a) => onAvisado?.(k, a)} onDispensar={id => onDispensar?.(id)}
+      onAbrirConversa={jid => { const c = conversas.find(x => x.jid === jid); if (c) { setModo("lista"); abrirConversa(c) } }} /></div></div>
   )
 
   if (modo === "funil") return (
