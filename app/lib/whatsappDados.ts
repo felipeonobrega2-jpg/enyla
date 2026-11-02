@@ -107,7 +107,8 @@ export async function gravarLote(msgs: WaMessage[], opts: { contarNaoLidas?: boo
     }
   }).map(c => Object.fromEntries(Object.entries(c).filter(([, v]) => v !== undefined)))
   for (let i = 0; i < conversas.length; i += 500)
-    await supabase.from("whatsapp_conversas").upsert(conversas.slice(i, i + 500), { onConflict: "jid", ignoreDuplicates: false })
+    // defaultToNull: false — campo ausente numa linha do lote fica como está (sem isso o banco gravava vazio)
+    await supabase.from("whatsapp_conversas").upsert(conversas.slice(i, i + 500), { onConflict: "jid", ignoreDuplicates: false, defaultToNull: false })
 
   const linhas = validas.map(m => {
     const { corpo, tipo, media_url } = extractBody(m)

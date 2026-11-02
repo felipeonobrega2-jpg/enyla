@@ -8,13 +8,13 @@ const BUCKET = "whatsapp-midia"   // privado: só sai por esta rota, que exige l
 
 // Foto, áudio, vídeo ou documento de uma mensagem. Primeira vez: baixa do Evolution e guarda uma cópia
 // (o WhatsApp apaga mídia antiga dos servidores dele); depois, serve da cópia.
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   if (!/^[\w-]{6,80}$/.test(id)) return NextResponse.json({ erro: "id inválido" }, { status: 400 })
   const caminho = `midia/${id}`
 
   const guardada = await supabase.storage.from(BUCKET).download(caminho)
-  if (guardada.data) return resposta(guardada.data, guardada.data.type)
+  if (guardada.data) return resposta(req, guardada.data, guardada.data.type)
 
   const r = await evo<{ base64?: string; mimetype?: string }>("/chat/getBase64FromMediaMessage/{i}", {
     method: "POST",
@@ -30,9 +30,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     await supabase.storage.createBucket(BUCKET, { public: false })
     up = await supabase.storage.from(BUCKET).upload(caminho, bytes, { contentType: tipo, upsert: true })
   }
-  return resposta(new Blob([bytes], { type: tipo }), tipo)
+  return resposta(req, new Blob([bytes], { type: tipo }), tipo)
 }
 
-function resposta(b: Blob, tipo: string) {
-  return new NextResponse(b, { headers: { "Content-Type": tipo || "application/octet-stream", "Cache-Control": "private, max-age=31536000, immutable" } })
+// Entrega por pedaços quando o navegador pede (Range): o Safari só toca áudio/vídeo assim
+async function resposta(req: NextRequest, b: Blob, tipo: string) {
+  const buf = Buffer.from(await b.arrayBuffer())
+  const base = { "Content-Type": tipo || "application/octet-stream", "Accept-Ranges": "bytes", "Cache-Control": "private, max-age=31536000, immutable" }
+  const m = /bytes=(\d*)-(\d*)/.exec(req.headers.get("range") ?? "")
+  if (!m) return new NextResponse(buf, { headers: { ...base, "Content-Length": String(buf.length) } })
+  const ini = m[1] ? Number(m[1]) : Math.max(0, buf.length - Number(m[2]))
+  const fim = m[1] && m[2] ? Math.min(Number(m[2]), buf.length - 1) : buf.length - 1
+  if (ini >= buf.length || ini > fim) return new NextResponse(null, { status: 416, headers: { ...base, "Content-Range": `bytes */${buf.length}` } })
+  return new NextResponse(buf.subarray(ini, fim + 1), { status: 206, headers: { ...base, "Content-Range": `bytes ${ini}-${fim}/${buf.length}`, "Content-Length": String(fim - ini + 1) } })
 }

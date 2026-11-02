@@ -1,6 +1,6 @@
 "use client"
 
-import { Image as ImageIcon, FileText, Smile, Check, X, Paperclip, SendHorizontal } from "lucide-react"
+import { Image as ImageIcon, FileText, Smile, Check, X, Paperclip, SendHorizontal, Mic, Video } from "lucide-react"
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, nomeChave } from "../lib/negocio"
@@ -38,9 +38,12 @@ function fmtHora(iso: string | null) {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
 }
 
-function Avatar({ nome, foto }: { nome: string; foto: string | null }) {
+// Foto de perfil buscada pelo sistema (cópia guardada); sem foto, as iniciais
+function Avatar({ nome, jid }: { nome: string; jid: string }) {
+  const [semFoto, setSemFoto] = useState(false)
   const initials = nome.split(" ").slice(0, 2).map(w => w[0] ?? "").join("").toUpperCase() || "?"
-  if (foto) return <img src={foto} alt={nome} className="w-10 h-10 rounded-full object-cover shrink-0" />
+  // eslint-disable-next-line @next/next/no-img-element
+  if (!semFoto) return <img src={`/api/whatsapp/foto/${encodeURIComponent(jid)}`} alt="" loading="lazy" onError={() => setSemFoto(true)} className="w-10 h-10 rounded-full object-cover shrink-0 bg-[#8456e8]/15" />
   return (
     <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-[13px] font-bold text-white"
       style={{ background: "#8456e8" }}>
@@ -95,15 +98,24 @@ export default function WhatsAppView({
 
   const carregarConversas = useCallback(async () => {
     const res = await fetch("/api/whatsapp/conversas")
-    if (res.ok) { const d: unknown = await res.json(); setConversas(Array.isArray(d) ? d : []) }
+    if (res.ok) {
+      const d: unknown = await res.json()
+      const novas = Array.isArray(d) ? d as Conversa[] : []
+      setConversas(prev => JSON.stringify(prev) === JSON.stringify(novas) ? prev : novas)
+    }
     setLoadingConvs(false)
   }, [])
 
-  const carregarMensagens = useCallback(async (jid: string) => {
-    setLoadingMsgs(true)
-    const res = await fetch(`/api/whatsapp/mensagens/${encodeURIComponent(jid)}`)
-    if (res.ok) { const d: unknown = await res.json(); setMensagens(Array.isArray(d) ? d : []) }
-    setLoadingMsgs(false)
+  // Atualização silenciosa: só troca a lista se chegou mensagem nova (não redesenha nem para o áudio que está tocando)
+  const carregarMensagens = useCallback(async (jid: string, primeira = false) => {
+    if (primeira) setLoadingMsgs(true)
+    const res = await fetch(`/api/whatsapp/mensagens/${encodeURIComponent(jid)}`).catch(() => null)
+    if (res?.ok) {
+      const d: unknown = await res.json()
+      const novas = Array.isArray(d) ? d as Mensagem[] : []
+      setMensagens(prev => prev.length === novas.length && prev[prev.length - 1]?.id === novas[novas.length - 1]?.id ? prev : novas)
+    }
+    if (primeira) setLoadingMsgs(false)
   }, [])
 
   useEffect(() => {
@@ -114,16 +126,21 @@ export default function WhatsAppView({
 
   useEffect(() => {
     if (!ativa) return
-    carregarMensagens(ativa.jid)
+    carregarMensagens(ativa.jid, true)
     const t = setInterval(() => carregarMensagens(ativa.jid), 5000)
     return () => clearInterval(t)
   }, [ativa, carregarMensagens])
 
+  // Desce para o fim ao abrir e quando chega mensagem nova, a menos que você esteja lendo lá em cima
+  const ultimaId = mensagens[mensagens.length - 1]?.id
+  const rolouParaCima = useRef(false)
   useEffect(() => {
-    if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight
-  }, [mensagens])
+    const el = threadRef.current
+    if (el && !rolouParaCima.current) el.scrollTop = el.scrollHeight
+  }, [ultimaId])
 
   async function abrirConversa(c: Conversa) {
+    rolouParaCima.current = false
     setAtiva(c)
     setMensagens([])
     if (c.nao_lidas > 0) {
@@ -212,7 +229,7 @@ export default function WhatsAppView({
                 borderLeft: ativa?.jid === c.jid ? "2px solid #8456e8" : "2px solid transparent",
               }}
             >
-              <Avatar nome={c.nome} foto={c.foto_url} />
+              <Avatar nome={c.nome} jid={c.jid} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[13.5px] font-semibold truncate flex items-center gap-1.5 min-w-0" style={{ color: "var(--text-main)" }}>
@@ -222,7 +239,7 @@ export default function WhatsAppView({
                   <span className="text-[11px] shrink-0" style={{ color: "var(--text-faint)" }}>{fmtHora(c.ultima_at)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-0.5">
-                  <span className="text-[12px] truncate" style={{ color: "var(--text-sub)" }}>{c.ultima_msg ?? ""}</span>
+                  <span className="text-[12px] truncate flex items-center gap-1 min-w-0" style={{ color: "var(--text-sub)" }}><Previa texto={c.ultima_msg} /></span>
                   {c.nao_lidas > 0 && (
                     <span className="shrink-0 text-[10px] font-bold text-white bg-[#25D366] rounded-full w-4 h-4 flex items-center justify-center">
                       {c.nao_lidas > 9 ? "9+" : c.nao_lidas}
@@ -254,7 +271,7 @@ export default function WhatsAppView({
           <>
             {/* Topbar da conversa */}
             <div className="flex items-center gap-3 px-5 py-3.5 border-b shrink-0" style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
-              <Avatar nome={ativa.nome} foto={ativa.foto_url} />
+              <Avatar key={ativa.jid} nome={ativa.nome} jid={ativa.jid} />
               <div className="flex-1 min-w-0">
                 <p className="text-[14px] font-semibold truncate" style={{ color: "var(--text-main)" }}>{ativa.nome}</p>
                 <ClienteDaConversa cliente={clienteDe(ativa)} resumo={resumo} clientes={nomesClientes}
@@ -273,7 +290,8 @@ export default function WhatsAppView({
             </div>
 
             {/* Thread */}
-            <div ref={threadRef} className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2" style={{ background: "#efeae2" }}>
+            <div ref={threadRef} onScroll={e => { const el = e.currentTarget; rolouParaCima.current = el.scrollHeight - el.scrollTop - el.clientHeight > 200 }}
+              className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2" style={{ background: "#efeae2" }}>
               {loadingMsgs && <div className="flex justify-center py-8"><TypingBubble /></div>}
 
               {!loadingMsgs && mensagens.map((m, i) => {
@@ -574,4 +592,17 @@ export function ClienteDaConversa({ cliente, resumo, clientes, onVincular, onAbr
       {onVincular && <button onClick={() => setEscolhendo(true)} className="ml-1 underline" style={{ color: "var(--text-faint)" }}>{cliente.manual ? "trocar" : "não é ele?"}</button>}
     </p>
   )
+}
+
+// Prévia da última mensagem: mídia aparece como ícone + nome ("Áudio", "Foto"…), não como código do WhatsApp
+const PREVIAS: Record<string, [string, typeof Mic]> = {
+  audio: ["Áudio", Mic], audioMessage: ["Áudio", Mic], image: ["Foto", ImageIcon], imageMessage: ["Foto", ImageIcon],
+  video: ["Vídeo", Video], videoMessage: ["Vídeo", Video], document: ["Documento", FileText], documentMessage: ["Documento", FileText],
+  sticker: ["Figurinha", Smile], stickerMessage: ["Figurinha", Smile], reaction: ["Reação", Smile],
+}
+function Previa({ texto }: { texto: string | null }) {
+  const m = /^\[(\w+)\]$/.exec(texto ?? "")
+  if (!m) return <span className="truncate">{texto ?? ""}</span>
+  const [rotulo, Icone] = PREVIAS[m[1]] ?? ["Mensagem", FileText]
+  return <><Icone className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{rotulo}</span></>
 }
