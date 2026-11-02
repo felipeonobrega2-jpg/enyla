@@ -5,6 +5,7 @@ import {
   AlertTriangle, CircleCheck, CalendarClock, CalendarX2, CircleDollarSign, Clock, Factory, FileText, Hourglass,
   MessageCircle, Percent, Plus, Receipt, TrendingUp, Truck, Users, Wallet, CheckCircle2, ArrowRight, Target, Trophy, Eye, MessageCircleHeart, Star, RotateCcw, Megaphone,
 } from "lucide-react"
+import { EnviarWhatsapp, Envio } from "./EnviarWhatsapp"
 import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COL_HOT, AprovacaoOnline } from "../types"
 import { Configuracoes } from "../config"
 import {
@@ -100,16 +101,18 @@ export function PainelView({
     entregaProxima: <CalendarClock className="w-4 h-4" />, orcamentoVencendo: <Hourglass className="w-4 h-4" />, semPrazo: <Clock className="w-4 h-4" />,
     abriuProposta: <Eye className="w-4 h-4" />, comoFicou: <MessageCircleHeart className="w-4 h-4" />, avaliado: <Star className="w-4 h-4" />, reposicao: <RotateCcw className="w-4 h-4" />, meta: <Megaphone className="w-4 h-4" />, whatsapp: <MessageCircle className="w-4 h-4" />,
   }
-  type Acao = { id: string; tom: Tom; icone: React.ReactNode; titulo: string; sub: string; valor?: string; ir: () => void; whatsapp?: string; cobrar?: Partial<LancamentoFinanceiro>; botao?: { rotulo: string; onClick: () => void } }
+  type Acao = { id: string; tom: Tom; icone: React.ReactNode; titulo: string; sub: string; valor?: string; ir: () => void; whatsapp?: string; envio?: Envio; cobrar?: Partial<LancamentoFinanceiro>; botao?: { rotulo: string; onClick: () => void } }
   const acoes: Acao[] = pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom, clientes, config, hoje }).map(x => ({
     id: x.id, tom: x.tom, icone: ICONE[x.tipo], titulo: x.titulo, sub: x.sub,
     valor: x.valor != null ? brl(x.valor) : undefined,
     ir: x.tipo === "fornecedor" ? () => onNavegar("fornecedores") : x.tipo === "meta" ? () => onNavegar("meta") : x.tipo === "whatsapp" ? () => onNavegar("whatsapp") : x.tipo === "conferir" ? () => abrirCaixa() : x.cliente ? () => onAbrirCliente(x.cliente!) : () => { if (x.card) onAbrirCard(x.card) },
     whatsapp: x.tipo === "orcamentoVencendo" || x.tipo === "abriuProposta" || x.tipo === "comoFicou" || x.tipo === "reposicao" ? x.whatsapp : undefined,
+    envio: x.tipo === "orcamentoVencendo" || x.tipo === "abriuProposta" || x.tipo === "comoFicou" || x.tipo === "reposicao" ? x.envio : undefined,
     cobrar: x.cobrar,
     botao: x.aprovacao && onAprovacaoOnline ? { rotulo: x.aprovacao.tipo === "recompra_qtd" ? "Orçar" : "Lançar sinal", onClick: () => onAprovacaoOnline(x.aprovacao!) } : undefined,
   }))
   const [verTodas, setVerTodas] = React.useState(false)
+  const [enviando, setEnviando] = React.useState<{ envio: Envio; link?: string } | null>(null)
   const acoesVisiveis = verTodas ? acoes : acoes.slice(0, 7)
 
   // ── Série mensal (últimos 6 meses) ─────────────────────────────────────────
@@ -306,6 +309,11 @@ export function PainelView({
                       className="h-8 px-2.5 mr-1 rounded-lg text-[11.5px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors shrink-0 whitespace-nowrap">
                       Lançar cobrança
                     </button>
+                  ) : a.envio ? (
+                    <button onClick={() => setEnviando({ envio: a.envio!, link: a.whatsapp })} title="Mandar mensagem pelo WhatsApp do sistema"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-[#25a35a] hover:bg-[#25a35a]/10 transition-colors shrink-0 mr-1">
+                      <MessageCircle className="w-4 h-4" />
+                    </button>
                   ) : a.whatsapp ? (
                     <a href={a.whatsapp} target="_blank" rel="noreferrer" title="Mandar mensagem no WhatsApp"
                       className="w-8 h-8 rounded-lg flex items-center justify-center text-[#25a35a] hover:bg-[#25a35a]/10 transition-colors shrink-0 mr-1">
@@ -448,6 +456,7 @@ export function PainelView({
         rodape={detalhe?.destino ? <Botao variante="secundario" onClick={() => { const ir = detalhe.destino!.ir; fechar(); ir() }}>{detalhe.destino.nome} <ArrowRight className="w-3.5 h-3.5" /></Botao> : undefined}>
         {detalhe?.linhas}
       </Gaveta>
+      {enviando && <EnviarWhatsapp envio={enviando.envio} linkWhatsapp={enviando.link} onFechar={() => setEnviando(null)} />}
     </Pagina>
   )
 }

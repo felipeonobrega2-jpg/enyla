@@ -24,6 +24,7 @@ export type Pendencia = {
   cobrar?: Partial<LancamentoFinanceiro>    // cobrança pronta para lançar
   aprovacao?: NonNullable<Configuracoes["aprovacoesOnline"]>[number]
   cliente?: string                          // abre o perfil do cliente
+  envio?: { cliente: string; texto?: string; modelo?: string; numero?: string }   // enviar pelo sistema (janela de revisão)
 }
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -154,6 +155,7 @@ export function pendencias(args: {
       titulo: `${card.numero} · ${card.nomeCliente}`,
       sub: `abriu a proposta ${quandoFoi(visita.ultima)}${visita.vezes > 1 ? ` · ${visita.vezes} vezes` : ""} · bom momento para chamar`,
       valor: card.preco, card,
+      envio: { cliente: card.nomeCliente, texto: `Olá! Tudo bem? Passando para saber se conseguiu ver a proposta ${card.numero}. Ficou alguma dúvida sobre quantidade ou acabamento? Posso te ajudar a escolher.` },
       whatsapp: linkWhatsApp(telefoneDe(card.nomeCliente), `Olá! Tudo bem? Passando para saber se conseguiu ver a proposta ${card.numero}. Ficou alguma dúvida sobre quantidade ou acabamento? Posso te ajudar a escolher.`),
     })),
     ...prod.atrasados.map(p => ({
@@ -170,6 +172,7 @@ export function pendencias(args: {
       titulo: `${p.numero} · ${p.nomeCliente}`,
       sub: `cobrança vencida${p.semCobranca > 0.5 ? ` · mais ${brl(p.semCobranca)} sem cobrança` : ""}`,
       valor: p.vencido, card: cardDoPedido(p),
+      envio: { cliente: p.nomeCliente, texto: `Olá! Tudo bem? Passando para lembrar do pagamento do pedido ${p.numero}, no valor de ${brl(p.vencido)}, que já venceu. Se já pagou, pode desconsiderar. Qualquer dúvida, estou à disposição!` },
       whatsapp: linkWhatsApp(telefoneDe(p.nomeCliente), `Olá! Tudo bem? Passando para lembrar do pagamento do pedido ${p.numero}, no valor de ${brl(p.vencido)}, que já venceu. Se já pagou, pode desconsiderar. Qualquer dúvida, estou à disposição!`),
     })),
     ...rec.comSaldo.filter(p => pedidoEntregue(p) && p.semCobranca > 0.5 && !dentroDoPrazoCombinado(p)).map(p => {
@@ -203,6 +206,7 @@ export function pendencias(args: {
         id: `cf-${p.key}`, tipo: "comoFicou" as const, tom: "info" as const,
         titulo: `${p.numero} · ${p.nomeCliente}`, sub: `entregue ${dataCurta(p.dataEntregaReal)} · pergunte como ficou`,
         card: c,
+        envio: { cliente: p.nomeCliente, modelo: "como-ficou", numero: p.numero },
         whatsapp: `/api/cliente/whatsapp?modelo=como-ficou&nome=${encodeURIComponent(p.nomeCliente)}&numero=${encodeURIComponent(p.numero)}${tel ? `&tel=${encodeURIComponent(tel)}` : ""}`,
       }
     }),
@@ -214,6 +218,7 @@ export function pendencias(args: {
         titulo: r.nome,
         sub: `${r.curva ? `cliente ${r.curva} · ` : ""}${textoRitmo(r)} dias · ${r.status === "perto" ? "hora de lembrar" : "passou do ritmo"}`,
         valor: r.ticket, card: ultimoCard, cliente: r.nome,
+        envio: { cliente: r.nome, modelo: "reposicao" },
         whatsapp: `/api/cliente/whatsapp?modelo=reposicao&nome=${encodeURIComponent(r.nome)}${tel ? `&tel=${encodeURIComponent(tel)}` : ""}`,
       }
     }),
@@ -222,6 +227,7 @@ export function pendencias(args: {
       titulo: `${card.numero} · ${card.nomeCliente}`,
       sub: `orçamento ${dias === 0 ? "vence hoje" : dias === 1 ? "vence amanhã" : `vence em ${dias} dias`} sem resposta`,
       valor: card.preco, card,
+      envio: { cliente: card.nomeCliente, texto: `Olá! Tudo bem? Passando para saber se conseguiu avaliar o orçamento ${card.numero}. Ele vale até ${dias === 0 ? "hoje" : dias === 1 ? "amanhã" : `daqui a ${dias} dias`}. Posso ajudar em algo?` },
       whatsapp: linkWhatsApp(telefoneDe(card.nomeCliente), `Olá! Tudo bem? Passando para saber se conseguiu avaliar o orçamento ${card.numero}. Ele vale até ${dias === 0 ? "hoje" : dias === 1 ? "amanhã" : `daqui a ${dias} dias`}. Posso ajudar em algo?`),
     })),
     ...prod.semPrazo.map(p => ({

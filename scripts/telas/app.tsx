@@ -21,6 +21,7 @@ import { dados, config } from "./dados"
 import { origemDoCliente } from "@/app/lib/coleta"
 import { PrecoQueFecha } from "@/app/components/PrecoQueFecha"
 import { ModalLancamento } from "@/app/components/FinanceiroView"
+import { EnviarWhatsapp } from "@/app/components/EnviarWhatsapp"
 import { PainelToken } from "@/app/components/MetaAdsView"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas } from "@/app/components/WhatsAppView"
 
@@ -93,6 +94,7 @@ function Telas() {
         cardsDe={c => dados.kanban.filter(k => k.nomeCliente === c.nome)} /></div>
     }
     case "whatsview": return <div style={{ height: "100vh" }}><WhatsAppView onCriarCard={() => {}} kanban={dados.kanban} lancamentos={lancs} /></div>
+    case "enviar": return <div style={{ height: "100vh" }}><EnviarWhatsapp envio={{ cliente: "Raniere Péricles", texto: "Olá! Tudo bem? Passando para saber se conseguiu ver a proposta ORC-2026-233. Ficou alguma dúvida sobre quantidade ou acabamento? Posso te ajudar a escolher." }} linkWhatsapp="https://wa.me/" onFechar={() => {}} /></div>
     case "calibragem": return pagina(<CalibragemView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onAtualizarConfig={setCfg} onDividir={() => {}} />)
     case "rotas": {
       const r = calcular(form, cfg)

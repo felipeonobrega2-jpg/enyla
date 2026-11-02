@@ -15,6 +15,7 @@ import {
   Periodo, Pedido, montarPedidos, vendasDoPeriodo, caixaDoPeriodo, recebiveis, producao, pipelineComercial,
   margemContribuicao, conversao, orcamentosDoPeriodo, parseData, nomeChave, isTerceirizado, isAberto,
 } from "../lib/negocio"
+import { EnviarWhatsapp, Envio } from "../components/EnviarWhatsapp"
 import { pendencias, Pendencia, TipoPendencia, cardDoPedido, prazoTexto, linkWhatsApp } from "../lib/pendencias"
 import { normalizarProducao, nomeServicos } from "../lib/producao"
 import { normalizarMetas } from "../lib/metas"
@@ -111,11 +112,12 @@ function Linha({ titulo, sub, valor, valorSub, tom, icone, onClick, acao }: {
   )
 }
 
-function BotaoWhats({ href }: { href?: string }) {
+function BotaoWhats({ href, onClick }: { href?: string; onClick?: () => void }) {
+  const cls = "w-9 h-9 rounded-xl grid place-items-center text-[#25a35a] bg-[#25a35a]/10 active:scale-95 transition-transform shrink-0"
+  if (onClick) return <button onClick={e => { e.stopPropagation(); onClick() }} aria-label="Mandar WhatsApp" className={cls}><MessageCircle className="w-4 h-4" /></button>
   if (!href) return null
   return (
-    <a href={href} target="_blank" rel="noreferrer" aria-label="Mandar WhatsApp"
-      className="w-9 h-9 rounded-xl grid place-items-center text-[#25a35a] bg-[#25a35a]/10 active:scale-95 transition-transform shrink-0">
+    <a href={href} target="_blank" rel="noreferrer" aria-label="Mandar WhatsApp" className={cls}>
       <MessageCircle className="w-4 h-4" />
     </a>
   )
@@ -274,6 +276,7 @@ function Inicio({ saudacao, hoje, periodo, nomePeriodo, pedidos, lancamentos, co
   onAbrir: (c?: KanbanCard) => void; onAba: (a: Aba) => void
 }) {
   const [verTodas, setVerTodas] = useState(false)
+  const [enviando, setEnviando] = useState<{ envio: Envio; link?: string } | null>(null)
   const vendas = vendasDoPeriodo(pedidos, lancamentos, periodo)
   const caixa = caixaDoPeriodo(lancamentos, periodo, hoje)
   const margem = margemContribuicao(vendas.pedidos)
@@ -335,7 +338,7 @@ function Inicio({ saudacao, hoje, periodo, nomePeriodo, pedidos, lancamentos, co
         {lista.map(p => (
           <Linha key={p.id} titulo={p.titulo} sub={p.sub} valor={p.valor != null ? curto(p.valor) : undefined} tom={p.tom} icone={ICONE[p.tipo]}
             onClick={p.card ? () => onAbrir(p.card) : p.tipo === "conferir" ? () => onAba("cobrancas") : undefined}
-            acao={<BotaoWhats href={p.whatsapp} />} />
+            acao={p.envio ? <BotaoWhats onClick={() => setEnviando({ envio: p.envio!, link: p.whatsapp })} /> : <BotaoWhats href={p.whatsapp} />} />
         ))}
         {pend.length > 6 && (
           <button onClick={() => setVerTodas(v => !v)} className="w-full py-3 text-[12.5px] font-medium text-[#8456e8]">
@@ -355,6 +358,7 @@ function Inicio({ saudacao, hoje, periodo, nomePeriodo, pedidos, lancamentos, co
         <div className="mt-2.5"><Barra pct={acumulado / proximo.valor * 100} cor={COR.alerta} /></div>
       </Cartao>
     )}
+    {enviando && <EnviarWhatsapp envio={enviando.envio} linkWhatsapp={enviando.link} onFechar={() => setEnviando(null)} />}
   </>
 }
 
