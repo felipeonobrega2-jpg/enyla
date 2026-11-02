@@ -2,7 +2,7 @@
 // Grava em lote: o histórico chega com milhares de mensagens de uma vez e, uma a uma, estourava o tempo da Vercel.
 
 import { supabase } from "./supabase"
-import { lerApelidos, juntarConversas } from "./juntarConversas"
+import { lerApelidos, juntarConversas, juntarGemeas } from "./juntarConversas"
 
 // ── Tipos Evolution API ────────────────────────────────────────────────────
 
@@ -145,5 +145,8 @@ export async function gravarLote(msgs: WaMessage[], opts: { contarNaoLidas?: boo
     for (const m of validas) if (!m.key.fromMe) await supabase.rpc("incrementar_nao_lidas", { p_jid: m.key.remoteJid })
   // Par aprendido agora: a conversa antiga do @lid (se houver) se junta à do número
   for (const n of novos) await juntarConversas(n.sai, n.fica).catch(() => null)
+  // Conversa nova com o mesmo nome de outra (uma pelo número, outra pelo @lid): mesma pessoa, junta sozinho
+  const criadas = jids.filter(j => !existentes.has(j) && !novos.some(n => n.fica === j))
+  if (criadas.length) await juntarGemeas(criadas).catch(() => null)
   return validas.length
 }

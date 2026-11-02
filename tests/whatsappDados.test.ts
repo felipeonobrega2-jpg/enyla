@@ -16,6 +16,7 @@ const juntadas: [string, string][] = []
 vi.mock("@/app/lib/juntarConversas", () => ({
   lerApelidos: async () => ({ "velho@lid": "5511999990000@s.whatsapp.net" }),
   juntarConversas: async (sai: string, fica: string) => { juntadas.push([sai, fica]); return { ok: true, fica } },
+  juntarGemeas: async () => 0,
 }))
 import { gravarLote, parDaMensagem } from "@/app/lib/whatsappDados"
 

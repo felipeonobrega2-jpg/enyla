@@ -56,3 +56,31 @@ export async function juntarConversas(sai: string, fica: string) {
   await supabase.from("AppConfig").update({ data: { ...cfg, apelidosWhatsapp: apelidos, vinculosWhatsapp: vinculos } }).eq("id", 1)
   return { ok: true as const, fica }
 }
+
+// Gêmeas pelo nome: conversa pelo número e conversa pelo @lid com o mesmo nome de contato, uma de cada.
+// O WhatsApp nem sempre manda os dois identificadores juntos; o nome do contato é o que liga as duas.
+// Nome só de número, ou mais de uma conversa do mesmo lado com o mesmo nome: não junta (não dá para saber quem é quem).
+export function paresPeloNome(conversas: { jid: string; nome: string | null }[]): { sai: string; fica: string }[] {
+  const chave = (n: string) => n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim()
+  const grupos = new Map<string, { lid: string[]; pn: string[] }>()
+  for (const c of conversas) {
+    if (!c.nome || /^[\d\s+()-]+$/.test(c.nome) || chave(c.nome).length < 3) continue
+    const lado = c.jid.endsWith("@lid") ? "lid" : c.jid.endsWith("@s.whatsapp.net") ? "pn" : null
+    if (!lado) continue
+    const g = grupos.get(chave(c.nome)) ?? { lid: [], pn: [] }
+    g[lado].push(c.jid); grupos.set(chave(c.nome), g)
+  }
+  return [...grupos.values()].filter(g => g.lid.length === 1 && g.pn.length === 1).map(g => ({ sai: g.lid[0], fica: g.pn[0] }))
+}
+
+// Procura e junta todas as gêmeas (verificação diária e depois de mensagens novas)
+export async function juntarGemeas(jidsNovos?: string[]) {
+  const todas: { jid: string; nome: string | null }[] = []
+  for (let p = 0; ; p++) {
+    const { data } = await supabase.from("whatsapp_conversas").select("jid, nome").range(p * 1000, p * 1000 + 999)
+    todas.push(...(data ?? [])); if ((data ?? []).length < 1000) break
+  }
+  const pares = paresPeloNome(todas).filter(p => !jidsNovos || jidsNovos.includes(p.sai) || jidsNovos.includes(p.fica))
+  for (const p of pares) await juntarConversas(p.sai, p.fica)
+  return pares.length
+}

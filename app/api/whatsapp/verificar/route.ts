@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { diagnosticar } from "@/app/lib/evolution"
 import { registrarConexao } from "@/app/lib/whatsappEventos"
 import { classificarOrigens } from "@/app/lib/origensWhatsappServidor"
+import { juntarGemeas } from "@/app/lib/juntarConversas"
 
 // Agendado na Vercel (vercel.json), todo dia: confere a conexão do número, mesmo que o aviso da hora não tenha chegado.
 // Rota fora do login (proxy.ts): com CRON_SECRET exige a senha; sem ele, só o agendador da Vercel.
@@ -17,5 +18,7 @@ export async function GET(req: NextRequest) {
   await registrarConexao(!d.alcancavel ? "servidor fora do ar" : !d.autorizado ? "chave recusada" : d.estado ?? "desconhecido")
   // Conversas novas do dia: anúncio/campanha e site
   const origens = await classificarOrigens().catch(() => null)
-  return NextResponse.json({ ok: true, conectado: d.conectado, origens })
+  // Mesma pessoa em duas conversas (número e @lid com o mesmo nome): junta
+  const juntadas = await juntarGemeas().catch(() => null)
+  return NextResponse.json({ ok: true, conectado: d.conectado, origens, juntadas })
 }
