@@ -113,7 +113,13 @@ export default function WhatsAppView({
     if (res?.ok) {
       const d: unknown = await res.json()
       const novas = Array.isArray(d) ? d as Mensagem[] : []
-      setMensagens(prev => prev.length === novas.length && prev[prev.length - 1]?.id === novas[novas.length - 1]?.id ? prev : novas)
+      setMensagens(prev => {
+        if (primeira || !prev.length) return novas
+        if (prev[prev.length - 1]?.id === novas[novas.length - 1]?.id) return prev
+        // Mantém as anteriores já carregadas e acrescenta as novas
+        const ids = new Set(prev.map(m => m.id))
+        return [...prev, ...novas.filter(m => !ids.has(m.id))]
+      })
     }
     if (primeira) setLoadingMsgs(false)
   }, [])
@@ -293,6 +299,14 @@ export default function WhatsAppView({
             <div ref={threadRef} onScroll={e => { const el = e.currentTarget; rolouParaCima.current = el.scrollHeight - el.scrollTop - el.clientHeight > 200 }}
               className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2" style={{ background: "#efeae2" }}>
               {loadingMsgs && <div className="flex justify-center py-8"><TypingBubble /></div>}
+              {!loadingMsgs && mensagens.length >= 300 && <CarregarAnteriores key={ativa.jid} jid={ativa.jid} primeira={mensagens[0]?.ts}
+                onCarregar={antigas => {
+                  const el = threadRef.current, alturaAntes = el?.scrollHeight ?? 0
+                  rolouParaCima.current = true
+                  setMensagens(prev => { const ids = new Set(prev.map(m => m.id)); return [...antigas.filter(m => !ids.has(m.id)), ...prev] })
+                  // Mantém a posição de leitura depois de acrescentar mensagens em cima
+                  requestAnimationFrame(() => { if (el) el.scrollTop = el.scrollHeight - alturaAntes })
+                }} />}
               {!loadingMsgs && <TranscreverConversa jid={ativa.jid} pendentes={mensagens.filter(m => (m.tipo === "audio" || m.tipo === "audioMessage") && !m.corpo).length}
                 onFim={() => carregarMensagens(ativa.jid)} />}
 
@@ -637,6 +651,28 @@ function TranscreverConversa({ jid, pendentes, onFim }: { jid: string; pendentes
         {erro ? <span className="text-[#d33a3c]">{erro}</span> : <span>{pendentes} {pendentes === 1 ? "áudio sem transcrição" : "áudios sem transcrição"}</span>}
         <button onClick={rodar} disabled={rodando} className="font-semibold text-[#1e8a4c] disabled:opacity-60">{rodando ? "Transcrevendo…" : "Transcrever"}</button>
       </div>
+    </div>
+  )
+}
+
+// "Carregar mensagens anteriores": busca as 300 anteriores à mais antiga já na tela
+function CarregarAnteriores({ jid, primeira, onCarregar }: { jid: string; primeira?: string; onCarregar: (m: Mensagem[]) => void }) {
+  const [carregando, setCarregando] = useState(false)
+  const [acabou, setAcabou] = useState(false)
+  if (acabou || !primeira) return null
+  async function carregar() {
+    setCarregando(true)
+    const r = await fetch(`/api/whatsapp/mensagens/${encodeURIComponent(jid)}?antes=${encodeURIComponent(primeira!)}`).then(r => r.json()).catch(() => null)
+    const lista = Array.isArray(r) ? r as Mensagem[] : []
+    if (lista.length < 300) setAcabou(true)
+    if (lista.length) onCarregar(lista)
+    setCarregando(false)
+  }
+  return (
+    <div className="flex justify-center mb-2">
+      <button onClick={carregar} disabled={carregando} className="text-[12px] font-semibold px-3 py-1.5 rounded-full shadow-sm disabled:opacity-60" style={{ background: "#ffffff", color: "#54656f" }}>
+        {carregando ? "Carregando…" : "Carregar mensagens anteriores"}
+      </button>
     </div>
   )
 }

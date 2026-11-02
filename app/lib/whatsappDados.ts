@@ -87,9 +87,9 @@ export async function gravarLote(msgs: WaMessage[], opts: { contarNaoLidas?: boo
     else if (nome && !atual.nome) atual.nome = nome
   }
   const jids = [...porJid.keys()]
-  const existentes = new Map<string, { ultima_at: string | null; nome: string | null; telefone: string | null }>()
+  const existentes = new Map<string, { ultima_at: string | null; ultima_msg: string | null; nome: string | null; telefone: string | null }>()
   for (let i = 0; i < jids.length; i += 300) {
-    const { data } = await supabase.from("whatsapp_conversas").select("jid, ultima_at, nome, telefone").in("jid", jids.slice(i, i + 300))
+    const { data } = await supabase.from("whatsapp_conversas").select("jid, ultima_at, ultima_msg, nome, telefone").in("jid", jids.slice(i, i + 300))
     for (const c of data ?? []) existentes.set(c.jid, c)
   }
   const numero = (s?: string | null) => !!s && /^\d+$/.test(s)
@@ -102,13 +102,13 @@ export async function gravarLote(msgs: WaMessage[], opts: { contarNaoLidas?: boo
       // Nome: o que já existe, a menos que seja só o número; senão o do contato/mensagem; senão o número
       nome: e?.nome && !numero(e.nome) ? e.nome : nome ?? e?.nome ?? jid.split("@")[0],
       telefone: e?.telefone ?? n.telefone ?? null,
-      ultima_msg: avanca ? n.corpo : undefined,
-      ultima_at: avanca ? n.ts : e?.ultima_at,
+      // Toda linha do lote leva todos os campos: campo ausente num upsert em lote vira vazio no banco
+      ultima_msg: avanca ? n.corpo : e?.ultima_msg ?? n.corpo,
+      ultima_at: avanca ? n.ts : e?.ultima_at ?? n.ts,
     }
-  }).map(c => Object.fromEntries(Object.entries(c).filter(([, v]) => v !== undefined)))
+  })
   for (let i = 0; i < conversas.length; i += 500)
-    // defaultToNull: false — campo ausente numa linha do lote fica como está (sem isso o banco gravava vazio)
-    await supabase.from("whatsapp_conversas").upsert(conversas.slice(i, i + 500), { onConflict: "jid", ignoreDuplicates: false, defaultToNull: false })
+    await supabase.from("whatsapp_conversas").upsert(conversas.slice(i, i + 500), { onConflict: "jid", ignoreDuplicates: false })
 
   const linhas = validas.map(m => {
     const { corpo, tipo, media_url } = extractBody(m)
