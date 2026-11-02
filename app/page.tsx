@@ -2446,10 +2446,11 @@ export default function Home() {
               onCriarEtiqueta={e => salvarConfigTudo({ ...config, etiquetasWhatsapp: [...(config.etiquetasWhatsapp ?? []).filter(x => x.nome !== e.nome), e] })}
               onVincular={(jid, nome) => salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [jid]: nome ?? "" } })}
               onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }}
-              onCriarCard={(nome, _jid) => {
-                navigate("pedidos")
-                // Salva nome do lead WA para pré-preencher o próximo card
-                sessionStorage.setItem("wa:lead_nome", nome)
+              onCriarCard={(nome, jid) => {
+                // Orçamento novo já com o cliente; a conversa fica ligada a ele (o funil acompanha o orçamento)
+                setForm({ ...FORM_INICIAL, nomeCliente: nome }); setResult(null); setDxfNome(null)
+                if (config.vinculosWhatsapp?.[jid] !== nome) salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [jid]: nome } })
+                navigate("orcamento")
               }}
             />
           ) : view === "conquistas" ? (

@@ -359,14 +359,14 @@ export default function WhatsAppView({
                 <Archive className="w-4 h-4" />{estaFechada(ativa) ? "Reabrir" : "Fechar"}
               </button>
               <button
-                onClick={() => onCriarCard(ativa.nome, ativa.jid)}
+                onClick={() => onCriarCard(clienteDe(ativa)?.nome ?? ativa.nome, ativa.jid)}
                 className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-xl transition-colors hover:opacity-90"
                 style={{ background: "#8456e8", color: "#fff" }}
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
-                Criar card no Kanban
+                Fazer orçamento
               </button>
             </div>
 
