@@ -52,13 +52,14 @@ function fmtHora(iso: string | null) {
 }
 
 // Foto de perfil buscada pelo sistema (cópia guardada); sem foto, as iniciais
-function Avatar({ nome, jid }: { nome: string; jid: string }) {
+function Avatar({ nome, jid, pequeno }: { nome: string; jid: string; pequeno?: boolean }) {
+  const tam = pequeno ? "w-7 h-7 text-[10.5px]" : "w-10 h-10 text-[13px]"
   const [semFoto, setSemFoto] = useState(false)
   const initials = nome.split(" ").slice(0, 2).map(w => w[0] ?? "").join("").toUpperCase() || "?"
   // eslint-disable-next-line @next/next/no-img-element
-  if (!semFoto) return <img src={`/api/whatsapp/foto/${encodeURIComponent(jid)}`} alt="" loading="lazy" onError={() => setSemFoto(true)} className="w-10 h-10 rounded-full object-cover shrink-0 bg-[#8456e8]/15" />
+  if (!semFoto) return <img src={`/api/whatsapp/foto/${encodeURIComponent(jid)}`} alt="" loading="lazy" onError={() => setSemFoto(true)} className={`${tam} rounded-full object-cover shrink-0 bg-[#8456e8]/15`} />
   return (
-    <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-[13px] font-bold text-white"
+    <div className={`${tam} rounded-full shrink-0 flex items-center justify-center font-bold text-white`}
       style={{ background: "#8456e8" }}>
       {initials}
     </div>
@@ -921,6 +922,7 @@ export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover
                         className="rounded-xl p-3 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow"
                         style={{ background: "var(--bg-surface)", opacity: arrastando === c.jid ? 0.5 : 1 }}>
                         <div className="flex items-center gap-1.5 min-w-0">
+                          <Avatar nome={cli?.nome ?? c.nome} jid={c.jid} pequeno />
                           <span className="text-[12.5px] font-semibold truncate" style={{ color: "var(--text-main)" }}>{cli?.nome ?? c.nome}</span>
                           <SeloOrigem campanha={c.campanha} />
                           {p.manual && <span title="Etapa escolhida à mão"><Pin className="w-3 h-3 shrink-0" style={{ color: "var(--text-faint)" }} /></span>}
