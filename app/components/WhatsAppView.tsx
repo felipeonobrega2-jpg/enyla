@@ -204,8 +204,7 @@ export default function WhatsAppView({
 
   async function abrirConversa(c: Conversa) {
     rolouParaCima.current = false
-    limparTimers()
-    setEspiada(null)
+    fecharEspiada()
     const guardadas = cache.current.get(c.jid) ?? []
     setBase(new Set(guardadas.map(m => m.id)))
     setAtiva(c)
@@ -254,22 +253,10 @@ export default function WhatsAppView({
   }
 
   // Espiada: parar o mouse numa linha mostra as últimas mensagens e deixa responder dali
-  const [espiada, setEspiada] = useState<{ conversa: Conversa; topo: number; esquerda: number; fixa: boolean } | null>(null)
-  const timerEspiar = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const timerFechar = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const limparTimers = () => { if (timerEspiar.current) clearTimeout(timerEspiar.current); if (timerFechar.current) clearTimeout(timerFechar.current) }
-  function espiar(c: Conversa, el: HTMLElement, fixa = false) {
-    limparTimers()
-    if (c.jid === ativa?.jid && !fixa) return
-    const abrir = () => setEspiada(e => e?.fixa && !fixa ? e : { conversa: c, topo: el.getBoundingClientRect().top, esquerda: (listaRef.current?.getBoundingClientRect().right ?? 320) + 8, fixa })
-    if (fixa) { abrir(); if (c.nao_lidas) marcarLida(c) } else timerEspiar.current = setTimeout(abrir, 450)
-  }
-  function soltarEspiada() {
-    limparTimers()
-    timerFechar.current = setTimeout(() => setEspiada(e => e?.fixa ? e : null), 220)
-  }
-  const fecharEspiada = useCallback(() => { limparTimers(); setEspiada(null) }, [])
-  useEffect(() => () => limparTimers(), [])
+  const esp = useEspiada(c => { if (c.nao_lidas) marcarLida(c) })
+  const { espiada, fechar: fecharEspiada, limpar: limparTimers } = esp
+  const espiar = (c: Conversa, el: HTMLElement, fixa = false) => { if (c.jid === ativa?.jid && !fixa) { limparTimers(); return } esp.espiar(c, el, fixa) }
+  const soltarEspiada = esp.soltar
 
   useReordenacaoSuave(listaRef, filtradas.map(c => c.jid).join("|"))
 
@@ -320,6 +307,7 @@ export default function WhatsAppView({
       etiquetasDef={etiquetasDef} onFechar={jids => alterar(jids, { fechar: true })} cardsDe={c => { const cl = clienteDe(c); return cl ? kanban.filter(k => nomeChave(k.nomeCliente) === nomeChave(cl.nome)) : [] }}
       clienteDe={clienteDe}
       onAbrir={c => { setModo("lista"); abrirConversa(c) }}
+      brilho={brilho} onEnviada={marcarEnviada} onLida={marcarLida}
       onMover={async (jid, etapa) => {
         setConversas(prev => prev.map(c => c.jid === jid ? { ...c, status_lead: etapa, ultima_classificacao_at: etapa ? new Date().toISOString() : null } : c))
         await fetch("/api/whatsapp/conversas", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid, etapa }) }).catch(() => {})
@@ -453,7 +441,7 @@ export default function WhatsAppView({
       {espiada && (
         <Espiada key={espiada.conversa.jid} conversa={espiada.conversa} topo={espiada.topo} fixa={espiada.fixa}
           esquerda={espiada.esquerda}
-          onFixar={() => { limparTimers(); setEspiada(e => e && !e.fixa ? { ...e, fixa: true } : e) }}
+          onFixar={esp.fixar}
           onFechar={fecharEspiada}
           onAbrir={() => abrirConversa(espiada.conversa)}
           onEnviada={t => marcarEnviada(espiada.conversa.jid, t)}
@@ -989,7 +977,10 @@ export function OrigemDaConversa({ campanha }: { campanha?: string | null }) {
 // Funil de conversas (antes da venda): leads por etapa, arrastáveis; "responder" = cliente falou por último
 const PERIODOS = [{ dias: 30, nome: "30 dias" }, { dias: 60, nome: "60 dias" }, { dias: 90, nome: "90 dias" }, { dias: 0, nome: "Tudo" }] as const
 
-export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover, onFechar, etiquetasDef = [], hoje = new Date() }: {
+export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover, onFechar, etiquetasDef = [], hoje = new Date(), brilho, onEnviada, onLida }: {
+  brilho?: Set<string>
+  onEnviada?: (jid: string, texto: string) => void
+  onLida?: (c: Conversa) => void
   onFechar?: (jids: string[]) => void
   etiquetasDef?: EtiquetaDef[]
   conversas: Conversa[]
@@ -1013,6 +1004,9 @@ export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover
   const porEtapa = (e: Etapa) => itens.filter(i => i.p.etapa === e)
     .sort((a, b) => Number(b.p.responder) - Number(a.p.responder) || (b.c.ultima_at ?? "").localeCompare(a.c.ultima_at ?? ""))
   const brl0 = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
+  const quadroRef = useRef<HTMLDivElement>(null)
+  const esp = useEspiada(c => { if (c.nao_lidas) onLida?.(c) })
+  useReordenacaoSuave(quadroRef, ETAPAS.map(e => porEtapa(e.id).map(i => i.c.jid).join(",")).join("|"))
   return (
     <div className="h-full flex flex-col" style={{ background: "var(--bg-page)" }}>
       <div className="px-5 py-3 border-b flex items-center gap-3 flex-wrap" style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
@@ -1039,8 +1033,8 @@ export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover
           ))}
         </div>
       </div>
-      <div className="flex-1 overflow-x-auto overflow-y-hidden">
-        <div className="flex gap-3 p-4 h-full min-w-full w-max">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden" onScroll={() => { if (!esp.espiada?.fixa) esp.fechar() }}>
+        <div ref={quadroRef} className="flex gap-3 p-4 h-full min-w-full w-max">
           {ETAPAS.map(e => {
             const lista = porEtapa(e.id)
             const valor = lista.reduce((t, i) => t + (i.p.valor ?? 0), 0)
@@ -1059,14 +1053,23 @@ export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover
                     <button onClick={() => onFechar(lista.map(i => i.c.jid))} className="text-[11px] font-semibold mt-1" style={{ color: "#8456e8" }}>Fechar todas ({lista.length})</button>
                   )}
                 </div>
-                <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2">
+                <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2" onScroll={() => { if (!esp.espiada?.fixa) esp.fechar() }}>
                   {lista.map(({ c, p }) => {
                     const cli = clienteDe(c)
                     return (
-                      <div key={c.jid} draggable onDragStart={() => setArrastando(c.jid)} onDragEnd={() => setArrastando(null)}
-                        onClick={() => onAbrir(c)}
-                        className="rounded-xl p-3 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow"
-                        style={{ background: "var(--bg-surface)", opacity: arrastando === c.jid ? 0.5 : 1 }}>
+                      <div key={c.jid} data-linha={c.jid} draggable
+                        onDragStart={() => { esp.fechar(); setArrastando(c.jid) }} onDragEnd={() => setArrastando(null)}
+                        onClick={() => { esp.fechar(); onAbrir(c) }}
+                        onMouseEnter={ev => { if (!arrastando) esp.espiar(c, ev.currentTarget) }} onMouseLeave={esp.soltar}
+                        className={`group relative rounded-xl p-3 cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.05)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.09)] hover:-translate-y-px transition-[box-shadow,transform,opacity] duration-200 ${brilho?.has(c.jid) ? "wa-brilho" : ""}`}
+                        style={{ background: "var(--bg-surface)", opacity: arrastando === c.jid ? 0.45 : 1, outline: esp.espiada?.conversa.jid === c.jid ? "2px solid rgba(132,86,232,0.35)" : undefined }}>
+                        {/* Ações no hover: responder aqui, fechar */}
+                        <span className="hidden group-hover:flex wa-acoes absolute top-2 right-2 items-center gap-0.5 rounded-lg shadow-sm" style={{ background: "var(--bg-surface)" }} onClick={ev => ev.stopPropagation()}>
+                          <button title="Responder sem abrir" onClick={ev => esp.espiar(c, ev.currentTarget.closest("[data-linha]") as HTMLElement, true)}
+                            className="w-7 h-7 rounded-lg grid place-items-center hover:bg-[#25a35a]/15 text-[#1d8a4b]"><Reply className="w-4 h-4" /></button>
+                          {onFechar && <button title="Fechar conversa" onClick={() => { esp.fechar(); onFechar([c.jid]) }}
+                            className="w-7 h-7 rounded-lg grid place-items-center hover:bg-black/5" style={{ color: "var(--text-sub)" }}><Archive className="w-4 h-4" /></button>}
+                        </span>
                         <div className="flex items-center gap-1.5 min-w-0">
                           <Avatar nome={cli?.nome ?? c.nome} jid={c.jid} pequeno />
                           <span className="text-[12.5px] font-semibold truncate" style={{ color: "var(--text-main)" }}>{cli?.nome ?? c.nome}</span>
@@ -1096,6 +1099,13 @@ export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover
           })}
         </div>
       </div>
+      {esp.espiada && (
+        <Espiada key={esp.espiada.conversa.jid} conversa={esp.espiada.conversa} topo={esp.espiada.topo} esquerda={esp.espiada.esquerda} fixa={esp.espiada.fixa}
+          onFixar={esp.fixar} onFechar={esp.fechar}
+          onAbrir={() => { const c = esp.espiada!.conversa; esp.fechar(); onAbrir(c) }}
+          onEnviada={t => onEnviada?.(esp.espiada!.conversa.jid, t)}
+          onMouseEnter={esp.limpar} onMouseLeave={esp.soltar} />
+      )}
     </div>
   )
 }
@@ -1154,25 +1164,52 @@ function EtiquetasDaConversa({ selecionadas, definicoes, onMudar, onCriar }: {
   )
 }
 
-// Reordenação suave da lista: cada linha desliza da posição antiga para a nova (conversa que recebeu mensagem sobe)
+// Reordenação suave: cada item [data-linha] desliza da posição antiga para a nova (conversa que recebeu mensagem sobe,
+// card que mudou de etapa atravessa o funil). Posição pela cadeia de offsets, que não muda com a rolagem.
 function useReordenacaoSuave(ref: React.RefObject<HTMLDivElement | null>, chave: string) {
-  const posicoes = useRef(new Map<string, number>())
+  const posicoes = useRef(new Map<string, { x: number; y: number }>())
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
     const calmo = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-    const novas = new Map<string, number>()
-    for (const filho of Array.from(el.children) as HTMLElement[]) {
-      const k = filho.dataset.linha
-      if (!k) continue
-      const topo = filho.offsetTop
-      novas.set(k, topo)
+    const posDe = (n: HTMLElement | null) => { let x = 0, y = 0; while (n) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent as HTMLElement | null } return { x, y } }
+    const novas = new Map<string, { x: number; y: number }>()
+    for (const item of Array.from(el.querySelectorAll<HTMLElement>("[data-linha]"))) {
+      const k = item.dataset.linha!
+      const o = posDe(item)
+      novas.set(k, { x: o.x, y: o.y })
       const antes = posicoes.current.get(k)
-      if (!calmo && antes !== undefined && antes !== topo && Math.abs(antes - topo) < 1500 && filho.animate)
-        filho.animate([{ transform: `translateY(${antes - topo}px)` }, { transform: "none" }], { duration: 340, easing: "cubic-bezier(.3,.9,.3,1)" })
+      if (!antes || calmo || !item.animate) continue
+      const dx = antes.x - o.x, dy = antes.y - o.y
+      if ((dx || dy) && Math.abs(dx) < 2500 && Math.abs(dy) < 1500)
+        item.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], { duration: 360, easing: "cubic-bezier(.3,.9,.3,1)" })
     }
     posicoes.current = novas
   }, [ref, chave])
+}
+
+// Espiada compartilhada pela lista e pelo funil: abre parando o mouse (450 ms) ou fixa pelo botão Responder
+type EstadoEspiada = { conversa: Conversa; topo: number; esquerda: number; fixa: boolean }
+function useEspiada(aoFixar?: (c: Conversa) => void) {
+  const [espiada, setEspiada] = useState<EstadoEspiada | null>(null)
+  const timerAbrir = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const timerFechar = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const limpar = useCallback(() => { if (timerAbrir.current) clearTimeout(timerAbrir.current); if (timerFechar.current) clearTimeout(timerFechar.current) }, [])
+  // Ao lado do elemento: à direita se couber, senão à esquerda
+  const lugar = (el: HTMLElement) => {
+    const r = el.getBoundingClientRect(), larg = 408
+    return { topo: r.top, esquerda: r.right + larg < window.innerWidth ? r.right + 8 : Math.max(8, r.left - larg) }
+  }
+  function espiar(c: Conversa, el: HTMLElement, fixa = false) {
+    limpar()
+    const abrir = () => setEspiada(e => e?.fixa && !fixa ? e : { conversa: c, ...lugar(el), fixa })
+    if (fixa) { abrir(); aoFixar?.(c) } else timerAbrir.current = setTimeout(abrir, 450)
+  }
+  const soltar = () => { limpar(); timerFechar.current = setTimeout(() => setEspiada(e => e?.fixa ? e : null), 220) }
+  const fechar = useCallback(() => { limpar(); setEspiada(null) }, [limpar])
+  const fixar = () => { limpar(); setEspiada(e => { if (e && !e.fixa) { aoFixar?.(e.conversa); return { ...e, fixa: true } } return e }) }
+  useEffect(() => limpar, [limpar])
+  return { espiada, espiar, soltar, fechar, fixar, limpar }
 }
 
 // Espiada: últimas mensagens + resposta, sem abrir a conversa. Abre parando o mouse na linha (ou no botão Responder).

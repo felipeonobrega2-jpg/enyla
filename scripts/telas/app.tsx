@@ -93,7 +93,7 @@ function Telas() {
         <OrigemDaConversa campanha={JSON.stringify({ canal: "anuncio", campanhaNome: "(JEROGRAF) - TESTAR NOVAMENTE Campanha", provavel: true })} />
       </div>)
     }
-    case "funil": {
+    case "funil": case "funil-espiar": {
       const hj = new Date("2026-11-02T12:00:00Z"), h = (d: number) => new Date(hj.getTime() - d * 86_400_000).toISOString()
       const anuncio = JSON.stringify({ canal: "anuncio", campanhaNome: "TESTAR NOVAMENTE" }), site = JSON.stringify({ canal: "site" })
       const cv = (jid: string, nome: string, msg: string, rec: number, env: number | null, campanha?: string, extra = {}) =>
