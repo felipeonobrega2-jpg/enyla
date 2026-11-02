@@ -2442,6 +2442,8 @@ export default function Home() {
           ) : view === "whatsapp" ? (
             <WhatsAppView
               kanban={kanban} lancamentos={lancamentos} vinculos={config.vinculosWhatsapp}
+              etiquetasDef={config.etiquetasWhatsapp ?? []}
+              onCriarEtiqueta={e => salvarConfigTudo({ ...config, etiquetasWhatsapp: [...(config.etiquetasWhatsapp ?? []).filter(x => x.nome !== e.nome), e] })}
               onVincular={(jid, nome) => salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [jid]: nome ?? "" } })}
               onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }}
               onCriarCard={(nome, _jid) => {

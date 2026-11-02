@@ -1,12 +1,12 @@
 "use client"
 
-import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle } from "lucide-react"
+import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag } from "lucide-react"
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, nomeChave } from "../lib/negocio"
 import { clienteDaConversa, Vinculos } from "../lib/vinculoWhatsapp"
 import { lerOrigem } from "../lib/origemWhatsapp"
-import { ETAPAS, Etapa, posicaoNoFunil } from "../lib/funilWhatsapp"
+import { ETAPAS, Etapa, posicaoNoFunil, estaFechada } from "../lib/funilWhatsapp"
 import { Segmentado } from "./ds"
 import { filtrar, preencher, Rapida } from "../lib/mensagensRapidas"
 import { COL_HOT } from "../types"
@@ -24,6 +24,8 @@ type Conversa = {
   ultima_enviada_at?: string | null
   status_lead?: string | null
   ultima_classificacao_at?: string | null
+  fechada_em?: string | null
+  etiquetas?: string[] | null
 }
 
 type Mensagem = {
@@ -76,8 +78,10 @@ function TypingBubble() {
 }
 
 export default function WhatsAppView({
-  onCriarCard, kanban = [], lancamentos = [], vinculos, onVincular, onAbrirCliente,
+  onCriarCard, kanban = [], lancamentos = [], vinculos, onVincular, onAbrirCliente, etiquetasDef = [], onCriarEtiqueta,
 }: {
+  etiquetasDef?: EtiquetaDef[]
+  onCriarEtiqueta?: (e: EtiquetaDef) => void
   onCriarCard: (nome: string, jid: string) => void
   kanban?: KanbanCard[]
   lancamentos?: LancamentoFinanceiro[]
@@ -96,6 +100,7 @@ export default function WhatsAppView({
     return m
   }, [kanban, lancamentos])
   const clienteDe = (c: { jid: string; nome: string | null }) => clienteDaConversa(c, nomesClientes, vinculos)
+  const defDe = (nome: string): EtiquetaDef => etiquetasDef.find(e => e.nome === nome) ?? { nome, cor: "#7a7983" }
   const [conversas, setConversas] = useState<Conversa[]>([])
   const [ativa, setAtiva] = useState<Conversa | null>(null)
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
@@ -104,8 +109,20 @@ export default function WhatsAppView({
   const [status, setStatus] = useState<StatusWhats | null>(null)
   useEffect(() => { fetch("/api/whatsapp/status").then(r => r.json()).then(setStatus).catch(() => {}) }, [])
   const [busca, setBusca] = useState("")
-  const [filtro, setFiltro] = useState<"todas" | "anuncio" | "site" | "clientes">("todas")
+  const [filtro, setFiltro] = useState<"todas" | "anuncio" | "site" | "clientes" | "fechadas">("todas")
   const [modo, setModo] = useState<"lista" | "funil">("lista")
+  const [etiquetaFiltro, setEtiquetaFiltro] = useState<string | null>(null)
+  // Fecha/reabre ou troca etiquetas: atualiza a tela na hora e grava em seguida
+  async function alterar(jids: string[], campos: { fechar?: boolean; etiquetas?: string[] }) {
+    const agora = new Date().toISOString()
+    setConversas(prev => prev.map(c => !jids.includes(c.jid) ? c : {
+      ...c,
+      ...(campos.fechar !== undefined ? { fechada_em: campos.fechar ? agora : null } : {}),
+      ...(campos.etiquetas !== undefined ? { etiquetas: campos.etiquetas } : {}),
+    }))
+    if (campos.fechar && ativa && jids.includes(ativa.jid)) setAtiva(null)
+    await fetch("/api/whatsapp/conversas", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jids, ...campos }) }).catch(() => {})
+  }
   const threadRef = useRef<HTMLDivElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -173,7 +190,9 @@ export default function WhatsAppView({
   }
 
   const filtradas = conversas.filter(c =>
-    (filtro === "todas" || (filtro === "clientes" ? !!clienteDe(c) : lerOrigem(c.campanha)?.canal === filtro)) &&
+    (filtro === "fechadas" ? estaFechada(c) : !estaFechada(c)) &&
+    (!etiquetaFiltro || (c.etiquetas ?? []).includes(etiquetaFiltro)) &&
+    (filtro === "todas" || filtro === "fechadas" || (filtro === "clientes" ? !!clienteDe(c) : lerOrigem(c.campanha)?.canal === filtro)) &&
     (c.nome.toLowerCase().includes(busca.toLowerCase()) || (c.ultima_msg ?? "").toLowerCase().includes(busca.toLowerCase()))
   )
 
@@ -193,7 +212,8 @@ export default function WhatsAppView({
   )
 
   if (modo === "funil") return (
-    <div className="flex flex-col h-full">{topo}<div className="flex-1 min-h-0"><FunilConversas conversas={conversas} cardsDe={c => { const cl = clienteDe(c); return cl ? kanban.filter(k => nomeChave(k.nomeCliente) === nomeChave(cl.nome)) : [] }}
+    <div className="flex flex-col h-full">{topo}<div className="flex-1 min-h-0"><FunilConversas conversas={conversas.filter(c => !estaFechada(c))}
+      etiquetasDef={etiquetasDef} onFechar={jids => alterar(jids, { fechar: true })} cardsDe={c => { const cl = clienteDe(c); return cl ? kanban.filter(k => nomeChave(k.nomeCliente) === nomeChave(cl.nome)) : [] }}
       clienteDe={clienteDe}
       onAbrir={c => { setModo("lista"); abrirConversa(c) }}
       onMover={async (jid, etapa) => {
@@ -220,13 +240,23 @@ export default function WhatsAppView({
             style={{ background: "var(--bg-page)", color: "var(--text-main)", border: "1px solid var(--border)" }}
           />
           <div className="flex gap-1 mt-2 flex-wrap">
-            {([["todas", "Todas"], ["anuncio", "Anúncio"], ["site", "Site"], ["clientes", "Clientes"]] as const).map(([v, n]) => (
+            {([["todas", "Todas"], ["anuncio", "Anúncio"], ["site", "Site"], ["clientes", "Clientes"], ["fechadas", "Fechadas"]] as const).map(([v, n]) => (
               <button key={v} onClick={() => setFiltro(v)} className="h-7 px-2.5 rounded-full text-[11.5px] font-medium transition-colors"
                 style={filtro === v ? { background: "#191625", color: "#fff" } : { background: "var(--bg-page)", color: "var(--text-sub)", border: "1px solid var(--border)" }}>
-                {n}{v !== "todas" ? ` ${conversas.filter(c => v === "clientes" ? !!clienteDe(c) : lerOrigem(c.campanha)?.canal === v).length}` : ""}
+                {n}{v !== "todas" ? ` ${conversas.filter(c => v === "fechadas" ? estaFechada(c) : !estaFechada(c) && (v === "clientes" ? !!clienteDe(c) : lerOrigem(c.campanha)?.canal === v)).length}` : ""}
               </button>
             ))}
           </div>
+          {etiquetasDef.length > 0 && (
+            <div className="flex gap-1 mt-1.5 flex-wrap">
+              {etiquetasDef.map(e => (
+                <button key={e.nome} onClick={() => setEtiquetaFiltro(f => f === e.nome ? null : e.nome)}
+                  className="rounded-full" style={{ outline: etiquetaFiltro === e.nome ? `2px solid ${e.cor}` : undefined, outlineOffset: 1 }}>
+                  <EtiquetaChip def={e} />
+                </button>
+              ))}
+            </div>
+          )}
           {status?.evolution?.conectado && <ImportarHistorico onFim={carregarConversas} />}
         </div>
 
@@ -276,6 +306,7 @@ export default function WhatsAppView({
                     <span className="truncate">{c.nome}</span>
                     {clienteDe(c) && <span className="shrink-0 text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-px rounded" style={{ background: "rgba(132,86,232,0.12)", color: "#8456e8" }}>cliente</span>}
                     <SeloOrigem campanha={c.campanha} />
+                    {(c.etiquetas ?? []).slice(0, 2).map(n => <EtiquetaChip key={n} def={defDe(n)} mini />)}
                   </span>
                   <span className="text-[11px] shrink-0" style={{ color: "var(--text-faint)" }}>{fmtHora(c.ultima_at)}</span>
                 </div>
@@ -319,6 +350,13 @@ export default function WhatsAppView({
                 <ClienteDaConversa cliente={clienteDe(ativa)} resumo={resumo} clientes={nomesClientes}
                   onVincular={onVincular ? nome => onVincular(ativa.jid, nome) : undefined} onAbrir={onAbrirCliente} />
               </div>
+              <EtiquetasDaConversa selecionadas={ativa.etiquetas ?? []} definicoes={etiquetasDef}
+                onMudar={lista => { alterar([ativa.jid], { etiquetas: lista }); setAtiva(a => a ? { ...a, etiquetas: lista } : a) }}
+                onCriar={onCriarEtiqueta} />
+              <button onClick={() => alterar([ativa.jid], { fechar: !estaFechada(ativa) })} title={estaFechada(ativa) ? "Reabrir conversa" : "Fechar conversa (volta sozinha se o cliente escrever)"}
+                className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-2 rounded-xl transition-colors hover:bg-black/5" style={{ color: "var(--text-sub)" }}>
+                <Archive className="w-4 h-4" />{estaFechada(ativa) ? "Reabrir" : "Fechar"}
+              </button>
               <button
                 onClick={() => onCriarCard(ativa.nome, ativa.jid)}
                 className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-xl transition-colors hover:opacity-90"
@@ -804,7 +842,9 @@ export function OrigemDaConversa({ campanha }: { campanha?: string | null }) {
 // Funil de conversas (antes da venda): leads por etapa, arrastáveis; "responder" = cliente falou por último
 const PERIODOS = [{ dias: 30, nome: "30 dias" }, { dias: 60, nome: "60 dias" }, { dias: 90, nome: "90 dias" }, { dias: 0, nome: "Tudo" }] as const
 
-export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover, hoje = new Date() }: {
+export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover, onFechar, etiquetasDef = [], hoje = new Date() }: {
+  onFechar?: (jids: string[]) => void
+  etiquetasDef?: EtiquetaDef[]
   conversas: Conversa[]
   cardsDe: (c: Conversa) => KanbanCard[]
   clienteDe: (c: Conversa) => { nome: string } | null
@@ -814,12 +854,14 @@ export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover
 }) {
   const [periodo, setPeriodo] = useState<number>(30)
   const [origem, setOrigem] = useState<"todas" | "anuncio" | "site">("todas")
+  const [etiqueta, setEtiqueta] = useState<string | null>(null)
   const [arrastando, setArrastando] = useState<string | null>(null)
   const [sobre, setSobre] = useState<Etapa | null>(null)
   const limite = periodo ? hoje.getTime() - periodo * 86_400_000 : 0
   const itens = conversas
     .filter(c => !c.jid.endsWith("@g.us") && c.ultima_recebida_at && new Date(c.ultima_at ?? 0).getTime() >= limite)
     .filter(c => origem === "todas" || lerOrigem(c.campanha)?.canal === origem)
+    .filter(c => !etiqueta || (c.etiquetas ?? []).includes(etiqueta))
     .map(c => ({ c, p: posicaoNoFunil(c, cardsDe(c), hoje) }))
   const porEtapa = (e: Etapa) => itens.filter(i => i.p.etapa === e)
     .sort((a, b) => Number(b.p.responder) - Number(a.p.responder) || (b.c.ultima_at ?? "").localeCompare(a.c.ultima_at ?? ""))
@@ -834,6 +876,13 @@ export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover
               {o === "todas" ? "Todas origens" : o === "anuncio" ? "Anúncio" : "Site"}
             </button>
           ))}
+          {etiquetasDef.length > 0 && <>
+            <span className="w-px mx-1" style={{ background: "var(--border)" }} />
+            {etiquetasDef.map(e => (
+              <button key={e.nome} onClick={() => setEtiqueta(x => x === e.nome ? null : e.nome)} className="rounded-full self-center"
+                style={{ outline: etiqueta === e.nome ? `2px solid ${e.cor}` : undefined, outlineOffset: 1 }}><EtiquetaChip def={e} /></button>
+            ))}
+          </>}
           <span className="w-px mx-1" style={{ background: "var(--border)" }} />
           {PERIODOS.map(p => (
             <button key={p.dias} onClick={() => setPeriodo(p.dias)} className="h-7 px-2.5 rounded-full text-[11.5px] font-medium"
@@ -859,6 +908,9 @@ export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover
                     <span className="text-[11.5px] font-semibold" style={{ color: "var(--text-faint)" }}>{lista.length}</span>
                   </div>
                   {valor > 0 && <p className="text-[11px] ds-num" style={{ color: "var(--text-sub)" }}>{brl0(valor)}</p>}
+                  {e.id === "perdido" && lista.length > 0 && onFechar && (
+                    <button onClick={() => onFechar(lista.map(i => i.c.jid))} className="text-[11px] font-semibold mt-1" style={{ color: "#8456e8" }}>Fechar todas ({lista.length})</button>
+                  )}
                 </div>
                 <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-2">
                   {lista.map(({ c, p }) => {
@@ -873,6 +925,9 @@ export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover
                           <SeloOrigem campanha={c.campanha} />
                           {p.manual && <span title="Etapa escolhida à mão"><Pin className="w-3 h-3 shrink-0" style={{ color: "var(--text-faint)" }} /></span>}
                         </div>
+                        {(c.etiquetas ?? []).length > 0 && (
+                          <div className="flex gap-1 mt-1 flex-wrap">{(c.etiquetas ?? []).map(n => <EtiquetaChip key={n} def={etiquetasDef.find(d => d.nome === n) ?? { nome: n, cor: "#7a7983" }} mini />)}</div>
+                        )}
                         <p className="text-[11.5px] truncate mt-0.5 flex items-center gap-1 min-w-0" style={{ color: "var(--text-sub)" }}><Previa texto={c.ultima_msg} /></p>
                         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                           {p.responder && <span className="text-[10px] font-bold uppercase px-1.5 py-px rounded" style={{ background: "rgba(37,163,90,0.14)", color: "#1e8a4c" }}>responder</span>}
@@ -893,6 +948,60 @@ export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover
           })}
         </div>
       </div>
+    </div>
+  )
+}
+
+// Etiquetas (suas, com cor): definidas em config.etiquetasWhatsapp, marcadas por conversa
+export type EtiquetaDef = { nome: string; cor: string }
+const CORES_ETIQUETA = ["#8456e8", "#2f7cf6", "#009351", "#c57800", "#d33a3c", "#d33a8a", "#0e9aa7", "#7a7983"]
+
+function EtiquetaChip({ def, mini }: { def: EtiquetaDef; mini?: boolean }) {
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full shrink-0 ${mini ? "text-[9.5px] px-1.5 py-px" : "text-[11px] px-2 py-0.5"} font-semibold`}
+      style={{ background: `${def.cor}1f`, color: def.cor }}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: def.cor }} />{def.nome}
+    </span>
+  )
+}
+
+function EtiquetasDaConversa({ selecionadas, definicoes, onMudar, onCriar }: {
+  selecionadas: string[]; definicoes: EtiquetaDef[]
+  onMudar: (lista: string[]) => void; onCriar?: (e: EtiquetaDef) => void
+}) {
+  const [aberto, setAberto] = useState(false)
+  const [nova, setNova] = useState("")
+  const [cor, setCor] = useState(CORES_ETIQUETA[0])
+  const alternar = (n: string) => onMudar(selecionadas.includes(n) ? selecionadas.filter(x => x !== n) : [...selecionadas, n])
+  return (
+    <div className="relative flex items-center gap-1 flex-wrap justify-end max-w-[260px]">
+      {selecionadas.map(n => <EtiquetaChip key={n} def={definicoes.find(d => d.nome === n) ?? { nome: n, cor: "#7a7983" }} />)}
+      <button onClick={() => setAberto(a => !a)} title="Etiquetas" className="w-8 h-8 rounded-lg grid place-items-center hover:bg-black/5" style={{ color: "var(--text-sub)" }}>
+        <Tag className="w-4 h-4" />
+      </button>
+      {aberto && (
+        <div className="absolute right-0 top-9 z-30 w-64 rounded-xl shadow-xl p-2" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+          {definicoes.map(d => (
+            <button key={d.nome} onClick={() => alternar(d.nome)} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-black/5">
+              <span className="w-4 h-4 rounded grid place-items-center" style={{ border: `1.5px solid ${d.cor}`, background: selecionadas.includes(d.nome) ? d.cor : "transparent" }}>
+                {selecionadas.includes(d.nome) && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+              </span>
+              <EtiquetaChip def={d} />
+            </button>
+          ))}
+          {onCriar && (
+            <div className="border-t mt-1 pt-2 px-1 space-y-1.5" style={{ borderColor: "var(--border)" }}>
+              <input value={nova} onChange={e => setNova(e.target.value)} placeholder="Nova etiqueta…"
+                onKeyDown={e => { if (e.key === "Enter" && nova.trim()) { const d = { nome: nova.trim(), cor }; onCriar(d); onMudar([...selecionadas, d.nome]); setNova("") } }}
+                className="w-full text-[12px] px-2.5 py-1.5 rounded-lg outline-none" style={{ background: "var(--bg-page)", color: "var(--text-main)", border: "1px solid var(--border)" }} />
+              <div className="flex gap-1">
+                {CORES_ETIQUETA.map(c => <button key={c} onClick={() => setCor(c)} aria-label="cor" className="w-5 h-5 rounded-full" style={{ background: c, outline: cor === c ? `2px solid ${c}` : undefined, outlineOffset: 1 }} />)}
+              </div>
+            </div>
+          )}
+          <button onClick={() => setAberto(false)} className="w-full text-[11.5px] mt-1.5 py-1" style={{ color: "var(--text-faint)" }}>Fechar</button>
+        </div>
+      )}
     </div>
   )
 }

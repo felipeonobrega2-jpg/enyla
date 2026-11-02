@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { posicaoNoFunil } from "@/app/lib/funilWhatsapp"
+import { posicaoNoFunil, estaFechada } from "@/app/lib/funilWhatsapp"
 import { card } from "./fixtures"
 
 const HOJE = new Date("2026-11-02T12:00:00Z")
@@ -22,5 +22,13 @@ describe("funil de conversas", () => {
   it("etapa à mão vale; 'perdido' à mão cai se o cliente voltar a falar", () => {
     expect(posicaoNoFunil({ ultima_recebida_at: h(1), ultima_enviada_at: h(1), status_lead: "negociando", ultima_classificacao_at: h(2) }, [], HOJE)).toMatchObject({ etapa: "negociando", manual: true })
     expect(posicaoNoFunil({ ultima_recebida_at: h(1), ultima_enviada_at: h(2), status_lead: "perdido", ultima_classificacao_at: h(3) }, [], HOJE)).toMatchObject({ etapa: "conversa", responder: true, manual: false })
+  })
+})
+
+describe("fechar conversa", () => {
+  it("fechada até o cliente escrever depois", () => {
+    expect(estaFechada({ fechada_em: "2026-11-01T10:00:00Z", ultima_recebida_at: "2026-10-30T10:00:00Z" })).toBe(true)
+    expect(estaFechada({ fechada_em: "2026-11-01T10:00:00Z", ultima_recebida_at: "2026-11-02T08:00:00Z" })).toBe(false)
+    expect(estaFechada({ fechada_em: null })).toBe(false)
   })
 })

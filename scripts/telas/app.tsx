@@ -83,10 +83,12 @@ function Telas() {
         cv("5@lid", "Ana Cosméticos", "Perfeito, pode seguir", 1, 0.5, undefined),
         cv("6@lid", "Carla Velas", "Recebi a proposta", 0.2, 1, anuncio),
         cv("7@lid", "Pedro", "ok", 20, 19, site),
-        cv("8@lid", "Rafa", "Fechado então", 3, 2, anuncio, { status_lead: "negociando", ultima_classificacao_at: h(2) }),
+        cv("8@lid", "Rafa", "Fechado então", 3, 2, anuncio, { status_lead: "negociando", ultima_classificacao_at: h(2), etiquetas: ["Atacado"] }),
+        cv("9@lid", "Lúcia", "Mandei a arte", 1, 0.5, site, { etiquetas: ["Amostra enviada", "VIP"] }),
       ]
       const nomes = ["Ana Cosméticos", "Carla Velas"]
-      return <div style={{ height: "100vh" }}><FunilConversas hoje={hj} conversas={conversas} onAbrir={() => {}} onMover={() => {}}
+      return <div style={{ height: "100vh" }}><FunilConversas hoje={hj} conversas={conversas} onAbrir={() => {}} onMover={() => {}} onFechar={() => {}}
+        etiquetasDef={[{ nome: "Atacado", cor: "#2f7cf6" }, { nome: "VIP", cor: "#c57800" }, { nome: "Amostra enviada", cor: "#009351" }]}
         clienteDe={c => nomes.includes(c.nome) ? { nome: c.nome } : null}
         cardsDe={c => dados.kanban.filter(k => k.nomeCliente === c.nome)} /></div>
     }

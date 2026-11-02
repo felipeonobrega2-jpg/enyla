@@ -65,3 +65,7 @@ export function posicaoNoFunil(c: ConversaFunil, cardsDoCliente: KanbanCard[], h
   const card = pelosCards?.card
   return { etapa, manual, responder: responder && etapa !== "perdido", esfriando, card, valor: card && etapa !== "novo" && etapa !== "conversa" ? card.preco : undefined }
 }
+
+// Conversa fechada: some da lista e do funil até o cliente escrever depois de fechada
+export const estaFechada = (c: { fechada_em?: string | null; ultima_recebida_at?: string | null }) =>
+  !!c.fechada_em && !(c.ultima_recebida_at && c.ultima_recebida_at > c.fechada_em)

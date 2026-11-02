@@ -90,6 +90,7 @@ export type Configuracoes = {
   clientesRelacionamento?: ClienteRelacionamento[]         // pagam depois da entrega
   whatsappConexao?: { estado: string; em: string }            // último estado da conexão do número (gravado pelo servidor)
   groqConfigurado?: boolean                                // transcrição de áudios (a chave fica só no servidor)
+  etiquetasWhatsapp?: { nome: string; cor: string }[]          // etiquetas das conversas do WhatsApp
   vinculosWhatsapp?: import("./lib/vinculoWhatsapp").Vinculos   // conversa (jid) → cliente, escolhido na tela do WhatsApp
   origensClientes?: import("./lib/coleta").OrigensClientes   // como cada cliente chegou (nomeChave → canal)
   ideias?: Ideia[]                                         // anotações para implementar depois
