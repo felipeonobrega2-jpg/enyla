@@ -22,7 +22,7 @@ import { origemDoCliente } from "@/app/lib/coleta"
 import { PrecoQueFecha } from "@/app/components/PrecoQueFecha"
 import { ModalLancamento } from "@/app/components/FinanceiroView"
 import { PainelToken } from "@/app/components/MetaAdsView"
-import { ConexaoWhats, Compositor, ClienteDaConversa } from "@/app/components/WhatsAppView"
+import { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa } from "@/app/components/WhatsAppView"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
 // Abas do Financeiro: "financeiro-receber" abre a aba "receber"
@@ -60,6 +60,8 @@ function Telas() {
       return pagina(<div className="space-y-8 bg-white p-6 rounded-xl">
         <ClienteDaConversa cliente={{ nome: "Raniere Péricles", manual: false }} resumo={resumo} clientes={["Raniere Péricles", "Ana"]} onVincular={() => {}} onAbrir={() => {}} />
         <ClienteDaConversa cliente={null} resumo={resumo} clientes={["Raniere Péricles", "Ana"]} onVincular={() => {}} />
+        <div className="flex gap-2 items-center"><span className="text-[13px] font-semibold">Camilo</span><SeloOrigem campanha={JSON.stringify({ canal: "anuncio", campanhaNome: "(JEROGRAF) - TESTAR NOVAMENTE Campanha" })} /><SeloOrigem campanha={JSON.stringify({ canal: "site" })} /></div>
+        <OrigemDaConversa campanha={JSON.stringify({ canal: "anuncio", campanhaNome: "(JEROGRAF) - TESTAR NOVAMENTE Campanha", provavel: true })} />
       </div>)
     }
     case "calibragem": return pagina(<CalibragemView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onAtualizarConfig={setCfg} onDividir={() => {}} />)

@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, nomeChave } from "../lib/negocio"
 import { clienteDaConversa, Vinculos } from "../lib/vinculoWhatsapp"
+import { lerOrigem } from "../lib/origemWhatsapp"
 import { brl } from "../utils"
 
 type Conversa = {
@@ -14,6 +15,7 @@ type Conversa = {
   ultima_at: string | null
   nao_lidas: number
   foto_url: string | null
+  campanha?: string | null
 }
 
 type Mensagem = {
@@ -94,6 +96,7 @@ export default function WhatsAppView({
   const [status, setStatus] = useState<StatusWhats | null>(null)
   useEffect(() => { fetch("/api/whatsapp/status").then(r => r.json()).then(setStatus).catch(() => {}) }, [])
   const [busca, setBusca] = useState("")
+  const [filtro, setFiltro] = useState<"todas" | "anuncio" | "site" | "clientes">("todas")
   const threadRef = useRef<HTMLDivElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -161,8 +164,8 @@ export default function WhatsAppView({
   }
 
   const filtradas = conversas.filter(c =>
-    c.nome.toLowerCase().includes(busca.toLowerCase()) ||
-    (c.ultima_msg ?? "").toLowerCase().includes(busca.toLowerCase())
+    (filtro === "todas" || (filtro === "clientes" ? !!clienteDe(c) : lerOrigem(c.campanha)?.canal === filtro)) &&
+    (c.nome.toLowerCase().includes(busca.toLowerCase()) || (c.ultima_msg ?? "").toLowerCase().includes(busca.toLowerCase()))
   )
 
   const totalNaoLidas = conversas.reduce((s, c) => s + c.nao_lidas, 0)
@@ -194,6 +197,14 @@ export default function WhatsAppView({
             className="w-full text-[13px] px-3 py-2 rounded-xl outline-none"
             style={{ background: "var(--bg-page)", color: "var(--text-main)", border: "1px solid var(--border)" }}
           />
+          <div className="flex gap-1 mt-2 flex-wrap">
+            {([["todas", "Todas"], ["anuncio", "Anúncio"], ["site", "Site"], ["clientes", "Clientes"]] as const).map(([v, n]) => (
+              <button key={v} onClick={() => setFiltro(v)} className="h-7 px-2.5 rounded-full text-[11.5px] font-medium transition-colors"
+                style={filtro === v ? { background: "#191625", color: "#fff" } : { background: "var(--bg-page)", color: "var(--text-sub)", border: "1px solid var(--border)" }}>
+                {n}{v !== "todas" ? ` ${conversas.filter(c => v === "clientes" ? !!clienteDe(c) : lerOrigem(c.campanha)?.canal === v).length}` : ""}
+              </button>
+            ))}
+          </div>
           {status?.evolution?.conectado && <ImportarHistorico onFim={carregarConversas} />}
         </div>
 
@@ -242,6 +253,7 @@ export default function WhatsAppView({
                   <span className="text-[13.5px] font-semibold truncate flex items-center gap-1.5 min-w-0" style={{ color: "var(--text-main)" }}>
                     <span className="truncate">{c.nome}</span>
                     {clienteDe(c) && <span className="shrink-0 text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-px rounded" style={{ background: "rgba(132,86,232,0.12)", color: "#8456e8" }}>cliente</span>}
+                    <SeloOrigem campanha={c.campanha} />
                   </span>
                   <span className="text-[11px] shrink-0" style={{ color: "var(--text-faint)" }}>{fmtHora(c.ultima_at)}</span>
                 </div>
@@ -281,6 +293,7 @@ export default function WhatsAppView({
               <Avatar key={ativa.jid} nome={ativa.nome} jid={ativa.jid} />
               <div className="flex-1 min-w-0">
                 <p className="text-[14px] font-semibold truncate" style={{ color: "var(--text-main)" }}>{ativa.nome}</p>
+                <OrigemDaConversa campanha={ativa.campanha} />
                 <ClienteDaConversa cliente={clienteDe(ativa)} resumo={resumo} clientes={nomesClientes}
                   onVincular={onVincular ? nome => onVincular(ativa.jid, nome) : undefined} onAbrir={onAbrirCliente} />
               </div>
@@ -482,6 +495,12 @@ function ImportarHistorico({ onFim }: { onFim: () => void }) {
       </button>
       {rodando && <div className="h-1 mt-1.5 rounded-full overflow-hidden" style={{ background: "var(--border)" }}><div className="h-full bg-[#25a35a] transition-[width]" style={{ width: `${pct}%` }} /></div>}
       {msg && <p className="text-[11px] mt-1.5" style={{ color: "var(--text-sub)" }}>{msg}</p>}
+      <button onClick={async () => {
+        setMsg("Classificando origens…")
+        const r = await fetch("/api/whatsapp/origens", { method: "POST" }).then(r => r.json()).catch(() => null)
+        setMsg(r ? `Origens: ${r.anuncio} de anúncio, ${r.site} do site · ${r.clientes} clientes atualizados.` : "Não deu para classificar agora.")
+        onFim()
+      }} className="mt-1 text-[11px] font-semibold text-[#8456e8]">Atualizar origens (anúncio / site)</button>
     </div>
   )
 }
@@ -683,4 +702,22 @@ function Recibo({ status }: { status?: string | null }) {
   if (status === "lida") return <CheckCheck className="w-3.5 h-3.5" style={{ color: "#53bdeb" }} aria-label="lida" />
   if (status === "entregue") return <CheckCheck className="w-3.5 h-3.5" aria-label="entregue" />
   return <Check className="w-3.5 h-3.5" aria-label="enviada" />
+}
+
+// Origem da conversa (primeira mensagem): anúncio da Meta ou botão do site
+export function SeloOrigem({ campanha }: { campanha?: string | null }) {
+  const o = lerOrigem(campanha)
+  if (!o) return null
+  const [txt, cor, fundo] = o.canal === "anuncio" ? ["anúncio", "#c57800", "rgba(197,120,0,0.12)"] : o.canal === "site" ? ["site", "#2f7cf6", "rgba(47,124,246,0.12)"] : ["instagram", "#d33a8a", "rgba(211,58,138,0.12)"]
+  return <span className="shrink-0 text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-px rounded" style={{ background: fundo, color: cor }}>{txt}</span>
+}
+
+export function OrigemDaConversa({ campanha }: { campanha?: string | null }) {
+  const o = lerOrigem(campanha)
+  if (!o) return null
+  return (
+    <p className="text-[11px]" style={{ color: "var(--text-faint)" }}>
+      {o.canal === "anuncio" ? <>veio do anúncio{o.campanhaNome ? <> · <b style={{ color: "#c57800" }}>{o.campanhaNome}</b>{o.provavel ? " (provável)" : ""}</> : ""}</> : o.canal === "site" ? "veio pelo botão do site" : "veio do Instagram"}
+    </p>
+  )
 }
