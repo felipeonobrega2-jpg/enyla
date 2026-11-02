@@ -1,6 +1,6 @@
 "use client"
 
-import { Image as ImageIcon, FileText, Smile, Check, X } from "lucide-react"
+import { Image as ImageIcon, FileText, Smile, Check, X, Paperclip, SendHorizontal } from "lucide-react"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { brl } from "../utils"
 
@@ -289,6 +289,8 @@ export default function WhatsAppView({
                 )
               })}
             </div>
+
+            <Compositor jid={ativa.jid} onEnviado={() => carregarMensagens(ativa.jid)} />
           </>
         )}
       </div>
@@ -454,4 +456,55 @@ function MidiaMensagem({ id, tipo: bruto, nome }: { id: string; tipo: string; no
     </a>
   )
   return null
+}
+
+// Caixa de resposta: Enter envia, Shift+Enter pula linha; clipe anexa foto/arquivo (com legenda)
+export function Compositor({ jid, onEnviado }: { jid: string; onEnviado: () => void }) {
+  const [texto, setTexto] = useState("")
+  const [arquivo, setArquivo] = useState<File | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  async function enviar() {
+    if (enviando || (!texto.trim() && !arquivo)) return
+    setEnviando(true); setErro(null)
+    let r: Response | null
+    if (arquivo) {
+      const f = new FormData()
+      f.set("jid", jid); f.set("arquivo", arquivo); f.set("legenda", texto.trim())
+      r = await fetch("/api/whatsapp/enviar", { method: "POST", body: f }).catch(() => null)
+    } else {
+      r = await fetch("/api/whatsapp/enviar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid, texto }) }).catch(() => null)
+    }
+    const d = r ? await r.json().catch(() => null) : null
+    if (r?.ok) { setTexto(""); setArquivo(null); onEnviado() } else setErro(d?.erro ?? "Sem conexão. Tente de novo.")
+    setEnviando(false)
+  }
+  return (
+    <div className="shrink-0 border-t px-4 py-3" style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
+      {arquivo && (
+        <div className="mb-2 flex items-center gap-2 text-[12px] px-3 py-1.5 rounded-lg w-fit max-w-full" style={{ background: "var(--bg-alt)", color: "var(--text-main)" }}>
+          <Paperclip className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{arquivo.name}</span>
+          <button onClick={() => setArquivo(null)} aria-label="Remover anexo" className="shrink-0"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      )}
+      {erro && <p className="mb-2 text-[12px] text-[#d33a3c]">{erro}</p>}
+      <div className="flex items-end gap-2">
+        <button onClick={() => inputRef.current?.click()} aria-label="Anexar foto ou arquivo" title="Anexar foto ou arquivo"
+          className="w-10 h-10 rounded-xl grid place-items-center shrink-0 transition-colors hover:bg-black/5" style={{ color: "var(--text-sub)" }}>
+          <Paperclip className="w-5 h-5" />
+        </button>
+        <input ref={inputRef} type="file" className="hidden" onChange={e => { setArquivo(e.target.files?.[0] ?? null); e.target.value = "" }} />
+        <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={1}
+          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar() } }}
+          placeholder={arquivo ? "Legenda (opcional)" : "Escreva uma mensagem"}
+          className="flex-1 resize-none rounded-xl px-3.5 py-2.5 text-[13.5px] outline-none max-h-40"
+          style={{ background: "var(--bg-page)", color: "var(--text-main)", border: "1px solid var(--border)", fieldSizing: "content" } as React.CSSProperties} />
+        <button onClick={enviar} disabled={enviando || (!texto.trim() && !arquivo)} aria-label="Enviar"
+          className="w-10 h-10 rounded-xl grid place-items-center shrink-0 text-white disabled:opacity-40 transition-opacity" style={{ background: "#25a35a" }}>
+          <SendHorizontal className="w-5 h-5" />
+        </button>
+      </div>
+    </div>
+  )
 }
