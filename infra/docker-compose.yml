@@ -47,6 +47,10 @@ services:
       SERVER_URL: https://evo.enyla.com.br
       AUTHENTICATION_TYPE: apikey
       AUTHENTICATION_API_KEY: ${EVO_API_KEY}
+      # Versão do WhatsApp Web que o Evolution informa ao parear. Desatualizada, o celular recusa com
+      # "Não é possível conectar novos dispositivos". Atual em 01/11/2026; a lista fica em
+      # github.com/wppconnect-team/wa-version (versions.json → currentVersion, sem o "-alpha").
+      CONFIG_SESSION_PHONE_VERSION: "2.3000.1052612007"
 
       # ── Webhook global → Next.js no Vercel ──────────────────────────────
       # Token no query param pois o Evolution não suporta headers customizados
