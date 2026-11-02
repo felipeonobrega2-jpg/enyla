@@ -240,3 +240,13 @@ html.dark .ds-borda  { border-color: #312e3e; }
   .ds-entrada, .ds-escalonado > *, .ds-cresce-x, .ds-cresce-y, .ds-gaveta, .ds-troca-tela { animation: none !important; }
   .ds-clicavel:hover { transform: none; }
 }
+
+/* Entregas: motorista no mapa com pulso */
+@keyframes mapa-pulso { 0% { box-shadow: 0 0 0 0 rgba(241,102,34,.55); } 100% { box-shadow: 0 0 0 16px rgba(241,102,34,0); } }
+.mapa-motorista { width: 34px; height: 34px; border-radius: 50%; background: #f16622; border: 2.5px solid #fff; display: grid; place-items: center; animation: mapa-pulso 1.6s ease-out infinite; }
+.leaflet-container { font-family: inherit; }
+.mapa-escuro { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.88) saturate(0.6); }
+html.dark .leaflet-control-zoom a { background: #161421; color: #eeedf5; border-color: #312e3e; }
+html.dark .leaflet-control-attribution { background: rgba(22,20,33,.7); color: #72707d; }
+html.dark .leaflet-control-attribution a { color: #a5a2b0; }
+@media (prefers-reduced-motion: reduce) { .mapa-motorista { animation: none; } }

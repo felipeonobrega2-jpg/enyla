@@ -59,6 +59,9 @@ export type FornecedorProducao = {
   frete: number                    // custo de levar o material até ele
   prazoDias: number                // prazo combinado (para medir atraso)
   obs?: string
+  endereco?: import("./frete").Endereco   // para a Lalamove (página Entregas)
+  contato?: string                 // quem entrega/recebe a mercadoria lá
+  telefone?: string
 }
 
 export type TipoFerramental = "faca" | "cliche" | "fotolito"

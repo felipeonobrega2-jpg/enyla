@@ -9,6 +9,8 @@ export type Endereco = {
   lat: number; lng: number
 }
 export type LocalRetirada = { id: string; nome: string; contato?: string; telefone?: string; endereco: Endereco }
+// Uma parada da corrida como fica guardada (nome do lugar + endereço)
+export type ParadaFrete = { nome: string; texto: string; lat: number; lng: number }
 
 export type Frete = {
   order_id: string
@@ -22,7 +24,9 @@ export type Frete = {
   cobrar_cliente: boolean
   retirada: { nome: string; texto: string } | null
   entrega: { texto: string } | null
-  motorista: { nome?: string; telefone?: string; placa?: string } | null
+  paradas: ParadaFrete[] | null
+  descricao: string | null
+  motorista: { nome?: string; telefone?: string; placa?: string; foto?: string; lat?: number; lng?: number; em?: string } | null
   veiculo: string | null
   lancamentos: string[]
   ambiente: string
@@ -62,16 +66,16 @@ export const NOME_VEICULO: Record<string, string> = {
 
 // Lançamentos de uma corrida: custo pago (sai da carteira da Lalamove) e, se for cobrado à parte, receita a receber
 export function lancamentosDoFrete(f: {
-  orderId: string; valor: number; cliente: string; numero?: string | null
+  orderId: string; valor: number; cliente?: string | null; numero?: string | null; trajeto?: string
   cardId?: string | null; loteId?: string | null; cobrarCliente: boolean; hoje: string; criadoEm: string; novoId: () => string
 }): LancamentoFinanceiro[] {
   const vinculo = f.loteId ? { loteId: f.loteId, loteNumero: f.numero ?? undefined } : f.cardId ? { cardId: f.cardId, cardNumero: f.numero ?? undefined } : {}
-  const base = { nomeCliente: f.cliente, criadoEm: f.criadoEm, categoria: "frete", ...vinculo }
+  const base = { ...(f.cliente ? { nomeCliente: f.cliente } : {}), criadoEm: f.criadoEm, categoria: "frete", ...vinculo }
   const custo: LancamentoFinanceiro = {
-    ...base, id: f.novoId(), tipo: "despesa", descricao: `Frete Lalamove${f.numero ? ` ${f.numero}` : ""}`, valor: f.valor,
+    ...base, id: f.novoId(), tipo: "despesa", descricao: `Frete Lalamove${f.numero ? ` ${f.numero}` : f.trajeto ? `: ${f.trajeto}` : ""}`, valor: f.valor,
     dataVencimento: f.hoje, dataPagamento: f.hoje, status: "pago", obs: `Corrida ${f.orderId}`,
   }
-  if (!f.cobrarCliente) return [custo]
+  if (!f.cobrarCliente || !f.cliente) return [custo]
   return [custo, {
     ...base, id: f.novoId(), tipo: "receita", descricao: `Frete${f.numero ? ` ${f.numero}` : ""} (cobrado do cliente)`, valor: f.valor,
     dataVencimento: f.hoje, status: "pendente", obs: `Corrida ${f.orderId}`,

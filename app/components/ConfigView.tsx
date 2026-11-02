@@ -1,10 +1,8 @@
 "use client"
 
 import { VARIAVEIS, Rapida } from "../lib/mensagensRapidas"
-import { Endereco, LocalRetirada, telefoneE164 } from "../lib/frete"
-import { BuscaEndereco } from "./FreteLalamove"
 import React, { useState, useRef } from "react"
-import { Percent, Layers, Target, Palette, Sparkles, Database, Download, Upload, Plus, X, Check, Save, RotateCcw, Info, KeyRound, CalendarOff, Handshake, Mic, Zap, BookOpen, Truck } from "lucide-react"
+import { Percent, Layers, Target, Palette, Sparkles, Database, Download, Upload, Plus, X, Check, Save, RotateCcw, Info, KeyRound, CalendarOff, Handshake, Mic, Zap, BookOpen } from "lucide-react"
 import { Configuracoes, Material, CONFIG_PADRAO } from "../config"
 import { FERIADOS_SP } from "../lib/diasUteis"
 import { nomeChave } from "../lib/negocio"
@@ -212,8 +210,6 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
           <ChaveGroq configurada={!!draft.groqConfigurado} />
 
           <MensagensRapidas />
-
-          <LocaisRetirada locais={draft.locaisRetirada ?? []} onMudar={l => setDraft(d => ({ ...d, locaisRetirada: l }))} />
 
           {/* Guia de atendimento: a IA lê antes de sugerir qualquer mensagem */}
           <Cartao className="ds-entrada">
@@ -500,42 +496,3 @@ function MensagensRapidas() {
   )
 }
 
-// Locais de onde a Lalamove retira (gráfica, cartonagem, fornecedores). Escolhidos ao chamar o motorista no pedido.
-function LocaisRetirada({ locais, onMudar }: { locais: LocalRetirada[]; onMudar: (l: LocalRetirada[]) => void }) {
-  const [novo, setNovo] = useState<{ nome: string; contato: string; telefone: string; endereco: Endereco | null } | null>(null)
-  return (
-    <Cartao className="ds-entrada">
-      <TituloCartao titulo="Locais de retirada (Lalamove)" icone={<Truck className="w-4 h-4" />}
-        sub="De onde o motorista busca: gráfica, cartonagem, fornecedores. O telefone é de quem entrega a mercadoria ao motorista." />
-      <div className="space-y-2">
-        {locais.map(l => (
-          <div key={l.id} className="flex items-start gap-3 rounded-lg px-3 py-2.5 ds-borda">
-            <div className="flex-1 min-w-0">
-              <p className="text-[12.5px] font-semibold text-[#191625]">{l.nome}{l.contato ? <span className="font-normal text-[#898892]"> · {l.contato} {l.telefone}</span> : null}</p>
-              <p className="text-[11.5px] text-[#5e5c68] truncate">{l.endereco.texto}</p>
-            </div>
-            <button onClick={() => onMudar(locais.filter(x => x.id !== l.id))} aria-label="Remover" className="text-[#898892] hover:text-[#d33a3c]"><X className="w-4 h-4" /></button>
-          </div>
-        ))}
-        {novo ? (
-          <div className="rounded-lg p-3 space-y-2 ds-borda">
-            <div className="grid grid-cols-3 gap-2">
-              <input value={novo.nome} onChange={e => setNovo({ ...novo, nome: e.target.value })} placeholder="Nome (ex.: Gráfica)" className={inputCls} />
-              <input value={novo.contato} onChange={e => setNovo({ ...novo, contato: e.target.value })} placeholder="Quem entrega ao motorista" className={inputCls} />
-              <input value={novo.telefone} onChange={e => setNovo({ ...novo, telefone: e.target.value })} placeholder="Telefone" className={inputCls} />
-            </div>
-            <BuscaEndereco valor={novo.endereco} onMudar={e => setNovo({ ...novo, endereco: e })} />
-            <div className="flex gap-2 justify-end">
-              <Botao variante="fantasma" onClick={() => setNovo(null)}>Cancelar</Botao>
-              <Botao variante="primario" disabled={!novo.nome.trim() || !novo.endereco || !telefoneE164(novo.telefone)}
-                onClick={() => { onMudar([...locais, { id: `loc-${Date.now()}`, nome: novo.nome.trim(), contato: novo.contato.trim() || undefined, telefone: novo.telefone.trim(), endereco: novo.endereco! }]); setNovo(null) }}>
-                Adicionar
-              </Botao>
-            </div>
-          </div>
-        ) : <Botao icone={<Plus className="w-3.5 h-3.5" />} onClick={() => setNovo({ nome: "", contato: "", telefone: "", endereco: null })}>Adicionar local</Botao>}
-        <p className="text-[11px] text-[#898892]">Salva com o botão Salvar da página.</p>
-      </div>
-    </Cartao>
-  )
-}

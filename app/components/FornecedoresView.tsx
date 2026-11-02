@@ -2,10 +2,11 @@
 
 import React from "react"
 import {
-  Factory, Clock, AlertTriangle, Gauge, History, PackageCheck, Plus, Trash2, Send, ChevronDown, Wrench, SlidersHorizontal, Save, Check,
+  Factory, Clock, AlertTriangle, Gauge, History, PackageCheck, Plus, Trash2, Send, ChevronDown, Wrench, SlidersHorizontal, Save, Check, MapPin,
 } from "lucide-react"
 import { KanbanCard, LancamentoFinanceiro, FormData } from "../types"
 import { CalibragemView } from "./CalibragemView"
+import { BuscaEndereco } from "./FreteLalamove"
 import { prazoDeProducao, Rastreio } from "../lib/prazoProducao"
 import { Configuracoes } from "../config"
 import {
@@ -583,6 +584,15 @@ function Cadastro({ draft, setDraft, fornecedoresFin }: {
                   </Campo>
                   <Campo label="Frete até ele (R$)"><Num value={f.frete} onChange={v => upd(f.id, { frete: v })} step={0.01} /></Campo>
                   <Campo label="Prazo combinado (dias úteis)"><Num value={f.prazoDias} onChange={v => upd(f.id, { prazoDias: v })} /></Campo>
+                </div>
+
+                <div className="rounded-lg p-3.5 bg-[rgba(116,116,128,0.04)] space-y-2.5">
+                  <p className="text-[12.5px] font-medium text-[#191625] flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-[#f16622]" />Endereço (para chamar a Lalamove)</p>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <Campo label="Quem entrega/recebe lá"><input value={f.contato ?? ""} onChange={e => upd(f.id, { contato: e.target.value || undefined })} className={inputCls} style={inputStyle} /></Campo>
+                    <Campo label="Telefone"><input value={f.telefone ?? ""} onChange={e => upd(f.id, { telefone: e.target.value || undefined })} placeholder="(11) 9…" className={inputCls} style={inputStyle} /></Campo>
+                  </div>
+                  <BuscaEndereco valor={f.endereco ?? null} onMudar={e => { if (e) upd(f.id, { endereco: e }) }} />
                 </div>
 
                 <div className="rounded-lg p-3.5 bg-[rgba(116,116,128,0.04)] space-y-2.5">

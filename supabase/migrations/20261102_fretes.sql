@@ -22,3 +22,7 @@ create table if not exists fretes (
 create index if not exists fretes_pedido on fretes (pedido_numero);
 create index if not exists fretes_card on fretes (card_id);
 create index if not exists fretes_lote on fretes (lote_id);
+
+-- Várias paradas por corrida (página Entregas): [{ nome, texto, lat, lng }] na ordem da rota
+alter table fretes add column if not exists paradas jsonb;
+alter table fretes add column if not exists descricao text;

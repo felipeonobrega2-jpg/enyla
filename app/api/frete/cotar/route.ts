@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cotar } from "@/app/lib/lalamove"
-import type { Endereco } from "@/app/lib/frete"
+import type { ParadaFrete } from "@/app/lib/frete"
 
-// Cota uma corrida (vale 5 minutos). (Rota protegida pelo login.)
+// Cota uma corrida com 2 a 16 paradas (a primeira é a retirada). Vale 5 minutos. (Rota protegida pelo login.)
 export async function POST(req: NextRequest) {
-  const { servico, retirada, entrega } = await req.json().catch(() => ({})) as { servico?: string; retirada?: Endereco; entrega?: Endereco }
-  if (!servico || !retirada || !entrega) return NextResponse.json({ erro: "Escolha o veículo, a retirada e a entrega." }, { status: 400 })
-  const parada = (e: Endereco) => ({ coordinates: { lat: String(e.lat), lng: String(e.lng) }, address: e.texto })
-  const r = await cotar(servico, [parada(retirada), parada(entrega)])
+  const { servico, paradas } = await req.json().catch(() => ({})) as { servico?: string; paradas?: ParadaFrete[] }
+  if (!servico || !paradas || paradas.length < 2) return NextResponse.json({ erro: "Escolha o veículo, a retirada e pelo menos uma entrega." }, { status: 400 })
+  if (paradas.length > 16) return NextResponse.json({ erro: "No máximo 15 entregas por corrida." }, { status: 400 })
+  const r = await cotar(servico, paradas.map(p => ({ coordinates: { lat: String(p.lat), lng: String(p.lng) }, address: p.texto })))
   if (!r.ok || !r.dados) return NextResponse.json({ erro: r.erro ?? "Não cotou." }, { status: r.status || 502 })
   const c = r.dados
   return NextResponse.json({

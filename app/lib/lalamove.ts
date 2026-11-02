@@ -66,7 +66,7 @@ export type PedidoLalamove = {
   priceBreakdown?: { total: string; currency: string }
   distance?: { value: string; unit: string }
 }
-export type Motorista = { driverId: string; name?: string; phone?: string; plateNumber?: string }
+export type Motorista = { driverId: string; name?: string; phone?: string; plateNumber?: string; photo?: string; coordinates?: { lat: string; lng: string; updatedAt?: string } }
 export type Cidade = { locode: string; name: string; services: { key: string; description?: string; dimensions?: unknown; load?: { value: string; unit: string } }[] }
 
 export const cidades = () => lalamove<Cidade[]>("GET", "/v3/cities")

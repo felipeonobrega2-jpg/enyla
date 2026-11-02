@@ -1,13 +1,13 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
-import { Ruler, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb } from "lucide-react"
+import { Ruler, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb, Truck } from "lucide-react"
 import { IdeiasView } from "./components/IdeiasView"
 import { signOut } from "next-auth/react"
 import WhatsAppView from "./components/WhatsAppView"
 import { podarDispensados } from "./lib/filaMensagens"
 import { formDoAtendimento } from "./lib/atendente"
-import { ModalFrete, PedidoFrete, enderecoDoCliente } from "./components/FreteLalamove"
+import { EntregasView, PrefillEntrega } from "./components/EntregasView"
 import Image from "next/image"
 import { useTheme } from "./components/ThemeProvider"
 import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, CustoSnapshot, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO, COL_HOT, COLUNAS_KANBAN, Parceiro, NegocioParceiro, LancamentoFinanceiro, Lote, TipoCaixa, PrazoEtapas, AprovacaoOnline } from "./types"
@@ -182,7 +182,7 @@ export default function Home() {
   const [editandoHistorico, setEditandoHistorico] = useState<string | null>(null)
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
   const [contador, setContador] = useState<number>(0)
-  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias">("painel")
+  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias" | "entregas">("painel")
   const [perfilClienteExterno, setPerfilClienteExterno] = useState<string | null>(null)
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
   definirFeriadosLocais(config.feriados)
@@ -205,8 +205,8 @@ export default function Home() {
   } | null>(null)
   const [modalSobra, setModalSobra] = useState<{ card: KanbanCard; loteCards: KanbanCard[] } | null>(null)
   const [modalLancPedidos, setModalLancPedidos] = useState<Partial<LancamentoFinanceiro> | null>(null)
-  const [modalFrete, setModalFrete] = useState<PedidoFrete | null>(null)
-  const [fretesVersao, setFretesVersao] = useState(0)
+  const [entregasPrefill, setEntregasPrefill] = useState<PrefillEntrega | null>(null)
+  const fretesVersao = 0
   const [buscaAberta, setBuscaAberta] = useState(false)
   const [orcTab, setOrcTab] = useState<"padrao" | "digital">("padrao")
   type CampoCusto = "custoPapel" | "custoImpressao" | "custoCorte" | "custoVerniz" | "custoColagem" | "custoArte" | "custoUnitSF" | "custoUnitCF"
@@ -1432,6 +1432,8 @@ export default function Home() {
           <NavGroup label="Produção" />
           <NavItem active={view === "fornecedores"} onClick={() => navigate("fornecedores")} label="Fornecedores"
             icon={<Factory className="w-4 h-4" strokeWidth={1.8} />} />
+          <NavItem active={view === "entregas"} onClick={() => { setEntregasPrefill(null); navigate("entregas") }} label="Entregas"
+            icon={<Truck className="w-4 h-4" strokeWidth={1.8} />} />
 
           <NavGroup label="Gestão" />
           <NavItem active={view === "financeiro"} onClick={() => navigate("financeiro")} label="Financeiro"
@@ -2113,7 +2115,7 @@ export default function Home() {
               lancamentos={lancamentos}
               onDetalhes={card => setDetalheModal({ tipo: "kanban", card })}
               onNovoLancamento={prefill => setModalLancPedidos(prefill)}
-              onChamarFrete={p => setModalFrete(p)}
+              onChamarFrete={p => { setEntregasPrefill({ pedido: p }); navigate("entregas") }}
               fretesVersao={fretesVersao}
               onLancamentosRemovidos={ids => setLancamentos(prev => prev.filter(l => !ids.includes(l.id)))}
               onSalvarData={(cardId, data) => {
@@ -2447,6 +2449,12 @@ export default function Home() {
                 ltvPorCampanha={ltvPorCampanha}
                 margemPorCampanha={margemPorCampanha}
               />
+          ) : view === "entregas" ? (
+            <EntregasView key={entregasPrefill ? JSON.stringify(entregasPrefill) : "entregas"} config={config} kanban={kanban} lancamentos={lancamentos} clientes={clientes} isDark={isDark}
+              prefill={entregasPrefill}
+              onLancamentos={ls => { setLancamentos(prev => [...ls, ...prev]); if (ls.length) showToast(`Lalamove chamada · ${ls[0].valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} lançado`) }}
+              onRemoverLancamentos={ids => setLancamentos(prev => prev.filter(l => !ids.includes(l.id)))}
+              onSalvarLocais={locaisRetirada => salvarConfigTudo({ ...config, locaisRetirada })} />
           ) : view === "whatsapp" ? (
             <WhatsAppView
               kanban={kanban} lancamentos={lancamentos} vinculos={config.vinculosWhatsapp}
@@ -2800,18 +2808,6 @@ export default function Home() {
           } : undefined}
           lancamentos={lancamentos}
         />
-      )}
-
-      {/* ── Modal: chamar Lalamove (via Pedidos) ─────────────────────────────── */}
-      {modalFrete && (
-        <ModalFrete pedido={modalFrete} locais={config.locaisRetirada ?? []}
-          enderecoSalvo={enderecoDoCliente(config.enderecosClientes, modalFrete.cliente)}
-          telefoneCliente={clientes.find(c => nomeChave(c.nome) === nomeChave(modalFrete.cliente))?.telefone}
-          onFechar={() => setModalFrete(null)}
-          onChamado={(f, ls) => {
-            setLancamentos(prev => [...ls, ...prev]); setModalFrete(null); setFretesVersao(v => v + 1)
-            showToast(`Lalamove chamada · ${f.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} lançado no pedido`)
-          }} />
       )}
 
       {/* ── Modal: novo lançamento (via Pedidos) ────────────────────────────── */}

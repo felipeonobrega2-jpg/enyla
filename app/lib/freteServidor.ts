@@ -12,12 +12,17 @@ export async function atualizarFrete(orderId: string): Promise<Frete | null> {
   const r = await consultarPedido(orderId)
   if (!r.ok || !r.dados) return atual as Frete
   const p = r.dados
+  // Motorista: nome/placa e a posição (a Lalamove atualiza a cada 10 s enquanto a corrida anda)
   let motorista = (atual as Frete).motorista
-  if (p.driverId && !motorista?.nome) {
+  if (p.driverId && (!motorista?.nome || p.status === "ON_GOING" || p.status === "PICKED_UP")) {
     const m = await consultarMotorista(orderId, p.driverId)
-    if (m.ok && m.dados) motorista = { nome: m.dados.name, telefone: m.dados.phone, placa: m.dados.plateNumber }
+    if (m.ok && m.dados) {
+      const c = m.dados.coordinates
+      motorista = { nome: m.dados.name, telefone: m.dados.phone, placa: m.dados.plateNumber, foto: m.dados.photo,
+        ...(c ? { lat: Number(c.lat), lng: Number(c.lng), em: c.updatedAt } : { lat: motorista?.lat, lng: motorista?.lng, em: motorista?.em }) }
+    }
   }
-  const mudou = p.status !== atual.status || (p.shareLink && p.shareLink !== atual.share_link) || motorista !== atual.motorista
+  const mudou = p.status !== atual.status || (p.shareLink && p.shareLink !== atual.share_link) || JSON.stringify(motorista) !== JSON.stringify(atual.motorista)
   if (!mudou) return atual as Frete
   const { data } = await supabase.from("fretes").update({
     status: p.status, share_link: p.shareLink ?? atual.share_link, motorista, atualizado_em: new Date().toISOString(),

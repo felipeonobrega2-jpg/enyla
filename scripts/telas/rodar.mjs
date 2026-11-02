@@ -10,14 +10,14 @@ mkdirSync(saida, { recursive: true })
 const css = []
 const procurar = d => { for (const f of readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); if (f.isDirectory()) procurar(p); else if (p.endsWith(".css")) css.push(readFileSync(p, "utf8")) } }
 procurar(path.join(raiz, ".next/static"))
-writeFileSync(path.join(saida, "app.css"), css.join("\n"))
+writeFileSync(path.join(saida, "next.css"), css.join("\n"))
 await build({
   entryPoints: [path.join(dir, "app.tsx")], bundle: true, outfile: path.join(saida, "app.js"), jsx: "automatic", logLevel: "error",
-  alias: { "@": raiz, "next/image": path.join(dir, "imagem.tsx") }, define: { "process.env.NODE_ENV": '"production"' },
+  alias: { "@": raiz, "next/image": path.join(dir, "imagem.tsx"), "next/dynamic": path.join(dir, "dinamico.tsx") }, define: { "process.env.NODE_ENV": '"production"' }, loader: { ".png": "dataurl" },
 })
-writeFileSync(path.join(saida, "index.html"), '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="app.css"><body><div id="root"></div><script src="app.js"></script>')
+writeFileSync(path.join(saida, "index.html"), '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="next.css"><link rel="stylesheet" href="app.css"><body><div id="root"></div><script src="app.js"></script>')
 
-const telas = [["caixa", 1440], ["config", 1440], ["calibragem", 1440], ["rotas", 1440], ["aprovar", 390], ["portal", 390], ["mobile", 390], ["relatorios", 1440], ["precofecha", 1100], ["lancamento", 900], ["metatoken", 1100], ["whats", 700], ["compositor", 900], ["wacliente", 700], ["funil", 1600], ["funil-espiar", 1600], ["whatsview", 1440], ["whatsview-espiar", 1440], ["fila", 1440], ["frete", 1100], ["pedidos", 1440], ["pedidos-escuro", 1440], ["pedidos-aberto", 1440], ["pedidos-aberto-escuro", 1440], ["pedidos-quadro-escuro", 1440], ["pedidos-visao-escuro", 1440], ["fila-m", 390], ["enviar", 1100], ["ideias", 1440], ["perfil", 1440], ["detalhe", 1440], ["detalhe-orcamento", 1440], ["financeiro-conciliacao", 1440], ["financeiro-dash", 1440], ["financeiro-receber", 1440], ["financeiro-lancamentos", 1440], ["financeiro-dre", 1440], ["financeiro-pix", 1440], ["financeiro-contas", 1440], ["financeiro-fixas", 1440], ["financeiro-fornecedores", 1440]]
+const telas = [["caixa", 1440], ["config", 1440], ["calibragem", 1440], ["rotas", 1440], ["aprovar", 390], ["portal", 390], ["mobile", 390], ["relatorios", 1440], ["precofecha", 1100], ["lancamento", 900], ["metatoken", 1100], ["whats", 700], ["compositor", 900], ["wacliente", 700], ["funil", 1600], ["funil-espiar", 1600], ["whatsview", 1440], ["whatsview-espiar", 1440], ["fila", 1440], ["entregas", 1440], ["entregas-escuro", 1440], ["entregas-corrida", 1440], ["pedidos", 1440], ["pedidos-escuro", 1440], ["pedidos-aberto", 1440], ["pedidos-aberto-escuro", 1440], ["pedidos-quadro-escuro", 1440], ["pedidos-visao-escuro", 1440], ["fila-m", 390], ["enviar", 1100], ["ideias", 1440], ["perfil", 1440], ["detalhe", 1440], ["detalhe-orcamento", 1440], ["financeiro-conciliacao", 1440], ["financeiro-dash", 1440], ["financeiro-receber", 1440], ["financeiro-lancamentos", 1440], ["financeiro-dre", 1440], ["financeiro-pix", 1440], ["financeiro-contas", 1440], ["financeiro-fixas", 1440], ["financeiro-fornecedores", 1440]]
 const navegador = await chromium.launch()
 let erros = 0
 // TELAS=a,b roda só essas
@@ -37,7 +37,8 @@ for (const [tela, largura] of telas.filter(([t]) => !so || so.includes(t))) {
   if (tela.startsWith("pedidos-aberto")) { await p.getByText("Ana Cosméticos").first().click(); await p.waitForTimeout(600) }
   if (tela === "pedidos-quadro-escuro") { await p.getByText("Quadro", { exact: true }).click(); await p.waitForTimeout(600) }
   if (tela === "pedidos-visao-escuro") { await p.getByText("Visão geral", { exact: true }).click(); await p.waitForTimeout(600) }
-  if (tela === "frete") { await p.getByText("Cotar", { exact: true }).click(); await p.waitForTimeout(700) }
+  if (tela.startsWith("entregas")) { await p.waitForTimeout(1500); await p.getByText("Cotar", { exact: true }).click(); await p.waitForTimeout(1200) }
+  if (tela === "entregas-corrida") { await p.getByText("Fornecedor Papel → Gráfica").first().click(); await p.waitForTimeout(2500) }
   await p.screenshot({ path: path.join(saida, `${tela}.png`), fullPage: true })
   console.log(`${falhas.length ? "ERRO" : "ok  "} ${tela}${falhas.length ? ": " + falhas.join(" | ") : ""}`)
   erros += falhas.length

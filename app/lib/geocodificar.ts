@@ -28,3 +28,20 @@ export async function enderecoPeloCep(cep: string, numero: string, complemento?:
   if (!coord) return { erro: "Não achei esse endereço no mapa. Confira o CEP." }
   return { ...partes, texto: textoEndereco(partes), ...coord }
 }
+
+// Texto livre ("Rua X, 100, Brás" ou um CEP) → até 5 endereços. Puxa para a Grande São Paulo, sem excluir o resto.
+export async function buscarEndereco(q: string): Promise<Endereco[]> {
+  const cep = q.replace(/\D/g, "")
+  if (/^\d{5}-?\d{3}$/.test(q.trim()) && cep.length === 8) {
+    const e = await enderecoPeloCep(cep, "")
+    return "erro" in e ? [] : [e]
+  }
+  const p = new URLSearchParams({ format: "jsonv2", limit: "5", countrycodes: "br", addressdetails: "1", q, viewbox: "-47.2,-23.2,-46.2,-24.0" })
+  const r = await fetch(`https://nominatim.openstreetmap.org/search?${p}`, { headers: UA }).catch(() => null)
+  const j = r?.ok ? await r.json().catch(() => null) as { lat: string; lon: string; address?: Record<string, string> }[] | null : null
+  return (j ?? []).map(x => {
+    const a = x.address ?? {}
+    const partes = { rua: a.road, numero: a.house_number, bairro: a.suburb ?? a.neighbourhood, cidade: a.city ?? a.town ?? a.municipality, uf: a["ISO3166-2-lvl4"]?.replace("BR-", ""), cep: a.postcode }
+    return { ...partes, texto: textoEndereco(partes) || q, lat: Number(x.lat), lng: Number(x.lon) }
+  })
+}
