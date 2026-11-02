@@ -1,7 +1,8 @@
 "use client"
 
+import { VARIAVEIS, Rapida } from "../lib/mensagensRapidas"
 import React, { useState, useRef } from "react"
-import { Percent, Layers, Target, Palette, Sparkles, Database, Download, Upload, Plus, X, Check, Save, RotateCcw, Info, KeyRound, CalendarOff, Handshake, Mic } from "lucide-react"
+import { Percent, Layers, Target, Palette, Sparkles, Database, Download, Upload, Plus, X, Check, Save, RotateCcw, Info, KeyRound, CalendarOff, Handshake, Mic, Zap } from "lucide-react"
 import { Configuracoes, Material, CONFIG_PADRAO } from "../config"
 import { FERIADOS_SP } from "../lib/diasUteis"
 import { nomeChave } from "../lib/negocio"
@@ -208,6 +209,8 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
 
           <ChaveGroq configurada={!!draft.groqConfigurado} />
 
+          <MensagensRapidas />
+
           {/* Backup */}
           <Cartao className="ds-entrada">
             <TituloCartao titulo="Backup" icone={<Database className="w-4 h-4" />} sub="Histórico, clientes, quadro e configurações em um arquivo JSON." />
@@ -406,6 +409,79 @@ function ChaveGroq({ configurada }: { configurada: boolean }) {
         <Botao onClick={salvar} disabled={salvando || !chave.trim()}>{salvando ? "Conferindo…" : "Salvar"}</Botao>
       </div>
       {msg && <p className="text-[12px] mt-2" style={{ color: msg.startsWith("Chave conferida") ? "#009351" : "#d33a3c" }}>{msg}</p>}
+    </Cartao>
+  )
+}
+
+// Mensagens rápidas do WhatsApp ("/" na caixa de mensagem). Salvas direto no banco (tabela quick_replies).
+function MensagensRapidas() {
+  const [lista, setLista] = useState<Rapida[]>([])
+  const [editando, setEditando] = useState<Partial<Rapida> | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+  const textoRef = useRef<HTMLTextAreaElement>(null)
+  const carregar = () => fetch("/api/whatsapp/rapidas").then(r => r.json()).then(d => setLista(Array.isArray(d) ? d : [])).catch(() => {})
+  React.useEffect(() => { carregar() }, [])
+  async function salvar() {
+    if (!editando) return
+    setErro(null)
+    const r = await fetch("/api/whatsapp/rapidas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(editando) }).catch(() => null)
+    const d = r ? await r.json().catch(() => null) : null
+    if (r?.ok) { setEditando(null); carregar() } else setErro(d?.erro ?? "Sem conexão.")
+  }
+  async function apagar(id: string) {
+    await fetch(`/api/whatsapp/rapidas?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {})
+    carregar()
+  }
+  function variavel(chave: string) {
+    const el = textoRef.current, v = `{{${chave}}}`
+    const t = editando?.corpo ?? "", i = el?.selectionStart ?? t.length
+    setEditando(e => ({ ...e, corpo: t.slice(0, i) + v + t.slice(i) }))
+  }
+  return (
+    <Cartao className="ds-entrada">
+      <TituloCartao titulo="Mensagens rápidas" icone={<Zap className="w-4 h-4" />}
+        sub="No WhatsApp do sistema, digite / na caixa de mensagem para escolher uma. As variáveis são preenchidas com os dados do contato."
+        acao={!editando ? <Botao icone={<Plus className="w-3.5 h-3.5" />} onClick={() => setEditando({ atalho: "", corpo: "", quando_usar: "", ativa: true })}>Nova</Botao> : undefined} />
+      {editando && (
+        <div className="rounded-xl p-3 mb-3 space-y-2" style={{ background: "rgba(116,116,128,0.06)" }}>
+          <div className="flex gap-2">
+            <input value={editando.atalho ?? ""} onChange={e => setEditando(x => ({ ...x, atalho: e.target.value }))} placeholder="/atalho" className={`${inputCls} w-32 font-mono`} />
+            <input value={editando.quando_usar === "—" ? "" : editando.quando_usar ?? ""} onChange={e => setEditando(x => ({ ...x, quando_usar: e.target.value }))} placeholder="Quando usar (também orienta o agente)" className={`${inputCls} flex-1`} />
+          </div>
+          <textarea ref={textoRef} value={editando.corpo ?? ""} onChange={e => setEditando(x => ({ ...x, corpo: e.target.value }))} rows={3}
+            placeholder="Texto da mensagem" className={`${inputCls} w-full h-auto py-2 resize-y`} />
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] text-[#898892]">Inserir:</span>
+            {VARIAVEIS.map(v => (
+              <button key={v.chave} onClick={() => variavel(v.chave)} title={v.descricao}
+                className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-white ds-borda text-[#8456e8]">{`{{${v.chave}}}`}</button>
+            ))}
+            <div className="ml-auto flex gap-2">
+              <Botao variante="fantasma" onClick={() => { setEditando(null); setErro(null) }}>Cancelar</Botao>
+              <Botao variante="primario" onClick={salvar}>Salvar</Botao>
+            </div>
+          </div>
+          {erro && <p className="text-[12px] text-[#d33a3c]">{erro}</p>}
+        </div>
+      )}
+      <div className="divide-y divide-[rgba(60,60,67,0.08)]">
+        {lista.map(r => (
+          <div key={r.id} className="py-2.5 flex items-start gap-3">
+            <span className="text-[12px] font-mono font-semibold text-[#8456e8] w-24 shrink-0 pt-px">{r.atalho}</span>
+            <div className="flex-1 min-w-0">
+              <p className={`text-[12.5px] whitespace-pre-wrap ${r.ativa ? "text-[#191625]" : "text-[#898892] line-through"}`}>{r.corpo}</p>
+              {r.quando_usar && r.quando_usar !== "—" && <p className="text-[11px] text-[#898892] mt-0.5">{r.quando_usar}</p>}
+            </div>
+            <div className="flex gap-1 shrink-0">
+              <button onClick={() => setEditando(r)} className="text-[11.5px] font-semibold text-[#8456e8] px-1.5">Editar</button>
+              <button onClick={async () => { await fetch("/api/whatsapp/rapidas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...r, ativa: !r.ativa }) }); carregar() }}
+                className="text-[11.5px] text-[#898892] px-1.5">{r.ativa ? "Desativar" : "Ativar"}</button>
+              <button onClick={() => apagar(r.id)} aria-label="Apagar" className="text-[#898892] hover:text-[#d33a3c] px-1"><X className="w-3.5 h-3.5" /></button>
+            </div>
+          </div>
+        ))}
+        {!lista.length && <p className="text-[12px] text-[#898892] py-3">Nenhuma mensagem rápida ainda.</p>}
+      </div>
     </Cartao>
   )
 }

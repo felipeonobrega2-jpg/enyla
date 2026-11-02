@@ -8,6 +8,8 @@ import { clienteDaConversa, Vinculos } from "../lib/vinculoWhatsapp"
 import { lerOrigem } from "../lib/origemWhatsapp"
 import { ETAPAS, Etapa, posicaoNoFunil } from "../lib/funilWhatsapp"
 import { Segmentado } from "./ds"
+import { filtrar, preencher, Rapida } from "../lib/mensagensRapidas"
+import { COL_HOT } from "../types"
 import { brl } from "../utils"
 
 type Conversa = {
@@ -386,7 +388,8 @@ export default function WhatsAppView({
               })}
             </div>
 
-            <Compositor jid={ativa.jid}
+            <Compositor jid={ativa.jid} contato={ativa.nome} cliente={clienteDe(ativa)?.nome ?? null}
+              orcamento={(() => { const cl = clienteDe(ativa); return cl ? kanban.filter(k => nomeChave(k.nomeCliente) === nomeChave(cl.nome) && (k.coluna === 0 || k.coluna === COL_HOT)).map(k => k.numero).pop() ?? null : null })()}
               onOtimista={m => { rolouParaCima.current = false; setMensagens(prev => [...prev, m]) }}
               onResultado={(tmp, real) => setMensagens(prev => real && prev.some(x => x.id === real)
                 ? prev.filter(x => x.id !== tmp)   // a atualização automática já trouxe a confirmada
@@ -567,8 +570,11 @@ function MidiaMensagem({ id, tipo: bruto, nome }: { id: string; tipo: string; no
 
 // Caixa de resposta: Enter envia, Shift+Enter pula linha; clipe anexa foto/arquivo (com legenda).
 // A mensagem aparece na hora (reloginho) e vira ✓ quando o WhatsApp confirma, sem travar a digitação.
-export function Compositor({ jid, onOtimista, onResultado }: {
+export function Compositor({ jid, contato = "", cliente = null, orcamento = null, onOtimista, onResultado }: {
   jid: string
+  contato?: string
+  cliente?: string | null
+  orcamento?: string | null
   onOtimista: (m: Mensagem) => void
   onResultado: (tmpId: string, realId: string | null) => void
 }) {
@@ -577,6 +583,22 @@ export function Compositor({ jid, onOtimista, onResultado }: {
   const [erro, setErro] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const areaRef = useRef<HTMLTextAreaElement>(null)
+  // Mensagens rápidas: "/" abre a lista; setas escolhem, Enter insere já preenchida
+  const [rapidas, setRapidas] = useState<Rapida[]>([])
+  const [sel, setSel] = useState(0)
+  const [fechou, setFechou] = useState(false)
+  useEffect(() => { fetch("/api/whatsapp/rapidas").then(r => r.json()).then(d => setRapidas(Array.isArray(d) ? d : [])).catch(() => {}) }, [])
+  const sugestoes = texto.startsWith("/") && !/\s/.test(texto) && !fechou ? filtrar(rapidas, texto) : []
+  async function inserir(r: Rapida) {
+    const t = await preencher(r.corpo ?? "", {
+      contato, cliente,
+      links: {
+        pagina: async () => cliente ? (await fetch(`/api/cliente/link?nome=${encodeURIComponent(cliente)}`).then(x => x.json()).catch(() => null))?.url ?? null : null,
+        proposta: async () => orcamento ? (await fetch(`/api/aprovacao/link?numero=${encodeURIComponent(orcamento)}`).then(x => x.json()).catch(() => null))?.url ?? null : null,
+      },
+    })
+    setTexto(t); setSel(0); areaRef.current?.focus()
+  }
   function enviar() {
     const t = texto.trim(), a = arquivo
     if (!t && !a) return
@@ -606,14 +628,34 @@ export function Compositor({ jid, onOtimista, onResultado }: {
         </div>
       )}
       {erro && <p className="mb-2 text-[12px] text-[#d33a3c]">{erro}</p>}
+      {sugestoes.length > 0 && (
+        <div className="mb-2 rounded-xl overflow-hidden shadow-lg max-w-xl" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+          {sugestoes.map((r, i) => (
+            <button key={r.id} onMouseDown={e => { e.preventDefault(); inserir(r) }} onMouseEnter={() => setSel(i)}
+              className="w-full text-left px-3 py-2 flex gap-3 items-baseline" style={{ background: i === sel ? "rgba(132,86,232,0.08)" : undefined }}>
+              <span className="text-[12px] font-mono font-semibold shrink-0" style={{ color: "#8456e8" }}>{r.atalho}</span>
+              <span className="text-[12.5px] truncate" style={{ color: "var(--text-main)" }}>{r.corpo}</span>
+            </button>
+          ))}
+          <p className="px-3 py-1.5 text-[10.5px] border-t" style={{ color: "var(--text-faint)", borderColor: "var(--border)" }}>↑↓ escolher · Enter inserir · Esc fechar · edite em Configurações → Mensagens rápidas</p>
+        </div>
+      )}
       <div className="flex items-end gap-2">
         <button onClick={() => inputRef.current?.click()} aria-label="Anexar foto ou arquivo" title="Anexar foto ou arquivo"
           className="w-10 h-10 rounded-xl grid place-items-center shrink-0 transition-colors hover:bg-black/5" style={{ color: "var(--text-sub)" }}>
           <Paperclip className="w-5 h-5" />
         </button>
         <input ref={inputRef} type="file" className="hidden" onChange={e => { setArquivo(e.target.files?.[0] ?? null); e.target.value = "" }} />
-        <textarea ref={areaRef} value={texto} onChange={e => setTexto(e.target.value)} rows={1}
-          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar() } }}
+        <textarea ref={areaRef} value={texto} onChange={e => { setTexto(e.target.value); setFechou(false); setSel(0) }} rows={1}
+          onKeyDown={e => {
+            if (sugestoes.length) {
+              if (e.key === "ArrowDown") { e.preventDefault(); setSel(i => (i + 1) % sugestoes.length); return }
+              if (e.key === "ArrowUp") { e.preventDefault(); setSel(i => (i - 1 + sugestoes.length) % sugestoes.length); return }
+              if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); inserir(sugestoes[Math.min(sel, sugestoes.length - 1)]); return }
+              if (e.key === "Escape") { setFechou(true); return }
+            }
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar() }
+          }}
           placeholder={arquivo ? "Legenda (opcional)" : "Escreva uma mensagem"}
           className="flex-1 resize-none rounded-xl px-3.5 py-2.5 text-[13.5px] outline-none max-h-40"
           style={{ background: "var(--bg-page)", color: "var(--text-main)", border: "1px solid var(--border)", fieldSizing: "content" } as React.CSSProperties} />

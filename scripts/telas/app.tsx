@@ -34,6 +34,12 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
   const u = String(url)
   if (u.startsWith("/api/data")) return new Response(JSON.stringify({ ...dados, config, clientes: [], propostasCustom: [] }))
   if (u.startsWith("/api/aprovacao/link")) return new Response(JSON.stringify({ url: "https://exemplo/aprovar/X?t=abc" }))
+  if (u.startsWith("/api/cliente/link")) return new Response(JSON.stringify({ url: "https://exemplo/c/abc" }))
+  if (u.startsWith("/api/whatsapp/rapidas")) return new Response(JSON.stringify([
+    { id: "1", atalho: "/m1", quando_usar: "Primeiro contato", corpo: "Olá, {{nome}}! Aqui é da Enyla Embalagens. Você está buscando embalagens para qual produto?", ativa: true, ordem: 1 },
+    { id: "2", atalho: "/pix", quando_usar: "Cobrar sinal", corpo: "Oi {{nome}}! Segue sua página com o Pix: {{pagina_cliente}}", ativa: true, ordem: 2 },
+    { id: "3", atalho: "/m4", quando_usar: "Lead frio", corpo: "Olá {{nome}}! Passando pra saber se ainda tem interesse nas embalagens.", ativa: false, ordem: 4 },
+  ]))
   if (u.startsWith("/api/")) return new Response("{}", { status: 404 })
   return orig(url, o)
 }
@@ -54,7 +60,7 @@ function Telas() {
     </div>)
     case "whats": return pagina(<ConexaoWhats onAtualizar={() => {}} status={{ segredoConfigurado: true, totalConversas: 0,
       evolution: { configurado: true, alcancavel: true, autorizado: true, conectado: false, estado: "close", webhookOk: false, webhookDestino: "evolution-api-production.up.railway.app/webhook", host: "evo.enyla.com.br" } }} />)
-    case "compositor": return <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#efeae2" }}><div style={{ flex: 1 }} /><Compositor jid="x" onOtimista={() => {}} onResultado={() => {}} /></div>
+    case "compositor": return <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#efeae2" }}><div style={{ flex: 1 }} /><Compositor jid="x" contato="Raniere" cliente="Raniere Péricles" onOtimista={() => {}} onResultado={() => {}} /></div>
     case "wacliente": {
       const resumo = new Map([["raniere pericles", { pedidos: 5, vendido: 27561, deve: 9540 }]])
       return pagina(<div className="space-y-8 bg-white p-6 rounded-xl">
