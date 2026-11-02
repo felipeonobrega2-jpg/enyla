@@ -37,6 +37,12 @@ if (escuro) document.documentElement.classList.add("dark")
 // Abas do Financeiro: "financeiro-receber" abre a aba "receber"
 if (tela.startsWith("financeiro-")) sessionStorage.setItem("fin:tab", tela.slice(11))
 
+// Microfones: simula um Mac com o iPhone por perto (Continuidade)
+if (tela === "compositor-mic" && navigator.mediaDevices) navigator.mediaDevices.enumerateDevices = async () => [
+  { kind: "audioinput", deviceId: "mac", label: "Microfone (MacBook Air)", groupId: "1" },
+  { kind: "audioinput", deviceId: "iph", label: "Microfone do iPhone de Felipe", groupId: "2" },
+] as MediaDeviceInfo[]
+
 // O celular busca /api/data e /api/aprovacao/link: responde com os dados fictícios
 const orig = window.fetch
 window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {

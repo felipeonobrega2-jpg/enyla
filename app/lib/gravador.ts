@@ -34,14 +34,17 @@ export function useGravador() {
   }, [])
   useEffect(() => () => { soltar(); if (audio) URL.revokeObjectURL(audio.url) }, [soltar, audio])
 
-  const iniciar = useCallback(async () => {
+  // deviceId: microfone escolhido (ex.: o do iPhone pela Continuidade da Apple); sem ele, o padrão do sistema
+  const iniciar = useCallback(async (deviceId?: string) => {
     setErro(null); setAudio(null); setSegundos(0); setNiveis([])
     if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) { setEstado("erro"); setErro("Este navegador não grava áudio."); return }
     setEstado("pedindo")
     try {
-      stream.current = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
+      stream.current = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, ...(deviceId ? { deviceId: { exact: deviceId } } : {}) } })
     } catch {
-      setEstado("erro"); setErro("Sem acesso ao microfone. Libere no cadeado ao lado do endereço do site."); return
+      setEstado("erro")
+      setErro(deviceId ? "Esse microfone não respondeu. Se for o iPhone: deixe-o perto do Mac, com Wi-Fi e Bluetooth ligados." : "Sem acesso ao microfone. Libere no cadeado ao lado do endereço do site.")
+      return
     }
     const mime = TIPOS.find(t => MediaRecorder.isTypeSupported?.(t))
     const r = new MediaRecorder(stream.current, mime ? { mimeType: mime } : undefined)
@@ -101,3 +104,21 @@ export function useGravador() {
 
 export const tempo = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
 export const extensaoAudio = (tipo: string) => tipo.includes("mp4") ? "m4a" : tipo.includes("ogg") ? "ogg" : "webm"
+
+// Microfones disponíveis. Os nomes só aparecem depois da primeira permissão de microfone no site.
+// O iPhone aparece aqui pela Continuidade da Apple (Mac + iPhone com o mesmo Apple ID, Wi-Fi e Bluetooth).
+export type Microfone = { id: string; nome: string; iphone: boolean }
+export function useMicrofones(atualizar: unknown) {
+  const [lista, setLista] = useState<Microfone[]>([])
+  useEffect(() => {
+    const md = typeof navigator !== "undefined" ? navigator.mediaDevices : undefined
+    if (!md?.enumerateDevices) return
+    const ler = () => md.enumerateDevices().then(ds => setLista(ds
+      .filter(d => d.kind === "audioinput" && d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications")
+      .map(d => ({ id: d.deviceId, nome: d.label || "Microfone", iphone: /iphone/i.test(d.label) })))).catch(() => {})
+    ler()
+    md.addEventListener?.("devicechange", ler)
+    return () => md.removeEventListener?.("devicechange", ler)
+  }, [atualizar])
+  return lista
+}

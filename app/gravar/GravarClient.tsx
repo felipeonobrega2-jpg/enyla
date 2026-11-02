@@ -55,7 +55,7 @@ export function GravarClient({ token, nome, expira, onFechar, onEnviado }: { tok
             {gravando ? (
               <button onClick={() => grav.parar()} aria-label="Parar" className="w-24 h-24 rounded-full grid place-items-center bg-[#d33a3c] shadow-[0_0_0_10px_rgba(211,58,60,0.2)]"><Square className="w-9 h-9 fill-white" /></button>
             ) : grav.estado === "pronto" ? null : (
-              <button onClick={grav.iniciar} disabled={grav.estado === "pedindo"} aria-label="Gravar" className="w-24 h-24 rounded-full grid place-items-center bg-[#25a35a] shadow-[0_0_0_10px_rgba(37,163,90,0.18)] active:scale-95 transition-transform">
+              <button onClick={() => grav.iniciar()} disabled={grav.estado === "pedindo"} aria-label="Gravar" className="w-24 h-24 rounded-full grid place-items-center bg-[#25a35a] shadow-[0_0_0_10px_rgba(37,163,90,0.18)] active:scale-95 transition-transform">
                 <Mic className="w-10 h-10" />
               </button>
             )}

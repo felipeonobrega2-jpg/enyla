@@ -11,7 +11,7 @@ import { Segmentado } from "./ds"
 import { FilaMensagens } from "./FilaMensagens"
 import { montarFila, AvisoPedido } from "../lib/filaMensagens"
 import { Atendimento, DadosPedido, ROTULO_ALERTA, temDados } from "../lib/atendente"
-import { useGravador, tempo, extensaoAudio } from "../lib/gravador"
+import { useGravador, useMicrofones, tempo, extensaoAudio } from "../lib/gravador"
 import QRCode from "qrcode"
 import { filtrar, preencher, Rapida } from "../lib/mensagensRapidas"
 import { COL_HOT } from "../types"
@@ -803,6 +803,9 @@ export function Compositor({ jid, contato = "", cliente = null, orcamento = null
   // Áudio: gravar no notebook ou pelo celular (QR code)
   const grav = useGravador()
   const [menuMic, setMenuMic] = useState(false)
+  const microfones = useMicrofones(`${menuMic}${grav.estado}`)
+  const iphone = microfones.find(m => m.iphone)
+  const outros = microfones.filter(m => !m.iphone)
   const [celular, setCelular] = useState(false)
   function enviarAudio(blob: Blob) {
     const tmp = `tmp-${Date.now()}`
@@ -900,14 +903,24 @@ export function Compositor({ jid, contato = "", cliente = null, orcamento = null
             {menuMic && (
               <div className="absolute bottom-12 right-0 z-30 w-64 rounded-xl shadow-xl overflow-hidden wa-espiar" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)", transformOrigin: "bottom right" }}
                 onMouseLeave={() => setMenuMic(false)}>
-                <button onClick={() => { setMenuMic(false); grav.iniciar() }} className="w-full text-left px-3.5 py-2.5 flex items-center gap-3 hover:bg-[#25a35a]/[0.08]">
+                {iphone && (
+                  <button onClick={() => { setMenuMic(false); grav.iniciar(iphone.id) }} className="w-full text-left px-3.5 py-2.5 flex items-center gap-3 hover:bg-[#25a35a]/[0.08] border-b" style={{ borderColor: "var(--border)" }}>
+                    <Smartphone className="w-4 h-4 text-[#1d8a4b]" />
+                    <span><span className="block text-[12.5px] font-semibold" style={{ color: "var(--text-main)" }}>Microfone do iPhone</span>
+                      <span className="block text-[11px]" style={{ color: "var(--text-faint)" }}>pela Continuidade da Apple, sem abrir nada</span></span>
+                  </button>
+                )}
+                <button onClick={() => { setMenuMic(false); grav.iniciar(outros.length === 1 ? outros[0].id : undefined) }} className="w-full text-left px-3.5 py-2.5 flex items-center gap-3 hover:bg-[#25a35a]/[0.08]">
                   <Laptop className="w-4 h-4 text-[#1d8a4b]" />
-                  <span><span className="block text-[12.5px] font-semibold" style={{ color: "var(--text-main)" }}>Gravar aqui</span>
-                    <span className="block text-[11px]" style={{ color: "var(--text-faint)" }}>microfone deste computador</span></span>
+                  <span className="min-w-0"><span className="block text-[12.5px] font-semibold" style={{ color: "var(--text-main)" }}>Gravar aqui</span>
+                    <span className="block text-[11px] truncate" style={{ color: "var(--text-faint)" }}>{outros.length === 1 ? outros[0].nome : "microfone deste computador"}</span></span>
                 </button>
+                {outros.length > 1 && outros.map(m => (
+                  <button key={m.id} onClick={() => { setMenuMic(false); grav.iniciar(m.id) }} className="w-full text-left pl-10 pr-3.5 py-1.5 text-[11.5px] truncate hover:bg-[#25a35a]/[0.08]" style={{ color: "var(--text-sub)" }}>{m.nome}</button>
+                ))}
                 <button onClick={() => { setMenuMic(false); setCelular(true) }} className="w-full text-left px-3.5 py-2.5 flex items-center gap-3 border-t hover:bg-[#25a35a]/[0.08]" style={{ borderColor: "var(--border)" }}>
                   <Smartphone className="w-4 h-4 text-[#1d8a4b]" />
-                  <span><span className="block text-[12.5px] font-semibold" style={{ color: "var(--text-main)" }}>Gravar no celular</span>
+                  <span><span className="block text-[12.5px] font-semibold" style={{ color: "var(--text-main)" }}>Gravar no celular (sistema aberto)</span>
                     <span className="block text-[11px]" style={{ color: "var(--text-faint)" }}>abre sozinho no celular com o sistema aberto</span></span>
                 </button>
               </div>
