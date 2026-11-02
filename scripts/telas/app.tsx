@@ -24,9 +24,13 @@ import { ModalLancamento } from "@/app/components/FinanceiroView"
 import { EnviarWhatsapp } from "@/app/components/EnviarWhatsapp"
 import { PainelToken } from "@/app/components/MetaAdsView"
 import { FilaMensagens } from "@/app/components/FilaMensagens"
+import { PedidosUnificadoView } from "@/app/components/PedidosUnificadoView"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas } from "@/app/components/WhatsAppView"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
+// Telas "-escuro": mesmo conteúdo no tema escuro
+const escuro = tela.endsWith("-escuro")
+if (escuro) document.documentElement.classList.add("dark")
 // Abas do Financeiro: "financeiro-receber" abre a aba "receber"
 if (tela.startsWith("financeiro-")) sessionStorage.setItem("fin:tab", tela.slice(11))
 
@@ -121,6 +125,9 @@ function Telas() {
         clienteDe={c => nomes.includes(c.nome) ? { nome: c.nome } : null}
         cardsDe={c => dados.kanban.filter(k => k.nomeCliente === c.nome)} /></div>
     }
+    case "pedidos": case "pedidos-escuro": case "pedidos-aberto": case "pedidos-aberto-escuro": case "pedidos-quadro-escuro": case "pedidos-visao-escuro":
+      return <div style={{ minHeight: "100vh", padding: 24 }} className={escuro ? "" : "bg-[#f5f5f7]"}><PedidosUnificadoView isDark={escuro} kanban={dados.kanban} historico={dados.historico as never}
+        lancamentos={lancs} lotes={[]} onMove={() => {}} onDelete={() => {}} onSetMotivo={() => {}} onFechamento={() => {}} onNovoLancamento={() => {}} onDetalhes={() => {}} /></div>
     case "fila": case "fila-m": {
       const h = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString()
       const cv = (jid: string, nome: string, rec: number, env: number, extra = {}) => ({ jid, nome, ultima_recebida_at: h(rec), ultima_enviada_at: h(env), ...extra })

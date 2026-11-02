@@ -525,7 +525,7 @@ function PrazosTimeline({
       </div>
 
       {/* Progress bar */}
-      <div className="h-[3px] bg-[rgba(0,0,0,0.06)] rounded-full mb-4 overflow-hidden">
+      <div className="h-[3px] rounded-full mb-4 overflow-hidden" style={{ background: "var(--bg-alt)" }}>
         <div className="h-full rounded-full transition-all duration-500"
           style={{ width: `${progPct}%`, background: progPct === 100 ? "#30D158" : "#8456e8" }} />
       </div>
@@ -538,7 +538,7 @@ function PrazosTimeline({
             <div key={idx} className="flex items-start gap-2 min-w-0">
               {/* status dot */}
               <div className={`w-[14px] h-[14px] rounded-full shrink-0 mt-[1px] flex items-center justify-center transition-colors ${
-                isDone ? "bg-[rgba(132,86,232,0.15)]" : "border border-[rgba(0,0,0,0.18)] bg-white"
+                isDone ? "bg-[rgba(132,86,232,0.15)]" : "border border-[var(--border)] bg-white"
               }`}>
                 {isDone && (
                   <svg className="w-2 h-2 text-[#8456e8]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}>
@@ -696,11 +696,11 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
   onSelectCard?: (cardId: string) => void
   onCopiarPedido?: (entry: OrderEntry) => void
 }) {
-  const cardBg = "#fff"
-  const border  = "rgba(0,0,0,0.07)"
+  const cardBg = "var(--bg-surface)"
+  const border  = "var(--border)"
   const txt     = "var(--text-main)"
   const sub     = "var(--text-faint)"
-  const divider = "rgba(0,0,0,0.05)"
+  const divider = "var(--border)"
   const innerBg = "rgba(116,116,128,0.03)"
 
   if (lista.length === 0) return (
@@ -755,7 +755,7 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
 
         return (
           <div key={entry.key} className={`rounded-xl overflow-hidden ds-cartao ${isOpen ? "shadow-[0_8px_24px_rgba(25,22,37,0.07)]" : "hover:shadow-[0_4px_14px_rgba(25,22,37,0.06)]"}`}
-            style={{ background: entry.cards.some(c => selectedCardIds?.has(c.id)) ? "rgba(132,86,232,0.06)" : "white", borderColor: entry.cards.some(c => selectedCardIds?.has(c.id)) ? "#8456e8" : undefined }}>
+            style={{ background: entry.cards.some(c => selectedCardIds?.has(c.id)) ? "rgba(132,86,232,0.06)" : "var(--bg-surface)", borderColor: entry.cards.some(c => selectedCardIds?.has(c.id)) ? "#8456e8" : undefined }}>
             <div className="group/row flex items-center gap-3 px-5 py-3.5 cursor-pointer select-none hover:bg-[rgba(116,116,128,0.03)] transition-colors" onClick={e => {
               if (e.metaKey || e.ctrlKey) { e.preventDefault(); entry.cards.forEach(c => onSelectCard?.(c.id)) }
               else toggle(entry.key)

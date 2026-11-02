@@ -2801,6 +2801,10 @@ export default function Home() {
         <ModalLancamento
           inicial={modalLancPedidos}
           kanban={kanban}
+          categoriasReceita={config?.categoriasReceita}
+          categoriasDespesa={config?.categoriasDespesa}
+          contas={config?.contas}
+          fornecedores={config?.fornecedores}
           onSave={l => {
             setLancamentos(prev => [l, ...prev])
             fetch("/api/lancamentos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(l) })
