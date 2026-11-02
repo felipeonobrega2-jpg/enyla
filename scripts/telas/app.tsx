@@ -54,6 +54,12 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       c("6@lid", "Juliana", "ok", 4, 3.5),
     ]))
   }
+  if (u.startsWith("/api/whatsapp/atender")) return new Response(JSON.stringify({
+    resposta: "Show! Pra 2 mil caixinhas de 100ml fica bem em conta 🙌🏻\n\nMe passa as medidas do seu frasco (altura, largura e profundidade) que eu já te mando o orçamento?",
+    etapa: "levantando_dados", alerta: "preco", motivo_alerta: "Pediu preço; falta a medida do frasco para orçar.", sugere_video: true,
+    dados: { produto: "perfume árabe 100ml", volume_ml: 100, caixa_cm: null, frasco_cm: null, quantidade: 2000, tem_arte: null, resumo: "Perfume árabe 100ml, 2.000 un" },
+    ultimaId: "e",
+  }))
   if (u.startsWith("/api/whatsapp/mensagens/")) {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
     const m = (id: string, eu: boolean, corpo: string, min: number) => ({ id, jid: "1@lid", from_me: eu, corpo, tipo: "text", media_url: null, ts: h(min), kanban_card_id: null, status: eu ? "lida" : null })

@@ -31,7 +31,7 @@ for (const [tela, largura] of telas.filter(([t]) => !so || so.includes(t))) {
   // Conciliação: importa o extrato de exemplo
   if (tela === "financeiro-conciliacao") { await p.setInputFiles("input[type=file]", path.join(dir, "extrato-exemplo.ofx")); await p.waitForTimeout(800) }
   // WhatsApp: abre uma conversa e para o mouse em outra linha (espiada + ações)
-  if (tela === "whatsview") { await p.click("[data-linha='2@lid']"); await p.waitForTimeout(500) }
+  if (tela === "whatsview") { await p.click("[data-linha='2@lid']"); await p.waitForTimeout(1500) }
   if (tela === "whatsview-espiar") { await p.click("[data-linha='3@lid']"); await p.hover("[data-linha='1@lid']"); await p.waitForTimeout(900) }
   if (tela === "funil-espiar") { await p.hover("[data-linha='4@lid']"); await p.waitForTimeout(900) }
   await p.screenshot({ path: path.join(saida, `${tela}.png`), fullPage: true })

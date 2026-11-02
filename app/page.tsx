@@ -6,6 +6,7 @@ import { IdeiasView } from "./components/IdeiasView"
 import { signOut } from "next-auth/react"
 import WhatsAppView from "./components/WhatsAppView"
 import { podarDispensados } from "./lib/filaMensagens"
+import { formDoAtendimento } from "./lib/atendente"
 import Image from "next/image"
 import { useTheme } from "./components/ThemeProvider"
 import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, CustoSnapshot, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO, COL_HOT, COLUNAS_KANBAN, Parceiro, NegocioParceiro, LancamentoFinanceiro, Lote, TipoCaixa, PrazoEtapas, AprovacaoOnline } from "./types"
@@ -2450,9 +2451,9 @@ export default function Home() {
               onCriarEtiqueta={e => salvarConfigTudo({ ...config, etiquetasWhatsapp: [...(config.etiquetasWhatsapp ?? []).filter(x => x.nome !== e.nome), e] })}
               onVincular={(jid, nome) => salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [jid]: nome ?? "" } })}
               onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }}
-              onCriarCard={(nome, jid) => {
-                // Orçamento novo já com o cliente; a conversa fica ligada a ele (o funil acompanha o orçamento)
-                setForm({ ...FORM_INICIAL, nomeCliente: nome }); setResult(null); setDxfNome(null)
+              onCriarCard={(nome, jid, dados) => {
+                // Orçamento novo já com o cliente (e o que ele contou na conversa); a conversa fica ligada a ele
+                setForm({ ...FORM_INICIAL, nomeCliente: nome, ...(dados ? formDoAtendimento(dados) : {}) }); setResult(null); setDxfNome(null)
                 if (config.vinculosWhatsapp?.[jid] !== nome) salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [jid]: nome } })
                 navigate("orcamento")
               }}

@@ -1,6 +1,6 @@
 "use client"
 
-import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag, ChevronRight, Reply, Keyboard } from "lucide-react"
+import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag, ChevronRight, Reply, Keyboard, Sparkles } from "lucide-react"
 import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, nomeChave } from "../lib/negocio"
@@ -10,6 +10,7 @@ import { ETAPAS, Etapa, posicaoNoFunil, estaFechada, DIAS_PERDIDO } from "../lib
 import { Segmentado } from "./ds"
 import { FilaMensagens } from "./FilaMensagens"
 import { montarFila, AvisoPedido } from "../lib/filaMensagens"
+import { Atendimento, DadosPedido, ROTULO_ALERTA, temDados } from "../lib/atendente"
 import { filtrar, preencher, Rapida } from "../lib/mensagensRapidas"
 import { COL_HOT } from "../types"
 
@@ -89,7 +90,7 @@ export default function WhatsAppView({
   onDispensar?: (id: string) => void
   etiquetasDef?: EtiquetaDef[]
   onCriarEtiqueta?: (e: EtiquetaDef) => void
-  onCriarCard: (nome: string, jid: string) => void
+  onCriarCard: (nome: string, jid: string, dados?: DadosPedido) => void
   kanban?: KanbanCard[]
   lancamentos?: LancamentoFinanceiro[]
   vinculos?: Vinculos
@@ -445,6 +446,7 @@ export default function WhatsAppView({
           onFechar={fecharEspiada}
           onAbrir={() => abrirConversa(espiada.conversa)}
           onEnviada={t => marcarEnviada(espiada.conversa.jid, t)}
+          onOrcamento={d => onCriarCard(clienteDe(espiada.conversa)?.nome ?? espiada.conversa.nome, espiada.conversa.jid, d)}
           onMouseEnter={limparTimers} onMouseLeave={soltarEspiada} />
       )}
 
@@ -482,7 +484,7 @@ export default function WhatsAppView({
                 <Archive className="w-4 h-4" />{estaFechada(ativa) ? "Reabrir" : "Fechar"}
               </button>
               <button
-                onClick={() => onCriarCard(clienteDe(ativa)?.nome ?? ativa.nome, ativa.jid)}
+                onClick={() => onCriarCard(clienteDe(ativa)?.nome ?? ativa.nome, ativa.jid, sugestoes.get(ativa.jid)?.dados)}
                 className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3.5 py-2 rounded-xl transition-colors hover:opacity-90"
                 style={{ background: "#8456e8", color: "#fff" }}
               >
@@ -551,7 +553,9 @@ export default function WhatsAppView({
               })}
             </div>
 
-            <Compositor jid={ativa.jid} contato={ativa.nome} cliente={clienteDe(ativa)?.nome ?? null}
+            <RespostaComSugestao key={ativa.jid} jid={ativa.jid} contato={ativa.nome} cliente={clienteDe(ativa)?.nome ?? null}
+              ultima={mensagens[mensagens.length - 1]} auto={!loadingMsgs}
+              onOrcamento={d => onCriarCard(clienteDe(ativa)?.nome ?? ativa.nome, ativa.jid, d)}
               orcamento={(() => { const cl = clienteDe(ativa); return cl ? kanban.filter(k => nomeChave(k.nomeCliente) === nomeChave(cl.nome) && (k.coluna === 0 || k.coluna === COL_HOT)).map(k => k.numero).pop() ?? null : null })()}
               onEnviarEProxima={abrirProxima}
               onOtimista={m => { rolouParaCima.current = false; setMensagens(prev => [...prev, m]); marcarEnviada(ativa.jid, m.corpo ?? "") }}
@@ -734,8 +738,11 @@ function MidiaMensagem({ id, tipo: bruto, nome }: { id: string; tipo: string; no
 
 // Caixa de resposta: Enter envia, Shift+Enter pula linha; clipe anexa foto/arquivo (com legenda).
 // A mensagem aparece na hora (reloginho) e vira ✓ quando o WhatsApp confirma, sem travar a digitação.
-export function Compositor({ jid, contato = "", cliente = null, orcamento = null, onOtimista, onResultado, onEnviarEProxima, autoFoco, compacto, onEnviou }: {
+export function Compositor({ jid, contato = "", cliente = null, orcamento = null, onOtimista, onResultado, onEnviarEProxima, autoFoco, compacto, onEnviou, sugestao, usarTexto, colado }: {
   jid: string
+  colado?: boolean                           // logo abaixo da sugestão (sem a linha de cima)
+  sugestao?: string                          // Tab com a caixa vazia usa a resposta sugerida
+  usarTexto?: { texto: string; vez: number }  // botão "Usar" da sugestão
   onEnviarEProxima?: () => void   // ⌘/Ctrl+Enter: envia e já abre a próxima conversa esperando você
   onEnviou?: () => void
   autoFoco?: boolean
@@ -757,6 +764,13 @@ export function Compositor({ jid, contato = "", cliente = null, orcamento = null
   const [fechou, setFechou] = useState(false)
   useEffect(() => { fetch("/api/whatsapp/rapidas").then(r => r.json()).then(d => setRapidas(Array.isArray(d) ? d : [])).catch(() => {}) }, [])
   useEffect(() => { if (autoFoco) areaRef.current?.focus() }, [autoFoco, jid])
+  // "Usar" da sugestão: troca o texto (durante a renderização, sem efeito em cascata) e põe o cursor no fim
+  const [vezUsada, setVezUsada] = useState<number | undefined>()
+  if (usarTexto && usarTexto.vez !== vezUsada) { setVezUsada(usarTexto.vez); setTexto(usarTexto.texto) }
+  useEffect(() => {
+    if (!usarTexto) return
+    requestAnimationFrame(() => { const a = areaRef.current; if (a) { a.focus(); a.setSelectionRange(a.value.length, a.value.length) } })
+  }, [usarTexto])
   const sugestoes = texto.startsWith("/") && !/\s/.test(texto) && !fechou ? filtrar(rapidas, texto) : []
   async function inserir(r: Rapida) {
     const t = await preencher(r.corpo ?? "", {
@@ -790,7 +804,7 @@ export function Compositor({ jid, contato = "", cliente = null, orcamento = null
     }).catch(() => { onResultado(tmp, null); setErro("Sem conexão: a mensagem não foi enviada.") })
   }
   return (
-    <div className={`shrink-0 border-t ${compacto ? "px-3 py-2.5" : "px-4 py-3"}`} style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
+    <div className={`shrink-0 ${colado ? "" : "border-t"} ${compacto ? "px-3 py-2.5" : "px-4 py-3"}`} style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
       {arquivo && (
         <div className="mb-2 flex items-center gap-2 text-[12px] px-3 py-1.5 rounded-lg w-fit max-w-full" style={{ background: "var(--bg-alt)", color: "var(--text-main)" }}>
           <Paperclip className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{arquivo.name}</span>
@@ -824,12 +838,13 @@ export function Compositor({ jid, contato = "", cliente = null, orcamento = null
               if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); inserir(sugestoes[Math.min(sel, sugestoes.length - 1)]); return }
               if (e.key === "Escape") { setFechou(true); return }
             }
+            if (e.key === "Tab" && !e.shiftKey && !texto && sugestao) { e.preventDefault(); setTexto(sugestao); return }
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && onEnviarEProxima) { e.preventDefault(); if (texto.trim() || arquivo) enviar(); onEnviarEProxima(); return }
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar() }
             if (e.key === "Escape") areaRef.current?.blur()
           }}
           data-compositor={compacto ? "espiada" : "principal"}
-          placeholder={arquivo ? "Legenda (opcional)" : compacto ? "Responder… (Enter envia, / mensagens rápidas)" : "Escreva uma mensagem"}
+          placeholder={arquivo ? "Legenda (opcional)" : sugestao ? "Tab usa a sugestão · Enter envia" : compacto ? "Responder… (Enter envia, / mensagens rápidas)" : "Escreva uma mensagem"}
           className="flex-1 resize-none rounded-xl px-3.5 py-2.5 text-[13.5px] outline-none max-h-40"
           style={{ background: "var(--bg-page)", color: "var(--text-main)", border: "1px solid var(--border)", fieldSizing: "content" } as React.CSSProperties} />
         <button onClick={enviar} disabled={!texto.trim() && !arquivo} aria-label="Enviar"
@@ -1213,8 +1228,9 @@ function useEspiada(aoFixar?: (c: Conversa) => void) {
 }
 
 // Espiada: últimas mensagens + resposta, sem abrir a conversa. Abre parando o mouse na linha (ou no botão Responder).
-function Espiada({ conversa, topo, esquerda, fixa, onFixar, onFechar, onAbrir, onEnviada, onMouseEnter, onMouseLeave }: {
+function Espiada({ conversa, topo, esquerda, fixa, onFixar, onFechar, onAbrir, onEnviada, onMouseEnter, onMouseLeave, onOrcamento }: {
   conversa: Conversa
+  onOrcamento?: (d: DadosPedido) => void
   topo: number
   esquerda: number
   fixa: boolean
@@ -1280,7 +1296,8 @@ function Espiada({ conversa, topo, esquerda, fixa, onFixar, onFechar, onAbrir, o
         ))}
         <div ref={fimRef} />
       </div>
-      <Compositor compacto autoFoco={fixa} jid={conversa.jid} contato={conversa.nome}
+      <RespostaComSugestao compacto autoFoco={fixa} jid={conversa.jid} contato={conversa.nome}
+        ultima={msgs?.[msgs.length - 1]} auto={fixa && !!msgs} onOrcamento={onOrcamento}
         onOtimista={m => { setMsgs(prev => [...(prev ?? []), m]); onEnviada(m.corpo ?? "") }}
         onResultado={(tmp, real) => {
           if (real) setBase(b => new Set(b).add(real))
@@ -1288,4 +1305,110 @@ function Espiada({ conversa, topo, esquerda, fixa, onFixar, onFechar, onAbrir, o
         }} />
     </div>
   )
+}
+
+// ── Atendente: resposta sugerida no seu tom + dados do pedido ─────────────────
+// Guardada por conversa (vale até chegar mensagem nova). Gera sozinha quando o cliente está esperando você.
+const sugestoes = new Map<string, Atendimento>()
+function useAtendimento(jid: string, ultima: { id: string; from_me: boolean } | undefined, auto: boolean) {
+  const [at, setAt] = useState<Atendimento | null>(() => sugestoes.get(jid) ?? null)
+  const [carregando, setCarregando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const pedindo = useRef<string | null>(null)
+  const gerar = useCallback(async () => {
+    pedindo.current = jid
+    setCarregando(true); setErro(null)
+    const r = await fetch("/api/whatsapp/atender", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid }) }).catch(() => null)
+    const d = r ? await r.json().catch(() => null) : null
+    if (pedindo.current !== jid) return
+    if (r?.ok && d?.resposta !== undefined) { sugestoes.set(jid, d); setAt(d) } else setErro(d?.erro ?? "A IA não respondeu.")
+    setCarregando(false)
+  }, [jid])
+  const guardada = sugestoes.get(jid)
+  const velha = !!guardada && !!ultima && guardada.ultimaId !== ultima.id
+  // Cliente falou por último e não há sugestão para a mensagem dele: gera (um componente por conversa: key = jid).
+  // Espera 600 ms: passando por várias conversas com ↑↓, só gera para aquela em que você parou.
+  const precisa = auto && !!ultima && !ultima.from_me && !ultima.id.startsWith("tmp-") && (!guardada || velha)
+  useEffect(() => {
+    if (!precisa) return
+    const t = setTimeout(gerar, 600)
+    return () => clearTimeout(t)
+  }, [precisa, gerar, ultima?.id])
+  return { at: velha && !ultima?.from_me ? null : at, carregando, erro, gerar, descartar: () => { sugestoes.delete(jid); setAt(null) } }
+}
+
+function SugestaoAtendente({ estado, onUsar, onOrcamento, compacto }: {
+  estado: ReturnType<typeof useAtendimento>
+  onUsar: (texto: string) => void
+  onOrcamento?: (d: DadosPedido) => void
+  compacto?: boolean
+}) {
+  const { at, carregando, erro, gerar, descartar } = estado
+  if (!at && !carregando && !erro) return (
+    <div className={`shrink-0 ${compacto ? "px-3 pt-2" : "px-4 pt-2.5"}`} style={{ background: "var(--bg-surface)" }}>
+      <button onClick={gerar} className="text-[11.5px] font-semibold flex items-center gap-1.5 px-2.5 h-7 rounded-lg hover:bg-[#8456e8]/10" style={{ color: "#8456e8" }}>
+        <Sparkles className="w-3.5 h-3.5" />Sugerir resposta
+      </button>
+    </div>
+  )
+  const d = at?.dados
+  const chips = d ? [
+    d.produto,
+    d.caixa_cm ? `caixa ${d.caixa_cm.frente}×${d.caixa_cm.lateral}×${d.caixa_cm.altura} cm` : "",
+    d.frasco_cm ? `frasco ${d.frasco_cm}` : "",
+    d.quantidade ? `${d.quantidade.toLocaleString("pt-BR")} un` : "",
+    d.tem_arte === true ? "tem arte" : d.tem_arte === false ? "sem arte" : "",
+  ].filter(Boolean) : []
+  return (
+    <div className={`shrink-0 border-t ${compacto ? "px-3 pt-2" : "px-4 pt-2.5"}`} style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}>
+      <div className="wa-espiar rounded-xl px-3 py-2.5" style={{ background: "rgba(132,86,232,0.06)", border: "1px solid rgba(132,86,232,0.18)" }}>
+        <div className="flex items-center gap-2 mb-1.5">
+          <Sparkles className="w-3.5 h-3.5 shrink-0" style={{ color: "#8456e8" }} />
+          <span className="text-[11px] font-semibold" style={{ color: "#8456e8" }}>{carregando ? "Pensando na resposta…" : "Sugestão no seu tom"}</span>
+          {at && at.alerta !== "nenhum" && (
+            <span title={at.motivo_alerta} className="text-[10px] font-bold uppercase px-1.5 py-px rounded flex items-center gap-1" style={{ background: "rgba(197,120,0,0.14)", color: "#b26b00" }}>
+              <AlertCircle className="w-3 h-3" />{ROTULO_ALERTA[at.alerta]}
+            </span>
+          )}
+          {at?.sugere_video && <span className="text-[10px] font-semibold flex items-center gap-1" style={{ color: "var(--text-faint)" }}><Video className="w-3 h-3" />vale mandar vídeo</span>}
+          <span className="ml-auto flex items-center gap-0.5">
+            {!carregando && <button onClick={gerar} title="Gerar outra" className="text-[11px] px-2 h-6 rounded-md hover:bg-black/5" style={{ color: "var(--text-sub)" }}>Outra</button>}
+            <button onClick={descartar} aria-label="Dispensar sugestão" className="w-6 h-6 rounded-md grid place-items-center hover:bg-black/5" style={{ color: "var(--text-faint)" }}><X className="w-3.5 h-3.5" /></button>
+          </span>
+        </div>
+        {carregando && !at ? (
+          <div className="space-y-1.5 py-0.5">{[85, 60].map(w => <div key={w} className="h-2.5 rounded bg-[#8456e8]/10 animate-pulse" style={{ width: `${w}%` }} />)}</div>
+        ) : erro && !at ? (
+          <p className="text-[12px] text-[#d33a3c]">{erro}</p>
+        ) : at && (<>
+          {at.resposta
+            ? <button onClick={() => onUsar(at.resposta)} title="Usar (Tab)" className={`w-full text-left text-[12.5px] leading-snug whitespace-pre-wrap rounded-lg px-2 py-1.5 hover:bg-white/70 transition-colors ${compacto ? "max-h-24 overflow-y-auto" : ""}`} style={{ color: "var(--text-main)" }}>{at.resposta}</button>
+            : <p className="text-[12px] italic" style={{ color: "var(--text-faint)" }}>Nada para responder agora.</p>}
+          {at.alerta !== "nenhum" && at.motivo_alerta && <p className="text-[11px] mt-1" style={{ color: "#b26b00" }}>{at.motivo_alerta}</p>}
+          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+            {chips.map(c => <span key={c} className="text-[10.5px] px-1.5 py-px rounded" style={{ background: "var(--bg-page)", color: "var(--text-sub)", border: "1px solid var(--border)" }}>{c}</span>)}
+            <span className="ml-auto flex items-center gap-1">
+              {onOrcamento && d && temDados(d) && <button onClick={() => onOrcamento(d)} className="text-[11.5px] font-semibold px-2.5 h-7 rounded-lg hover:bg-[#8456e8]/10" style={{ color: "#8456e8" }}>Orçamento com estes dados</button>}
+              {at.resposta && <button onClick={() => onUsar(at.resposta)} className="text-[11.5px] font-semibold px-3 h-7 rounded-lg text-white" style={{ background: "#8456e8" }}>Usar <span className="opacity-60 font-normal">Tab</span></button>}
+            </span>
+          </div>
+        </>)}
+      </div>
+    </div>
+  )
+}
+
+// Caixa de resposta com o atendente em cima (conversa aberta e espiada)
+function RespostaComSugestao({ jid, ultima, auto, compacto, onOrcamento, ...props }: {
+  ultima: { id: string; from_me: boolean } | undefined
+  auto: boolean
+  onOrcamento?: (d: DadosPedido) => void
+} & Omit<Parameters<typeof Compositor>[0], "sugestao" | "usarTexto" | "colado">) {
+  const estado = useAtendimento(jid, ultima, auto)
+  const [usar, setUsar] = useState<{ texto: string; vez: number } | undefined>()
+  return <>
+    <SugestaoAtendente estado={estado} compacto={compacto} onOrcamento={onOrcamento} onUsar={t => setUsar({ texto: t, vez: Date.now() })} />
+    <Compositor {...props} jid={jid} compacto={compacto} colado={!!(estado.at || estado.carregando || estado.erro)}
+      sugestao={estado.at?.resposta || undefined} usarTexto={usar} onEnviou={() => { estado.descartar(); props.onEnviou?.() }} />
+  </>
 }
