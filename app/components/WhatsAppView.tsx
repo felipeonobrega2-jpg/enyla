@@ -275,22 +275,8 @@ export default function WhatsAppView({
                           borderRadius: m.from_me ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
                         }}
                       >
-                        {m.tipo === "audio" && (
-                          <div className="flex items-center gap-2 text-[12px]" style={{ color: "#54656f" }}>
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 0 1-7 7m0 0a7 7 0 0 1-7-7m7 7v4m0 0H8m4 0h4M12 3a4 4 0 0 1 4 4v4a4 4 0 0 1-8 0V7a4 4 0 0 1 4-4Z" /></svg>
-                            Áudio
-                          </div>
-                        )}
-                        {m.tipo === "image" && (
-                          <div className="text-[12px] italic mb-1" style={{ color: "#54656f" }}><ImageIcon className="w-3.5 h-3.5 inline -mt-px mr-1" />Imagem</div>
-                        )}
-                        {m.tipo === "document" && (
-                          <div className="text-[12px] italic mb-1" style={{ color: "#54656f" }}><FileText className="w-3.5 h-3.5 inline -mt-px mr-1" />Documento</div>
-                        )}
-                        {m.tipo === "sticker" && (
-                          <div className="text-[12px] italic" style={{ color: "#54656f" }}><Smile className="w-3.5 h-3.5 inline -mt-px mr-1" />Figurinha</div>
-                        )}
-                        {m.corpo && (
+                        <MidiaMensagem id={m.id} tipo={m.tipo} nome={m.corpo} />
+                        {m.corpo && m.tipo !== "document" && (
                           <p className="text-[13.5px] leading-snug whitespace-pre-wrap" style={{ color: "#111b21" }}>{m.corpo}</p>
                         )}
                         <p className="text-[10.5px] mt-1 text-right" style={{ color: "#8696a0" }}>
@@ -433,4 +419,39 @@ function ImportarHistorico({ onFim }: { onFim: () => void }) {
       {msg && <p className="text-[11px] mt-1.5" style={{ color: "var(--text-sub)" }}>{msg}</p>}
     </div>
   )
+}
+
+// Mídia da mensagem servida pelo sistema (cópia guardada; primeira vez busca no Evolution)
+function MidiaMensagem({ id, tipo: bruto, nome }: { id: string; tipo: string; nome: string | null }) {
+  const [falhou, setFalhou] = useState(false)
+  // Importações antigas gravaram o tipo cru do WhatsApp
+  const tipo = ({ videoMessage: "video", ptvMessage: "video", documentWithCaptionMessage: "document" } as Record<string, string>)[bruto] ?? bruto
+  const src = `/api/whatsapp/midia/${encodeURIComponent(id)}`
+  const indisponivel = (rotulo: string) => (
+    <div className="text-[12px] italic mb-1" style={{ color: "#54656f" }}>{rotulo} indisponível</div>
+  )
+  if (tipo === "image") return falhou ? indisponivel("Imagem") : (
+    <a href={src} target="_blank" rel="noreferrer" className="block mb-1">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="Imagem" loading="lazy" onError={() => setFalhou(true)} className="rounded-xl max-w-[260px] max-h-[320px] object-cover bg-black/5 min-w-[120px] min-h-[80px]" />
+    </a>
+  )
+  if (tipo === "sticker") return falhou ? indisponivel("Figurinha") : (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt="Figurinha" loading="lazy" onError={() => setFalhou(true)} className="w-28 h-28 object-contain" />
+  )
+  if (tipo === "audio") return falhou ? indisponivel("Áudio") : (
+    <audio controls preload="none" src={src} onError={() => setFalhou(true)} className="w-[240px] max-w-full h-10" />
+  )
+  if (tipo === "video") return falhou ? indisponivel("Vídeo") : (
+    <video controls preload="none" src={src} onError={() => setFalhou(true)} className="rounded-xl max-w-[280px] max-h-[320px] bg-black/5 mb-1" />
+  )
+  if (tipo === "document") return (
+    <a href={src} target="_blank" rel="noreferrer" download={nome ?? undefined}
+      className="flex items-center gap-2 px-3 py-2 mb-1 rounded-xl bg-black/[0.04] hover:bg-black/[0.07] max-w-[260px]">
+      <FileText className="w-5 h-5 shrink-0" style={{ color: "#8456e8" }} />
+      <span className="text-[12.5px] truncate" style={{ color: "#111b21" }}>{nome || "Documento"}</span>
+    </a>
+  )
+  return null
 }

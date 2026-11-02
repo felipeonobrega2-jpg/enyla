@@ -14,6 +14,8 @@ export type WaMessage = {
     conversation?: string
     extendedTextMessage?: { text: string }
     imageMessage?: { caption?: string; url?: string }
+    videoMessage?: { caption?: string; url?: string }
+    documentWithCaptionMessage?: { message?: { documentMessage?: { caption?: string; url?: string; fileName?: string } } }
     audioMessage?: { url?: string }
     documentMessage?: { caption?: string; url?: string; fileName?: string }
     stickerMessage?: { url?: string }
@@ -32,6 +34,11 @@ export function extractBody(msg: WaMessage): { corpo: string | null; tipo: strin
   if (m.conversation)                       return { corpo: m.conversation, tipo: "text", media_url: null }
   if (m.extendedTextMessage?.text)          return { corpo: m.extendedTextMessage.text, tipo: "text", media_url: null }
   if (m.imageMessage)                       return { corpo: m.imageMessage.caption ?? null, tipo: "image", media_url: m.imageMessage.url ?? null }
+  if (m.videoMessage)                       return { corpo: m.videoMessage.caption ?? null, tipo: "video", media_url: m.videoMessage.url ?? null }
+  if (m.documentWithCaptionMessage?.message?.documentMessage) {
+    const d = m.documentWithCaptionMessage.message.documentMessage
+    return { corpo: d.caption ?? d.fileName ?? null, tipo: "document", media_url: d.url ?? null }
+  }
   if (m.audioMessage)                       return { corpo: null, tipo: "audio", media_url: m.audioMessage.url ?? null }
   if (m.documentMessage)                    return { corpo: m.documentMessage.caption ?? m.documentMessage.fileName ?? null, tipo: "document", media_url: m.documentMessage.url ?? null }
   if (m.stickerMessage)                     return { corpo: null, tipo: "sticker", media_url: m.stickerMessage.url ?? null }
