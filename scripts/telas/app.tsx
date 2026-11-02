@@ -24,6 +24,7 @@ import { ModalLancamento } from "@/app/components/FinanceiroView"
 import { EnviarWhatsapp } from "@/app/components/EnviarWhatsapp"
 import { PainelToken } from "@/app/components/MetaAdsView"
 import { FilaMensagens } from "@/app/components/FilaMensagens"
+import { ModalFrete } from "@/app/components/FreteLalamove"
 import { PedidosUnificadoView } from "@/app/components/PedidosUnificadoView"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas } from "@/app/components/WhatsAppView"
 
@@ -58,6 +59,12 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       c("6@lid", "Juliana", "ok", 4, 3.5),
     ]))
   }
+  if (u.startsWith("/api/frete/servicos")) return new Response(JSON.stringify({ configurada: true, ambiente: "sandbox", cidade: "São Paulo", servicos: [
+    { key: "LALAGO", nome: "Moto", descricao: "Até 20 kg", carga: "20 kg" }, { key: "CAR", nome: "Carro", descricao: "", carga: "200 kg" }, { key: "UV_FIORINO", nome: "Utilitário (Fiorino)", descricao: "", carga: "600 kg" }] }))
+  if (u.startsWith("/api/frete/cotar")) return new Response(JSON.stringify({ quotationId: "q1", expiraEm: new Date(Date.now() + 272_000).toISOString(), valor: 38.9, moeda: "BRL", distanciaKm: 7.4, paradas: ["s1", "s2"], servico: "LALAGO" }))
+  if (u.startsWith("/api/frete/pedido")) return new Response(JSON.stringify([
+    { order_id: "1", status: "PICKED_UP", valor: 38.9, cobrar_cliente: false, share_link: "https://share.lalamove.com/x", motorista: { nome: "Guilherme", placa: "FPL-6J51" }, ambiente: "sandbox" },
+    { order_id: "2", status: "COMPLETED", valor: 52.4, cobrar_cliente: true, share_link: null, motorista: null, ambiente: "sandbox" }]))
   if (u.startsWith("/api/whatsapp/atender")) return new Response(JSON.stringify({
     resposta: "Show! Pra 2 mil caixinhas de 100ml fica bem em conta 🙌🏻\n\nMe passa as medidas do seu frasco (altura, largura e profundidade) que eu já te mando o orçamento?",
     etapa: "levantando_dados", alerta: "preco", motivo_alerta: "Pediu preço; falta a medida do frasco para orçar.", sugere_video: true,
@@ -127,7 +134,10 @@ function Telas() {
     }
     case "pedidos": case "pedidos-escuro": case "pedidos-aberto": case "pedidos-aberto-escuro": case "pedidos-quadro-escuro": case "pedidos-visao-escuro":
       return <div style={{ minHeight: "100vh", padding: 24 }} className={escuro ? "" : "bg-[#f5f5f7]"}><PedidosUnificadoView isDark={escuro} kanban={dados.kanban} historico={dados.historico as never}
-        lancamentos={lancs} lotes={[]} onMove={() => {}} onDelete={() => {}} onSetMotivo={() => {}} onFechamento={() => {}} onNovoLancamento={() => {}} onDetalhes={() => {}} /></div>
+        lancamentos={lancs} lotes={[]} onChamarFrete={() => {}} onMove={() => {}} onDelete={() => {}} onSetMotivo={() => {}} onFechamento={() => {}} onNovoLancamento={() => {}} onDetalhes={() => {}} /></div>
+    case "frete": return <ModalFrete pedido={{ numero: "ANA-001", loteId: "l1", cliente: "Ana Cosméticos" }} onFechar={() => {}} onChamado={() => {}}
+      locais={[{ id: "g", nome: "Gráfica", contato: "Alanno", telefone: "11999990000", endereco: { texto: "Rua Correia de Andrade, 50 · Brás · São Paulo - SP", lat: -23.54, lng: -46.62 } }]}
+      enderecoSalvo={{ texto: "Avenida Paulista, 1000 · Bela Vista · São Paulo - SP · 01310-100", lat: -23.56, lng: -46.65, recebedor: "Ana", telefone: "(11) 98888-7777" }} />
     case "fila": case "fila-m": {
       const h = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString()
       const cv = (jid: string, nome: string, rec: number, env: number, extra = {}) => ({ jid, nome, ultima_recebida_at: h(rec), ultima_enviada_at: h(env), ...extra })

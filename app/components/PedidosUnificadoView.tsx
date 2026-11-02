@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import {
   Package, TrendingUp, CheckCircle2,
   DollarSign, BarChart3, Factory, User, Users, Home, Building2, Megaphone, Wrench, ClipboardList,
-  CalendarDays, Search, X, Copy, ChevronDown, Check, Lock, Plus, Wallet, CalendarX2, CalendarClock,
+  CalendarDays, Search, X, Copy, ChevronDown, Check, Lock, Plus, Wallet, CalendarX2, CalendarClock, Truck,
 } from "lucide-react"
 import {
   KanbanCard, KanbanOpcao, Lote, LancamentoFinanceiro,
@@ -15,6 +15,7 @@ import { brl, num } from "../utils"
 import { custoFixoPeriodo, rateioPorPedido } from "../lib/metrics"
 import { montarPedidos, margemContribuicao, Pedido } from "../lib/negocio"
 import { KanbanView } from "./KanbanView"
+import { FretesDoPedido, PedidoFrete } from "./FreteLalamove"
 import { CabecalhoPagina, Kpi, GradeKpis, Segmentado, Selo, Cartao, TituloCartao, ListaBarras, Colunas, Gaveta, LinhaLista, Vazio } from "./ds"
 
 type Tab = "lista" | "kanban" | "visao"
@@ -100,6 +101,15 @@ type Props = {
   negocios?: NegocioParceiro[]
   onUpdateNegocio?: (n: NegocioParceiro) => void
   onAddLancamento?: (l: LancamentoFinanceiro) => void
+  onChamarFrete?: (p: PedidoFrete) => void
+  fretesVersao?: number
+  onLancamentosRemovidos?: (ids: string[]) => void
+}
+
+// Pedido → identificação para o frete (lote inteiro quando houver)
+const pedidoFreteDe = (entry: OrderEntry): PedidoFrete => {
+  const c = entry.cards[0]
+  return c.loteId ? { loteId: c.loteId, numero: c.loteNumero ?? c.numero, cliente: c.nomeCliente } : { cardId: c.id, numero: c.numero, cliente: c.nomeCliente }
 }
 
 export function PedidosUnificadoView(props: Props) {
@@ -109,6 +119,7 @@ export function PedidosUnificadoView(props: Props) {
     onMove, onDelete, onSetMotivo, onFechamento, onHotOpcao, onKanbanDetalhes,
     lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge, onLoteRename,
     negocios, onUpdateNegocio, onAddLancamento, onBulkUpdate, onCopiarPedido,
+    onChamarFrete, fretesVersao, onLancamentosRemovidos,
   } = props
 
   const [tab, setTab]     = useState<Tab>("lista")
@@ -319,6 +330,8 @@ export function PedidosUnificadoView(props: Props) {
             kpiConcluidos={kpiConcluidos}
             toggle={toggle} toggleConcluido={toggleConcluido}
             onDetalhes={onDetalhes} onNovoLancamento={onNovoLancamento} onSalvarData={onSalvarData}
+            onChamarFrete={onChamarFrete} fretesVersao={fretesVersao} onLancamentosRemovidos={onLancamentosRemovidos}
+            onMarcarEntregue={ids => ids.forEach(id => onMove(id, 9))}
             onSavePrazos={onSavePrazos} onSalvarPrazoRecebimentoInterno={onSalvarPrazoRecebimentoInterno}
             selectedCardIds={selectedCardIds} onSelectCard={toggleSelectCard}
             onCopiarPedido={onCopiarPedido}
@@ -676,7 +689,11 @@ function DashboardTab({ entries, onDetalhes }: {
 
 // ── Lista Tab ─────────────────────────────────────────────────────────────────
 
-function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, custoFixoTotal, kpiConcluidos, toggle, toggleConcluido, onDetalhes, onNovoLancamento, onSalvarData, onSavePrazos, onSalvarPrazoRecebimentoInterno, selectedCardIds, onSelectCard, onCopiarPedido }: {
+function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, custoFixoTotal, kpiConcluidos, toggle, toggleConcluido, onDetalhes, onNovoLancamento, onSalvarData, onSavePrazos, onSalvarPrazoRecebimentoInterno, selectedCardIds, onSelectCard, onCopiarPedido, onChamarFrete, fretesVersao, onLancamentosRemovidos, onMarcarEntregue }: {
+  onChamarFrete?: (p: PedidoFrete) => void
+  fretesVersao?: number
+  onLancamentosRemovidos?: (ids: string[]) => void
+  onMarcarEntregue?: (cardIds: string[]) => void
   lista: OrderEntry[]
   busca: string
   expanded: Set<string>
@@ -874,6 +891,12 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
                       </span>
                     )}
                     <div className="flex-1" />
+                    {onChamarFrete && (
+                      <button onClick={e => { e.stopPropagation(); onChamarFrete(pedidoFreteDe(entry)) }}
+                        className="h-8 px-3 rounded-lg text-[12px] font-semibold inline-flex items-center gap-1.5 transition-colors hover:bg-[rgba(241,102,34,0.08)] ds-borda" style={{ color: "#f16622", background: "var(--bg-surface)" }}>
+                        <Truck className="w-3.5 h-3.5" /> Lalamove
+                      </button>
+                    )}
                     {onNovoLancamento && (
                       <button onClick={e => {
                         e.stopPropagation()
@@ -891,6 +914,10 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
                     )}
                   </div>
                 </div>
+
+                <FretesDoPedido pedido={pedidoFreteDe(entry)} versao={fretesVersao} entregue={entry.cards.every(c => c.coluna === 9)}
+                  onMarcarEntregue={onMarcarEntregue ? () => onMarcarEntregue(entry.cards.map(c => c.id)) : undefined}
+                  onLancamentosRemovidos={onLancamentosRemovidos} />
 
                 {entry.cards.length > 1 && (
                   <div className="px-5 pt-2 pb-3" style={{ borderTop: `1px solid ${divider}`, background: innerBg }}>

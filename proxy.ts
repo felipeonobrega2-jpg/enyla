@@ -13,6 +13,7 @@ export default auth((req) => {
     pathname.startsWith("/api/aprovar/") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/whatsapp/webhook") ||
+    pathname === "/api/frete/webhook" ||        // Lalamove (só lê o nº da corrida; status vem da API)
     pathname === "/api/meta/cron-refresh" ||
     pathname === "/api/whatsapp/verificar" ||    // agendador da Vercel (mesma regra)     // agendador da Vercel (exige CRON_SECRET na própria rota)
     pathname.startsWith("/api/track") ||

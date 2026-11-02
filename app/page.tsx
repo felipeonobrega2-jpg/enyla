@@ -7,6 +7,7 @@ import { signOut } from "next-auth/react"
 import WhatsAppView from "./components/WhatsAppView"
 import { podarDispensados } from "./lib/filaMensagens"
 import { formDoAtendimento } from "./lib/atendente"
+import { ModalFrete, PedidoFrete, enderecoDoCliente } from "./components/FreteLalamove"
 import Image from "next/image"
 import { useTheme } from "./components/ThemeProvider"
 import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, CustoSnapshot, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO, COL_HOT, COLUNAS_KANBAN, Parceiro, NegocioParceiro, LancamentoFinanceiro, Lote, TipoCaixa, PrazoEtapas, AprovacaoOnline } from "./types"
@@ -204,6 +205,8 @@ export default function Home() {
   } | null>(null)
   const [modalSobra, setModalSobra] = useState<{ card: KanbanCard; loteCards: KanbanCard[] } | null>(null)
   const [modalLancPedidos, setModalLancPedidos] = useState<Partial<LancamentoFinanceiro> | null>(null)
+  const [modalFrete, setModalFrete] = useState<PedidoFrete | null>(null)
+  const [fretesVersao, setFretesVersao] = useState(0)
   const [buscaAberta, setBuscaAberta] = useState(false)
   const [orcTab, setOrcTab] = useState<"padrao" | "digital">("padrao")
   type CampoCusto = "custoPapel" | "custoImpressao" | "custoCorte" | "custoVerniz" | "custoColagem" | "custoArte" | "custoUnitSF" | "custoUnitCF"
@@ -2110,6 +2113,9 @@ export default function Home() {
               lancamentos={lancamentos}
               onDetalhes={card => setDetalheModal({ tipo: "kanban", card })}
               onNovoLancamento={prefill => setModalLancPedidos(prefill)}
+              onChamarFrete={p => setModalFrete(p)}
+              fretesVersao={fretesVersao}
+              onLancamentosRemovidos={ids => setLancamentos(prev => prev.filter(l => !ids.includes(l.id)))}
               onSalvarData={(cardId, data) => {
                 setKanban(prev => prev.map(c => c.id === cardId ? { ...c, dataFechamento: data } : c))
                 fetch(`/api/kanban/${cardId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataFechamento: data }) }).catch(() => {})
@@ -2794,6 +2800,18 @@ export default function Home() {
           } : undefined}
           lancamentos={lancamentos}
         />
+      )}
+
+      {/* ── Modal: chamar Lalamove (via Pedidos) ─────────────────────────────── */}
+      {modalFrete && (
+        <ModalFrete pedido={modalFrete} locais={config.locaisRetirada ?? []}
+          enderecoSalvo={enderecoDoCliente(config.enderecosClientes, modalFrete.cliente)}
+          telefoneCliente={clientes.find(c => nomeChave(c.nome) === nomeChave(modalFrete.cliente))?.telefone}
+          onFechar={() => setModalFrete(null)}
+          onChamado={(f, ls) => {
+            setLancamentos(prev => [...ls, ...prev]); setModalFrete(null); setFretesVersao(v => v + 1)
+            showToast(`Lalamove chamada · ${f.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} lançado no pedido`)
+          }} />
       )}
 
       {/* ── Modal: novo lançamento (via Pedidos) ────────────────────────────── */}
