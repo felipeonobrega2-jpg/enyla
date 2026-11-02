@@ -7,7 +7,6 @@ export default auth((req) => {
     pathname.startsWith("/login") ||
     pathname.startsWith("/track") ||
     pathname.startsWith("/pix") ||
-    pathname === "/gravar" || pathname === "/api/gravar" ||   // gravar áudio pelo celular (link assinado, 10 min)
     pathname.startsWith("/aprovar") ||
     pathname.startsWith("/c/") ||
     pathname.startsWith("/api/c/") ||
