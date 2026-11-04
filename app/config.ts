@@ -95,6 +95,9 @@ export type Configuracoes = {
   origensClientes?: import("./lib/coleta").OrigensClientes   // como cada cliente chegou (nomeChave → canal)
   locaisRetirada?: import("./lib/frete").LocalRetirada[]   // de onde a Lalamove retira (gráfica, fornecedores)
   enderecosClientes?: Record<string, import("./lib/frete").Endereco & { recebedor?: string; telefone?: string }>  // entrega salva por cliente (gravado pelo servidor)
+  pluggy?: import("./lib/bancoServidor").ConfigPluggy        // bancos conectados (Item ID), data de corte, modo automático
+  pluggyStatus?: import("./lib/bancoServidor").StatusPluggy  // última sincronização (gravado pelo servidor)
+  regrasBanco?: import("./lib/banco").RegraBanco[]           // aprendidas com as suas correções (gravado pelo servidor)
   guiaAtendimento?: string                                 // como você conversa: a IA lê antes de sugerir mensagens
   avisosPedido?: Record<string, import("./lib/filaMensagens").AvisoPedido>  // último aviso de produção mandado por pedido
   filaDispensados?: Record<string, string>                 // itens da fila já enviados/dispensados (id → quando)

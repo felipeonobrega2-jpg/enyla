@@ -16,6 +16,7 @@ import {
 import { brl, num } from "../utils"
 import { CategoriaFinanceira, ContaBancaria, Configuracoes } from "../config"
 import { ContasTab } from "./financeiro/ContasTab"
+import { BancoTab } from "./financeiro/BancoTab"
 import { FixasTab } from "./financeiro/FixasTab"
 import { FornecedoresTab } from "./financeiro/FornecedoresTab"
 import {
@@ -1054,7 +1055,7 @@ function periodoRange(p: Periodo, mesOffset = 0): { from: Date | null; to: Date 
 
 const MESES_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]
 
-type FinTab = "dash" | "previsao" | "conciliacao" | "dre" | "receber" | "lancamentos" | "pix" | "contas" | "fixas" | "fornecedores" | "config"
+type FinTab = "dash" | "previsao" | "conciliacao" | "dre" | "receber" | "lancamentos" | "pix" | "contas" | "fixas" | "fornecedores" | "config" | "banco"
 
 const PERIODO_LABEL: Record<Periodo, string> = {
   mes: "Este mês", trimestre: "Este trimestre", semestre: "Este semestre", ano: "Este ano", tudo: "Tudo"
@@ -1121,8 +1122,8 @@ export function FinanceiroView({
   // Restore on mount — write effects would corrupt sessionStorage during SSR hydration
   useEffect(() => {
     const t = sessionStorage.getItem("fin:tab")
-    if (t && ["dash", "previsao", "conciliacao", "dre", "receber", "lancamentos", "pix", "contas", "fixas", "fornecedores", "config"].includes(t))
-      setTab(t as "dash" | "previsao" | "conciliacao" | "dre" | "receber" | "lancamentos" | "pix" | "contas" | "fixas" | "fornecedores" | "config")
+    if (t && ["dash", "previsao", "conciliacao", "dre", "receber", "lancamentos", "pix", "contas", "fixas", "fornecedores", "config", "banco"].includes(t))
+      setTab(t as FinTab)
     const p = sessionStorage.getItem("fin:periodo")
     if (p && ["mes", "trimestre", "semestre", "ano", "tudo"].includes(p))
       setPeriodo(p as Periodo)
@@ -1370,6 +1371,7 @@ export function FinanceiroView({
             { v: "conciliacao", nome: "Conciliação" },
             { v: "receber", nome: vencidos.length ? `A receber · ${vencidos.length} vencidos` : "A receber" },
             { v: "lancamentos", nome: "Lançamentos" },
+            { v: "banco", nome: "Banco" },
             { v: "dre", nome: "DRE" },
             { v: "pix", nome: pixPendentes.length ? `Pix · ${pixPendentes.length}` : "Pix" },
           ]} />
@@ -2198,6 +2200,10 @@ export function FinanceiroView({
         )}
 
         {/* ── CONTAS ── */}
+        {tab === "banco" && config && onUpdateConfig && (
+          <BancoTab config={config} lancamentos={lancamentos} kanban={kanban} onUpdateConfig={cfg => onUpdateConfig(cfg)} onAdd={onAdd} onUpdate={onUpdate} onDelete={onDelete} />
+        )}
+
         {tab === "contas" && config && onUpdateConfig && (
           <ContasTab config={config} onUpdateConfig={cfg => { onUpdateConfig(cfg) }} />
         )}

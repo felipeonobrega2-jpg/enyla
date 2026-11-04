@@ -67,6 +67,18 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       c("5511977776666@s.whatsapp.net", "Raniere Péricles", "Bom dia, chegou?", 0.02, 0.5),
     ]))
   }
+  if (u.startsWith("/api/banco/transacoes")) {
+    const t = (id: string, p: Record<string, unknown>) => ({ id, conta_id: "c1", conta_nome: "Santander · 2005886-0", data: "2026-11-03", valor: 100, tipo: "saida", descricao: "PIX ENVIADO", contraparte_nome: null, contraparte_doc: null, categoria_pluggy: null, estado: "pendente", lancamento_ids: [], historico: [], ...p })
+    return new Response(JSON.stringify({ configurada: true, tabela: true, erro: null, pendentes: 5,
+      status: { em: new Date().toISOString(), novas: 5, contas: [{ id: "c1", nome: "Santander · 2005886-0", saldo: 12840.55 }, { id: "c2", nome: "Inter · 1234", saldo: 3120.1 }] },
+      transacoes: [
+        t("a", { tipo: "entrada", valor: 650, contraparte_nome: "ANA COSMETICOS LTDA", descricao: "PIX RECEBIDO", sugestao: { acao: "atualizar", lancamentoId: "x", campos: { status: "pago" }, motivo: "" } }),
+        t("b", { valor: 2000, contraparte_nome: "JEROGRAF GRAFICA E EDITORA", contraparte_doc: "03999896000152", sugestao: { acao: "criar", origem: "conta", motivo: "pagamento da conta Jerograf: abate o saldo devedor (não é custo novo)", lancamentos: [{ descricao: "Pagamento da conta — Jerograf", valor: 2000, tipo: "receita" }] } }),
+        t("c", { valor: 1350, contraparte_nome: "PAPELARIA BRAS LTDA", sugestao: { acao: "criar", origem: "ia", motivo: "IA: papel cartão para o lote do Maurício (valor e fornecedor de papel)", lancamentos: [{ descricao: "Papel", categoria: "materiais", valor: 900, loteNumero: "MAU-007" }, { descricao: "Impressão", categoria: "fornecedor", valor: 450, loteNumero: "MAU-007" }] } }),
+        t("d", { valor: 89.9, contraparte_nome: "IFOOD", descricao: "COMPRA CARTAO DEBITO", sugestao: { acao: "ignorar", motivo: "IA: gasto pessoal (alimentação)" } }),
+        t("e", { valor: 37.5, descricao: "TARIFA PACOTE SERVICOS", sugestao: { acao: "revisar", motivo: "sem pista: confira" } }),
+      ] }))
+  }
   if (u.startsWith("/api/whatsapp/pendentes")) {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
     return new Response(JSON.stringify([
