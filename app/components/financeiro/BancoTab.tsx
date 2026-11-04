@@ -36,11 +36,35 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [corrigindo, setCorrigindo] = useState<{ tx: TxBanco; inicial: Partial<LancamentoFinanceiro> } | null>(null)
   const salvos = useRef<LancamentoFinanceiro[]>([])
+  // Sugestões em pedaços (cada chamada tem 1 minuto): enquanto houver transação sem sugestão, pede o próximo pedaço
+  const [preparando, setPreparando] = useState<number | null>(null)
+  const rodando = useRef(false)
+  const [verAprendizado, setVerAprendizado] = useState(false)
 
   const carregar = useCallback(() => {
     fetch(`/api/banco/transacoes?estado=${estado}`).then(r => r.json()).then(setDados).catch(() => {})
   }, [estado])
   useEffect(() => { carregar() }, [carregar])
+
+  const prepararTudo = useCallback(async () => {
+    if (rodando.current) return
+    rodando.current = true
+    for (let i = 0; i < 40; i++) {
+      const r = await fetch("/api/banco/sugerir", { method: "POST" }).then(x => x.json()).catch(() => null) as { feitas: number; restantes: number } | null
+      if (!r) break
+      setPreparando(r.restantes || null)
+      carregar()
+      if (!r.restantes || !r.feitas) break
+    }
+    setPreparando(null)
+    rodando.current = false
+  }, [carregar])
+  const semSugestao = (dados?.transacoes ?? []).filter(t => !t.sugestao).length
+  useEffect(() => {
+    if (estado !== "pendente" || semSugestao === 0) return
+    const t = setTimeout(prepararTudo, 0)
+    return () => clearTimeout(t)
+  }, [estado, semSugestao, prepararTudo])
 
   const pluggy = config.pluggy ?? {}
   const nomeCat = (id?: string) => [...(config.categoriasDespesa ?? []), ...(config.categoriasReceita ?? [])].find(c => c.id === id)?.nome ?? id
@@ -51,8 +75,9 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
     setSincronizando(true); setMsg(null)
     const r = await fetch("/api/banco/sincronizar", { method: "POST" }).then(x => x.json()).catch(() => null)
     setSincronizando(false)
-    setMsg(r ? (r.erro ? r.erro : `${r.novas} transações novas · ${r.sugeridas} com sugestão`) : "Sem conexão.")
+    setMsg(r ? (r.erro ? r.erro : `${r.novas} transações novas · ${r.sugeridas} com sugestão${r.restantes ? ` · preparando as outras ${r.restantes}…` : ""}`) : "Sem conexão.")
     carregar()
+    if (r?.restantes) prepararTudo()
   }
 
   // Envia a decisão e reflete na tela os lançamentos criados/atualizados/removidos pelo servidor
@@ -66,6 +91,8 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
     for (const id of r.removidos ?? []) onDelete(id)
     setDados(d => d ? { ...d, transacoes: d.transacoes.filter(t => t.id !== tx.id), pendentes: d.pendentes + (decisao.acao === "desfazer" ? 1 : estado === "pendente" ? -1 : 0) } : d)
   }
+
+  const trocarSugestao = (id: string, sugestao: SugestaoBanco) => setDados(d => d ? { ...d, transacoes: d.transacoes.map(t => t.id === id ? { ...t, sugestao } : t) } : d)
 
   const aceitar = (tx: TxBanco, s: SugestaoBanco) => {
     if (s.acao === "vincular") return decidir(tx, { acao: "vincular", lancamentoId: s.lancamentoId })
@@ -121,6 +148,23 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
         {verConfig && <ConfigBanco valor={pluggy} onSalvar={p => { salvarPluggy(p); setVerConfig(false) }} />}
       </div>
 
+      {preparando != null && (
+        <div className="rounded-xl px-4 py-2.5 flex items-center gap-2 text-[12.5px] bg-[rgba(132,86,232,0.07)] text-[#5b36c4]">
+          <Loader2 className="w-4 h-4 animate-spin" />Preparando as sugestões… faltam {preparando}. Pode ir conferindo as que já estão prontas.
+        </div>
+      )}
+
+      {/* O que a IA aprendeu */}
+      <div className="rounded-xl bg-white ds-cartao">
+        <button onClick={() => setVerAprendizado(v => !v)} className="w-full px-4 py-3 flex items-center gap-2 text-left">
+          <Sparkles className="w-4 h-4 text-[#8456e8]" />
+          <span className="text-[13px] font-semibold text-[#191625]">O que a IA aprendeu com você</span>
+          <span className="text-[11.5px] text-[#898892]">· lições, regras e correções (dá para corrigir aqui)</span>
+          <span className="ml-auto text-[11.5px] font-semibold text-[#8456e8]">{verAprendizado ? "Fechar" : "Abrir"}</span>
+        </button>
+        {verAprendizado && <PainelAprendizado nomeCat={nomeCat} nomeForn={nomeForn} />}
+      </div>
+
       {/* Estados */}
       <div className="flex items-center gap-3 flex-wrap">
         <Segmentado<Estado> valor={estado} onChange={setEstado} opcoes={[
@@ -169,6 +213,7 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
                       {s?.acao !== "ignorar" && <button onClick={() => decidir(tx, { acao: "ignorar" })} className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold text-[#5e5c68] hover:bg-black/5 inline-flex items-center gap-1"><EyeOff className="w-3.5 h-3.5" />Ignorar</button>}
                       <button onClick={() => decidir(tx, { acao: "ignorar", sempre: true })} className="h-7 px-2.5 rounded-lg text-[11.5px] text-[#898892] hover:bg-black/5" title="Da próxima vez, quem está do outro lado já vem ignorado">Sempre ignorar este</button>
                     </div>
+                    <EnsinarIA tx={tx} onNova={sg => trocarSugestao(tx.id, sg)} />
                   </div>
                 ) : (
                   <div className="mt-1.5 flex items-center gap-2 flex-wrap">
@@ -265,6 +310,113 @@ function ConfigBanco({ valor, onSalvar }: { valor: NonNullable<Configuracoes["pl
         <span><b>Modo automático</b> <span className="text-[#898892]">· vincula o que já estava lançado, abate conta de fornecedor e aplica as suas regras sem perguntar. Sugestões da IA continuam esperando você. Recomendo ligar depois de umas duas semanas conferindo.</span></span>
       </label>
       <div className="flex justify-end"><Botao variante="primario" onClick={() => onSalvar({ itens, dataCorte: corte, automatico: auto, documentosProprios: docs.split(",").map(d => d.trim()).filter(Boolean) })}>Salvar</Botao></div>
+    </div>
+  )
+}
+
+// Você explica o que é a transação; a IA refaz a sugestão e (se marcado) guarda como lição para as próximas
+function EnsinarIA({ tx, onNova }: { tx: TxBanco; onNova: (s: SugestaoBanco) => void }) {
+  const [aberto, setAberto] = useState(false)
+  const [texto, setTexto] = useState("")
+  const [lembrar, setLembrar] = useState(true)
+  const [indo, setIndo] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  async function enviar() {
+    setIndo(true); setErro(null)
+    const r = await fetch("/api/banco/corrigir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: tx.id, instrucao: texto, lembrar }) }).then(x => x.json()).catch(() => null)
+    setIndo(false)
+    if (r?.ok && r.sugestao) { onNova(r.sugestao); setAberto(false); setTexto("") } else setErro(r?.erro ?? "Não refez.")
+  }
+  if (!aberto) return (
+    <button onClick={() => setAberto(true)} className="mt-1.5 text-[11.5px] font-semibold text-[#8456e8] inline-flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" />Ensinar a IA o que é isso</button>
+  )
+  return (
+    <div className="mt-2 space-y-1.5">
+      <div className="flex gap-1.5">
+        <input autoFocus value={texto} onChange={e => setTexto(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && texto.trim()) enviar() }}
+          placeholder="Ex.: é o aluguel do galpão · papel do lote MAU-007 · gasto pessoal · pagamento da Jerograf"
+          className={`${campo} flex-1`} />
+        <Botao variante="primario" disabled={indo || !texto.trim()} onClick={enviar} icone={indo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}>Refazer sugestão</Botao>
+        <button onClick={() => setAberto(false)} className="text-[#898892] px-1" aria-label="Fechar"><X className="w-4 h-4" /></button>
+      </div>
+      <label className="flex items-center gap-1.5 text-[11px] text-[#5e5c68] cursor-pointer">
+        <input type="checkbox" checked={lembrar} onChange={e => setLembrar(e.target.checked)} />Lembrar disso para as próximas transações
+      </label>
+      {erro && <p className="text-[11.5px] text-[#d33a3c]">{erro}</p>}
+    </div>
+  )
+}
+
+type Aprendido = {
+  regras: { chave: string; tipo: string; acao: string; categoria?: string; fornecedorId?: string; descricao?: string; vezes: number }[]
+  licoes: { id: string; texto: string; em: string }[]
+  exemplos: { contraparte: string; descricao: string; tipo: string; ia: string; voce: string; em: string }[]
+}
+
+// Lições escritas (você edita), regras aprendidas (quem pagou/recebeu → o que lançar) e as últimas correções
+function PainelAprendizado({ nomeCat, nomeForn }: { nomeCat: (id?: string) => string | undefined; nomeForn: (id?: string) => string | undefined }) {
+  const [a, setA] = useState<Aprendido | null>(null)
+  const [nova, setNova] = useState("")
+  const [editando, setEditando] = useState<{ id: string; texto: string } | null>(null)
+  useEffect(() => { fetch("/api/banco/aprendizado").then(r => r.json()).then(setA).catch(() => {}) }, [])
+  const mudar = (m: Record<string, unknown>) => fetch("/api/banco/aprendizado", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(m) }).then(r => r.json()).then(setA).catch(() => {})
+  if (!a) return <p className="px-4 pb-4 text-[12px] text-[#898892]">Carregando…</p>
+  return (
+    <div className="px-4 pb-4 space-y-4 border-t border-[rgba(60,60,67,0.08)] pt-3">
+      <div>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-1.5">Lições ({a.licoes.length})</p>
+        <p className="text-[11px] text-[#898892] mb-2">A IA lê isto antes de sugerir. Escreva do seu jeito, como explicaria a alguém do financeiro.</p>
+        <div className="space-y-1">
+          {a.licoes.map(l => (
+            <div key={l.id} className="flex items-start gap-2 text-[12px] text-[#191625] group">
+              {editando?.id === l.id ? (<>
+                <input value={editando.texto} onChange={e => setEditando({ ...editando, texto: e.target.value })} className={`${campo} flex-1`} />
+                <Botao onClick={() => { mudar({ editarLicao: editando }); setEditando(null) }}>Salvar</Botao>
+              </>) : (<>
+                <span className="flex-1">• {l.texto}</span>
+                <button onClick={() => setEditando({ id: l.id, texto: l.texto })} className="text-[11px] text-[#8456e8] opacity-0 group-hover:opacity-100">editar</button>
+                <button onClick={() => mudar({ tirarLicao: l.id })} className="text-[#898892] hover:text-[#d33a3c]" aria-label="Apagar"><X className="w-3.5 h-3.5" /></button>
+              </>)}
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2 mt-2">
+          <input value={nova} onChange={e => setNova(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && nova.trim()) { mudar({ novaLicao: nova }); setNova("") } }}
+            placeholder="Ex.: Pix para a Papelaria Brás é sempre papel · Uber é deslocamento para fornecedor · iFood é pessoal" className={`${campo} flex-1`} />
+          <Botao disabled={!nova.trim()} onClick={() => { mudar({ novaLicao: nova }); setNova("") }}>Adicionar</Botao>
+        </div>
+      </div>
+      <div>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-1.5">Regras automáticas ({a.regras.length})</p>
+        {!a.regras.length && <p className="text-[11.5px] text-[#898892]">Aparecem quando você lança ou ignora sempre alguém. Ex.: “Papelaria Brás → Materiais”.</p>}
+        <div className="space-y-1">
+          {a.regras.map(r => (
+            <div key={r.chave + r.tipo} className="flex items-center gap-2 text-[12px]">
+              <span className="font-mono text-[11px] text-[#5e5c68] truncate max-w-[220px]">{r.chave}</span>
+              <span className="text-[#898892]">{r.tipo === "entrada" ? "entrada" : "saída"} →</span>
+              <span className="text-[#191625] font-semibold truncate">{r.acao === "ignorar" ? "ignorar" : [nomeCat(r.categoria), nomeForn(r.fornecedorId), r.descricao].filter(Boolean).join(" · ") || "lançar"}</span>
+              <span className="text-[10.5px] text-[#898892]">{r.vezes}×</span>
+              <button onClick={() => mudar({ tirarRegra: { chave: r.chave, tipo: r.tipo } })} className="ml-auto text-[#898892] hover:text-[#d33a3c]" aria-label="Apagar regra"><X className="w-3.5 h-3.5" /></button>
+            </div>
+          ))}
+        </div>
+      </div>
+      {!!a.exemplos.length && (
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-1.5">Correções recentes (a IA usa como exemplo)</p>
+          <div className="space-y-1">
+            {a.exemplos.map(e => (
+              <div key={e.em} className="flex items-center gap-2 text-[11.5px]">
+                <span className="text-[#191625] font-semibold truncate max-w-[180px]">{e.contraparte || e.descricao}</span>
+                <span className="text-[#d33a3c] line-through truncate max-w-[200px]">{e.ia}</span>
+                <span className="text-[#898892]">→</span>
+                <span className="text-[#009351] truncate">{e.voce}</span>
+                <button onClick={() => mudar({ tirarExemplo: e.em })} className="ml-auto text-[#898892] hover:text-[#d33a3c]" aria-label="Apagar"><X className="w-3.5 h-3.5" /></button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -67,6 +67,12 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       c("5511977776666@s.whatsapp.net", "Raniere Péricles", "Bom dia, chegou?", 0.02, 0.5),
     ]))
   }
+  if (u.startsWith("/api/banco/sugerir")) return new Response(JSON.stringify({ feitas: 0, restantes: 0 }))
+  if (u.startsWith("/api/banco/aprendizado")) return new Response(JSON.stringify({
+    regras: [{ chave: "papelaria bras", tipo: "saida", acao: "lancar", categoria: "materiais", descricao: "Papel", vezes: 3 }, { chave: "ifood", tipo: "saida", acao: "ignorar", vezes: 2 }],
+    licoes: [{ id: "l1", texto: "Uber é deslocamento para fornecedor", em: "2026-11-04" }],
+    exemplos: [{ contraparte: "POSTO SHELL", descricao: "COMPRA", tipo: "saida", ia: "Combustível · Despesas gerais", voce: "ignorar", em: "2026-11-04T10:00:00Z" }],
+  }))
   if (u.startsWith("/api/banco/transacoes")) {
     const t = (id: string, p: Record<string, unknown>) => ({ id, conta_id: "c1", conta_nome: "Santander · 2005886-0", data: "2026-11-03", valor: 100, tipo: "saida", descricao: "PIX ENVIADO", contraparte_nome: null, contraparte_doc: null, categoria_pluggy: null, estado: "pendente", lancamento_ids: [], historico: [], ...p })
     return new Response(JSON.stringify({ configurada: true, tabela: true, erro: null, pendentes: 5,
