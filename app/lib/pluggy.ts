@@ -38,7 +38,7 @@ export const contas = (itemId: string) => pluggy<{ results: ContaPluggy[] }>(`/a
 // Transações de uma conta a partir de uma data (paginação por cursor da v2)
 export async function transacoes<T>(contaId: string, desde: string): Promise<{ ok: boolean; lista: T[]; erro?: string }> {
   const lista: T[] = []
-  let caminho: string | null = `/v2/transactions?accountId=${encodeURIComponent(contaId)}&dateFrom=${desde}&from=${desde}`
+  let caminho: string | null = `/v2/transactions?accountId=${encodeURIComponent(contaId)}&dateFrom=${desde}`
   for (let paginas = 0; caminho && paginas < 40; paginas++) {
     const r: { ok: boolean; dados: { results?: T[]; next?: string | null } | null; erro?: string } = await pluggy<{ results?: T[]; next?: string | null }>(caminho)
     if (!r.ok) return { ok: false, lista, erro: r.erro }
