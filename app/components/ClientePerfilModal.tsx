@@ -146,14 +146,16 @@ export function ClientePerfilModal({
   const allPedFechados = calcularPedidosFechados(kanban, lancamentos)
   const pedidoGroupsMap = new Map<string, PedidoGroup>()
 
-  for (const item of itens) {
-    const card = kanban.find(c => item.numero && c.numero === item.numero)
-    if (!card || !isFechado(card)) continue
+  // Parte dos pedidos (cada lote é um pedido): um orçamento repetido gera vários pedidos com o mesmo número
+  // (ex.: MAU-006 e MAU-007 do ORC-2026-225), e procurar "o" pedido pelo número escondia os outros.
+  for (const card of cardsFechados) {
+    const doCard = itens.filter(i => i.numero && i.numero === card.numero)
+    if (!doCard.length) continue
     const key = card.loteId ? `lote-${card.loteId}` : `card-${card.id}`
     if (!pedidoGroupsMap.has(key)) {
       pedidoGroupsMap.set(key, {
         key,
-        label: card.loteNumero ?? card.numero ?? item.numero ?? "—",
+        label: card.loteNumero ?? card.numero ?? "—",
         itens: [],
         cards: [],
         pago: 0,
@@ -162,7 +164,7 @@ export function ClientePerfilModal({
       })
     }
     const g = pedidoGroupsMap.get(key)!
-    g.itens.push(item)
+    for (const item of doCard) if (!g.itens.includes(item)) g.itens.push(item)
     if (!g.cards.some(c => c.id === card.id)) g.cards.push(card)
   }
 
@@ -171,12 +173,12 @@ export function ClientePerfilModal({
     if (pf) { g.pago = pf.pago; g.restante = pf.restante; g.total = pf.total }
   }
 
+  // Mais recente primeiro (como antes, pela ordem do histórico)
   const pedidoGroups = Array.from(pedidoGroupsMap.values())
+    .sort((a, b) => (dataPedido(b.cards[0])?.getTime() ?? 0) - (dataPedido(a.cards[0])?.getTime() ?? 0))
 
-  const itensOrcamento = itens.filter(item => {
-    const card = kanban.find(c => item.numero && c.numero === item.numero)
-    return !card || !isFechado(card)
-  })
+  // Orçamento em aberto: nenhum pedido com esse número foi fechado
+  const itensOrcamento = itens.filter(item => !kanban.some(c => item.numero && c.numero === item.numero && isFechado(c)))
   const propostasOrcamento = propostas.filter(p => {
     const card = p.cardId ? kanban.find(c => c.id === p.cardId) : null
     return !card || !isFechado(card)
