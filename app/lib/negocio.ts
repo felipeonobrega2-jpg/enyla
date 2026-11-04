@@ -22,7 +22,7 @@
 
 import {
   KanbanCard, LancamentoFinanceiro,
-  COL_FECHADO, COL_ENTREGUE, COL_PERDIDO, COL_HOT, COLUNAS_KANBAN,
+  COL_FECHADO, COL_EXPEDICAO, COL_ENTREGUE, COL_PERDIDO, COL_HOT, COLUNAS_KANBAN,
 } from "../types"
 
 // ─── Datas ───────────────────────────────────────────────────────────────────
@@ -346,9 +346,10 @@ export function producao(pedidos: Pedido[], hoje = new Date()): Producao {
     emProducao,
     valorEmProducao: emProducao.reduce((s, p) => s + p.valor, 0),
     entregues: pedidos.filter(pedidoEntregue),
-    atrasados: emProducao.filter(p => p.dataEntregaPrevista && diasAte(p.dataEntregaPrevista, hoje) < 0),
+    // Na expedição o pedido já está pronto: se ficou parado (cliente não pagou o restante, não retirou) não é atraso
+    atrasados: emProducao.filter(p => p.coluna < COL_EXPEDICAO && p.dataEntregaPrevista && diasAte(p.dataEntregaPrevista, hoje) < 0),
     vencendo3d: emProducao.filter(p => {
-      if (!p.dataEntregaPrevista) return false
+      if (!p.dataEntregaPrevista || p.coluna >= COL_EXPEDICAO) return false
       const d = diasAte(p.dataEntregaPrevista, hoje)
       return d >= 0 && d <= 3
     }),

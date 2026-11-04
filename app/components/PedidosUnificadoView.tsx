@@ -9,7 +9,7 @@ import {
 import {
   KanbanCard, KanbanOpcao, Lote, LancamentoFinanceiro,
   NegocioParceiro, FormData, Calculo, PrazoEtapas,
-  COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO,
+  COLUNAS_KANBAN, COL_FECHADO, COL_EXPEDICAO, COL_ENTREGUE, COL_PERDIDO,
 } from "../types"
 import { brl, num } from "../utils"
 import { custoFixoPeriodo, rateioPorPedido } from "../lib/metrics"
@@ -392,9 +392,10 @@ function passaFiltro(e: OrderEntry, f: FiltroStatus, hoje: Date): boolean {
     case "andamento": return aberto
     case "entregue":  return !aberto
     case "receber":   return e.aReceber > 0
-    case "atrasados": return aberto && !!e.dataEntregaPrevista && diasPara(e.dataEntregaPrevista, hoje) < 0
+    // Expedição: pronto, esperando pagamento ou retirada; não conta como atraso nem como "entrega em 3 dias"
+    case "atrasados": return aberto && e.coluna < COL_EXPEDICAO && !!e.dataEntregaPrevista && diasPara(e.dataEntregaPrevista, hoje) < 0
     case "prazo": {
-      if (!aberto || !e.dataEntregaPrevista) return false
+      if (!aberto || e.coluna >= COL_EXPEDICAO || !e.dataEntregaPrevista) return false
       const d = diasPara(e.dataEntregaPrevista, hoje)
       return d >= 0 && d <= 3
     }
@@ -766,7 +767,8 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
         const isOpen = expanded.has(entry.key)
         const temLanc = entry.receitas.length > 0 || entry.despesas.length > 0
         const entregaDate = entry.dataEntregaPrevista
-        const diasEnt = entregaDate && entry.coluna !== COL_ENTREGUE
+        const naExpedicao = entry.coluna === COL_EXPEDICAO
+        const diasEnt = entregaDate && entry.coluna !== COL_ENTREGUE && !naExpedicao
           ? Math.round((new Date(entregaDate + "T12:00:00").getTime() - hoje.getTime()) / 86_400_000)
           : null
         const emAtraso  = diasEnt !== null && diasEnt < 0
@@ -794,12 +796,14 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
               <div className="text-right shrink-0 w-[150px] hidden sm:block">
                 {entry.coluna === COL_ENTREGUE ? (
                   <p className="text-[11px] font-semibold text-[#009351]">Entregue {entry.dataEntregaReal ? fmt(entry.dataEntregaReal) : ""}</p>
+                ) : naExpedicao ? (
+                  <p className="text-[11px] font-semibold" style={{ color: entry.aReceber > 0.5 ? "#c57800" : "#009351" }}>{entry.aReceber > 0.5 ? "Pronto · aguardando pagamento" : "Pronto · aguardando retirada"}</p>
                 ) : entregaDate ? (
                   <p className="text-[11px] font-semibold" style={{ color: emAtraso ? "#d33a3c" : quaseVenc ? "#c57800" : sub }}>
                     {emAtraso ? `${Math.abs(diasEnt!)} ${Math.abs(diasEnt!) === 1 ? "dia" : "dias"} de atraso` : diasEnt === 0 ? "Entrega hoje" : diasEnt === 1 ? "Entrega amanhã" : `Entrega em ${diasEnt} dias`}
                   </p>
                 ) : <p className="text-[11px] text-[#898892]">Sem data de entrega</p>}
-                <p className="text-[10.5px] text-[#898892] mt-0.5">{entregaDate && entry.coluna !== COL_ENTREGUE ? fmtFull(entregaDate) : ""}</p>
+                <p className="text-[10.5px] text-[#898892] mt-0.5">{entregaDate && entry.coluna !== COL_ENTREGUE && !naExpedicao ? fmtFull(entregaDate) : ""}</p>
               </div>
               <div className="text-right shrink-0 w-[150px] whitespace-nowrap">
                 <p className="text-[13.5px] font-semibold ds-num" style={{ color: txt }}>{brl(entry.precoTotal)}</p>

@@ -16,7 +16,7 @@ import {
   margemContribuicao, conversao, orcamentosDoPeriodo, parseData, nomeChave, isTerceirizado, isAberto,
 } from "../lib/negocio"
 import { EnviarWhatsapp, Envio } from "../components/EnviarWhatsapp"
-import { pendencias, Pendencia, TipoPendencia, cardDoPedido, prazoTexto, linkWhatsApp } from "../lib/pendencias"
+import { pendencias, Pendencia, TipoPendencia, cardDoPedido, prazoTexto, prazoDoPedido, linkWhatsApp } from "../lib/pendencias"
 import { normalizarProducao, nomeServicos } from "../lib/producao"
 import { normalizarMetas } from "../lib/metas"
 import { ehDiaUtil, diasUteisEntre, definirFeriadosLocais } from "../lib/diasUteis"
@@ -452,7 +452,7 @@ function Producao({ pedidos, config, hoje, onAbrir }: { pedidos: Pedido[]; confi
         {[...prod.emProducao].sort((a, b) => (a.dataEntregaPrevista ?? "9").localeCompare(b.dataEntregaPrevista ?? "9")).map(p => {
           const atrasado = prod.atrasados.includes(p), logo = prod.vencendo3d.includes(p)
           return (
-            <Linha key={p.key} titulo={`${p.numero} · ${p.nomeCliente}`} sub={`${p.etapa} · ${prazoTexto(p.dataEntregaPrevista, hoje)}`}
+            <Linha key={p.key} titulo={`${p.numero} · ${p.nomeCliente}`} sub={`${p.etapa} · ${prazoDoPedido(p, hoje)}`}
               valor={curto(p.valor)} tom={atrasado ? "perigo" : logo ? "alerta" : undefined} onClick={() => onAbrir(cardDoPedido(p))} />
           )
         })}

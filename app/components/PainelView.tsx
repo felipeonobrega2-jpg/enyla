@@ -13,7 +13,7 @@ import {
   pipelineComercial, margemContribuicao, isAberto, isGanho, isPerdido, isExpirado,
   parseData, diasAte, nomeChave, noPeriodo, Pedido, recebiveis,
 } from "../lib/negocio"
-import { pendencias, cardDoPedido, prazoTexto, TipoPendencia } from "../lib/pendencias"
+import { pendencias, cardDoPedido, prazoDoPedido, TipoPendencia } from "../lib/pendencias"
 import { ehDiaUtil } from "../lib/diasUteis"
 import { normalizarMetas, sugerirMeta, conquistasDeSaude } from "../lib/metas"
 import { brl, num } from "../utils"
@@ -222,8 +222,8 @@ export function PainelView({
       titulo: lista[0]?.etapa ?? "Produção",
       sub: `${lista.length} pedidos · ${brl(lista.reduce((s, p) => s + p.valor, 0))}`,
       linhas: lista.map(p => (
-        <LinhaLista key={p.key} titulo={`${p.numero} · ${p.nomeCliente}`} sub={prazoTexto(p.dataEntregaPrevista)}
-          valor={brl(p.valor)} tom={p.dataEntregaPrevista && diasAte(p.dataEntregaPrevista, hoje) < 0 ? "perigo" : undefined}
+        <LinhaLista key={p.key} titulo={`${p.numero} · ${p.nomeCliente}`} sub={prazoDoPedido(p)}
+          valor={brl(p.valor)} tom={prod.atrasados.includes(p) ? "perigo" : undefined}
           onClick={() => { fechar(); onAbrirCard(cardDoPedido(p)) }} />
       )),
       destino: { nome: "Abrir Pedidos", ir: () => onNavegar("pedidos") },

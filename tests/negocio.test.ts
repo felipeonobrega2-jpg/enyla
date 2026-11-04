@@ -87,3 +87,17 @@ describe("conta corrente do fornecedor", () => {
     expect(caixaDoPeriodo(lancs, p).recebido).toBe(1000)
   })
 })
+
+describe("atraso só até a expedição", () => {
+  it("pedido na expedição com data passada não está atrasado nem 'entrega próxima'", async () => {
+    const { montarPedidos, producao } = await import("@/app/lib/negocio")
+    const { card } = await import("./fixtures")
+    const hoje = new Date("2026-11-04T12:00:00")
+    const naImpressao = card({ numero: "A", preco: 100, coluna: 5, dataEntregaPrevista: "2026-10-30" })
+    const naExpedicao = card({ numero: "B", preco: 100, coluna: 8, dataEntregaPrevista: "2026-10-30" })
+    const amanhaExp = card({ numero: "C", preco: 100, coluna: 8, dataEntregaPrevista: "2026-11-05" })
+    const p = producao(montarPedidos([naImpressao, naExpedicao, amanhaExp], []), hoje)
+    expect(p.atrasados.map(x => x.numero)).toEqual(["A"])
+    expect(p.vencendo3d.map(x => x.numero)).toEqual([])
+  })
+})

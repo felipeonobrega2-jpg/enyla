@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { Flame, X, ChevronDown } from "lucide-react"
-import { KanbanCard, KanbanOpcao, Lote, LancamentoFinanceiro, NegocioParceiro, StatusLoteParceiro, COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO, COL_HOT } from "../types"
+import { KanbanCard, KanbanOpcao, Lote, LancamentoFinanceiro, NegocioParceiro, StatusLoteParceiro, COLUNAS_KANBAN, COL_FECHADO, COL_EXPEDICAO, COL_ENTREGUE, COL_PERDIDO, COL_HOT } from "../types"
 import { brl, num } from "../utils"
 import { COL_COLORS } from "./kanban-colors"
 import { MOTIVOS_PERDA, CategoriaPerda, textoMotivo } from "../lib/coleta"
@@ -424,7 +424,7 @@ export function KanbanView({
         const hj = new Date().toISOString().slice(0, 10)
         const atrasados = cards.filter(c =>
           c.dataEntregaPrevista && c.dataEntregaPrevista < hj &&
-          c.coluna < COL_ENTREGUE && c.coluna !== COL_PERDIDO
+          c.coluna < COL_EXPEDICAO && c.coluna !== COL_PERDIDO   // na expedição já está pronto: não é atraso
         )
         if (atrasados.length === 0 || hideDashboard) return null
         return (
@@ -769,7 +769,7 @@ function KanbanCardItem({
 
   // Delivery
   const entregaDate = card.dataEntregaPrevista
-  const diasEnt = entregaDate && !isPerdido && colIdx < COL_ENTREGUE
+  const diasEnt = entregaDate && !isPerdido && colIdx < COL_EXPEDICAO
     ? Math.round((new Date(entregaDate + "T12:00:00").getTime() - Date.now()) / 86_400_000)
     : null
   const emAtraso  = diasEnt !== null && diasEnt < 0

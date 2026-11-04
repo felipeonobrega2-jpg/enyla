@@ -1,7 +1,7 @@
 // "Precisa de você": o que pede ação agora, em ordem de urgência.
 // Fonte única para o Painel (computador) e para o celular.
 
-import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COL_FECHADO, COL_PERDIDO, COL_HOT } from "../types"
+import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COL_FECHADO, COL_EXPEDICAO, COL_PERDIDO, COL_HOT } from "../types"
 import { Configuracoes } from "../config"
 import { Pedido, producao, recebiveis, pedidoEntregue, isTerceirizado, parseData, diasAte, nomeChave } from "./negocio"
 import { normalizarProducao } from "./producao"
@@ -48,6 +48,10 @@ export const linkWhatsApp = (telefone: string | undefined, texto: string) => {
   if (!tel) return undefined
   return `https://wa.me/${tel.length <= 11 ? "55" + tel : tel}?text=${encodeURIComponent(texto)}`
 }
+
+// Prazo de um pedido em produção; na expedição já está pronto (parado por pagamento ou retirada, não atrasado)
+export const prazoDoPedido = (p: Pick<Pedido, "coluna" | "dataEntregaPrevista" | "aReceber">, hoje = new Date()) =>
+  p.coluna === COL_EXPEDICAO ? (p.aReceber > 0.5 ? "pronto · aguardando pagamento" : "pronto · aguardando retirada") : prazoTexto(p.dataEntregaPrevista, hoje)
 
 export function pendencias(args: {
   pedidos: Pedido[]
