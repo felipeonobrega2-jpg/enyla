@@ -42,3 +42,32 @@ describe("agente de leads: o que pode sair sem o Felipe", () => {
     expect(ehMensagemAutomaticaDoWhatsapp("Bom dia")).toBe(false)
   })
 })
+
+import { organizarLead, proximoFollowUp, semFollowUp, horarioDeFollowUp } from "@/app/lib/agenteLeads"
+
+describe("agente de leads: etiquetas e follow-up", () => {
+  it("lead bom vai para MQL; ruim para Descartado; suas etiquetas ficam", () => {
+    expect(organizarLead(["Cliente VIP", "F1"], "icp")).toEqual({ etiquetas: ["Cliente VIP", "MQL", "ICP"], etapa: "mql" })
+    expect(organizarLead([], "medio")).toEqual({ etiquetas: ["MQL", "Lead médio"], etapa: "mql" })
+    expect(organizarLead(["Lead médio", "MQL"], "pequeno")).toEqual({ etiquetas: ["Descartado", "Lead pequeno"], etapa: "descartado" })
+    expect(organizarLead(["F2"], "indefinido")).toEqual({ etiquetas: ["F2"], etapa: null })
+  })
+  it("MQL trava o automático", () => {
+    expect(travaDoEnvio({ ...ok, emMql: true })).toMatch(/MQL/)
+  })
+  it("F1 → F2 → F3 → Sem resposta, cada um no seu tempo", () => {
+    expect(proximoFollowUp([], 2)).toBeNull()
+    expect(proximoFollowUp([], 3)).toEqual({ tipo: "mensagem", nivel: 1, etiquetas: ["F1"] })
+    expect(proximoFollowUp(["F1"], 10)).toBeNull()
+    expect(proximoFollowUp(["X", "F1"], 24)).toEqual({ tipo: "mensagem", nivel: 2, etiquetas: ["X", "F2"] })
+    expect(proximoFollowUp(["F2"], 72)).toEqual({ tipo: "mensagem", nivel: 3, etiquetas: ["F3"] })
+    expect(proximoFollowUp(["F3"], 95)).toBeNull()
+    expect(proximoFollowUp(["F3"], 96)).toEqual({ tipo: "encerrar", etiquetas: ["Sem resposta"] })
+    expect(proximoFollowUp(["Sem resposta"], 999)).toBeNull()
+  })
+  it("respondeu: sai do follow-up; horário comercial", () => {
+    expect(semFollowUp(["F2", "MQL", "Sem resposta"])).toEqual(["MQL"])
+    expect(horarioDeFollowUp(new Date("2026-11-05T13:00:00Z"))).toBe(true)   // 10h em SP
+    expect(horarioDeFollowUp(new Date("2026-11-05T02:00:00Z"))).toBe(false)  // 23h em SP
+  })
+})

@@ -35,6 +35,7 @@ export type RegistroAgente = {
   enviou: boolean
   texto: string
   motivo: string              // por que enviou ou por que segurou
+  passo?: string              // "F1", "F2", "F3", "Sem resposta" (follow-up)
 }
 
 export type ContextoEnvio = {
@@ -49,6 +50,7 @@ export type ContextoEnvio = {
   enviadasHoje: number
   maxPorDia: number
   jaEncerrouPequeno: boolean  // o agente já explicou e indicou o parceiro para este lead pequeno
+  emMql?: boolean             // já está em MQL: daqui em diante quem atende é você
   precosDoFiltro: string[]    // valores em R$ que estão escritos no filtro (os únicos que podem sair)
 }
 
@@ -65,6 +67,7 @@ export function travaDoEnvio(c: ContextoEnvio): string | null {
   if (!c.ligado) return "modo automático desligado"
   if (!c.resposta.trim()) return "nada a responder"
   if (c.lead.perfil === "nao_lead") return "não é lead"
+  if (c.emMql) return "MQL: você atende"
   if (c.clienteCadastrado) return "cliente cadastrado: fica com você"
   if (!c.conversaNova) return "contato antigo: fica com você"
   if (c.manualRecente) return "você está nessa conversa agora"
@@ -77,6 +80,57 @@ export function travaDoEnvio(c: ContextoEnvio): string | null {
   const fora = valoresEmReais(c.resposta).filter(v => !permitidos.has(v))
   if (fora.length) return `citou valor que não está no filtro (R$ ${fora.join(", ")})`
   return null
+}
+
+// ── Etiquetas e etapas que o agente organiza ─────────────────────────────────
+// Lead bom → MQL (você atende, sem o contato perceber a troca). Lead ruim → Descartado.
+// Sem resposta → F1, F2, F3 e, por fim, Sem resposta (vai para Perdido).
+
+export const ETIQUETAS_AGENTE = {
+  mql: "MQL", descartado: "Descartado", f1: "F1", f2: "F2", f3: "F3", semResposta: "Sem resposta",
+} as const
+export const COR_ETIQUETA_AGENTE: Record<string, string> = {
+  "MQL": "#009351", "Descartado": "#a0a0aa", "F1": "#c57800", "F2": "#d56a00", "F3": "#d33a3c", "Sem resposta": "#7a7983",
+  "ICP": "#009351", "Lead médio": "#8456e8", "Lead pequeno": "#a0a0aa",
+}
+const FOLLOW = ["F1", "F2", "F3"] as const
+const DO_AGENTE: string[] = [...Object.values(ETIQUETAS_AGENTE), ...Object.values(ETIQUETA_PERFIL) as string[]]
+export const ehEtiquetaDoAgente = (e: string) => DO_AGENTE.includes(e)
+
+export const ehQualificado = (p: PerfilLead) => p === "icp" || p === "medio"
+
+// Depois de avaliar o lead: etiquetas novas (as suas ficam) e a etapa do funil (null = não mexe)
+export function organizarLead(atuais: string[], perfil: PerfilLead): { etiquetas: string[]; etapa: "mql" | "descartado" | null } {
+  const suas = atuais.filter(e => !DO_AGENTE.includes(e))
+  const perf = ETIQUETA_PERFIL[perfil]
+  if (ehQualificado(perfil)) return { etiquetas: [...suas, ETIQUETAS_AGENTE.mql, perf!], etapa: "mql" }
+  if (perfil === "pequeno") return { etiquetas: [...suas, ETIQUETAS_AGENTE.descartado, perf!], etapa: "descartado" }
+  // Indefinido: mantém o que já tinha (inclusive F1/F2/F3); não é lead: não mexe
+  return { etiquetas: atuais, etapa: null }
+}
+
+// O lead respondeu: sai do follow-up
+export const semFollowUp = (atuais: string[]) => atuais.filter(e => !(FOLLOW as readonly string[]).includes(e) && e !== ETIQUETAS_AGENTE.semResposta)
+
+// Horas desde a sua última mensagem para o próximo passo (F1 3 h; F2 1 dia depois; F3 3 dias depois; Sem resposta 4 dias depois)
+export const HORAS_FOLLOW = { F1: 3, F2: 24, F3: 72, fim: 96 }
+
+export type PassoFollowUp = { tipo: "mensagem"; nivel: 1 | 2 | 3; etiquetas: string[] } | { tipo: "encerrar"; etiquetas: string[] }
+
+export function proximoFollowUp(atuais: string[], horasDesdeSuaUltima: number): PassoFollowUp | null {
+  const nivel = FOLLOW.reduce((n, f, i) => atuais.includes(f) ? i + 1 : n, 0)
+  const resto = atuais.filter(e => !(FOLLOW as readonly string[]).includes(e))
+  if (atuais.includes(ETIQUETAS_AGENTE.semResposta)) return null
+  if (nivel === 3) return horasDesdeSuaUltima >= HORAS_FOLLOW.fim ? { tipo: "encerrar", etiquetas: [...resto, ETIQUETAS_AGENTE.semResposta] } : null
+  const proximo = (nivel + 1) as 1 | 2 | 3
+  const espera = [HORAS_FOLLOW.F1, HORAS_FOLLOW.F2, HORAS_FOLLOW.F3][nivel]
+  return horasDesdeSuaUltima >= espera ? { tipo: "mensagem", nivel: proximo, etiquetas: [...resto, FOLLOW[nivel]] } : null
+}
+
+// Follow-up só em horário comercial (8h às 20h de São Paulo)
+export const horarioDeFollowUp = (d = new Date()) => {
+  const h = Number(d.toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false }))
+  return h >= 8 && h < 20
 }
 
 // Mensagens separadas por linha em branco viram envios separados (no máximo 3)

@@ -2,19 +2,23 @@
 //   Automático: sem resposta sua = Novo; você respondeu = Em conversa; cliente ligado com orçamento aberto =
 //   Orçamento enviado; card quente = Negociando; card fechado = Virou pedido; 14 dias sem o cliente falar = Perdido.
 //   À mão: arrastar para uma etapa vale até o cliente voltar a falar depois de "Perdido".
+//   Agente de leads: lead qualificado vai para MQL (você atende); lead pequeno vai para Descartado.
+//   MQL anda sozinho quando o cliente ganha orçamento/pedido.
 //   Sinais: "responder" (cliente falou por último) e "esfriando" (você falou por último há 3+ dias).
 
 import { KanbanCard, COL_HOT, COL_PERDIDO } from "../types"
 import { parseData } from "./negocio"
 
-export type Etapa = "novo" | "conversa" | "orcamento" | "negociando" | "pedido" | "perdido"
+export type Etapa = "novo" | "mql" | "conversa" | "orcamento" | "negociando" | "pedido" | "perdido" | "descartado"
 export const ETAPAS: { id: Etapa; nome: string }[] = [
   { id: "novo", nome: "Novo" },
+  { id: "mql", nome: "MQL" },
   { id: "conversa", nome: "Em conversa" },
   { id: "orcamento", nome: "Orçamento enviado" },
   { id: "negociando", nome: "Negociando" },
   { id: "pedido", nome: "Virou pedido" },
   { id: "perdido", nome: "Perdido" },
+  { id: "descartado", nome: "Descartado" },
 ]
 const ORDEM = ETAPAS.map(e => e.id)
 
@@ -57,13 +61,14 @@ export function posicaoNoFunil(c: ConversaFunil, cardsDoCliente: KanbanCard[], h
   const escolhida = ORDEM.includes(c.status_lead as Etapa) ? c.status_lead as Etapa : null
   if (escolhida) {
     const voltou = escolhida === "perdido" && !!recebida && !!c.ultima_classificacao_at && recebida > c.ultima_classificacao_at
-    if (!voltou) { etapa = escolhida; manual = true }
+    const andou = escolhida === "mql" && !!pelosCards    // MQL que ganhou orçamento segue pelos cards
+    if (!voltou && !andou) { etapa = escolhida; manual = true }
   }
 
-  const ativa = etapa === "conversa" || etapa === "orcamento" || etapa === "negociando"
+  const ativa = etapa === "mql" || etapa === "conversa" || etapa === "orcamento" || etapa === "negociando"
   const esfriando = ativa && !responder && dias(enviada, hoje) >= DIAS_ESFRIANDO
   const card = pelosCards?.card
-  return { etapa, manual, responder: responder && etapa !== "perdido", esfriando, card, valor: card && etapa !== "novo" && etapa !== "conversa" ? card.preco : undefined }
+  return { etapa, manual, responder: responder && etapa !== "perdido" && etapa !== "descartado", esfriando, card, valor: card && etapa !== "novo" && etapa !== "conversa" ? card.preco : undefined }
 }
 
 // Conversa fechada: some da lista e do funil até o cliente escrever depois de fechada

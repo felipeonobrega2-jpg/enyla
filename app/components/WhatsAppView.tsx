@@ -1165,7 +1165,7 @@ export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover
                     <span className="text-[11.5px] font-semibold" style={{ color: "var(--text-faint)" }}>{lista.length}</span>
                   </div>
                   {valor > 0 && <p className="text-[11px] ds-num" style={{ color: "var(--text-sub)" }}>{brl0(valor)}</p>}
-                  {e.id === "perdido" && lista.length > 0 && onFechar && (
+                  {(e.id === "perdido" || e.id === "descartado") && lista.length > 0 && onFechar && (
                     <button onClick={() => onFechar(lista.map(i => i.c.jid))} className="text-[11px] font-semibold mt-1" style={{ color: "#8456e8" }}>Fechar todas ({lista.length})</button>
                   )}
                 </div>

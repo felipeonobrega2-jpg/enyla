@@ -56,12 +56,20 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
           <p className="text-[11.5px] text-[#5e5c68]">
             {ligado
               ? "Responde sozinho só contato novo (até 4 dias), espera 20 s o lead terminar de digitar e segura tudo que é decisão sua."
-              : "Desligado, ele só sugere a resposta na conversa. Ligado, responde sozinho os leads novos."}
+              : "Desligado, ele só sugere a resposta na conversa. Ligado, responde sozinho os leads novos e organiza o funil."}
           </p>
         </div>
         <Botao variante={ligado ? "secundario" : "primario"} disabled={!auto || mudando} onClick={alternar}
           icone={mudando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Power className="w-3.5 h-3.5" />}>{ligado ? "Desligar" : "Ligar"}</Botao>
       </div>
+
+      {/* Como ele organiza */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4 text-[11.5px]">
+        <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#009351]">Lead bom → MQL</p><p className="text-[#5e5c68]">1.000+ unidades. Etiqueta MQL e vai para a coluna MQL do funil. Daí em diante ele não responde mais: é você, sem o contato perceber a troca.</p></div>
+        <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#5e5c68]">Lead ruim → Descartado</p><p className="text-[#5e5c68]">Menos de 1.000. Uma mensagem orientando e indicando o parceiro, etiqueta Descartado e sai da sua lista de responder.</p></div>
+        <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#c57800]">Sem resposta → F1, F2, F3</p><p className="text-[#5e5c68]">F1 após 3 h, F2 após 1 dia, F3 após 3 dias (8h–20h). 4 dias depois do F3: Sem resposta, vai para Perdido. No MQL só etiqueta, quem cobra é você.</p></div>
+      </div>
+      <p className="text-[11px] text-[#898892] mb-4">No seu WhatsApp Business: crie no app as etiquetas com estes nomes exatos (MQL, Descartado, F1, F2, F3, Sem resposta, ICP, Lead médio, Lead pequeno) e ele marca lá também.</p>
 
       {/* Filtro */}
       <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-1.5">Filtro de leads</p>
@@ -105,7 +113,7 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
             {log.map(l => (
               <div key={l.em + l.jid} className="text-[11.5px] flex items-start gap-2">
                 <span className="text-[#898892] shrink-0 w-[78px]">{hora(l.em)}</span>
-                <Selo tom={l.enviou ? "sucesso" : "neutro"}>{l.enviou ? "Enviou" : "Segurou"}</Selo>
+                <Selo tom={l.enviou ? "sucesso" : "neutro"}>{l.passo ? `${l.passo} · ` : ""}{l.enviou ? "Enviou" : "Segurou"}</Selo>
                 <span className="min-w-0">
                   <span className="font-semibold text-[#191625]">{l.nome ?? l.jid.split("@")[0]}</span>
                   <span className="text-[#898892]"> · {ROTULO_PERFIL[l.perfil]} · {l.motivo}</span>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server"
 import { transcreverPendentes } from "@/app/lib/transcricao"
 import { registrarConexao, registrarRecibos, registrarContatos } from "@/app/lib/whatsappEventos"
 import { gravarLote, WaMessage, deveIgnorar, extractBody } from "@/app/lib/whatsappDados"
-import { responderSozinho } from "@/app/lib/agenteAuto"
+import { responderSozinho, talvezFollowUps } from "@/app/lib/agenteAuto"
 
 // Espera do modo automático (o lead termina de digitar) + resposta da IA + envio
 export const maxDuration = 60
@@ -19,6 +19,8 @@ export async function POST(req: NextRequest) {
   try {
     const body  = await req.json()
     const event = body.event as string
+    // Follow-ups do agente de leads pegam carona nos eventos (no máximo uma rodada a cada 10 min)
+    after(() => talvezFollowUps().catch(e => console.error("[agente follow-up]", e)))
 
     // ── messages.upsert — mensagem nova em tempo real
     if (event === "messages.upsert") {
