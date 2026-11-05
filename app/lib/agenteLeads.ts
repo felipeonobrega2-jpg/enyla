@@ -28,6 +28,19 @@ export type AgenteAuto = {
   esperaSeg?: number          // espera o lead terminar de digitar antes de responder (padrão 20 s)
   maxPorDia?: number          // respostas automáticas por conversa em 24 h (padrão 6)
   vitrine?: string            // mensagem do Instagram, mandada uma vez a cada lead depois da primeira resposta
+  avisoNumero?: string        // número que recebe o aviso de MQL no WhatsApp (vazio = o seu próprio chat "Você")
+}
+
+// Aviso de lead bom, mandado no seu WhatsApp: quem é, o que quer e o link para abrir a conversa
+export function textoAvisoMql(a: { nome: string | null; telefone: string | null; perfil: PerfilLead; quantidade: number | null; motivo: string; resumo?: string }) {
+  const rotulo = a.perfil === "icp" ? "ICP" : a.perfil === "oportunidade" ? "Oportunidade" : "Lead médio"
+  return [
+    `🟢 *Novo MQL* · ${rotulo}${a.quantidade ? ` · ${a.quantidade.toLocaleString("pt-BR")} un` : ""}`,
+    a.nome ? `*${a.nome}*` : null,
+    a.resumo || null,
+    a.motivo,
+    a.telefone ? `wa.me/${a.telefone}` : null,
+  ].filter(Boolean).join("\n")
 }
 
 export const VITRINE_PADRAO = "Dá uma olhada no nosso Instagram: instagram.com/enyla.embalagens"
@@ -179,8 +192,8 @@ RESPOSTAS QUE EU USO
 LEAD PEQUENO (menos de 1.000)
 - Não gaste tempo. Uma mensagem só, cordial e curta: nossa impressão é offset e não roda essa quantidade; para isso o ideal é impressão digital, e eu tenho um parceiro que faz poucas unidades (com verniz à base d'água).
 - Na mesma mensagem, deixe a porta aberta para o resto: se ele precisar de frasco, essência, válvula ou envase, eu tenho fornecedor direto e consigo ajudar. Se ele responder que precisa, vira oportunidade.
-- Contato do parceiro de impressão digital: (preencha aqui nome e telefone). Se estiver sem contato, diga que vou passar o contato dele e marque decisao_sua.
-- Diga para falar que veio através de mim, Felipe da ENYLA, que ele dá desconto. Deseje boa sorte ("todo começo é assim mesmo").
+- Contato do parceiro de impressão digital (faz poucas unidades): (11) 96843-7324. Passe o número na mensagem.
+- Diga para ele falar que veio pelo Luiz, da ENYLA, e pedir o meu cupom quando for fechar. Deseje boa sorte ("todo começo é assim mesmo").
 - Depois disso não insista e não faça follow-up. Se ele topar 1.000 ("1000 então"), vira lead normal.
 
 O QUE NÃO FAZEMOS
@@ -201,3 +214,20 @@ NÃO É LEAD
 - Fornecedor (papel, frasco, válvula, essência, gráfica, colagem), parceiro, cliente com pedido em andamento, conversa pessoal: não responda (decisao_sua). Se for fornecedor, marque fornecedor = true.`
 
 export const filtroEfetivo = (t?: string | null) => t?.trim() || FILTRO_PADRAO
+
+// ── Conhecimento que o agente aprende com os seus atendimentos (agenteAprende) ──
+export type Conhecimento = { id: string; tema: string; texto: string; em: string }
+
+export const TEMAS = ["preco", "produto", "fornecedor", "prazo", "processo", "venda", "objecao", "recusa", "outro"] as const
+export const ROTULO_TEMA: Record<string, string> = {
+  preco: "Preço", produto: "Produto", fornecedor: "Fornecedor", prazo: "Prazo", processo: "Processo",
+  venda: "Como vende", objecao: "Objeção", recusa: "O que recusa", outro: "Outro",
+}
+// Texto que vai no prompt do atendente
+export function conhecimentoNoPrompt(itens: Conhecimento[] | undefined) {
+  if (!itens?.length) return ""
+  const porTema = new Map<string, string[]>()
+  for (const i of itens) porTema.set(i.tema, [...(porTema.get(i.tema) ?? []), i.texto])
+  return [...porTema].map(([t, l]) => `${ROTULO_TEMA[t] ?? t}:\n${l.map(x => `- ${x}`).join("\n")}`).join("\n\n")
+}
+

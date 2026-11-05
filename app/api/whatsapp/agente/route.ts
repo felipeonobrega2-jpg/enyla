@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { atender, lerConfigAtendente } from "@/app/lib/atendenteServidor"
 import { enviarEtiquetasAoWhatsapp } from "@/app/lib/agenteAuto"
+import { aprenderComConversas, Conhecimento } from "@/app/lib/agenteAprende"
 import { AgenteAuto, RegistroAgente, travaDoEnvio, valoresEmReais, PerfilLead, filtroEfetivo } from "@/app/lib/agenteLeads"
 
 export const maxDuration = 60
@@ -13,7 +14,7 @@ export const maxDuration = 60
 //   POST { simular: true }   → roda o agente nos leads mais recentes e mostra o que ele mandaria (não envia nada)
 // (Rota protegida pelo login.)
 
-type Cfg = { agenteAuto?: AgenteAuto; agenteLog?: RegistroAgente[]; filtroLeads?: string }
+type Cfg = { agenteAuto?: AgenteAuto; agenteLog?: RegistroAgente[]; filtroLeads?: string; conhecimentoAgente?: Conhecimento[]; agenteAprendeuEm?: string }
 
 export type Taxa = { passo: string; enviados: number; responderam: number }
 
@@ -32,19 +33,32 @@ async function taxas(log: RegistroAgente[]): Promise<Taxa[]> {
 export async function GET() {
   const cfg = await lerConfigAtendente() as Cfg
   const log = cfg.agenteLog ?? []
-  return NextResponse.json({ auto: cfg.agenteAuto ?? { ligado: false }, log: log.slice(0, 80), taxas: await taxas(log) })
+  return NextResponse.json({ auto: cfg.agenteAuto ?? { ligado: false }, log: log.slice(0, 80), taxas: await taxas(log), conhecimento: cfg.conhecimentoAgente ?? [], aprendeuEm: cfg.agenteAprendeuEm ?? null })
 }
 
 export type Simulacao = { jid: string; nome: string | null; ultima: string; perfil: PerfilLead; quantidade: number | null; motivo: string; resposta: string; enviaria: boolean; trava: string | null }
 
 export async function POST(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as Partial<AgenteAuto> & { simular?: boolean; etiquetasWhatsapp?: number }
+  const b = await req.json().catch(() => ({})) as Partial<AgenteAuto> & { simular?: boolean; etiquetasWhatsapp?: number; aprender?: number; tirarConhecimento?: string }
+  // Aprender agora com as suas conversas dos últimos N dias (padrão 1)
+  if (typeof b.aprender === "number") {
+    const r = await aprenderComConversas(new Date(Date.now() - Math.min(7, Math.max(1, b.aprender)) * 86_400_000).toISOString())
+    const cfg = await lerConfigAtendente() as Cfg
+    return NextResponse.json({ ...r, conhecimento: cfg.conhecimentoAgente ?? [] })
+  }
+  if (b.tirarConhecimento) {
+    const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+    const d = (data?.data ?? {}) as Record<string, unknown> & Cfg
+    const conhecimento = (d.conhecimentoAgente ?? []).filter(i => i.id !== b.tirarConhecimento)
+    await supabase.from("AppConfig").update({ data: { ...d, conhecimentoAgente: conhecimento } }).eq("id", 1)
+    return NextResponse.json({ conhecimento })
+  }
   // Etiquetas do sistema → WhatsApp Business, uma página por chamada (a tela repete até acabar)
   if (typeof b.etiquetasWhatsapp === "number") return NextResponse.json(await enviarEtiquetasAoWhatsapp(b.etiquetasWhatsapp))
   if (!b.simular) {
     const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
     const d = (data?.data ?? {}) as Record<string, unknown> & Cfg
-    const auto: AgenteAuto = { ...(d.agenteAuto ?? { ligado: false }), ...(typeof b.ligado === "boolean" ? { ligado: b.ligado } : {}), ...(b.esperaSeg ? { esperaSeg: b.esperaSeg } : {}), ...(b.maxPorDia ? { maxPorDia: b.maxPorDia } : {}), ...(typeof b.vitrine === "string" ? { vitrine: b.vitrine.trim().slice(0, 400) } : {}) }
+    const auto: AgenteAuto = { ...(d.agenteAuto ?? { ligado: false }), ...(typeof b.ligado === "boolean" ? { ligado: b.ligado } : {}), ...(b.esperaSeg ? { esperaSeg: b.esperaSeg } : {}), ...(b.maxPorDia ? { maxPorDia: b.maxPorDia } : {}), ...(typeof b.vitrine === "string" ? { vitrine: b.vitrine.trim().slice(0, 400) } : {}), ...(typeof b.avisoNumero === "string" ? { avisoNumero: b.avisoNumero.replace(/\D/g, "").slice(0, 15) } : {}) }
     await supabase.from("AppConfig").update({ data: { ...d, agenteAuto: auto } }).eq("id", 1)
     return NextResponse.json({ auto })
   }

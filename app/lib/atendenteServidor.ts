@@ -10,6 +10,7 @@ import { COLUNAS_KANBAN, COL_PERDIDO } from "../types"
 import type { Atendimento } from "./atendente"
 import { LeadAvaliado, filtroEfetivo } from "./agenteLeads"
 import { transcreverPendentes } from "./transcricao"
+import { Conhecimento, conhecimentoNoPrompt } from "./agenteAprende"
 
 const ESQUEMA = {
   type: "object",
@@ -63,7 +64,7 @@ export type ConversaLida = {
   mensagens: { id: string; from_me: boolean; corpo: string | null; tipo: string; ts: string }[]
 }
 
-type Cfg = { apiKey?: string; guiaAtendimento?: string; filtroLeads?: string; vinculosWhatsapp?: Vinculos }
+type Cfg = { apiKey?: string; guiaAtendimento?: string; filtroLeads?: string; vinculosWhatsapp?: Vinculos; conhecimentoAgente?: Conhecimento[] }
 
 export async function lerConfigAtendente(): Promise<Cfg> {
   const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
@@ -125,7 +126,13 @@ Seu trabalho principal com quem chega do anúncio é descobrir os bons negócios
 <filtro_leads>
 ${filtroEfetivo(cfg.filtroLeads)}
 </filtro_leads>
+${cfg.conhecimentoAgente?.length ? `
+O que você já aprendeu com os atendimentos do próprio Felipe (conversas e áudios dele). Use para responder como ele; se contradiz o filtro, vale o filtro. Valores daqui são histórico dele: não cite valor que não esteja no filtro.
 
+<aprendido>
+${conhecimentoNoPrompt(cfg.conhecimentoAgente)}
+</aprendido>
+` : ""}
 Como decidir a resposta:
 - Responda ao que o cliente disse por último, no ponto da conversa em que estão. Espelhe o tom dele.
 - No máximo 2 mensagens curtas (separadas por uma linha em branco); quase sempre 1 basta. Frases completas, nada de fragmentos soltos.

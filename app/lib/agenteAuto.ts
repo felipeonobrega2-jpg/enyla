@@ -10,7 +10,7 @@ import { gravarLote, WaMessage } from "./whatsappDados"
 import { atender, lerConfigAtendente } from "./atendenteServidor"
 import {
   AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, filtroEfetivo,
-  organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, proximoFollowUp, horarioDeFollowUp, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE,
+  organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, proximoFollowUp, horarioDeFollowUp, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE,
 } from "./agenteLeads"
 
 const DIAS_CONVERSA_NOVA = 4
@@ -125,6 +125,33 @@ async function enviar(c: Conversa, texto: string, lida?: string): Promise<{ ids:
   return { ids }
 }
 
+// ── Aviso de MQL no seu WhatsApp ───────────────────────────────────────────────
+// O seu número (dono da conexão), para o aviso ir no chat "Você" quando não há outro número configurado
+let cacheDono: string | null = null
+async function seuNumero() {
+  if (cacheDono) return cacheDono
+  const r = await evo<unknown>(`/instance/fetchInstances?instanceName=${encodeURIComponent(process.env.EVOLUTION_INSTANCE ?? "")}`)
+  const lista = (Array.isArray(r.corpo) ? r.corpo : [r.corpo]) as { ownerJid?: string; owner?: string; instance?: { owner?: string; ownerJid?: string } }[]
+  const jid = lista.map(i => i?.ownerJid ?? i?.owner ?? i?.instance?.ownerJid ?? i?.instance?.owner).find(Boolean)
+  cacheDono = jid ? jid.split("@")[0].split(":")[0] : null
+  return cacheDono
+}
+
+// A conversa fica como não lida no seu celular (você vê na lista que tem lead esperando)
+async function marcarNaoLida(c: Conversa, msgId: string) {
+  const { data: m } = await supabase.from("whatsapp_mensagens").select("ts").eq("id", msgId).maybeSingle()
+  await evo("/chat/markChatUnread/{i}", { method: "POST", body: JSON.stringify({
+    chat: c.jid, lastMessage: { key: { remoteJid: c.jid, fromMe: false, id: msgId }, messageTimestamp: m?.ts ? Math.floor(new Date(m.ts).getTime() / 1000) : undefined },
+  }) }).catch(() => null)
+}
+
+async function avisarMql(cfg: CfgAgente, c: Conversa, r: { lead: { perfil: PerfilLead; quantidade_total: number | null; motivo: string }; dados?: { resumo?: string } }) {
+  const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
+  if (!destino) return
+  const texto = textoAvisoMql({ nome: c.nome, telefone: c.telefone, perfil: r.lead.perfil, quantidade: r.lead.quantidade_total, motivo: r.lead.motivo, resumo: r.dados?.resumo })
+  await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: texto }) }).catch(() => null)
+}
+
 const ultimaDa = async (jid: string) =>
   (await supabase.from("whatsapp_mensagens").select("id, from_me, ts").eq("jid", jid).order("ts", { ascending: false }).limit(1).maybeSingle()).data
 
@@ -203,6 +230,7 @@ export async function responderSozinho(msgId: string) {
   })
   // Lead pequeno só vai para Descartado depois de orientado (senão sumiria da sua lista sem resposta)
   const organiza = !conversa.clienteCadastrado && r.lead.perfil !== "nao_lead"
+  const viraMql = organiza && ehQualificado(r.lead.perfil) && c.status_lead !== "mql"
   if (organiza && r.lead.perfil !== "pequeno") await organizar(c, r.lead.perfil)
   // Fornecedor novo ganha a sua etiqueta "Fornecedora" (e o agente não mexe mais)
   if (r.lead.perfil === "nao_lead" && r.lead.fornecedor && !(c.etiquetas ?? []).includes("Fornecedora")) await aplicar(c, [...(c.etiquetas ?? []), "Fornecedora"], null)
@@ -227,9 +255,13 @@ export async function responderSozinho(msgId: string) {
 
   if (trava || velha) await pequeno(false)
   if (!velha && querVitrine && ehQualificado(r.lead.perfil)) {
-    await marcarLida(c, msgId)
     const v = await mandarVitrine()
     if (v.ids.length) await registrar({ ...base, texto: vitrine, enviou: true, ids: v.ids, motivo: "Instagram (vitrine) enquanto você assume", passo: "Instagram" })
+  }
+  // Lead bom: aviso no seu WhatsApp e a conversa fica não lida no seu celular
+  if (viraMql) {
+    await marcarNaoLida(c, msgId)
+    await avisarMql(cfg, c, r)
   }
   if (trava || velha) return registrar({ ...base, enviou: false, motivo: trava ?? "chegou mensagem nova enquanto preparava" + (r.motivo_alerta ? ` · ${r.motivo_alerta}` : "") })
 

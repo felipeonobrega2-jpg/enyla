@@ -4,9 +4,9 @@
 // (liga na hora), a simulação nos leads que estão esperando e o registro do que ele fez sozinho.
 
 import { useEffect, useState } from "react"
-import { Bot, Loader2, Play, Power, Tag } from "lucide-react"
+import { Bot, Loader2, Play, Power, Tag, Sparkles, X } from "lucide-react"
 import { Cartao, TituloCartao, Botao, Selo, Tom } from "./ds"
-import { AgenteAuto, RegistroAgente, PerfilLead, ROTULO_PERFIL, FILTRO_PADRAO, VITRINE_PADRAO } from "../lib/agenteLeads"
+import { AgenteAuto, RegistroAgente, PerfilLead, ROTULO_PERFIL, FILTRO_PADRAO, VITRINE_PADRAO, ROTULO_TEMA } from "../lib/agenteLeads"
 
 type Simulacao = { jid: string; nome: string | null; ultima: string; perfil: PerfilLead; quantidade: number | null; motivo: string; resposta: string; enviaria: boolean; trava: string | null }
 
@@ -22,10 +22,14 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
   const [mudando, setMudando] = useState(false)
   const [vitrine, setVitrine] = useState<string | null>(null)
   const [vitrineSalva, setVitrineSalva] = useState(false)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const [conhecimento, setConhecimento] = useState<{ id: string; tema: string; texto: string; em: string }[]>([])
+  const [aprendeuEm, setAprendeuEm] = useState<string | null>(null)
+  const [aprendendo, setAprendendo] = useState<string | null>(null)
   const [wa, setWa] = useState<{ rodando: boolean; feitas: number; total: number; msg?: string } | null>(null)
 
   useEffect(() => {
-    fetch("/api/whatsapp/agente").then(r => r.json()).then(d => { setAuto(d.auto); setLog(d.log ?? []); setTaxas(d.taxas ?? []) }).catch(() => {})
+    fetch("/api/whatsapp/agente").then(r => r.json()).then(d => { setAuto(d.auto); setLog(d.log ?? []); setTaxas(d.taxas ?? []); setConhecimento(d.conhecimento ?? []); setAprendeuEm(d.aprendeuEm ?? null) }).catch(() => {})
   }, [])
 
   async function alternar() {
@@ -46,6 +50,22 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
   async function salvarVitrine() {
     const d = await fetch("/api/whatsapp/agente", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vitrine: vitrine ?? "" }) }).then(r => r.json()).catch(() => null)
     if (d?.auto) { setAuto(d.auto); setVitrine(null); setVitrineSalva(true); setTimeout(() => setVitrineSalva(false), 2000) }
+  }
+
+  const post = (corpo: Record<string, unknown>) => fetch("/api/whatsapp/agente", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }).then(r => r.json()).catch(() => null)
+  async function salvarAviso() {
+    const d = await post({ avisoNumero: aviso ?? "" })
+    if (d?.auto) { setAuto(d.auto); setAviso(null) }
+  }
+  async function aprenderAgora() {
+    setAprendendo("Lendo as suas conversas dos últimos 3 dias…")
+    const d = await post({ aprender: 3 })
+    if (d?.conhecimento) setConhecimento(d.conhecimento)
+    setAprendendo(d ? (d.erro ?? `Leu ${d.conversas} conversas e aprendeu ${d.novos} coisas novas.`) : "Sem conexão.")
+  }
+  async function tirar(id: string) {
+    const d = await post({ tirarConhecimento: id })
+    if (d?.conhecimento) setConhecimento(d.conhecimento)
   }
 
   async function etiquetasParaWhatsapp() {
@@ -109,6 +129,15 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
       </div>
       <p className="text-[11px] text-[#898892] mb-4">Vai como segunda mensagem, logo depois da primeira resposta, uma vez por lead. Bom negócio (que é seu) recebe só ela. Se o link já foi na conversa, não repete. Deixe vazio para não mandar.</p>
 
+      {/* Aviso de MQL */}
+      <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-1.5">Aviso de lead bom no seu WhatsApp</p>
+      <div className="flex gap-2 mb-1.5">
+        <input value={aviso ?? auto?.avisoNumero ?? ""} onChange={e => setAviso(e.target.value)} placeholder="Vazio: vai no seu chat “Você” · ou outro número, ex.: 5511999990000"
+          className="flex-1 h-9 rounded-lg px-3 text-[12.5px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] ds-borda" />
+        <Botao disabled={aviso == null || !auto} onClick={salvarAviso}>Salvar</Botao>
+      </div>
+      <p className="text-[11px] text-[#898892] mb-4">Quando um lead vira MQL: chega um resumo com o link da conversa, a conversa fica não lida no seu celular e ganha a etiqueta MQL. Mensagem para você mesmo não toca notificação; para tocar, use outro número (um segundo chip, por exemplo).</p>
+
       {/* Filtro */}
       <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-1.5">Filtro de leads</p>
       {semContato && (
@@ -142,6 +171,25 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
           ))}
         </div>
       )}
+
+      {/* O que ele aprendeu do negócio */}
+      <div className="mt-4">
+        <div className="flex items-center gap-2 mb-1.5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] flex-1">O que ele aprendeu com você ({conhecimento.length})</p>
+          <Botao onClick={aprenderAgora} disabled={!!aprendendo && aprendendo.endsWith("…")} icone={aprendendo?.endsWith("…") ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}>Aprender agora</Botao>
+        </div>
+        <p className="text-[11px] text-[#898892] mb-2">Toda noite ele lê as conversas em que você atendeu (os seus áudios transcritos, MQLs primeiro) e guarda o que vale para o negócio. Apague o que estiver errado.{aprendeuEm ? ` Última vez: ${hora(aprendeuEm)}.` : ""}</p>
+        {aprendendo && <p className="text-[11.5px] text-[#5e5c68] mb-2">{aprendendo}</p>}
+        <div className="space-y-1 max-h-[280px] overflow-y-auto">
+          {[...conhecimento].reverse().map(i => (
+            <div key={i.id} className="flex items-start gap-2 text-[12px] group">
+              <span className="shrink-0 mt-px"><Selo>{ROTULO_TEMA[i.tema] ?? i.tema}</Selo></span>
+              <span className="flex-1 text-[#191625]">{i.texto}</span>
+              <button onClick={() => tirar(i.id)} className="text-[#898892] hover:text-[#d33a3c] opacity-0 group-hover:opacity-100" aria-label="Apagar"><X className="w-3.5 h-3.5" /></button>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Taxa de resposta */}
       {!!taxas.length && (

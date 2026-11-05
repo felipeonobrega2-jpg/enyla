@@ -83,3 +83,19 @@ describe("agente de leads: Instagram", () => {
     expect(jaViuVitrine(["Dá uma olhada no nosso Instagram: Instagram.com/enyla.embalagens"])).toBe(true)
   })
 })
+
+import { textoAvisoMql, FILTRO_PADRAO as FP } from "@/app/lib/agenteLeads"
+
+describe("agente de leads: aviso de MQL e parceiro", () => {
+  it("aviso traz perfil, volume, nome, motivo e link", () => {
+    const t = textoAvisoMql({ nome: "Ruglia", telefone: "5511999990000", perfil: "icp", quantidade: 12000, motivo: "Lotes de 12 mil", resumo: "perfume 100ml" })
+    expect(t).toContain("Novo MQL* · ICP · 12.000 un")
+    expect(t).toContain("*Ruglia*")
+    expect(t).toContain("wa.me/5511999990000")
+  })
+  it("filtro já traz o contato do parceiro e o cupom", () => {
+    expect(FP).toContain("(11) 96843-7324")
+    expect(FP).toContain("pedir o meu cupom")
+    expect(FP).not.toMatch(/preencha aqui/i)
+  })
+})
