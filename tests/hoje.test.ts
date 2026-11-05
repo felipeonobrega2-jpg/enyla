@@ -60,20 +60,6 @@ it("dadosDaConversa lê o que a IA guardou e tolera lixo", async () => {
   expect(dadosDaConversa(null)).toBeNull()
 })
 
-describe("segurado para você", () => {
-  const reg = (o: Record<string, unknown>) => ({ em: h(0.5), jid: "x", nome: null, perfil: "indefinido" as const, enviou: false, texto: "", motivo: "precisa de você (desconto)", ...o })
-  it("lead sem etiqueta que o agente segurou entra, com o motivo", () => {
-    const r = quemResponder([conv({ jid: "x", ultima_recebida_at: h(1), ultima_enviada_at: h(2) })], marcosDoRegistro([reg({})], agora), agora)
-    expect(r.responder[0]).toMatchObject({ jid: "x", rotulo: "Para você", porque: "precisa de você (desconto)" })
-  })
-  it("nada a responder, follow-up ou decisão velha (antes da mensagem nova) não contam", () => {
-    const c = [conv({ jid: "x", ultima_recebida_at: h(1), ultima_enviada_at: h(2) })]
-    expect(quemResponder(c, marcosDoRegistro([reg({ motivo: "nada a responder" })], agora), agora).responder).toEqual([])
-    expect(quemResponder(c, marcosDoRegistro([reg({ passo: "F1" })], agora), agora).responder).toEqual([])
-    expect(quemResponder(c, marcosDoRegistro([reg({ em: h(3) })], agora), agora).responder).toEqual([])
-  })
-})
-
 it("qualidade: sem resposta vira sumiu, mas lead pequeno continua descartado", async () => {
   const { qualidadeDoLead } = await import("../app/lib/marketing")
   expect(qualidadeDoLead({ status_lead: "descartado", etiquetas: ["Sem resposta"] })).toBe("sumiu")

@@ -11,7 +11,7 @@ import { DadosPedido } from "../lib/atendente"
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 })
 const dm = (dia: string) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`
-const TOM: Record<string, Tom> = { Retomada: "sucesso", "Para você": "alerta", ICP: "sucesso", Oportunidade: "info", "Lead médio": "acento", MQL: "acento" }
+const TOM: Record<string, Tom> = { Retomada: "sucesso", ICP: "sucesso", Oportunidade: "info", "Lead médio": "acento", MQL: "acento" }
 const MOSTRAR = 6
 
 function Numero({ rotulo, valor, tom }: { rotulo: string; valor: number; tom?: Tom }) {
@@ -49,7 +49,6 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
   if (!d) return null
   const lista = verTodos ? d.responder : d.responder.slice(0, MOSTRAR)
   const retomadas = d.responder.filter(x => x.retomada).length
-  const segurados = d.responder.filter(x => x.porque).length
   const a = d.anuncio
   const r = d.reativacao
 
@@ -61,10 +60,8 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
           <div className="px-5 pt-5">
             <TituloCartao titulo="Hoje" icone={<Sun className="w-4 h-4" />}
               sub={d.responder.length
-                ? [`${d.responder.length} ${d.responder.length === 1 ? "conversa esperando" : "conversas esperando"} sua resposta`,
-                  retomadas ? `${retomadas} ${retomadas === 1 ? "voltou" : "voltaram"} pela retomada` : "",
-                  segurados ? `${segurados} o agente deixou para você` : ""].filter(Boolean).join(", ")
-                : "Nada esperando sua resposta"}
+                ? `${d.responder.length} ${d.responder.length === 1 ? "bom negócio esperando" : "bons negócios esperando"} sua resposta${retomadas ? `, ${retomadas} ${retomadas === 1 ? "voltou" : "voltaram"} pela retomada` : ""}`
+                : "Nenhum bom negócio esperando resposta"}
               acao={d.responder.length > 0 ? <Selo tom={retomadas ? "sucesso" : "acento"}>{d.responder.length}</Selo> : undefined} />
           </div>
           <div className="px-2 pb-2 -mt-1">
@@ -72,7 +69,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
               ? <div className="flex items-center gap-2 px-3 pb-3 text-[12px] text-[#5e5c68]"><CheckCircle2 className="w-4 h-4 text-[#009351]" />Em dia com MQL e retomadas.</div>
               : lista.map(x => (
                 <LinhaLista key={x.jid} titulo={x.nome || x.jid.split("@")[0]} icone={x.retomada ? <RotateCcw className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />}
-                  tom={x.retomada ? "sucesso" : "acento"} sub={`${x.porque ? `Agente segurou: ${x.porque} · ` : ""}${doPedido(x.dados)}${x.mensagem ?? ""}` || undefined}
+                  tom={x.retomada ? "sucesso" : "acento"} sub={`${doPedido(x.dados)}${x.mensagem ?? ""}` || undefined}
                   valor={<span className="hidden sm:inline"><Selo tom={TOM[x.rotulo] ?? "acento"}>{x.rotulo}</Selo></span>} valorSub={haQuanto(x.desde)}
                   onClick={() => onAbrirConversa(x.jid)}
                   acao={onOrcar ? (
