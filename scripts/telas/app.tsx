@@ -139,7 +139,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     return new Response(JSON.stringify([
       m("a", false, "Olá, Gostaria se saber mais sobre as caixinhas.", 400), m("b", true, "Olá, tudo bem? Aqui é o Felipe, Gerente Comercial da Jerograf 👋 Vou cuidar pessoalmente do seu pedido.", 395),
       m("c", true, "Você já tá vendendo seu produto ou tá lançando agora? E que volume você precisa?", 394),
-      m("d", false, "Já vendo, perfume árabe 100ml", 30), m("e", false, "Quanto fica 2 mil caixinhas de 100ml?", 15),
+      m("d", false, "Já vendo, perfume árabe 100ml", 30), { ...m("au", false, "Preciso pra semana que vem, consegue?", 20), tipo: "audio" }, m("e", false, "Quanto fica 2 mil caixinhas de 100ml?", 15),
     ]))
   }
   if (u.startsWith("/api/")) return new Response("{}", { status: 404 })

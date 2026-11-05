@@ -1,7 +1,7 @@
 "use client"
 
 import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag, ChevronRight, Reply, Keyboard, Sparkles, Laptop, Smartphone, Trash2, Square, Merge } from "lucide-react"
-import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect, useSyncExternalStore } from "react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, nomeChave } from "../lib/negocio"
 import { clienteDaConversa, Vinculos } from "../lib/vinculoWhatsapp"
@@ -742,6 +742,38 @@ function ImportarHistorico({ onFim }: { onFim: () => void }) {
   )
 }
 
+// Velocidade dos áudios (1×, 1,5×, 2×): vale para todos os players e fica lembrada neste navegador
+const VELOCIDADES = [1, 1.5, 2] as const
+let velocidadeAtual: number = (() => { try { const v = Number(localStorage.getItem("wa-velocidade")); return VELOCIDADES.includes(v as 1) ? v : 1 } catch { return 1 } })()
+const ouvintesVelocidade = new Set<() => void>()
+const velocidade = {
+  ler: () => velocidadeAtual,
+  ouvir: (f: () => void) => { ouvintesVelocidade.add(f); return () => { ouvintesVelocidade.delete(f) } },
+  proxima: () => {
+    velocidadeAtual = VELOCIDADES[(VELOCIDADES.indexOf(velocidadeAtual as 1) + 1) % VELOCIDADES.length]
+    try { localStorage.setItem("wa-velocidade", String(velocidadeAtual)) } catch {}
+    ouvintesVelocidade.forEach(f => f())
+  },
+}
+
+function AudioComVelocidade({ src, onErro }: { src: string; onErro: () => void }) {
+  const ref = useRef<HTMLAudioElement>(null)
+  const vel = useSyncExternalStore(velocidade.ouvir, velocidade.ler, () => 1)
+  // O navegador volta para 1× ao carregar o arquivo: reaplica ao carregar e ao tocar
+  useEffect(() => { if (ref.current) ref.current.playbackRate = vel }, [vel])
+  const aplicar = () => { if (ref.current) ref.current.playbackRate = velocidade.ler() }
+  return (
+    <div className="flex items-center gap-1.5">
+      <audio ref={ref} controls preload="none" src={src} onError={onErro} onLoadedMetadata={aplicar} onPlay={aplicar} className="w-[240px] max-w-full h-10" />
+      <button onClick={velocidade.proxima} title="Velocidade do áudio"
+        className="shrink-0 h-6 min-w-[38px] px-1.5 rounded-full text-[11px] font-bold tabular-nums transition-colors"
+        style={vel === 1 ? { background: "rgba(84,101,111,0.12)", color: "#54656f" } : { background: "#8456e8", color: "#fff" }}>
+        {String(vel).replace(".", ",")}×
+      </button>
+    </div>
+  )
+}
+
 // Mídia da mensagem servida pelo sistema (cópia guardada; primeira vez busca no Evolution)
 function MidiaMensagem({ id, tipo: bruto, nome }: { id: string; tipo: string; nome: string | null }) {
   const [falhou, setFalhou] = useState(false)
@@ -764,9 +796,7 @@ function MidiaMensagem({ id, tipo: bruto, nome }: { id: string; tipo: string; no
   if (tipo === "audio" && id.startsWith("tmp-")) return (
     <div className="flex items-center gap-2 text-[12px] italic mb-1 px-1" style={{ color: "#54656f" }}><Mic className="w-4 h-4" />Enviando áudio…</div>
   )
-  if (tipo === "audio") return falhou ? indisponivel("Áudio") : (
-    <audio controls preload="none" src={src} onError={() => setFalhou(true)} className="w-[240px] max-w-full h-10" />
-  )
+  if (tipo === "audio") return falhou ? indisponivel("Áudio") : <AudioComVelocidade src={src} onErro={() => setFalhou(true)} />
   if (tipo === "video") return falhou ? indisponivel("Vídeo") : (
     <video controls preload="none" src={src} onError={() => setFalhou(true)} className="rounded-xl max-w-[280px] max-h-[320px] bg-black/5 mb-1" />
   )
