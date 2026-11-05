@@ -231,3 +231,24 @@ export function conhecimentoNoPrompt(itens: Conhecimento[] | undefined) {
   return [...porTema].map(([t, l]) => `${ROTULO_TEMA[t] ?? t}:\n${l.map(x => `- ${x}`).join("\n")}`).join("\n\n")
 }
 
+
+// ── Economia de IA sem mudar a resposta ──────────────────────────────────────
+// Primeiro contato que é só a mensagem pronta do anúncio (ou um "oi"): a resposta é sempre a sua saudação do filtro.
+// Sai sem chamar a IA. Qualquer coisa a mais (pergunta, quantidade, áudio, foto) vai para a IA normalmente.
+const SO_ABERTURA = /^(ol[aá]|oi+|opa|e a[ií]|bom dia|boa tarde|boa noite|tudo bem\??|ol[aá],? gostaria (?:de|se) saber mais sobre as caixinhas\.?|posso encomendar\??|ol[aá],? gostaria de solicitar um or[cç]amento\.?|tenho interesse|quero saber mais|informa[cç][oõ]es)[\s!.,?]*$/i
+
+export function saudacaoDoFiltro(filtro: string): string | null {
+  const m = filtro.match(/PRIMEIRA MENSAGEM[^\n]*\n([^\n]+)/)
+  const t = m?.[1]?.trim()
+  return t && !t.startsWith("-") ? t : null
+}
+
+export function soAbertura(msgs: { from_me: boolean; corpo: string | null; tipo: string }[]) {
+  const doLead = msgs.filter(m => !m.from_me)
+  const minhas = msgs.filter(m => m.from_me && !ehMensagemAutomaticaDoWhatsapp(m.corpo))
+  return doLead.length > 0 && doLead.length <= 3 && minhas.length === 0
+    && doLead.every(m => m.tipo === "text" && !!m.corpo && SO_ABERTURA.test(m.corpo.trim()))
+}
+
+// Sem crédito na Anthropic (mensagem da API): o agente avisa você e segue só com o que não precisa de IA
+export const ehSemCredito = (erro: string) => /credit balance is too low|billing/i.test(erro)

@@ -1446,10 +1446,10 @@ function useAtendimento(jid: string, ultima: { id: string; from_me: boolean } | 
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const pedindo = useRef<string | null>(null)
-  const gerar = useCallback(async () => {
+  const gerar = useCallback(async (outra?: boolean) => {
     pedindo.current = jid
     setCarregando(true); setErro(null)
-    const r = await fetch("/api/whatsapp/atender", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid }) }).catch(() => null)
+    const r = await fetch("/api/whatsapp/atender", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid, outra: outra === true }) }).catch(() => null)
     const d = r ? await r.json().catch(() => null) : null
     if (pedindo.current !== jid) return
     if (r?.ok && d?.resposta !== undefined) { sugestoes.set(jid, d); setAt(d) } else setErro(d?.erro ?? "A IA não respondeu.")
@@ -1462,7 +1462,7 @@ function useAtendimento(jid: string, ultima: { id: string; from_me: boolean } | 
   const precisa = auto && !!ultima && !ultima.from_me && !ultima.id.startsWith("tmp-") && (!guardada || velha)
   useEffect(() => {
     if (!precisa) return
-    const t = setTimeout(gerar, 600)
+    const t = setTimeout(() => gerar(), 600)
     return () => clearTimeout(t)
   }, [precisa, gerar, ultima?.id])
   return { at: velha && !ultima?.from_me ? null : at, carregando, erro, gerar, descartar: () => { sugestoes.delete(jid); setAt(null) } }
@@ -1477,7 +1477,7 @@ function SugestaoAtendente({ estado, onUsar, onOrcamento, compacto }: {
   const { at, carregando, erro, gerar, descartar } = estado
   if (!at && !carregando && !erro) return (
     <div className={`shrink-0 ${compacto ? "px-3 pt-2" : "px-4 pt-2.5"}`} style={{ background: "var(--bg-surface)" }}>
-      <button onClick={gerar} className="text-[11.5px] font-semibold flex items-center gap-1.5 px-2.5 h-7 rounded-lg hover:bg-[#8456e8]/10" style={{ color: "#8456e8" }}>
+      <button onClick={() => gerar()} className="text-[11.5px] font-semibold flex items-center gap-1.5 px-2.5 h-7 rounded-lg hover:bg-[#8456e8]/10" style={{ color: "#8456e8" }}>
         <Sparkles className="w-3.5 h-3.5" />Sugerir resposta
       </button>
     </div>
@@ -1508,7 +1508,7 @@ function SugestaoAtendente({ estado, onUsar, onOrcamento, compacto }: {
           ) })()}
           {at?.sugere_video && <span className="text-[10px] font-semibold flex items-center gap-1" style={{ color: "var(--text-faint)" }}><Video className="w-3 h-3" />vale mandar vídeo</span>}
           <span className="ml-auto flex items-center gap-0.5">
-            {!carregando && <button onClick={gerar} title="Gerar outra" className="text-[11px] px-2 h-6 rounded-md hover:bg-black/5" style={{ color: "var(--text-sub)" }}>Outra</button>}
+            {!carregando && <button onClick={() => gerar(true)} title="Gerar outra" className="text-[11px] px-2 h-6 rounded-md hover:bg-black/5" style={{ color: "var(--text-sub)" }}>Outra</button>}
             <button onClick={descartar} aria-label="Dispensar sugestão" className="w-6 h-6 rounded-md grid place-items-center hover:bg-black/5" style={{ color: "var(--text-faint)" }}><X className="w-3.5 h-3.5" /></button>
           </span>
         </div>

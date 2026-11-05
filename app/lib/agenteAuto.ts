@@ -10,7 +10,7 @@ import { gravarLote, WaMessage } from "./whatsappDados"
 import { atender, lerConfigAtendente } from "./atendenteServidor"
 import {
   AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, filtroEfetivo,
-  organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, proximoFollowUp, horarioDeFollowUp, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE,
+  organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, ehSemCredito, proximoFollowUp, horarioDeFollowUp, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE,
 } from "./agenteLeads"
 
 const DIAS_CONVERSA_NOVA = 4
@@ -20,7 +20,7 @@ const MAX_REGISTROS = 300
 const MIN_ENTRE_RODADAS = 10         // follow-ups: no máximo uma rodada a cada 10 min
 
 type Registro = RegistroAgente & { ids?: string[] }
-type CfgAgente = { agenteAuto?: AgenteAuto; agenteLog?: Registro[]; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string }
+type CfgAgente = { agenteAuto?: AgenteAuto; agenteLog?: Registro[]; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string; agenteSemCreditoEm?: string }
 type Conversa = { jid: string; nome: string | null; telefone: string | null; etiquetas: string[] | null; status_lead: string | null }
 
 async function lerCfg() { return await lerConfigAtendente() as Awaited<ReturnType<typeof lerConfigAtendente>> & CfgAgente }
@@ -152,6 +152,16 @@ async function avisarMql(cfg: CfgAgente, c: Conversa, r: { lead: { perfil: Perfi
   await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: texto }) }).catch(() => null)
 }
 
+// A IA ficou sem crédito: avisa você no WhatsApp (no máximo a cada 6 h). As saudações seguem saindo sem IA.
+async function avisarSemCredito(cfg: CfgAgente) {
+  if (cfg.agenteSemCreditoEm && Date.now() - new Date(cfg.agenteSemCreditoEm).getTime() < 6 * 3_600_000) return
+  await gravarCfg(() => ({ agenteSemCreditoEm: new Date().toISOString() }))
+  const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
+  if (!destino) return
+  await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text:
+    "⚠️ *A IA do sistema ficou sem crédito na Anthropic.*\nO agente parou de responder os leads (as saudações do anúncio continuam saindo). Recarregue em console.anthropic.com → Billing e, se puder, ligue a recarga automática." }) }).catch(() => null)
+}
+
 const ultimaDa = async (jid: string) =>
   (await supabase.from("whatsapp_mensagens").select("id, from_me, ts").eq("jid", jid).order("ts", { ascending: false }).limit(1).maybeSingle()).data
 
@@ -221,7 +231,10 @@ export async function responderSozinho(msgId: string) {
   if (manualRecente) return
 
   const a = await atender(jid, { cfg, automatico: true }).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
-  if (!a.ok) return registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: "indefinido", enviou: false, texto: "", motivo: `IA falhou: ${a.erro}` })
+  if (!a.ok) {
+    if (ehSemCredito(a.erro)) await avisarSemCredito(cfg)
+    return registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: "indefinido", enviou: false, texto: "", motivo: ehSemCredito(a.erro) ? "IA sem crédito na Anthropic" : `IA falhou: ${a.erro.slice(0, 120)}` })
+  }
   const { r, conversa } = a
 
   const trava = travaDoEnvio({

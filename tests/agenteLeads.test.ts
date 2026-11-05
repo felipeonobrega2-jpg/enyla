@@ -99,3 +99,26 @@ describe("agente de leads: aviso de MQL e parceiro", () => {
     expect(FP).not.toMatch(/preencha aqui/i)
   })
 })
+
+import { saudacaoDoFiltro, soAbertura, ehSemCredito } from "@/app/lib/agenteLeads"
+
+describe("agente de leads: economia de IA", () => {
+  const m = (corpo: string, from_me = false) => ({ from_me, corpo, tipo: "text" })
+  it("saudação sai do filtro", () => {
+    expect(saudacaoDoFiltro(FP)).toMatch(/^Oi, tudo bem\? aqui é o Luiz Felipe/)
+  })
+  it("só a mensagem do anúncio (ou oi): sem IA; qualquer coisa a mais: IA", () => {
+    expect(soAbertura([m("Olá, Gostaria se saber mais sobre as caixinhas.")])).toBe(true)   // o texto do anúncio, com "se saber"
+    expect(soAbertura([m("Olá, gostaria de saber mais sobre as caixinhas")])).toBe(true)
+    expect(soAbertura([m("Posso encomendar?")])).toBe(true)
+    expect(soAbertura([m("Boa tarde"), m("Olá, gostaria de solicitar um orçamento.")])).toBe(true)
+    expect(soAbertura([m("Posso encomendar?"), m("Qual pedido mínimo e qual valor ?")])).toBe(false)
+    expect(soAbertura([m("Oi"), m("Estou fora do horário no momento, retorno em breve.", true)])).toBe(true)
+    expect(soAbertura([m("Oi"), m("Oi, tudo bem? aqui é o Luiz Felipe", true)])).toBe(false)
+    expect(soAbertura([{ from_me: false, corpo: null, tipo: "audio" }])).toBe(false)
+  })
+  it("reconhece falta de crédito", () => {
+    expect(ehSemCredito("400 Your credit balance is too low to access the Anthropic API")).toBe(true)
+    expect(ehSemCredito("Erro da IA (529): overloaded")).toBe(false)
+  })
+})
