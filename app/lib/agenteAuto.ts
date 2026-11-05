@@ -8,6 +8,7 @@ import { supabase } from "./supabase"
 import { evo } from "./evolution"
 import { gravarLote, WaMessage } from "./whatsappDados"
 import { atender, lerConfigAtendente } from "./atendenteServidor"
+import { garantirTelefone } from "./contatosServidor"
 import {
   AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, filtroEfetivo,
   organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, ehSemCredito, proximoFollowUp, horarioDeFollowUp, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE,
@@ -273,6 +274,7 @@ export async function responderSozinho(msgId: string) {
   }
   // Lead bom: aviso no seu WhatsApp e a conversa fica não lida no seu celular
   if (viraMql) {
+    await garantirTelefone(c.jid).catch(() => null)   // MQL fica com o telefone guardado no sistema
     await marcarNaoLida(c, msgId)
     await avisarMql(cfg, c, r)
   }

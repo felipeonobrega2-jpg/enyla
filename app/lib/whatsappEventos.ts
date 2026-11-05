@@ -2,6 +2,7 @@
 // Só roda no servidor.
 
 import { supabase } from "./supabase"
+import { telefoneNaResposta } from "./contatos"
 
 // Estado da conexão do número (Painel avisa quando cai). Grava só quando muda.
 export async function registrarConexao(estado: string) {
@@ -30,12 +31,17 @@ export async function registrarRecibos(lista: Recibo[]) {
   }
 }
 
-type Contato = { id?: string; remoteJid?: string; pushName?: string; name?: string; notify?: string }
+type Contato = { id?: string; remoteJid?: string; pushName?: string; name?: string; notify?: string; [k: string]: unknown }
 
 // Contatos: completa o nome das conversas que só têm o número
 export async function registrarContatos(lista: Contato[]) {
   for (const c of lista) {
     const jid = c.remoteJid ?? c.id
+    // Contato novo (@lid) que veio com o número junto: guarda o telefone (o WhatsApp esconde nas conversas)
+    if (jid?.endsWith("@lid")) {
+      const tel = telefoneNaResposta({ ...c, remoteJid: undefined, id: undefined })
+      if (tel) await supabase.from("whatsapp_conversas").update({ telefone: tel }).eq("jid", jid).is("telefone", null)
+    }
     const nome = c.pushName ?? c.name ?? c.notify
     if (!jid || !nome || /^\d+$/.test(nome)) continue
     await supabase.from("whatsapp_conversas").update({ nome }).eq("jid", jid).filter("nome", "match", "^[0-9]+$")

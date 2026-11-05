@@ -28,6 +28,7 @@ import { EntregasView } from "@/app/components/EntregasView"
 import { AvisoWhatsapp } from "@/app/components/AvisoWhatsapp"
 import { PedidosUnificadoView } from "@/app/components/PedidosUnificadoView"
 import AgenteLeadsCard from "@/app/components/AgenteLeadsCard"
+import ContatosProtegidosCard from "@/app/components/ContatosProtegidosCard"
 import { ParceriasView } from "@/app/components/ParceriasView"
 import { ModalVenda } from "@/app/components/parceiros/ModalVenda"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas } from "@/app/components/WhatsAppView"
@@ -75,6 +76,11 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     { em: new Date().toISOString(), jid: "2@lid", nome: "Marcio", perfil: "icp", enviou: false, texto: "Show! Vou preparar o seu orçamento.", motivo: "precisa de você (decisao_sua)" },
     { em: new Date().toISOString(), jid: "3@lid", nome: "Bia", perfil: "indefinido", enviou: true, passo: "F1", texto: "Oi! Conseguiu ver a quantidade?", motivo: "F1: sem resposta" },
   ], taxas: [{ passo: "Resposta", enviados: 42, responderam: 29 }, { passo: "F1", enviados: 18, responderam: 6 }, { passo: "F2", enviados: 9, responderam: 2 }, { passo: "F3", enviados: 5, responderam: 1 }] }))
+  if (u.startsWith("/api/whatsapp/contatos")) return new Response(JSON.stringify({ total: 84, comTelefone: 66, lista: [
+    { jid: "1@lid", nome: "Perfumaria Exemplo", telefone: null, motivos: ["MQL", "ICP"], etiquetas: [], ultima: null },
+    { jid: "2@lid", nome: "Carlos (Diretor)", telefone: null, motivos: ["Cliente: Carlos Teste"], etiquetas: [], ultima: null },
+    { jid: "3@s.whatsapp.net", nome: "Ana Cosméticos", telefone: "5511999990000", motivos: ["MQL"], etiquetas: [], ultima: null },
+  ] }))
   if (u.startsWith("/api/banco/sugerir")) return new Response(JSON.stringify({ feitas: 0, restantes: 0 }))
   if (u.startsWith("/api/banco/aprendizado")) return new Response(JSON.stringify({
     regras: [{ chave: "papelaria bras", tipo: "saida", acao: "lancar", categoria: "materiais", descricao: "Papel", vezes: 3 }, { chave: "ifood", tipo: "saida", acao: "ignorar", vezes: 2 }],
@@ -170,6 +176,7 @@ function Telas() {
         {tela === "parceiros-modal" && <ModalVenda inicial={negs[1]} parceiros={parc} clientes={["Camilo"]} onSalvar={() => {}} onNovoParceiro={() => {}} onFechar={() => {}} />}
       </div>
     }
+    case "contatos": return pagina(<div className="max-w-[860px]"><ContatosProtegidosCard /></div>)
     case "agente": return pagina(<div className="max-w-[860px]"><AgenteLeadsCard onFiltro={() => {}} /></div>)
     case "metatoken": return pagina(<div className="space-y-4">
       <PainelToken status={{ hasToken: true, valido: false, erro: "O token já venceu.", canAutoRefresh: false }} expirou novo="" setNovo={() => {}} salvando={false} onSalvar={() => {}} msg={null} />
