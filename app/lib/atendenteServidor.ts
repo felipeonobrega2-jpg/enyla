@@ -6,7 +6,7 @@ import { supabase } from "./supabase"
 import { clienteClaude, FALLBACK, MODELO } from "./claude"
 import { clienteDaConversa, Vinculos } from "./vinculoWhatsapp"
 import { nomeChave } from "./negocio"
-import { COLUNAS_KANBAN } from "../types"
+import { COLUNAS_KANBAN, COL_PERDIDO } from "../types"
 import type { Atendimento } from "./atendente"
 import { LeadAvaliado, filtroEfetivo } from "./agenteLeads"
 import { transcreverPendentes } from "./transcricao"
@@ -91,7 +91,10 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
   // Cliente ligado: pedidos e orçamentos dele, para a IA saber em que pé está
   const nomes = [...new Set((cards ?? []).map(c => c.nomeCliente).filter(Boolean))] as string[]
   const cli = conv ? clienteDaConversa(conv, nomes, cfg.vinculosWhatsapp) : null
-  const doCliente = cli ? (cards ?? []).filter(c => nomeChave(c.nomeCliente) === nomeChave(cli.nome)).slice(-6) : []
+  const todosDoCliente = cli ? (cards ?? []).filter(c => nomeChave(c.nomeCliente) === nomeChave(cli.nome)) : []
+  const doCliente = todosDoCliente.slice(-6)
+  // Cliente "seu" é quem tem orçamento em aberto, negociação ou pedido; quem só tem orçamento perdido voltou a ser lead
+  const clienteAtivo = todosDoCliente.some(c => c.coluna !== COL_PERDIDO)
   const contexto = cli
     ? `Cliente cadastrado: ${cli.nome}. ${doCliente.length ? "Orçamentos/pedidos: " + doCliente.map(c => `${c.numero} (${c.coluna === 11 ? "negociando" : COLUNAS_KANBAN[c.coluna] ?? "?"}, ${c.quantidade} un, ${c.dimensoes}, R$ ${c.preco})`).join("; ") : "Sem orçamentos ainda."}`
     : "Contato ainda não ligado a um cliente do cadastro (provável lead novo)."
@@ -148,6 +151,6 @@ Regras que nunca quebram:
   return {
     ok: true,
     r: { ...a, ultimaId: mensagens[mensagens.length - 1].id },
-    conversa: { nome: conv?.nome ?? null, clienteCadastrado: !!cli, primeiraEm: primeira?.ts ?? null, mensagens },
+    conversa: { nome: conv?.nome ?? null, clienteCadastrado: clienteAtivo, primeiraEm: primeira?.ts ?? null, mensagens },
   }
 }

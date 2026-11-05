@@ -81,7 +81,9 @@ export function parDaMensagem(key: WaKey): { lid: string; pn: string } | null {
   return lid && pn ? { lid, pn } : null
 }
 
-export async function gravarLote(msgs: WaMessage[], opts: { contarNaoLidas?: boolean; nomes?: Map<string, string> } = {}) {
+// opts.novas recebe os ids que entraram agora (o Evolution às vezes entrega o mesmo evento duas vezes:
+// a repetida não entra de novo, não conta como não lida e não dispara o agente outra vez)
+export async function gravarLote(msgs: WaMessage[], opts: { contarNaoLidas?: boolean; nomes?: Map<string, string>; novas?: Set<string> } = {}) {
   const brutas = msgs.filter(m => m?.key?.remoteJid && m.key.id && !deveIgnorar(m.key.remoteJid))
   if (!brutas.length) return 0
 
@@ -138,11 +140,15 @@ export async function gravarLote(msgs: WaMessage[], opts: { contarNaoLidas?: boo
     const { corpo, tipo, media_url } = extractBody(m)
     return { id: m.key.id, jid: m.key.remoteJid, from_me: !!m.key.fromMe, corpo, tipo, media_url, ts: tsDe(m) }
   })
-  for (let i = 0; i < linhas.length; i += 500)
-    await supabase.from("whatsapp_mensagens").upsert(linhas.slice(i, i + 500), { onConflict: "id", ignoreDuplicates: true })
+  const inseridas = new Set<string>()
+  for (let i = 0; i < linhas.length; i += 500) {
+    const { data } = await supabase.from("whatsapp_mensagens").upsert(linhas.slice(i, i + 500), { onConflict: "id", ignoreDuplicates: true }).select("id")
+    for (const r of data ?? []) inseridas.add(r.id)
+  }
+  if (opts.novas) for (const id of inseridas) opts.novas.add(id)
 
   if (opts.contarNaoLidas)
-    for (const m of validas) if (!m.key.fromMe) await supabase.rpc("incrementar_nao_lidas", { p_jid: m.key.remoteJid })
+    for (const m of validas) if (!m.key.fromMe && inseridas.has(m.key.id)) await supabase.rpc("incrementar_nao_lidas", { p_jid: m.key.remoteJid })
   // Par aprendido agora: a conversa antiga do @lid (se houver) se junta à do número
   for (const n of novos) await juntarConversas(n.sai, n.fica).catch(() => null)
   // Conversa nova com o mesmo nome de outra (uma pelo número, outra pelo @lid): mesma pessoa, junta sozinho

@@ -25,11 +25,12 @@ export async function POST(req: NextRequest) {
     // ── messages.upsert — mensagem nova em tempo real
     if (event === "messages.upsert") {
       const data = body.data as WaMessage
-      await gravarLote([data], { contarNaoLidas: true })
+      const novas = new Set<string>()
+      await gravarLote([data], { contarNaoLidas: true, novas })
       // Áudio novo: transcreve depois de responder ao Evolution (não atrasa o recebimento)
       if (data?.message?.audioMessage && data.key?.id) after(() => transcreverPendentes({ ids: [data.key.id] }).catch(() => {}))
       // Agente de leads no modo automático (desligado por padrão; ele mesmo confere as travas)
-      if (data?.key?.id && !data.key.fromMe && !deveIgnorar(data.key.remoteJid ?? "") && ["text", "audio", "image", "video", "document"].includes(extractBody(data).tipo)) after(() => responderSozinho(data.key.id).catch(e => console.error("[agente]", e)))
+      if (data?.key?.id && novas.has(data.key.id) && !data.key.fromMe && !deveIgnorar(data.key.remoteJid ?? "") && ["text", "audio", "image", "video", "document"].includes(extractBody(data).tipo)) after(() => responderSozinho(data.key.id).catch(e => console.error("[agente]", e)))
       return NextResponse.json({ ok: true })
     }
 
