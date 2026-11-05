@@ -71,7 +71,8 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
   if (u.startsWith("/api/whatsapp/agente")) return new Response(JSON.stringify({ auto: { ligado: false }, log: [
     { em: new Date().toISOString(), jid: "1@lid", nome: "Camilo", perfil: "pequeno", enviou: true, texto: "Pô, essa quantidade a gente não roda porque é offset…", motivo: "100 unidades no total" },
     { em: new Date().toISOString(), jid: "2@lid", nome: "Marcio", perfil: "icp", enviou: false, texto: "Show! Vou preparar o seu orçamento.", motivo: "precisa de você (decisao_sua)" },
-  ] }))
+    { em: new Date().toISOString(), jid: "3@lid", nome: "Bia", perfil: "indefinido", enviou: true, passo: "F1", texto: "Oi! Conseguiu ver a quantidade?", motivo: "F1: sem resposta" },
+  ], taxas: [{ passo: "Resposta", enviados: 42, responderam: 29 }, { passo: "F1", enviados: 18, responderam: 6 }, { passo: "F2", enviados: 9, responderam: 2 }, { passo: "F3", enviados: 5, responderam: 1 }] }))
   if (u.startsWith("/api/banco/sugerir")) return new Response(JSON.stringify({ feitas: 0, restantes: 0 }))
   if (u.startsWith("/api/banco/aprendizado")) return new Response(JSON.stringify({
     regras: [{ chave: "papelaria bras", tipo: "saida", acao: "lancar", categoria: "materiais", descricao: "Papel", vezes: 3 }, { chave: "ifood", tipo: "saida", acao: "ignorar", vezes: 2 }],

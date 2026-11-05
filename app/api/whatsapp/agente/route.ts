@@ -13,9 +13,24 @@ export const maxDuration = 60
 
 type Cfg = { agenteAuto?: AgenteAuto; agenteLog?: RegistroAgente[]; filtroLeads?: string }
 
+export type Taxa = { passo: string; enviados: number; responderam: number }
+
+// Quantos responderam depois de cada tipo de mensagem automática (1ª resposta, F1, F2, F3): base para testar versões e vídeos
+async function taxas(log: RegistroAgente[]): Promise<Taxa[]> {
+  const enviados = log.filter(l => l.enviou)
+  if (!enviados.length) return []
+  const { data } = await supabase.from("whatsapp_conversas").select("jid, ultima_recebida_at").in("jid", [...new Set(enviados.map(l => l.jid))])
+  const recebida = new Map((data ?? []).map(c => [c.jid, c.ultima_recebida_at as string | null]))
+  return ["Resposta", "F1", "F2", "F3"].map(passo => {
+    const doPasso = enviados.filter(l => (l.passo ?? "Resposta") === passo)
+    return { passo, enviados: doPasso.length, responderam: doPasso.filter(l => (recebida.get(l.jid) ?? "") > l.em).length }
+  }).filter(t => t.enviados)
+}
+
 export async function GET() {
   const cfg = await lerConfigAtendente() as Cfg
-  return NextResponse.json({ auto: cfg.agenteAuto ?? { ligado: false }, log: (cfg.agenteLog ?? []).slice(0, 80) })
+  const log = cfg.agenteLog ?? []
+  return NextResponse.json({ auto: cfg.agenteAuto ?? { ligado: false }, log: log.slice(0, 80), taxas: await taxas(log) })
 }
 
 export type Simulacao = { jid: string; nome: string | null; ultima: string; perfil: PerfilLead; quantidade: number | null; motivo: string; resposta: string; enviaria: boolean; trava: string | null }

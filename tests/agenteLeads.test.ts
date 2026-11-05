@@ -51,6 +51,7 @@ describe("agente de leads: etiquetas e follow-up", () => {
     expect(organizarLead([], "medio")).toEqual({ etiquetas: ["MQL", "Lead médio"], etapa: "mql" })
     expect(organizarLead(["Lead médio", "MQL"], "pequeno")).toEqual({ etiquetas: ["Descartado", "Lead pequeno"], etapa: "descartado" })
     expect(organizarLead(["F2"], "indefinido")).toEqual({ etiquetas: ["F2"], etapa: null })
+    expect(organizarLead(["Lead pequeno", "Descartado"], "oportunidade")).toEqual({ etiquetas: ["MQL", "Oportunidade"], etapa: "mql" })
   })
   it("MQL trava o automático", () => {
     expect(travaDoEnvio({ ...ok, emMql: true })).toMatch(/MQL/)

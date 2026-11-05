@@ -83,12 +83,22 @@ const organizar = (c: Conversa, perfil: PerfilLead) => {
   return aplicar(c, o.etiquetas, o.etapa)
 }
 
-async function enviar(c: Conversa, texto: string): Promise<{ ids: string[]; erro?: string }> {
+// Como uma pessoa no WhatsApp: lê a mensagem, fica "digitando…" o tempo do tamanho do texto, pausa entre as mensagens
+const tempoDigitando = (t: string) => Math.min(4000, 1200 + t.length * 25 + Math.random() * 800)
+
+async function marcarLida(c: Conversa, msgId?: string) {
+  if (!msgId) return
+  await evo("/chat/markMessageAsRead/{i}", { method: "POST", body: JSON.stringify({ readMessages: [{ remoteJid: c.jid, fromMe: false, id: msgId }] }) }).catch(() => null)
+}
+
+async function enviar(c: Conversa, texto: string, lida?: string): Promise<{ ids: string[]; erro?: string }> {
   const number = c.telefone || c.jid
   const ids: string[] = []
+  await marcarLida(c, lida)
   for (const [i, parte] of partesDaResposta(texto).entries()) {
-    if (i) await new Promise(res => setTimeout(res, 1500))
-    const env = await evo<WaMessage>("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number, text: parte }) })
+    if (i) await new Promise(res => setTimeout(res, 800 + Math.random() * 1500))
+    // "delay" faz o Evolution mostrar "digitando…" antes de enviar
+    const env = await evo<WaMessage>("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number, text: parte, delay: Math.round(tempoDigitando(parte)) }) })
     if (!env.ok || !env.corpo?.key?.id) return { ids, erro: `não enviou (${env.status})` }
     ids.push(env.corpo.key.id)
     await gravarLote([{ ...env.corpo, key: { ...env.corpo.key, remoteJid: c.jid, fromMe: true } }])
@@ -123,7 +133,8 @@ export async function responderSozinho(msgId: string) {
   if (!auto?.ligado) return
 
   // Espera o lead terminar (costumam mandar 2–3 mensagens seguidas); só a última dispara a resposta
-  await new Promise(r => setTimeout(r, Math.min(40, Math.max(5, auto.esperaSeg ?? 20)) * 1000))
+  // (com variação, para não responder sempre no mesmo segundo)
+  await new Promise(r => setTimeout(r, (Math.min(25, Math.max(5, auto.esperaSeg ?? 15)) + Math.random() * 8) * 1000))
   // A conversa pelo id gravado (a gravação pode ter juntado o @lid com o número)
   const { data: msg } = await supabase.from("whatsapp_mensagens").select("jid").eq("id", msgId).maybeSingle()
   if (!msg?.jid) return
@@ -155,6 +166,8 @@ export async function responderSozinho(msgId: string) {
   // Lead pequeno só vai para Descartado depois de orientado (senão sumiria da sua lista sem resposta)
   const organiza = !conversa.clienteCadastrado && r.lead.perfil !== "nao_lead"
   if (organiza && r.lead.perfil !== "pequeno") await organizar(c, r.lead.perfil)
+  // Fornecedor novo ganha a sua etiqueta "Fornecedora" (e o agente não mexe mais)
+  if (r.lead.perfil === "nao_lead" && r.lead.fornecedor && !(c.etiquetas ?? []).includes("Fornecedora")) await aplicar(c, [...(c.etiquetas ?? []), "Fornecedora"], null)
   const pequeno = async (orientado: boolean) => {
     if (!organiza || r.lead.perfil !== "pequeno") return
     if (orientado || log.some(l => l.enviou && l.perfil === "pequeno")) return organizar(c, "pequeno")
@@ -168,7 +181,7 @@ export async function responderSozinho(msgId: string) {
   if (trava || velha) await pequeno(false)
   if (trava || velha) return registrar({ ...base, enviou: false, motivo: trava ?? "chegou mensagem nova enquanto preparava" + (r.motivo_alerta ? ` · ${r.motivo_alerta}` : "") })
 
-  const env = await enviar(c, r.resposta)
+  const env = await enviar(c, r.resposta, msgId)
   await pequeno(env.ids.length > 0)
   return registrar({ ...base, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? r.lead.motivo })
 }

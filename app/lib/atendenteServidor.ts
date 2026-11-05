@@ -42,9 +42,10 @@ const ESQUEMA = {
     lead: {
       type: "object",
       additionalProperties: false,
-      required: ["perfil", "quantidade_total", "motivo"],
+      required: ["perfil", "quantidade_total", "motivo", "fornecedor"],
       properties: {
-        perfil: { type: "string", enum: ["icp", "medio", "pequeno", "indefinido", "nao_lead"], description: "Pelo filtro de leads: icp (5 mil+ ou recorrente), medio (1.000 a 4.999), pequeno (menos de 1.000), indefinido (ainda não disse volume), nao_lead (fornecedor, parceiro, cliente em andamento, pessoal)." },
+        perfil: { type: "string", enum: ["icp", "medio", "oportunidade", "pequeno", "indefinido", "nao_lead"], description: "Pelo filtro de leads: icp (caixas 5 mil+ ou recorrente), medio (caixas 1.000 a 4.999), oportunidade (frasco, essência, válvula, envase ou produto pronto em volume, mesmo com pouca caixa), pequeno (menos de 1.000 caixas e nada mais), indefinido (ainda não disse volume), nao_lead (fornecedor, parceiro, cliente em andamento, pessoal)." },
+        fornecedor: { type: "boolean", description: "true se o contato é fornecedor (papel, frasco, válvula, essência, gráfica, colagem…), não cliente." },
         quantidade_total: { type: ["number", "null"], description: "Quantidade total do lote que o lead disse (soma dos modelos)." },
         motivo: { type: "string", description: "Uma frase: por que esse perfil." },
       },
@@ -110,7 +111,7 @@ Siga o guia de atendimento: é a voz e o método dele.
 ${cfg.guiaAtendimento?.trim() || "Mensagens curtas, cordiais, em primeira pessoa. Espelhe o tom do cliente."}
 </guia>
 
-Seu trabalho principal com quem chega do anúncio é filtrar os leads do jeito dele, com o mínimo de mensagens: descobrir rápido a quantidade total e separar quem é cliente (ICP) de quem não é. Cerca de 90% dos leads querem poucas caixas e não são o nosso cliente. Siga o filtro:
+Seu trabalho principal com quem chega do anúncio é descobrir os bons negócios e poupar o tempo dele, com o mínimo de mensagens: descobrir rápido o volume e separar quem é bom negócio de quem não é. Bom negócio é caixa em volume ou os outros produtos do ramo em que ele também ganha (frasco, essência, válvula, envase, produto pronto). Cerca de 90% dos leads querem poucas caixas e não são o nosso cliente. Siga o filtro:
 
 <filtro_leads>
 ${filtroEfetivo(cfg.filtroLeads)}

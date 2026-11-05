@@ -10,18 +10,19 @@ import { AgenteAuto, RegistroAgente, PerfilLead, ROTULO_PERFIL, FILTRO_PADRAO } 
 
 type Simulacao = { jid: string; nome: string | null; ultima: string; perfil: PerfilLead; quantidade: number | null; motivo: string; resposta: string; enviaria: boolean; trava: string | null }
 
-const TOM_PERFIL: Record<PerfilLead, Tom> = { icp: "sucesso", medio: "acento", pequeno: "neutro", indefinido: "info", nao_lead: "alerta" }
+const TOM_PERFIL: Record<PerfilLead, Tom> = { icp: "sucesso", medio: "acento", oportunidade: "info", pequeno: "neutro", indefinido: "neutro", nao_lead: "alerta" }
 const hora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
 
 export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string; onFiltro: (t: string) => void }) {
   const [auto, setAuto] = useState<AgenteAuto | null>(null)
   const [log, setLog] = useState<RegistroAgente[]>([])
+  const [taxas, setTaxas] = useState<{ passo: string; enviados: number; responderam: number }[]>([])
   const [sim, setSim] = useState<Simulacao[] | null>(null)
   const [simulando, setSimulando] = useState(false)
   const [mudando, setMudando] = useState(false)
 
   useEffect(() => {
-    fetch("/api/whatsapp/agente").then(r => r.json()).then(d => { setAuto(d.auto); setLog(d.log ?? []) }).catch(() => {})
+    fetch("/api/whatsapp/agente").then(r => r.json()).then(d => { setAuto(d.auto); setLog(d.log ?? []); setTaxas(d.taxas ?? []) }).catch(() => {})
   }, [])
 
   async function alternar() {
@@ -55,7 +56,7 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
           <p className="text-[13px] font-semibold text-[#191625]">Modo automático {ligado ? "ligado" : "desligado"}</p>
           <p className="text-[11.5px] text-[#5e5c68]">
             {ligado
-              ? "Responde sozinho só contato novo (até 4 dias), espera 20 s o lead terminar de digitar e segura tudo que é decisão sua."
+              ? "Responde sozinho só contato novo (até 4 dias), espera 15 a 25 s o lead terminar de digitar, lê, fica “digitando…” e segura tudo que é decisão sua."
               : "Desligado, ele só sugere a resposta na conversa. Ligado, responde sozinho os leads novos e organiza o funil."}
           </p>
         </div>
@@ -65,11 +66,11 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
 
       {/* Como ele organiza */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4 text-[11.5px]">
-        <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#009351]">Lead bom → MQL</p><p className="text-[#5e5c68]">1.000+ unidades. Etiqueta MQL e vai para a coluna MQL do funil. Daí em diante ele não responde mais: é você, sem o contato perceber a troca.</p></div>
-        <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#5e5c68]">Lead ruim → Descartado</p><p className="text-[#5e5c68]">Menos de 1.000. Uma mensagem orientando e indicando o parceiro, etiqueta Descartado e sai da sua lista de responder.</p></div>
+        <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#009351]">Lead bom → MQL</p><p className="text-[#5e5c68]">1.000+ caixas, ou frasco, essência, válvula e envase em volume (Oportunidade). Etiqueta MQL e vai para a coluna MQL do funil. Daí em diante ele não responde mais: é você, sem o contato perceber a troca.</p></div>
+        <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#5e5c68]">Lead ruim → Descartado</p><p className="text-[#5e5c68]">Menos de 1.000 caixas e nada mais. Uma mensagem orientando, indicando o parceiro e oferecendo frasco/essência; etiqueta Descartado e sai da sua lista de responder.</p></div>
         <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#c57800]">Sem resposta → F1, F2, F3</p><p className="text-[#5e5c68]">F1 após 3 h, F2 após 1 dia, F3 após 3 dias (8h–20h). 4 dias depois do F3: Sem resposta, vai para Perdido. No MQL só etiqueta, quem cobra é você.</p></div>
       </div>
-      <p className="text-[11px] text-[#898892] mb-4">No seu WhatsApp Business: crie no app as etiquetas com estes nomes exatos (MQL, Descartado, F1, F2, F3, Sem resposta, ICP, Lead médio, Lead pequeno) e ele marca lá também.</p>
+      <p className="text-[11px] text-[#898892] mb-4">No seu WhatsApp Business: crie no app as etiquetas com estes nomes exatos (MQL, Descartado, F1, F2, F3, Sem resposta, ICP, Lead médio, Oportunidade, Lead pequeno, Fornecedora) e ele marca lá também.</p>
 
       {/* Filtro */}
       <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-1.5">Filtro de leads</p>
@@ -102,6 +103,22 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
               <p className="text-[11px] text-[#5e5c68] mt-1">{s.motivo}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Taxa de resposta */}
+      {!!taxas.length && (
+        <div className="mt-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-1.5">Taxa de resposta</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {taxas.map(t => (
+              <div key={t.passo} className="rounded-lg ds-borda px-3 py-2">
+                <p className="text-[11px] text-[#898892]">{t.passo === "Resposta" ? "1ª resposta" : t.passo}</p>
+                <p className="text-[16px] font-semibold text-[#191625] tabular-nums">{Math.round(t.responderam / t.enviados * 100)}%</p>
+                <p className="text-[10.5px] text-[#898892]">{t.responderam} de {t.enviados} responderam</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

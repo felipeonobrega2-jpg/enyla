@@ -2,24 +2,26 @@
 // Aqui ficam só as travas duras (o que nunca sai sem você). O julgamento — quem é ICP, o que dizer —
 // está no texto "Filtro de leads" das Configurações, que a IA lê antes de responder.
 
-export type PerfilLead = "icp" | "medio" | "pequeno" | "indefinido" | "nao_lead"
+export type PerfilLead = "icp" | "medio" | "oportunidade" | "pequeno" | "indefinido" | "nao_lead"
 
 export type LeadAvaliado = {
   perfil: PerfilLead
   quantidade_total: number | null   // quantidade total do lote que o lead disse
   motivo: string
+  fornecedor?: boolean              // contato é fornecedor (papel, frasco, gráfica…), não cliente
 }
 
 export const ROTULO_PERFIL: Record<PerfilLead, string> = {
   icp: "ICP: 5 mil+",
   medio: "Lead 1 a 5 mil",
+  oportunidade: "Oportunidade: outros produtos",
   pequeno: "Lead pequeno",
   indefinido: "Lead: falta volume",
   nao_lead: "Não é lead",
 }
 
 // Etiqueta que a conversa recebe (aparece na lista do WhatsApp e no funil)
-export const ETIQUETA_PERFIL: Partial<Record<PerfilLead, string>> = { icp: "ICP", medio: "Lead médio", pequeno: "Lead pequeno" }
+export const ETIQUETA_PERFIL: Partial<Record<PerfilLead, string>> = { icp: "ICP", medio: "Lead médio", oportunidade: "Oportunidade", pequeno: "Lead pequeno" }
 
 export type AgenteAuto = {
   ligado: boolean
@@ -91,13 +93,14 @@ export const ETIQUETAS_AGENTE = {
 } as const
 export const COR_ETIQUETA_AGENTE: Record<string, string> = {
   "MQL": "#009351", "Descartado": "#a0a0aa", "F1": "#c57800", "F2": "#d56a00", "F3": "#d33a3c", "Sem resposta": "#7a7983",
-  "ICP": "#009351", "Lead médio": "#8456e8", "Lead pequeno": "#a0a0aa",
+  "ICP": "#009351", "Lead médio": "#8456e8", "Oportunidade": "#1f7ae0", "Lead pequeno": "#a0a0aa",
 }
 const FOLLOW = ["F1", "F2", "F3"] as const
 const DO_AGENTE: string[] = [...Object.values(ETIQUETAS_AGENTE), ...Object.values(ETIQUETA_PERFIL) as string[]]
 export const ehEtiquetaDoAgente = (e: string) => DO_AGENTE.includes(e)
 
-export const ehQualificado = (p: PerfilLead) => p === "icp" || p === "medio"
+// Bom negócio: caixa em volume ou outros produtos do ramo em que você ganha (frasco, essência, válvula, envase)
+export const ehQualificado = (p: PerfilLead) => p === "icp" || p === "medio" || p === "oportunidade"
 
 // Depois de avaliar o lead: etiquetas novas (as suas ficam) e a etapa do funil (null = não mexe)
 export function organizarLead(atuais: string[], perfil: PerfilLead): { etiquetas: string[]; etapa: "mql" | "descartado" | null } {
@@ -140,7 +143,10 @@ export const partesDaResposta = (r: string) => r.split(/\n\s*\n/).map(s => s.tri
 export const ehMensagemAutomaticaDoWhatsapp = (t: string | null) => !!t && /^estou fora do hor[aá]rio/i.test(t.trim())
 
 // Filtro inicial, tirado das conversas reais do Felipe com os leads do anúncio (04/11/2026). Fica editável em Configurações.
-export const FILTRO_PADRAO = `QUEM É O NOSSO CLIENTE
+export const FILTRO_PADRAO = `OBJETIVO
+Descobrir os bons negócios e poupar o meu tempo. Bom negócio é caixa em volume OU os outros produtos do ramo em que eu também ganho: frasco, essência, válvula, envase, produto pronto (frasco + essência + caixa). Lead ruim eu não quero ver; lead bom eu quero receber já qualificado.
+
+QUEM É O NOSSO CLIENTE
 - Somos gráfica offset. O ponto ótimo é 5.000 unidades no lote total; dentro de 5 mil dá para fazer de 4 a 6 modelos diferentes (depende de quantos cabem numa chapa).
 - Referência que eu passo: a caixinha padrão de 100ml (fundo automático, verniz, papel 300g) em 5 mil unidades sai R$ 0,85 a unidade. Não passe nenhum outro valor.
 - Pedido mínimo: em torno de 1.000 no total. Regra: quanto menor a caixa, maior precisa ser a quantidade (caixinha de 15ml: umas 1.000 de cada modelo).
@@ -149,7 +155,8 @@ FAIXAS
 - Menos de 1.000 no total (10, 30, 50, 100, 500…): não é nosso cliente. É a maioria dos leads do anúncio.
 - 1.000 a 4.999: atendemos, mas deixe claro que o custo unitário fica mais alto ("é padrão de indústria: quanto menor a quantidade, maior o custo unitário"). Siga levantando os dados.
 - 5.000 ou mais, ou recorrente (ex.: 3 mil por semana, 20 mil por mês): cliente ideal. Levante os dados e me chame (decisao_sua): eu assumo.
-- "Estou começando/lançando agora" sozinho não desqualifica; o que desqualifica é a quantidade.
+- Quer frasco, essência, válvula, envase ou o produto pronto em volume (centenas de frascos ou mais, ou recorrente): é oportunidade, mesmo que a caixa seja pouca. Levante o que ele precisa (o quê, quantos, com que frequência, quanto paga hoje) e me chame.
+- "Estou começando/lançando agora" sozinho não desqualifica; o que desqualifica é o volume do negócio todo.
 
 PRIMEIRA MENSAGEM (lead que chega: "gostaria de saber mais sobre as caixinhas", "posso encomendar?", "boa tarde")
 Oi, tudo bem? aqui é o Luiz Felipe, da Jerograf / ENYLA👋 Você já tá vendendo seu produto ou tá lançando agora? E que volume você precisa?
@@ -164,6 +171,7 @@ RESPOSTAS QUE EU USO
 
 LEAD PEQUENO (menos de 1.000)
 - Não gaste tempo. Uma mensagem só, cordial e curta: nossa impressão é offset e não roda essa quantidade; para isso o ideal é impressão digital, e eu tenho um parceiro que faz poucas unidades (com verniz à base d'água).
+- Na mesma mensagem, deixe a porta aberta para o resto: se ele precisar de frasco, essência, válvula ou envase, eu tenho fornecedor direto e consigo ajudar. Se ele responder que precisa, vira oportunidade.
 - Contato do parceiro de impressão digital: (preencha aqui nome e telefone). Se estiver sem contato, diga que vou passar o contato dele e marque decisao_sua.
 - Diga para falar que veio através de mim, Felipe da ENYLA, que ele dá desconto. Deseje boa sorte ("todo começo é assim mesmo").
 - Depois disso não insista e não faça follow-up. Se ele topar 1.000 ("1000 então"), vira lead normal.
@@ -177,12 +185,12 @@ LEVANTAR DADOS (1.000 ou mais)
 - Uma ou duas perguntas por vez. Com tudo em mãos: "vou preparar o seu orçamento" e decisao_sua.
 
 O QUE EU FALO PARA CLIENTE BOM
-- Somos um hub comercial: tenho o fornecedor de frasco mais barato do país (importa direto da China), essência (um químico que importa a matéria-prima), válvula e envase. Não coloco nenhum centavo em cima; ganho só nas caixas.
+- Somos um hub comercial: tenho o fornecedor de frasco mais barato do país (importa direto da China), essência (um químico que importa a matéria-prima), válvula e envase. Consigo montar o produto completo: frasco, essência, envase e caixa.
 - Prazo médio de produção: de 7 a 14 dias úteis.
 - Estamos em São Paulo: Barueri e Brás.
 - Amostra, visita, ligação: só eu decido (decisao_sua).
 
 NÃO É LEAD
-- Fornecedor (papel, frasco, válvula, essência, gráfica, colagem), parceiro, cliente com pedido em andamento, conversa pessoal: não responda (decisao_sua).`
+- Fornecedor (papel, frasco, válvula, essência, gráfica, colagem), parceiro, cliente com pedido em andamento, conversa pessoal: não responda (decisao_sua). Se for fornecedor, marque fornecedor = true.`
 
 export const filtroEfetivo = (t?: string | null) => t?.trim() || FILTRO_PADRAO
