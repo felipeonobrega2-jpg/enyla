@@ -2061,6 +2061,7 @@ export default function Home() {
               onSalvarMeta={metaMensal => salvarConfigTudo({ ...configAtual.current, metaMensal })}
               onAprovacaoOnline={concluirAprovacaoOnline}
               onAbrirConversa={jid => { setWhatsAbrir({ jid, vez: Date.now() }); navigate("whatsapp") }}
+              onOrcarConversa={orcamentoDaConversa}
             />
           ) : view === "dashboard" ? (
             <RelatoriosView kanban={kanban} lancamentos={lancamentos} clientes={clientes} origensClientes={config.origensClientes} historico={historico}

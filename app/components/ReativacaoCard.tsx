@@ -11,7 +11,7 @@ import type { RegistroAgente } from "../lib/agenteLeads"
 type Candidato = { jid: string; nome: string | null; motivo: string; paradoDias: number; ultimaMsg: string | null; ultimaDeQuem: "voce" | "cliente" | null }
 type Rascunho = { texto: string; trava: string | null; motivo?: string; carregando?: boolean; enviando?: boolean; erro?: string }
 
-const TOM: Record<string, Tom> = { ICP: "sucesso", "Cliente que já comprou": "sucesso", "Orçamento perdido 5 mil+": "acento", Oportunidade: "info", "Orçamento perdido": "alerta", "Lead médio": "acento", MQL: "neutro" }
+const TOM: Record<string, Tom> = { "Orçamento sem resposta": "perigo", ICP: "sucesso", "Cliente que já comprou": "sucesso", "Orçamento perdido 5 mil+": "acento", Oportunidade: "info", "Orçamento perdido": "alerta", "Lead médio": "acento", MQL: "neutro" }
 const hora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
 const post = (corpo: Record<string, unknown>) => fetch("/api/whatsapp/reativacao", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }).then(r => r.json()).catch(() => null)
 
@@ -57,7 +57,7 @@ export default function ReativacaoCard() {
   return (
     <Cartao className="ds-entrada">
       <TituloCartao titulo="Reativação" icone={<RotateCcw className="w-4 h-4" />}
-        sub="Bons negócios parados há 10 dias ou mais: ICPs, clientes que já compraram (30 dias sem conversa), orçamentos de 1.000+ que não fecharam, oportunidades e leads médios. A IA escreve a retomada no seu tom, lembrando o que a pessoa queria. Quando ela responde, volta para MQL e você recebe o aviso no WhatsApp." />
+        sub="Orçamentos em aberto sem resposta há 2 dias (primeiro da fila) e bons negócios parados há 10 dias ou mais: ICPs, clientes que já compraram (30 dias sem conversa), orçamentos de 1.000+ que não fecharam, oportunidades e leads médios. A IA escreve a retomada no seu tom, lembrando o que a pessoa queria. Quando ela responde, volta para MQL e você recebe o aviso no WhatsApp." />
       {!d ? <p className="text-[12px] text-[#898892]">Carregando…</p> : (<>
         <div className={`rounded-xl px-4 py-3 flex items-center gap-3 mb-3 flex-wrap ${ligado ? "bg-[rgba(0,147,81,0.08)]" : "bg-[rgba(116,116,128,0.07)]"}`}>
           <Power className={`w-4 h-4 shrink-0 ${ligado ? "text-[#009351]" : "text-[#898892]"}`} />

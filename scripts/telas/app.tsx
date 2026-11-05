@@ -84,7 +84,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     return new Response(JSON.stringify({
       responder: [
         { jid: "9@lid", nome: "Essências Exemplo", mensagem: "Oi! Ainda quero sim, dá pra atualizar pra 5 mil?", desde: h(40), rotulo: "Retomada", retomada: true },
-        { jid: "1@lid", nome: "Perfumaria Modelo", mensagem: "Preciso de 3 mil caixinhas de 50ml com hot stamping", desde: h(190), rotulo: "ICP", retomada: false },
+        { jid: "1@lid", nome: "Perfumaria Modelo", mensagem: "Preciso de 3 mil caixinhas de 50ml com hot stamping", desde: h(190), rotulo: "ICP", retomada: false, cliente: null, dados: { produto: "caixinha", volume_ml: 50, caixa_cm: null, frasco_cm: null, quantidade: 3000, tem_arte: true, resumo: "" } },
         { jid: "2@lid", nome: "Aroma Teste", mensagem: "Vocês fazem frasco também?", desde: h(75), rotulo: "Oportunidade", retomada: false },
         { jid: "3@lid", nome: "Cosméticos Fictícia", mensagem: "Umas 1.500, por aí", desde: h(12), rotulo: "Lead médio", retomada: false },
       ],
@@ -214,7 +214,7 @@ function Telas() {
         {tela === "parceiros-modal" && <ModalVenda inicial={negs[1]} parceiros={parc} clientes={["Camilo"]} onSalvar={() => {}} onNovoParceiro={() => {}} onFechar={() => {}} />}
       </div>
     }
-    case "hoje": case "hoje-m": return pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} /></div>)
+    case "hoje": case "hoje-m": return pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)
     case "marketing": case "marketing-m": return pagina(<div className="max-w-[1100px]"><MarketingRelatorio /></div>)
     case "reativacao": return pagina(<div className="max-w-[860px]"><ReativacaoCard /></div>)
     case "contatos": return pagina(<div className="max-w-[860px]"><ContatosProtegidosCard /></div>)

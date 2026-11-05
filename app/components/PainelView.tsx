@@ -59,7 +59,7 @@ type Detalhe = { titulo: string; sub?: string; linhas: React.ReactNode; destino?
 
 export function PainelView({
   kanban, lancamentos, historico, propostasCustom, clientes, config,
-  onAbrirCard, onAbrirCliente, onNavegar, onNovoOrcamento, onLancarCobranca, onSalvarMeta, onAprovacaoOnline, onAbrirConversa,
+  onAbrirCard, onAbrirCliente, onNavegar, onNovoOrcamento, onLancarCobranca, onSalvarMeta, onAprovacaoOnline, onAbrirConversa, onOrcarConversa,
 }: {
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
@@ -75,6 +75,7 @@ export function PainelView({
   onSalvarMeta?: (metaMensal: number) => void
   onAprovacaoOnline?: (a: AprovacaoOnline) => void
   onAbrirConversa?: (jid: string) => void
+  onOrcarConversa?: (nome: string, jid: string, dados?: import("../lib/atendente").DadosPedido) => void
 }) {
   const [periodoId, setPeriodoId] = React.useState<PeriodoId>("mes")
   const [detalhe, setDetalhe] = React.useState<Detalhe | null>(null)
@@ -270,7 +271,7 @@ export function PainelView({
         </>}
       />
 
-      {onAbrirConversa && <HojeCard onAbrirConversa={onAbrirConversa} onNavegar={onNavegar} />}
+      {onAbrirConversa && <HojeCard onAbrirConversa={onAbrirConversa} onNavegar={onNavegar} onOrcar={onOrcarConversa} />}
 
       <GradeKpis>
         <Kpi rotulo="Vendido" icone={<TrendingUp className="w-3.5 h-3.5" />} tom="acento" destaque

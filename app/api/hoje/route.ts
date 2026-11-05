@@ -14,12 +14,12 @@ export async function GET() {
   const [cfg, { data, error }] = await Promise.all([
     lerCfg() as Promise<Awaited<ReturnType<typeof lerCfg>> & CfgReativacao & { marketingRelatorios?: Relatorio[] }>,
     supabase.from("whatsapp_conversas")
-      .select("jid, nome, ultima_msg, ultima_recebida_at, ultima_enviada_at, fechada_em, status_lead, etiquetas, campanha, criado_em")
+      .select("jid, nome, ultima_msg, ultima_recebida_at, ultima_enviada_at, fechada_em, status_lead, etiquetas, campanha, criado_em, proxima_acao")
       .not("jid", "like", "%@g.us").gte("ultima_at", desde).order("ultima_at", { ascending: false }).limit(1500),
   ])
   if (error) return NextResponse.json({ erro: error.message }, { status: 500 })
   const convs = (data ?? []) as ConvHoje[]
-  const { responder, outros } = quemResponder(convs, cfg.agenteLog ?? [])
+  const { responder, outros } = quemResponder(convs, cfg.agenteLog ?? [], Date.now(), cfg.vinculosWhatsapp)
   const rel = (cfg.marketingRelatorios ?? [])[0]
   const t = rel ? total(rel.dia1) : null
   const auto = cfg.reativacaoAuto ?? { ligado: false, porDia: POR_DIA_PADRAO }

@@ -7,8 +7,8 @@ const dias = (n: number) => new Date(AGORA - n * 86_400_000).toISOString()
 const conv = (o: Partial<Parameters<typeof motivoReativacao>[0]>) => ({ jid: "1@s.whatsapp.net", status_lead: null, etiquetas: [], ultima_recebida_at: dias(20), ultima_enviada_at: dias(15), ...o })
 
 describe("motivoReativacao", () => {
-  it("ICP parado há 15 dias entra, com prioridade máxima", () => {
-    expect(motivoReativacao(conv({ etiquetas: ["ICP"] }), AGORA)).toEqual({ motivo: "ICP", prioridade: 0, paradoDias: 15 })
+  it("ICP parado há 15 dias entra, logo depois de orçamento sem resposta", () => {
+    expect(motivoReativacao(conv({ etiquetas: ["ICP"] }), AGORA)).toEqual({ motivo: "ICP", prioridade: 1, paradoDias: 15 })
   })
   it("MQL sem etiqueta de perfil entra por último", () => {
     expect(motivoReativacao(conv({ status_lead: "mql" }), AGORA)?.motivo).toBe("MQL")
@@ -46,6 +46,21 @@ describe("motivoReativacao com o Kanban", () => {
     expect(grande.prioridade).toBeLessThan(op.prioridade)
     expect(motivoReativacao(conv({}), AGORA, cli({ maiorOrcamento: 500 }))).toBeNull()
     expect(motivoReativacao(conv({}), AGORA, cli({ maiorOrcamento: 2000 }))?.motivo).toBe("Orçamento perdido")
+  })
+})
+
+describe("orçamento sem resposta", () => {
+  const cli = (dias: number) => ({ comprou: false, emAndamento: false, maiorOrcamento: 3000, orcamentoAberto: { numero: "ORC-1", dias } })
+  it("orçamento aberto e 2 dias de silêncio: primeiro da fila", () => {
+    expect(motivoReativacao(conv({ ultima_recebida_at: dias(4), ultima_enviada_at: dias(3) }), AGORA, cli(3))).toEqual({ motivo: "Orçamento sem resposta", prioridade: 0, paradoDias: 3 })
+  })
+  it("conversa de ontem ou orçamento de hoje ainda não", () => {
+    expect(motivoReativacao(conv({ ultima_recebida_at: dias(1), ultima_enviada_at: dias(1) }), AGORA, cli(3))).toBeNull()
+    expect(motivoReativacao(conv({ ultima_recebida_at: dias(4), ultima_enviada_at: dias(3) }), AGORA, cli(1))).toBeNull()
+  })
+  it("pedido em produção ou contato descartado não recebe", () => {
+    expect(motivoReativacao(conv({ ultima_enviada_at: dias(3) }), AGORA, { ...cli(3), emAndamento: true })).toBeNull()
+    expect(motivoReativacao(conv({ ultima_enviada_at: dias(3), etiquetas: ["Lead pequeno"] }), AGORA, cli(3))).toBeNull()
   })
 })
 

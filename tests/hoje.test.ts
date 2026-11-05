@@ -51,3 +51,10 @@ it("haQuanto", () => {
   expect(haQuanto(h(3), agora)).toBe("há 3 h")
   expect(haQuanto(h(50), agora)).toBe("há 2 dias")
 })
+
+it("dadosDaConversa lê o que a IA guardou e tolera lixo", async () => {
+  const { dadosDaConversa } = await import("../app/lib/hoje")
+  expect(dadosDaConversa(JSON.stringify({ r: { dados: { quantidade: 3000 } } }))?.quantidade).toBe(3000)
+  expect(dadosDaConversa("{quebrado")).toBeNull()
+  expect(dadosDaConversa(null)).toBeNull()
+})

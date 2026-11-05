@@ -5,13 +5,24 @@
 import { aguardandoResposta } from "./funilWhatsapp"
 import { qualidadeDoLead } from "./marketing"
 import type { RegistroAgente } from "./agenteLeads"
+import type { DadosPedido } from "./atendente"
 
 export type ConvHoje = {
   jid: string; nome: string | null; ultima_msg: string | null; ultima_recebida_at: string | null; ultima_enviada_at: string | null
   fechada_em: string | null; status_lead: string | null; etiquetas: string[] | null; campanha: string | null; criado_em: string | null
+  proxima_acao?: string | null
 }
 
-export type ItemHoje = { jid: string; nome: string | null; mensagem: string | null; desde: string; rotulo: string; retomada: boolean }
+export type ItemHoje = {
+  jid: string; nome: string | null; mensagem: string | null; desde: string; rotulo: string; retomada: boolean
+  dados: DadosPedido | null          // o que a IA já tirou da conversa (para o orçamento sair preenchido)
+  cliente: string | null             // cliente do cadastro ligado à conversa
+}
+
+// Última leitura da IA guardada na conversa
+export function dadosDaConversa(proximaAcao: string | null | undefined): DadosPedido | null {
+  try { return (JSON.parse(proximaAcao ?? "") as { r?: { dados?: DadosPedido } }).r?.dados ?? null } catch { return null }
+}
 
 export type Hoje = {
   responder: ItemHoje[]                         // bons negócios esperando você (o cliente falou por último)
@@ -26,7 +37,7 @@ const DIAS_RETOMADA = 7
 // Qual etiqueta mostra melhor por que é bom negócio
 const rotuloDe = (et: string[]) => ["ICP", "Oportunidade", "Lead médio"].find(e => et.includes(e)) ?? "MQL"
 
-export function quemResponder(convs: ConvHoje[], log: RegistroAgente[], agora = Date.now()): { responder: ItemHoje[]; outros: number } {
+export function quemResponder(convs: ConvHoje[], log: RegistroAgente[], agora = Date.now(), vinculos: Record<string, string> = {}): { responder: ItemHoje[]; outros: number } {
   const respondeu = new Set(log.filter(l => l.passo === "Respondeu" && agora - new Date(l.em).getTime() < DIAS_RETOMADA * 86_400_000).map(l => l.jid))
   const esperando = convs.filter(c => aguardandoResposta(c, agora))
   const responder: ItemHoje[] = []
@@ -34,7 +45,7 @@ export function quemResponder(convs: ConvHoje[], log: RegistroAgente[], agora = 
   for (const c of esperando) {
     const retomada = respondeu.has(c.jid)
     if (!retomada && qualidadeDoLead(c) !== "mql") { if (qualidadeDoLead(c) === "aberto") outros++; continue }
-    responder.push({ jid: c.jid, nome: c.nome, mensagem: c.ultima_msg, desde: c.ultima_recebida_at!, rotulo: retomada ? "Retomada" : rotuloDe(c.etiquetas ?? []), retomada })
+    responder.push({ jid: c.jid, nome: c.nome, mensagem: c.ultima_msg, desde: c.ultima_recebida_at!, rotulo: retomada ? "Retomada" : rotuloDe(c.etiquetas ?? []), retomada, dados: dadosDaConversa(c.proxima_acao), cliente: vinculos[c.jid] || null })
   }
   // Retomada respondida primeiro (é a chance que você foi buscar); depois o mais recente (lead quente fecha mais)
   responder.sort((a, b) => Number(b.retomada) - Number(a.retomada) || b.desde.localeCompare(a.desde))

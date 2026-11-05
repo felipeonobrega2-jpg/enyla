@@ -6,12 +6,12 @@ import { atender } from "./atendenteServidor"
 import { lerCfg, gravarCfg, registrar, lerConversa, aplicar, enviar, CfgAgente } from "./agenteAuto"
 import { valoresEmReais, filtroEfetivo, PerfilLead } from "./agenteLeads"
 import {
-  ETIQUETA_REATIVACAO, POR_DIA_PADRAO, MINUTOS_ENTRE_ENVIOS, DIAS_PARADO, DIAS_MAXIMO, HistoricoCliente,
+  ETIQUETA_REATIVACAO, POR_DIA_PADRAO, MINUTOS_ENTRE_ENVIOS, DIAS_MAXIMO, DIAS_ORCAMENTO_SEM_RESPOSTA, DIAS_ORCAMENTO_ABERTO, HistoricoCliente,
   motivoReativacao, tentouHaPouco, horarioDeReativacao, travaDaReativacao,
 } from "./reativacao"
 import { clienteDaConversa, ligacaoForte } from "./vinculoWhatsapp"
-import { nomeChave } from "./negocio"
-import { COL_FECHADO, COL_ENTREGUE } from "../types"
+import { nomeChave, parseData } from "./negocio"
+import { COL_FECHADO, COL_ENTREGUE, COL_HOT } from "../types"
 
 export type CfgReativacao = {
   reativacaoAuto?: { ligado: boolean; porDia?: number }
@@ -30,11 +30,11 @@ export type Candidato = {
   prioridade: number                     // 0 = ICP, depois oportunidade, médio, MQL
 }
 
-const PERFIL: Record<string, PerfilLead> = { ICP: "icp", Oportunidade: "oportunidade", "Lead médio": "medio", MQL: "icp", "Cliente que já comprou": "icp", "Orçamento perdido 5 mil+": "icp", "Orçamento perdido": "medio" }
+const PERFIL: Record<string, PerfilLead> = { "Orçamento sem resposta": "icp", ICP: "icp", Oportunidade: "oportunidade", "Lead médio": "medio", MQL: "icp", "Cliente que já comprou": "icp", "Orçamento perdido 5 mil+": "icp", "Orçamento perdido": "medio" }
 
 // Kanban por cliente: comprou (fechado → entregue), em produção agora, maior quantidade orçada
 async function historicos(): Promise<{ nomes: string[]; porCliente: Map<string, HistoricoCliente> }> {
-  const { data: cards } = await supabase.from("KanbanCard").select("nomeCliente, coluna, quantidade")
+  const { data: cards } = await supabase.from("KanbanCard").select("nomeCliente, coluna, quantidade, numero, data")
   const porCliente = new Map<string, HistoricoCliente>()
   for (const c of cards ?? []) {
     if (!c.nomeCliente) continue
@@ -43,6 +43,10 @@ async function historicos(): Promise<{ nomes: string[]; porCliente: Map<string, 
     if (c.coluna >= COL_FECHADO && c.coluna <= COL_ENTREGUE) h.comprou = true
     if (c.coluna >= COL_FECHADO && c.coluna < COL_ENTREGUE) h.emAndamento = true
     h.maiorOrcamento = Math.max(h.maiorOrcamento, Number(c.quantidade) || 0)
+    const quando = parseData(c.data)
+    const dias = quando ? Math.floor((Date.now() - quando.getTime()) / 86_400_000) : null
+    if ((c.coluna === 0 || c.coluna === COL_HOT) && dias != null && dias <= DIAS_ORCAMENTO_ABERTO && (!h.orcamentoAberto || dias < h.orcamentoAberto.dias))
+      h.orcamentoAberto = { numero: c.numero ?? "", dias }
     porCliente.set(k, h)
   }
   return { nomes: [...new Set((cards ?? []).map(c => c.nomeCliente).filter(Boolean))] as string[], porCliente }
@@ -51,7 +55,8 @@ async function historicos(): Promise<{ nomes: string[]; porCliente: Map<string, 
 export async function candidatos(cfg?: Cfg): Promise<Candidato[]> {
   cfg ??= await lerCfg() as Cfg
   const desde = new Date(Date.now() - DIAS_MAXIMO * 86_400_000).toISOString()
-  const ate = new Date(Date.now() - DIAS_PARADO * 86_400_000).toISOString()
+  // Orçamento sem resposta entra com 2 dias; os outros motivos pedem 10 (motivoReativacao decide)
+  const ate = new Date(Date.now() - DIAS_ORCAMENTO_SEM_RESPOSTA * 86_400_000).toISOString()
   const [{ data }, { nomes, porCliente }] = await Promise.all([
     supabase.from("whatsapp_conversas")
       .select("jid, nome, telefone, status_lead, etiquetas, ultima_msg, ultima_recebida_at, ultima_enviada_at")

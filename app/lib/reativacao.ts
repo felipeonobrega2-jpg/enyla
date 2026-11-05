@@ -20,16 +20,19 @@ export type ConvReativacao = {
 
 export const DIAS_PARADO_CLIENTE = 30      // cliente que já comprou: retoma (recompra) depois de 30 dias sem conversa
 export const QTD_MINIMA_ORCAMENTO = 1000   // orçamento perdido só entra se era de 1.000+ (menos que isso é lead pequeno)
+export const DIAS_ORCAMENTO_SEM_RESPOSTA = 2   // orçamento em aberto: retoma depois de 2 dias de silêncio
+export const DIAS_ORCAMENTO_ABERTO = 20        // até 20 dias do orçamento (depois cai em "orçamento perdido")
 
 // O que o Kanban diz desse contato (cliente ligado com segurança à conversa)
 export type HistoricoCliente = {
   comprou: boolean           // tem pedido fechado/entregue
   emAndamento: boolean       // pedido em produção agora (fechado → expedição)
   maiorOrcamento: number     // maior quantidade orçada
+  orcamentoAberto?: { numero: string; dias: number } | null   // orçamento em aberto mais recente (até 20 dias)
 }
 
 // Ordem da fila: quem está mais perto do dinheiro primeiro
-export const MOTIVOS = ["ICP", "Cliente que já comprou", "Orçamento perdido 5 mil+", "Oportunidade", "Orçamento perdido", "Lead médio", "MQL"] as const
+export const MOTIVOS = ["Orçamento sem resposta", "ICP", "Cliente que já comprou", "Orçamento perdido 5 mil+", "Oportunidade", "Orçamento perdido", "Lead médio", "MQL"] as const
 export type MotivoReativacao = typeof MOTIVOS[number]
 
 const FORA = ["Descartado", "Lead pequeno", "Fornecedora"]
@@ -43,6 +46,9 @@ export function motivoReativacao(c: ConvReativacao, agora = Date.now(), cli?: Hi
   if (!ultima) return null
   const paradoDias = Math.floor((agora - new Date(ultima).getTime()) / 86_400_000)
   if (paradoDias > DIAS_MAXIMO) return null
+  // Orçamento enviado e silêncio: a retomada mais perto do dinheiro, bem antes dos 10 dias
+  if (cli?.orcamentoAberto && cli.orcamentoAberto.dias >= DIAS_ORCAMENTO_SEM_RESPOSTA && paradoDias >= DIAS_ORCAMENTO_SEM_RESPOSTA)
+    return { motivo: "Orçamento sem resposta", prioridade: 0, paradoDias }
   const motivo: MotivoReativacao | null =
     et.includes("ICP") ? "ICP"
     : cli?.comprou ? (paradoDias >= DIAS_PARADO_CLIENTE ? "Cliente que já comprou" : null)
@@ -58,6 +64,7 @@ export function motivoReativacao(c: ConvReativacao, agora = Date.now(), cli?: Hi
 
 // O que a IA precisa saber para escrever a retomada certa
 export function instrucaoDoMotivo(m: string) {
+  if (m === "Orçamento sem resposta") return "Você mandou o orçamento há poucos dias e ele não respondeu. Retome leve: pergunte se conseguiu ver e se ficou alguma dúvida (quantidade, acabamento, prazo), oferecendo ajustar a quantidade se precisar. Não repita valores nem cobre decisão."
   if (m === "Cliente que já comprou") return "É cliente que já comprou com o Felipe (veja os pedidos dele). Retome como quem cuida do cliente: pergunte como foram as vendas e se ele vai precisar repor ou fazer um lote novo."
   if (m.startsWith("Orçamento perdido")) return "Ele recebeu orçamento e não fechou. Retome perguntando, sem pressão, se o projeto ainda está de pé ou se quer que você atualize o orçamento; se ele disse por que não fechou, leve isso em conta."
   return "É lead bom (volume ou outros produtos do ramo) e a conversa parou. Retome o que ele queria."

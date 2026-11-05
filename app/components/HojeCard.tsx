@@ -7,6 +7,7 @@ import { useEffect, useState } from "react"
 import { Sun, MessageCircle, RotateCcw, Megaphone, ArrowRight, CheckCircle2 } from "lucide-react"
 import { Cartao, TituloCartao, LinhaLista, Selo, Botao, Tom } from "./ds"
 import { Hoje, haQuanto } from "../lib/hoje"
+import { DadosPedido } from "../lib/atendente"
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 })
 const dm = (dia: string) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`
@@ -23,8 +24,16 @@ function Numero({ rotulo, valor, tom }: { rotulo: string; valor: number; tom?: T
   )
 }
 
-export function HojeCard({ onAbrirConversa, onNavegar }: {
+// "3.000 un · caixa 50ml · " antes da mensagem, quando a IA já sabe
+function doPedido(d: DadosPedido | null) {
+  if (!d) return ""
+  const p = [d.quantidade ? `${d.quantidade.toLocaleString("pt-BR")} un` : "", d.volume_ml ? `${d.volume_ml} ml` : d.produto].filter(Boolean)
+  return p.length ? `${p.join(" · ")} · ` : ""
+}
+
+export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
   onAbrirConversa: (jid: string) => void
+  onOrcar?: (nome: string, jid: string, dados?: DadosPedido) => void
   onNavegar: (view: "whatsapp" | "meta" | "config") => void
 }) {
   const [d, setD] = useState<Hoje | null>(null)
@@ -60,9 +69,13 @@ export function HojeCard({ onAbrirConversa, onNavegar }: {
               ? <div className="flex items-center gap-2 px-3 pb-3 text-[12px] text-[#5e5c68]"><CheckCircle2 className="w-4 h-4 text-[#009351]" />Em dia com MQL e retomadas.</div>
               : lista.map(x => (
                 <LinhaLista key={x.jid} titulo={x.nome || x.jid.split("@")[0]} icone={x.retomada ? <RotateCcw className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />}
-                  tom={x.retomada ? "sucesso" : "acento"} sub={x.mensagem ?? undefined}
-                  valor={<Selo tom={TOM[x.rotulo] ?? "acento"}>{x.rotulo}</Selo>} valorSub={haQuanto(x.desde)}
-                  onClick={() => onAbrirConversa(x.jid)} />
+                  tom={x.retomada ? "sucesso" : "acento"} sub={`${doPedido(x.dados)}${x.mensagem ?? ""}` || undefined}
+                  valor={<span className="hidden sm:inline"><Selo tom={TOM[x.rotulo] ?? "acento"}>{x.rotulo}</Selo></span>} valorSub={haQuanto(x.desde)}
+                  onClick={() => onAbrirConversa(x.jid)}
+                  acao={onOrcar ? (
+                    <button onClick={() => onOrcar(x.cliente || x.nome || x.jid.split("@")[0], x.jid, x.dados ?? undefined)} title="Novo orçamento com o que o cliente já contou"
+                      className="h-8 px-2.5 mr-1 rounded-lg text-[11.5px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors shrink-0 whitespace-nowrap">Orçar</button>
+                  ) : undefined} />
               ))}
             {d.responder.length > MOSTRAR && (
               <button onClick={() => setVerTodos(v => !v)} className="w-full py-2 text-[12px] font-medium text-[#8456e8] hover:bg-[#8456e8]/[0.04] rounded-lg transition-colors">
