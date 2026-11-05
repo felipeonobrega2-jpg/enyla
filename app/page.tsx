@@ -65,7 +65,6 @@ import { PedidosUnificadoView, OrderEntry } from "./components/PedidosUnificadoV
 import { ClientesView } from "./components/ClientesView"
 import { ConfigView } from "./components/ConfigView"
 import { KanbanView } from "./components/KanbanView"
-import { ParceirosView } from "./components/ParceirosView"
 import { FinanceiroView, ModalLancamento } from "./components/FinanceiroView"
 import { ClienteCombobox, ClienteContactCard } from "./components/ClienteFields"
 import { ModalPersonalizarProposta } from "./components/ModalPersonalizarProposta"
@@ -2394,14 +2393,9 @@ export default function Home() {
               kanban={kanban}
               lancamentos={lancamentos}
               clientes={clientes}
-              abaInicial={view === "terceirizados" ? "revendas" : "visao"}
-              onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }}
-              cadastro={
-            <ParceirosView
-              embutido
-              parceiros={parceiros}
-              negocios={negocios}
               lotes={lotes}
+              abaInicial={view === "terceirizados" ? "pedidos" : "vendas"}
+              onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }}
               onAddParceiro={p => {
                 setParceiros(prev => [...prev, p])
                 fetch("/api/parceiros", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) }).catch(() => {})
@@ -2426,8 +2420,6 @@ export default function Home() {
                 setNegocios(prev => prev.filter(x => x.id !== id))
                 fetch(`/api/negocios/${id}`, { method: "DELETE" }).catch(() => {})
               }}
-            />
-              }
               itensRevenda={<TerceirizadosView
                 embutido
               kanban={kanban}

@@ -1,29 +1,40 @@
 "use client"
 
 import React from "react"
-import { Handshake, Percent, Repeat, Lightbulb, Package, Users, AlertTriangle, ArrowRight, MessageCircle } from "lucide-react"
-import { KanbanCard, LancamentoFinanceiro, NegocioParceiro, Parceiro, Cliente } from "../types"
+import { Handshake, Percent, Repeat, Lightbulb, Package, Users, MessageCircle, Plus, Wallet, ArrowRight, Pencil, Trash2 } from "lucide-react"
+import { KanbanCard, LancamentoFinanceiro, NegocioParceiro, Parceiro, Cliente, Lote, TipoNegocio } from "../types"
 import { montarPedidos, resumoClientes, nomeChave, parseData, isTerceirizado, isGanho } from "../lib/negocio"
 import { brl, num } from "../utils"
 import { CabecalhoPagina, Segmentado, Kpi, GradeKpis, Cartao, TituloCartao, LinhaLista, Vazio, Selo, Botao } from "./ds"
+import { ModalVenda } from "./parceiros/ModalVenda"
+import { ModalParceiro } from "./ParceirosView"
 
-// Duas relações diferentes com parceiros:
-//   Comissão — o parceiro vende e fatura direto ao cliente; você recebe uma comissão.
-//   Revenda  — você compra pronto do parceiro e fatura ao seu cliente, como item do pedido.
-// "Terceirizados" (itens de pedido marcados como terceirizados) são revendas.
+// O que você ganha fora da caixa, em dois jeitos:
+//   Ganho em cima — o cliente te paga, você paga o parceiro; você fica com a diferença.
+//   Comissão      — o cliente paga direto o parceiro; ele te repassa uma parte.
+// Itens terceirizados dentro de pedidos também são ganho em cima (aparecem na lista, editados no pedido).
+// O ganho recebido entra no Financeiro como "receita de parceria" (Visão geral, Resultado e DRE).
 
-type Aba = "visao" | "comissoes" | "revendas" | "cadastro"
+type Aba = "vendas" | "oferta" | "parceiros" | "pedidos"
+type Filtro = "tudo" | "receber" | "ganho" | "comissao"
 
-type Revenda = {
+type Linha = {
   id: string
-  origem: "pedido" | "parceiro"
-  produto: string
-  parceiro: string
+  origem: "negocio" | "pedido"
+  tipo: TipoNegocio
   cliente: string
+  produto: string
+  detalhe?: string
+  parceiro: string
   pedido?: string
+  data?: string
   venda: number
   custo: number | null
-  data?: string
+  ganho: number | null
+  perc: number
+  quantidade?: number
+  status: "recebido" | "receber" | "cancelado"
+  negocio?: NegocioParceiro
 }
 
 // Linha de produto para sugerir oferta casada
@@ -32,53 +43,73 @@ function linhaDe(texto: string, categoriaParceiro?: string): string {
   if (/adesiv|r[oó]tul|etiq|bopp/.test(t)) return "Adesivos e rótulos"
   if (/sacol/.test(t)) return "Sacolas"
   if (/frasc|vidr/.test(t)) return "Frascos e vidros"
+  if (/ess[eê]nc/.test(t)) return "Essências"
+  if (/v[aá]lvul/.test(t)) return "Válvulas"
   return "Outros itens de parceiro"
 }
 
 const DIAS_ATIVO = 180
 
 export function ParceriasView({
-  parceiros, negocios, kanban, lancamentos, clientes, abaInicial = "visao", cadastro, itensRevenda, onAbrirCliente,
+  parceiros, negocios, kanban, lancamentos, clientes, lotes, abaInicial = "vendas", itensRevenda, onAbrirCliente,
+  onAddParceiro, onUpdateParceiro, onDeleteParceiro, onAddNegocio, onUpdateNegocio, onDeleteNegocio,
 }: {
   parceiros: Parceiro[]
   negocios: NegocioParceiro[]
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
   clientes: Cliente[]
+  lotes?: Lote[]
   abaInicial?: Aba
-  cadastro: React.ReactNode      // cadastro de parceiros e lançamento de negócios (tela existente)
   itensRevenda: React.ReactNode  // itens revendidos dentro dos pedidos (antiga tela Terceirizados)
   onAbrirCliente: (nome: string) => void
+  onAddParceiro: (p: Parceiro) => void
+  onUpdateParceiro: (p: Parceiro) => void
+  onDeleteParceiro: (id: string) => void
+  onAddNegocio: (n: NegocioParceiro) => void
+  onUpdateNegocio: (n: NegocioParceiro) => void
+  onDeleteNegocio: (id: string) => void
 }) {
   const [aba, setAba] = React.useState<Aba>(abaInicial)
+  const [filtro, setFiltro] = React.useState<Filtro>("tudo")
+  const [modal, setModal] = React.useState<{ inicial?: NegocioParceiro; tipo?: TipoNegocio } | null>(null)
+  const [modalParceiro, setModalParceiro] = React.useState<Parceiro | true | null>(null)
 
   const pedidos = React.useMemo(() => montarPedidos(kanban, lancamentos), [kanban, lancamentos])
   const clienteDoLote = React.useMemo(() => new Map(kanban.filter(c => c.loteNumero).map(c => [c.loteNumero!, c.nomeCliente])), [kanban])
-  const parceiroPorId = new Map(parceiros.map(p => [p.id, p]))
+  const nomesClientes = React.useMemo(() => [...new Set([...clientes.map(c => c.nome), ...kanban.map(k => k.nomeCliente)].filter(Boolean))].sort(), [clientes, kanban])
 
-  const validos = negocios.filter(n => n.status !== "cancelado")
-  const comissoes = validos.filter(n => n.tipo === "comissao")
-
-  // Revendas: itens terceirizados dentro de pedidos + revendas lançadas como "ganho" em parceiros
-  const revendas: Revenda[] = [
-    ...kanban.filter(c => isTerceirizado(c) && isGanho(c)).map(c => ({
-      id: `card-${c.id}`, origem: "pedido" as const, produto: c.dimensoes || "Item terceirizado",
-      parceiro: c.fornecedor || "Fornecedor não informado", cliente: c.nomeCliente, pedido: c.loteNumero ?? c.numero,
-      venda: c.preco, custo: c.custoTerceiro ?? null, data: c.dataFechamento,
+  // ── Tudo numa lista: o que você registrou + itens terceirizados dentro dos pedidos ──
+  const linhas: Linha[] = React.useMemo(() => [
+    ...negocios.map(n => ({
+      id: `neg-${n.id}`, origem: "negocio" as const, tipo: n.tipo,
+      cliente: n.nomeCliente || (n.loteNumero && clienteDoLote.get(n.loteNumero)) || "",
+      produto: n.produto || n.descricao, detalhe: n.produto && n.descricao !== n.produto ? n.descricao : undefined,
+      parceiro: n.parceiroNome, pedido: n.loteNumero, data: n.dataOrcamento,
+      venda: n.valorVenda, custo: n.tipo === "ganho" ? n.valorCusto ?? null : null, ganho: n.comissaoValor, perc: n.comissaoPerc, quantidade: n.quantidade,
+      status: n.status === "cancelado" ? "cancelado" as const : n.status === "pago" ? "recebido" as const : "receber" as const,
+      negocio: n,
     })),
-    ...validos.filter(n => n.tipo === "ganho").map(n => ({
-      id: `neg-${n.id}`, origem: "parceiro" as const, produto: n.descricao, parceiro: n.parceiroNome,
-      cliente: (n.loteNumero && clienteDoLote.get(n.loteNumero)) || n.descricao,
-      pedido: n.loteNumero, venda: n.valorVenda, custo: n.valorCusto ?? null, data: n.dataOrcamento,
-    })),
-  ].sort((a, b) => (b.data ?? "").localeCompare(a.data ?? ""))
+    ...kanban.filter(c => isTerceirizado(c) && isGanho(c)).map(c => {
+      const custo = c.custoTerceiro && c.custoTerceiro > 0 ? c.custoTerceiro : null
+      return {
+        id: `card-${c.id}`, origem: "pedido" as const, tipo: "ganho" as const, cliente: c.nomeCliente,
+        produto: c.dimensoes || "Item terceirizado", parceiro: c.fornecedor || "Fornecedor não informado", pedido: c.loteNumero ?? c.numero,
+        data: c.dataFechamento, venda: c.preco, custo, ganho: custo != null ? c.preco - custo : null, perc: custo ? (c.preco - custo) / custo * 100 : 0,
+        status: "recebido" as const,
+      }
+    }),
+  ].sort((a, b) => (parseData(b.data)?.getTime() ?? 0) - (parseData(a.data)?.getTime() ?? 0)), [negocios, kanban, clienteDoLote])
 
-  const comissaoRecebida = comissoes.filter(n => n.status === "pago").reduce((s, n) => s + n.comissaoValor, 0)
-  const comissaoPendente = comissoes.filter(n => n.status === "pendente").reduce((s, n) => s + n.comissaoValor, 0)
-  const vendaRevendas = revendas.reduce((s, r) => s + r.venda, 0)
-  const comCusto = revendas.filter(r => r.custo != null && r.custo > 0)
-  const margemRevendas = comCusto.reduce((s, r) => s + r.venda - (r.custo ?? 0), 0)
-  const semCusto = revendas.filter(r => r.custo == null || r.custo <= 0)
+  const validas = linhas.filter(l => l.status !== "cancelado")
+  const recebido = validas.filter(l => l.status === "recebido" && l.ganho != null).reduce((s, l) => s + (l.ganho ?? 0), 0)
+  const aReceber = validas.filter(l => l.status === "receber").reduce((s, l) => s + (l.ganho ?? 0), 0)
+  const mesAtual = new Date().toISOString().slice(0, 7)
+  const ganhoMes = validas.filter(l => l.status === "recebido" && (parseData(l.data)?.toISOString().slice(0, 7) === mesAtual)).reduce((s, l) => s + (l.ganho ?? 0), 0)
+  const vendidoFora = validas.filter(l => l.tipo === "ganho").reduce((s, l) => s + l.venda, 0)
+  const semCusto = validas.filter(l => l.tipo === "ganho" && l.custo == null)
+
+  const visiveis = linhas.filter(l => filtro === "tudo" ? true : filtro === "receber" ? l.status === "receber" : l.tipo === filtro)
 
   // ── Oferta casada: quem já compra caixa e ainda não comprou a linha do parceiro ──
   const sugestoes = React.useMemo(() => {
@@ -98,16 +129,12 @@ export function ParceriasView({
     }
     const compradores = new Map<string, Set<string>>()
     const fonte = new Map<string, Set<string>>()
-    const add = (linha: string, cliente: string, parceiro: string) => {
+    for (const l of validas) {
+      if (!l.cliente) continue
+      const linha = linhaDe(`${l.produto} ${l.detalhe ?? ""}`, parceiros.find(p => p.nome === l.parceiro)?.categoria)
       if (!compradores.has(linha)) { compradores.set(linha, new Set()); fonte.set(linha, new Set()) }
-      compradores.get(linha)!.add(canonico(cliente))
-      if (parceiro && !/não informado/.test(parceiro)) fonte.get(linha)!.add(parceiro)
-    }
-    for (const r of revendas) add(linhaDe(r.produto), r.cliente, r.parceiro)
-    for (const n of comissoes) {
-      const p = parceiroPorId.get(n.parceiroId)
-      const cliente = (n.loteNumero && clienteDoLote.get(n.loteNumero)) || n.descricao.replace(/^pedido\s+/i, "")
-      add(linhaDe(`${n.descricao} ${n.parceiroNome}`, p?.categoria), cliente, n.parceiroNome)
+      compradores.get(linha)!.add(canonico(l.cliente))
+      if (l.parceiro && !/não informado/.test(l.parceiro)) fonte.get(linha)!.add(l.parceiro)
     }
     return [...compradores.entries()]
       .filter(([linha]) => linha !== "Outros itens de parceiro")
@@ -119,171 +146,178 @@ export function ParceriasView({
       }))
       .filter(s => s.oferecerPara.length > 0)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kanban, pedidos, negocios])
+  }, [kanban, pedidos, linhas])
 
   const telefone = (nome: string) => clientes.find(c => nomeChave(c.nome) === nomeChave(nome))?.telefone?.replace(/\D/g, "")
   const totalOportunidades = sugestoes.reduce((s, x) => s + x.oferecerPara.length, 0)
 
   // Resumo por parceiro
   const porParceiro = parceiros.map(p => {
-    const ns = validos.filter(n => n.parceiroId === p.id)
-    const com = ns.filter(n => n.tipo === "comissao").reduce((s, n) => s + n.comissaoValor, 0)
-    const rev = ns.filter(n => n.tipo === "ganho")
-    const ultimo = ns.map(n => n.dataOrcamento).filter(Boolean).sort().pop()
-    return { p, com, revVenda: rev.reduce((s, n) => s + n.valorVenda, 0), revGanho: rev.reduce((s, n) => s + n.comissaoValor, 0), qtd: ns.length, ultimo }
-  }).sort((a, b) => (b.com + b.revGanho) - (a.com + a.revGanho))
+    const ls = validas.filter(l => l.origem === "negocio" && l.negocio?.parceiroId === p.id)
+    const ultimo = ls.map(l => l.data).filter(Boolean).sort().pop()
+    return { p, ganho: ls.reduce((s, l) => s + (l.ganho ?? 0), 0), qtd: ls.length, ultimo }
+  }).sort((a, b) => b.ganho - a.ganho)
 
   const dataCurta = (iso?: string) => parseData(iso)?.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).replace(".", "") ?? "—"
+
+  const descreve = (l: Linha) => l.tipo === "ganho"
+    ? l.custo != null
+      ? `Ganho em cima · cliente pagou ${brl(l.venda)}, você pagou ${brl(l.custo)} a ${l.parceiro}`
+      : `Ganho em cima · vendido ${brl(l.venda)} · falta o custo de ${l.parceiro}`
+    : `Comissão ${num(l.perc, 1)}% sobre ${brl(l.venda)} vendidos por ${l.parceiro}`
 
   return (
     <div className="h-full overflow-y-auto" style={{ background: "var(--bg-page)" }}>
       <div className="max-w-[1320px] mx-auto px-6 pt-6 pb-10 space-y-4">
         <CabecalhoPagina
           titulo="Parceiros"
-          sub="Comissão: o parceiro vende ao cliente e te paga uma parte. Revenda: você compra pronto e fatura ao cliente."
-          acoes={<Segmentado<Aba> valor={aba} onChange={setAba} opcoes={[
-            { v: "visao", nome: "Visão geral" },
-            { v: "comissoes", nome: `Comissões ${comissoes.length}` },
-            { v: "revendas", nome: `Revendas ${revendas.length}` },
-            { v: "cadastro", nome: "Cadastro e lançamentos" },
-          ]} />}
+          sub="O que você ganha fora da caixa: frasco, essência, válvula, envase, adesivo…"
+          acoes={<div className="flex items-center gap-2 flex-wrap">
+            <Segmentado<Aba> valor={aba} onChange={setAba} opcoes={[
+              { v: "vendas", nome: `Vendas e comissões ${validas.length}` },
+              { v: "oferta", nome: `Oferta casada${totalOportunidades ? ` ${totalOportunidades}` : ""}` },
+              { v: "parceiros", nome: `Parceiros ${parceiros.length}` },
+              { v: "pedidos", nome: "Itens nos pedidos" },
+            ]} />
+            <Botao variante="primario" icone={<Plus className="w-3.5 h-3.5" />} onClick={() => setModal({})}>Registrar venda ou comissão</Botao>
+          </div>}
         />
 
-        {aba !== "cadastro" && (
-          <GradeKpis>
-            <Kpi rotulo="Comissões recebidas" icone={<Percent className="w-3.5 h-3.5" />} tom="sucesso" valor={comissaoRecebida} formato={brl}
-              sub={comissaoPendente > 0 ? `${brl(comissaoPendente)} a receber` : `${comissoes.length} indicações`} onClick={() => setAba("comissoes")} />
-            <Kpi rotulo="Vendido em revendas" icone={<Repeat className="w-3.5 h-3.5" />} tom="acento" valor={vendaRevendas} formato={brl}
-              sub={`${revendas.length} itens revendidos`} onClick={() => setAba("revendas")} />
-            <Kpi rotulo="Margem nas revendas" icone={<Package className="w-3.5 h-3.5" />} tom={semCusto.length ? "alerta" : "sucesso"}
-              valor={comCusto.length ? margemRevendas : null} formato={brl}
-              sub={semCusto.length ? `${semCusto.length} sem custo lançado` : "todas com custo"} onClick={() => setAba("revendas")} />
-            <Kpi rotulo="Parceiros ativos" icone={<Handshake className="w-3.5 h-3.5" />} valor={porParceiro.filter(x => x.qtd > 0).length} formato={n => num(Math.round(n))}
-              sub={`${parceiros.length} cadastrados`} onClick={() => setAba("cadastro")} />
-            <Kpi rotulo="Oportunidades" icone={<Lightbulb className="w-3.5 h-3.5" />} tom={totalOportunidades ? "info" : "neutro"} valor={totalOportunidades} formato={n => num(Math.round(n))}
-              sub="ofertas casadas sugeridas" />
-          </GradeKpis>
-        )}
+        <GradeKpis>
+          <Kpi rotulo="Ganho recebido" icone={<Wallet className="w-3.5 h-3.5" />} tom="sucesso" valor={recebido} formato={brl}
+            sub={`${brl(ganhoMes)} este mês`} onClick={() => { setAba("vendas"); setFiltro("tudo") }} />
+          <Kpi rotulo="A receber" icone={<Percent className="w-3.5 h-3.5" />} tom={aReceber > 0 ? "alerta" : "neutro"} valor={aReceber} formato={brl}
+            sub={`${validas.filter(l => l.status === "receber").length} pendentes`} onClick={() => { setAba("vendas"); setFiltro("receber") }} />
+          <Kpi rotulo="Vendido fora da caixa" icone={<Repeat className="w-3.5 h-3.5" />} tom="acento" valor={vendidoFora} formato={brl}
+            sub={semCusto.length ? `${semCusto.length} sem custo lançado` : "ganho em cima"} onClick={() => { setAba("vendas"); setFiltro("ganho") }} />
+          <Kpi rotulo="Oportunidades" icone={<Lightbulb className="w-3.5 h-3.5" />} tom={totalOportunidades ? "info" : "neutro"} valor={totalOportunidades} formato={n => num(Math.round(n))}
+            sub="clientes para oferecer" onClick={() => setAba("oferta")} />
+        </GradeKpis>
 
-        {aba === "visao" && (
-          <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-4 items-start ds-escalonado">
+        {aba === "vendas" && (
+          <div className="space-y-4 ds-entrada">
+            {/* Como registrar: os dois jeitos, com exemplo */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <button onClick={() => setModal({ tipo: "ganho" })} className="text-left rounded-xl bg-white ds-cartao px-4 py-3.5 hover:ring-2 hover:ring-[#8456e8]/20 transition-shadow">
+                <span className="flex items-center gap-2 text-[13px] font-semibold text-[#191625]"><Repeat className="w-4 h-4 text-[#8456e8]" />Ganho em cima<ArrowRight className="w-3.5 h-3.5 ml-auto text-[#898892]" /></span>
+                <span className="block text-[11.5px] text-[#5e5c68] mt-1">O cliente te pagou e você pagou o parceiro. Você fica com a diferença.</span>
+                <span className="block text-[11px] text-[#898892] mt-1">Ex.: 3.000 frascos, cliente pagou R$ 7.800, você pagou R$ 7.200 → ganho de R$ 600.</span>
+              </button>
+              <button onClick={() => setModal({ tipo: "comissao" })} className="text-left rounded-xl bg-white ds-cartao px-4 py-3.5 hover:ring-2 hover:ring-[#8456e8]/20 transition-shadow">
+                <span className="flex items-center gap-2 text-[13px] font-semibold text-[#191625]"><Percent className="w-4 h-4 text-[#8456e8]" />Comissão<ArrowRight className="w-3.5 h-3.5 ml-auto text-[#898892]" /></span>
+                <span className="block text-[11.5px] text-[#5e5c68] mt-1">O cliente pagou direto o parceiro e ele te repassa uma parte (em % ou valor fixo).</span>
+                <span className="block text-[11px] text-[#898892] mt-1">Ex.: indicou a essência, venda de R$ 8.000 do parceiro, 3% → comissão de R$ 240.</span>
+              </button>
+            </div>
+
             <Cartao padding={false}>
               <div className="px-5 pt-5">
-                <TituloCartao titulo="Oferta casada" icone={<Lightbulb className="w-4 h-4" />}
-                  sub={`Clientes que compraram caixa nos últimos ${DIAS_ATIVO} dias e ainda não compraram estes itens`} />
+                <TituloCartao titulo="Vendas e comissões" icone={<Handshake className="w-4 h-4" />}
+                  sub="Clique para editar. O ganho recebido entra no Financeiro como receita de parceria (Visão geral, Resultado e DRE)."
+                  acao={<Segmentado<Filtro> valor={filtro} onChange={setFiltro} opcoes={[
+                    { v: "tudo", nome: "Tudo" }, { v: "receber", nome: "A receber" }, { v: "ganho", nome: "Ganho em cima" }, { v: "comissao", nome: "Comissões" },
+                  ]} />} />
               </div>
-              <div className="px-2 pb-3 space-y-3">
-                {sugestoes.length === 0 && <Vazio icone={<Lightbulb className="w-8 h-8" />} titulo="Nenhuma sugestão agora" sub="Aparecem quando algum cliente compra um item de parceiro que outros ainda não compraram." />}
-                {sugestoes.map(s => (
-                  <div key={s.linha}>
-                    <div className="px-3 pb-1 flex items-center gap-2 flex-wrap">
-                      <p className="text-[12.5px] font-semibold text-[#191625]">{s.linha}</p>
-                      <Selo tom="neutro">{s.jaCompraram} {s.jaCompraram === 1 ? "cliente já compra" : "clientes já compram"}</Selo>
-                      {s.parceiros.length > 0 && <span className="text-[11px] text-[#898892]">via {s.parceiros.join(", ")}</span>}
-                    </div>
-                    {s.oferecerPara.slice(0, 6).map(c => {
-                      const tel = telefone(c.nome)
-                      return (
-                        <LinhaLista key={s.linha + c.chave} titulo={c.nome}
-                          sub={`${c.pedidos.length} ${c.pedidos.length === 1 ? "pedido" : "pedidos"} de caixa · ${brl(c.ltv)}`}
-                          onClick={() => onAbrirCliente(c.nome)}
-                          acao={tel ? (
-                            <a href={`https://wa.me/${tel.length <= 11 ? "55" + tel : tel}?text=${encodeURIComponent(`Olá! Além das caixas, também fornecemos ${s.linha.toLowerCase()}. Quer que eu mande um orçamento junto com o próximo pedido?`)}`}
-                              target="_blank" rel="noreferrer" title="Oferecer no WhatsApp"
-                              className="w-8 h-8 mr-1 rounded-lg flex items-center justify-center text-[#25a35a] hover:bg-[#25a35a]/10 transition-colors shrink-0">
-                              <MessageCircle className="w-4 h-4" />
-                            </a>
-                          ) : undefined} />
-                      )
-                    })}
-                    {s.oferecerPara.length > 6 && <p className="px-3 text-[11px] text-[#898892]">e mais {s.oferecerPara.length - 6} clientes</p>}
-                  </div>
+              <div className="px-2 pb-2 -mt-1">
+                {visiveis.length === 0 && <Vazio icone={<Handshake className="w-8 h-8" />} titulo="Nada aqui ainda" sub="Use “Registrar venda ou comissão” para lançar o que você ganhou com frasco, essência, válvula, envase…" />}
+                {visiveis.map(l => (
+                  <LinhaLista key={l.id}
+                    titulo={`${l.cliente || "Sem cliente"} · ${l.produto}${l.quantidade ? ` · ${num(l.quantidade)} un` : ""}${l.pedido ? ` · ${l.pedido}` : ""}`}
+                    sub={`${descreve(l)} · ${dataCurta(l.data)}${l.origem === "pedido" ? " · item do pedido" : ""}${l.detalhe ? ` · ${l.detalhe}` : ""}`}
+                    valor={l.ganho != null ? brl(l.ganho) : "—"}
+                    valorSub={l.status === "cancelado" ? "cancelado" : l.status === "recebido" ? "recebido" : "a receber"}
+                    tom={l.status === "cancelado" ? undefined : l.ganho == null ? "alerta" : l.status === "recebido" ? "sucesso" : "alerta"}
+                    icone={l.tipo === "ganho" ? <Repeat className="w-4 h-4" /> : <Percent className="w-4 h-4" />}
+                    onClick={() => l.negocio ? setModal({ inicial: l.negocio }) : setAba("pedidos")}
+                    acao={l.negocio && l.status === "receber" ? (
+                      <Botao className="h-7 px-2.5 text-[11.5px] mr-1" onClick={() => onUpdateNegocio({ ...l.negocio!, status: "pago" })}>Recebi</Botao>
+                    ) : undefined} />
                 ))}
               </div>
             </Cartao>
-
-            <div className="space-y-4">
-              <Cartao padding={false}>
-                <div className="px-5 pt-5">
-                  <TituloCartao titulo="Por parceiro" icone={<Users className="w-4 h-4" />} sub="O que cada um gerou para você"
-                    acao={<Botao variante="fantasma" className="h-7 px-2 text-[11.5px]" onClick={() => setAba("cadastro")}>Cadastro <ArrowRight className="w-3.5 h-3.5" /></Botao>} />
-                </div>
-                <div className="px-2 pb-2 -mt-1">
-                  {porParceiro.length === 0 && <Vazio icone={<Handshake className="w-8 h-8" />} titulo="Nenhum parceiro cadastrado" />}
-                  {porParceiro.map(x => (
-                    <LinhaLista key={x.p.id} titulo={x.p.nome}
-                      sub={[
-                        x.com > 0 ? `${brl(x.com)} em comissões` : null,
-                        x.revVenda > 0 ? `${brl(x.revVenda)} revendidos` : null,
-                        x.ultimo ? `último ${dataCurta(x.ultimo)}` : "sem negócios ainda",
-                      ].filter(Boolean).join(" · ")}
-                      valor={brl(x.com + x.revGanho)} valorSub="ganho" tom={x.com + x.revGanho > 0 ? "sucesso" : undefined}
-                      icone={<Handshake className="w-4 h-4" />} />
-                  ))}
-                </div>
-              </Cartao>
-
-              {semCusto.length > 0 && (
-                <Cartao>
-                  <TituloCartao titulo={`${semCusto.length} ${semCusto.length === 1 ? "revenda" : "revendas"} sem custo lançado`} icone={<AlertTriangle className="w-4 h-4" />}
-                    sub="Sem o custo do parceiro não dá para saber quanto você ganhou. Preencha na aba Revendas." />
-                  <Botao variante="secundario" onClick={() => setAba("revendas")}>Ver revendas <ArrowRight className="w-3.5 h-3.5" /></Botao>
-                </Cartao>
-              )}
-            </div>
           </div>
         )}
 
-        {aba === "comissoes" && (
+        {aba === "oferta" && (
           <Cartao padding={false} className="ds-entrada">
             <div className="px-5 pt-5">
-              <TituloCartao titulo="Comissões" icone={<Percent className="w-4 h-4" />}
-                sub="Indicações em que o parceiro vendeu e faturou direto ao cliente"
-                acao={<Botao variante="secundario" onClick={() => setAba("cadastro")}>Registrar comissão</Botao>} />
+              <TituloCartao titulo="Oferta casada" icone={<Lightbulb className="w-4 h-4" />}
+                sub={`Clientes que compraram caixa nos últimos ${DIAS_ATIVO} dias e ainda não compraram estes itens`} />
             </div>
-            <div className="px-2 pb-2 -mt-1">
-              {comissoes.length === 0 && <Vazio icone={<Percent className="w-8 h-8" />} titulo="Nenhuma comissão registrada" />}
-              {comissoes.map(n => (
-                <LinhaLista key={n.id} titulo={`${n.parceiroNome} · ${n.descricao}`}
-                  sub={`venda do parceiro ${brl(n.valorVenda)} · ${num(n.comissaoPerc, 1)}% · ${dataCurta(n.dataOrcamento)}`}
-                  valor={brl(n.comissaoValor)} valorSub={n.status === "pago" ? "recebida" : "a receber"}
-                  tom={n.status === "pago" ? "sucesso" : "alerta"} />
+            <div className="px-2 pb-3 space-y-3">
+              {sugestoes.length === 0 && <Vazio icone={<Lightbulb className="w-8 h-8" />} titulo="Nenhuma sugestão agora" sub="Aparecem quando algum cliente compra um item de parceiro que outros ainda não compraram." />}
+              {sugestoes.map(s => (
+                <div key={s.linha}>
+                  <div className="px-3 pb-1 flex items-center gap-2 flex-wrap">
+                    <p className="text-[12.5px] font-semibold text-[#191625]">{s.linha}</p>
+                    <Selo tom="neutro">{s.jaCompraram} {s.jaCompraram === 1 ? "cliente já compra" : "clientes já compram"}</Selo>
+                    {s.parceiros.length > 0 && <span className="text-[11px] text-[#898892]">via {s.parceiros.join(", ")}</span>}
+                  </div>
+                  {s.oferecerPara.slice(0, 8).map(c => {
+                    const tel = telefone(c.nome)
+                    return (
+                      <LinhaLista key={s.linha + c.chave} titulo={c.nome}
+                        sub={`${c.pedidos.length} ${c.pedidos.length === 1 ? "pedido" : "pedidos"} de caixa · ${brl(c.ltv)}`}
+                        onClick={() => onAbrirCliente(c.nome)}
+                        acao={tel ? (
+                          <a href={`https://wa.me/${tel.length <= 11 ? "55" + tel : tel}?text=${encodeURIComponent(`Olá! Além das caixas, também fornecemos ${s.linha.toLowerCase()}. Quer que eu mande um orçamento junto com o próximo pedido?`)}`}
+                            target="_blank" rel="noreferrer" title="Oferecer no WhatsApp"
+                            className="w-8 h-8 mr-1 rounded-lg flex items-center justify-center text-[#25a35a] hover:bg-[#25a35a]/10 transition-colors shrink-0">
+                            <MessageCircle className="w-4 h-4" />
+                          </a>
+                        ) : undefined} />
+                    )
+                  })}
+                  {s.oferecerPara.length > 8 && <p className="px-3 text-[11px] text-[#898892]">e mais {s.oferecerPara.length - 8} clientes</p>}
+                </div>
               ))}
             </div>
           </Cartao>
         )}
 
-        {aba === "revendas" && (
-          <div className="space-y-4 ds-entrada">
-            <Cartao padding={false}>
-              <div className="px-5 pt-5">
-                <TituloCartao titulo="Todas as revendas" icone={<Repeat className="w-4 h-4" />}
-                  sub="Itens comprados prontos de parceiros e faturados por você" />
-              </div>
-              <div className="px-2 pb-2 -mt-1">
-                {revendas.length === 0 && <Vazio icone={<Repeat className="w-8 h-8" />} titulo="Nenhuma revenda registrada" />}
-                {revendas.map(r => {
-                  const margem = r.custo != null && r.custo > 0 ? r.venda - r.custo : null
-                  return (
-                    <LinhaLista key={r.id} titulo={`${r.cliente}${r.pedido ? ` · ${r.pedido}` : ""}`}
-                      sub={`${r.produto} · ${r.parceiro}${r.origem === "pedido" ? " · item do pedido" : ""}`}
-                      valor={brl(r.venda)}
-                      valorSub={margem != null ? `ganho ${brl(margem)} (${num(margem / r.venda * 100, 0)}%)` : "sem custo lançado"}
-                      tom={margem == null ? "alerta" : undefined} />
-                  )
-                })}
-              </div>
-            </Cartao>
-            <div>
-              <p className="text-[13.5px] font-semibold text-[#191625] mb-1">Itens revendidos dentro dos pedidos</p>
-              <p className="text-[11.5px] text-[#898892] mb-3">Acompanhe a chegada do fornecedor e preencha quem forneceu e quanto custou.</p>
-              {itensRevenda}
+        {aba === "parceiros" && (
+          <Cartao padding={false} className="ds-entrada">
+            <div className="px-5 pt-5">
+              <TituloCartao titulo="Parceiros" icone={<Users className="w-4 h-4" />} sub="Quem fornece o que você vende fora da caixa e o que cada um já te gerou"
+                acao={<Botao icone={<Plus className="w-3.5 h-3.5" />} onClick={() => setModalParceiro(true)}>Novo parceiro</Botao>} />
             </div>
-          </div>
+            <div className="px-2 pb-2 -mt-1">
+              {porParceiro.length === 0 && <Vazio icone={<Handshake className="w-8 h-8" />} titulo="Nenhum parceiro cadastrado" sub="Também dá para cadastrar direto ao registrar uma venda." />}
+              {porParceiro.map(x => (
+                <LinhaLista key={x.p.id} titulo={x.p.nome}
+                  sub={[x.p.categoria, x.p.contato, x.p.comissaoDefault ? `comissão padrão ${num(x.p.comissaoDefault, 1)}%` : null,
+                    x.qtd ? `${x.qtd} ${x.qtd === 1 ? "registro" : "registros"} · último ${dataCurta(x.ultimo)}` : "sem registros ainda"].filter(Boolean).join(" · ")}
+                  valor={brl(x.ganho)} valorSub="ganho" tom={x.ganho > 0 ? "sucesso" : undefined}
+                  icone={<Package className="w-4 h-4" />}
+                  onClick={() => setModalParceiro(x.p)}
+                  acao={<span className="flex items-center mr-1">
+                    <button onClick={e => { e.stopPropagation(); setModalParceiro(x.p) }} className="w-8 h-8 rounded-lg grid place-items-center text-[#898892] hover:bg-black/5" aria-label="Editar"><Pencil className="w-3.5 h-3.5" /></button>
+                    <button onClick={e => { e.stopPropagation(); if (x.qtd ? confirm(`${x.p.nome} tem ${x.qtd} registros. Excluir mesmo assim? (os registros ficam)`) : confirm(`Excluir ${x.p.nome}?`)) onDeleteParceiro(x.p.id) }}
+                      className="w-8 h-8 rounded-lg grid place-items-center text-[#898892] hover:text-[#d33a3c] hover:bg-[#d33a3c]/[0.06]" aria-label="Excluir"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </span>} />
+              ))}
+            </div>
+          </Cartao>
         )}
 
-        {aba === "cadastro" && <div className="ds-entrada">{cadastro}</div>}
+        {aba === "pedidos" && (
+          <div className="ds-entrada">
+            <p className="text-[13.5px] font-semibold text-[#191625] mb-1">Itens revendidos dentro dos pedidos</p>
+            <p className="text-[11.5px] text-[#898892] mb-3">Itens de parceiro que entraram num pedido de caixa (marcados como terceirizados). Preencha quem forneceu e quanto custou para o ganho aparecer.</p>
+            {itensRevenda}
+          </div>
+        )}
       </div>
+
+      {modal && (
+        <ModalVenda inicial={modal.inicial} tipoInicial={modal.tipo} parceiros={parceiros} clientes={nomesClientes} lotes={lotes}
+          onSalvar={n => modal.inicial ? onUpdateNegocio(n) : onAddNegocio(n)}
+          onNovoParceiro={onAddParceiro} onExcluir={onDeleteNegocio} onFechar={() => setModal(null)} />
+      )}
+      {modalParceiro && (
+        <ModalParceiro inicial={modalParceiro === true ? undefined : modalParceiro}
+          onSave={p => modalParceiro === true ? onAddParceiro(p) : onUpdateParceiro(p)} onClose={() => setModalParceiro(null)} />
+      )}
     </div>
   )
 }

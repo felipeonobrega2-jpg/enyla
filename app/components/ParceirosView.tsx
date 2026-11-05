@@ -39,7 +39,7 @@ function pill(text: string, cls: string) {
 }
 
 // ─── Modal Parceiro ─────────────────────────────────────────────────────────
-function ModalParceiro({ inicial, onSave, onClose }: {
+export function ModalParceiro({ inicial, onSave, onClose }: {
   inicial?: Parceiro
   onSave: (p: Parceiro) => void
   onClose: () => void

@@ -381,4 +381,7 @@ export type NegocioParceiro = {
   loteId?: string
   loteNumero?: string
   statusLote?: StatusLoteParceiro
+  nomeCliente?: string     // para quem você vendeu
+  produto?: string         // frasco, essência, válvula, envase, adesivo…
+  quantidade?: number
 }

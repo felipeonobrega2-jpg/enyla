@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
+import { faltaColuna, semColunasNovas } from "@/app/lib/negociosDb"
+
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    await supabase.from("NegocioParceiro").upsert({
+    const linha = {
       id:             body.id,
       parceiroId:     body.parceiroId,
       parceiroNome:   body.parceiroNome,
@@ -21,7 +23,13 @@ export async function POST(req: NextRequest) {
       loteNumero:     body.loteNumero ?? null,
       statusLote:     body.statusLote ?? null,
       criadoEm:       body.criadoEm,
-    }, { onConflict: "id" })
+      nomeCliente:    body.nomeCliente ?? null,
+      produto:        body.produto ?? null,
+      quantidade:     body.quantidade ?? null,
+    }
+    let { error } = await supabase.from("NegocioParceiro").upsert(linha, { onConflict: "id" })
+    if (faltaColuna(error)) ({ error } = await supabase.from("NegocioParceiro").upsert(semColunasNovas(linha), { onConflict: "id" }))
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)

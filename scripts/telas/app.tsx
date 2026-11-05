@@ -28,6 +28,8 @@ import { EntregasView } from "@/app/components/EntregasView"
 import { AvisoWhatsapp } from "@/app/components/AvisoWhatsapp"
 import { PedidosUnificadoView } from "@/app/components/PedidosUnificadoView"
 import AgenteLeadsCard from "@/app/components/AgenteLeadsCard"
+import { ParceriasView } from "@/app/components/ParceriasView"
+import { ModalVenda } from "@/app/components/parceiros/ModalVenda"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas } from "@/app/components/WhatsAppView"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
@@ -155,6 +157,19 @@ function Telas() {
     case "caixa": return pagina(<CaixaView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onUpdateConfig={setCfg} onAddLancamento={l => setLancs(p => [l, ...p])} />)
     case "config": return <ThemeProvider><div style={{ height: "100vh" }}><ConfigView config={cfg} onSave={setCfg} onExportar={() => {}} onImportar={() => {}} clientes={["Cliente Relacionamento", "Outro Cliente"]} /></div></ThemeProvider>
     case "lancamento": return <ModalLancamento inicial={{ tipo: "despesa", descricao: "Impressão + Papel", valor: 3100 }} kanban={dados.kanban} onSave={() => {}} onClose={() => {}} />
+    case "parceiros": case "parceiros-modal": {
+      const parc = [{ id: "p1", nome: "Jeferson Vidros", categoria: "Vidros", comissaoDefault: 3, criadoEm: "" }, { id: "p2", nome: "Marcelino", categoria: "Impressão", comissaoDefault: 0, criadoEm: "" }, { id: "p3", nome: "Denis Essências", categoria: "Essências", comissaoDefault: 0, criadoEm: "" }]
+      const negs = [
+        { id: "n1", parceiroId: "p1", parceiroNome: "Jeferson Vidros", descricao: "Frasco", produto: "Frasco", nomeCliente: "Raniere Péricles", tipo: "comissao" as const, valorVenda: 8286, comissaoPerc: 3, comissaoValor: 248.58, dataOrcamento: "2026-10-20", status: "pago" as const, criadoEm: "" },
+        { id: "n2", parceiroId: "p3", parceiroNome: "Denis Essências", descricao: "Essência importada 6 fragrâncias", produto: "Essência", nomeCliente: "Camilo", quantidade: 6, tipo: "ganho" as const, valorVenda: 1620, valorCusto: 1380, comissaoPerc: 17.4, comissaoValor: 240, dataOrcamento: "2026-11-04", status: "pendente" as const, criadoEm: "" },
+        { id: "n3", parceiroId: "p2", parceiroNome: "Marcelino", descricao: "Sacola", produto: "Sacola", nomeCliente: "BellaLiz", tipo: "ganho" as const, valorVenda: 400, valorCusto: 280, comissaoPerc: 42.9, comissaoValor: 120, dataOrcamento: "2026-11-02", status: "pago" as const, criadoEm: "" },
+      ]
+      return <div style={{ height: "100vh" }}>
+        <ParceriasView parceiros={parc} negocios={negs} kanban={dados.kanban} lancamentos={[]} clientes={[]} lotes={[]} itensRevenda={<div />} onAbrirCliente={() => {}}
+          onAddParceiro={() => {}} onUpdateParceiro={() => {}} onDeleteParceiro={() => {}} onAddNegocio={() => {}} onUpdateNegocio={() => {}} onDeleteNegocio={() => {}} />
+        {tela === "parceiros-modal" && <ModalVenda inicial={negs[1]} parceiros={parc} clientes={["Camilo"]} onSalvar={() => {}} onNovoParceiro={() => {}} onFechar={() => {}} />}
+      </div>
+    }
     case "agente": return pagina(<div className="max-w-[860px]"><AgenteLeadsCard onFiltro={() => {}} /></div>)
     case "metatoken": return pagina(<div className="space-y-4">
       <PainelToken status={{ hasToken: true, valido: false, erro: "O token já venceu.", canAutoRefresh: false }} expirou novo="" setNovo={() => {}} salvando={false} onSalvar={() => {}} msg={null} />
