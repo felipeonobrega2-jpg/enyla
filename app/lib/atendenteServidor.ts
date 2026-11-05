@@ -80,7 +80,7 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
   if (audios.length) await transcreverPendentes({ ids: audios }, 6).catch(() => null)
 
   const [{ data: conv }, { data: msgs }, { data: cards }, { data: primeira }] = await Promise.all([
-    supabase.from("whatsapp_conversas").select("jid, nome").eq("jid", jid).maybeSingle(),
+    supabase.from("whatsapp_conversas").select("jid, nome, campanha").eq("jid", jid).maybeSingle(),
     supabase.from("whatsapp_mensagens").select("id, from_me, corpo, tipo, ts").eq("jid", jid).order("ts", { ascending: false }).limit(50),
     supabase.from("KanbanCard").select("numero, nomeCliente, coluna, preco, quantidade, dimensoes, data"),
     supabase.from("whatsapp_mensagens").select("ts").eq("jid", jid).order("ts", { ascending: true }).limit(1).maybeSingle(),
@@ -98,6 +98,12 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
   const contexto = cli
     ? `Cliente cadastrado: ${cli.nome}. ${doCliente.length ? "Orçamentos/pedidos: " + doCliente.map(c => `${c.numero} (${c.coluna === 11 ? "negociando" : COLUNAS_KANBAN[c.coluna] ?? "?"}, ${c.quantidade} un, ${c.dimensoes}, R$ ${c.preco})`).join("; ") : "Sem orçamentos ainda."}`
     : "Contato ainda não ligado a um cliente do cadastro (provável lead novo)."
+  // Contato novo, sem nada seu antes: é lead (quase sempre do anúncio), mesmo que a primeira mensagem seja vaga
+  const doAnuncio = typeof conv?.campanha === "string" && conv.campanha.includes("anuncio")
+  const novo = !mensagens.some(m => m.from_me) && !!primeira?.ts && Date.now() - new Date(primeira.ts).getTime() < 4 * 86_400_000
+  const origem = novo
+    ? `\nContato novo: é a primeira conversa dele com o Felipe${doAnuncio ? " e veio do anúncio" : " (os contatos novos quase sempre vêm do anúncio)"}. É lead: qualquer mensagem vaga ("blz", "oi", "ok", figurinha, áudio curto) é primeiro contato — mande a primeira mensagem do filtro, com pode_enviar_sozinho true.`
+    : doAnuncio ? "\nO contato veio do anúncio." : ""
 
   const historico = mensagens.map(m => {
     const quando = new Date(m.ts).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
@@ -142,7 +148,7 @@ Regras que nunca quebram:
     model: MODELO, max_tokens: 4000, ...FALLBACK,
     output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
     system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-    messages: [{ role: "user", content: `${contexto}\n\nConversa (mais antiga primeiro):\n<conversa>\n${historico}\n</conversa>\n\nPrepare a próxima mensagem do Felipe.` }],
+    messages: [{ role: "user", content: `${contexto}${origem}\n\nConversa (mais antiga primeiro):\n<conversa>\n${historico}\n</conversa>\n\nPrepare a próxima mensagem do Felipe.` }],
   })
   if (r.stop_reason === "refusal") return { ok: false, erro: "A IA não pôde responder a esse pedido.", status: 422 }
   const texto = r.content.flatMap(b => b.type === "text" ? [b.text] : []).join("")

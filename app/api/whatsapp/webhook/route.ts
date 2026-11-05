@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server"
 import { transcreverPendentes } from "@/app/lib/transcricao"
 import { registrarConexao, registrarRecibos, registrarContatos } from "@/app/lib/whatsappEventos"
 import { gravarLote, WaMessage, deveIgnorar, extractBody } from "@/app/lib/whatsappDados"
+import { supabase } from "@/app/lib/supabase"
 import { responderSozinho, talvezFollowUps } from "@/app/lib/agenteAuto"
 
 // Espera do modo automático (o lead termina de digitar) + resposta da IA + envio
@@ -27,6 +28,12 @@ export async function POST(req: NextRequest) {
       const data = body.data as WaMessage
       const novas = new Set<string>()
       await gravarLote([data], { contarNaoLidas: true, novas })
+      // Clique no anúncio (o WhatsApp marca a primeira mensagem): grava a origem na hora, sem esperar a classificação do dia.
+      // Só uma dica para o funil e para o agente; nada do payload é usado além disso.
+      if (data?.key?.id && novas.has(data.key.id) && !data.key.fromMe && /externalAdReply|conversionSource|"ctwa/i.test(JSON.stringify(data))) {
+        const { data: salva } = await supabase.from("whatsapp_mensagens").select("jid").eq("id", data.key.id).maybeSingle()
+        if (salva?.jid) await supabase.from("whatsapp_conversas").update({ campanha: JSON.stringify({ canal: "anuncio" }) }).eq("jid", salva.jid).is("campanha", null)
+      }
       // Áudio novo: transcreve depois de responder ao Evolution (não atrasa o recebimento)
       if (data?.message?.audioMessage && data.key?.id) after(() => transcreverPendentes({ ids: [data.key.id] }).catch(() => {}))
       // Agente de leads no modo automático (desligado por padrão; ele mesmo confere as travas)
