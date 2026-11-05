@@ -6,6 +6,7 @@ import {
   MessageCircle, Percent, Plus, Receipt, TrendingUp, Truck, Users, Wallet, CheckCircle2, ArrowRight, Target, Trophy, Eye, MessageCircleHeart, Star, RotateCcw, Megaphone,
 } from "lucide-react"
 import { EnviarWhatsapp, Envio } from "./EnviarWhatsapp"
+import { HojeCard } from "./HojeCard"
 import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COL_HOT, AprovacaoOnline } from "../types"
 import { Configuracoes } from "../config"
 import {
@@ -58,7 +59,7 @@ type Detalhe = { titulo: string; sub?: string; linhas: React.ReactNode; destino?
 
 export function PainelView({
   kanban, lancamentos, historico, propostasCustom, clientes, config,
-  onAbrirCard, onAbrirCliente, onNavegar, onNovoOrcamento, onLancarCobranca, onSalvarMeta, onAprovacaoOnline,
+  onAbrirCard, onAbrirCliente, onNavegar, onNovoOrcamento, onLancarCobranca, onSalvarMeta, onAprovacaoOnline, onAbrirConversa,
 }: {
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
@@ -68,11 +69,12 @@ export function PainelView({
   config: Configuracoes
   onAbrirCard: (card: KanbanCard) => void
   onAbrirCliente: (nome: string) => void
-  onNavegar: (view: "orcamentos" | "pedidos" | "financeiro" | "fornecedores" | "clientes" | "meta" | "whatsapp") => void
+  onNavegar: (view: "orcamentos" | "pedidos" | "financeiro" | "fornecedores" | "clientes" | "meta" | "whatsapp" | "config") => void
   onNovoOrcamento: () => void
   onLancarCobranca?: (prefill: Partial<LancamentoFinanceiro>) => void
   onSalvarMeta?: (metaMensal: number) => void
   onAprovacaoOnline?: (a: AprovacaoOnline) => void
+  onAbrirConversa?: (jid: string) => void
 }) {
   const [periodoId, setPeriodoId] = React.useState<PeriodoId>("mes")
   const [detalhe, setDetalhe] = React.useState<Detalhe | null>(null)
@@ -267,6 +269,8 @@ export function PainelView({
           <Botao variante="primario" icone={<Plus className="w-4 h-4" />} onClick={onNovoOrcamento}>Novo orçamento</Botao>
         </>}
       />
+
+      {onAbrirConversa && <HojeCard onAbrirConversa={onAbrirConversa} onNavegar={onNavegar} />}
 
       <GradeKpis>
         <Kpi rotulo="Vendido" icone={<TrendingUp className="w-3.5 h-3.5" />} tom="acento" destaque

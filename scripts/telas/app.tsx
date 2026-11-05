@@ -30,6 +30,7 @@ import { PedidosUnificadoView } from "@/app/components/PedidosUnificadoView"
 import AgenteLeadsCard from "@/app/components/AgenteLeadsCard"
 import ContatosProtegidosCard from "@/app/components/ContatosProtegidosCard"
 import ReativacaoCard from "@/app/components/ReativacaoCard"
+import { HojeCard } from "@/app/components/HojeCard"
 import MarketingRelatorio from "@/app/components/MarketingRelatorio"
 import { ParceriasView } from "@/app/components/ParceriasView"
 import { ModalVenda } from "@/app/components/parceiros/ModalVenda"
@@ -78,6 +79,21 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     { em: new Date().toISOString(), jid: "2@lid", nome: "Marcio", perfil: "icp", enviou: false, texto: "Show! Vou preparar o seu orçamento.", motivo: "precisa de você (decisao_sua)" },
     { em: new Date().toISOString(), jid: "3@lid", nome: "Bia", perfil: "indefinido", enviou: true, passo: "F1", texto: "Oi! Conseguiu ver a quantidade?", motivo: "F1: sem resposta" },
   ], taxas: [{ passo: "Resposta", enviados: 42, responderam: 29 }, { passo: "F1", enviados: 18, responderam: 6 }, { passo: "F2", enviados: 9, responderam: 2 }, { passo: "F3", enviados: 5, responderam: 1 }] }))
+  if (u.startsWith("/api/hoje")) {
+    const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
+    return new Response(JSON.stringify({
+      responder: [
+        { jid: "9@lid", nome: "Essências Exemplo", mensagem: "Oi! Ainda quero sim, dá pra atualizar pra 5 mil?", desde: h(40), rotulo: "Retomada", retomada: true },
+        { jid: "1@lid", nome: "Perfumaria Modelo", mensagem: "Preciso de 3 mil caixinhas de 50ml com hot stamping", desde: h(190), rotulo: "ICP", retomada: false },
+        { jid: "2@lid", nome: "Aroma Teste", mensagem: "Vocês fazem frasco também?", desde: h(75), rotulo: "Oportunidade", retomada: false },
+        { jid: "3@lid", nome: "Cosméticos Fictícia", mensagem: "Umas 1.500, por aí", desde: h(12), rotulo: "Lead médio", retomada: false },
+      ],
+      outrosEsperando: 17,
+      anuncio: { leads: 41, mql: 5, semClassificar: 29, descartados: 7 },
+      marketing: { dia: "2026-11-04", acao: "Leve os 12 MQL para orçamento hoje e mantenha a verba até ver se o custo por MQL se sustenta.", custoMql: 12.91 },
+      reativacao: { ligado: false, porDia: 4, hoje: 0, fila: 30 },
+    }))
+  }
   if (u.startsWith("/api/marketing")) {
     const L = (o: Record<string, unknown>) => ({ id: "c1", nome: "Caixinhas para perfume (teste)", gasto: 0, impressoes: 0, cliques: 0, conversasMeta: 0, leads: 0, mql: 0, descartados: 0, semClassificar: 0, orcamentos: 0, pedidos: 0, faturamento: 0, ...o })
     return new Response(JSON.stringify({ relatorios: [{ dia: "2026-11-04", geradoEm: new Date().toISOString(),
@@ -198,6 +214,7 @@ function Telas() {
         {tela === "parceiros-modal" && <ModalVenda inicial={negs[1]} parceiros={parc} clientes={["Camilo"]} onSalvar={() => {}} onNovoParceiro={() => {}} onFechar={() => {}} />}
       </div>
     }
+    case "hoje": case "hoje-m": return pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} /></div>)
     case "marketing": case "marketing-m": return pagina(<div className="max-w-[1100px]"><MarketingRelatorio /></div>)
     case "reativacao": return pagina(<div className="max-w-[860px]"><ReativacaoCard /></div>)
     case "contatos": return pagina(<div className="max-w-[860px]"><ContatosProtegidosCard /></div>)

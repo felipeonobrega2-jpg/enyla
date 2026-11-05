@@ -225,7 +225,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
           </Cartao>
 
           <AgenteLeadsCard filtro={draft.filtroLeads} onFiltro={t => setDraft(d => ({ ...d, filtroLeads: t }))} />
-          <ReativacaoCard />
+          <div id="reativacao" className="scroll-mt-4"><ReativacaoCard /></div>
 
           <ContatosProtegidosCard />
 
