@@ -11,6 +11,7 @@ import { Segmentado } from "./ds"
 import { FilaMensagens } from "./FilaMensagens"
 import { montarFila, AvisoPedido } from "../lib/filaMensagens"
 import { Atendimento, DadosPedido, ROTULO_ALERTA, temDados } from "../lib/atendente"
+import { LeadAvaliado, ROTULO_PERFIL } from "../lib/agenteLeads"
 import { useGravador, useMicrofones, tempo, extensaoAudio } from "../lib/gravador"
 import { filtrar, preencher, Rapida } from "../lib/mensagensRapidas"
 import { COL_HOT } from "../types"
@@ -1470,6 +1471,11 @@ function SugestaoAtendente({ estado, onUsar, onOrcamento, compacto }: {
               <AlertCircle className="w-3 h-3" />{ROTULO_ALERTA[at.alerta]}
             </span>
           )}
+          {(() => { const l = (at as (Atendimento & { lead?: LeadAvaliado }) | null)?.lead; return l && l.perfil !== "nao_lead" && (
+            <span title={l.motivo} className="text-[10px] font-bold uppercase px-1.5 py-px rounded" style={l.perfil === "icp" ? { background: "rgba(0,147,81,0.12)", color: "#009351" } : l.perfil === "pequeno" ? { background: "rgba(116,116,128,0.12)", color: "var(--text-sub)" } : { background: "rgba(132,86,232,0.12)", color: "#8456e8" }}>
+              {ROTULO_PERFIL[l.perfil]}{l.quantidade_total ? ` · ${l.quantidade_total.toLocaleString("pt-BR")}` : ""}
+            </span>
+          ) })()}
           {at?.sugere_video && <span className="text-[10px] font-semibold flex items-center gap-1" style={{ color: "var(--text-faint)" }}><Video className="w-3 h-3" />vale mandar vídeo</span>}
           <span className="ml-auto flex items-center gap-0.5">
             {!carregando && <button onClick={gerar} title="Gerar outra" className="text-[11px] px-2 h-6 rounded-md hover:bg-black/5" style={{ color: "var(--text-sub)" }}>Outra</button>}

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { transcreverPendentes } from "@/app/lib/transcricao"
 import { registrarConexao, registrarRecibos, registrarContatos } from "@/app/lib/whatsappEventos"
-import { gravarLote, WaMessage } from "@/app/lib/whatsappDados"
+import { gravarLote, WaMessage, deveIgnorar, extractBody } from "@/app/lib/whatsappDados"
+import { responderSozinho } from "@/app/lib/agenteAuto"
+
+// Espera do modo automático (o lead termina de digitar) + resposta da IA + envio
+export const maxDuration = 60
 
 // ── Handler principal ─────────────────────────────────────────────────────
 
@@ -22,6 +26,8 @@ export async function POST(req: NextRequest) {
       await gravarLote([data], { contarNaoLidas: true })
       // Áudio novo: transcreve depois de responder ao Evolution (não atrasa o recebimento)
       if (data?.message?.audioMessage && data.key?.id) after(() => transcreverPendentes({ ids: [data.key.id] }).catch(() => {}))
+      // Agente de leads no modo automático (desligado por padrão; ele mesmo confere as travas)
+      if (data?.key?.id && !data.key.fromMe && !deveIgnorar(data.key.remoteJid ?? "") && ["text", "audio", "image", "video", "document"].includes(extractBody(data).tipo)) after(() => responderSozinho(data.key.id).catch(e => console.error("[agente]", e)))
       return NextResponse.json({ ok: true })
     }
 

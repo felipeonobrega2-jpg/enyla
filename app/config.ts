@@ -99,6 +99,8 @@ export type Configuracoes = {
   pluggyStatus?: import("./lib/bancoServidor").StatusPluggy  // última sincronização (gravado pelo servidor)
   regrasBanco?: import("./lib/banco").RegraBanco[]           // aprendidas com as suas correções (gravado pelo servidor)
   guiaAtendimento?: string                                 // como você conversa: a IA lê antes de sugerir mensagens
+  filtroLeads?: string                                     // quem é ICP e como filtrar os leads: o agente lê antes de responder
+  agenteAuto?: import("./lib/agenteLeads").AgenteAuto      // modo automático do agente de leads
   avisosPedido?: Record<string, import("./lib/filaMensagens").AvisoPedido>  // último aviso de produção mandado por pedido
   filaDispensados?: Record<string, string>                 // itens da fila já enviados/dispensados (id → quando)
   ideias?: Ideia[]                                         // anotações para implementar depois

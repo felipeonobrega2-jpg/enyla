@@ -27,6 +27,7 @@ import { FilaMensagens } from "@/app/components/FilaMensagens"
 import { EntregasView } from "@/app/components/EntregasView"
 import { AvisoWhatsapp } from "@/app/components/AvisoWhatsapp"
 import { PedidosUnificadoView } from "@/app/components/PedidosUnificadoView"
+import AgenteLeadsCard from "@/app/components/AgenteLeadsCard"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas } from "@/app/components/WhatsAppView"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
@@ -67,6 +68,10 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       c("5511977776666@s.whatsapp.net", "Raniere Péricles", "Bom dia, chegou?", 0.02, 0.5),
     ]))
   }
+  if (u.startsWith("/api/whatsapp/agente")) return new Response(JSON.stringify({ auto: { ligado: false }, log: [
+    { em: new Date().toISOString(), jid: "1@lid", nome: "Camilo", perfil: "pequeno", enviou: true, texto: "Pô, essa quantidade a gente não roda porque é offset…", motivo: "100 unidades no total" },
+    { em: new Date().toISOString(), jid: "2@lid", nome: "Marcio", perfil: "icp", enviou: false, texto: "Show! Vou preparar o seu orçamento.", motivo: "precisa de você (decisao_sua)" },
+  ] }))
   if (u.startsWith("/api/banco/sugerir")) return new Response(JSON.stringify({ feitas: 0, restantes: 0 }))
   if (u.startsWith("/api/banco/aprendizado")) return new Response(JSON.stringify({
     regras: [{ chave: "papelaria bras", tipo: "saida", acao: "lancar", categoria: "materiais", descricao: "Papel", vezes: 3 }, { chave: "ifood", tipo: "saida", acao: "ignorar", vezes: 2 }],
@@ -149,6 +154,7 @@ function Telas() {
     case "caixa": return pagina(<CaixaView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onUpdateConfig={setCfg} onAddLancamento={l => setLancs(p => [l, ...p])} />)
     case "config": return <ThemeProvider><div style={{ height: "100vh" }}><ConfigView config={cfg} onSave={setCfg} onExportar={() => {}} onImportar={() => {}} clientes={["Cliente Relacionamento", "Outro Cliente"]} /></div></ThemeProvider>
     case "lancamento": return <ModalLancamento inicial={{ tipo: "despesa", descricao: "Impressão + Papel", valor: 3100 }} kanban={dados.kanban} onSave={() => {}} onClose={() => {}} />
+    case "agente": return pagina(<div className="max-w-[860px]"><AgenteLeadsCard onFiltro={() => {}} /></div>)
     case "metatoken": return pagina(<div className="space-y-4">
       <PainelToken status={{ hasToken: true, valido: false, erro: "O token já venceu.", canAutoRefresh: false }} expirou novo="" setNovo={() => {}} salvando={false} onSalvar={() => {}} msg={null} />
       <PainelToken status={{ hasToken: true, valido: true, daysLeft: 5, canAutoRefresh: false }} expirou={false} novo="" setNovo={() => {}} salvando={false} onSalvar={() => {}} msg={null} />

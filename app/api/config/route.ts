@@ -4,10 +4,10 @@ import { supabase } from "@/app/lib/supabase"
 // Campos gravados só pelo servidor (renovação do token da Meta, aprovações online dos clientes). A tela envia a
 // configuração inteira que carregou; sem isto, salvar qualquer ajuste regravaria
 // um token antigo por cima do renovado.
-const CAMPOS_DO_SERVIDOR = ["metaToken", "metaTokenExpiry", "metaTokenTipo", "metaTokenValido", "metaTokenErro", "metaTokenVerificadoEm", "metaContaId", "metaContaEscolhida", "metaContas", "aprovacoesOnline", "avaliacoes", "visitasProposta", "groqKey", "whatsappConexao", "enderecosClientes", "apelidosWhatsapp", "lalamoveCarteira", "lalamoveEventos", "lalamoveServicos", "pluggyStatus", "regrasBanco", "licoesBanco", "exemplosBanco"] as const
+const CAMPOS_DO_SERVIDOR = ["metaToken", "metaTokenExpiry", "metaTokenTipo", "metaTokenValido", "metaTokenErro", "metaTokenVerificadoEm", "metaContaId", "metaContaEscolhida", "metaContas", "aprovacoesOnline", "avaliacoes", "visitasProposta", "groqKey", "whatsappConexao", "enderecosClientes", "apelidosWhatsapp", "lalamoveCarteira", "lalamoveEventos", "lalamoveServicos", "pluggyStatus", "regrasBanco", "licoesBanco", "exemplosBanco", "agenteLog", "agenteAuto"] as const
 
 // Campos novos que uma aba aberta antes deles existirem não conhece: se não vierem, mantém o que está salvo
-const MANTER_SE_AUSENTE = ["guiaAtendimento", "avisosPedido", "filaDispensados"] as const
+const MANTER_SE_AUSENTE = ["guiaAtendimento", "avisosPedido", "filaDispensados", "filtroLeads"] as const
 
 export async function POST(req: NextRequest) {
   try {
