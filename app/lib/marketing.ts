@@ -12,7 +12,8 @@ export type LinhaCampanha = {
   leads: number               // conversas que chegaram do anúncio no período (pelo sistema)
   mql: number                 // bons negócios (ICP, lead médio, oportunidade)
   descartados: number         // lead pequeno
-  semClassificar: number      // ainda sem volume / sem resposta
+  sumiram?: number            // não respondeu nem aos follow-ups (etiqueta "Sem resposta"); relatórios antigos não têm
+  semClassificar: number      // ainda em conversa, sem dizer o volume
   orcamentos: number
   pedidos: number
   faturamento: number         // valor dos pedidos fechados
@@ -32,21 +33,24 @@ export type Relatorio = {
 
 export const SEM_CAMPANHA = "sem-campanha"
 
-// Qualidade do lead pelo que o agente (ou você) marcou
-export function qualidadeDoLead(c: { status_lead: string | null; etiquetas: string[] | null }): "mql" | "descartado" | "aberto" {
+// Qualidade do lead pelo que o agente (ou você) marcou. "Sumiu" = não respondeu nem aos follow-ups: separado de
+// "aberto" (ainda conversando) para o custo por MQL não esconder quem nunca ia responder.
+export function qualidadeDoLead(c: { status_lead: string | null; etiquetas: string[] | null }): "mql" | "descartado" | "sumiu" | "aberto" {
   const et = c.etiquetas ?? []
   if (c.status_lead === "mql" || et.some(e => ["MQL", "ICP", "Lead médio", "Oportunidade"].includes(e))) return "mql"
-  if (c.status_lead === "descartado" || et.some(e => ["Descartado", "Lead pequeno"].includes(e))) return "descartado"
+  if (et.some(e => ["Descartado", "Lead pequeno"].includes(e))) return "descartado"
+  if (et.includes("Sem resposta")) return "sumiu"
+  if (c.status_lead === "descartado") return "descartado"
   return "aberto"
 }
 
 export const linhaVazia = (id: string, nome: string): LinhaCampanha =>
-  ({ id, nome, gasto: 0, impressoes: 0, cliques: 0, conversasMeta: 0, leads: 0, mql: 0, descartados: 0, semClassificar: 0, orcamentos: 0, pedidos: 0, faturamento: 0 })
+  ({ id, nome, gasto: 0, impressoes: 0, cliques: 0, conversasMeta: 0, leads: 0, mql: 0, descartados: 0, sumiram: 0, semClassificar: 0, orcamentos: 0, pedidos: 0, faturamento: 0 })
 
 export function total(linhas: LinhaCampanha[]): LinhaCampanha {
   const t = linhaVazia("total", "Total")
-  for (const l of linhas) for (const k of ["gasto", "impressoes", "cliques", "conversasMeta", "leads", "mql", "descartados", "semClassificar", "orcamentos", "pedidos", "faturamento"] as const) t[k] += l[k]
-  return t
+  for (const l of linhas) for (const k of ["gasto", "impressoes", "cliques", "conversasMeta", "leads", "mql", "descartados", "sumiram", "semClassificar", "orcamentos", "pedidos", "faturamento"] as const) t[k] = (t[k] ?? 0) + (l[k] ?? 0)
+  return t as Required<LinhaCampanha>
 }
 
 // Custo por algo (null quando não houve nenhum: "sem MQL" é diferente de custo zero)
@@ -80,7 +84,7 @@ const dm = (dia: string) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`
 export function numerosParaIA(r: Pick<Relatorio, "dia" | "dia1" | "semana" | "semanaAnterior">) {
   const bloco = (titulo: string, linhas: LinhaCampanha[]) => {
     const t = total(linhas)
-    return [`${titulo}: gasto ${brl(t.gasto)}, ${t.cliques} cliques, ${t.conversasMeta} conversas (Meta), ${t.leads} leads no WhatsApp, ${t.mql} MQL, ${t.descartados} descartados, ${t.semClassificar} sem classificar, ${t.orcamentos} orçamentos, ${t.pedidos} pedidos (${brl(t.faturamento)}).`,
+    return [`${titulo}: gasto ${brl(t.gasto)}, ${t.cliques} cliques, ${t.conversasMeta} conversas (Meta), ${t.leads} leads no WhatsApp, ${t.mql} MQL, ${t.descartados} descartados, ${t.sumiram} sumiram (não responderam nem aos follow-ups), ${t.semClassificar} ainda conversando sem dizer o volume, ${t.orcamentos} orçamentos, ${t.pedidos} pedidos (${brl(t.faturamento)}).`,
       ...linhas.filter(l => l.gasto || l.leads).map(l => `- ${l.nome}: gasto ${brl(l.gasto)}, ${l.cliques} cliques, ${l.conversasMeta} conversas (Meta), ${l.leads} leads, ${l.mql} MQL, ${l.descartados} descartados, ${l.orcamentos} orçamentos, ${l.pedidos} pedidos (${brl(l.faturamento)})${custoPor(l.gasto, l.mql) != null ? `, custo por MQL ${brl(custoPor(l.gasto, l.mql)!)}` : ""}`)].join("\n")
   }
   return [bloco(`Dia ${dm(r.dia)}`, r.dia1), bloco(`Últimos 7 dias`, r.semana), bloco(`7 dias anteriores`, r.semanaAnterior)].join("\n\n")

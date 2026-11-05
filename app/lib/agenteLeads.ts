@@ -252,3 +252,34 @@ export function soAbertura(msgs: { from_me: boolean; corpo: string | null; tipo:
 
 // Sem crédito na Anthropic (mensagem da API): o agente avisa você e segue só com o que não precisa de IA
 export const ehSemCredito = (erro: string) => /credit balance is too low|billing/i.test(erro)
+
+// ── Marcos por conversa: o que as regras precisam lembrar por semanas ─────────
+// O registro (agenteLog) guarda só os últimos eventos, para a tela; com o volume do anúncio ele cobre ~1 dia.
+// Follow-up (14 dias), reativação (45 dias) e "já orientou o lead pequeno" leem daqui.
+export type MarcoConversa = {
+  em: string                                         // último evento do agente nesta conversa
+  passos?: Record<string, string>                    // F1/F2/F3/Sem resposta (tentado), Reativação/Pequeno (enviado), Respondeu → quando
+  segurou?: { em: string; motivo: string } | null    // resposta que o agente deixou para você (some quando ele envia)
+}
+export type Marcos = Record<string, MarcoConversa>
+export const DIAS_MARCO = 15
+export const DIAS_MARCO_REATIVACAO = 46
+
+export function marcar(m: Marcos, r: RegistroAgente, agora = Date.now()): Marcos {
+  const out: Marcos = {}
+  for (const [jid, x] of Object.entries(m)) {
+    const reativ = x.passos?.["Reativação"]
+    if (agora - new Date(x.em).getTime() < DIAS_MARCO * 86_400_000 || (reativ && agora - new Date(reativ).getTime() < DIAS_MARCO_REATIVACAO * 86_400_000)) out[jid] = x
+  }
+  const e: MarcoConversa = { ...(out[r.jid] ?? {}), em: r.em, passos: { ...(out[r.jid]?.passos ?? {}) } }
+  const p = r.passo
+  if (p && /^F\d$|^Sem resposta$|^Respondeu$/.test(p)) e.passos![p] = r.em
+  if (p === "Reativação" && r.enviou) e.passos!["Reativação"] = r.em
+  if (r.enviou && r.perfil === "pequeno") e.passos!["Pequeno"] = r.em
+  if (!p) e.segurou = r.enviou ? null : { em: r.em, motivo: r.motivo.slice(0, 80) }
+  out[r.jid] = e
+  return out
+}
+
+// Primeira vez: monta a partir do registro que existe (do mais velho para o mais novo)
+export const marcosDoRegistro = (log: RegistroAgente[], agora = Date.now()) => [...log].reverse().reduce((m, r) => marcar(m, r, agora), {} as Marcos)

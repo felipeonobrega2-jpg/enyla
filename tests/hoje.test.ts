@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { quemResponder, doAnuncio, haQuanto, ConvHoje } from "../app/lib/hoje"
+import { marcosDoRegistro } from "../app/lib/agenteLeads"
 
 const agora = new Date("2026-11-05T14:00:00Z").getTime()
 const h = (horas: number) => new Date(agora - horas * 3_600_000).toISOString()
@@ -15,7 +16,7 @@ describe("quemResponder", () => {
       conv({ jid: "b" }),
       conv({ jid: "c", etiquetas: ["Lead pequeno"] }),
       conv({ jid: "d", etiquetas: ["MQL"], ultima_enviada_at: h(0.5) }),   // você já respondeu
-    ], [], agora)
+    ], {}, agora)
     expect(r.responder.map(x => x.jid)).toEqual(["a"])
     expect(r.responder[0].rotulo).toBe("ICP")
     expect(r.outros).toBe(1)
@@ -25,13 +26,13 @@ describe("quemResponder", () => {
     const r = quemResponder([
       conv({ jid: "a", status_lead: "mql", ultima_recebida_at: h(5), ultima_enviada_at: h(6) }),
       conv({ jid: "b", ultima_recebida_at: h(1) }),
-    ], [{ em: h(1), jid: "b", nome: null, perfil: "icp", enviou: false, texto: "", motivo: "", passo: "Respondeu" }], agora)
+    ], marcosDoRegistro([{ em: h(1), jid: "b", nome: null, perfil: "icp", enviou: false, texto: "", motivo: "", passo: "Respondeu" }], agora), agora)
     expect(r.responder.map(x => x.jid)).toEqual(["b", "a"])
     expect(r.responder[0].retomada).toBe(true)
   })
 
   it("resposta à retomada de mais de 7 dias não conta", () => {
-    const r = quemResponder([conv({ jid: "b" })], [{ em: h(24 * 8), jid: "b", nome: null, perfil: "icp", enviou: false, texto: "", motivo: "", passo: "Respondeu" }], agora)
+    const r = quemResponder([conv({ jid: "b" })], marcosDoRegistro([{ em: h(24 * 8), jid: "b", nome: null, perfil: "icp", enviou: false, texto: "", motivo: "", passo: "Respondeu" }], agora), agora)
     expect(r.responder).toEqual([])
   })
 })
@@ -57,4 +58,46 @@ it("dadosDaConversa lê o que a IA guardou e tolera lixo", async () => {
   expect(dadosDaConversa(JSON.stringify({ r: { dados: { quantidade: 3000 } } }))?.quantidade).toBe(3000)
   expect(dadosDaConversa("{quebrado")).toBeNull()
   expect(dadosDaConversa(null)).toBeNull()
+})
+
+describe("segurado para você", () => {
+  const reg = (o: Record<string, unknown>) => ({ em: h(0.5), jid: "x", nome: null, perfil: "indefinido" as const, enviou: false, texto: "", motivo: "precisa de você (desconto)", ...o })
+  it("lead sem etiqueta que o agente segurou entra, com o motivo", () => {
+    const r = quemResponder([conv({ jid: "x", ultima_recebida_at: h(1), ultima_enviada_at: h(2) })], marcosDoRegistro([reg({})], agora), agora)
+    expect(r.responder[0]).toMatchObject({ jid: "x", rotulo: "Para você", porque: "precisa de você (desconto)" })
+  })
+  it("nada a responder, follow-up ou decisão velha (antes da mensagem nova) não contam", () => {
+    const c = [conv({ jid: "x", ultima_recebida_at: h(1), ultima_enviada_at: h(2) })]
+    expect(quemResponder(c, marcosDoRegistro([reg({ motivo: "nada a responder" })], agora), agora).responder).toEqual([])
+    expect(quemResponder(c, marcosDoRegistro([reg({ passo: "F1" })], agora), agora).responder).toEqual([])
+    expect(quemResponder(c, marcosDoRegistro([reg({ em: h(3) })], agora), agora).responder).toEqual([])
+  })
+})
+
+it("qualidade: sem resposta vira sumiu, mas lead pequeno continua descartado", async () => {
+  const { qualidadeDoLead } = await import("../app/lib/marketing")
+  expect(qualidadeDoLead({ status_lead: "descartado", etiquetas: ["Sem resposta"] })).toBe("sumiu")
+  expect(qualidadeDoLead({ status_lead: null, etiquetas: ["Lead pequeno", "Sem resposta"] })).toBe("descartado")
+  expect(qualidadeDoLead({ status_lead: "mql", etiquetas: ["Sem resposta"] })).toBe("mql")
+})
+
+describe("marcar (marcos duráveis do agente)", () => {
+  const r = (o: Record<string, unknown>) => ({ em: h(1), jid: "x", nome: null, perfil: "indefinido" as const, enviou: true, texto: "", motivo: "", ...o })
+  it("guarda passos, retomada enviada, lead pequeno e o que segurou", async () => {
+    const { marcar } = await import("../app/lib/agenteLeads")
+    let m = marcar({}, r({ passo: "F1", enviou: false }), agora)
+    m = marcar(m, r({ passo: "Reativação", enviou: false, em: h(0.9) }), agora)
+    expect(m.x.passos).toEqual({ F1: h(1) })
+    m = marcar(m, r({ passo: "Reativação", em: h(0.8) }), agora)
+    m = marcar(m, r({ perfil: "pequeno", em: h(0.7) }), agora)
+    m = marcar(m, r({ enviou: false, motivo: "precisa de você (desconto)", em: h(0.6) }), agora)
+    expect(m.x.passos).toEqual({ F1: h(1), "Reativação": h(0.8), Pequeno: h(0.7) })
+    expect(m.x.segurou?.motivo).toBe("precisa de você (desconto)")
+    expect(marcar(m, r({ em: h(0.5) }), agora).x.segurou).toBeNull()
+  })
+  it("esquece depois de 15 dias, menos quem recebeu retomada (45)", async () => {
+    const { marcar } = await import("../app/lib/agenteLeads")
+    const velho = { velho: { em: h(24 * 20) }, retomado: { em: h(24 * 20), passos: { "Reativação": h(24 * 20) } }, antigo: { em: h(24 * 50), passos: { "Reativação": h(24 * 50) } } }
+    expect(Object.keys(marcar(velho, r({}), agora)).sort()).toEqual(["retomado", "x"])
+  })
 })

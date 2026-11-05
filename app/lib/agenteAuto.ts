@@ -13,6 +13,7 @@ import { textoAvisoReativacao } from "./reativacao"
 import {
   AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, filtroEfetivo,
   organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, ehSemCredito, proximoFollowUp, horarioDeFollowUp, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE, ETIQUETAS_AGENTE,
+  marcar, marcosDoRegistro, Marcos,
 } from "./agenteLeads"
 
 const DIAS_CONVERSA_NOVA = 4
@@ -22,7 +23,7 @@ const MAX_REGISTROS = 300
 const MIN_ENTRE_RODADAS = 10         // follow-ups: no máximo uma rodada a cada 10 min
 
 export type Registro = RegistroAgente & { ids?: string[] }
-export type CfgAgente = { agenteAuto?: AgenteAuto; agenteLog?: Registro[]; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string; agenteSemCreditoEm?: string }
+export type CfgAgente = { agenteAuto?: AgenteAuto; agenteLog?: Registro[]; agenteMarcos?: Marcos; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string; agenteSemCreditoEm?: string }
 export type Conversa = { jid: string; nome: string | null; telefone: string | null; etiquetas: string[] | null; status_lead: string | null }
 
 export async function lerCfg() { return await lerConfigAtendente() as Awaited<ReturnType<typeof lerConfigAtendente>> & CfgAgente }
@@ -37,7 +38,10 @@ export async function gravarCfg(mudar: (d: Record<string, unknown> & CfgAgente) 
 export const registrar = (r: Registro) => gravarCfg(d => {
   const defs = [...(d.etiquetasWhatsapp ?? [])]
   for (const [nome, cor] of Object.entries(COR_ETIQUETA_AGENTE)) if (!defs.some(e => e.nome === nome)) defs.push({ nome, cor })
-  return { etiquetasWhatsapp: defs, agenteLog: [r, ...(d.agenteLog ?? [])].slice(0, MAX_REGISTROS) }
+  return {
+    etiquetasWhatsapp: defs, agenteLog: [r, ...(d.agenteLog ?? [])].slice(0, MAX_REGISTROS),
+    agenteMarcos: marcar(d.agenteMarcos ?? marcosDoRegistro(d.agenteLog ?? []), r),
+  }
 })
 
 export const lerConversa = async (jid: string) =>
@@ -177,10 +181,10 @@ async function voceNaConversa(jid: string, log: Registro[]) {
   return (minhas ?? []).some(m => !idsDoAgente.has(m.id) && !ehMensagemAutomaticaDoWhatsapp(m.corpo))
 }
 
-const contexto = (cfg: CfgAgente, log: Registro[]) => ({
+const contexto = (cfg: CfgAgente, log: Registro[], jid: string) => ({
   enviadasHoje: log.filter(l => l.enviou && new Date(l.em).getTime() > Date.now() - 86_400_000).length,
   maxPorDia: cfg.agenteAuto?.maxPorDia ?? 6,
-  jaEncerrouPequeno: log.some(l => l.enviou && l.perfil === "pequeno"),
+  jaEncerrouPequeno: log.some(l => l.enviou && l.perfil === "pequeno") || !!cfg.agenteMarcos?.[jid]?.passos?.["Pequeno"],
   precosDoFiltro: valoresEmReais(filtroEfetivo(cfg.filtroLeads)),
 })
 
@@ -248,7 +252,7 @@ export async function responderSozinho(msgId: string) {
 
   const trava = travaDoEnvio({
     ligado: true, resposta: r.resposta, alerta: r.alerta, podeSozinho: r.pode_enviar_sozinho, lead: r.lead,
-    conversaNova, clienteCadastrado: conversa.clienteCadastrado, manualRecente, emMql: false, ...contexto(cfg, log),
+    conversaNova, clienteCadastrado: conversa.clienteCadastrado, manualRecente, emMql: false, ...contexto(cfg, log, jid),
   })
   // Lead pequeno só vai para Descartado depois de orientado (senão sumiria da sua lista sem resposta)
   const organiza = !conversa.clienteCadastrado && r.lead.perfil !== "nao_lead"
@@ -300,10 +304,11 @@ export async function responderSozinho(msgId: string) {
 
 // Respondeu a uma retomada (reativação): volta para MQL, fica não lida no seu celular e você recebe o aviso (uma vez)
 async function respondeuRetomada(cfg: CfgAgente, c: Conversa, msgId: string) {
-  const log = (cfg.agenteLog ?? []).filter(l => l.jid === c.jid)
-  const retomada = log.find(l => l.passo === "Reativação" && l.enviou)
-  if (!retomada || Date.now() - new Date(retomada.em).getTime() > 30 * 86_400_000) return
-  if (log.some(l => l.passo === "Respondeu" && l.em > retomada.em)) return
+  const passos = cfg.agenteMarcos?.[c.jid]?.passos ?? {}
+  const retomadaEm = passos["Reativação"]
+  if (!retomadaEm || Date.now() - new Date(retomadaEm).getTime() > 30 * 86_400_000) return
+  if (passos["Respondeu"] && passos["Respondeu"] > retomadaEm) return
+  const retomada = { perfil: (cfg.agenteLog ?? []).find(l => l.jid === c.jid && l.passo === "Reativação")?.perfil ?? "icp" as const }
   const atual = (await lerConversa(c.jid)) ?? c
   const etiquetas = [...new Set([...(atual.etiquetas ?? []), ETIQUETAS_AGENTE.mql])]
   await aplicar(atual, etiquetas, "mql")
@@ -333,12 +338,12 @@ export async function talvezFollowUps() {
 export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
   // Só leads que o agente já atendeu (estão no registro) e não descartados. No MQL (seu) ele só etiqueta, não envia.
   // Quem recebeu retomada fica fora: é contato antigo (o agente não responde) e quem cobra é você
-  const retomados = new Set((cfg.agenteLog ?? []).filter(l => l.passo === "Reativação").map(l => l.jid))
-  const jidsDoAgente = [...new Set((cfg.agenteLog ?? []).map(l => l.jid))].filter(j => !retomados.has(j))
+  const marcos = cfg.agenteMarcos ?? marcosDoRegistro(cfg.agenteLog ?? [])
+  const jidsDoAgente = Object.entries(marcos).filter(([, m]) => !m.passos?.["Reativação"]).sort((a, b) => b[1].em.localeCompare(a[1].em)).map(([j]) => j)
   if (!jidsDoAgente.length) return
   const { data } = await supabase.from("whatsapp_conversas")
     .select("jid, nome, telefone, etiquetas, status_lead, ultima_recebida_at, ultima_enviada_at, fechada_em")
-    .in("jid", jidsDoAgente.slice(0, 300))
+    .in("jid", jidsDoAgente.slice(0, 600))
     .not("ultima_enviada_at", "is", null)
     .gte("ultima_enviada_at", new Date(Date.now() - DIAS_FOLLOW_UP * 86_400_000).toISOString())
   const candidatos = (data ?? []).filter(c =>
@@ -346,7 +351,7 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     && (!c.ultima_recebida_at || c.ultima_recebida_at < c.ultima_enviada_at))
     .map(c => ({ c: c as Conversa, enviada: c.ultima_enviada_at as string, passo: proximoFollowUp(c.etiquetas ?? [], (Date.now() - new Date(c.ultima_enviada_at).getTime()) / 3_600_000) }))
     // já tentou este passo depois da sua última mensagem (e segurou): não tenta de novo
-    .filter(x => x.passo && !(cfg.agenteLog ?? []).some(l => l.jid === x.c.jid && l.em > x.enviada && l.passo === (x.passo!.tipo === "encerrar" ? "Sem resposta" : `F${x.passo!.nivel}`)))
+    .filter(x => x.passo && !((marcos[x.c.jid]?.passos?.[x.passo!.tipo === "encerrar" ? "Sem resposta" : `F${x.passo!.nivel}`] ?? "") > x.enviada))
     .slice(0, 3)   // cabe no minuto da Vercel; o resto vai na próxima rodada
 
   await Promise.all(candidatos.map(async ({ c, passo }) => {
@@ -369,7 +374,7 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     const trava = travaDoEnvio({
       ligado: true, resposta: r.resposta, alerta: r.alerta, podeSozinho: r.pode_enviar_sozinho, lead: r.lead,
       conversaNova: recente, clienteCadastrado: conversa.clienteCadastrado, manualRecente: await voceNaConversa(c.jid, log), emMql: false,
-      ...contexto(cfg, log),
+      ...contexto(cfg, log, c.jid),
     })
     const dados = { ...base, perfil: r.lead.perfil, texto: r.resposta, passo: `F${nivel}` }
     if (trava) return registrar({ ...dados, enviou: false, motivo: `F${nivel} segurado: ${trava}` })

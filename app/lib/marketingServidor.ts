@@ -84,6 +84,7 @@ function juntar(meta: Map<string, LinhaCampanha>, leads: Lead[], p: Periodo): Li
     linha.leads++
     if (l.qualidade === "mql") linha.mql++
     else if (l.qualidade === "descartado") linha.descartados++
+    else if (l.qualidade === "sumiu") linha.sumiram = (linha.sumiram ?? 0) + 1
     else linha.semClassificar++
     if (l.orcamentos) linha.orcamentos++
     if (l.pedidos) linha.pedidos++
@@ -115,7 +116,7 @@ Como ele qualifica os leads (resumo do filtro dele):
 ${filtro.slice(0, 2500)}
 </filtro>
 
-Escreva em português, direto, como um sócio que entende do negócio. Use só os números dados; não invente nada. "Sem classificar" são leads que ainda não disseram volume. Poucos dias e números pequenos variam muito: não tire conclusão forte de 1 ou 2 leads, e diga quando a amostra é pequena. Pedidos demoram semanas para fechar: não cobre pedido de lead de ontem.`,
+Escreva em português, direto, como um sócio que entende do negócio. Use só os números dados; não invente nada. "Sumiram" não responderam nem aos follow-ups (lead do anúncio que não leu); "ainda conversando" são os que falam mas não disseram o volume. Poucos dias e números pequenos variam muito: não tire conclusão forte de 1 ou 2 leads, e diga quando a amostra é pequena. Pedidos demoram semanas para fechar: não cobre pedido de lead de ontem.`,
     messages: [{ role: "user", content: `${numerosParaIA(r)}\n\nEscreva a leitura de marketing do dia.` }],
   })
   const texto = resp.content.flatMap(b => b.type === "text" ? [b.text] : []).join("")

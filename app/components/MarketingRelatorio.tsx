@@ -103,7 +103,8 @@ export default function MarketingRelatorio() {
           </div>
           <div className="flex items-center gap-2 flex-wrap mb-4 text-[11px] text-[#898892]">
             <Selo tom="neutro">{t.descartados} descartados (pequenos)</Selo>
-            <Selo tom="alerta">{t.semClassificar} sem classificar</Selo>
+            <Selo tom="neutro">{t.sumiram} sumiram (sem resposta)</Selo>
+            <Selo tom="alerta">{t.semClassificar} conversando sem dizer volume</Selo>
             <span>A Meta contou {t.conversasMeta} conversas iniciadas.</span>
           </div>
 

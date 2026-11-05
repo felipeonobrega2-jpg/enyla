@@ -5,6 +5,7 @@ import { candidatos, enviadasHoje, CfgReativacao } from "@/app/lib/reativacaoSer
 import { POR_DIA_PADRAO } from "@/app/lib/reativacao"
 import { DIAS_PERDIDO } from "@/app/lib/funilWhatsapp"
 import { total, custoPor, Relatorio } from "@/app/lib/marketing"
+import { marcosDoRegistro } from "@/app/lib/agenteLeads"
 import { quemResponder, doAnuncio, ConvHoje, Hoje } from "@/app/lib/hoje"
 
 // Painel → Hoje: bons negócios esperando você, o que o anúncio trouxe em 24 h, a ação do relatório e a reativação.
@@ -19,7 +20,7 @@ export async function GET() {
   ])
   if (error) return NextResponse.json({ erro: error.message }, { status: 500 })
   const convs = (data ?? []) as ConvHoje[]
-  const { responder, outros } = quemResponder(convs, cfg.agenteLog ?? [], Date.now(), cfg.vinculosWhatsapp)
+  const { responder, outros } = quemResponder(convs, cfg.agenteMarcos ?? marcosDoRegistro(cfg.agenteLog ?? []), Date.now(), cfg.vinculosWhatsapp)
   const rel = (cfg.marketingRelatorios ?? [])[0]
   const t = rel ? total(rel.dia1) : null
   const auto = cfg.reativacaoAuto ?? { ligado: false, porDia: POR_DIA_PADRAO }

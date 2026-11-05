@@ -64,6 +64,7 @@ export async function candidatos(cfg?: Cfg): Promise<Candidato[]> {
     historicos(),
   ])
   const ultimaRetomada = new Map<string, string>()
+  for (const [jid, m] of Object.entries(cfg.agenteMarcos ?? {})) if (m.passos?.["Reativação"]) ultimaRetomada.set(jid, m.passos["Reativação"])
   for (const l of cfg.agenteLog ?? []) if (l.passo === "Reativação" && l.enviou && !ultimaRetomada.has(l.jid)) ultimaRetomada.set(l.jid, l.em)
   const out: Candidato[] = []
   for (const c of data ?? []) {
@@ -107,7 +108,8 @@ export async function pular(jid: string) {
 
 export const enviadasHoje = (cfg: CfgAgente) => {
   const hoje = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
-  return (cfg.agenteLog ?? []).filter(l => l.passo === "Reativação" && l.enviou && new Date(l.em).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) === hoje).length
+  const dia = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
+  return Object.values(cfg.agenteMarcos ?? {}).filter(m => m.passos?.["Reativação"] && dia(m.passos["Reativação"]) === hoje).length
 }
 
 // Chamado a cada evento do webhook: no horário, se ligado e se já passou o intervalo, manda UMA retomada
