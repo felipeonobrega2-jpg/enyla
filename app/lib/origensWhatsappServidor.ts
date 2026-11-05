@@ -65,10 +65,10 @@ export async function classificarOrigens() {
   for (const [jid, m] of primeira) {
     const e = entradaDaMensagem(m.corpo)
     if (!e) continue
-    if (e.canal !== "anuncio") { origens.set(jid, { canal: e.canal }); continue }
+    if (e.canal !== "anuncio") { origens.set(jid, { canal: e.canal, entrada: m.ts }); continue }
     const dia = new Date(m.ts).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
     const c = campanhaDoDia(dia, candidatas.get(e.frase) ?? [], porDia, nomes)
-    origens.set(jid, c ? { canal: "anuncio", ...c } : { canal: "anuncio" })
+    origens.set(jid, c ? { canal: "anuncio", ...c, entrada: m.ts } : { canal: "anuncio", entrada: m.ts })
   }
   for (const [jid, o] of origens) await supabase.from("whatsapp_conversas").update({ campanha: JSON.stringify(o) }).eq("jid", jid)
 

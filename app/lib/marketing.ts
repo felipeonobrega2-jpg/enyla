@@ -1,0 +1,108 @@
+// Agente de marketing: o anúncio até o dinheiro, por campanha. Gasto e cliques vêm da Meta; leads, qualidade
+// (MQL, descartado), orçamentos e pedidos vêm do sistema. A IA lê os números e escreve o que fazer.
+// Aqui só as regras puras; marketingServidor busca, monta, pede a leitura e guarda.
+
+export type LinhaCampanha = {
+  id: string                  // id da campanha na Meta ("sem-campanha" = veio do anúncio, campanha ainda não identificada)
+  nome: string
+  gasto: number
+  impressoes: number
+  cliques: number
+  conversasMeta: number       // conversas iniciadas, segundo a Meta
+  leads: number               // conversas que chegaram do anúncio no período (pelo sistema)
+  mql: number                 // bons negócios (ICP, lead médio, oportunidade)
+  descartados: number         // lead pequeno
+  semClassificar: number      // ainda sem volume / sem resposta
+  orcamentos: number
+  pedidos: number
+  faturamento: number         // valor dos pedidos fechados
+}
+
+export type Periodo = { de: string; ate: string }   // datas YYYY-MM-DD (São Paulo)
+
+export type Relatorio = {
+  dia: string                 // o dia analisado (ontem, quando gerado de manhã)
+  geradoEm: string
+  dia1: LinhaCampanha[]       // o dia
+  semana: LinhaCampanha[]     // últimos 7 dias (até o dia)
+  semanaAnterior: LinhaCampanha[]
+  leitura?: { resumo: string; destaques: string[]; acao: string } | null
+  erroLeitura?: string
+}
+
+export const SEM_CAMPANHA = "sem-campanha"
+
+// Qualidade do lead pelo que o agente (ou você) marcou
+export function qualidadeDoLead(c: { status_lead: string | null; etiquetas: string[] | null }): "mql" | "descartado" | "aberto" {
+  const et = c.etiquetas ?? []
+  if (c.status_lead === "mql" || et.some(e => ["MQL", "ICP", "Lead médio", "Oportunidade"].includes(e))) return "mql"
+  if (c.status_lead === "descartado" || et.some(e => ["Descartado", "Lead pequeno"].includes(e))) return "descartado"
+  return "aberto"
+}
+
+export const linhaVazia = (id: string, nome: string): LinhaCampanha =>
+  ({ id, nome, gasto: 0, impressoes: 0, cliques: 0, conversasMeta: 0, leads: 0, mql: 0, descartados: 0, semClassificar: 0, orcamentos: 0, pedidos: 0, faturamento: 0 })
+
+export function total(linhas: LinhaCampanha[]): LinhaCampanha {
+  const t = linhaVazia("total", "Total")
+  for (const l of linhas) for (const k of ["gasto", "impressoes", "cliques", "conversasMeta", "leads", "mql", "descartados", "semClassificar", "orcamentos", "pedidos", "faturamento"] as const) t[k] += l[k]
+  return t
+}
+
+// Custo por algo (null quando não houve nenhum: "sem MQL" é diferente de custo zero)
+export const custoPor = (gasto: number, n: number) => (n > 0 ? gasto / n : null)
+
+// Variação em % (null sem base)
+export const variacao = (agora: number, antes: number) => (antes > 0 ? (agora - antes) / antes : null)
+
+// Datas em São Paulo
+export const diaSP = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
+export function somarDias(dia: string, n: number) {
+  const d = new Date(`${dia}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+export const periodos = (dia: string) => ({
+  dia1: { de: dia, ate: dia },
+  semana: { de: somarDias(dia, -6), ate: dia },
+  semanaAnterior: { de: somarDias(dia, -13), ate: somarDias(dia, -7) },
+})
+export const dentro = (iso: string | null | undefined, p: Periodo) => {
+  if (!iso) return false
+  const d = diaSP(new Date(iso))
+  return d >= p.de && d <= p.ate
+}
+
+const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: n < 100 ? 2 : 0 })
+const dm = (dia: string) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`
+
+// Números que a IA lê (texto curto e exato; ela não inventa nada além disso)
+export function numerosParaIA(r: Pick<Relatorio, "dia" | "dia1" | "semana" | "semanaAnterior">) {
+  const bloco = (titulo: string, linhas: LinhaCampanha[]) => {
+    const t = total(linhas)
+    return [`${titulo}: gasto ${brl(t.gasto)}, ${t.cliques} cliques, ${t.conversasMeta} conversas (Meta), ${t.leads} leads no WhatsApp, ${t.mql} MQL, ${t.descartados} descartados, ${t.semClassificar} sem classificar, ${t.orcamentos} orçamentos, ${t.pedidos} pedidos (${brl(t.faturamento)}).`,
+      ...linhas.filter(l => l.gasto || l.leads).map(l => `- ${l.nome}: gasto ${brl(l.gasto)}, ${l.cliques} cliques, ${l.conversasMeta} conversas (Meta), ${l.leads} leads, ${l.mql} MQL, ${l.descartados} descartados, ${l.orcamentos} orçamentos, ${l.pedidos} pedidos (${brl(l.faturamento)})${custoPor(l.gasto, l.mql) != null ? `, custo por MQL ${brl(custoPor(l.gasto, l.mql)!)}` : ""}`)].join("\n")
+  }
+  return [bloco(`Dia ${dm(r.dia)}`, r.dia1), bloco(`Últimos 7 dias`, r.semana), bloco(`7 dias anteriores`, r.semanaAnterior)].join("\n\n")
+}
+
+// Resumo que vai no seu WhatsApp (o relatório completo fica na página Campanhas)
+export function textoResumoWhatsapp(r: Relatorio, link: string) {
+  const t = total(r.dia1), s = total(r.semana)
+  const cpm = custoPor(t.gasto, t.mql), cpmS = custoPor(s.gasto, s.mql)
+  return [
+    `📊 *Marketing de ontem (${dm(r.dia)})*`,
+    `Gasto ${brl(t.gasto)} · ${t.leads} leads · *${t.mql} MQL*${cpm != null ? ` (${brl(cpm)} cada)` : ""}`,
+    t.pedidos ? `${t.pedidos} pedido${t.pedidos > 1 ? "s" : ""} · ${brl(t.faturamento)}` : null,
+    `7 dias: ${brl(s.gasto)} · ${s.leads} leads · ${s.mql} MQL${cpmS != null ? ` (${brl(cpmS)} cada)` : ""}`,
+    r.leitura?.resumo ? `\n${r.leitura.resumo}` : null,
+    r.leitura?.acao ? `👉 ${r.leitura.acao}` : null,
+    `\n${link}`,
+  ].filter(Boolean).join("\n")
+}
+
+// Gera de manhã (depois das 9h15, quando a verificação diária já identificou a campanha de cada conversa)
+export function horaDoRelatorio(d = new Date()) {
+  const [h, m] = d.toLocaleTimeString("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).split(":").map(Number)
+  return h * 60 + m >= 9 * 60 + 15
+}

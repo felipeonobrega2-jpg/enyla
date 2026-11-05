@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { DollarSign, BarChart2, MousePointer, Users, TrendingDown, Target } from "lucide-react"
+import MarketingRelatorio from "./MarketingRelatorio"
 
 interface Props {
   isDark?: boolean
@@ -394,6 +395,9 @@ export default function MetaAdsView({ isDark = false, faturamentoPorCampanha = {
           <p className="text-[12px] mt-1 opacity-80">{error}</p>
         </div>
       )}
+
+      {/* Agente de marketing: funil do anúncio ao pedido + leitura da IA */}
+      <MarketingRelatorio />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-3 gap-3 lg:grid-cols-6">

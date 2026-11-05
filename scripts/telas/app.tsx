@@ -30,6 +30,7 @@ import { PedidosUnificadoView } from "@/app/components/PedidosUnificadoView"
 import AgenteLeadsCard from "@/app/components/AgenteLeadsCard"
 import ContatosProtegidosCard from "@/app/components/ContatosProtegidosCard"
 import ReativacaoCard from "@/app/components/ReativacaoCard"
+import MarketingRelatorio from "@/app/components/MarketingRelatorio"
 import { ParceriasView } from "@/app/components/ParceriasView"
 import { ModalVenda } from "@/app/components/parceiros/ModalVenda"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas } from "@/app/components/WhatsAppView"
@@ -77,6 +78,15 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     { em: new Date().toISOString(), jid: "2@lid", nome: "Marcio", perfil: "icp", enviou: false, texto: "Show! Vou preparar o seu orçamento.", motivo: "precisa de você (decisao_sua)" },
     { em: new Date().toISOString(), jid: "3@lid", nome: "Bia", perfil: "indefinido", enviou: true, passo: "F1", texto: "Oi! Conseguiu ver a quantidade?", motivo: "F1: sem resposta" },
   ], taxas: [{ passo: "Resposta", enviados: 42, responderam: 29 }, { passo: "F1", enviados: 18, responderam: 6 }, { passo: "F2", enviados: 9, responderam: 2 }, { passo: "F3", enviados: 5, responderam: 1 }] }))
+  if (u.startsWith("/api/marketing")) {
+    const L = (o: Record<string, unknown>) => ({ id: "c1", nome: "Caixinhas para perfume (teste)", gasto: 0, impressoes: 0, cliques: 0, conversasMeta: 0, leads: 0, mql: 0, descartados: 0, semClassificar: 0, orcamentos: 0, pedidos: 0, faturamento: 0, ...o })
+    return new Response(JSON.stringify({ relatorios: [{ dia: "2026-11-04", geradoEm: new Date().toISOString(),
+      dia1: [L({ gasto: 155, cliques: 378, conversasMeta: 101, leads: 98, mql: 12, descartados: 12, semClassificar: 74 })],
+      semana: [L({ gasto: 160, cliques: 397, conversasMeta: 106, leads: 100, mql: 12, descartados: 12, semClassificar: 76, orcamentos: 3, pedidos: 1, faturamento: 4250 }), L({ id: "c2", nome: "Remarketing (teste)", gasto: 42, cliques: 61, conversasMeta: 9, leads: 8, mql: 1, descartados: 4, semClassificar: 3 })],
+      semanaAnterior: [L({ gasto: 82.7, cliques: 182, conversasMeta: 54, leads: 30, mql: 2, descartados: 3, semClassificar: 25 })],
+      leitura: { resumo: "O dia 04/11 concentrou quase toda a semana: R$ 155, 98 leads e 12 MQL, R$ 12,91 por MQL, contra R$ 41,35 na semana anterior.", destaques: ["74 dos 98 leads ainda sem classificar: o custo por MQL real só fica claro depois da triagem.", "Amostra de um dia só: cedo para cravar que a campanha melhorou."], acao: "Leve os 12 MQL para orçamento hoje e mantenha a verba até ver se o custo por MQL se sustenta." },
+    }, { dia: "2026-11-03", geradoEm: new Date().toISOString(), dia1: [], semana: [], semanaAnterior: [], leitura: null }] }))
+  }
   if (u.startsWith("/api/whatsapp/reativacao")) {
     if (o?.method === "POST" && String(o.body).includes("preparar")) return new Response(JSON.stringify({ ok: true, texto: "Oi! Tudo certo por aí? Como foram as vendas com aquelas 8 mil caixinhas? Já tá na hora de repor ou pensar num lote novo?", trava: null, motivo: "Já comprou 8 mil" }))
     return new Response(JSON.stringify({ auto: { ligado: true, porDia: 4 }, hoje: 1, fila: [
@@ -188,6 +198,7 @@ function Telas() {
         {tela === "parceiros-modal" && <ModalVenda inicial={negs[1]} parceiros={parc} clientes={["Camilo"]} onSalvar={() => {}} onNovoParceiro={() => {}} onFechar={() => {}} />}
       </div>
     }
+    case "marketing": case "marketing-m": return pagina(<div className="max-w-[1100px]"><MarketingRelatorio /></div>)
     case "reativacao": return pagina(<div className="max-w-[860px]"><ReativacaoCard /></div>)
     case "contatos": return pagina(<div className="max-w-[860px]"><ContatosProtegidosCard /></div>)
     case "agente": return pagina(<div className="max-w-[860px]"><AgenteLeadsCard onFiltro={() => {}} /></div>)

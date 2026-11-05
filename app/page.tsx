@@ -293,7 +293,9 @@ export default function Home() {
 
   // Persist main view across F5 — read on mount, write in navigate()
   useEffect(() => {
-    const saved = sessionStorage.getItem("app:view")
+    // Link direto (ex.: resumo de marketing no WhatsApp abre em Campanhas: /?aba=meta)
+    const aba = new URLSearchParams(window.location.search).get("aba")
+    const saved = aba ?? sessionStorage.getItem("app:view")
     const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias"]
     // Conquistas virou o cartão "Meta do mês" do Painel
     if (saved === "conquistas") setView("painel")

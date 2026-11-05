@@ -6,6 +6,7 @@ import { supabase } from "@/app/lib/supabase"
 import { agendarResposta, talvezFollowUps } from "@/app/lib/agenteAuto"
 import { talvezAprender } from "@/app/lib/agenteAprende"
 import { talvezReativar } from "@/app/lib/reativacaoServidor"
+import { talvezRelatorio } from "@/app/lib/marketingServidor"
 
 // Espera do modo automático (o lead termina de digitar) + resposta da IA + envio
 export const maxDuration = 60
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest) {
     after(() => talvezFollowUps().catch(e => console.error("[agente follow-up]", e)))
     after(() => talvezAprender().catch(e => console.error("[agente aprende]", e)))
     after(() => talvezReativar().catch(e => console.error("[reativação]", e)))
+    after(() => talvezRelatorio(req.nextUrl.origin).catch(e => console.error("[marketing]", e)))
 
     // ── messages.upsert — mensagem nova em tempo real
     if (event === "messages.upsert") {
@@ -36,7 +38,7 @@ export async function POST(req: NextRequest) {
       // Só uma dica para o funil e para o agente; nada do payload é usado além disso.
       if (data?.key?.id && novas.has(data.key.id) && !data.key.fromMe && /externalAdReply|conversionSource|"ctwa/i.test(JSON.stringify(data))) {
         const { data: salva } = await supabase.from("whatsapp_mensagens").select("jid").eq("id", data.key.id).maybeSingle()
-        if (salva?.jid) await supabase.from("whatsapp_conversas").update({ campanha: JSON.stringify({ canal: "anuncio" }) }).eq("jid", salva.jid).is("campanha", null)
+        if (salva?.jid) await supabase.from("whatsapp_conversas").update({ campanha: JSON.stringify({ canal: "anuncio", entrada: new Date().toISOString() }) }).eq("jid", salva.jid).is("campanha", null)
       }
       // Áudio novo: transcreve depois de responder ao Evolution (não atrasa o recebimento)
       if (data?.message?.audioMessage && data.key?.id) after(() => transcreverPendentes({ ids: [data.key.id] }).catch(() => {}))

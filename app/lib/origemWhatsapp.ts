@@ -13,7 +13,7 @@ export const ENTRADAS_PADRAO: Entrada[] = [
   { frase: "gostaria de solicitar um orcamento", canal: "site" },
 ]
 
-export type OrigemConversa = { canal: Entrada["canal"]; campanhaId?: string; campanhaNome?: string; provavel?: boolean }
+export type OrigemConversa = { canal: Entrada["canal"]; campanhaId?: string; campanhaNome?: string; provavel?: boolean; entrada?: string }   // entrada: 1ª mensagem do contato
 
 export const normalizar = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim()
 
