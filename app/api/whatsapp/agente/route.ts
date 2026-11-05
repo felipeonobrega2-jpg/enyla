@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   if (!b.simular) {
     const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
     const d = (data?.data ?? {}) as Record<string, unknown> & Cfg
-    const auto: AgenteAuto = { ...(d.agenteAuto ?? { ligado: false }), ...(typeof b.ligado === "boolean" ? { ligado: b.ligado } : {}), ...(b.esperaSeg ? { esperaSeg: b.esperaSeg } : {}), ...(b.maxPorDia ? { maxPorDia: b.maxPorDia } : {}) }
+    const auto: AgenteAuto = { ...(d.agenteAuto ?? { ligado: false }), ...(typeof b.ligado === "boolean" ? { ligado: b.ligado } : {}), ...(b.esperaSeg ? { esperaSeg: b.esperaSeg } : {}), ...(b.maxPorDia ? { maxPorDia: b.maxPorDia } : {}), ...(typeof b.vitrine === "string" ? { vitrine: b.vitrine.trim().slice(0, 400) } : {}) }
     await supabase.from("AppConfig").update({ data: { ...d, agenteAuto: auto } }).eq("id", 1)
     return NextResponse.json({ auto })
   }

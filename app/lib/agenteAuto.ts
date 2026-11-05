@@ -10,7 +10,7 @@ import { gravarLote, WaMessage } from "./whatsappDados"
 import { atender, lerConfigAtendente } from "./atendenteServidor"
 import {
   AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, filtroEfetivo,
-  organizarLead, semFollowUp, ETIQUETA_PERFIL, proximoFollowUp, horarioDeFollowUp, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE,
+  organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, proximoFollowUp, horarioDeFollowUp, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE,
 } from "./agenteLeads"
 
 const DIAS_CONVERSA_NOVA = 4
@@ -178,11 +178,29 @@ export async function responderSozinho(msgId: string) {
   const agora = await ultimaDa(jid)
   const velha = !agora || agora.id !== msgId
   const base = { em: new Date().toISOString(), jid, nome: conversa.nome, perfil: r.lead.perfil, texto: r.resposta }
+  // Vitrine: todo lead recebe o Instagram uma vez, logo depois da primeira resposta.
+  // Bom negócio (que o agente não responde) recebe só o Instagram, como quem manda o portfólio antes de você chegar.
+  const vitrine = (auto.vitrine ?? VITRINE_PADRAO).trim()
+  const querVitrine = !!vitrine && organiza && !jaViuVitrine(conversa.mensagens.filter(m => m.from_me).map(m => m.corpo))
+  const mandarVitrine = async () => {
+    await new Promise(res => setTimeout(res, 1500 + Math.random() * 2000))
+    return enviar(c, vitrine)
+  }
+
   if (trava || velha) await pequeno(false)
+  if (!velha && querVitrine && ehQualificado(r.lead.perfil)) {
+    await marcarLida(c, msgId)
+    const v = await mandarVitrine()
+    if (v.ids.length) await registrar({ ...base, texto: vitrine, enviou: true, ids: v.ids, motivo: "Instagram (vitrine) enquanto você assume", passo: "Instagram" })
+  }
   if (trava || velha) return registrar({ ...base, enviou: false, motivo: trava ?? "chegou mensagem nova enquanto preparava" + (r.motivo_alerta ? ` · ${r.motivo_alerta}` : "") })
 
   const env = await enviar(c, r.resposta, msgId)
   await pequeno(env.ids.length > 0)
+  if (env.ids.length && querVitrine) {
+    const v = await mandarVitrine()
+    env.ids.push(...v.ids)
+  }
   return registrar({ ...base, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? r.lead.motivo })
 }
 

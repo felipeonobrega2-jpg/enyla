@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react"
 import { Bot, Loader2, Play, Power } from "lucide-react"
 import { Cartao, TituloCartao, Botao, Selo, Tom } from "./ds"
-import { AgenteAuto, RegistroAgente, PerfilLead, ROTULO_PERFIL, FILTRO_PADRAO } from "../lib/agenteLeads"
+import { AgenteAuto, RegistroAgente, PerfilLead, ROTULO_PERFIL, FILTRO_PADRAO, VITRINE_PADRAO } from "../lib/agenteLeads"
 
 type Simulacao = { jid: string; nome: string | null; ultima: string; perfil: PerfilLead; quantidade: number | null; motivo: string; resposta: string; enviaria: boolean; trava: string | null }
 
@@ -20,6 +20,8 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
   const [sim, setSim] = useState<Simulacao[] | null>(null)
   const [simulando, setSimulando] = useState(false)
   const [mudando, setMudando] = useState(false)
+  const [vitrine, setVitrine] = useState<string | null>(null)
+  const [vitrineSalva, setVitrineSalva] = useState(false)
 
   useEffect(() => {
     fetch("/api/whatsapp/agente").then(r => r.json()).then(d => { setAuto(d.auto); setLog(d.log ?? []); setTaxas(d.taxas ?? []) }).catch(() => {})
@@ -40,7 +42,13 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
     setSimulando(false)
   }
 
+  async function salvarVitrine() {
+    const d = await fetch("/api/whatsapp/agente", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vitrine: vitrine ?? "" }) }).then(r => r.json()).catch(() => null)
+    if (d?.auto) { setAuto(d.auto); setVitrine(null); setVitrineSalva(true); setTimeout(() => setVitrineSalva(false), 2000) }
+  }
+
   const ligado = !!auto?.ligado
+  const textoVitrine = vitrine ?? auto?.vitrine ?? VITRINE_PADRAO
   const texto = filtro ?? FILTRO_PADRAO
   const semContato = /\(preencha aqui/i.test(texto)
 
@@ -71,6 +79,15 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
         <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#c57800]">Sem resposta → F1, F2, F3</p><p className="text-[#5e5c68]">F1 após 3 h, F2 após 1 dia, F3 após 3 dias (8h–20h). 4 dias depois do F3: Sem resposta, vai para Perdido. No MQL só etiqueta, quem cobra é você.</p></div>
       </div>
       <p className="text-[11px] text-[#898892] mb-4">No seu WhatsApp Business: crie no app as etiquetas com estes nomes exatos (MQL, Descartado, F1, F2, F3, Sem resposta, ICP, Lead médio, Oportunidade, Lead pequeno, Fornecedora) e ele marca lá também.</p>
+
+      {/* Vitrine */}
+      <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-1.5">Instagram para todo lead</p>
+      <div className="flex gap-2 mb-1.5">
+        <input value={textoVitrine} onChange={e => setVitrine(e.target.value)}
+          className="flex-1 h-9 rounded-lg px-3 text-[12.5px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] ds-borda" />
+        <Botao disabled={vitrine == null || !auto} onClick={salvarVitrine}>{vitrineSalva ? "Salvo" : "Salvar"}</Botao>
+      </div>
+      <p className="text-[11px] text-[#898892] mb-4">Vai como segunda mensagem, logo depois da primeira resposta, uma vez por lead. Bom negócio (que é seu) recebe só ela. Se o link já foi na conversa, não repete. Deixe vazio para não mandar.</p>
 
       {/* Filtro */}
       <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-1.5">Filtro de leads</p>

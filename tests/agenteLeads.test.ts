@@ -73,3 +73,13 @@ describe("agente de leads: etiquetas e follow-up", () => {
     expect(horarioDeFollowUp(new Date("2026-11-05T02:00:00Z"))).toBe(false)  // 23h em SP
   })
 })
+
+import { jaViuVitrine } from "@/app/lib/agenteLeads"
+
+describe("agente de leads: Instagram", () => {
+  it("não repete o link se já foi (por você ou pela mensagem de ausência)", () => {
+    expect(jaViuVitrine([null, "Oi, tudo bem?"])).toBe(false)
+    expect(jaViuVitrine(["Estou fora do horário no momento, retorno em breve. Enquanto isso, dá uma olhada no nosso portfólio: instagram.com/enyla.embalagens"])).toBe(true)
+    expect(jaViuVitrine(["Dá uma olhada no nosso Instagram: Instagram.com/enyla.embalagens"])).toBe(true)
+  })
+})

@@ -27,7 +27,13 @@ export type AgenteAuto = {
   ligado: boolean
   esperaSeg?: number          // espera o lead terminar de digitar antes de responder (padrão 20 s)
   maxPorDia?: number          // respostas automáticas por conversa em 24 h (padrão 6)
+  vitrine?: string            // mensagem do Instagram, mandada uma vez a cada lead depois da primeira resposta
 }
+
+export const VITRINE_PADRAO = "Dá uma olhada no nosso Instagram: instagram.com/enyla.embalagens"
+
+// O lead já viu o Instagram? (você mandou, ou a mensagem de ausência do WhatsApp Business já trouxe o link)
+export const jaViuVitrine = (minhas: (string | null)[]) => minhas.some(t => !!t && /instagram\.com\/enyla/i.test(t))
 
 export type RegistroAgente = {
   em: string
