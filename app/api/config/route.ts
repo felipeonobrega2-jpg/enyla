@@ -20,6 +20,9 @@ export async function POST(req: NextRequest) {
       else delete proximo[k]
     }
     for (const k of MANTER_SE_AUSENTE) if (!(k in body) && k in salvo) proximo[k] = salvo[k]
+    // Vínculos conversa → cliente também nascem no servidor (telefone, conversas juntadas): soma, nunca perde.
+    // A tela não apaga vínculo, só marca "" (não é cliente), então a versão dela vence em cada conversa.
+    proximo.vinculosWhatsapp = { ...(salvo.vinculosWhatsapp as Record<string, string> ?? {}), ...(body.vinculosWhatsapp as Record<string, string> ?? {}) }
     await supabase.from("AppConfig").upsert({ id: 1, data: proximo }, { onConflict: "id" })
     return NextResponse.json({ ok: true })
   } catch (e) {

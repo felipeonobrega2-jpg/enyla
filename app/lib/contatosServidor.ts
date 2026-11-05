@@ -3,7 +3,7 @@
 
 import { supabase } from "./supabase"
 import { evo } from "./evolution"
-import { clienteDaConversa, ligacaoForte, Vinculos } from "./vinculoWhatsapp"
+import { clienteDaConversa, ligacaoForte, vinculosPorTelefone, Vinculos } from "./vinculoWhatsapp"
 import { nomeChave } from "./negocio"
 import { ContatoImportante, ETIQUETAS_IMPORTANTES, telefoneDaConversa, telefoneNaResposta, normalizarTelefone } from "./contatos"
 
@@ -58,6 +58,7 @@ export async function descobrirTelefones(limite = 40): Promise<{ achados: number
     }
   }))
   const achados = peloCadastro + pelaEvolution
+  if (pelaEvolution) await ligarPorTelefone()
   return { achados, faltam: lista.length - achados, pelaEvolution, peloCadastro }
 }
 
@@ -66,5 +67,19 @@ export async function garantirTelefone(jid: string) {
   const { data: c } = await supabase.from("whatsapp_conversas").select("jid, telefone").eq("jid", jid).maybeSingle()
   if (!c || telefoneDaConversa(c)) return
   const tel = await telefonePelaEvolution(jid).catch(() => null)
-  if (tel) await supabase.from("whatsapp_conversas").update({ telefone: tel }).eq("jid", jid).is("telefone", null)
+  if (tel) { await supabase.from("whatsapp_conversas").update({ telefone: tel }).eq("jid", jid).is("telefone", null); await ligarPorTelefone() }
+}
+
+// Liga ao cliente as conversas com o telefone dele no cadastro (vínculo gravado: vale para o sistema todo)
+export async function ligarPorTelefone(): Promise<number> {
+  const [{ data: convs }, { data: clientes }, { data: cfg }] = await Promise.all([
+    supabase.from("whatsapp_conversas").select("jid, telefone").not("jid", "like", "%@g.us"),
+    supabase.from("Cliente").select("nome, telefone").not("telefone", "is", null),
+    supabase.from("AppConfig").select("data").eq("id", 1).single(),
+  ])
+  const d = (cfg?.data ?? {}) as Record<string, unknown> & { vinculosWhatsapp?: Vinculos }
+  const novos = vinculosPorTelefone(convs ?? [], clientes ?? [], d.vinculosWhatsapp)
+  const n = Object.keys(novos).length
+  if (n) await supabase.from("AppConfig").update({ data: { ...d, vinculosWhatsapp: { ...novos, ...(d.vinculosWhatsapp ?? {}) } } }).eq("id", 1)
+  return n
 }

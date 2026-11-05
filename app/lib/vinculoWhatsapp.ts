@@ -1,8 +1,11 @@
 // Qual cliente do cadastro é dono de uma conversa do WhatsApp.
 // O WhatsApp esconde o telefone nas conversas novas (@lid), então a ligação é:
-//   1. manual (config.vinculosWhatsapp: jid → nome do cliente; "" = não é cliente)
+//   1. gravada (config.vinculosWhatsapp: jid → nome do cliente; "" = não é cliente): escolhida por você, criada ao
+//      orçar pela conversa, ou pelo telefone (vinculosPorTelefone, todo dia)
 //   2. nome do contato idêntico ao do cliente
 //   3. todas as palavras do nome do cliente dentro do nome do contato, se só um cliente servir
+
+import { normalizarTelefone, telefoneDaConversa } from "./contatos"
 
 export type Vinculos = Record<string, string>
 
@@ -24,4 +27,28 @@ export function clienteDaConversa(conv: { jid: string; nome: string | null }, cl
 // ou cliente com nome e sobrenome. Só o primeiro nome batendo ("Maurício" × "Mauricio Daniel") pode ser outra pessoa.
 export function ligacaoForte(conv: { nome: string | null }, cli: { nome: string; manual: boolean }) {
   return cli.manual || norm(conv.nome) === norm(cli.nome) || palavras(cli.nome).length >= 2
+}
+
+// Mesmo telefone com ou sem o 9 na frente: DDD + 8 últimos dígitos (só Brasil)
+export function chaveTelefone(t: string | null | undefined) {
+  const n = normalizarTelefone(t)
+  if (!n?.startsWith("55") || n.length < 12) return null
+  return n.slice(2, 4) + n.slice(-8)
+}
+
+// Conversas cujo telefone é o de um cliente do cadastro: vínculos novos (não mexe nas já ligadas nem nas marcadas
+// "não é cliente"; telefone repetido em dois clientes não liga ninguém)
+export function vinculosPorTelefone(convs: { jid: string; telefone: string | null }[], clientes: { nome: string; telefone: string | null }[], vinculos: Vinculos = {}): Vinculos {
+  const dono = new Map<string, string | null>()
+  for (const c of clientes) {
+    const k = chaveTelefone(c.telefone)
+    if (k) dono.set(k, dono.has(k) && dono.get(k) !== c.nome ? null : c.nome)
+  }
+  const novos: Vinculos = {}
+  for (const c of convs) {
+    if (c.jid.endsWith("@g.us") || c.jid in vinculos) continue
+    const nome = dono.get(chaveTelefone(telefoneDaConversa(c)) ?? "")
+    if (nome) novos[c.jid] = nome
+  }
+  return novos
 }
