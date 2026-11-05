@@ -31,6 +31,9 @@ import AgenteLeadsCard from "@/app/components/AgenteLeadsCard"
 import ContatosProtegidosCard from "@/app/components/ContatosProtegidosCard"
 import ReativacaoCard from "@/app/components/ReativacaoCard"
 import { HojeCard } from "@/app/components/HojeCard"
+import { gerarHtmlOrcamentoCliente } from "@/app/pdf"
+import { folhasDoHtml, htmlParaPdf } from "@/app/lib/pdfArquivo"
+import { EnviarProposta } from "@/app/components/EnviarProposta"
 import MarketingRelatorio from "@/app/components/MarketingRelatorio"
 import { ParceriasView } from "@/app/components/ParceriasView"
 import { ModalVenda } from "@/app/components/parceiros/ModalVenda"
@@ -79,6 +82,8 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     { em: new Date().toISOString(), jid: "2@lid", nome: "Marcio", perfil: "icp", enviou: false, texto: "Show! Vou preparar o seu orçamento.", motivo: "precisa de você (decisao_sua)" },
     { em: new Date().toISOString(), jid: "3@lid", nome: "Bia", perfil: "indefinido", enviou: true, passo: "F1", texto: "Oi! Conseguiu ver a quantidade?", motivo: "F1: sem resposta" },
   ], taxas: [{ passo: "Resposta", enviados: 42, responderam: 29 }, { passo: "F1", enviados: 18, responderam: 6 }, { passo: "F2", enviados: 9, responderam: 2 }, { passo: "F3", enviados: 5, responderam: 1 }] }))
+  if (u.startsWith("/api/whatsapp/destino")) return new Response(JSON.stringify(u.includes("Sem%20Conversa") ? { jid: null } : { jid: "1@lid", nome: "Perfumaria Modelo", como: "conversa" }))
+  if (u.startsWith("/api/aprovacao/link")) return new Response(JSON.stringify({ url: "https://app.enyla.com.br/aprovar/ORC-2026-999?t=exemplo" }))
   if (u.startsWith("/api/hoje")) {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
     return new Response(JSON.stringify({
@@ -213,6 +218,15 @@ function Telas() {
           onAddParceiro={() => {}} onUpdateParceiro={() => {}} onDeleteParceiro={() => {}} onAddNegocio={() => {}} onUpdateNegocio={() => {}} onDeleteNegocio={() => {}} />
         {tela === "parceiros-modal" && <ModalVenda inicial={negs[1]} parceiros={parc} clientes={["Camilo"]} onSalvar={() => {}} onNovoParceiro={() => {}} onFechar={() => {}} />}
       </div>
+    }
+    case "pdfcliente": return <FolhasPdf />
+    case "enviarproposta": case "enviarproposta-sem": {
+      const form = { ...dados.historico[0].form, nomeCliente: tela === "enviarproposta" ? "Perfumaria Modelo" : "Sem Conversa" }
+      const calculo = calcular(form, config)!
+      return <div style={{ height: "100vh", background: "#f5f5f7" }}><EnviarProposta cliente={form.nomeCliente} numero="ORC-2026-999"
+        gerarHtml={async () => gerarHtmlOrcamentoCliente({ form, calculo, data: "05/11/2026, 10:00:00", numero: "ORC-2026-999" })}
+        mensagem={l => `Oi, Perfumaria! Segue a proposta ORC-2026-999 da sua embalagem.\n\n3.000 unidades · R$ 8.476,64 à vista (R$ 2,83/un)\n\nPara ver a caixa em 3D e aprovar: ${l}\n\nQualquer dúvida, é só me chamar.`}
+        onFechar={() => {}} /></div>
     }
     case "hoje": case "hoje-m": return pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)
     case "marketing": case "marketing-m": return pagina(<div className="max-w-[1100px]"><MarketingRelatorio /></div>)
@@ -349,3 +363,22 @@ function Telas() {
 }
 
 createRoot(document.getElementById("root")!).render(<Telas />)
+
+// PDF do cliente como arquivo: as folhas que vão no .pdf, lado a lado com o HTML da impressão
+function FolhasPdf() {
+  const [folhas, setFolhas] = React.useState<{ imagem: string; altura: number }[] | null>(null)
+  const html = React.useMemo(() => {
+    const form = { ...dados.historico[0].form, nomeCliente: "Perfumaria Modelo", obsCliente: "Arte enviada pelo cliente." }
+    return gerarHtmlOrcamentoCliente({ form, calculo: calcular(form, config)!, data: "05/11/2026, 10:00:00", numero: "ORC-2026-999" })
+  }, [])
+  React.useEffect(() => {
+    folhasDoHtml(html).then(setFolhas)
+    // o arquivo de verdade, para o teste conferir que é um PDF válido
+    htmlParaPdf(html, "teste.pdf").then(f => { const r = new FileReader(); r.onload = () => { (window as unknown as { __pdf: string }).__pdf = String(r.result).split(",")[1] }; r.readAsDataURL(f) })
+  }, [html])
+  return <div style={{ display: "flex", gap: 24, padding: 24, background: "#ccc", alignItems: "flex-start" }}>
+    <div id="pronto" data-folhas={folhas?.length ?? 0} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {(folhas ?? []).map((f, i) => <img key={i} src={f.imagem} style={{ width: 718, background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,.2)" }} alt="" />)}
+    </div>
+  </div>
+}

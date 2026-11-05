@@ -9,6 +9,7 @@ import { podarDispensados } from "./lib/filaMensagens"
 import { formDoAtendimento, DadosPedido } from "./lib/atendente"
 import { AvisoWhatsapp } from "./components/AvisoWhatsapp"
 import { EntregasView, PrefillEntrega } from "./components/EntregasView"
+import { EnviarProposta } from "./components/EnviarProposta"
 import Image from "next/image"
 import { useTheme } from "./components/ThemeProvider"
 import { FormData, Calculo, PropostaCustom, Cliente, KanbanCard, CustoSnapshot, COL_FECHADO, COL_ENTREGUE, COL_PERDIDO, COL_HOT, COLUNAS_KANBAN, Parceiro, NegocioParceiro, LancamentoFinanceiro, Lote, TipoCaixa, PrazoEtapas, AprovacaoOnline } from "./types"
@@ -194,6 +195,7 @@ export default function Home() {
   definirFeriadosLocais(config.feriados)
   const configAtual = useRef<Configuracoes>(CONFIG_PADRAO)
   useEffect(() => { configAtual.current = config }, [config])
+  const [envioProposta, setEnvioProposta] = useState<{ form: FormData; calculo: Calculo; numero: string; data: string } | null>(null)
   const [modalSalvar, setModalSalvar] = useState<{ form: FormData; calculo: Calculo; numero: string; data: string; cardId: string } | null>(null)
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [propostasCustom, setPropostasCustom] = useState<PropostaCustom[]>([])
@@ -1041,7 +1043,8 @@ export default function Home() {
     abrirPdf(gerarHtmlOrcamento(item))
   }
 
-  async function downloadPdfCliente(item: { form: FormData; calculo: Calculo; data: string }) {
+  // PDF do cliente (com o QR da caixa em 3D): o mesmo HTML vai para a impressão e para o arquivo enviado
+  async function htmlPdfCliente(item: { form: FormData; calculo: Calculo; data: string; numero?: string }) {
     const telefone = clientes.find(c => c.nome.toLowerCase() === item.form.nomeCliente.trim().toLowerCase())?.telefone
     const { form } = item
     const previewUrl = `${window.location.origin}/box-preview?l=${form.frente}&a=${form.alturaBox}&p=${form.lateral}&v=${form.incluirVerniz ? 1 : 0}`
@@ -1050,7 +1053,30 @@ export default function Home() {
       const QRCode = (await import("qrcode")).default
       qrDataUrl = await QRCode.toDataURL(previewUrl, { width: 180, margin: 1, color: { dark: "#5009c4", light: "#ffffff" } })
     } catch {}
-    abrirPdf(gerarHtmlOrcamentoCliente(item, telefone, qrDataUrl, previewUrl))
+    return gerarHtmlOrcamentoCliente(item, telefone, qrDataUrl, previewUrl)
+  }
+
+  async function downloadPdfCliente(item: { form: FormData; calculo: Calculo; data: string }) {
+    abrirPdf(await htmlPdfCliente(item))
+  }
+
+  // Orçamento salvo: PDF + mensagem pelo WhatsApp do sistema, em um clique. Sem número (ainda não salvo): o texto pelo wa.me.
+  function enviarProposta(form: FormData, calculo: Calculo, numero?: string, data?: string) {
+    if (!numero) return compartilharWhatsApp(form, calculo)
+    setEnvioProposta({ form, calculo, numero, data: data ?? historico.find(h => h.numero === numero)?.data ?? new Date().toLocaleString("pt-BR") })
+  }
+
+  function mensagemProposta(form: FormData, calculo: Calculo, numero: string, link: string | null) {
+    const ideal = calculo.tabela.find(l => l.quantidade === calculo.sweetSpotIdealQtd) ?? calculo.tabela[calculo.tabela.length - 1]
+    const primeiro = form.nomeCliente.trim().split(/\s+/)[0]
+    const total = ideal ? (form.comFaca ? ideal.precoComFaca : ideal.precoSemFaca) : 0
+    const unit = ideal ? (form.comFaca ? ideal.unitarioComFaca : ideal.unitarioSemFaca) : 0
+    return [
+      `Oi${primeiro ? `, ${primeiro}` : ""}! Segue a proposta ${numero} da sua embalagem.`,
+      ideal ? `\n${num(ideal.quantidade)} unidades · ${brl(total)} à vista (${brl(unit)}/un)` : null,
+      link ? `\nPara ver a caixa em 3D e aprovar: ${link}` : null,
+      `\nQualquer dúvida, é só me chamar.`,
+    ].filter(Boolean).join("\n")
   }
 
   async function handleEmitirOS(card: KanbanCard) {
@@ -2116,7 +2142,7 @@ export default function Home() {
               lancamentos={lancamentos}
               cadastro={clientes}
               onReplicar={replicar}
-              onWhatsApp={(item) => compartilharWhatsApp(item.form, item.calculo, item.numero)}
+              onWhatsApp={(item) => enviarProposta(item.form, item.calculo, item.numero, item.data)}
               onSaveCliente={atualizarCliente}
               initialPerfil={perfilClienteExterno}
               origens={config.origensClientes}
@@ -2322,7 +2348,7 @@ export default function Home() {
               onDownloadPdf={downloadPdf}
               onDownloadPdfCliente={downloadPdfCliente}
               onExcluir={excluirHistorico}
-              onWhatsApp={(item) => compartilharWhatsApp(item.form, item.calculo, item.numero)}
+              onWhatsApp={(item) => enviarProposta(item.form, item.calculo, item.numero, item.data)}
               onPdfCustom={(p) => abrirPdf(gerarHtmlPropostaCustom(p, clientes.find(c => c.nome.toLowerCase() === p.nomeCliente.trim().toLowerCase())?.telefone))}
               onWhatsAppCustom={compartilharWhatsAppCustom}
               onExcluirCustom={(id) => {
@@ -2730,13 +2756,19 @@ export default function Home() {
       </div>
 
       {/* ── Modal: personalizar proposta ──────────────────────────────────── */}
+      {envioProposta && (
+        <EnviarProposta cliente={envioProposta.form.nomeCliente.trim() || "cliente"} numero={envioProposta.numero}
+          gerarHtml={() => htmlPdfCliente(envioProposta)}
+          mensagem={link => mensagemProposta(envioProposta.form, envioProposta.calculo, envioProposta.numero, link)}
+          onFechar={() => setEnvioProposta(null)} />
+      )}
       {modalSalvar && (
         <ModalPersonalizarProposta
           data={modalSalvar}
           config={config}
           onClose={() => setModalSalvar(null)}
           onAbrirPdf={abrirPdf}
-          onWhatsApp={compartilharWhatsApp}
+          onWhatsApp={(f, c, n) => enviarProposta(f, c, n, modalSalvar.data)}
           clientes={clientes}
           lotes={lotes}
           cardLoteNumero={kanban.find(c => c.id === modalSalvar.cardId)?.loteNumero}
