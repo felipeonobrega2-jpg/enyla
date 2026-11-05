@@ -146,20 +146,39 @@ const contexto = (cfg: CfgAgente, log: Registro[]) => ({
 })
 
 // ── Lead mandou mensagem ─────────────────────────────────────────────────────
+// Ritmo de gente: a resposta sai entre ~40 s e ~70 s depois da última mensagem do lead, nunca no mesmo tempo.
+// Como cada execução na Vercel tem 1 minuto, a espera vai em duas etapas: o webhook espera a 1ª parte e chama
+// /api/whatsapp/webhook/responder, que espera a 2ª, pensa e digita.
+const espera = (min: number, max: number) => new Promise(r => setTimeout(r, (min + Math.random() * (max - min)) * 1000))
+
+// A conversa pelo id gravado (a gravação pode ter juntado o @lid com o número); null se a mensagem já não é a última
+async function aindaEhAUltima(msgId: string) {
+  const { data: msg } = await supabase.from("whatsapp_mensagens").select("jid").eq("id", msgId).maybeSingle()
+  if (!msg?.jid) return null
+  const ultima = await ultimaDa(msg.jid as string)
+  return ultima && ultima.id === msgId && !ultima.from_me ? msg.jid as string : null
+}
+
+// 1ª etapa (no webhook): espera o lead terminar de escrever (costumam mandar 2–3 mensagens seguidas)
+export async function agendarResposta(msgId: string, origem: string) {
+  const cfg = await lerCfg()
+  if (!cfg.agenteAuto?.ligado) return
+  await espera(20, 28)
+  if (!await aindaEhAUltima(msgId)) return   // chegou outra: a última é quem dispara
+  await fetch(`${origem}/api/whatsapp/webhook/responder?token=${encodeURIComponent(process.env.WHATSAPP_WEBHOOK_SECRET ?? "")}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ msgId }), signal: AbortSignal.timeout(8000),
+  }).catch(() => null)
+}
+
+// 2ª etapa: mais um tempo (como quem viu e vai responder), pensa, lê e digita
 export async function responderSozinho(msgId: string) {
   const cfg = await lerCfg()
   const auto = cfg.agenteAuto
   if (!auto?.ligado) return
-
-  // Espera o lead terminar (costumam mandar 2–3 mensagens seguidas); só a última dispara a resposta
-  // (com variação, para não responder sempre no mesmo segundo)
-  await new Promise(r => setTimeout(r, (Math.min(25, Math.max(5, auto.esperaSeg ?? 15)) + Math.random() * 8) * 1000))
-  // A conversa pelo id gravado (a gravação pode ter juntado o @lid com o número)
-  const { data: msg } = await supabase.from("whatsapp_mensagens").select("jid").eq("id", msgId).maybeSingle()
-  if (!msg?.jid) return
-  const jid = msg.jid as string
-  const ultima = await ultimaDa(jid)
-  if (!ultima || ultima.id !== msgId || ultima.from_me) return
+  const inicio = Date.now()
+  await espera(10, 25)
+  const jid = await aindaEhAUltima(msgId)
+  if (!jid) return
 
   // Filtro barato antes de chamar a IA: só contato novo (fornecedor e cliente antigo nunca)
   const primeira = await primeiraDa(jid)
@@ -216,7 +235,8 @@ export async function responderSozinho(msgId: string) {
 
   const env = await enviar(c, r.resposta, msgId)
   await pequeno(env.ids.length > 0)
-  if (env.ids.length && querVitrine) {
+  // Instagram só se ainda cabe no minuto da Vercel (senão vai na próxima resposta)
+  if (env.ids.length && querVitrine && Date.now() - inicio < 47_000) {
     const v = await mandarVitrine()
     env.ids.push(...v.ids)
   }

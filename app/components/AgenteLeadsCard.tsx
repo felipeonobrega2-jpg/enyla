@@ -78,7 +78,7 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
           <p className="text-[13px] font-semibold text-[#191625]">Modo automático {ligado ? "ligado" : "desligado"}</p>
           <p className="text-[11.5px] text-[#5e5c68]">
             {ligado
-              ? "Responde sozinho só contato novo (até 4 dias), espera 15 a 25 s o lead terminar de digitar, lê, fica “digitando…” e segura tudo que é decisão sua."
+              ? "Responde sozinho só contato novo (até 4 dias), responde no ritmo de gente (40 s a 1 min depois da última mensagem, variando), lê, fica “digitando…” e segura tudo que é decisão sua."
               : "Desligado, ele só sugere a resposta na conversa. Ligado, responde sozinho os leads novos e organiza o funil."}
           </p>
         </div>
