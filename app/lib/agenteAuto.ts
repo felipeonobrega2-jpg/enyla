@@ -9,9 +9,10 @@ import { evo } from "./evolution"
 import { gravarLote, WaMessage } from "./whatsappDados"
 import { atender, lerConfigAtendente } from "./atendenteServidor"
 import { garantirTelefone } from "./contatosServidor"
+import { textoAvisoReativacao } from "./reativacao"
 import {
   AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, filtroEfetivo,
-  organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, ehSemCredito, proximoFollowUp, horarioDeFollowUp, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE,
+  organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, ehSemCredito, proximoFollowUp, horarioDeFollowUp, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE, ETIQUETAS_AGENTE,
 } from "./agenteLeads"
 
 const DIAS_CONVERSA_NOVA = 4
@@ -20,26 +21,26 @@ const MINUTOS_VOCE_NA_CONVERSA = 10
 const MAX_REGISTROS = 300
 const MIN_ENTRE_RODADAS = 10         // follow-ups: no máximo uma rodada a cada 10 min
 
-type Registro = RegistroAgente & { ids?: string[] }
-type CfgAgente = { agenteAuto?: AgenteAuto; agenteLog?: Registro[]; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string; agenteSemCreditoEm?: string }
-type Conversa = { jid: string; nome: string | null; telefone: string | null; etiquetas: string[] | null; status_lead: string | null }
+export type Registro = RegistroAgente & { ids?: string[] }
+export type CfgAgente = { agenteAuto?: AgenteAuto; agenteLog?: Registro[]; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string; agenteSemCreditoEm?: string }
+export type Conversa = { jid: string; nome: string | null; telefone: string | null; etiquetas: string[] | null; status_lead: string | null }
 
-async function lerCfg() { return await lerConfigAtendente() as Awaited<ReturnType<typeof lerConfigAtendente>> & CfgAgente }
+export async function lerCfg() { return await lerConfigAtendente() as Awaited<ReturnType<typeof lerConfigAtendente>> & CfgAgente }
 
-async function gravarCfg(mudar: (d: Record<string, unknown> & CfgAgente) => Partial<CfgAgente>) {
+export async function gravarCfg(mudar: (d: Record<string, unknown> & CfgAgente) => Partial<CfgAgente>) {
   const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
   const d = (data?.data ?? {}) as Record<string, unknown> & CfgAgente
   await supabase.from("AppConfig").update({ data: { ...d, ...mudar(d) } }).eq("id", 1)
 }
 
 // Registro + garante que as etiquetas do agente existem (com cor) na lista de etiquetas do WhatsApp
-const registrar = (r: Registro) => gravarCfg(d => {
+export const registrar = (r: Registro) => gravarCfg(d => {
   const defs = [...(d.etiquetasWhatsapp ?? [])]
   for (const [nome, cor] of Object.entries(COR_ETIQUETA_AGENTE)) if (!defs.some(e => e.nome === nome)) defs.push({ nome, cor })
   return { etiquetasWhatsapp: defs, agenteLog: [r, ...(d.agenteLog ?? [])].slice(0, MAX_REGISTROS) }
 })
 
-const lerConversa = async (jid: string) =>
+export const lerConversa = async (jid: string) =>
   (await supabase.from("whatsapp_conversas").select("jid, nome, telefone, etiquetas, status_lead").eq("jid", jid).maybeSingle()).data as Conversa | null
 
 // ── Etiquetas no WhatsApp Business (Evolution). Só funciona com etiquetas criadas no app com o mesmo nome. ──
@@ -85,7 +86,7 @@ export async function enviarEtiquetasAoWhatsapp(pagina: number, tamanho = 30) {
 }
 
 // Troca as etiquetas (e a etapa do funil, se veio) no sistema e no WhatsApp
-async function aplicar(c: Conversa, etiquetas: string[], etapa: string | null) {
+export async function aplicar(c: Conversa, etiquetas: string[], etapa: string | null) {
   const antes = c.etiquetas ?? []
   const mesmas = antes.length === etiquetas.length && antes.every(e => etiquetas.includes(e))
   const campos: Record<string, unknown> = {}
@@ -111,7 +112,7 @@ async function marcarLida(c: Conversa, msgId?: string) {
   await evo("/chat/markMessageAsRead/{i}", { method: "POST", body: JSON.stringify({ readMessages: [{ remoteJid: c.jid, fromMe: false, id: msgId }] }) }).catch(() => null)
 }
 
-async function enviar(c: Conversa, texto: string, lida?: string): Promise<{ ids: string[]; erro?: string }> {
+export async function enviar(c: Conversa, texto: string, lida?: string): Promise<{ ids: string[]; erro?: string }> {
   const number = c.telefone || c.jid
   const ids: string[] = []
   await marcarLida(c, lida)
@@ -129,7 +130,7 @@ async function enviar(c: Conversa, texto: string, lida?: string): Promise<{ ids:
 // ── Aviso de MQL no seu WhatsApp ───────────────────────────────────────────────
 // O seu número (dono da conexão), para o aviso ir no chat "Você" quando não há outro número configurado
 let cacheDono: string | null = null
-async function seuNumero() {
+export async function seuNumero() {
   if (cacheDono) return cacheDono
   const r = await evo<unknown>(`/instance/fetchInstances?instanceName=${encodeURIComponent(process.env.EVOLUTION_INSTANCE ?? "")}`)
   const lista = (Array.isArray(r.corpo) ? r.corpo : [r.corpo]) as { ownerJid?: string; owner?: string; instance?: { owner?: string; ownerJid?: string } }[]
@@ -139,7 +140,7 @@ async function seuNumero() {
 }
 
 // A conversa fica como não lida no seu celular (você vê na lista que tem lead esperando)
-async function marcarNaoLida(c: Conversa, msgId: string) {
+export async function marcarNaoLida(c: Conversa, msgId: string) {
   const { data: m } = await supabase.from("whatsapp_mensagens").select("ts").eq("id", msgId).maybeSingle()
   await evo("/chat/markChatUnread/{i}", { method: "POST", body: JSON.stringify({
     chat: c.jid, lastMessage: { key: { remoteJid: c.jid, fromMe: false, id: msgId }, messageTimestamp: m?.ts ? Math.floor(new Date(m.ts).getTime() / 1000) : undefined },
@@ -200,7 +201,13 @@ async function aindaEhAUltima(msgId: string) {
 // 1ª etapa (no webhook): espera o lead terminar de escrever (costumam mandar 2–3 mensagens seguidas)
 export async function agendarResposta(msgId: string, origem: string) {
   const cfg = await lerCfg()
-  if (!cfg.agenteAuto?.ligado) return
+  if (!cfg.agenteAuto?.ligado) {
+    // Desligado, o agente não responde; mas resposta a uma retomada ainda vira aviso para você
+    const jid = await aindaEhAUltima(msgId)
+    const c = jid ? await lerConversa(jid) : null
+    if (c) await respondeuRetomada(cfg, c, msgId).catch(() => null)
+    return
+  }
   await espera(20, 28)
   if (!await aindaEhAUltima(msgId)) return   // chegou outra: a última é quem dispara
   await fetch(`${origem}/api/whatsapp/webhook/responder?token=${encodeURIComponent(process.env.WHATSAPP_WEBHOOK_SECRET ?? "")}`, {
@@ -225,6 +232,7 @@ export async function responderSozinho(msgId: string) {
   if (!c) return
   // Respondeu: sai do follow-up (vale também para lead que você está atendendo)
   await aplicar(c, semFollowUp(c.etiquetas ?? []), null)
+  await respondeuRetomada(cfg, c, msgId).catch(() => null)
   if (!conversaNova || c.status_lead === "mql") return   // MQL: daqui em diante é você
 
   const log = (cfg.agenteLog ?? []).filter(l => l.jid === jid)
@@ -290,6 +298,24 @@ export async function responderSozinho(msgId: string) {
   return registrar({ ...base, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? r.lead.motivo })
 }
 
+// Respondeu a uma retomada (reativação): volta para MQL, fica não lida no seu celular e você recebe o aviso (uma vez)
+async function respondeuRetomada(cfg: CfgAgente, c: Conversa, msgId: string) {
+  const log = (cfg.agenteLog ?? []).filter(l => l.jid === c.jid)
+  const retomada = log.find(l => l.passo === "Reativação" && l.enviou)
+  if (!retomada || Date.now() - new Date(retomada.em).getTime() > 30 * 86_400_000) return
+  if (log.some(l => l.passo === "Respondeu" && l.em > retomada.em)) return
+  const atual = (await lerConversa(c.jid)) ?? c
+  const etiquetas = [...new Set([...(atual.etiquetas ?? []), ETIQUETAS_AGENTE.mql])]
+  await aplicar(atual, etiquetas, "mql")
+  await garantirTelefone(c.jid).catch(() => null)
+  await marcarNaoLida(c, msgId)
+  const { data: m } = await supabase.from("whatsapp_mensagens").select("corpo").eq("id", msgId).maybeSingle()
+  const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
+  const motivo = (atual.etiquetas ?? []).find(e => ["ICP", "Oportunidade", "Lead médio"].includes(e)) ?? "MQL"
+  if (destino) await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: textoAvisoReativacao({ nome: c.nome, telefone: atual.telefone, motivo, mensagem: m?.corpo ?? null }) }) }).catch(() => null)
+  await registrar({ em: new Date().toISOString(), jid: c.jid, nome: c.nome, perfil: retomada.perfil, enviou: false, texto: "", motivo: "Respondeu à retomada: voltou para MQL, é com você", passo: "Respondeu" })
+}
+
 // ── Lead parou de responder: F1, F2, F3 e Sem resposta ───────────────────────
 let ultimaRodadaLocal = 0
 
@@ -306,7 +332,9 @@ export async function talvezFollowUps() {
 
 export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
   // Só leads que o agente já atendeu (estão no registro) e não descartados. No MQL (seu) ele só etiqueta, não envia.
-  const jidsDoAgente = [...new Set((cfg.agenteLog ?? []).map(l => l.jid))]
+  // Quem recebeu retomada fica fora: é contato antigo (o agente não responde) e quem cobra é você
+  const retomados = new Set((cfg.agenteLog ?? []).filter(l => l.passo === "Reativação").map(l => l.jid))
+  const jidsDoAgente = [...new Set((cfg.agenteLog ?? []).map(l => l.jid))].filter(j => !retomados.has(j))
   if (!jidsDoAgente.length) return
   const { data } = await supabase.from("whatsapp_conversas")
     .select("jid, nome, telefone, etiquetas, status_lead, ultima_recebida_at, ultima_enviada_at, fechada_em")

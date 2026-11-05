@@ -24,7 +24,7 @@ async function taxas(log: RegistroAgente[]): Promise<Taxa[]> {
   if (!enviados.length) return []
   const { data } = await supabase.from("whatsapp_conversas").select("jid, ultima_recebida_at").in("jid", [...new Set(enviados.map(l => l.jid))])
   const recebida = new Map((data ?? []).map(c => [c.jid, c.ultima_recebida_at as string | null]))
-  return ["Resposta", "F1", "F2", "F3"].map(passo => {
+  return ["Resposta", "F1", "F2", "F3", "Reativação"].map(passo => {
     const doPasso = enviados.filter(l => (l.passo ?? "Resposta") === passo)
     return { passo, enviados: doPasso.length, responderam: doPasso.filter(l => (recebida.get(l.jid) ?? "") > l.em).length }
   }).filter(t => t.enviados)

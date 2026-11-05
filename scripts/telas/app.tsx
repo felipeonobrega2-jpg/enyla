@@ -29,6 +29,7 @@ import { AvisoWhatsapp } from "@/app/components/AvisoWhatsapp"
 import { PedidosUnificadoView } from "@/app/components/PedidosUnificadoView"
 import AgenteLeadsCard from "@/app/components/AgenteLeadsCard"
 import ContatosProtegidosCard from "@/app/components/ContatosProtegidosCard"
+import ReativacaoCard from "@/app/components/ReativacaoCard"
 import { ParceriasView } from "@/app/components/ParceriasView"
 import { ModalVenda } from "@/app/components/parceiros/ModalVenda"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas } from "@/app/components/WhatsAppView"
@@ -76,6 +77,17 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     { em: new Date().toISOString(), jid: "2@lid", nome: "Marcio", perfil: "icp", enviou: false, texto: "Show! Vou preparar o seu orçamento.", motivo: "precisa de você (decisao_sua)" },
     { em: new Date().toISOString(), jid: "3@lid", nome: "Bia", perfil: "indefinido", enviou: true, passo: "F1", texto: "Oi! Conseguiu ver a quantidade?", motivo: "F1: sem resposta" },
   ], taxas: [{ passo: "Resposta", enviados: 42, responderam: 29 }, { passo: "F1", enviados: 18, responderam: 6 }, { passo: "F2", enviados: 9, responderam: 2 }, { passo: "F3", enviados: 5, responderam: 1 }] }))
+  if (u.startsWith("/api/whatsapp/reativacao")) {
+    if (o?.method === "POST" && String(o.body).includes("preparar")) return new Response(JSON.stringify({ ok: true, texto: "Oi! Tudo certo por aí? Como foram as vendas com aquelas 8 mil caixinhas? Já tá na hora de repor ou pensar num lote novo?", trava: null, motivo: "Já comprou 8 mil" }))
+    return new Response(JSON.stringify({ auto: { ligado: true, porDia: 4 }, hoje: 1, fila: [
+      { jid: "1@lid", nome: "Perfumaria Modelo", motivo: "Cliente que já comprou", paradoDias: 47, ultimaMsg: "Fechado, obrigado!", ultimaDeQuem: "cliente", prioridade: 1 },
+      { jid: "2@lid", nome: "Aroma Exemplo", motivo: "Orçamento perdido 5 mil+", paradoDias: 30, ultimaMsg: "Segue o orçamento das 5.000 caixinhas", ultimaDeQuem: "voce", prioridade: 2 },
+      { jid: "3@lid", nome: "Fragrâncias Teste", motivo: "Orçamento perdido", paradoDias: 79, ultimaMsg: "Vou ver com meu sócio", ultimaDeQuem: "cliente", prioridade: 4 },
+    ], registro: [
+      { em: new Date().toISOString(), jid: "9@lid", nome: "Bia Essências", perfil: "icp", enviou: false, texto: "", passo: "Respondeu", motivo: "Respondeu à retomada: voltou para MQL, é com você" },
+      { em: new Date(Date.now() - 3600_000).toISOString(), jid: "9@lid", nome: "Bia Essências", perfil: "icp", enviou: true, texto: "Oi Bia!", passo: "Reativação", motivo: "Retomada de bom negócio parado" },
+    ] }))
+  }
   if (u.startsWith("/api/whatsapp/contatos")) return new Response(JSON.stringify({ total: 84, comTelefone: 66, lista: [
     { jid: "1@lid", nome: "Perfumaria Exemplo", telefone: null, motivos: ["MQL", "ICP"], etiquetas: [], ultima: null },
     { jid: "2@lid", nome: "Carlos (Diretor)", telefone: null, motivos: ["Cliente: Carlos Teste"], etiquetas: [], ultima: null },
@@ -176,6 +188,7 @@ function Telas() {
         {tela === "parceiros-modal" && <ModalVenda inicial={negs[1]} parceiros={parc} clientes={["Camilo"]} onSalvar={() => {}} onNovoParceiro={() => {}} onFechar={() => {}} />}
       </div>
     }
+    case "reativacao": return pagina(<div className="max-w-[860px]"><ReativacaoCard /></div>)
     case "contatos": return pagina(<div className="max-w-[860px]"><ContatosProtegidosCard /></div>)
     case "agente": return pagina(<div className="max-w-[860px]"><AgenteLeadsCard onFiltro={() => {}} /></div>)
     case "metatoken": return pagina(<div className="space-y-4">

@@ -14,6 +14,7 @@ import { useTheme, ThemeChoice } from "./ThemeProvider"
 import { Pagina, CabecalhoPagina, Cartao, TituloCartao, Segmentado, Botao } from "./ds"
 import AgenteLeadsCard from "./AgenteLeadsCard"
 import ContatosProtegidosCard from "./ContatosProtegidosCard"
+import ReativacaoCard from "./ReativacaoCard"
 
 const inputCls = "h-9 rounded-lg px-2.5 text-[12.5px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] transition-colors ds-borda"
 
@@ -224,6 +225,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
           </Cartao>
 
           <AgenteLeadsCard filtro={draft.filtroLeads} onFiltro={t => setDraft(d => ({ ...d, filtroLeads: t }))} />
+          <ReativacaoCard />
 
           <ContatosProtegidosCard />
 

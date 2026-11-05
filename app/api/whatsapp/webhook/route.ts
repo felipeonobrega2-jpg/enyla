@@ -5,6 +5,7 @@ import { gravarLote, WaMessage, deveIgnorar, extractBody } from "@/app/lib/whats
 import { supabase } from "@/app/lib/supabase"
 import { agendarResposta, talvezFollowUps } from "@/app/lib/agenteAuto"
 import { talvezAprender } from "@/app/lib/agenteAprende"
+import { talvezReativar } from "@/app/lib/reativacaoServidor"
 
 // Espera do modo automático (o lead termina de digitar) + resposta da IA + envio
 export const maxDuration = 60
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
     // Follow-ups do agente de leads pegam carona nos eventos (no máximo uma rodada a cada 10 min)
     after(() => talvezFollowUps().catch(e => console.error("[agente follow-up]", e)))
     after(() => talvezAprender().catch(e => console.error("[agente aprende]", e)))
+    after(() => talvezReativar().catch(e => console.error("[reativação]", e)))
 
     // ── messages.upsert — mensagem nova em tempo real
     if (event === "messages.upsert") {

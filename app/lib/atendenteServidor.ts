@@ -11,6 +11,7 @@ import type { Atendimento } from "./atendente"
 import { LeadAvaliado, filtroEfetivo, soAbertura, saudacaoDoFiltro } from "./agenteLeads"
 import { transcreverPendentes } from "./transcricao"
 import { Conhecimento, conhecimentoNoPrompt } from "./agenteAprende"
+import { instrucaoDoMotivo } from "./reativacao"
 
 const ESQUEMA = {
   type: "object",
@@ -74,7 +75,7 @@ export async function lerConfigAtendente(): Promise<Cfg> {
   return (data?.data ?? {}) as Cfg
 }
 
-export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boolean; followUp?: 1 | 2 | 3; outra?: boolean } = {}): Promise<{ ok: true; r: ResultadoAtendente; conversa: ConversaLida } | { ok: false; erro: string; status: number }> {
+export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boolean; followUp?: 1 | 2 | 3; outra?: boolean; reativar?: { dias: number; motivo: string } } = {}): Promise<{ ok: true; r: ResultadoAtendente; conversa: ConversaLida } | { ok: false; erro: string; status: number }> {
   const cfg = opts.cfg ?? await lerConfigAtendente()
   if (!cfg.apiKey) return { ok: false, erro: "Chave da IA não configurada (Configurações).", status: 400 }
 
@@ -124,7 +125,8 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
   const ultimaId = mensagens[mensagens.length - 1].id
 
   // 1. Já respondida para esta mesma última mensagem (pelo agente ou pela tela): reaproveita, sem pagar de novo
-  if (!opts.followUp && !opts.outra && conv?.proxima_acao) {
+  const outraPergunta = !!opts.followUp || !!opts.reativar   // follow-up e retomada não reaproveitam nem guardam
+  if (!outraPergunta && !opts.outra && conv?.proxima_acao) {
     try {
       const g = JSON.parse(conv.proxima_acao) as { assinatura?: string; auto?: boolean; r?: ResultadoAtendente }
       if (g.assinatura === assinatura && g.r?.lead && (g.auto || !opts.automatico)) return { ok: true, r: { ...g.r, uso: undefined }, conversa: conversaLida }
@@ -132,7 +134,7 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
   }
   // 2. Lead novo que só mandou a mensagem do anúncio (ou "oi"): a resposta é sempre a sua saudação do filtro
   const saudacao = saudacaoDoFiltro(filtroEfetivo(cfg.filtroLeads))
-  if (!opts.followUp && !opts.outra && saudacao && !clienteAtivo && soAbertura(mensagens)) {
+  if (!outraPergunta && !opts.outra && saudacao && !clienteAtivo && soAbertura(mensagens)) {
     const r: ResultadoAtendente = {
       resposta: saudacao, etapa: "primeiro_contato", alerta: "nenhum", motivo_alerta: "", sugere_video: false,
       dados: { produto: "", volume_ml: null, caixa_cm: null, frasco_cm: null, quantidade: null, tem_arte: null, resumo: "" },
@@ -190,6 +192,7 @@ Regras que nunca quebram:
   const extra = [
     opts.automatico ? "Modo automático: a sua resposta pode sair sem o Felipe ver. Se tiver qualquer dúvida, pode_enviar_sozinho = false." : "",
     opts.followUp ? `Follow-up ${opts.followUp} de 3: o lead parou de responder depois da sua última mensagem. Escreva um follow-up curto, natural e sem pressão no estilo do guia (ex.: "Oi! Conseguiu ver?"), retomando o ponto em que pararam. ${opts.followUp === 3 ? "É o último: deixe a porta aberta, sem cobrar." : "Não repita a mensagem anterior."} Avalie o lead normalmente.` : "",
+    opts.reativar ? `Retomada: a conversa parou há ${opts.reativar.dias} dias. ${instrucaoDoMotivo(opts.reativar.motivo)} Escreva UMA mensagem curta para retomar como o Felipe faria: pessoal e natural, lembrando em poucas palavras o que o cliente queria (produto, quantidade, orçamento) e terminando com uma pergunta fácil de responder (ex.: se ainda está de pé, se já fechou, se quer que você atualize o orçamento). Varie a abertura de um contato para outro (nada de fórmula fixa como "passei aqui porque lembrei de você"). Sem pressão e sem cobrar resposta; não cite quanto tempo passou de forma cobradora. Sem desconto, sem preço novo, sem prazo. Se a última mensagem foi do cliente e ficou sem resposta, comece pedindo desculpa pela demora. Se pela conversa não faz sentido retomar (já fechou com você, disse que não quer, pedido em andamento, fornecedor, conversa pessoal), deixe "resposta" vazia e explique em motivo_alerta. Aqui a regra de ICP não se aplica: a retomada pode sair (alerta "nenhum", pode_enviar_sozinho true); quem segue a conversa quando ele responder é o Felipe.` : "",
   ].filter(Boolean).join("\n")
 
   const r = await clienteClaude(cfg.apiKey).beta.messages.create({
@@ -204,7 +207,7 @@ Regras que nunca quebram:
   let a: Omit<ResultadoAtendente, "ultimaId">
   try { a = JSON.parse(texto) } catch { return { ok: false, erro: "A IA respondeu fora do formato. Tente de novo.", status: 502 } }
   const resultado: ResultadoAtendente = { ...a, ultimaId, uso: { entrada: r.usage.input_tokens, cache: r.usage.cache_read_input_tokens ?? 0, gravouCache: r.usage.cache_creation_input_tokens ?? 0, saida: r.usage.output_tokens } }
-  // Guarda para reaproveitar enquanto não chegar mensagem nova (follow-up não: é outra pergunta)
-  if (!opts.followUp) await supabase.from("whatsapp_conversas").update({ proxima_acao: JSON.stringify({ assinatura, ultimaId, auto: !!opts.automatico, em: new Date().toISOString(), r: { ...resultado, uso: undefined } }) }).eq("jid", jid)
+  // Guarda para reaproveitar enquanto não chegar mensagem nova (follow-up e retomada não: são outra pergunta)
+  if (!outraPergunta) await supabase.from("whatsapp_conversas").update({ proxima_acao: JSON.stringify({ assinatura, ultimaId, auto: !!opts.automatico, em: new Date().toISOString(), r: { ...resultado, uso: undefined } }) }).eq("jid", jid)
   return { ok: true, r: resultado, conversa: conversaLida }
 }

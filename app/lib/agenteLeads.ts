@@ -113,7 +113,7 @@ export const ETIQUETAS_AGENTE = {
 } as const
 export const COR_ETIQUETA_AGENTE: Record<string, string> = {
   "MQL": "#009351", "Descartado": "#a0a0aa", "F1": "#c57800", "F2": "#d56a00", "F3": "#d33a3c", "Sem resposta": "#7a7983",
-  "ICP": "#009351", "Lead médio": "#8456e8", "Oportunidade": "#1f7ae0", "Lead pequeno": "#a0a0aa",
+  "ICP": "#009351", "Lead médio": "#8456e8", "Oportunidade": "#1f7ae0", "Lead pequeno": "#a0a0aa", "Reativação": "#0f8b8d",
 }
 const FOLLOW = ["F1", "F2", "F3"] as const
 const DO_AGENTE: string[] = [...Object.values(ETIQUETAS_AGENTE), ...Object.values(ETIQUETA_PERFIL) as string[]]
