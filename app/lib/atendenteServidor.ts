@@ -4,7 +4,7 @@
 
 import { supabase } from "./supabase"
 import { clienteClaude, FALLBACK, MODELO } from "./claude"
-import { clienteDaConversa, Vinculos } from "./vinculoWhatsapp"
+import { clienteDaConversa, ligacaoForte, Vinculos } from "./vinculoWhatsapp"
 import { nomeChave } from "./negocio"
 import { COLUNAS_KANBAN, COL_PERDIDO } from "../types"
 import type { Atendimento } from "./atendente"
@@ -57,6 +57,9 @@ const ESQUEMA = {
 
 export type ResultadoAtendente = Atendimento & { lead: LeadAvaliado; pode_enviar_sozinho: boolean; uso?: { entrada: number; cache: number; gravouCache: number; saida: number } }
 
+// Impressão digital curta (djb2) do que a IA leu
+const assinar = (t: string) => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return `${t.length}:${(h >>> 0).toString(36)}` }
+
 export type ConversaLida = {
   nome: string | null
   clienteCadastrado: boolean
@@ -91,14 +94,19 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
 
   // Cliente ligado: pedidos e orçamentos dele, para a IA saber em que pé está
   const nomes = [...new Set((cards ?? []).map(c => c.nomeCliente).filter(Boolean))] as string[]
-  const cli = conv ? clienteDaConversa(conv, nomes, cfg.vinculosWhatsapp) : null
+  const achado = conv ? clienteDaConversa(conv, nomes, cfg.vinculosWhatsapp) : null
+  // Só o primeiro nome bate com um cliente: pode ser outra pessoa; atende como lead e só avisa a IA
+  const parecido = achado && conv && !ligacaoForte(conv, achado) ? achado.nome : null
+  const cli = parecido ? null : achado
   const todosDoCliente = cli ? (cards ?? []).filter(c => nomeChave(c.nomeCliente) === nomeChave(cli.nome)) : []
   const doCliente = todosDoCliente.slice(-6)
   // Cliente "seu" é quem tem orçamento em aberto, negociação ou pedido; quem só tem orçamento perdido voltou a ser lead
   const clienteAtivo = todosDoCliente.some(c => c.coluna !== COL_PERDIDO)
   const contexto = cli
     ? `Cliente cadastrado: ${cli.nome}. ${doCliente.length ? "Orçamentos/pedidos: " + doCliente.map(c => `${c.numero} (${c.coluna === 11 ? "negociando" : COLUNAS_KANBAN[c.coluna] ?? "?"}, ${c.quantidade} un, ${c.dimensoes}, R$ ${c.preco})`).join("; ") : "Sem orçamentos ainda."}`
-    : "Contato ainda não ligado a um cliente do cadastro (provável lead novo)."
+    : parecido
+      ? `Contato ainda não ligado a um cliente do cadastro. Existe um cliente cadastrado com nome parecido ("${parecido}"), mas pode ser outra pessoa: trate como lead novo, a menos que a conversa deixe claro que é o mesmo cliente (pedido anterior, caixinha de sempre).`
+      : "Contato ainda não ligado a um cliente do cadastro (provável lead novo)."
   // Contato novo, sem nada seu antes: é lead (quase sempre do anúncio), mesmo que a primeira mensagem seja vaga
   const doAnuncio = typeof conv?.campanha === "string" && conv.campanha.includes("anuncio")
   const novo = !mensagens.some(m => m.from_me) && !!primeira?.ts && Date.now() - new Date(primeira.ts).getTime() < 4 * 86_400_000
@@ -106,14 +114,20 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
     ? `\nContato novo: é a primeira conversa dele com o Felipe${doAnuncio ? " e veio do anúncio" : " (os contatos novos quase sempre vêm do anúncio)"}. É lead: qualquer mensagem vaga ("blz", "oi", "ok", figurinha, áudio curto) é primeiro contato — mande a primeira mensagem do filtro, com pode_enviar_sozinho true.`
     : doAnuncio ? "\nO contato veio do anúncio." : ""
 
+  // Tudo o que a IA lê (conversa inteira, cliente/pedidos, guia, filtro, o que aprendeu): se qualquer coisa
+  // mudar, a resposta guardada não vale mais
+  const assinatura = assinar(JSON.stringify([
+    mensagens.map(m => [m.id, m.corpo]), contexto, cfg.guiaAtendimento ?? "", filtroEfetivo(cfg.filtroLeads),
+    (cfg.conhecimentoAgente ?? []).map(i => i.id), conv?.campanha ?? null,
+  ]))
   const conversaLida: ConversaLida = { nome: conv?.nome ?? null, clienteCadastrado: clienteAtivo, primeiraEm: primeira?.ts ?? null, mensagens }
   const ultimaId = mensagens[mensagens.length - 1].id
 
   // 1. Já respondida para esta mesma última mensagem (pelo agente ou pela tela): reaproveita, sem pagar de novo
   if (!opts.followUp && !opts.outra && conv?.proxima_acao) {
     try {
-      const g = JSON.parse(conv.proxima_acao) as { ultimaId?: string; auto?: boolean; r?: ResultadoAtendente }
-      if (g.ultimaId === ultimaId && g.r?.lead && (g.auto || !opts.automatico)) return { ok: true, r: { ...g.r, uso: undefined }, conversa: conversaLida }
+      const g = JSON.parse(conv.proxima_acao) as { assinatura?: string; auto?: boolean; r?: ResultadoAtendente }
+      if (g.assinatura === assinatura && g.r?.lead && (g.auto || !opts.automatico)) return { ok: true, r: { ...g.r, uso: undefined }, conversa: conversaLida }
     } catch { /* texto antigo nesse campo: ignora */ }
   }
   // 2. Lead novo que só mandou a mensagem do anúncio (ou "oi"): a resposta é sempre a sua saudação do filtro
@@ -191,6 +205,6 @@ Regras que nunca quebram:
   try { a = JSON.parse(texto) } catch { return { ok: false, erro: "A IA respondeu fora do formato. Tente de novo.", status: 502 } }
   const resultado: ResultadoAtendente = { ...a, ultimaId, uso: { entrada: r.usage.input_tokens, cache: r.usage.cache_read_input_tokens ?? 0, gravouCache: r.usage.cache_creation_input_tokens ?? 0, saida: r.usage.output_tokens } }
   // Guarda para reaproveitar enquanto não chegar mensagem nova (follow-up não: é outra pergunta)
-  if (!opts.followUp) await supabase.from("whatsapp_conversas").update({ proxima_acao: JSON.stringify({ ultimaId, auto: !!opts.automatico, em: new Date().toISOString(), r: { ...resultado, uso: undefined } }) }).eq("jid", jid)
+  if (!opts.followUp) await supabase.from("whatsapp_conversas").update({ proxima_acao: JSON.stringify({ assinatura, ultimaId, auto: !!opts.automatico, em: new Date().toISOString(), r: { ...resultado, uso: undefined } }) }).eq("jid", jid)
   return { ok: true, r: resultado, conversa: conversaLida }
 }

@@ -19,3 +19,9 @@ export function clienteDaConversa(conv: { jid: string; nome: string | null }, cl
   const contidos = clientes.filter(c => { const t = palavras(c); return t.length > 0 && t.every(p => pc.includes(p)) })
   return contidos.length === 1 ? { nome: contidos[0], manual: false } : null
 }
+
+// Ligação segura o bastante para o agente tratar como cliente (e não atender sozinho): vínculo manual, nome idêntico,
+// ou cliente com nome e sobrenome. Só o primeiro nome batendo ("Maurício" × "Mauricio Daniel") pode ser outra pessoa.
+export function ligacaoForte(conv: { nome: string | null }, cli: { nome: string; manual: boolean }) {
+  return cli.manual || norm(conv.nome) === norm(cli.nome) || palavras(cli.nome).length >= 2
+}
