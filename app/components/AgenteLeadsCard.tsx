@@ -4,7 +4,7 @@
 // (liga na hora), a simulação nos leads que estão esperando e o registro do que ele fez sozinho.
 
 import { useEffect, useState } from "react"
-import { Bot, Loader2, Play, Power } from "lucide-react"
+import { Bot, Loader2, Play, Power, Tag } from "lucide-react"
 import { Cartao, TituloCartao, Botao, Selo, Tom } from "./ds"
 import { AgenteAuto, RegistroAgente, PerfilLead, ROTULO_PERFIL, FILTRO_PADRAO, VITRINE_PADRAO } from "../lib/agenteLeads"
 
@@ -22,6 +22,7 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
   const [mudando, setMudando] = useState(false)
   const [vitrine, setVitrine] = useState<string | null>(null)
   const [vitrineSalva, setVitrineSalva] = useState(false)
+  const [wa, setWa] = useState<{ rodando: boolean; feitas: number; total: number; msg?: string } | null>(null)
 
   useEffect(() => {
     fetch("/api/whatsapp/agente").then(r => r.json()).then(d => { setAuto(d.auto); setLog(d.log ?? []); setTaxas(d.taxas ?? []) }).catch(() => {})
@@ -45,6 +46,19 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
   async function salvarVitrine() {
     const d = await fetch("/api/whatsapp/agente", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vitrine: vitrine ?? "" }) }).then(r => r.json()).catch(() => null)
     if (d?.auto) { setAuto(d.auto); setVitrine(null); setVitrineSalva(true); setTimeout(() => setVitrineSalva(false), 2000) }
+  }
+
+  async function etiquetasParaWhatsapp() {
+    setWa({ rodando: true, feitas: 0, total: 0 })
+    let feitas = 0
+    for (let p = 0; p < 50; p++) {
+      const d = await fetch("/api/whatsapp/agente", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ etiquetasWhatsapp: p }) }).then(r => r.json()).catch(() => null)
+      if (!d || d.erro) return setWa({ rodando: false, feitas, total: d?.total ?? 0, msg: d?.erro ?? "Sem conexão." })
+      feitas += d.feitas
+      const falta = d.faltando?.length ? ` Faltam no app: ${d.faltando.join(", ")}.` : ""
+      setWa({ rodando: d.mais, feitas, total: d.total, msg: d.mais ? undefined : `Pronto: ${feitas} conversas etiquetadas no WhatsApp.${falta}` })
+      if (!d.mais) return
+    }
   }
 
   const ligado = !!auto?.ligado
@@ -78,7 +92,13 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
         <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#5e5c68]">Lead ruim → Descartado</p><p className="text-[#5e5c68]">Menos de 1.000 caixas e nada mais. Uma mensagem orientando, indicando o parceiro e oferecendo frasco/essência; etiqueta Descartado e sai da sua lista de responder.</p></div>
         <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#c57800]">Sem resposta → F1, F2, F3</p><p className="text-[#5e5c68]">F1 após 3 h, F2 após 1 dia, F3 após 3 dias (8h–20h). 4 dias depois do F3: Sem resposta, vai para Perdido. No MQL só etiqueta, quem cobra é você.</p></div>
       </div>
-      <p className="text-[11px] text-[#898892] mb-4">No seu WhatsApp Business: crie no app as etiquetas com estes nomes exatos (MQL, Descartado, F1, F2, F3, Sem resposta, ICP, Lead médio, Oportunidade, Lead pequeno, Fornecedora) e ele marca lá também.</p>
+      <div className="flex items-start gap-3 mb-4">
+        <p className="text-[11px] text-[#898892] flex-1">No seu WhatsApp Business: crie no app as etiquetas com estes nomes exatos (MQL, Descartado, F1, F2, F3, Sem resposta, ICP, Lead médio, Oportunidade, Lead pequeno) e ele marca lá também. Depois de criar, mande as que já existem no sistema:</p>
+        <Botao onClick={etiquetasParaWhatsapp} disabled={!!wa?.rodando} icone={wa?.rodando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Tag className="w-3.5 h-3.5" />}>
+          {wa?.rodando ? `${wa.feitas}${wa.total ? ` de ${wa.total}` : ""}…` : "Etiquetar no WhatsApp"}
+        </Botao>
+      </div>
+      {wa?.msg && <p className="text-[11.5px] text-[#5e5c68] -mt-2 mb-4">{wa.msg}</p>}
 
       {/* Vitrine */}
       <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-1.5">Instagram para todo lead</p>

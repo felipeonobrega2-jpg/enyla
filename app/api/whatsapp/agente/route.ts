@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { atender, lerConfigAtendente } from "@/app/lib/atendenteServidor"
+import { enviarEtiquetasAoWhatsapp } from "@/app/lib/agenteAuto"
 import { AgenteAuto, RegistroAgente, travaDoEnvio, valoresEmReais, PerfilLead, filtroEfetivo } from "@/app/lib/agenteLeads"
 
 export const maxDuration = 60
@@ -8,6 +9,7 @@ export const maxDuration = 60
 // Agente de leads (Configurações): estado do modo automático, o que ele fez e simulação sem enviar.
 //   GET                      → { auto, log }
 //   POST { ligado, ... }     → liga/desliga o modo automático (grava na hora, sem o Salvar da página)
+//   POST { etiquetasWhatsapp: página } → copia as etiquetas do agente para o WhatsApp Business
 //   POST { simular: true }   → roda o agente nos leads mais recentes e mostra o que ele mandaria (não envia nada)
 // (Rota protegida pelo login.)
 
@@ -36,7 +38,9 @@ export async function GET() {
 export type Simulacao = { jid: string; nome: string | null; ultima: string; perfil: PerfilLead; quantidade: number | null; motivo: string; resposta: string; enviaria: boolean; trava: string | null }
 
 export async function POST(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as Partial<AgenteAuto> & { simular?: boolean }
+  const b = await req.json().catch(() => ({})) as Partial<AgenteAuto> & { simular?: boolean; etiquetasWhatsapp?: number }
+  // Etiquetas do sistema → WhatsApp Business, uma página por chamada (a tela repete até acabar)
+  if (typeof b.etiquetasWhatsapp === "number") return NextResponse.json(await enviarEtiquetasAoWhatsapp(b.etiquetasWhatsapp))
   if (!b.simular) {
     const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
     const d = (data?.data ?? {}) as Record<string, unknown> & Cfg

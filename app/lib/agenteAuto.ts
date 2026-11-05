@@ -64,6 +64,25 @@ async function sincronizarNoWhatsapp(number: string, antes: string[], depois: st
   }
 }
 
+// Manda para o WhatsApp Business as etiquetas do agente que já estão no sistema (arrumação em lote).
+// Em páginas: devolve quantas conversas foram e se ainda há mais.
+export async function enviarEtiquetasAoWhatsapp(pagina: number, tamanho = 30) {
+  const nomes = Object.keys(COR_ETIQUETA_AGENTE)
+  const { data, count } = await supabase.from("whatsapp_conversas").select("jid, telefone, etiquetas", { count: "exact" })
+    .overlaps("etiquetas", nomes).order("jid").range(pagina * tamanho, pagina * tamanho + tamanho - 1)
+  const lista = await etiquetasDoWhatsapp().catch(() => [])
+  if (!lista.length) return { feitas: 0, total: count ?? 0, mais: false, erro: "Não achei etiquetas no seu WhatsApp Business. Crie no app as etiquetas com os mesmos nomes." }
+  const faltando = nomes.filter(n => !lista.some(l => l.name?.trim().toLowerCase() === n.toLowerCase()))
+  const fila = [...(data ?? [])]
+  await Promise.all(Array.from({ length: 5 }, async () => {
+    while (fila.length) {
+      const c = fila.shift()!
+      await sincronizarNoWhatsapp(c.telefone || c.jid, [], (c.etiquetas ?? []) as string[])
+    }
+  }))
+  return { feitas: (data ?? []).length, total: count ?? 0, mais: (pagina + 1) * tamanho < (count ?? 0), faltando }
+}
+
 // Troca as etiquetas (e a etapa do funil, se veio) no sistema e no WhatsApp
 async function aplicar(c: Conversa, etiquetas: string[], etapa: string | null) {
   const antes = c.etiquetas ?? []
