@@ -32,7 +32,7 @@ describe("agente de leads: o que pode sair sem o Felipe", () => {
     const peq = { ...ok, lead: { perfil: "pequeno" as const, quantidade_total: 100, motivo: "" } }
     expect(travaDoEnvio(peq)).toBeNull()
     expect(travaDoEnvio({ ...peq, jaEncerrouPequeno: true })).toMatch(/orientado/)
-    expect(travaDoEnvio({ ...ok, jaEncerrouPequeno: true, lead: { ...ok.lead, perfil: "medio" } })).toBeNull()
+    expect(travaDoEnvio({ ...ok, jaEncerrouPequeno: true, lead: { ...ok.lead, perfil: "indefinido" } })).toBeNull()
     expect(travaDoEnvio({ ...ok, enviadasHoje: 6 })).toMatch(/6×/)
   })
   it("partes, valores e mensagem de ausência", () => {
@@ -55,6 +55,7 @@ describe("agente de leads: etiquetas e follow-up", () => {
   })
   it("MQL trava o automático", () => {
     expect(travaDoEnvio({ ...ok, emMql: true })).toMatch(/MQL/)
+    for (const perfil of ["icp", "medio", "oportunidade"] as const) expect(travaDoEnvio({ ...ok, lead: { ...ok.lead, perfil } })).toMatch(/MQL/)
   })
   it("F1 → F2 → F3 → Sem resposta, cada um no seu tempo", () => {
     expect(proximoFollowUp([], 2)).toBeNull()

@@ -70,6 +70,7 @@ export function travaDoEnvio(c: ContextoEnvio): string | null {
   if (!c.resposta.trim()) return "nada a responder"
   if (c.lead.perfil === "nao_lead") return "não é lead"
   if (c.emMql) return "MQL: você atende"
+  if (ehQualificado(c.lead.perfil)) return "bom negócio: foi para MQL, você atende"
   if (c.clienteCadastrado) return "cliente cadastrado: fica com você"
   if (!c.conversaNova) return "contato antigo: fica com você"
   if (c.manualRecente) return "você está nessa conversa agora"

@@ -66,7 +66,7 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
 
       {/* Como ele organiza */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4 text-[11.5px]">
-        <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#009351]">Lead bom → MQL</p><p className="text-[#5e5c68]">1.000+ caixas, ou frasco, essência, válvula e envase em volume (Oportunidade). Etiqueta MQL e vai para a coluna MQL do funil. Daí em diante ele não responde mais: é você, sem o contato perceber a troca.</p></div>
+        <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#009351]">Lead bom → MQL</p><p className="text-[#5e5c68]">1.000+ caixas, ou frasco, essência, válvula e envase em volume (Oportunidade). Etiqueta MQL e vai para a coluna MQL do funil. Assim que vê que é bom negócio ele para de responder: é você, sem o contato perceber a troca.</p></div>
         <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#5e5c68]">Lead ruim → Descartado</p><p className="text-[#5e5c68]">Menos de 1.000 caixas e nada mais. Uma mensagem orientando, indicando o parceiro e oferecendo frasco/essência; etiqueta Descartado e sai da sua lista de responder.</p></div>
         <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#c57800]">Sem resposta → F1, F2, F3</p><p className="text-[#5e5c68]">F1 após 3 h, F2 após 1 dia, F3 após 3 dias (8h–20h). 4 dias depois do F3: Sem resposta, vai para Perdido. No MQL só etiqueta, quem cobra é você.</p></div>
       </div>
