@@ -119,6 +119,7 @@ describe("agente de leads: economia de IA", () => {
   })
   it("reconhece falta de crédito", () => {
     expect(ehSemCredito("400 Your credit balance is too low to access the Anthropic API")).toBe(true)
+    expect(ehSemCredito("400 You have reached your specified API usage limits. You will regain access on 2026-12-01")).toBe(true)
     expect(ehSemCredito("Erro da IA (529): overloaded")).toBe(false)
   })
 })

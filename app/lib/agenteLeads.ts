@@ -253,7 +253,8 @@ export function soAbertura(msgs: { from_me: boolean; corpo: string | null; tipo:
 }
 
 // Sem crédito na Anthropic (mensagem da API): o agente avisa você e segue só com o que não precisa de IA
-export const ehSemCredito = (erro: string) => /credit balance is too low|billing/i.test(erro)
+// (também o limite de gasto que você configura no console: "You have reached your specified API usage limits")
+export const ehSemCredito = (erro: string) => /credit balance is too low|billing|usage limit/i.test(erro)
 
 // ── Marcos por conversa: o que as regras precisam lembrar por semanas ─────────
 // O registro (agenteLog) guarda só os últimos eventos, para a tela; com o volume do anúncio ele cobre ~1 dia.

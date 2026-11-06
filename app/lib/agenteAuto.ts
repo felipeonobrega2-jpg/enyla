@@ -167,7 +167,7 @@ async function avisarSemCredito(cfg: CfgAgente) {
   const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
   if (!destino) return
   await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text:
-    "⚠️ *A IA do sistema ficou sem crédito na Anthropic.*\nO agente parou de responder os leads (as saudações do anúncio continuam saindo). Recarregue em console.anthropic.com → Billing e, se puder, ligue a recarga automática." }) }).catch(() => null)
+    "⚠️ *A IA do sistema parou: sem crédito ou limite de gasto atingido na Anthropic.*\nO agente parou de responder os leads (as saudações do anúncio continuam saindo). Em console.anthropic.com, confira o saldo (Billing) e o limite de gasto mensal (Limits); se puder, ligue a recarga automática." }) }).catch(() => null)
 }
 
 const ultimaDa = async (jid: string) =>
