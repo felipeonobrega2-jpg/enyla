@@ -4,6 +4,8 @@
 // sem resposta → F1, F2, F3 e Sem resposta. As etiquetas vão também para o WhatsApp Business, quando existem lá.
 // Tudo fica registrado (Configurações → Agente de leads) com o motivo de ter enviado ou segurado.
 
+import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoOrcamentoDigital, linkPixDigital, valoresDoPedido, PedidoDigital } from "./digital"
+import type { RegraDigital } from "./precoDigital"
 import { supabase } from "./supabase"
 import { evo } from "./evolution"
 import { gravarLote, WaMessage } from "./whatsappDados"
@@ -24,7 +26,7 @@ const MAX_REGISTROS = 300
 const MIN_ENTRE_RODADAS = 10         // follow-ups: no máximo uma rodada a cada 10 min
 
 export type Registro = RegistroAgente & { ids?: string[] }
-export type CfgAgente = { agenteAuto?: AgenteAuto; agenteLog?: Registro[]; agenteMarcos?: Marcos; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string; agenteSemCreditoEm?: string }
+export type CfgAgente = { pedidosDigitais?: PedidoDigital[]; digital?: RegraDigital; agenteAuto?: AgenteAuto; agenteLog?: Registro[]; agenteMarcos?: Marcos; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string; agenteSemCreditoEm?: string }
 export type Conversa = { jid: string; nome: string | null; telefone: string | null; etiquetas: string[] | null; status_lead: string | null }
 
 export async function lerCfg() { return await lerConfigAtendente() as Awaited<ReturnType<typeof lerConfigAtendente>> & CfgAgente }
@@ -183,12 +185,16 @@ async function voceNaConversa(jid: string, log: Registro[]) {
   return (minhas ?? []).some(m => !idsDoAgente.has(m.id) && !ehMensagemAutomaticaDoWhatsapp(m.corpo))
 }
 
+// Endereço público do sistema (links que vão para o cliente)
+const BASE_PUBLICA = "https://app.enyla.com.br"
+
 const contexto = (cfg: CfgAgente, log: Registro[], jid: string) => ({
   enviadasHoje: log.filter(l => l.enviou && new Date(l.em).getTime() > Date.now() - 86_400_000).length,
   maxPorDia: cfg.agenteAuto?.maxPorDia ?? 6,
   // Vendendo em digital, o lead pequeno segue na conversa até o orçamento (não é só uma mensagem)
   jaEncerrouPequeno: cfg.agenteAuto?.pequenoParceiro !== false && (log.some(l => l.enviou && l.perfil === "pequeno") || !!cfg.agenteMarcos?.[jid]?.passos?.["Pequeno"]),
-  precosDoFiltro: valoresEmReais(filtroEfetivo(cfg.filtroLeads)),
+  // Valores do orçamento digital desta conversa também podem sair (a IA responde dúvidas sobre ele)
+  precosDoFiltro: [...valoresEmReais(filtroEfetivo(cfg.filtroLeads)), ...(pedidoDaConversa(cfg.pedidosDigitais, jid) ? valoresDoPedido(pedidoDaConversa(cfg.pedidosDigitais, jid)!) : [])],
 })
 
 // ── Lead mandou mensagem ─────────────────────────────────────────────────────
@@ -253,9 +259,24 @@ export async function responderSozinho(msgId: string) {
   }
   const { r, conversa } = a
 
+  // Braço digital: lead pequeno com quantidade e ml (ou medidas) recebe o orçamento da tabela da Villa e o link do
+  // sinal, sem você. Mandou as medidas do frasco ou mudou a quantidade antes de pagar: recota.
+  let novoPedido: PedidoDigital | null = null
+  const anterior = pedidoDaConversa(cfg.pedidosDigitais, jid)
+  if (auto.pequenoParceiro === false && r.lead.perfil === "pequeno" && !conversa.clienteCadastrado) {
+    const cot = cotarDigital(r.dados, cfg.digital)
+    if (cot.ok && (!anterior || mudouACotacao(anterior, cot))) {
+      novoPedido = montarPedido(cfg.pedidosDigitais ?? [], jid, conversa.nome, r.dados, cot)
+      r.resposta = textoOrcamentoDigital(novoPedido, linkPixDigital(BASE_PUBLICA, novoPedido))
+      r.alerta = "nenhum"; r.pode_enviar_sozinho = true
+    }
+  }
+  const ctx = contexto(cfg, log, jid)
+  if (novoPedido) ctx.precosDoFiltro.push(...valoresDoPedido(novoPedido))
+
   const trava = travaDoEnvio({
     ligado: true, resposta: r.resposta, alerta: r.alerta, podeSozinho: r.pode_enviar_sozinho, lead: r.lead,
-    conversaNova, clienteCadastrado: conversa.clienteCadastrado, manualRecente, emMql: false, ...contexto(cfg, log, jid),
+    conversaNova, clienteCadastrado: conversa.clienteCadastrado, manualRecente, emMql: false, ...ctx,
   })
   // Lead pequeno só vai para Descartado depois de orientado (senão sumiria da sua lista sem resposta)
   const organiza = !conversa.clienteCadastrado && r.lead.perfil !== "nao_lead"
@@ -299,6 +320,11 @@ export async function responderSozinho(msgId: string) {
 
   const env = await enviar(c, r.resposta, msgId)
   await pequeno(env.ids.length > 0)
+  // Orçamento digital enviado: o pedido fica esperando o sinal (o anterior desta conversa, se havia, é trocado)
+  if (novoPedido && env.ids.length) {
+    const np = novoPedido
+    await gravarCfg(d => ({ pedidosDigitais: [np, ...(d.pedidosDigitais ?? []).map(p => p.jid === jid && p.status === "aguardando_sinal" ? { ...p, status: "cancelado" as const } : p)].slice(0, 500) }))
+  }
   // Instagram só se ainda cabe no minuto da Vercel (senão vai na próxima resposta)
   if (env.ids.length && querVitrine && Date.now() - inicio < 47_000) {
     const v = await mandarVitrine()

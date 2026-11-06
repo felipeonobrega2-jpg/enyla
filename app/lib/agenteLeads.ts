@@ -222,12 +222,13 @@ export const filtroEfetivo = (t?: string | null) => t?.trim() || FILTRO_PADRAO
 
 // Você vende o lead pequeno em impressão digital: troca a regra de indicar o parceiro por levantar os dados do orçamento
 export const SECAO_DIGITAL = `LEAD PEQUENO (menos de 1.000): VENDEMOS EM IMPRESSÃO DIGITAL
-- Poucas unidades a gente também faz, em impressão digital (com verniz à base d'água). Não indique outra gráfica e não passe contato de parceiro.
-- Pedido mínimo: em offset fica em torno de 1.000; abaixo disso a gente faz em impressão digital.
-- Levante, uma ou duas perguntas por vez: o que vai na caixa (ml), medidas do frasco ou da caixa (altura x largura x profundidade), quantidade, quantos modelos/artes e se já tem arte.
-- Não passe preço da impressão digital: o valor vai no orçamento. Com os dados em mãos: "vou preparar o seu orçamento" e decisao_sua.
+- Poucas unidades a gente também faz, em impressão digital: triplex 300g com laminação fosca ou brilhante, arte inclusa (nossa designer cria). Não indique outra gráfica e não passe contato de parceiro.
+- Pedido mínimo: em offset fica em torno de 1.000; abaixo disso, de 20 a 500 caixas, a gente faz em impressão digital.
+- O que precisa para o orçamento: a quantidade e o ml do frasco (ou as medidas da caixa: altura x largura x profundidade). Pergunte o que faltar, uma coisa por vez.
+- Não escreva preço da impressão digital: com a quantidade e o ml (ou as medidas), o sistema manda o orçamento com o link do sinal de 50% pelo Pix. Depois que ele foi, você pode repetir os valores que estão nele.
+- Frete: calculado no final do pedido, pelo CEP. Prazo: começa depois do sinal; a designer manda a arte para ele aprovar antes de imprimir.
 - Hot stamping em digital não dá: sugira simular o hot stamping na arte.
-- Na mesma conversa, deixe a porta aberta para frasco, essência, válvula ou envase (só vira oportunidade em volume: 1.000+ ou recorrente).
+- Deixe a porta aberta para frasco, essência, válvula ou envase (só vira oportunidade em volume: 1.000+ ou recorrente).
 - Se ele topar 1.000 ou mais, vira lead normal (offset).`
 export function filtroDoModo(filtro: string, parceiro: boolean): string {
   if (parceiro) return filtro
