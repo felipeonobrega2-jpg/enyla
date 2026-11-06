@@ -9,7 +9,7 @@ import { nomeChave } from "./negocio"
 import { COLUNAS_KANBAN, COL_PERDIDO, COL_FECHADO, COL_ENTREGUE } from "../types"
 import type { Atendimento } from "./atendente"
 import { agoraParaIA, corrigirCumprimento } from "./atendente"
-import { LeadAvaliado, filtroEfetivo, soAbertura, saudacaoDoFiltro } from "./agenteLeads"
+import { LeadAvaliado, filtroDoAgente, soAbertura, saudacaoDoFiltro } from "./agenteLeads"
 import { transcreverPendentes } from "./transcricao"
 import { Conhecimento, conhecimentoNoPrompt } from "./agenteAprende"
 import { instrucaoDoMotivo } from "./reativacao"
@@ -69,7 +69,7 @@ export type ConversaLida = {
   mensagens: { id: string; from_me: boolean; corpo: string | null; tipo: string; ts: string }[]
 }
 
-type Cfg = { apiKey?: string; guiaAtendimento?: string; filtroLeads?: string; vinculosWhatsapp?: Vinculos; conhecimentoAgente?: Conhecimento[] }
+type Cfg = { apiKey?: string; guiaAtendimento?: string; filtroLeads?: string; agenteAuto?: { pequenoParceiro?: boolean }; vinculosWhatsapp?: Vinculos; conhecimentoAgente?: Conhecimento[] }
 
 export async function lerConfigAtendente(): Promise<Cfg> {
   const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
@@ -124,7 +124,7 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
   // Tudo o que a IA lê (conversa inteira, cliente/pedidos, guia, filtro, o que aprendeu): se qualquer coisa
   // mudar, a resposta guardada não vale mais
   const assinatura = assinar(JSON.stringify([
-    mensagens.map(m => [m.id, m.corpo]), contexto, cfg.guiaAtendimento ?? "", filtroEfetivo(cfg.filtroLeads),
+    mensagens.map(m => [m.id, m.corpo]), contexto, cfg.guiaAtendimento ?? "", filtroDoAgente(cfg),
     (cfg.conhecimentoAgente ?? []).map(i => i.id), conv?.campanha ?? null,
   ]))
   const conversaLida: ConversaLida = { nome: conv?.nome ?? null, clienteCadastrado: clienteAtivo, primeiraEm: primeira?.ts ?? null, mensagens }
@@ -139,7 +139,7 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
     } catch { /* texto antigo nesse campo: ignora */ }
   }
   // 2. Lead novo que só mandou a mensagem do anúncio (ou "oi"): a resposta é sempre a sua saudação do filtro
-  const saudacao = saudacaoDoFiltro(filtroEfetivo(cfg.filtroLeads))
+  const saudacao = saudacaoDoFiltro(filtroDoAgente(cfg))
   if (!outraPergunta && !opts.outra && saudacao && !clienteAtivo && soAbertura(mensagens)) {
     const r: ResultadoAtendente = {
       resposta: saudacao, etapa: "primeiro_contato", alerta: "nenhum", motivo_alerta: "", sugere_video: false,
@@ -168,7 +168,7 @@ ${cfg.guiaAtendimento?.trim() || "Mensagens curtas, cordiais, em primeira pessoa
 Seu trabalho principal com quem chega do anúncio é descobrir os bons negócios e poupar o tempo dele, com o mínimo de mensagens: descobrir rápido o volume e separar quem é bom negócio de quem não é. Bom negócio é caixa em volume ou os outros produtos do ramo em que ele também ganha (frasco, essência, válvula, envase, produto pronto). Cerca de 90% dos leads querem poucas caixas e não são o nosso cliente. Siga o filtro:
 
 <filtro_leads>
-${filtroEfetivo(cfg.filtroLeads)}
+${filtroDoAgente(cfg)}
 </filtro_leads>
 ${cfg.conhecimentoAgente?.length ? `
 O que você já aprendeu com os atendimentos do próprio Felipe (conversas e áudios dele). Use para responder como ele; se contradiz o filtro, vale o filtro. Valores daqui são histórico dele: não cite valor que não esteja no filtro.

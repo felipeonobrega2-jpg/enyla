@@ -29,6 +29,7 @@ export type AgenteAuto = {
   maxPorDia?: number          // respostas automáticas por conversa em 24 h (padrão 6)
   vitrine?: string            // mensagem do Instagram, mandada uma vez a cada lead depois da primeira resposta
   avisoNumero?: string        // número que recebe o aviso de MQL no WhatsApp (vazio = o seu próprio chat "Você")
+  pequenoParceiro?: boolean   // lead pequeno (menos de 1.000): indica o parceiro digital (padrão) · false: você vende em digital
 }
 
 // Aviso de lead bom, mandado no seu WhatsApp: quem é, o que quer e o link para abrir a conversa
@@ -109,10 +110,10 @@ export function travaDoEnvio(c: ContextoEnvio): string | null {
 // Sem resposta → F1, F2, F3 e, por fim, Sem resposta (vai para Perdido).
 
 export const ETIQUETAS_AGENTE = {
-  mql: "MQL", descartado: "Descartado", f1: "F1", f2: "F2", f3: "F3", semResposta: "Sem resposta",
+  mql: "MQL", descartado: "Descartado", digital: "Digital", f1: "F1", f2: "F2", f3: "F3", semResposta: "Sem resposta",
 } as const
 export const COR_ETIQUETA_AGENTE: Record<string, string> = {
-  "MQL": "#009351", "Descartado": "#a0a0aa", "F1": "#c57800", "F2": "#d56a00", "F3": "#d33a3c", "Sem resposta": "#7a7983",
+  "MQL": "#009351", "Descartado": "#a0a0aa", "Digital": "#c2410c", "F1": "#c57800", "F2": "#d56a00", "F3": "#d33a3c", "Sem resposta": "#7a7983",
   "ICP": "#009351", "Lead médio": "#8456e8", "Oportunidade": "#1f7ae0", "Lead pequeno": "#a0a0aa", "Reativação": "#0f8b8d",
 }
 const FOLLOW = ["F1", "F2", "F3"] as const
@@ -123,10 +124,12 @@ export const ehEtiquetaDoAgente = (e: string) => DO_AGENTE.includes(e)
 export const ehQualificado = (p: PerfilLead) => p === "icp" || p === "medio" || p === "oportunidade"
 
 // Depois de avaliar o lead: etiquetas novas (as suas ficam) e a etapa do funil (null = não mexe)
-export function organizarLead(atuais: string[], perfil: PerfilLead): { etiquetas: string[]; etapa: "mql" | "descartado" | null } {
+// digital: você vende o lead pequeno em impressão digital (etiqueta Digital, não vai para Descartado)
+export function organizarLead(atuais: string[], perfil: PerfilLead, digital = false): { etiquetas: string[]; etapa: "mql" | "descartado" | null } {
   const suas = atuais.filter(e => !DO_AGENTE.includes(e))
   const perf = ETIQUETA_PERFIL[perfil]
   if (ehQualificado(perfil)) return { etiquetas: [...suas, ETIQUETAS_AGENTE.mql, perf!], etapa: "mql" }
+  if (perfil === "pequeno" && digital) return { etiquetas: [...suas, ETIQUETAS_AGENTE.digital, perf!], etapa: null }
   if (perfil === "pequeno") return { etiquetas: [...suas, ETIQUETAS_AGENTE.descartado, perf!], etapa: "descartado" }
   // Indefinido: mantém o que já tinha (inclusive F1/F2/F3); não é lead: não mexe
   return { etiquetas: atuais, etapa: null }
@@ -216,6 +219,24 @@ NÃO É LEAD
 - Fornecedor (papel, frasco, válvula, essência, gráfica, colagem), parceiro, cliente com pedido em andamento, conversa pessoal: não responda (decisao_sua). Se for fornecedor, marque fornecedor = true.`
 
 export const filtroEfetivo = (t?: string | null) => t?.trim() || FILTRO_PADRAO
+
+// Você vende o lead pequeno em impressão digital: troca a regra de indicar o parceiro por levantar os dados do orçamento
+export const SECAO_DIGITAL = `LEAD PEQUENO (menos de 1.000): VENDEMOS EM IMPRESSÃO DIGITAL
+- Poucas unidades a gente também faz, em impressão digital (com verniz à base d'água). Não indique outra gráfica e não passe contato de parceiro.
+- Pedido mínimo: em offset fica em torno de 1.000; abaixo disso a gente faz em impressão digital.
+- Levante, uma ou duas perguntas por vez: o que vai na caixa (ml), medidas do frasco ou da caixa (altura x largura x profundidade), quantidade, quantos modelos/artes e se já tem arte.
+- Não passe preço da impressão digital: o valor vai no orçamento. Com os dados em mãos: "vou preparar o seu orçamento" e decisao_sua.
+- Hot stamping em digital não dá: sugira simular o hot stamping na arte.
+- Na mesma conversa, deixe a porta aberta para frasco, essência, válvula ou envase (só vira oportunidade em volume: 1.000+ ou recorrente).
+- Se ele topar 1.000 ou mais, vira lead normal (offset).`
+export function filtroDoModo(filtro: string, parceiro: boolean): string {
+  if (parceiro) return filtro
+  const faixa = filtro.replace(/^- Menos de 1\.000 no total[^\n]*$/m, "- Menos de 1.000 no total: atendemos em impressão digital (ver LEAD PEQUENO).")
+  const sec = /^LEAD PEQUENO[^\n]*\n[\s\S]*?(?=\n\n[A-ZÇÃÕÉÊÍÓÚ][A-ZÇÃÕÉÊÍÓÚ ]+\n|(?![\s\S]))/m
+  return sec.test(faixa) ? faixa.replace(sec, SECAO_DIGITAL) : `${faixa}\n\n${SECAO_DIGITAL}\n(Esta regra vale sobre qualquer outra sobre lead pequeno acima.)`
+}
+export const filtroDoAgente = (cfg: { filtroLeads?: string; agenteAuto?: { pequenoParceiro?: boolean } }) =>
+  filtroDoModo(filtroEfetivo(cfg.filtroLeads), cfg.agenteAuto?.pequenoParceiro !== false)
 
 // ── Conhecimento que o agente aprende com os seus atendimentos (agenteAprende) ──
 export type Conhecimento = { id: string; tema: string; texto: string; em: string }

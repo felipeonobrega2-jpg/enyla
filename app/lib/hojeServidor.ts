@@ -8,7 +8,7 @@ import { POR_DIA_PADRAO } from "./reativacao"
 import { DIAS_PERDIDO } from "./funilWhatsapp"
 import { total, custoPor, Relatorio } from "./marketing"
 import { marcosDoRegistro } from "./agenteLeads"
-import { quemResponder, doAnuncio, deveOrcamento, etapaDaConversa, dadosDaConversa, ConvHoje, Hoje, ItemHoje, Passos } from "./hoje"
+import { quemResponder, doAnuncio, doDigital, deveOrcamento, etapaDaConversa, dadosDaConversa, ConvHoje, Hoje, ItemHoje, Passos } from "./hoje"
 import { qualidadeDoLead } from "./marketing"
 import { nomeChave } from "./negocio"
 
@@ -36,6 +36,7 @@ export async function montarHoje(): Promise<Hoje> {
       ligado: !!auto.ligado, porDia: auto.porDia ?? POR_DIA_PADRAO, hoje: enviadasHoje(cfg), fila: fila.length,
       orcamentosSemResposta: fila.filter(c => c.motivo === "Orçamento sem resposta").length,
     },
+    digital: { ligado: (cfg as { agenteAuto?: { pequenoParceiro?: boolean } }).agenteAuto?.pequenoParceiro === false, ...doDigital(convs) },
   }
 }
 

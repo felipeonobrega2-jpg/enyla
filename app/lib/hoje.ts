@@ -68,6 +68,22 @@ export type Hoje = {
   anuncio: { leads: number; mql: number; semClassificar: number; descartados: number }   // últimas 24 h
   marketing: { dia: string; acao: string; custoMql: number | null } | null
   reativacao: { ligado: boolean; hoje: number; porDia: number; fila: number; orcamentosSemResposta?: number }
+  digital?: { ligado: boolean; ativos: number; paraOrcar: number; esperando: number }   // leads pequenos que você vende em digital (7 dias)
+}
+
+// Leads pequenos vendidos em impressão digital (etiqueta Digital), separados dos bons negócios: quantos falaram nos
+// últimos 7 dias, quantos já passaram tudo para orçar e quantos escreveram por último
+export function doDigital(convs: ConvHoje[], agora = Date.now()) {
+  const out = { ativos: 0, paraOrcar: 0, esperando: 0 }
+  for (const c of convs) {
+    if (!(c.etiquetas ?? []).includes("Digital") || ["pedido", "perdido"].includes(c.status_lead ?? "")) continue
+    const recebida = c.ultima_recebida_at
+    if (!recebida || agora - new Date(recebida).getTime() > DIAS_ORCAR * 86_400_000) continue
+    out.ativos++
+    if (etapaDaConversa(c.proxima_acao) === "orcamento") out.paraOrcar++
+    else if ((!c.ultima_enviada_at || recebida > c.ultima_enviada_at) && !ehSoConfirmacao(c.ultima_msg)) out.esperando++
+  }
+  return out
 }
 
 const DIAS_RETOMADA = 7

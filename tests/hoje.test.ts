@@ -152,3 +152,20 @@ describe("orçamento para fazer", async () => {
     expect(deveOrcamento(pronto(), nada, { tipo: "esperando", em: h(1), ate: h(-48) }, agora)).toBe(false)
   })
 })
+
+describe("Digital", () => {
+  it("conta só quem tem a etiqueta Digital e falou nos últimos 7 dias", async () => {
+    const { doDigital } = await import("../app/lib/hoje")
+    const agora = Date.parse("2026-11-06T12:00:00Z")
+    const d = (dias: number) => new Date(agora - dias * 86_400_000).toISOString()
+    const base = { nome: null, fechada_em: null, status_lead: null, campanha: null, criado_em: null, ultima_msg: "quanto fica?" }
+    const r = doDigital([
+      { ...base, jid: "a", etiquetas: ["Digital", "Lead pequeno"], ultima_recebida_at: d(1), ultima_enviada_at: d(1.1), proxima_acao: JSON.stringify({ r: { etapa: "orcamento" } }) },
+      { ...base, jid: "b", etiquetas: ["Digital"], ultima_recebida_at: d(0.5), ultima_enviada_at: d(0.6) },
+      { ...base, jid: "c", etiquetas: ["Digital"], ultima_recebida_at: d(2), ultima_enviada_at: d(1) },
+      { ...base, jid: "d", etiquetas: ["Digital"], ultima_recebida_at: d(9), ultima_enviada_at: d(9.1) },
+      { ...base, jid: "e", etiquetas: ["Lead pequeno"], ultima_recebida_at: d(1), ultima_enviada_at: d(2) },
+    ], agora)
+    expect(r).toEqual({ ativos: 3, paraOrcar: 1, esperando: 1 })
+  })
+})

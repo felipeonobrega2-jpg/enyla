@@ -186,7 +186,8 @@ async function voceNaConversa(jid: string, log: Registro[]) {
 const contexto = (cfg: CfgAgente, log: Registro[], jid: string) => ({
   enviadasHoje: log.filter(l => l.enviou && new Date(l.em).getTime() > Date.now() - 86_400_000).length,
   maxPorDia: cfg.agenteAuto?.maxPorDia ?? 6,
-  jaEncerrouPequeno: log.some(l => l.enviou && l.perfil === "pequeno") || !!cfg.agenteMarcos?.[jid]?.passos?.["Pequeno"],
+  // Vendendo em digital, o lead pequeno segue na conversa até o orçamento (não é só uma mensagem)
+  jaEncerrouPequeno: cfg.agenteAuto?.pequenoParceiro !== false && (log.some(l => l.enviou && l.perfil === "pequeno") || !!cfg.agenteMarcos?.[jid]?.passos?.["Pequeno"]),
   precosDoFiltro: valoresEmReais(filtroEfetivo(cfg.filtroLeads)),
 })
 
@@ -264,6 +265,8 @@ export async function responderSozinho(msgId: string) {
   if (r.lead.perfil === "nao_lead" && r.lead.fornecedor && !(c.etiquetas ?? []).includes("Fornecedora")) await aplicar(c, [...(c.etiquetas ?? []), "Fornecedora"], null)
   const pequeno = async (orientado: boolean) => {
     if (!organiza || r.lead.perfil !== "pequeno") return
+    // Você vende em digital: etiqueta Digital, fica aberto (não vai para Descartado)
+    if (auto.pequenoParceiro === false) { const o = organizarLead(c.etiquetas ?? [], "pequeno", true); return aplicar(c, o.etiquetas, o.etapa) }
     if (orientado || log.some(l => l.enviou && l.perfil === "pequeno")) return organizar(c, "pequeno")
     return aplicar(c, [...(c.etiquetas ?? []).filter(e => !ehEtiquetaDoAgente(e) || e.startsWith("F")), ETIQUETA_PERFIL.pequeno!], null)
   }

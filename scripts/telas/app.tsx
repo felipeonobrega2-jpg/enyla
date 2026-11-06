@@ -77,7 +77,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       c("5511977776666@s.whatsapp.net", "Raniere Péricles", "Bom dia, chegou?", 0.02, 0.5),
     ]))
   }
-  if (u.startsWith("/api/whatsapp/agente")) return new Response(JSON.stringify({ auto: { ligado: false }, log: [
+  if (u.startsWith("/api/whatsapp/agente")) return new Response(JSON.stringify({ auto: { ligado: false, pequenoParceiro: false }, log: [
     { em: new Date().toISOString(), jid: "1@lid", nome: "Camilo", perfil: "pequeno", enviou: true, texto: "Pô, essa quantidade a gente não roda porque é offset…", motivo: "100 unidades no total" },
     { em: new Date().toISOString(), jid: "2@lid", nome: "Marcio", perfil: "icp", enviou: false, texto: "Show! Vou preparar o seu orçamento.", motivo: "precisa de você (decisao_sua)" },
     { em: new Date().toISOString(), jid: "3@lid", nome: "Bia", perfil: "indefinido", enviou: true, passo: "F1", texto: "Oi! Conseguiu ver a quantidade?", motivo: "F1: sem resposta" },
@@ -104,7 +104,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       outrosEsperando: 17,
       anuncio: { leads: 41, mql: 5, semClassificar: 29, descartados: 7 },
       marketing: { dia: "2026-11-04", acao: "Leve os 12 MQL para orçamento hoje e mantenha a verba até ver se o custo por MQL se sustenta.", custoMql: 12.91 },
-      reativacao: { ligado: false, porDia: 4, hoje: 0, fila: 30 },
+      reativacao: { ligado: false, porDia: 4, hoje: 0, fila: 30 }, digital: { ligado: true, ativos: 12, paraOrcar: 3, esperando: 2 },
     }))
   }
   if (u.startsWith("/api/marketing")) {

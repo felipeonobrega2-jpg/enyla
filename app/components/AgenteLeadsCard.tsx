@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react"
 import { Bot, Loader2, Play, Power, Tag, Sparkles, X } from "lucide-react"
-import { Cartao, TituloCartao, Botao, Selo, Tom } from "./ds"
+import { Cartao, TituloCartao, Botao, Selo, Tom, Segmentado } from "./ds"
 import { AgenteAuto, RegistroAgente, PerfilLead, ROTULO_PERFIL, FILTRO_PADRAO, VITRINE_PADRAO, ROTULO_TEMA } from "../lib/agenteLeads"
 
 type Simulacao = { jid: string; nome: string | null; ultima: string; perfil: PerfilLead; quantidade: number | null; motivo: string; resposta: string; enviaria: boolean; trava: string | null }
@@ -53,6 +53,12 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
   }
 
   const post = (corpo: Record<string, unknown>) => fetch("/api/whatsapp/agente", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }).then(r => r.json()).catch(() => null)
+  async function modoPequeno(parceiro: boolean) {
+    if (!auto) return
+    setAuto({ ...auto, pequenoParceiro: parceiro })
+    const d = await post({ pequenoParceiro: parceiro })
+    if (d?.auto) setAuto(d.auto)
+  }
   async function salvarAviso() {
     const d = await post({ avisoNumero: aviso ?? "" })
     if (d?.auto) { setAuto(d.auto); setAviso(null) }
@@ -109,16 +115,28 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
       {/* Como ele organiza */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4 text-[11.5px]">
         <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#009351]">Lead bom → MQL</p><p className="text-[#5e5c68]">1.000+ caixas, ou frasco, essência, válvula e envase em volume (Oportunidade). Etiqueta MQL e vai para a coluna MQL do funil. Assim que vê que é bom negócio ele para de responder: é você, sem o contato perceber a troca.</p></div>
-        <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#5e5c68]">Lead ruim → Descartado</p><p className="text-[#5e5c68]">Menos de 1.000 caixas e nada mais. Uma mensagem orientando, indicando o parceiro e oferecendo frasco/essência; etiqueta Descartado e sai da sua lista de responder.</p></div>
+        {auto?.pequenoParceiro === false
+          ? <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#c2410c]">Lead pequeno → Digital</p><p className="text-[#5e5c68]">Menos de 1.000 caixas. Ele atende em impressão digital: levanta ml, medidas, quantidade e arte, sem passar preço, e te passa para orçar. Etiqueta Digital; não vai para Descartado.</p></div>
+          : <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#5e5c68]">Lead ruim → Descartado</p><p className="text-[#5e5c68]">Menos de 1.000 caixas e nada mais. Uma mensagem orientando, indicando o parceiro e oferecendo frasco/essência; etiqueta Descartado e sai da sua lista de responder.</p></div>}
         <div className="rounded-lg ds-borda px-3 py-2"><p className="font-semibold text-[#c57800]">Sem resposta → F1, F2, F3</p><p className="text-[#5e5c68]">F1 após 3 h, F2 após 1 dia, F3 após 3 dias (8h–20h). 4 dias depois do F3: Sem resposta, vai para Perdido. No MQL só etiqueta, quem cobra é você.</p></div>
       </div>
       <div className="flex items-start gap-3 mb-4">
-        <p className="text-[11px] text-[#898892] flex-1">No seu WhatsApp Business: crie no app as etiquetas com estes nomes exatos (MQL, Descartado, F1, F2, F3, Sem resposta, ICP, Lead médio, Oportunidade, Lead pequeno) e ele marca lá também. Depois de criar, mande as que já existem no sistema:</p>
+        <p className="text-[11px] text-[#898892] flex-1">No seu WhatsApp Business: crie no app as etiquetas com estes nomes exatos (MQL, Descartado, Digital, F1, F2, F3, Sem resposta, ICP, Lead médio, Oportunidade, Lead pequeno) e ele marca lá também. Depois de criar, mande as que já existem no sistema:</p>
         <Botao onClick={etiquetasParaWhatsapp} disabled={!!wa?.rodando} icone={wa?.rodando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Tag className="w-3.5 h-3.5" />}>
           {wa?.rodando ? `${wa.feitas}${wa.total ? ` de ${wa.total}` : ""}…` : "Etiquetar no WhatsApp"}
         </Botao>
       </div>
       {wa?.msg && <p className="text-[11.5px] text-[#5e5c68] -mt-2 mb-4">{wa.msg}</p>}
+
+      {/* Lead pequeno: indicar o parceiro ou vender em digital */}
+      <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-1.5">Lead pequeno (menos de 1.000)</p>
+      <div className="flex items-center gap-3 flex-wrap mb-1.5">
+        <Segmentado valor={auto?.pequenoParceiro === false ? "digital" : "parceiro"} onChange={v => modoPequeno(v === "parceiro")}
+          opcoes={[{ v: "parceiro", nome: "Indicar o parceiro" }, { v: "digital", nome: "Eu vendo em digital" }]} />
+      </div>
+      <p className="text-[11px] text-[#898892] mb-4">{auto?.pequenoParceiro === false
+        ? "Ele não passa o contato do parceiro: segue a conversa, levanta os dados e para no preço (o orçamento é seu). A conversa ganha a etiqueta Digital e aparece no Hoje, separada dos bons negócios."
+        : "Uma mensagem só: indica o parceiro de impressão digital com o seu cupom, oferece frasco/essência e encerra (Descartado)."}</p>
 
       {/* Vitrine */}
       <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-1.5">Instagram para todo lead</p>

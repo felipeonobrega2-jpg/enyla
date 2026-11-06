@@ -123,3 +123,26 @@ describe("agente de leads: economia de IA", () => {
     expect(ehSemCredito("Erro da IA (529): overloaded")).toBe(false)
   })
 })
+
+describe("lead pequeno: parceiro ou digital", async () => {
+  const { filtroDoModo, filtroDoAgente, FILTRO_PADRAO, SECAO_DIGITAL, organizarLead: org } = await import("@/app/lib/agenteLeads")
+  it("parceiro (padrão): filtro igual", () => {
+    expect(filtroDoAgente({})).toBe(FILTRO_PADRAO)
+    expect(filtroDoAgente({ agenteAuto: { pequenoParceiro: true } })).toBe(FILTRO_PADRAO)
+  })
+  it("digital: troca a seção do lead pequeno e tira o contato do parceiro", () => {
+    const f = filtroDoModo(FILTRO_PADRAO, false)
+    expect(f).toContain(SECAO_DIGITAL)
+    expect(f).not.toContain("96843-7324")
+    expect(f).not.toContain("não é nosso cliente")
+    expect(f).toContain("O QUE NÃO FAZEMOS")      // o resto do filtro continua
+    expect(f).toContain("LEVANTAR DADOS")
+  })
+  it("filtro seu sem a seção: acrescenta a regra no fim", () => {
+    expect(filtroDoModo("OBJETIVO\nvender caixa", false)).toContain(SECAO_DIGITAL)
+  })
+  it("digital: etiqueta Digital, sem Descartado", () => {
+    expect(org(["F1", "Cliente VIP"], "pequeno", true)).toEqual({ etiquetas: ["Cliente VIP", "Digital", "Lead pequeno"], etapa: null })
+    expect(org(["Digital", "Lead pequeno"], "icp")).toEqual({ etiquetas: ["MQL", "ICP"], etapa: "mql" })
+  })
+})

@@ -4,7 +4,7 @@
 // respondeu à retomada primeiro), o que o anúncio trouxe em 24 h, a ação do relatório de marketing e a reativação.
 
 import { useEffect, useState } from "react"
-import { Sun, MessageCircle, RotateCcw, Megaphone, ArrowRight, CheckCircle2, CalendarClock, FileText } from "lucide-react"
+import { Sun, MessageCircle, RotateCcw, Megaphone, ArrowRight, CheckCircle2, CalendarClock, FileText, Printer } from "lucide-react"
 import { Cartao, TituloCartao, LinhaLista, Selo, Botao, Tom } from "./ds"
 import { Hoje, ItemHoje, haQuanto } from "../lib/hoje"
 import { ProximoPasso } from "./ProximoPasso"
@@ -141,6 +141,17 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
               </p>
               <p className="text-[12.5px] font-medium text-[#191625] leading-snug mt-1">{d.marketing.acao}</p>
             </button>
+          )}
+
+          {d.digital && (d.digital.ligado || d.digital.ativos > 0) && (
+            <div className="flex items-center gap-2.5">
+              <Printer className="w-4 h-4 shrink-0 text-[#c2410c]" />
+              <p className="flex-1 min-w-0 text-[11.5px] text-[#5e5c68] leading-snug">
+                <span className="font-semibold text-[#191625]">Digital</span>
+                {` · ${d.digital.paraOrcar} para orçar · ${d.digital.esperando} esperando resposta · ${d.digital.ativos} na semana`}
+              </p>
+              <Botao variante="fantasma" className="h-7 px-2 text-[11.5px] shrink-0" onClick={() => onNavegar("whatsapp")}>Abrir <ArrowRight className="w-3.5 h-3.5" /></Botao>
+            </div>
           )}
 
           <div className="flex items-center gap-2.5">
