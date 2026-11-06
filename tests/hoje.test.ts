@@ -109,6 +109,11 @@ describe("próximo passo e quem falou por último", async () => {
     expect(listaDoHoje(mql({ ultima_recebida_at: d(5), ultima_enviada_at: d(4) }), undefined, agora)?.lista).toBe("retomar")
     expect(listaDoHoje(mql({ ultima_recebida_at: d(12), ultima_enviada_at: d(11) }), undefined, agora)).toBeNull()
   })
+  it("negócio grande (ICP/Oportunidade): retomar já no dia seguinte", () => {
+    expect(listaDoHoje(mql({ etiquetas: ["MQL", "ICP"], ultima_recebida_at: d(2), ultima_enviada_at: h(20) }), undefined, agora)).toBeNull()
+    expect(listaDoHoje(mql({ etiquetas: ["MQL", "Oportunidade"], ultima_recebida_at: d(2), ultima_enviada_at: h(26) }), undefined, agora)?.lista).toBe("retomar")
+    expect(listaDoHoje(mql({ etiquetas: ["MQL", "Lead médio"], ultima_recebida_at: d(2), ultima_enviada_at: h(26) }), undefined, agora)).toBeNull()
+  })
   it("esperando o cliente: some; um ok dele não traz de volta; mensagem de verdade traz; no prazo volta para retomar", () => {
     const passo = { tipo: "esperando" as const, em: h(10), ate: new Date(agora + 2 * 86_400_000).toISOString() }
     expect(listaDoHoje(mql({ ultima_msg: "E o prazo?", ultima_recebida_at: h(11), ultima_enviada_at: h(12) }), passo, agora)).toBeNull()

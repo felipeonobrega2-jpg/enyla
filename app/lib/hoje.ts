@@ -26,6 +26,8 @@ export type Passos = Record<string, ProximoPasso>
 export const DIAS_ESPERANDO = 3
 export const RETOMAR_DE = 3      // você falou por último há 3 dias: volta para retomar
 export const RETOMAR_ATE = 10    // depois disso o bom negócio já entra na Reativação
+export const RETOMAR_GRANDE = 1  // ICP/Oportunidade (milhares de peças) não pode esfriar 3 dias: volta no dia seguinte
+const ehGrande = (c: ConvHoje) => (c.etiquetas ?? []).some(e => e === "ICP" || e === "Oportunidade")
 
 export type ItemHoje = {
   jid: string; nome: string | null; mensagem: string | null; desde: string; rotulo: string; retomada: boolean
@@ -89,9 +91,9 @@ export function listaDoHoje(c: ConvHoje, passo: ProximoPasso | undefined, agora 
   }
   if (estaFechada(c) && !(escreveu && c.fechada_em && recebida! > c.fechada_em)) return null
   if (escreveu) return { lista: "responder", desde: recebida! }
-  // Você falou por último (ou ele só confirmou) há 3 a 10 dias: retomar
+  // Você falou por último (ou ele só confirmou) há 3 a 10 dias (1 dia, se é negócio grande): retomar
   const ultima = [enviada, recebida].filter(Boolean).sort().pop()
-  if (enviada && ultima && dias(ultima) >= RETOMAR_DE && dias(ultima) < RETOMAR_ATE) return { lista: "retomar", desde: ultima }
+  if (enviada && ultima && dias(ultima) >= (ehGrande(c) ? RETOMAR_GRANDE : RETOMAR_DE) && dias(ultima) < RETOMAR_ATE) return { lista: "retomar", desde: ultima }
   return null
 }
 
