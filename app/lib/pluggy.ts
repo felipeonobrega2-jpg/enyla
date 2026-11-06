@@ -47,3 +47,12 @@ export async function transacoes<T>(contaId: string, desde: string): Promise<{ o
   }
   return { ok: true, lista }
 }
+
+// Pede à Pluggy para buscar no banco agora (roda em segundo plano; os dados novos chegam em alguns minutos)
+export async function atualizarItem(id: string): Promise<boolean> {
+  if (!pluggyConfigurada()) return false
+  const chave = await chaveAcesso()
+  if (!chave) return false
+  const r = await fetch(`${BASE}/items/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "X-API-KEY": chave, "Content-Type": "application/json" }, body: "{}" }).catch(() => null)
+  return !!r?.ok
+}

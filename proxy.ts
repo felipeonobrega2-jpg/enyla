@@ -8,6 +8,8 @@ export default auth((req) => {
     pathname.startsWith("/track") ||
     pathname.startsWith("/pix") ||
     pathname.startsWith("/aprovar") ||
+    pathname.startsWith("/d/") ||               // pedido digital (link assinado)
+    pathname.startsWith("/api/d/") ||
     pathname.startsWith("/c/") ||
     pathname.startsWith("/api/c/") ||
     pathname.startsWith("/api/aprovar/") ||

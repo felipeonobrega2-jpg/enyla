@@ -4,7 +4,8 @@
 // sem resposta → F1, F2, F3 e Sem resposta. As etiquetas vão também para o WhatsApp Business, quando existem lá.
 // Tudo fica registrado (Configurações → Agente de leads) com o motivo de ter enviado ou segurado.
 
-import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoOrcamentoDigital, linkPixDigital, valoresDoPedido, PedidoDigital } from "./digital"
+import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital } from "./digital"
+import { linkPedido } from "./digitalLink"
 import type { RegraDigital } from "./precoDigital"
 import { supabase } from "./supabase"
 import { evo } from "./evolution"
@@ -185,9 +186,6 @@ async function voceNaConversa(jid: string, log: Registro[]) {
   return (minhas ?? []).some(m => !idsDoAgente.has(m.id) && !ehMensagemAutomaticaDoWhatsapp(m.corpo))
 }
 
-// Endereço público do sistema (links que vão para o cliente)
-const BASE_PUBLICA = "https://app.enyla.com.br"
-
 const contexto = (cfg: CfgAgente, log: Registro[], jid: string) => ({
   enviadasHoje: log.filter(l => l.enviou && new Date(l.em).getTime() > Date.now() - 86_400_000).length,
   maxPorDia: cfg.agenteAuto?.maxPorDia ?? 6,
@@ -267,7 +265,7 @@ export async function responderSozinho(msgId: string) {
     const cot = cotarDigital(r.dados, cfg.digital)
     if (cot.ok && (!anterior || mudouACotacao(anterior, cot))) {
       novoPedido = montarPedido(cfg.pedidosDigitais ?? [], jid, conversa.nome, r.dados, cot)
-      r.resposta = textoOrcamentoDigital(novoPedido, linkPixDigital(BASE_PUBLICA, novoPedido))
+      r.resposta = textoLinkPedido(novoPedido, linkPedido(novoPedido.id))
       r.alerta = "nenhum"; r.pode_enviar_sozinho = true
     }
   }

@@ -106,3 +106,55 @@ export const pedidoDaConversa = (pedidos: PedidoDigital[] | undefined, jid: stri
 // Recotar? Só antes do sinal e se mudou a quantidade ou as medidas (ele mandou as do frasco dele)
 export const mudouACotacao = (p: PedidoDigital, c: Extract<Cotacao, { ok: true }>) =>
   p.status === "aguardando_sinal" && (p.quantidade !== c.quantidade || p.medidas.a !== c.medidas.a || p.medidas.l !== c.medidas.l || p.medidas.p !== c.medidas.p)
+
+// ── Página do pedido ─────────────────────────────────────────────────────────
+export type Briefing = { marca?: string; cores?: string; referencias?: string; arquivos?: { nome: string; url: string }[]; em?: string }
+export type PedidoComBriefing = PedidoDigital & { briefing?: Briefing; pagamento?: { txId: string; valor: number; data: string; nome: string | null } }
+
+// As quantidades da tabela da folha deste pedido, com o preço de cada uma
+export function opcoesDoPedido(p: Pick<PedidoDigital, "folha">, regra: RegraDigital = REGRA_DIGITAL_PADRAO) {
+  return quantidadesDa(p.folha).map(q => precoDigital(q, p.folha, regra)!).map(x => ({ quantidade: x.faixa, total: x.total, unit: x.total / x.faixa }))
+}
+
+// Cliente escolheu outra quantidade na página (só antes do sinal): refaz total e sinal
+export function trocarQuantidade(pedidos: PedidoDigital[], p: PedidoDigital, q: number, regra: RegraDigital = REGRA_DIGITAL_PADRAO): PedidoDigital | null {
+  if (p.status !== "aguardando_sinal") return null
+  const x = precoDigital(q, p.folha, regra)
+  if (!x || x.faixa !== q) return null
+  const abertos = pedidos.filter(o => o.id !== p.id && o.status === "aguardando_sinal").map(o => o.sinal)
+  return { ...p, quantidade: q, faixa: q, custo: x.custo, arte: x.arte, margem: x.margem, total: x.total, sinal: sinalUnico(x.total, abertos) }
+}
+
+// ── Sinal no extrato ─────────────────────────────────────────────────────────
+export type EntradaBanco = { id: string; data: string; valor: number; tipo: "entrada" | "saida"; contraparte_nome?: string | null }
+// Entrada com o valor exato do sinal, a partir do dia em que cotou, que ainda não pagou outro pedido
+export function sinaisPagos(pedidos: PedidoDigital[], extrato: EntradaBanco[], usadas: Set<string>): { id: string; tx: EntradaBanco }[] {
+  const out: { id: string; tx: EntradaBanco }[] = []
+  const ja = new Set(usadas)
+  for (const p of pedidos.filter(x => x.status === "aguardando_sinal")) {
+    const dia = new Date(new Date(p.em).getTime() - 3 * 3_600_000).toISOString().slice(0, 10)   // dia em São Paulo
+    const tx = extrato.find(t => t.tipo === "entrada" && !ja.has(t.id) && t.data >= dia && Math.round(t.valor * 100) === Math.round(p.sinal * 100))
+    if (tx) { out.push({ id: p.id, tx }); ja.add(tx.id) }
+  }
+  return out
+}
+
+export function textoSinalPago(p: Pick<PedidoDigital, "id" | "sinal">, link: string, temBriefing: boolean) {
+  return [
+    `Pagamento do sinal confirmado (${brl(p.sinal)}). Obrigado! ✅`,
+    temBriefing
+      ? `A designer já está com as suas informações e começa a sua arte. Assim que ficar pronta, eu te mando aqui para aprovar.`
+      : `Para a designer começar a sua arte, me conta pelo link: o nome da marca, as cores e, se tiver, o logo e referências. ${link}`,
+  ].join("\n\n")
+}
+
+// Mensagem curta do orçamento: o preço e o link da página (a escolha da quantidade e o Pix ficam lá)
+export function textoLinkPedido(p: Pick<PedidoDigital, "quantidade" | "ml" | "medidas" | "padrao" | "total" | "produto">, link: string) {
+  const oque = p.ml ? `para frasco de ${p.ml} ml` : p.produto ? `para ${p.produto}` : ""
+  return [
+    `Montei o seu orçamento em impressão digital, com a *arte inclusa* (nossa designer cria pra você).`,
+    `*${p.quantidade.toLocaleString("pt-BR")} caixinhas* ${oque} (${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm): *${brl(p.total)}*`,
+    `Veja a caixa, escolha a quantidade e pague o sinal de 50% pelo Pix aqui: ${link}`,
+    p.padrao ? `Usei a medida padrão de caixa ${oque}. Se o seu frasco for diferente, me manda as medidas que eu ajusto.` : null,
+  ].filter(x => x !== null).join("\n\n")
+}

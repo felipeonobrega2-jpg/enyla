@@ -36,7 +36,12 @@ export async function montarHoje(): Promise<Hoje> {
       ligado: !!auto.ligado, porDia: auto.porDia ?? POR_DIA_PADRAO, hoje: enviadasHoje(cfg), fila: fila.length,
       orcamentosSemResposta: fila.filter(c => c.motivo === "Orçamento sem resposta").length,
     },
-    digital: { ligado: (cfg as { agenteAuto?: { pequenoParceiro?: boolean } }).agenteAuto?.pequenoParceiro === false, ...doDigital(convs) },
+    digital: (() => {
+      const c = cfg as { agenteAuto?: { pequenoParceiro?: boolean }; pedidosDigitais?: { status: string; em: string }[] }
+      const ped = (c.pedidosDigitais ?? []).filter(p => Date.now() - new Date(p.em).getTime() < 30 * 86_400_000)
+      return { ligado: c.agenteAuto?.pequenoParceiro === false, ...doDigital(convs),
+        aguardandoSinal: ped.filter(p => p.status === "aguardando_sinal").length, pagos: ped.filter(p => p.status === "sinal_pago").length }
+    })(),
   }
 }
 

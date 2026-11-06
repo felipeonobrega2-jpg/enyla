@@ -37,6 +37,7 @@ import { EnviarProposta } from "@/app/components/EnviarProposta"
 import MarketingRelatorio from "@/app/components/MarketingRelatorio"
 import { ParceriasView } from "@/app/components/ParceriasView"
 import { ModalVenda } from "@/app/components/parceiros/ModalVenda"
+import DigitalClient from "@/app/d/[id]/DigitalClient"
 import { OrcamentoDigitalView } from "@/app/components/OrcamentoDigitalView"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas, ConversaLateral } from "@/app/components/WhatsAppView"
 
@@ -78,6 +79,13 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       c("5511977776666@s.whatsapp.net", "Raniere Péricles", "Bom dia, chegou?", 0.02, 0.5),
     ]))
   }
+  if (u.startsWith("/api/d/")) {
+    const pago = u.includes("PAGO")
+    return new Response(JSON.stringify({ id: pago ? "DIG-0002" : "DIG-0001", nome: "Ana Exemplo", ml: 50, produto: "perfume", medidas: { a: 10, l: 5, p: 5 }, padrao: true, folha: "A4",
+      quantidade: 100, total: 619.95, sinal: 309.98, status: pago ? "sinal_pago" : "aguardando_sinal", sinalPagoEm: pago ? new Date().toISOString() : null,
+      briefing: { marca: pago ? "Essência Rara" : "", cores: "", referencias: "", arquivos: pago ? [{ nome: "logo-essencia.png", url: "#" }] : [] },
+      opcoes: [{ quantidade: 20, total: 339.94, unit: 17 }, { quantidade: 50, total: 419.95, unit: 8.4 }, { quantidade: 100, total: 619.95, unit: 6.2 }] }))
+  }
   if (u.startsWith("/api/whatsapp/agente")) return new Response(JSON.stringify({ auto: { ligado: false, pequenoParceiro: false }, log: [
     { em: new Date().toISOString(), jid: "1@lid", nome: "Camilo", perfil: "pequeno", enviou: true, texto: "Pô, essa quantidade a gente não roda porque é offset…", motivo: "100 unidades no total" },
     { em: new Date().toISOString(), jid: "2@lid", nome: "Marcio", perfil: "icp", enviou: false, texto: "Show! Vou preparar o seu orçamento.", motivo: "precisa de você (decisao_sua)" },
@@ -105,7 +113,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       outrosEsperando: 17,
       anuncio: { leads: 41, mql: 5, semClassificar: 29, descartados: 7 },
       marketing: { dia: "2026-11-04", acao: "Leve os 12 MQL para orçamento hoje e mantenha a verba até ver se o custo por MQL se sustenta.", custoMql: 12.91 },
-      reativacao: { ligado: false, porDia: 4, hoje: 0, fila: 30 }, digital: { ligado: true, ativos: 12, paraOrcar: 3, esperando: 2 },
+      reativacao: { ligado: false, porDia: 4, hoje: 0, fila: 30 }, digital: { ligado: true, ativos: 12, paraOrcar: 3, esperando: 2, aguardandoSinal: 4, pagos: 2 },
     }))
   }
   if (u.startsWith("/api/marketing")) {
@@ -238,6 +246,7 @@ function Telas() {
         mensagem={l => `Oi, Perfumaria! Segue a proposta ORC-2026-999 da sua embalagem.\n\n3.000 unidades · R$ 8.476,64 à vista (R$ 2,83/un)\n\nPara ver a caixa em 3D e aprovar: ${l}\n\nQualquer dúvida, é só me chamar.`}
         onFechar={() => {}} /></div>
     }
+    case "pedidodigital": case "pedidodigital-pago": return <DigitalClient id={tela.endsWith("pago") ? "DIG-PAGO" : "DIG-0001"} t="x" />
     case "digital": return <div style={{ height: "100vh", display: "flex", background: "#f5f5f7" }}><OrcamentoDigitalView regra={{ arte: 70, margem: 150 }} onRegra={() => {}} onVerKanban={() => {}} onSalvar={d => ({ ...d, id: "x", numero: "DIG-001", cardId: "c" })} /></div>
     case "conversalateral": case "conversalateral-busca": case "conversalateral-m": return <div style={{ height: "100vh", background: "#f5f5f7" }}>
       <aside className="w-72 h-full bg-white border-r p-4"><p className="text-[12px] font-semibold">Cliente</p><div className="mt-2 h-9 rounded-xl border px-3 flex items-center text-[13px]">Perfumaria Modelo</div></aside>

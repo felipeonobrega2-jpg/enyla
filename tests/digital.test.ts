@@ -40,3 +40,35 @@ describe("braço digital", () => {
     for (const v of valoresEmReais(t)) expect(valoresDoPedido(p)).toContain(v)
   })
 })
+
+describe("página do pedido e sinal no extrato", async () => {
+  const { opcoesDoPedido, trocarQuantidade, sinaisPagos, textoLinkPedido, textoSinalPago } = await import("../app/lib/digital")
+  const c = cotarDigital(dados({ volume_ml: 50, quantidade: 50 }))
+  if (!c.ok) throw new Error()
+  const p = montarPedido([], "1@lid", "Ana", dados({ volume_ml: 50 }), c, new Date("2026-11-06T15:00:00Z"))
+
+  it("opções da folha e troca de quantidade antes do sinal", () => {
+    expect(opcoesDoPedido(p).map(o => o.quantidade)).toEqual([20, 50, 100])
+    const n = trocarQuantidade([p], p, 100)!
+    expect(n.total).toBe(619.95); expect(n.sinal).toBe(309.98)
+    expect(trocarQuantidade([p], p, 75)).toBeNull()
+    expect(trocarQuantidade([p], { ...p, status: "sinal_pago" }, 100)).toBeNull()
+  })
+  it("acha o Pix pelo valor exato, a partir do dia da cotação, sem usar a mesma entrada duas vezes", () => {
+    const ext = [
+      { id: "a", data: "2026-11-05", valor: p.sinal, tipo: "entrada" as const },
+      { id: "b", data: "2026-11-06", valor: p.sinal, tipo: "saida" as const },
+      { id: "c", data: "2026-11-06", valor: p.sinal, tipo: "entrada" as const },
+    ]
+    expect(sinaisPagos([p], ext, new Set())).toEqual([{ id: p.id, tx: ext[2] }])
+    expect(sinaisPagos([p], ext, new Set(["c"]))).toEqual([])
+    expect(sinaisPagos([p], [{ id: "d", data: "2026-11-07", valor: p.sinal + 0.01, tipo: "entrada" }], new Set())).toEqual([])
+  })
+  it("textos", () => {
+    const t = textoLinkPedido(p, "https://x/d/DIG-0001?t=a")
+    expect(t).toContain("R$ 419,95"); expect(t).toContain("https://x/d/DIG-0001?t=a"); expect(t).not.toMatch(/frete/i)
+    for (const v of valoresEmReais(t)) expect(valoresDoPedido(p)).toContain(v)
+    expect(textoSinalPago(p, "L", false)).toContain("L")
+    expect(textoSinalPago(p, "L", true)).not.toContain("L")
+  })
+})

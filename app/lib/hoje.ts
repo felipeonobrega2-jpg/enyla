@@ -68,7 +68,7 @@ export type Hoje = {
   anuncio: { leads: number; mql: number; semClassificar: number; descartados: number }   // últimas 24 h
   marketing: { dia: string; acao: string; custoMql: number | null } | null
   reativacao: { ligado: boolean; hoje: number; porDia: number; fila: number; orcamentosSemResposta?: number }
-  digital?: { ligado: boolean; ativos: number; paraOrcar: number; esperando: number }   // leads pequenos que você vende em digital (7 dias)
+  digital?: { ligado: boolean; ativos: number; paraOrcar: number; esperando: number; aguardandoSinal?: number; pagos?: number }   // leads pequenos que você vende em digital (7 dias)
 }
 
 // Leads pequenos vendidos em impressão digital (etiqueta Digital), separados dos bons negócios: quantos falaram nos

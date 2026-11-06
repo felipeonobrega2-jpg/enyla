@@ -148,7 +148,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
               <Printer className="w-4 h-4 shrink-0 text-[#c2410c]" />
               <p className="flex-1 min-w-0 text-[11.5px] text-[#5e5c68] leading-snug">
                 <span className="font-semibold text-[#191625]">Digital</span>
-                {` · ${d.digital.paraOrcar} para orçar · ${d.digital.esperando} esperando resposta · ${d.digital.ativos} na semana`}
+                {[` · ${d.digital.aguardandoSinal ?? 0} esperando o sinal`, d.digital.pagos ? `${d.digital.pagos} ${d.digital.pagos === 1 ? "pago" : "pagos"}` : "", `${d.digital.ativos} na semana`].filter(Boolean).join(" · ")}
               </p>
               <Botao variante="fantasma" className="h-7 px-2 text-[11.5px] shrink-0" onClick={() => onNavegar("whatsapp")}>Abrir <ArrowRight className="w-3.5 h-3.5" /></Botao>
             </div>

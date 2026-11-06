@@ -7,6 +7,7 @@ import { agendarResposta, talvezFollowUps } from "@/app/lib/agenteAuto"
 import { talvezAprender } from "@/app/lib/agenteAprende"
 import { talvezReativar } from "@/app/lib/reativacaoServidor"
 import { talvezRelatorio } from "@/app/lib/marketingServidor"
+import { conferirSinais } from "@/app/lib/digitalServidor"
 
 // Espera do modo automático (o lead termina de digitar) + resposta da IA + envio
 export const maxDuration = 60
@@ -28,6 +29,8 @@ export async function POST(req: NextRequest) {
     after(() => talvezAprender().catch(e => console.error("[agente aprende]", e)))
     after(() => talvezReativar().catch(e => console.error("[reativação]", e)))
     after(() => talvezRelatorio(req.nextUrl.origin).catch(e => console.error("[marketing]", e)))
+    // Braço digital: confere no extrato os sinais esperando Pix (no máximo a cada 5 min; só se há pedido esperando)
+    after(() => conferirSinais().then(() => undefined).catch(e => console.error("[digital]", e)))
 
     // ── messages.upsert — mensagem nova em tempo real
     if (event === "messages.upsert") {
