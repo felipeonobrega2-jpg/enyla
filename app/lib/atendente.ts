@@ -53,3 +53,31 @@ export function formDoAtendimento(d: DadosPedido): Partial<FormData> {
 // Tem algo do pedido que valha mostrar/pré-preencher?
 export const temDados = (d: DadosPedido | undefined) =>
   !!d && !!(d.produto || d.caixa_cm || d.frasco_cm || d.quantidade || d.volume_ml)
+
+// ── Cumprimento do horário (São Paulo) ─────────────────────────────────────────
+// A IA não sabe que horas são e às vezes copia o "bom dia" do cliente: o sistema diz a hora e corrige antes de enviar.
+// Bom dia até 11h59, boa tarde até 17h59, boa noite depois (e de madrugada).
+export function horaEmSP(d = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", minute: "2-digit", hour12: false }).formatToParts(d).map(x => [x.type, x.value]))
+  return { h: Number(p.hour) % 24, m: Number(p.minute) }
+}
+export function cumprimentoDoHorario(d = new Date()): "bom dia" | "boa tarde" | "boa noite" {
+  const { h } = horaEmSP(d)
+  return h >= 5 && h < 12 ? "bom dia" : h >= 12 && h < 18 ? "boa tarde" : "boa noite"
+}
+
+// Troca o cumprimento errado no começo de cada mensagem ("Bom dia!", "Oi, boa tarde, tudo bem?"); o resto não mexe
+export function corrigirCumprimento(texto: string, d = new Date()) {
+  const certo = cumprimentoDoHorario(d)
+  return texto.split(/(\n\s*\n)/).map(parte => parte.replace(/^(\s*(?:oi|olá|ola|opa|e aí|e ai)?[\s,!.]*)(bom dia|boa tarde|boa noite)/i, (_, antes: string, usado: string) => {
+    if (usado.toLowerCase() === certo) return antes + usado
+    return antes + (usado[0] === usado[0].toUpperCase() ? certo[0].toUpperCase() + certo.slice(1) : certo)
+  })).join("")
+}
+
+// Linha para a IA: dia, hora e o cumprimento certo
+export function agoraParaIA(d = new Date()) {
+  const dia = d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "2-digit" })
+  const { h, m } = horaEmSP(d)
+  return `Agora: ${dia}, ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")} em São Paulo. Se for cumprimentar pelo horário, use "${cumprimentoDoHorario(d)}" (mesmo que o cliente tenha usado outro).`
+}

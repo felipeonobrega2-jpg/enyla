@@ -15,6 +15,7 @@ import {
   organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, ehSemCredito, proximoFollowUp, horarioDeFollowUp, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE, ETIQUETAS_AGENTE,
   marcar, marcosDoRegistro, Marcos,
 } from "./agenteLeads"
+import { corrigirCumprimento } from "./atendente"
 
 const DIAS_CONVERSA_NOVA = 4
 const DIAS_FOLLOW_UP = 14            // follow-up vale para lead que chegou nos últimos 14 dias
@@ -120,7 +121,8 @@ export async function enviar(c: Conversa, texto: string, lida?: string): Promise
   const number = c.telefone || c.jid
   const ids: string[] = []
   await marcarLida(c, lida)
-  for (const [i, parte] of partesDaResposta(texto).entries()) {
+  // Cumprimento pela hora do envio (a resposta pode ter sido preparada antes, ou a IA ter copiado o do cliente)
+  for (const [i, parte] of partesDaResposta(corrigirCumprimento(texto)).entries()) {
     if (i) await new Promise(res => setTimeout(res, 800 + Math.random() * 1500))
     // "delay" faz o Evolution mostrar "digitando…" antes de enviar
     const env = await evo<WaMessage>("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number, text: parte, delay: Math.round(tempoDigitando(parte)) }) })
