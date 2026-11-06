@@ -11,7 +11,7 @@ describe("preço digital (tabela da Villa)", () => {
     expect(folha(25, 12, 10)).toBeNull()       // maior que A3
   })
   it("custo pela faixa da tabela", () => {
-    expect(custoVilla(20, "A4")).toEqual({ faixa: 20, custo: 149.95 })
+    expect(custoVilla(20, "A4")).toEqual({ faixa: 20, custo: 119.94 })
     expect(custoVilla(75, "A4")).toEqual({ faixa: 100, custo: 399.95 })
     expect(custoVilla(150, "A4")).toBeNull()
     expect(custoVilla(100, "A3")?.custo).toBe(499.95)

@@ -226,7 +226,7 @@ export const SECAO_DIGITAL = `LEAD PEQUENO (menos de 1.000): VENDEMOS EM IMPRESS
 - Pedido mínimo: em offset fica em torno de 1.000; abaixo disso, de 20 a 500 caixas, a gente faz em impressão digital.
 - O que precisa para o orçamento: a quantidade e o ml do frasco (ou as medidas da caixa: altura x largura x profundidade). Pergunte o que faltar, uma coisa por vez.
 - Não escreva preço da impressão digital: com a quantidade e o ml (ou as medidas), o sistema manda o orçamento com o link do sinal de 50% pelo Pix. Depois que ele foi, você pode repetir os valores que estão nele.
-- Frete: calculado no final do pedido, pelo CEP. Prazo: começa depois do sinal; a designer manda a arte para ele aprovar antes de imprimir.
+- Frete: não fale dele por conta própria. Só se ele perguntar: é calculado no final do pedido, pelo CEP. Prazo: começa depois do sinal; a designer manda a arte para ele aprovar antes de imprimir.
 - Hot stamping em digital não dá: sugira simular o hot stamping na arte.
 - Deixe a porta aberta para frasco, essência, válvula ou envase (só vira oportunidade em volume: 1.000+ ou recorrente).
 - Se ele topar 1.000 ou mais, vira lead normal (offset).`

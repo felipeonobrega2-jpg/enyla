@@ -77,7 +77,7 @@ export function textoOrcamentoDigital(p: Pick<PedidoDigital, "quantidade" | "ml"
     `Fechou! Em impressão digital fica assim:`,
     ``,
     `*${p.quantidade.toLocaleString("pt-BR")} caixinhas* ${oque} (${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm), triplex 300g com laminação fosca ou brilhante, *arte inclusa* (nossa designer cria pra você).`,
-    `Total: *${brl(p.total)}* (${brl(p.total / p.quantidade)} a unidade). O frete é calculado no final, pelo seu CEP.`,
+    `Total: *${brl(p.total)}* (${brl(p.total / p.quantidade)} a unidade).`,
     ``,
     `Para começar, o sinal de 50% (*${brl(p.sinal)}*) pelo Pix: ${link}`,
     `Assim que cair, a designer já começa a sua arte.`,
