@@ -75,7 +75,22 @@ export function posicaoNoFunil(c: ConversaFunil, cardsDoCliente: KanbanCard[], h
 export const estaFechada = (c: { fechada_em?: string | null; ultima_recebida_at?: string | null }) =>
   !!c.fechada_em && !(c.ultima_recebida_at && c.ultima_recebida_at > c.fechada_em)
 
-// Esperando você: o cliente falou por último, nos últimos 14 dias, conversa aberta (não vale para grupos)
-export const aguardandoResposta = (c: { jid?: string; fechada_em?: string | null; ultima_recebida_at?: string | null; ultima_enviada_at?: string | null }, agora = Date.now()) =>
+// "ok", "obrigado", "👍", "valeu, show"…: confirmação, não pede resposta (todas as palavras são de confirmação)
+const PALAVRAS_CONFIRMACAO = new Set(["ok", "okk", "okay", "blz", "beleza", "obrigado", "obrigada", "obrigados", "obrigadas", "muito", "obg", "brigado",
+  "brigada", "valeu", "vlw", "show", "perfeito", "perfeita", "combinado", "certo", "top", "ta", "tá", "bom", "tranquilo", "fechado", "entendi",
+  "otimo", "ótimo", "massa", "joia", "jóia", "de", "nada", "por", "imagina", "tmj", "demais", "legal", "maravilha", "certinho"])
+export const ehSoConfirmacao = (t: string | null | undefined) => {
+  const x = (t ?? "").trim()
+  if (!x || x.length > 40) return false
+  if (/^\[(sticker|reaction)/i.test(x)) return true
+  const palavras = x.toLowerCase().replace(/\p{Extended_Pictographic}|\uFE0F|\u200D/gu, " ").replace(/[!.,;:?]+/g, " ").split(/\s+/).filter(Boolean)
+  if (x.includes("?")) return false
+  return palavras.every(p => PALAVRAS_CONFIRMACAO.has(p)) && (palavras.length > 0 || /\p{Extended_Pictographic}/u.test(x))
+}
+
+// Esperando você: o cliente falou por último, nos últimos 14 dias, conversa aberta (não vale para grupos).
+// Se a última dele é só confirmação ("ok", "👍") depois de uma sua, não pede resposta.
+export const aguardandoResposta = (c: { jid?: string; fechada_em?: string | null; ultima_recebida_at?: string | null; ultima_enviada_at?: string | null; ultima_msg?: string | null }, agora = Date.now()) =>
   !c.jid?.endsWith("@g.us") && !estaFechada(c) && !!c.ultima_recebida_at && (!c.ultima_enviada_at || c.ultima_recebida_at > c.ultima_enviada_at)
+  && !(c.ultima_enviada_at && ehSoConfirmacao(c.ultima_msg))
   && agora - new Date(c.ultima_recebida_at).getTime() < DIAS_PERDIDO * 86_400_000

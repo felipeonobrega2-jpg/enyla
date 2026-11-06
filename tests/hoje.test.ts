@@ -87,3 +87,43 @@ describe("marcar (marcos duráveis do agente)", () => {
     expect(Object.keys(marcar(velho, r({}), agora)).sort()).toEqual(["retomado", "x"])
   })
 })
+
+describe("próximo passo e quem falou por último", async () => {
+  const { listaDoHoje, ehSoConfirmacao } = await import("../app/lib/hoje")
+  const d = (n: number) => h(24 * n)
+  const mql = (o: Partial<ConvHoje>) => conv({ status_lead: "mql", ...o })
+
+  it("ok, obrigado e 👍 são só confirmação; pergunta não é", () => {
+    for (const t of ["ok", "Ok!", "obrigado", "Muito obrigada!", "👍👍👍", "valeu 🙏", "show", "Beleza.", "tá bom", "[stickerMessage]"]) expect(ehSoConfirmacao(t)).toBe(true)
+    for (const t of ["ok, e o prazo?", "Quanto fica 3 mil?", "oi", "pode mandar o pix", ""]) expect(ehSoConfirmacao(t)).toBe(false)
+  })
+  it("ele escreveu de verdade: responder", () => {
+    expect(listaDoHoje(mql({ ultima_msg: "E o prazo?", ultima_recebida_at: h(1), ultima_enviada_at: h(2) }), undefined, agora)?.lista).toBe("responder")
+  })
+  it("ele só confirmou: não é responder; vira retomar depois de 3 dias", () => {
+    expect(listaDoHoje(mql({ ultima_msg: "👍", ultima_recebida_at: h(1), ultima_enviada_at: h(2) }), undefined, agora)).toBeNull()
+    expect(listaDoHoje(mql({ ultima_msg: "👍", ultima_recebida_at: d(4), ultima_enviada_at: d(4.1) }), undefined, agora)?.lista).toBe("retomar")
+  })
+  it("você falou por último: retomar entre 3 e 10 dias (depois é a Reativação)", () => {
+    expect(listaDoHoje(mql({ ultima_recebida_at: d(5), ultima_enviada_at: d(2) }), undefined, agora)).toBeNull()
+    expect(listaDoHoje(mql({ ultima_recebida_at: d(5), ultima_enviada_at: d(4) }), undefined, agora)?.lista).toBe("retomar")
+    expect(listaDoHoje(mql({ ultima_recebida_at: d(12), ultima_enviada_at: d(11) }), undefined, agora)).toBeNull()
+  })
+  it("esperando o cliente: some; um ok dele não traz de volta; mensagem de verdade traz; no prazo volta para retomar", () => {
+    const passo = { tipo: "esperando" as const, em: h(10), ate: new Date(agora + 2 * 86_400_000).toISOString() }
+    expect(listaDoHoje(mql({ ultima_msg: "E o prazo?", ultima_recebida_at: h(11), ultima_enviada_at: h(12) }), passo, agora)).toBeNull()
+    expect(listaDoHoje(mql({ ultima_msg: "ok obrigado", ultima_recebida_at: h(1), ultima_enviada_at: h(12) }), passo, agora)).toBeNull()
+    expect(listaDoHoje(mql({ ultima_msg: "Fechado, manda o pix", ultima_recebida_at: h(1), ultima_enviada_at: h(12) }), passo, agora)?.lista).toBe("responder")
+    const venceu = { ...passo, ate: h(1) }
+    expect(listaDoHoje(mql({ ultima_recebida_at: h(30), ultima_enviada_at: h(12) }), venceu, agora)?.lista).toBe("retomar")
+  })
+  it("lembrete com nota volta no dia, com a nota; se você já falou com ele depois do dia, sai", () => {
+    const passo = { tipo: "lembrar" as const, em: d(5), ate: h(2), nota: "vai mandar a arte" }
+    expect(listaDoHoje(mql({ ultima_recebida_at: d(5), ultima_enviada_at: d(5.1) }), passo, agora)).toEqual({ lista: "retomar", desde: d(5), nota: "vai mandar a arte" })
+    expect(listaDoHoje(mql({ ultima_recebida_at: d(5), ultima_enviada_at: h(1) }), passo, agora)).toBeNull()
+  })
+  it("fechou ou perdido: sai de vez", () => {
+    expect(listaDoHoje(mql({ status_lead: "pedido", ultima_msg: "manda o pix" }), undefined, agora)).toBeNull()
+    expect(listaDoHoje(mql({ status_lead: "perdido", ultima_msg: "e aí?" }), undefined, agora)).toBeNull()
+  })
+})

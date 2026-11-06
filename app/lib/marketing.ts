@@ -94,6 +94,7 @@ export function numerosParaIA(r: Pick<Relatorio, "dia" | "dia1" | "semana" | "se
 export type DiaNoResumo = {
   esperando: { nome: string | null; jid: string; rotulo: string; quantidade?: number | null }[]
   orcamentosSemResposta: number
+  retomar?: number                 // lembretes que venceram e bons negócios sem resposta há 3+ dias
   linkHoje: string
 }
 const MOSTRAR_NO_RESUMO = 5
@@ -109,7 +110,8 @@ export function textoResumoWhatsapp(r: Relatorio, link: string, dia?: DiaNoResum
     ...dia.esperando.slice(0, MOSTRAR_NO_RESUMO).map(x => `• ${x.nome || x.jid.split("@")[0]} · ${x.rotulo}${x.quantidade ? ` · ${x.quantidade.toLocaleString("pt-BR")} un` : ""}`),
     n > MOSTRAR_NO_RESUMO ? `• e mais ${n - MOSTRAR_NO_RESUMO}` : null,
     dia.orcamentosSemResposta ? `📄 ${dia.orcamentosSemResposta} ${dia.orcamentosSemResposta === 1 ? "orçamento sem resposta" : "orçamentos sem resposta"} há 2 dias ou mais (retomada pronta em Reativação)` : null,
-    n || dia.orcamentosSemResposta ? `👉 ${dia.linkHoje}` : null,
+    dia.retomar ? `🔁 ${dia.retomar} para retomar hoje (lembretes e sem resposta há 3+ dias)` : null,
+    n || dia.orcamentosSemResposta || dia.retomar ? `👉 ${dia.linkHoje}` : null,
     "",
   ] : []
   return [

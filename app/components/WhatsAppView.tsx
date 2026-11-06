@@ -11,6 +11,7 @@ import { Segmentado } from "./ds"
 import { FilaMensagens } from "./FilaMensagens"
 import { montarFila, AvisoPedido } from "../lib/filaMensagens"
 import { Atendimento, DadosPedido, ROTULO_ALERTA, temDados } from "../lib/atendente"
+import { ProximoPasso } from "./ProximoPasso"
 import { LeadAvaliado, ROTULO_PERFIL } from "../lib/agenteLeads"
 import { useGravador, useMicrofones, tempo, extensaoAudio } from "../lib/gravador"
 import { filtrar, preencher, Rapida } from "../lib/mensagensRapidas"
@@ -520,6 +521,7 @@ export default function WhatsAppView({
               <EtiquetasDaConversa selecionadas={ativa.etiquetas ?? []} definicoes={etiquetasDef}
                 onMudar={lista => { alterar([ativa.jid], { etiquetas: lista }); setAtiva(a => a ? { ...a, etiquetas: lista } : a) }}
                 onCriar={onCriarEtiqueta} />
+              <ProximoPasso key={ativa.jid} jid={ativa.jid} rotulo="Próximo passo" />
               <button onClick={() => alterar([ativa.jid], { fechar: !estaFechada(ativa) })} title={estaFechada(ativa) ? "Reabrir conversa" : "Fechar conversa (volta sozinha se o cliente escrever)"}
                 className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-2 rounded-xl transition-colors hover:bg-black/5" style={{ color: "var(--text-sub)" }}>
                 <Archive className="w-4 h-4" />{estaFechada(ativa) ? "Reabrir" : "Fechar"}

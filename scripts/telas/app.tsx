@@ -84,14 +84,19 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
   ], taxas: [{ passo: "Resposta", enviados: 42, responderam: 29 }, { passo: "F1", enviados: 18, responderam: 6 }, { passo: "F2", enviados: 9, responderam: 2 }, { passo: "F3", enviados: 5, responderam: 1 }] }))
   if (u.startsWith("/api/whatsapp/destino")) return new Response(JSON.stringify(u.includes("Sem%20Conversa") ? { jid: null } : { jid: "1@lid", nome: "Perfumaria Modelo", como: "conversa" }))
   if (u.startsWith("/api/aprovacao/link")) return new Response(JSON.stringify({ url: "https://app.enyla.com.br/aprovar/ORC-2026-999?t=exemplo" }))
+  if (u.startsWith("/api/whatsapp/proximo-passo")) return new Response(JSON.stringify({ passo: { tipo: "lembrar", em: new Date().toISOString(), ate: "2026-11-12T12:00:00Z", nota: "vai mandar a arte" } }))
   if (u.startsWith("/api/hoje")) {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
     return new Response(JSON.stringify({
       responder: [
-        { jid: "9@lid", nome: "Essências Exemplo", mensagem: "Oi! Ainda quero sim, dá pra atualizar pra 5 mil?", desde: h(40), rotulo: "Retomada", retomada: true },
-        { jid: "1@lid", nome: "Perfumaria Modelo", mensagem: "Preciso de 3 mil caixinhas de 50ml com hot stamping", desde: h(190), rotulo: "ICP", retomada: false, cliente: null, dados: { produto: "caixinha", volume_ml: 50, caixa_cm: null, frasco_cm: null, quantidade: 3000, tem_arte: true, resumo: "" } },
-        { jid: "2@lid", nome: "Aroma Teste", mensagem: "Vocês fazem frasco também?", desde: h(75), rotulo: "Oportunidade", retomada: false },
-        { jid: "3@lid", nome: "Cosméticos Fictícia", mensagem: "Umas 1.500, por aí", desde: h(12), rotulo: "Lead médio", retomada: false },
+        { jid: "9@lid", nome: "Essências Exemplo", mensagem: "Oi! Ainda quero sim, dá pra atualizar pra 5 mil?", desde: h(40), rotulo: "Retomada", retomada: true, lista: "responder" },
+        { jid: "1@lid", nome: "Perfumaria Modelo", mensagem: "Preciso de 3 mil caixinhas de 50ml com hot stamping", desde: h(190), rotulo: "ICP", retomada: false, lista: "responder", cliente: null, dados: { produto: "caixinha", volume_ml: 50, caixa_cm: null, frasco_cm: null, quantidade: 3000, tem_arte: true, resumo: "" } },
+        { jid: "2@lid", nome: "Aroma Teste", mensagem: "Vocês fazem frasco também?", desde: h(75), rotulo: "Oportunidade", retomada: false, lista: "responder" },
+        { jid: "3@lid", nome: "Cosméticos Fictícia", mensagem: "Umas 1.500, por aí", desde: h(12), rotulo: "Lead médio", retomada: false, lista: "responder" },
+      ],
+      retomar: [
+        { jid: "7@lid", nome: "Embalagens Fictícias", mensagem: "Vou ver com meu sócio e te falo", desde: h(60 * 24 * 4), rotulo: "ICP", retomada: false, lista: "retomar", cliente: null, dados: { produto: "caixinha", volume_ml: 100, caixa_cm: null, frasco_cm: null, quantidade: 5000, tem_arte: true, resumo: "" } },
+        { jid: "8@lid", nome: "Aromas Exemplo", mensagem: "Te mando a arte até sexta", desde: h(60 * 24 * 5), rotulo: "Lead médio", retomada: false, lista: "retomar", nota: "vai mandar a arte", cliente: null, dados: null },
       ],
       outrosEsperando: 17,
       anuncio: { leads: 41, mql: 5, semClassificar: 29, descartados: 7 },
@@ -229,7 +234,7 @@ function Telas() {
         mensagem={l => `Oi, Perfumaria! Segue a proposta ORC-2026-999 da sua embalagem.\n\n3.000 unidades · R$ 8.476,64 à vista (R$ 2,83/un)\n\nPara ver a caixa em 3D e aprovar: ${l}\n\nQualquer dúvida, é só me chamar.`}
         onFechar={() => {}} /></div>
     }
-    case "hoje": case "hoje-m": return pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)
+    case "hoje": case "hoje-m": case "hoje-passo": return pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)
     case "marketing": case "marketing-m": return pagina(<div className="max-w-[1100px]"><MarketingRelatorio /></div>)
     case "reativacao": return pagina(<div className="max-w-[860px]"><ReativacaoCard /></div>)
     case "contatos": return pagina(<div className="max-w-[860px]"><ContatosProtegidosCard /></div>)
