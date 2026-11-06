@@ -2567,6 +2567,8 @@ export default function Home() {
 
               {orcTab === "digital" ? (
                 <OrcamentoDigitalView
+                  regra={config.digital}
+                  onRegra={r => salvarConfigTudo({ ...config, digital: r })}
                   onSalvar={salvarPropostaCustom}
                   onVerKanban={() => navigate("pedidos")}
                 />

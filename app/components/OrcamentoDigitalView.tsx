@@ -4,35 +4,7 @@ import { useState, useMemo } from "react"
 import { gerarHtmlPropostaCustom } from "../pdf"
 import type { PropostaCustom, LinhaPropostaCustom } from "../types"
 import { brl } from "../utils"
-
-// ── Pricing engine ─────────────────────────────────────────────────────────
-
-function calcN(A: number, L: number, P: number): number {
-  const fw = 2 * (L + P) + 1.5
-  const fh = A + 2 * P
-  if (fw <= 0 || fh <= 0) return 0
-  const A3W = 28.7, A3H = 41
-  const opA = Math.floor(A3W / fw) * Math.floor(A3H / fh)
-  const opB = Math.floor(A3W / fh) * Math.floor(A3H / fw)
-  return Math.max(opA, opB)
-}
-
-function fixo(q: number): number {
-  if (q <= 100) return 200
-  if (q <= 300) return 200 + ((q - 100) / 200) * 400
-  if (q <= 500) return 600 + ((q - 300) / 200) * 250
-  return 850 + ((q - 500) / 200) * 250
-}
-
-function precoNosso(q: number, n: number): number {
-  const forn = fixo(q) + (150 + 1.5 * q) / n
-  return forn * (q <= 100 ? 2.0 : 1.5)
-}
-
-// Arredondamento psicológico → X,88 (sensação de barato)
-function charm(valor: number): number {
-  return Math.round(valor) - 0.12
-}
+import { facaAberta, folhaDaFaca, quantidadesDa, precoDigital, PrecoDigital, RegraDigital, REGRA_DIGITAL_PADRAO } from "../lib/precoDigital"
 
 // ── Parser de dimensões estilo WhatsApp ────────────────────────────────────
 
@@ -62,19 +34,22 @@ function openPdf(proposta: PropostaCustom, telefone?: string) {
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-const QTDS_PADRAO = [100, 300, 500]
 
 type Res = { proposta: PropostaCustom; telefone: string }
 
 export function OrcamentoDigitalView({
   onSalvar,
   onVerKanban,
+  regra = REGRA_DIGITAL_PADRAO,
+  onRegra,
 }: {
   onSalvar: (draft: Omit<PropostaCustom, "id" | "numero" | "cardId">) => PropostaCustom
   onVerKanban: () => void
+  regra?: RegraDigital                      // preço = custo da Villa + arte + margem (por pedido)
+  onRegra?: (r: RegraDigital) => void
 }) {
   const [dimInput,   setDimInput]   = useState("")
-  const [qtdsSel,    setQtdsSel]   = useState<number[]>([100, 300, 500])
+  const [qtdsSel,    setQtdsSel]   = useState<number[]>([20, 50, 100])
   const [customQtd,  setCustomQtd] = useState("")
   const [showCustom, setShowCustom] = useState(false)
   const [nome,       setNome]       = useState("")
@@ -88,9 +63,8 @@ export function OrcamentoDigitalView({
     const parsed = parseDims(dimInput)
     if (!parsed) return null
     const [a, l, p] = parsed
-    const n = calcN(a, l, p)
-    if (n === 0) return null
-    return { a, l, p, n, fw: +(2 * (l + p) + 1.5).toFixed(2), fh: +(a + 2 * p).toFixed(2) }
+    const faca = facaAberta(a, l, p)
+    return { a, l, p, fw: faca.largura, fh: faca.altura, folha: folhaDaFaca(faca.largura, faca.altura) }
   }, [dimInput])
 
   const todasQtds = useMemo(() => {
@@ -102,12 +76,10 @@ export function OrcamentoDigitalView({
 
   const precos = useMemo(() => {
     if (!dims) return []
-    return todasQtds.map(q => ({
-      q,
-      total: charm(precoNosso(q, dims.n)),
-      unit:  charm(precoNosso(q, dims.n) / q),
-    }))
-  }, [dims, todasQtds])
+    if (!dims?.folha) return []
+    return todasQtds.map(q => precoDigital(q, dims.folha!, regra)).filter((x): x is PrecoDigital => !!x)
+  }, [dims, todasQtds, regra])
+  const qtdsDaFolha = dims?.folha ? quantidadesDa(dims.folha) : []
 
   function toggleQtd(q: number) {
     setQtdsSel(prev =>
@@ -121,6 +93,7 @@ export function OrcamentoDigitalView({
       setErro(dimInput.trim() ? "Não reconheci — tente: 10 x 6 x 4" : "Cole ou informe as dimensões.")
       return
     }
+    if (!dims.folha) { setErro("A caixa aberta não cabe numa A3: consulte a Villa."); return }
     if (precos.length === 0) { setErro("Selecione ao menos uma quantidade."); return }
     if (!nome.trim())        { setErro("Informe o nome do cliente."); return }
 
@@ -132,7 +105,7 @@ export function OrcamentoDigitalView({
     const draft: Omit<PropostaCustom, "id" | "numero" | "cardId"> = {
       nomeCliente: nome.trim(),
       descricao:   "Caixinha Personalizada — Impressão Digital 4/4",
-      material:    "Couché 300g",
+      material:    "Triplex 300g com laminação fosca ou brilhante",
       dimensoes:   `${dims.a} × ${dims.l} × ${dims.p} cm (Alt × Larg × Prof)`,
       incluirVerniz: false, comFaca: false, valorFaca: 0, numSKUs: 1,
       validadeDias: 7, obsCliente: obs.trim(),
@@ -146,7 +119,7 @@ export function OrcamentoDigitalView({
   function reset() {
     setRes(null); setErro("")
     setDimInput(""); setNome(""); setTel(""); setObs("")
-    setQtdsSel([100, 300, 500]); setCustomQtd(""); setShowCustom(false); setShowObs(false)
+    setQtdsSel([20, 50, 100]); setCustomQtd(""); setShowCustom(false); setShowObs(false)
   }
 
   // ── Tela de resultado ────────────────────────────────────────────────────────
@@ -234,10 +207,10 @@ export function OrcamentoDigitalView({
                 <div className="w-1.5 h-1.5 rounded-full bg-[#009351]" />
                 <span className="text-[12px] font-semibold text-[#191625]">{dims.a} × {dims.l} × {dims.p} cm</span>
                 <span className="text-[10px] text-[#C7C7CC]">·</span>
-                <span className="text-[11px] text-[#8E8E93]">faca {dims.fw}×{dims.fh}</span>
+                <span className="text-[11px] text-[#8E8E93]">faca {dims.fw.toLocaleString("pt-BR")} × {dims.fh.toLocaleString("pt-BR")} cm</span>
               </div>
-              <span className="text-[11px] font-semibold" style={{ color: "#8456e8" }}>
-                {dims.n}×/A3
+              <span className="text-[11px] font-semibold" style={{ color: dims.folha ? "#8456e8" : "#d33a3c" }}>
+                {dims.folha ? `cabe na ${dims.folha}` : "maior que A3"}
               </span>
             </div>
           ) : dimInput.trim() ? (
@@ -248,14 +221,23 @@ export function OrcamentoDigitalView({
         {/* ── 2. Quantidades + Preços ────────────────────────────────────── */}
         {dims && (
           <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.03)] overflow-hidden">
-            <div className="px-4 pt-4 pb-2.5 border-b border-[rgba(60,60,67,0.08)]">
+            <div className="px-4 pt-4 pb-2.5 border-b border-[rgba(60,60,67,0.08)] flex items-center justify-between gap-3 flex-wrap">
               <p className="text-[9.5px] font-bold uppercase tracking-widest text-[#8E8E93]">Quantidades</p>
+              <div className="flex items-center gap-1.5 text-[11px] text-[#5e5c68]" title="Preço do pedido = custo da Villa + arte + a sua margem">
+                <span>Villa +</span>
+                <label className="flex items-center gap-1">arte R$<input type="number" min={0} value={regra.arte} onChange={e => onRegra?.({ ...regra, arte: Math.max(0, Number(e.target.value) || 0) })} disabled={!onRegra}
+                  className="w-12 h-6 px-1.5 rounded-md bg-[rgba(116,116,128,0.08)] text-[11.5px] font-semibold text-[#191625] ds-num outline-none focus:ring-2 focus:ring-[#8456e8]/20" /></label>
+                <span>+</span>
+                <label className="flex items-center gap-1">margem R$<input type="number" min={0} value={regra.margem} onChange={e => onRegra?.({ ...regra, margem: Math.max(0, Number(e.target.value) || 0) })} disabled={!onRegra}
+                  className="w-14 h-6 px-1.5 rounded-md bg-[rgba(116,116,128,0.08)] text-[11.5px] font-semibold text-[#191625] ds-num outline-none focus:ring-2 focus:ring-[#8456e8]/20" /></label>
+              </div>
             </div>
 
-            {QTDS_PADRAO.map((q, i) => {
+            {!dims.folha && <p className="px-4 py-3 text-[12px] text-[#d33a3c]">A caixa aberta ({dims.fw.toLocaleString("pt-BR")} × {dims.fh.toLocaleString("pt-BR")} cm) não cabe numa A3. Peça o valor para a Villa.</p>}
+            {qtdsDaFolha.map(q => {
               const sel    = qtdsSel.includes(q)
               const prev   = precos.find(r => r.q === q)
-              const isIdeal = i === 1
+              const isIdeal = q === 100
               return (
                 <button key={q} type="button" onClick={() => toggleQtd(q)}
                   className={`w-full flex items-center justify-between px-4 py-3.5 border-b border-[rgba(60,60,67,0.07)] last:border-b-0 transition-colors text-left ${
@@ -282,6 +264,7 @@ export function OrcamentoDigitalView({
                     <div className="text-right">
                       <p className="text-[15px] font-bold text-[#191625] ds-num">{brl(prev.total)}</p>
                       <p className="text-[11px] text-[#8E8E93] ds-num">{brl(prev.unit)}/un</p>
+                      <p className="text-[10.5px] text-[#898892] ds-num mt-0.5" title="Só para você: não vai no PDF">Villa {brl(prev.custo)} · arte {brl(prev.arte)} · você <span className="font-semibold text-[#009351]">{brl(prev.margem)}</span></p>
                     </div>
                   )}
                 </button>
@@ -301,7 +284,7 @@ export function OrcamentoDigitalView({
                   />
                   {customQtd && dims && isFinite(parseInt(customQtd)) && parseInt(customQtd) > 0 && (
                     <p className="text-[14px] font-bold ds-num text-[#191625] shrink-0">
-                      {brl(charm(precoNosso(parseInt(customQtd), dims.n)))}
+                      {dims.folha && precoDigital(parseInt(customQtd), dims.folha, regra) ? brl(precoDigital(parseInt(customQtd), dims.folha, regra)!.total) : "consultar a Villa"}
                     </p>
                   )}
                   <button onClick={() => { setShowCustom(false); setCustomQtd("") }}
