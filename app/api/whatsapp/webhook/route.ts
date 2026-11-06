@@ -3,7 +3,7 @@ import { transcreverPendentes } from "@/app/lib/transcricao"
 import { registrarConexao, registrarRecibos, registrarContatos } from "@/app/lib/whatsappEventos"
 import { gravarLote, WaMessage, deveIgnorar, extractBody } from "@/app/lib/whatsappDados"
 import { supabase } from "@/app/lib/supabase"
-import { agendarResposta, talvezFollowUps } from "@/app/lib/agenteAuto"
+import { agendarResposta, talvezFollowUps, talvezRetomarParados } from "@/app/lib/agenteAuto"
 import { talvezAprender } from "@/app/lib/agenteAprende"
 import { talvezReativar } from "@/app/lib/reativacaoServidor"
 import { talvezRelatorio } from "@/app/lib/marketingServidor"
@@ -26,6 +26,8 @@ export async function POST(req: NextRequest) {
     const event = body.event as string
     // Follow-ups do agente de leads pegam carona nos eventos (no máximo uma rodada a cada 10 min)
     after(() => talvezFollowUps().catch(e => console.error("[agente follow-up]", e)))
+    // Lead que respondeu enquanto você estava na conversa e ficou sem resposta: o agente retoma
+    after(() => talvezRetomarParados(req.nextUrl.origin).catch(e => console.error("[agente retoma]", e)))
     after(() => talvezAprender().catch(e => console.error("[agente aprende]", e)))
     after(() => talvezReativar().catch(e => console.error("[reativação]", e)))
     after(() => talvezRelatorio(req.nextUrl.origin).catch(e => console.error("[marketing]", e)))

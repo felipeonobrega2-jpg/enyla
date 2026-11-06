@@ -72,3 +72,16 @@ describe("página do pedido e sinal no extrato", async () => {
     expect(textoSinalPago(p, "L", true)).not.toContain("L")
   })
 })
+
+describe("caixa padrão cresce até caber o frasco", () => {
+  it("30 ml com 9,6 cm de altura com a válvula: a caixa sobe para 10 cm", async () => {
+    const { caberFrasco, cotarDigital } = await import("../app/lib/digital")
+    expect(caberFrasco({ a: 9, l: 4, p: 4 }, "9,6 com a válvula")).toEqual({ a: 10, l: 4, p: 4 })
+    expect(caberFrasco({ a: 9, l: 4, p: 4 }, "30 ml, 3,2 x 8 cm")).toEqual({ a: 9, l: 4, p: 4 })
+    expect(caberFrasco({ a: 9, l: 4, p: 4 }, "4,5 x 10 cm")).toEqual({ a: 10.4, l: 4.8, p: 4.8 })
+    const c = cotarDigital({ produto: "", volume_ml: 30, caixa_cm: null, frasco_cm: "9,6 com válvula", quantidade: 20, tem_arte: null, resumo: "" } as never)
+    expect(c.ok && c.medidas).toEqual({ a: 10, l: 4, p: 4 })
+    expect(c.ok && c.folha).toBe("A4")
+    expect(c.ok && c.total).toBe(339.94)
+  })
+})

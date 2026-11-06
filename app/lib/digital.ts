@@ -18,6 +18,18 @@ export function padraoDoMl(ml: number | null | undefined) {
   return MEDIDA_PADRAO.reduce((m, x) => Math.abs(x.ml - ml) < Math.abs(m.ml - ml) ? x : m)
 }
 
+// Medida padrão crescida até caber o frasco que o cliente descreveu ("9,6 com a válvula", "3 x 10 cm"):
+// o maior número é a altura (+0,4 cm de folga), o menor é o diâmetro (+0,3 cm). Números com "ml" não contam.
+export function caberFrasco(pad: { a: number; l: number; p: number }, frasco: string | null | undefined, alturaCaixa?: number) {
+  const nums = (frasco ?? "").replace(/(\d+(?:[.,]\d+)?)\s*ml/gi, " ").match(/\d+(?:[.,]\d+)?/g)?.map(n => Number(n.replace(",", "."))).filter(n => n >= 1 && n <= 30) ?? []
+  const r1 = (n: number) => Math.round(n * 10) / 10
+  let { a, l, p } = pad
+  if (nums.length) a = Math.max(a, r1(Math.max(...nums) + 0.4))
+  if (nums.length >= 2) { const d = r1(Math.min(...nums) + 0.3); l = Math.max(l, d); p = Math.max(p, d) }
+  if (alturaCaixa && alturaCaixa > 0 && alturaCaixa <= 30) a = Math.max(a, alturaCaixa)
+  return { a, l, p }
+}
+
 export const SINAL_DIGITAL = 0.5
 
 export type StatusDigital = "aguardando_sinal" | "sinal_pago" | "arte" | "producao" | "enviado" | "cancelado"
@@ -44,7 +56,7 @@ export function cotarDigital(d: DadosPedido | null, regra: RegraDigital = REGRA_
   const cx = d.caixa_cm && d.caixa_cm.altura > 0 && d.caixa_cm.frente > 0 && d.caixa_cm.lateral > 0 ? d.caixa_cm : null
   const pad = cx ? null : padraoDoMl(d.volume_ml)
   if (!cx && !pad) return { ok: false, motivo: "faltam as medidas (ou o ml)" }
-  const medidas = cx ? { a: cx.altura, l: cx.frente, p: cx.lateral } : { a: pad!.a, l: pad!.l, p: pad!.p }
+  const medidas = cx ? { a: cx.altura, l: cx.frente, p: cx.lateral } : caberFrasco(pad!, d.frasco_cm, d.caixa_cm?.altura)
   const faca = facaAberta(medidas.a, medidas.l, medidas.p)
   const folha = folhaDaFaca(faca.largura, faca.altura)
   if (!folha) return { ok: false, motivo: "caixa maior que A3 (consultar a Villa)" }

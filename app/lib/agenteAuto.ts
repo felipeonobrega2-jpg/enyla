@@ -27,7 +27,7 @@ const MAX_REGISTROS = 300
 const MIN_ENTRE_RODADAS = 10         // follow-ups: no máximo uma rodada a cada 10 min
 
 export type Registro = RegistroAgente & { ids?: string[] }
-export type CfgAgente = { pedidosDigitais?: PedidoDigital[]; digital?: RegraDigital; agenteAuto?: AgenteAuto; agenteLog?: Registro[]; agenteMarcos?: Marcos; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string; agenteSemCreditoEm?: string }
+export type CfgAgente = { pedidosDigitais?: PedidoDigital[]; digital?: RegraDigital; agenteAuto?: AgenteAuto; agenteLog?: Registro[]; agenteMarcos?: Marcos; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string; agenteSemCreditoEm?: string; agenteRetomadaEm?: string; agenteRetomadas?: string[] }
 export type Conversa = { jid: string; nome: string | null; telefone: string | null; etiquetas: string[] | null; status_lead: string | null }
 
 export async function lerCfg() { return await lerConfigAtendente() as Awaited<ReturnType<typeof lerConfigAtendente>> & CfgAgente }
@@ -329,6 +329,34 @@ export async function responderSozinho(msgId: string) {
     env.ids.push(...v.ids)
   }
   return registrar({ ...base, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? r.lead.motivo })
+}
+
+// Lead sem resposta depois que você entrou na conversa: o agente se afasta por 10 min quando você escreve, e o que o
+// lead mandou nesse intervalo ficava parado. Rodada a cada 5 min (carona no webhook): conversa que o agente atendia
+// nas últimas 6 h, última mensagem do lead entre 2 min e 3 h, nada registrado depois dela e você fora há 10 min →
+// o agente responde (cada mensagem uma vez só).
+export async function talvezRetomarParados(origem: string) {
+  const cfg = await lerCfg()
+  if (!cfg.agenteAuto?.ligado) return
+  if (cfg.agenteRetomadaEm && Date.now() - new Date(cfg.agenteRetomadaEm).getTime() < 5 * 60_000) return
+  await gravarCfg(() => ({ agenteRetomadaEm: new Date().toISOString() }))
+  const logTodo = cfg.agenteLog ?? []
+  const desde = Date.now() - 6 * 3_600_000
+  const jids = [...new Set(logTodo.filter(l => l.enviou && new Date(l.em).getTime() > desde && (l.perfil === "pequeno" || l.perfil === "indefinido")).map(l => l.jid))]
+  const feitas = new Set(cfg.agenteRetomadas ?? [])
+  for (const jid of jids.slice(0, 8)) {
+    const u = await ultimaDa(jid)
+    if (!u || u.from_me || feitas.has(u.id)) continue
+    const idade = Date.now() - new Date(u.ts).getTime()
+    if (idade < 2 * 60_000 || idade > 3 * 3_600_000) continue
+    const log = logTodo.filter(l => l.jid === jid)
+    if (log[0] && new Date(log[0].em).getTime() > new Date(u.ts).getTime()) continue
+    if (await voceNaConversa(jid, log)) continue
+    await gravarCfg(d => ({ agenteRetomadas: [u.id, ...(d.agenteRetomadas ?? [])].slice(0, 100) }))
+    await fetch(`${origem}/api/whatsapp/webhook/responder?token=${encodeURIComponent(process.env.WHATSAPP_WEBHOOK_SECRET ?? "")}`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ msgId: u.id }), signal: AbortSignal.timeout(8000),
+    }).catch(() => null)
+  }
 }
 
 // Respondeu a uma retomada (reativação): volta para MQL, fica não lida no seu celular e você recebe o aviso (uma vez)
