@@ -58,6 +58,7 @@ import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom,
 import FormaView from "./FormaView"
 import FormaBubble from "./components/FormaBubble"
 import { brl, num } from "./utils"
+import { mensagemProposta } from "./lib/mensagemProposta"
 import { FormSection, Label, NumberInput, Section, TH, TabelaRow, AnaliseEstrategica, EmptyState } from "./components/ui"
 import { CabecalhoPagina, Kpi, Segmentado } from "./components/ds"
 import { HistoricoView } from "./components/HistoricoView"
@@ -1082,19 +1083,6 @@ export default function Home() {
   function enviarProposta(form: FormData, calculo: Calculo, numero?: string, data?: string) {
     if (!numero) return compartilharWhatsApp(form, calculo)
     setEnvioProposta({ form, calculo, numero, data: data ?? historico.find(h => h.numero === numero)?.data ?? new Date().toLocaleString("pt-BR") })
-  }
-
-  function mensagemProposta(form: FormData, calculo: Calculo, numero: string, link: string | null) {
-    const ideal = calculo.tabela.find(l => l.quantidade === calculo.sweetSpotIdealQtd) ?? calculo.tabela[calculo.tabela.length - 1]
-    const primeiro = form.nomeCliente.trim().split(/\s+/)[0]
-    const total = ideal ? (form.comFaca ? ideal.precoComFaca : ideal.precoSemFaca) : 0
-    const unit = ideal ? (form.comFaca ? ideal.unitarioComFaca : ideal.unitarioSemFaca) : 0
-    return [
-      `Oi${primeiro ? `, ${primeiro}` : ""}! Segue a proposta ${numero} da sua embalagem.`,
-      ideal ? `\n${num(ideal.quantidade)} unidades · ${brl(total)} à vista (${brl(unit)}/un)` : null,
-      link ? `\nPara ver a caixa em 3D e aprovar: ${link}` : null,
-      `\nQualquer dúvida, é só me chamar.`,
-    ].filter(Boolean).join("\n")
   }
 
   async function handleEmitirOS(card: KanbanCard) {
