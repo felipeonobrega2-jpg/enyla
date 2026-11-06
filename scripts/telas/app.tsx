@@ -37,7 +37,7 @@ import { EnviarProposta } from "@/app/components/EnviarProposta"
 import MarketingRelatorio from "@/app/components/MarketingRelatorio"
 import { ParceriasView } from "@/app/components/ParceriasView"
 import { ModalVenda } from "@/app/components/parceiros/ModalVenda"
-import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas } from "@/app/components/WhatsAppView"
+import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas, ConversaLateral } from "@/app/components/WhatsAppView"
 
 const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
 // Telas "-escuro": mesmo conteúdo no tema escuro
@@ -237,6 +237,11 @@ function Telas() {
         mensagem={l => `Oi, Perfumaria! Segue a proposta ORC-2026-999 da sua embalagem.\n\n3.000 unidades · R$ 8.476,64 à vista (R$ 2,83/un)\n\nPara ver a caixa em 3D e aprovar: ${l}\n\nQualquer dúvida, é só me chamar.`}
         onFechar={() => {}} /></div>
     }
+    case "conversalateral": case "conversalateral-busca": case "conversalateral-m": return <div style={{ height: "100vh", background: "#f5f5f7" }}>
+      <aside className="w-72 h-full bg-white border-r p-4"><p className="text-[12px] font-semibold">Cliente</p><div className="mt-2 h-9 rounded-xl border px-3 flex items-center text-[13px]">Perfumaria Modelo</div></aside>
+      <ConversaLateral jid="1@lid" nome="Perfumaria Modelo" onFechar={() => {}} onAbrir={() => {}}
+        dados={{ produto: "perfume árabe 100ml", volume_ml: 100, caixa_cm: { frente: 6, lateral: 3, altura: 10.5 }, frasco_cm: null, quantidade: 2000, tem_arte: true, resumo: "Perfume árabe 100ml, 2 mil caixas, verniz localizado no logo; precisa para a semana que vem." }} />
+    </div>
     case "hoje": case "hoje-m": case "hoje-passo": return pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)
     case "marketing": case "marketing-m": return pagina(<div className="max-w-[1100px]"><MarketingRelatorio /></div>)
     case "reativacao": return pagina(<div className="max-w-[860px]"><ReativacaoCard /></div>)

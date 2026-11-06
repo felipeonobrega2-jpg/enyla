@@ -1,6 +1,6 @@
 "use client"
 
-import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag, ChevronRight, Reply, Keyboard, Sparkles, Laptop, Smartphone, Trash2, Square, Merge } from "lucide-react"
+import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag, ChevronRight, Reply, Keyboard, Sparkles, Laptop, Smartphone, Trash2, Square, Merge, Search } from "lucide-react"
 import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect, useSyncExternalStore } from "react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, nomeChave } from "../lib/negocio"
@@ -1579,6 +1579,107 @@ function BarraGravacao({ grav, onEnviar }: { grav: ReturnType<typeof useGravador
       )}
       <button onClick={onEnviar} disabled={grav.estado === "pedindo"} aria-label="Enviar áudio" title="Enviar"
         className="w-10 h-10 rounded-xl grid place-items-center shrink-0 text-white disabled:opacity-40" style={{ background: "#25a35a" }}><SendHorizontal className="w-5 h-5" /></button>
+    </div>
+  )
+}
+
+// ── Conversa ao lado do orçamento ──────────────────────────────────────────────
+// Painel fixo à direita, sem cobrir o formulário: o que a IA tirou da conversa no topo, as mensagens (áudios com
+// a transcrição) e uma busca ("verniz", "medida") para achar o detalhe que faltou sem sair do orçamento.
+const diaDe = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "America/Sao_Paulo" })
+export function ConversaLateral({ jid, nome, dados, onFechar, onAbrir }: {
+  jid: string
+  nome: string
+  dados?: DadosPedido | null
+  onFechar: () => void
+  onAbrir: () => void
+}) {
+  const [msgs, setMsgs] = useState<Mensagem[] | null>(null)
+  const [busca, setBusca] = useState("")
+  const fimRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    let vivo = true
+    fetch(`/api/whatsapp/mensagens/${encodeURIComponent(jid)}`).then(r => r.json())
+      .then((d: unknown) => { if (vivo) setMsgs(Array.isArray(d) ? d as Mensagem[] : []) })
+      .catch(() => vivo && setMsgs([]))
+    return () => { vivo = false }
+  }, [jid])
+  useEffect(() => { if (!busca) fimRef.current?.scrollIntoView({ block: "end" }) }, [msgs, busca])
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onFechar() }
+    document.addEventListener("keydown", esc)
+    return () => document.removeEventListener("keydown", esc)
+  }, [onFechar])
+
+  const termo = busca.trim().toLowerCase()
+  const lista = (msgs ?? []).filter(m => !termo || (m.corpo ?? "").toLowerCase().includes(termo))
+  const marcar = (t: string) => {
+    if (!termo) return t
+    const i = t.toLowerCase().indexOf(termo)
+    return i < 0 ? t : <>{t.slice(0, i)}<mark className="bg-[#ffe08a] rounded-sm px-0.5">{t.slice(i, i + termo.length)}</mark>{t.slice(i + termo.length)}</>
+  }
+  const pedido = dados ? [
+    dados.quantidade ? `${dados.quantidade.toLocaleString("pt-BR")} un` : "",
+    dados.volume_ml ? `${dados.volume_ml} ml` : "",
+    dados.caixa_cm ? `caixa ${[dados.caixa_cm.frente, dados.caixa_cm.lateral, dados.caixa_cm.altura].map(n => n.toLocaleString("pt-BR")).join("×")} cm` : "",
+    dados.tem_arte === true ? "tem arte" : dados.tem_arte === false ? "sem arte" : "",
+  ].filter(Boolean) : []
+
+  return (
+    <div className="wa-conversa-lateral fixed z-[70] top-0 right-0 bottom-0 w-full sm:w-[400px] shadow-2xl flex flex-col print:hidden"
+      style={{ background: "var(--bg-surface)", borderLeft: "1px solid var(--border)" }}>
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5 border-b shrink-0" style={{ borderColor: "var(--border)" }}>
+        <Avatar nome={nome} jid={jid} pequeno />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-main)" }}>{nome}</p>
+          <p className="text-[10.5px]" style={{ color: "var(--text-faint)" }}>Conversa no WhatsApp · Esc fecha</p>
+        </div>
+        <button onClick={onAbrir} className="text-[11.5px] font-semibold px-2.5 h-7 rounded-lg hover:bg-black/5 flex items-center gap-1" style={{ color: "#8456e8" }}>
+          Abrir<ChevronRight className="w-3.5 h-3.5" />
+        </button>
+        <button onClick={onFechar} aria-label="Fechar" className="w-7 h-7 rounded-lg grid place-items-center hover:bg-black/5" style={{ color: "var(--text-sub)" }}><X className="w-4 h-4" /></button>
+      </div>
+      {dados && (dados.resumo || pedido.length > 0) && (
+        <div className="px-3.5 py-2.5 border-b shrink-0 bg-[rgba(132,86,232,0.05)]" style={{ borderColor: "var(--border)" }}>
+          <p className="text-[10.5px] font-bold uppercase tracking-wider text-[#8456e8] flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" />O que ele pediu</p>
+          {pedido.length > 0 && <p className="text-[12.5px] font-semibold mt-1" style={{ color: "var(--text-main)" }}>{pedido.join(" · ")}</p>}
+          {dados.produto && <p className="text-[12px] mt-0.5" style={{ color: "var(--text-sub)" }}>{dados.produto}{dados.frasco_cm ? ` · frasco: ${dados.frasco_cm}` : ""}</p>}
+          {dados.resumo && <p className="text-[12px] mt-1 leading-snug" style={{ color: "var(--text-sub)" }}>{dados.resumo}</p>}
+        </div>
+      )}
+      <div className="px-3 py-2 border-b shrink-0" style={{ borderColor: "var(--border)" }}>
+        <div className="flex items-center gap-2 h-8 px-2.5 rounded-lg bg-[rgba(116,116,128,0.08)]">
+          <Search className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--text-faint)" }} />
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar na conversa: verniz, medida, prazo…"
+            className="flex-1 min-w-0 bg-transparent text-[12.5px] focus:outline-none" style={{ color: "var(--text-main)" }} />
+          {busca && <button onClick={() => setBusca("")} aria-label="Limpar busca" style={{ color: "var(--text-faint)" }}><X className="w-3.5 h-3.5" /></button>}
+        </div>
+        {termo && msgs && <p className="text-[10.5px] mt-1 px-1" style={{ color: "var(--text-faint)" }}>{lista.length ? `${lista.length} ${lista.length === 1 ? "mensagem" : "mensagens"}` : "Nada encontrado"}</p>}
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-1.5" style={{ background: "#efeae2" }}>
+        {!msgs && <div className="flex justify-center py-8"><TypingBubble /></div>}
+        {msgs && msgs.length === 0 && <p className="text-center text-[12px] py-8" style={{ color: "#54656f" }}>Nenhuma mensagem guardada desta conversa.</p>}
+        {lista.map((m, i) => {
+          const novoDia = !lista[i - 1] || diaDe(lista[i - 1].ts) !== diaDe(m.ts)
+          return (
+            <div key={m.id}>
+              {novoDia && <div className="flex justify-center my-1.5"><span className="text-[10.5px] font-medium px-2.5 py-0.5 rounded-md bg-white/80" style={{ color: "#54656f" }}>{diaDe(m.ts)}</span></div>}
+              <div className={`flex ${m.from_me ? "justify-end" : "justify-start"}`}>
+                <div className="max-w-[85%] px-2.5 py-1.5 shadow-sm" style={{ background: m.from_me ? "#d9fdd3" : "#fff", borderRadius: m.from_me ? "14px 14px 4px 14px" : "14px 14px 14px 4px" }}>
+                  <MidiaMensagem id={m.id} tipo={m.tipo} nome={m.corpo} />
+                  {m.corpo && m.tipo !== "document" && (
+                    <p className={`text-[12.5px] leading-snug whitespace-pre-wrap ${m.tipo === "audio" || m.tipo === "audioMessage" ? "italic" : ""}`} style={{ color: "#111b21" }}>{marcar(m.corpo)}</p>
+                  )}
+                  <p className="text-[10px] mt-0.5 text-right" style={{ color: "#8696a0" }}>
+                    {new Date(m.ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+        <div ref={fimRef} />
+      </div>
     </div>
   )
 }

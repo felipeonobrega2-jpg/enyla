@@ -4,7 +4,7 @@ import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { Ruler, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb, Truck } from "lucide-react"
 import { IdeiasView } from "./components/IdeiasView"
 import { signOut } from "next-auth/react"
-import WhatsAppView from "./components/WhatsAppView"
+import WhatsAppView, { ConversaLateral } from "./components/WhatsAppView"
 import { podarDispensados } from "./lib/filaMensagens"
 import { formDoAtendimento, DadosPedido } from "./lib/atendente"
 import { AvisoWhatsapp } from "./components/AvisoWhatsapp"
@@ -216,6 +216,21 @@ export default function Home() {
   const [entregasPrefill, setEntregasPrefill] = useState<PrefillEntrega | null>(null)
   const [whatsPendentes, setWhatsPendentes] = useState(0)
   const [whatsAbrir, setWhatsAbrir] = useState<{ jid: string; vez: number } | undefined>()
+  // Conversa do cliente do orçamento (botão "Ver conversa"): vem do Orçar ou é achada pelo nome
+  const [conversaOrc, setConversaOrc] = useState<{ jid: string; nome: string; dados: DadosPedido | null; cliente: string } | null>(null)
+  const [verConversa, setVerConversa] = useState(false)
+  const nomeOrc = form.nomeCliente.trim()
+  useEffect(() => {
+    if (view !== "orcamento" || nomeOrc.length < 3 || conversaOrc?.cliente === nomeOrc) return
+    let vivo = true
+    const t = setTimeout(() => {
+      fetch(`/api/whatsapp/destino?cliente=${encodeURIComponent(nomeOrc)}`).then(r => r.json())
+        .then(d => { if (vivo) setConversaOrc(d?.como === "conversa" ? { jid: d.jid, nome: d.nome || nomeOrc, dados: d.dados ?? null, cliente: nomeOrc } : null) })
+        .catch(() => {})
+    }, 700)
+    return () => { vivo = false; clearTimeout(t) }
+  }, [view, nomeOrc, conversaOrc?.cliente])
+  const conversaDoOrc = conversaOrc && nomeOrc && conversaOrc.cliente === nomeOrc ? conversaOrc : null
   const fretesVersao = 0
   const [buscaAberta, setBuscaAberta] = useState(false)
   const [orcTab, setOrcTab] = useState<"padrao" | "digital">("padrao")
@@ -308,6 +323,9 @@ export default function Home() {
   function orcamentoDaConversa(nome: string, jid: string, dados?: DadosPedido) {
     setForm({ ...FORM_INICIAL, nomeCliente: nome, ...(dados ? formDoAtendimento(dados) : {}) }); setResult(null); setDxfNome(null)
     if (config.vinculosWhatsapp?.[jid] !== nome) salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [jid]: nome } })
+    setConversaOrc({ jid, nome, dados: dados ?? null, cliente: nome }); setVerConversa(false)
+    fetch(`/api/whatsapp/destino?jid=${encodeURIComponent(jid)}`).then(r => r.json())
+      .then(d => { if (d?.jid) setConversaOrc(c => c?.jid === jid ? { ...c, nome: d.nome || c.nome, dados: d.dados ?? c.dados } : c) }).catch(() => {})
     navigate("orcamento")
   }
 
@@ -1662,6 +1680,11 @@ export default function Home() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ──── SIDEBAR ──────────────────────────────────────────────────────── */}
+        {view === "orcamento" && verConversa && conversaDoOrc && (
+          <ConversaLateral key={conversaDoOrc.jid} jid={conversaDoOrc.jid} nome={conversaDoOrc.nome} dados={conversaDoOrc.dados}
+            onFechar={() => setVerConversa(false)}
+            onAbrir={() => { setVerConversa(false); setWhatsAbrir({ jid: conversaDoOrc.jid, vez: Date.now() }); navigate("whatsapp") }} />
+        )}
         {view === "orcamento" && orcTab === "padrao" && (
         <aside className="w-72 shrink-0 border-r flex flex-col overflow-y-auto print:hidden" style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}>
 
@@ -1672,6 +1695,14 @@ export default function Home() {
               onChange={v => set("nomeCliente", v)}
               clientes={clientes}
             />
+            {conversaDoOrc && (
+              <button onClick={() => setVerConversa(v => !v)} title="Abre a conversa do WhatsApp ao lado, sem sair do orçamento"
+                className="mt-2 w-full flex items-center gap-2 px-3 h-9 rounded-xl text-[12.5px] font-semibold transition-colors"
+                style={verConversa ? { background: "#8456e8", color: "#fff" } : { background: "rgba(132,86,232,0.08)", color: "#8456e8" }}>
+                <MessageCircle className="w-4 h-4" />{verConversa ? "Fechar conversa" : "Ver conversa"}
+                {conversaDoOrc.dados?.quantidade ? <span className="ml-auto text-[11px] font-medium opacity-80">{conversaDoOrc.dados.quantidade.toLocaleString("pt-BR")} un</span> : null}
+              </button>
+            )}
             {form.nomeCliente.trim() && (
               <ClienteContactCard
                 key={clienteAtual?.id ?? `draft-${form.nomeCliente}`}
