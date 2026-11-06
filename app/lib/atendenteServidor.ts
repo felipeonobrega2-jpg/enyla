@@ -46,7 +46,7 @@ const ESQUEMA = {
       additionalProperties: false,
       required: ["perfil", "quantidade_total", "motivo", "fornecedor"],
       properties: {
-        perfil: { type: "string", enum: ["icp", "medio", "oportunidade", "pequeno", "indefinido", "nao_lead"], description: "Pelo filtro de leads: icp (caixas 5 mil+ ou recorrente), medio (caixas 1.000 a 4.999), oportunidade (frasco, essência, válvula, envase ou produto pronto em volume, mesmo com pouca caixa), pequeno (menos de 1.000 caixas e nada mais), indefinido (ainda não disse volume), nao_lead (fornecedor, parceiro, cliente em andamento, pessoal)." },
+        perfil: { type: "string", enum: ["icp", "medio", "oportunidade", "pequeno", "indefinido", "nao_lead"], description: "Pelo filtro de leads: icp (caixas 5 mil+ ou recorrente), medio (caixas 1.000 a 4.999), oportunidade (frasco, essência, válvula, envase ou produto pronto em volume: 1.000+ unidades ou recorrente, mesmo com pouca caixa; rótulo não conta), pequeno (menos de 1.000 caixas e nenhum outro produto em volume), indefinido (ainda não disse volume), nao_lead (fornecedor, parceiro, cliente em andamento, pessoal)." },
         fornecedor: { type: "boolean", description: "true se o contato é fornecedor (papel, frasco, válvula, essência, gráfica, colagem…), não cliente." },
         quantidade_total: { type: ["number", "null"], description: "Quantidade total do lote que o lead disse (soma dos modelos)." },
         motivo: { type: "string", description: "Uma frase: por que esse perfil." },

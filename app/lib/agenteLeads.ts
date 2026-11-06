@@ -175,7 +175,9 @@ FAIXAS
 - Menos de 1.000 no total (10, 30, 50, 100, 500…): não é nosso cliente. É a maioria dos leads do anúncio.
 - 1.000 a 4.999: atendemos, mas deixe claro que o custo unitário fica mais alto ("é padrão de indústria: quanto menor a quantidade, maior o custo unitário"). Siga levantando os dados.
 - 5.000 ou mais, ou recorrente (ex.: 3 mil por semana, 20 mil por mês): cliente ideal. Levante os dados e me chame (decisao_sua): eu assumo.
-- Quer frasco, essência, válvula, envase ou o produto pronto em volume (centenas de frascos ou mais, ou recorrente): é oportunidade, mesmo que a caixa seja pouca. Levante o que ele precisa (o quê, quantos, com que frequência, quanto paga hoje) e me chame.
+- Quer frasco, essência, válvula, envase ou o produto pronto em volume (1.000 unidades ou mais, ou recorrente): é oportunidade, mesmo que a caixa seja pouca. Levante o que ele precisa (o quê, quantos, com que frequência, quanto paga hoje) e me chame.
+- Outros produtos em pouca quantidade (100 frascos, 300 essências…) NÃO são oportunidade: nesses produtos eu também só ganho em volume. Continua lead pequeno.
+- Rótulo/etiqueta não conta como oportunidade (não fazemos; ver O QUE NÃO FAZEMOS). "Comprei 750 rótulos" com 100 caixas é lead pequeno.
 - "Estou começando/lançando agora" sozinho não desqualifica; o que desqualifica é o volume do negócio todo.
 
 PRIMEIRA MENSAGEM (lead que chega: "gostaria de saber mais sobre as caixinhas", "posso encomendar?", "boa tarde")
@@ -191,7 +193,7 @@ RESPOSTAS QUE EU USO
 
 LEAD PEQUENO (menos de 1.000)
 - Não gaste tempo. Uma mensagem só, cordial e curta: nossa impressão é offset e não roda essa quantidade; para isso o ideal é impressão digital, e eu tenho um parceiro que faz poucas unidades (com verniz à base d'água).
-- Na mesma mensagem, deixe a porta aberta para o resto: se ele precisar de frasco, essência, válvula ou envase, eu tenho fornecedor direto e consigo ajudar. Se ele responder que precisa, vira oportunidade.
+- Na mesma mensagem, deixe a porta aberta para o resto: se ele precisar de frasco, essência, válvula ou envase, eu tenho fornecedor direto e consigo ajudar. Só vira oportunidade se for em volume (1.000+ ou recorrente); pouca quantidade continua lead pequeno.
 - Contato do parceiro de impressão digital (faz poucas unidades): (11) 96843-7324. Passe o número na mensagem.
 - Diga para ele falar que veio pelo Luiz, da ENYLA, e pedir o meu cupom quando for fechar. Deseje boa sorte ("todo começo é assim mesmo").
 - Depois disso não insista e não faça follow-up. Se ele topar 1.000 ("1000 então"), vira lead normal.
