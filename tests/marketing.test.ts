@@ -51,3 +51,21 @@ it("resumo do WhatsApp traz MQL, custo por MQL, a ação e o link", () => {
   expect(t).toContain("?aba=meta")
   expect(numerosParaIA(r)).toContain("custo por MQL")
 })
+
+describe("resumo da manhã", () => {
+  const r: Relatorio = { dia: "2026-11-04", geradoEm: "", dia1: [{ ...linhaVazia("c", "C"), gasto: 155, leads: 98, mql: 12 }], semana: [], semanaAnterior: [], leitura: { resumo: "Bom dia.", destaques: [], acao: "Leve os MQL para orçamento." } }
+  it("bons negócios esperando vêm primeiro, com perfil e quantidade, e o link do Hoje", () => {
+    const esperando = Array.from({ length: 7 }, (_, i) => ({ nome: `Lead ${i}`, jid: `${i}@lid`, rotulo: i ? "Lead médio" : "ICP", quantidade: i ? null : 3000 }))
+    const t = textoResumoWhatsapp(r, "https://x/?aba=meta", { esperando, orcamentosSemResposta: 2, linkHoje: "https://x/?aba=painel" })
+    expect(t.split("\n")[0]).toBe("☀️ *7 bons negócios esperando sua resposta*")
+    expect(t).toContain("• Lead 0 · ICP · 3.000 un")
+    expect(t).toContain("• e mais 2")
+    expect(t).toContain("2 orçamentos sem resposta")
+    expect(t.indexOf("https://x/?aba=painel")).toBeLessThan(t.indexOf("Marketing de ontem"))
+  })
+  it("sem nada esperando, só avisa e segue para o marketing", () => {
+    const t = textoResumoWhatsapp(r, "https://x/?aba=meta", { esperando: [], orcamentosSemResposta: 0, linkHoje: "https://x/?aba=painel" })
+    expect(t).toContain("Nenhum bom negócio esperando")
+    expect(t).not.toContain("aba=painel")
+  })
+})

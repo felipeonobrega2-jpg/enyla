@@ -29,7 +29,7 @@ export type Hoje = {
   outrosEsperando: number                       // demais conversas esperando (não classificadas como bom negócio)
   anuncio: { leads: number; mql: number; semClassificar: number; descartados: number }   // últimas 24 h
   marketing: { dia: string; acao: string; custoMql: number | null } | null
-  reativacao: { ligado: boolean; hoje: number; porDia: number; fila: number }
+  reativacao: { ligado: boolean; hoje: number; porDia: number; fila: number; orcamentosSemResposta?: number }
 }
 
 const DIAS_RETOMADA = 7

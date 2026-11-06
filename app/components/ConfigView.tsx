@@ -41,6 +41,15 @@ function Num({ value, onChange, step = 1, prefixo, sufixo, className = "w-full" 
   )
 }
 
+// Abas: o que é do negócio, os agentes do WhatsApp e o resto do sistema. A aba fica lembrada nesta aba do navegador
+// (o Painel abre direto em Agentes quando você clica para ver a reativação).
+export type AbaConfig = "negocio" | "agentes" | "sistema"
+const ABAS: { v: AbaConfig; nome: string }[] = [{ v: "negocio", nome: "Negócio" }, { v: "agentes", nome: "Agentes" }, { v: "sistema", nome: "Sistema" }]
+export const CHAVE_ABA = "config:aba"
+function abaGuardada(): AbaConfig {
+  try { const a = sessionStorage.getItem(CHAVE_ABA); return ABAS.some(x => x.v === a) ? a as AbaConfig : "negocio" } catch { return "negocio" }
+}
+
 export function ConfigView({ config, onSave, onExportar, onImportar, clientes = [] }: {
   config: Configuracoes
   clientes?: string[]
@@ -49,6 +58,8 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
   onImportar: (file: File) => void
 }) {
   const [draft, setDraft] = useState<Configuracoes>(config)
+  const [aba, setAba] = useState<AbaConfig>(abaGuardada)
+  const mudarAba = (a: AbaConfig) => { setAba(a); try { sessionStorage.setItem(CHAVE_ABA, a) } catch {} }
   const [salvo, setSalvo] = useState(false)
   const importRef = useRef<HTMLInputElement>(null)
   const { theme, setTheme } = useTheme()
@@ -80,7 +91,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
 
   return (
     <Pagina>
-      <CabecalhoPagina titulo="Configurações" sub="Preço, papel, metas e preferências do sistema. Preços de fornecedores ficam em Fornecedores."
+      <CabecalhoPagina titulo="Configurações" sub="Negócio (preço, papel, metas), agentes do WhatsApp e sistema. Preços de fornecedores ficam em Fornecedores."
         acoes={<>
           {sujo && <Botao variante="fantasma" icone={<RotateCcw className="w-3.5 h-3.5" />} onClick={() => setDraft(config)}>Descartar</Botao>}
           <Botao variante="primario" onClick={salvar} disabled={!sujo && !salvo}
@@ -90,6 +101,11 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
           </Botao>
         </>} />
 
+      <div className="mb-4">
+        <Segmentado<AbaConfig> valor={aba} onChange={mudarAba} opcoes={ABAS} />
+      </div>
+
+      {aba === "negocio" && (
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <div className="space-y-4">
           {/* Preço */}
@@ -148,7 +164,6 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
             </div>
           </Cartao>
         </div>
-
         <div className="space-y-4">
           {/* Metas */}
           <Cartao className="ds-entrada">
@@ -189,29 +204,17 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
 
           <FeriadosCartao config={draft} onChange={feriados => setDraft(d => ({ ...d, feriados }))} />
           <RelacionamentoCartao config={draft} clientes={clientes} onChange={lista => setDraft(d => ({ ...d, clientesRelacionamento: lista }))} />
-
-          {/* Aparência */}
-          <Cartao className="ds-entrada">
-            <TituloCartao titulo="Aparência" icone={<Palette className="w-4 h-4" />} sub="“Sistema” acompanha a preferência do seu dispositivo. Vale só para este navegador." />
-            <Segmentado<ThemeChoice> valor={theme} onChange={setTheme}
-              opcoes={[{ v: "system", nome: "Sistema" }, { v: "light", nome: "Claro" }, { v: "dark", nome: "Escuro" }]} />
-          </Cartao>
-
-          {/* IA */}
-          <Cartao className="ds-entrada">
-            <TituloCartao titulo="Forma IA" icone={<Sparkles className="w-4 h-4" />} sub="Chave da Anthropic usada pela assistente de design de embalagens." />
-            <Campo label="Chave da API">
-              <div className="relative">
-                <KeyRound className="w-3.5 h-3.5 text-[#898892] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input type="password" value={draft.apiKey} autoComplete="off" placeholder="sk-ant-…"
-                  onChange={e => setDraft(d => ({ ...d, apiKey: e.target.value }))}
-                  className={`${inputCls} w-full pl-8 font-mono`} />
-              </div>
-            </Campo>
-          </Cartao>
-
-          <ChaveGroq configurada={!!draft.groqConfigurado} />
-
+        </div>
+      </div>
+      )}
+      {aba === "agentes" && (
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        <div className="space-y-4">
+          <AgenteLeadsCard filtro={draft.filtroLeads} onFiltro={t => setDraft(d => ({ ...d, filtroLeads: t }))} />
+          <ContatosProtegidosCard />
+        </div>
+        <div className="space-y-4">
+          <div id="reativacao" className="scroll-mt-4"><ReativacaoCard /></div>
           <MensagensRapidas />
 
           {/* Guia de atendimento: a IA lê antes de sugerir qualquer mensagem */}
@@ -223,11 +226,34 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
               className="w-full rounded-lg px-3 py-2.5 text-[12.5px] leading-relaxed font-mono text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] ds-borda resize-y" />
             <p className="text-[11px] text-[#898892] mt-1.5">{(draft.guiaAtendimento ?? "").split(/\s+/).filter(Boolean).length} palavras · salva com o botão Salvar da página</p>
           </Cartao>
+        </div>
+      </div>
+      )}
+      {aba === "sistema" && (
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        <div className="space-y-4">
+          {/* Aparência */}
+          <Cartao className="ds-entrada">
+            <TituloCartao titulo="Aparência" icone={<Palette className="w-4 h-4" />} sub="“Sistema” acompanha a preferência do seu dispositivo. Vale só para este navegador." />
+            <Segmentado<ThemeChoice> valor={theme} onChange={setTheme}
+              opcoes={[{ v: "system", nome: "Sistema" }, { v: "light", nome: "Claro" }, { v: "dark", nome: "Escuro" }]} />
+          </Cartao>
 
-          <AgenteLeadsCard filtro={draft.filtroLeads} onFiltro={t => setDraft(d => ({ ...d, filtroLeads: t }))} />
-          <div id="reativacao" className="scroll-mt-4"><ReativacaoCard /></div>
-
-          <ContatosProtegidosCard />
+          {/* IA */}
+          <Cartao className="ds-entrada">
+            <TituloCartao titulo="Chave da IA (Anthropic)" icone={<Sparkles className="w-4 h-4" />} sub="A mesma chave move o agente de leads, a reativação, o relatório de marketing e a assistente de design. Sem ela, os agentes param." />
+            <Campo label="Chave da API">
+              <div className="relative">
+                <KeyRound className="w-3.5 h-3.5 text-[#898892] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input type="password" value={draft.apiKey} autoComplete="off" placeholder="sk-ant-…"
+                  onChange={e => setDraft(d => ({ ...d, apiKey: e.target.value }))}
+                  className={`${inputCls} w-full pl-8 font-mono`} />
+              </div>
+            </Campo>
+          </Cartao>
+        </div>
+        <div className="space-y-4">
+          <ChaveGroq configurada={!!draft.groqConfigurado} />
 
           {/* Backup */}
           <Cartao className="ds-entrada">
@@ -242,6 +268,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
           </Cartao>
         </div>
       </div>
+      )}
     </Pagina>
   )
 }

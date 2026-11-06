@@ -8,6 +8,7 @@ import { clienteDaConversa, ligacaoForte, Vinculos } from "./vinculoWhatsapp"
 import { nomeChave } from "./negocio"
 import { COL_FECHADO, COL_ENTREGUE } from "../types"
 import { filtroEfetivo } from "./agenteLeads"
+import { montarHoje } from "./hojeServidor"
 import {
   LinhaCampanha, Periodo, Relatorio, SEM_CAMPANHA, linhaVazia, qualidadeDoLead, periodos, dentro, diaSP, somarDias,
   numerosParaIA, textoResumoWhatsapp, horaDoRelatorio,
@@ -16,6 +17,7 @@ import {
 const BASE = "https://graph.facebook.com/v20.0"
 const CONVERSA = "onsite_conversion.messaging_conversation_started_7d"
 const MAX_RELATORIOS = 30
+const ORDEM_RESUMO = ["Retomada", "ICP", "Oportunidade", "Lead médio", "MQL"]
 
 type Cfg = {
   apiKey?: string; metaToken?: string; metaContaId?: string; filtroLeads?: string; vinculosWhatsapp?: Vinculos
@@ -143,7 +145,8 @@ async function seuNumero() {
   return jid ? jid.split("@")[0].split(":")[0] : null
 }
 
-// Chamado a cada evento do webhook: uma vez por dia, de manhã, gera o de ontem e manda o resumo
+// Chamado a cada evento do webhook: uma vez por dia, de manhã, gera o de ontem e manda o resumo da manhã
+// (bons negócios esperando você + marketing)
 let ultimaLocal = 0
 export async function talvezRelatorio(origem: string) {
   if (Date.now() - ultimaLocal < 15 * 60_000 || !horaDoRelatorio()) return
@@ -155,5 +158,14 @@ export async function talvezRelatorio(origem: string) {
   await gravar(() => ({ marketingGerandoEm: new Date().toISOString() }))
   const rel = await gerarRelatorio(ontem)
   const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
-  if (destino) await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: textoResumoWhatsapp(rel, `${/vercel\.app|localhost/.test(origem) ? "https://app.enyla.com.br" : origem.replace(/\/$/, "")}/?aba=meta`) }) }).catch(() => null)
+  const base = /vercel\.app|localhost/.test(origem) ? "https://app.enyla.com.br" : origem.replace(/\/$/, "")
+  // O que pede você hoje vai no topo; se falhar, sai só o marketing
+  const hoje = await montarHoje().catch(() => null)
+  const dia = hoje ? {
+    // No resumo, o maior negócio primeiro: retomada e ICP, oportunidade, lead médio; depois a quantidade
+    esperando: hoje.responder.map(x => ({ nome: x.nome, jid: x.jid, rotulo: x.rotulo, quantidade: x.dados?.quantidade }))
+      .sort((a, b) => ORDEM_RESUMO.indexOf(a.rotulo) - ORDEM_RESUMO.indexOf(b.rotulo) || (b.quantidade ?? 0) - (a.quantidade ?? 0)),
+    orcamentosSemResposta: hoje.reativacao.orcamentosSemResposta ?? 0, linkHoje: `${base}/?aba=painel`,
+  } : undefined
+  if (destino) await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: textoResumoWhatsapp(rel, `${base}/?aba=meta`, dia) }) }).catch(() => null)
 }

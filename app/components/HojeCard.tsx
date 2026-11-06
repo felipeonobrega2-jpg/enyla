@@ -117,7 +117,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
               <span className="font-semibold text-[#191625]">Reativação {r.ligado ? "ligada" : "desligada"}</span>
               {r.ligado ? ` · ${r.hoje} de ${r.porDia} hoje` : ""} · {r.fila} {r.fila === 1 ? "bom negócio parado" : "bons negócios parados"}
             </p>
-            <Botao variante="fantasma" className="h-7 px-2 text-[11.5px] shrink-0" onClick={() => { onNavegar("config"); setTimeout(() => document.getElementById("reativacao")?.scrollIntoView({ behavior: "smooth" }), 450) }}>Abrir <ArrowRight className="w-3.5 h-3.5" /></Botao>
+            <Botao variante="fantasma" className="h-7 px-2 text-[11.5px] shrink-0" onClick={() => { try { sessionStorage.setItem("config:aba", "agentes") } catch {} onNavegar("config"); setTimeout(() => document.getElementById("reativacao")?.scrollIntoView({ behavior: "smooth" }), 450) }}>Abrir <ArrowRight className="w-3.5 h-3.5" /></Botao>
           </div>
         </div>
       </div>

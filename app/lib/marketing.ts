@@ -90,11 +90,30 @@ export function numerosParaIA(r: Pick<Relatorio, "dia" | "dia1" | "semana" | "se
   return [bloco(`Dia ${dm(r.dia)}`, r.dia1), bloco(`Últimos 7 dias`, r.semana), bloco(`7 dias anteriores`, r.semanaAnterior)].join("\n\n")
 }
 
-// Resumo que vai no seu WhatsApp (o relatório completo fica na página Campanhas)
-export function textoResumoWhatsapp(r: Relatorio, link: string) {
+// O que pede você hoje (vem do Hoje): entra no topo do resumo da manhã
+export type DiaNoResumo = {
+  esperando: { nome: string | null; jid: string; rotulo: string; quantidade?: number | null }[]
+  orcamentosSemResposta: number
+  linkHoje: string
+}
+const MOSTRAR_NO_RESUMO = 5
+
+// Resumo da manhã no seu WhatsApp: primeiro os bons negócios esperando você, depois o marketing de ontem
+// (o relatório completo fica na página Campanhas)
+export function textoResumoWhatsapp(r: Relatorio, link: string, dia?: DiaNoResumo) {
   const t = total(r.dia1), s = total(r.semana)
   const cpm = custoPor(t.gasto, t.mql), cpmS = custoPor(s.gasto, s.mql)
+  const n = dia?.esperando.length ?? 0
+  const bloco = dia ? [
+    n ? `☀️ *${n} ${n === 1 ? "bom negócio esperando" : "bons negócios esperando"} sua resposta*` : "☀️ *Nenhum bom negócio esperando resposta*",
+    ...dia.esperando.slice(0, MOSTRAR_NO_RESUMO).map(x => `• ${x.nome || x.jid.split("@")[0]} · ${x.rotulo}${x.quantidade ? ` · ${x.quantidade.toLocaleString("pt-BR")} un` : ""}`),
+    n > MOSTRAR_NO_RESUMO ? `• e mais ${n - MOSTRAR_NO_RESUMO}` : null,
+    dia.orcamentosSemResposta ? `📄 ${dia.orcamentosSemResposta} ${dia.orcamentosSemResposta === 1 ? "orçamento sem resposta" : "orçamentos sem resposta"} há 2 dias ou mais (retomada pronta em Reativação)` : null,
+    n || dia.orcamentosSemResposta ? `👉 ${dia.linkHoje}` : null,
+    "",
+  ] : []
   return [
+    ...bloco,
     `📊 *Marketing de ontem (${dm(r.dia)})*`,
     `Gasto ${brl(t.gasto)} · ${t.leads} leads · *${t.mql} MQL*${cpm != null ? ` (${brl(cpm)} cada)` : ""}`,
     t.pedidos ? `${t.pedidos} pedido${t.pedidos > 1 ? "s" : ""} · ${brl(t.faturamento)}` : null,
@@ -102,7 +121,7 @@ export function textoResumoWhatsapp(r: Relatorio, link: string) {
     r.leitura?.resumo ? `\n${r.leitura.resumo}` : null,
     r.leitura?.acao ? `👉 ${r.leitura.acao}` : null,
     `\n${link}`,
-  ].filter(Boolean).join("\n")
+  ].filter(x => x != null).join("\n")
 }
 
 // Gera de manhã (depois das 9h15, quando a verificação diária já identificou a campanha de cada conversa)
