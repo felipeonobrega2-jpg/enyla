@@ -112,6 +112,8 @@ export default function WhatsAppView({
     return m
   }, [kanban, lancamentos])
   const clienteDe = (c: { jid: string; nome: string | null }) => clienteDaConversa(c, nomesClientes, vinculos)
+  // Cliente é quem já comprou (tem pedido); quem só recebeu orçamento continua lead
+  const comprou = (c: { jid: string; nome: string | null }) => { const cli = clienteDe(c); return !!cli && (resumo.get(nomeChave(cli.nome))?.pedidos ?? 0) > 0 }
   const defDe = (nome: string): EtiquetaDef => etiquetasDef.find(e => e.nome === nome) ?? { nome, cor: "#7a7983" }
   const [conversas, setConversas] = useState<Conversa[]>([])
   const [ativa, setAtiva] = useState<Conversa | null>(null)
@@ -233,7 +235,7 @@ export default function WhatsAppView({
     (filtro === "fechadas" ? estaFechada(c) : !estaFechada(c)) &&
     (filtro !== "responder" || aguardando(c)) &&
     (!etiquetaFiltro || (c.etiquetas ?? []).includes(etiquetaFiltro)) &&
-    (filtro === "todas" || filtro === "fechadas" || filtro === "responder" || (filtro === "clientes" ? !!clienteDe(c) : lerOrigem(c.campanha)?.canal === filtro)) &&
+    (filtro === "todas" || filtro === "fechadas" || filtro === "responder" || (filtro === "clientes" ? comprou(c) : lerOrigem(c.campanha)?.canal === filtro)) &&
     (c.nome.toLowerCase().includes(busca.toLowerCase()) || (c.ultima_msg ?? "").toLowerCase().includes(busca.toLowerCase()))
   )
 
@@ -378,7 +380,7 @@ export default function WhatsAppView({
             {([["todas", "Todas"], ["anuncio", "Anúncio"], ["site", "Site"], ["clientes", "Clientes"], ["fechadas", "Fechadas"]] as const).map(([v, n]) => (
               <button key={v} onClick={() => setFiltro(v)} className="h-7 px-2.5 rounded-full text-[11.5px] font-medium transition-colors"
                 style={filtro === v ? { background: "#191625", color: "#fff" } : { background: "var(--bg-page)", color: "var(--text-sub)", border: "1px solid var(--border)" }}>
-                {n}{v !== "todas" ? ` ${conversas.filter(c => v === "fechadas" ? estaFechada(c) : !estaFechada(c) && (v === "clientes" ? !!clienteDe(c) : lerOrigem(c.campanha)?.canal === v)).length}` : ""}
+                {n}{v !== "todas" ? ` ${conversas.filter(c => v === "fechadas" ? estaFechada(c) : !estaFechada(c) && (v === "clientes" ? comprou(c) : lerOrigem(c.campanha)?.canal === v)).length}` : ""}
               </button>
             ))}
           </div>
@@ -443,7 +445,9 @@ export default function WhatsAppView({
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[13.5px] font-semibold truncate flex items-center gap-1.5 min-w-0" style={{ color: "var(--text-main)" }}>
                     <span className="truncate">{c.nome}</span>
-                    {clienteDe(c) && <span className="shrink-0 text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-px rounded" style={{ background: "rgba(132,86,232,0.12)", color: "#8456e8" }}>cliente</span>}
+                    {comprou(c)
+                      ? <span className="shrink-0 text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-px rounded" style={{ background: "rgba(132,86,232,0.12)", color: "#8456e8" }}>cliente</span>
+                      : clienteDe(c) && <span title="Recebeu orçamento, ainda não comprou" className="shrink-0 text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-px rounded" style={{ background: "rgba(31,122,224,0.1)", color: "#1f7ae0" }}>orçamento</span>}
                     <SeloOrigem campanha={c.campanha} />
                     {(c.etiquetas ?? []).slice(0, 2).map(n => <EtiquetaChip key={n} def={defDe(n)} mini />)}
                   </span>
@@ -1026,7 +1030,7 @@ export function ClienteDaConversa({ cliente, resumo, clientes, onVincular, onAbr
   return (
     <p className="text-[11.5px] flex items-center gap-1.5 flex-wrap" style={{ color: "var(--text-sub)" }}>
       <button onClick={() => onAbrir?.(cliente.nome)} className="font-semibold text-[#8456e8] hover:underline">{cliente.nome}</button>
-      <span>· {r ? `${r.pedidos} ${r.pedidos === 1 ? "pedido" : "pedidos"} · ${brlCurto(r.vendido)}` : "só orçamentos"}</span>
+      <span>· {r ? `cliente · ${r.pedidos} ${r.pedidos === 1 ? "pedido" : "pedidos"} · ${brlCurto(r.vendido)}` : "lead com orçamento (ainda não comprou)"}</span>
       {r && r.deve > 0.5 && <span className="font-semibold text-[#d33a3c]">· deve {brlCurto(r.deve)}</span>}
       {onVincular && <button onClick={() => setEscolhendo(true)} className="ml-1 underline" style={{ color: "var(--text-faint)" }}>{cliente.manual ? "trocar" : "não é ele?"}</button>}
     </p>

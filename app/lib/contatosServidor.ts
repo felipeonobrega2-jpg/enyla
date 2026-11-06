@@ -5,6 +5,7 @@ import { supabase } from "./supabase"
 import { evo } from "./evolution"
 import { clienteDaConversa, ligacaoForte, vinculosPorTelefone, Vinculos } from "./vinculoWhatsapp"
 import { nomeChave } from "./negocio"
+import { COL_FECHADO, COL_ENTREGUE } from "../types"
 import { ContatoImportante, ETIQUETAS_IMPORTANTES, telefoneDaConversa, telefoneNaResposta, normalizarTelefone } from "./contatos"
 
 type Conv = { jid: string; nome: string | null; telefone: string | null; status_lead: string | null; etiquetas: string[] | null; ultima_at: string | null }
@@ -12,11 +13,13 @@ type Conv = { jid: string; nome: string | null; telefone: string | null; status_
 export async function contatosImportantes(): Promise<ContatoImportante[]> {
   const [{ data: convs }, { data: cards }, { data: cfg }] = await Promise.all([
     supabase.from("whatsapp_conversas").select("jid, nome, telefone, status_lead, etiquetas, ultima_at").not("jid", "like", "%@g.us"),
-    supabase.from("KanbanCard").select("nomeCliente"),
+    supabase.from("KanbanCard").select("nomeCliente, coluna"),
     supabase.from("AppConfig").select("data").eq("id", 1).single(),
   ])
   const vinculos = ((cfg?.data ?? {}) as { vinculosWhatsapp?: Vinculos }).vinculosWhatsapp
   const nomes = [...new Set((cards ?? []).map(c => c.nomeCliente).filter(Boolean))] as string[]
+  // Cliente é quem já comprou; quem só orçou é lead com orçamento
+  const compradores = new Set((cards ?? []).filter(c => c.coluna >= COL_FECHADO && c.coluna <= COL_ENTREGUE).map(c => nomeChave(c.nomeCliente)))
   const out: ContatoImportante[] = []
   for (const c of (convs ?? []) as Conv[]) {
     const etiquetas = c.etiquetas ?? []
@@ -24,7 +27,7 @@ export async function contatosImportantes(): Promise<ContatoImportante[]> {
     if (c.status_lead === "mql") motivos.push("MQL")
     for (const e of etiquetas) if (ETIQUETAS_IMPORTANTES.includes(e) && !motivos.includes(e)) motivos.push(e)
     const cli = clienteDaConversa(c, nomes, vinculos)
-    if (cli && ligacaoForte(c, cli)) motivos.push(`Cliente: ${cli.nome}`)
+    if (cli && ligacaoForte(c, cli)) motivos.push(compradores.has(nomeChave(cli.nome)) ? `Cliente: ${cli.nome}` : `Orçamento: ${cli.nome}`)
     if (!motivos.length) continue
     out.push({ jid: c.jid, nome: c.nome || cli?.nome || c.jid.split("@")[0], telefone: telefoneDaConversa(c), motivos, etiquetas, ultima: c.ultima_at })
   }
@@ -50,7 +53,7 @@ export async function descobrirTelefones(limite = 40): Promise<{ achados: number
   await Promise.all(Array.from({ length: 4 }, async () => {
     while (fila.length) {
       const c = fila.shift()!
-      const doCliente = c.motivos.find(m => m.startsWith("Cliente: "))?.slice(9)
+      const doCliente = c.motivos.find(m => m.startsWith("Cliente: ") || m.startsWith("Orçamento: "))?.replace(/^[^:]+: /, "")
       let tel = doCliente ? telCliente.get(nomeChave(doCliente)) ?? null : null
       if (tel) peloCadastro++
       else { tel = await telefonePelaEvolution(c.jid).catch(() => null); if (tel) pelaEvolution++ }

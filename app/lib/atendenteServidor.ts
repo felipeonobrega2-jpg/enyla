@@ -6,7 +6,7 @@ import { supabase } from "./supabase"
 import { clienteClaude, FALLBACK, MODELO } from "./claude"
 import { clienteDaConversa, ligacaoForte, Vinculos } from "./vinculoWhatsapp"
 import { nomeChave } from "./negocio"
-import { COLUNAS_KANBAN, COL_PERDIDO } from "../types"
+import { COLUNAS_KANBAN, COL_PERDIDO, COL_FECHADO, COL_ENTREGUE } from "../types"
 import type { Atendimento } from "./atendente"
 import { agoraParaIA, corrigirCumprimento } from "./atendente"
 import { LeadAvaliado, filtroEfetivo, soAbertura, saudacaoDoFiltro } from "./agenteLeads"
@@ -47,7 +47,7 @@ const ESQUEMA = {
       additionalProperties: false,
       required: ["perfil", "quantidade_total", "motivo", "fornecedor"],
       properties: {
-        perfil: { type: "string", enum: ["icp", "medio", "oportunidade", "pequeno", "indefinido", "nao_lead"], description: "Pelo filtro de leads: icp (caixas 5 mil+ ou recorrente), medio (caixas 1.000 a 4.999), oportunidade (frasco, essência, válvula, envase ou produto pronto em volume: 1.000+ unidades ou recorrente, mesmo com pouca caixa; rótulo não conta), pequeno (menos de 1.000 caixas e nenhum outro produto em volume), indefinido (ainda não disse volume), nao_lead (fornecedor, parceiro, cliente em andamento, pessoal)." },
+        perfil: { type: "string", enum: ["icp", "medio", "oportunidade", "pequeno", "indefinido", "nao_lead"], description: "Pelo filtro de leads: icp (caixas 5 mil+ ou recorrente), medio (caixas 1.000 a 4.999), oportunidade (frasco, essência, válvula, envase ou produto pronto em volume: 1.000+ unidades ou recorrente, mesmo com pouca caixa; rótulo não conta), pequeno (menos de 1.000 caixas e nenhum outro produto em volume), indefinido (ainda não disse volume), nao_lead (fornecedor, parceiro, cliente que já comprou com pedido em andamento, pessoal; quem só recebeu orçamento é lead e tem perfil pelo volume)." },
         fornecedor: { type: "boolean", description: "true se o contato é fornecedor (papel, frasco, válvula, essência, gráfica, colagem…), não cliente." },
         quantidade_total: { type: ["number", "null"], description: "Quantidade total do lote que o lead disse (soma dos modelos)." },
         motivo: { type: "string", description: "Uma frase: por que esse perfil." },
@@ -104,8 +104,13 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
   const doCliente = todosDoCliente.slice(-6)
   // Cliente "seu" é quem tem orçamento em aberto, negociação ou pedido; quem só tem orçamento perdido voltou a ser lead
   const clienteAtivo = todosDoCliente.some(c => c.coluna !== COL_PERDIDO)
+  // Cliente é quem já comprou (pedido fechado em diante); quem só recebeu orçamento continua lead
+  const comprou = todosDoCliente.some(c => c.coluna >= COL_FECHADO && c.coluna <= COL_ENTREGUE)
+  const historicoCards = doCliente.length ? " Orçamentos/pedidos: " + doCliente.map(c => `${c.numero} (${c.coluna === 11 ? "negociando" : COLUNAS_KANBAN[c.coluna] ?? "?"}, ${c.quantidade} un, ${c.dimensoes}, R$ ${c.preco})`).join("; ") : ""
   const contexto = cli
-    ? `Cliente cadastrado: ${cli.nome}. ${doCliente.length ? "Orçamentos/pedidos: " + doCliente.map(c => `${c.numero} (${c.coluna === 11 ? "negociando" : COLUNAS_KANBAN[c.coluna] ?? "?"}, ${c.quantidade} un, ${c.dimensoes}, R$ ${c.preco})`).join("; ") : "Sem orçamentos ainda."}`
+    ? comprou
+      ? `Cliente (já comprou com o Felipe): ${cli.nome}.${historicoCards}`
+      : `Lead com orçamento (recebeu proposta, ainda não comprou): ${cli.nome}.${historicoCards || " Sem orçamentos ainda."} Classifique o perfil pelo volume como qualquer lead.`
     : parecido
       ? `Contato ainda não ligado a um cliente do cadastro. Existe um cliente cadastrado com nome parecido ("${parecido}"), mas pode ser outra pessoa: trate como lead novo, a menos que a conversa deixe claro que é o mesmo cliente (pedido anterior, caixinha de sempre).`
       : "Contato ainda não ligado a um cliente do cadastro (provável lead novo)."
