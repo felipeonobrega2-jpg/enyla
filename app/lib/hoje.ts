@@ -29,10 +29,28 @@ export const RETOMAR_ATE = 10    // depois disso o bom negócio já entra na Rea
 
 export type ItemHoje = {
   jid: string; nome: string | null; mensagem: string | null; desde: string; rotulo: string; retomada: boolean
-  lista: "responder" | "retomar"     // responder: ele escreveu; retomar: lembrete venceu ou você falou por último há 3+ dias
+  lista: "responder" | "retomar" | "orcar"   // responder: ele escreveu; retomar: lembrete venceu ou você falou por último há 3+ dias; orcar: ele passou tudo e o orçamento está com você
   nota?: string                      // a nota do lembrete
   dados: DadosPedido | null          // o que a IA já tirou da conversa (para o orçamento sair preenchido)
   cliente: string | null             // cliente do cadastro ligado à conversa
+}
+
+// Etapa da conversa na última leitura da IA ("orcamento" = o cliente já passou o que precisa para cotar)
+export function etapaDaConversa(proximaAcao: string | null | undefined): string | null {
+  try { return (JSON.parse(proximaAcao ?? "") as { r?: { etapa?: string } }).r?.etapa ?? null } catch { return null }
+}
+
+export const DIAS_ORCAR = 7
+
+// O orçamento está com você: ele passou tudo (etapa "orcamento"), é bom negócio, falou nos últimos 7 dias e, depois
+// da última mensagem dele, você não mandou PDF/documento, não criou orçamento no sistema e não marcou próximo passo
+export function deveOrcamento(c: ConvHoje, depois: { documento: boolean; orcamentoNoSistema: boolean }, passo: ProximoPasso | undefined, agora = Date.now()) {
+  const recebida = c.ultima_recebida_at
+  if (!recebida || c.jid.endsWith("@g.us") || ["pedido", "perdido", "descartado"].includes(c.status_lead ?? "")) return false
+  if (etapaDaConversa(c.proxima_acao) !== "orcamento" || qualidadeDoLead(c) !== "mql") return false
+  if (agora - new Date(recebida).getTime() > DIAS_ORCAR * 86_400_000) return false
+  if (passo && passo.em > recebida) return false
+  return !depois.documento && !depois.orcamentoNoSistema
 }
 
 // Última leitura da IA guardada na conversa
@@ -43,6 +61,7 @@ export function dadosDaConversa(proximaAcao: string | null | undefined): DadosPe
 export type Hoje = {
   responder: ItemHoje[]                         // bons negócios esperando você (o cliente falou por último)
   retomar?: ItemHoje[]                          // bons negócios para retomar hoje (lembrete ou silêncio de 3+ dias)
+  orcar?: ItemHoje[]                            // bons negócios que já passaram tudo e esperam o seu orçamento
   outrosEsperando: number                       // demais conversas esperando (não classificadas como bom negócio)
   anuncio: { leads: number; mql: number; semClassificar: number; descartados: number }   // últimas 24 h
   marketing: { dia: string; acao: string; custoMql: number | null } | null

@@ -127,3 +127,23 @@ describe("próximo passo e quem falou por último", async () => {
     expect(listaDoHoje(mql({ status_lead: "perdido", ultima_msg: "e aí?" }), undefined, agora)).toBeNull()
   })
 })
+
+describe("orçamento para fazer", async () => {
+  const { deveOrcamento } = await import("../app/lib/hoje")
+  const pronto = (o: Partial<ConvHoje> = {}) => conv({ status_lead: "mql", etiquetas: ["MQL", "ICP"], ultima_recebida_at: h(10), ultima_enviada_at: h(9.9),
+    proxima_acao: JSON.stringify({ r: { etapa: "orcamento" } }), ...o })
+  const nada = { documento: false, orcamentoNoSistema: false }
+  it("passou tudo, você disse 'pode deixar' e não mandou nada: o orçamento está com você", () => {
+    expect(deveOrcamento(pronto(), nada, undefined, agora)).toBe(true)
+  })
+  it("já mandou o PDF ou criou o orçamento no sistema: sai", () => {
+    expect(deveOrcamento(pronto(), { ...nada, documento: true }, undefined, agora)).toBe(false)
+    expect(deveOrcamento(pronto(), { ...nada, orcamentoNoSistema: true }, undefined, agora)).toBe(false)
+  })
+  it("ainda levantando dados, lead pequeno, mais de 7 dias ou próximo passo marcado depois: não entra", () => {
+    expect(deveOrcamento(pronto({ proxima_acao: JSON.stringify({ r: { etapa: "levantando_dados" } }) }), nada, undefined, agora)).toBe(false)
+    expect(deveOrcamento(pronto({ status_lead: null, etiquetas: ["Lead pequeno"] }), nada, undefined, agora)).toBe(false)
+    expect(deveOrcamento(pronto({ ultima_recebida_at: h(24 * 8) }), nada, undefined, agora)).toBe(false)
+    expect(deveOrcamento(pronto(), nada, { tipo: "esperando", em: h(1), ate: h(-48) }, agora)).toBe(false)
+  })
+})

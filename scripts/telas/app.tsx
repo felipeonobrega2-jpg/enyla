@@ -94,6 +94,9 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
         { jid: "2@lid", nome: "Aroma Teste", mensagem: "Vocês fazem frasco também?", desde: h(75), rotulo: "Oportunidade", retomada: false, lista: "responder" },
         { jid: "3@lid", nome: "Cosméticos Fictícia", mensagem: "Umas 1.500, por aí", desde: h(12), rotulo: "Lead médio", retomada: false, lista: "responder" },
       ],
+      orcar: [
+        { jid: "10@lid", nome: "Cosméticos Modelo", mensagem: "Me faz a cotação para as duas qualidades por gentileza", desde: h(60 * 9), rotulo: "ICP", retomada: false, lista: "orcar", cliente: null, dados: { produto: "caixa", volume_ml: null, caixa_cm: { frente: 4, lateral: 4, altura: 8 }, frasco_cm: null, quantidade: 10000, tem_arte: true, resumo: "10 e 20 mil caixas 8x4x4, verniz localizado" } },
+      ],
       retomar: [
         { jid: "7@lid", nome: "Embalagens Fictícias", mensagem: "Vou ver com meu sócio e te falo", desde: h(60 * 24 * 4), rotulo: "ICP", retomada: false, lista: "retomar", cliente: null, dados: { produto: "caixinha", volume_ml: 100, caixa_cm: null, frasco_cm: null, quantidade: 5000, tem_arte: true, resumo: "" } },
         { jid: "8@lid", nome: "Aromas Exemplo", mensagem: "Te mando a arte até sexta", desde: h(60 * 24 * 5), rotulo: "Lead médio", retomada: false, lista: "retomar", nota: "vai mandar a arte", cliente: null, dados: null },

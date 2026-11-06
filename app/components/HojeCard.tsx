@@ -4,7 +4,7 @@
 // respondeu à retomada primeiro), o que o anúncio trouxe em 24 h, a ação do relatório de marketing e a reativação.
 
 import { useEffect, useState } from "react"
-import { Sun, MessageCircle, RotateCcw, Megaphone, ArrowRight, CheckCircle2, CalendarClock } from "lucide-react"
+import { Sun, MessageCircle, RotateCcw, Megaphone, ArrowRight, CheckCircle2, CalendarClock, FileText } from "lucide-react"
 import { Cartao, TituloCartao, LinhaLista, Selo, Botao, Tom } from "./ds"
 import { Hoje, ItemHoje, haQuanto } from "../lib/hoje"
 import { ProximoPasso } from "./ProximoPasso"
@@ -53,13 +53,16 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
   // Marcou o próximo passo: some na hora (o servidor confirma na próxima atualização)
   const responder = d.responder.filter(x => !feitos.has(x.jid))
   const retomar = (d.retomar ?? []).filter(x => !feitos.has(x.jid))
+  const orcar = (d.orcar ?? []).filter(x => !feitos.has(x.jid))
   const retomadas = responder.filter(x => x.retomada).length
 
   const linha = (x: ItemHoje) => (
     <LinhaLista key={x.jid} titulo={x.nome || x.jid.split("@")[0]}
-      icone={x.retomada ? <RotateCcw className="w-4 h-4" /> : x.lista === "retomar" ? <CalendarClock className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />}
-      tom={x.retomada ? "sucesso" : x.lista === "retomar" ? "info" : "acento"}
-      sub={x.lista === "retomar"
+      icone={x.retomada ? <RotateCcw className="w-4 h-4" /> : x.lista === "orcar" ? <FileText className="w-4 h-4" /> : x.lista === "retomar" ? <CalendarClock className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />}
+      tom={x.retomada ? "sucesso" : x.lista === "orcar" ? "alerta" : x.lista === "retomar" ? "info" : "acento"}
+      sub={x.lista === "orcar"
+        ? `Esperando o seu orçamento ${haQuanto(x.desde)} · ${doPedido(x.dados)}${x.dados?.resumo || x.mensagem || ""}`
+        : x.lista === "retomar"
         ? `${x.nota ? `Lembrete: ${x.nota} · ` : `Sem resposta ${haQuanto(x.desde)} · `}${doPedido(x.dados)}${x.mensagem ?? ""}`
         : `${doPedido(x.dados)}${x.mensagem ?? ""}` || undefined}
       valor={<span className="hidden sm:inline"><Selo tom={TOM[x.rotulo] ?? "acento"}>{x.rotulo}</Selo></span>} valorSub={x.lista === "responder" ? haQuanto(x.desde) : undefined}
@@ -81,13 +84,19 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
           <div className="px-5 pt-5">
             <TituloCartao titulo="Hoje" icone={<Sun className="w-4 h-4" />}
               sub={[
+                orcar.length ? `${orcar.length} ${orcar.length === 1 ? "orçamento" : "orçamentos"} para fazer` : "",
                 responder.length ? `${responder.length} para responder` : "Ninguém para responder",
                 retomadas ? `${retomadas} ${retomadas === 1 ? "voltou" : "voltaram"} pela retomada` : "",
                 retomar.length ? `${retomar.length} para retomar` : "",
               ].filter(Boolean).join(", ")}
-              acao={responder.length + retomar.length > 0 ? <Selo tom={retomadas ? "sucesso" : "acento"}>{responder.length + retomar.length}</Selo> : undefined} />
+              acao={orcar.length + responder.length + retomar.length > 0 ? <Selo tom={orcar.length ? "alerta" : retomadas ? "sucesso" : "acento"}>{orcar.length + responder.length + retomar.length}</Selo> : undefined} />
           </div>
           <div className="px-2 pb-2 -mt-1">
+            {orcar.length > 0 && (<>
+              <p className="px-3 pt-1 pb-1 text-[11px] font-bold uppercase tracking-wider text-[#c57800]">Orçamento para fazer</p>
+              {orcar.map(linha)}
+              <p className="px-3 pt-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-[#898892]">Responder</p>
+            </>)}
             {responder.length === 0
               ? <div className="flex items-center gap-2 px-3 pb-3 text-[12px] text-[#5e5c68]"><CheckCircle2 className="w-4 h-4 text-[#009351]" />Em dia: nenhum bom negócio esperando sua resposta.</div>
               : (verTodos ? responder : responder.slice(0, MOSTRAR)).map(linha)}

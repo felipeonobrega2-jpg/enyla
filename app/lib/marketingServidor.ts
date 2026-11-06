@@ -165,7 +165,7 @@ export async function talvezRelatorio(origem: string) {
     // No resumo, o maior negócio primeiro: retomada e ICP, oportunidade, lead médio; depois a quantidade
     esperando: hoje.responder.map(x => ({ nome: x.nome, jid: x.jid, rotulo: x.rotulo, quantidade: x.dados?.quantidade }))
       .sort((a, b) => ORDEM_RESUMO.indexOf(a.rotulo) - ORDEM_RESUMO.indexOf(b.rotulo) || (b.quantidade ?? 0) - (a.quantidade ?? 0)),
-    orcamentosSemResposta: hoje.reativacao.orcamentosSemResposta ?? 0, retomar: hoje.retomar?.length ?? 0, linkHoje: `${base}/?aba=painel`,
+    orcamentosSemResposta: hoje.reativacao.orcamentosSemResposta ?? 0, retomar: hoje.retomar?.length ?? 0, orcar: (hoje.orcar ?? []).map(x => ({ nome: x.nome, jid: x.jid, quantidade: x.dados?.quantidade })), linkHoje: `${base}/?aba=painel`,
   } : undefined
   if (destino) await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: textoResumoWhatsapp(rel, `${base}/?aba=meta`, dia) }) }).catch(() => null)
 }
