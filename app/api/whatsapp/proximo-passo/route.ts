@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { DIAS_ESPERANDO, Passos, ProximoPasso } from "@/app/lib/hoje"
+import { gravarCampos } from "@/app/lib/configAtomica"
 
 // O próximo passo de uma conversa (Hoje e topo da conversa do WhatsApp). (Rota protegida pelo login.)
 //   GET ?jid=                                     → { passo } (ou null)
@@ -42,10 +43,10 @@ export async function POST(req: NextRequest) {
   } else if (b.tipo !== "limpar") return NextResponse.json({ erro: "tipo inválido" }, { status: 400 })
 
   // Grava lendo a versão mais nova (o resto da configuração não muda) e esquece passos velhos
-  const { d, passos } = await lerPassos()
+  const { passos } = await lerPassos()
   const limite = agora.getTime() - DIAS_GUARDAR * 86_400_000
   const proximos: Passos = Object.fromEntries(Object.entries(passos).filter(([j, p]) => j !== b.jid && new Date(p.ate).getTime() > limite))
   if (passo) proximos[b.jid] = passo
-  await supabase.from("AppConfig").update({ data: { ...d, proximosPassos: proximos } }).eq("id", 1)
+  await gravarCampos({ proximosPassos: proximos })
   return NextResponse.json({ ok: true, passo })
 }

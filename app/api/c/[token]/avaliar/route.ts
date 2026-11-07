@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { carregarPortal } from "@/app/lib/portalCliente"
 import { Avaliacao, COL_ENTREGUE } from "@/app/types"
+import { gravarCampos } from "@/app/lib/configAtomica"
 
 // "Chegou! Como ficou?": o cliente dá nota (1 a 5) e um comentário opcional a um pedido entregue
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
@@ -19,6 +20,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
   const cfg = (cfgRow?.data ?? {}) as Record<string, unknown>
   const lista = [nova, ...((cfg.avaliacoes as Avaliacao[] | undefined) ?? []).filter(a => a.key !== pedido.key)].slice(0, 500)
-  await supabase.from("AppConfig").update({ data: { ...cfg, avaliacoes: lista } }).eq("id", 1)
+  await gravarCampos({ avaliacoes: lista })
   return NextResponse.json({ ok: true })
 }

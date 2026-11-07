@@ -7,6 +7,7 @@ import { somarDiasUteis, definirFeriadosLocais } from "@/app/lib/diasUteis"
 import { normalizarProducao } from "@/app/lib/producao"
 import { CONFIG_PADRAO } from "@/app/config"
 import { AprovacaoOnline, COL_FECHADO, COLUNAS_KANBAN } from "@/app/types"
+import { gravarCampos } from "@/app/lib/configAtomica"
 
 // Cliente repete um pedido pela página dele.
 //   Mesma quantidade → pedido novo fechado com o preço do último pedido (+ Pix do sinal)
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const cfg = (cfgRow?.data ?? {}) as Record<string, unknown>
   const avisar = async (a: AprovacaoOnline) => {
     const lista = [a, ...((cfg.aprovacoesOnline as AprovacaoOnline[] | undefined) ?? [])].slice(0, 100)
-    await supabase.from("AppConfig").update({ data: { ...cfg, aprovacoesOnline: lista } }).eq("id", 1)
+    await gravarCampos({ aprovacoesOnline: lista })
   }
   const agora = new Date()
   const hoje = agora.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })

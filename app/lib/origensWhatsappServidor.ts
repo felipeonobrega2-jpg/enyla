@@ -5,6 +5,7 @@ import { supabase } from "./supabase"
 import { ENTRADAS_PADRAO, entradaDaMensagem, campanhaDoDia, normalizar, OrigemConversa } from "./origemWhatsapp"
 import { clienteDaConversa, Vinculos } from "./vinculoWhatsapp"
 import { nomeChave } from "./negocio"
+import { gravarCampos } from "./configAtomica"
 
 const BASE = "https://graph.facebook.com/v20.0"
 const CONVERSA = "onsite_conversion.messaging_conversation_started_7d"
@@ -94,8 +95,7 @@ export async function classificarOrigens() {
       clientes++
     }
   }
-  const { data: atual } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
-  await supabase.from("AppConfig").update({ data: { ...((atual?.data as object) ?? {}), origensClientes } }).eq("id", 1)
+  await gravarCampos({ origensClientes })
 
   const v = [...origens.values()]
   return {

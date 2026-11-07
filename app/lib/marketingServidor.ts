@@ -9,6 +9,7 @@ import { nomeChave } from "./negocio"
 import { COL_FECHADO, COL_ENTREGUE } from "../types"
 import { filtroEfetivo } from "./agenteLeads"
 import { montarHoje } from "./hojeServidor"
+import { mudarConfig } from "./configAtomica"
 import {
   LinhaCampanha, Periodo, Relatorio, SEM_CAMPANHA, linhaVazia, qualidadeDoLead, periodos, dentro, diaSP, somarDias,
   numerosParaIA, textoResumoWhatsapp, horaDoRelatorio,
@@ -29,8 +30,7 @@ async function lerCfg() {
   return (data?.data ?? {}) as Record<string, unknown> & Cfg
 }
 async function gravar(mudar: (d: Record<string, unknown> & Cfg) => Partial<Cfg>) {
-  const d = await lerCfg()
-  await supabase.from("AppConfig").update({ data: { ...d, ...mudar(d) } }).eq("id", 1)
+  await mudarConfig(d => mudar(d as Record<string, unknown> & Cfg))
 }
 
 // Meta: gasto, cliques e conversas por campanha no período

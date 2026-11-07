@@ -4,6 +4,7 @@ import { supabase } from "@/app/lib/supabase"
 import { criarPedido, ambienteLalamove } from "@/app/lib/lalamove"
 import { Endereco, ParadaFrete, lancamentosDoFrete, telefoneE164 } from "@/app/lib/frete"
 import { nomeChave } from "@/app/lib/negocio"
+import { gravarCampos } from "@/app/lib/configAtomica"
 
 type Pessoa = { nome: string; telefone: string; observacao?: string }
 
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
     const cfg = (cfgRow?.data ?? {}) as Record<string, unknown>
     const s = b.salvarCliente
     const enderecos = { ...((cfg.enderecosClientes as Record<string, unknown>) ?? {}), [nomeChave(s.cliente)]: { ...s.endereco, recebedor: s.recebedor, telefone: s.telefone } }
-    await supabase.from("AppConfig").update({ data: { ...cfg, enderecosClientes: enderecos } }).eq("id", 1)
+    await gravarCampos({ enderecosClientes: enderecos })
   }
 
   return NextResponse.json({ frete, lancamentos: errL ? [] : lancs, avisoLancamento: errL ? `A corrida foi chamada, mas o custo não foi lançado: ${errL.message}` : null })

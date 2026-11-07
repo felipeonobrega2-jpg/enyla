@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { atualizarFrete } from "@/app/lib/freteServidor"
 import { supabase } from "@/app/lib/supabase"
+import { gravarCampos } from "@/app/lib/configAtomica"
 
 // Aviso da Lalamove (status, motorista, valor, saldo da carteira). Rota pública: o conteúdo não é confiável (sem
 // assinatura documentada), então para corridas só usamos o número e buscamos a situação real na API com as nossas chaves.
@@ -26,10 +27,10 @@ export async function POST(req: NextRequest) {
   const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
   const cfg = (cfgRow?.data ?? {}) as Record<string, unknown>
   const eventos = [{ tipo, em: new Date().toISOString(), dados: JSON.stringify(corpo ?? {}).slice(0, 1500) }, ...((cfg.lalamoveEventos as unknown[]) ?? [])].slice(0, 15)
-  const novo: Record<string, unknown> = { ...cfg, lalamoveEventos: eventos }
+  const novo: Record<string, unknown> = { lalamoveEventos: eventos }
   if (saldo !== undefined && /WALLET/i.test(tipo + JSON.stringify(corpo ?? {}).slice(0, 300)))
     novo.lalamoveCarteira = { saldo: Number(saldo), moeda: String(achar(corpo, k => k === "currency") ?? "BRL"), em: new Date().toISOString() }
-  await supabase.from("AppConfig").update({ data: novo }).eq("id", 1)
+  await gravarCampos(novo)
   return NextResponse.json({ ok: true })   // a Lalamove exige 200
 }
 // A Lalamove testa a URL ao cadastrar

@@ -3,7 +3,7 @@
 // o definitivo é o token de "usuário do sistema" do Business Manager gerado sem data de expiração.
 // Só roda no servidor.
 
-import { supabase } from "./supabase"
+import { gravarCampos } from "./configAtomica"
 
 const BASE = "https://graph.facebook.com/v20.0"
 
@@ -75,9 +75,7 @@ function traduzir(msg: string) {
 
 // Grava token e situação no config (campos do servidor; a tela não sobrescreve)
 export async function gravarStatus(campos: Record<string, unknown>) {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
-  const atual = (data?.data as Record<string, unknown>) ?? {}
-  await supabase.from("AppConfig").upsert({ id: 1, data: { ...atual, ...campos } }, { onConflict: "id" })
+  await gravarCampos(campos)
 }
 
 export const camposDoStatus = (s: StatusToken, escolhida = false) => ({

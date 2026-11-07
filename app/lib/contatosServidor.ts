@@ -7,6 +7,7 @@ import { clienteDaConversa, ligacaoForte, vinculosPorTelefone, Vinculos } from "
 import { nomeChave } from "./negocio"
 import { COL_FECHADO, COL_ENTREGUE } from "../types"
 import { ContatoImportante, ETIQUETAS_IMPORTANTES, telefoneDaConversa, telefoneNaResposta, normalizarTelefone } from "./contatos"
+import { gravarCampos } from "./configAtomica"
 
 type Conv = { jid: string; nome: string | null; telefone: string | null; status_lead: string | null; etiquetas: string[] | null; ultima_at: string | null }
 
@@ -83,6 +84,6 @@ export async function ligarPorTelefone(): Promise<number> {
   const d = (cfg?.data ?? {}) as Record<string, unknown> & { vinculosWhatsapp?: Vinculos }
   const novos = vinculosPorTelefone(convs ?? [], clientes ?? [], d.vinculosWhatsapp)
   const n = Object.keys(novos).length
-  if (n) await supabase.from("AppConfig").update({ data: { ...d, vinculosWhatsapp: { ...novos, ...(d.vinculosWhatsapp ?? {}) } } }).eq("id", 1)
+  if (n) await gravarCampos({ vinculosWhatsapp: { ...novos, ...(d.vinculosWhatsapp ?? {}) } })
   return n
 }

@@ -9,33 +9,37 @@ import { linkPedido } from "./digitalLink"
 import type { RegraDigital } from "./precoDigital"
 import { supabase } from "./supabase"
 import { evo } from "./evolution"
-import { gravarLote, WaMessage } from "./whatsappDados"
+import { gravarLote, WaMessage, deveIgnorar } from "./whatsappDados"
 import { atender, lerConfigAtendente } from "./atendenteServidor"
 import { garantirTelefone } from "./contatosServidor"
 import { textoAvisoReativacao } from "./reativacao"
 import {
   AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, filtroEfetivo,
   organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, ehSemCredito, proximoFollowUp, horarioDeFollowUp, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE, ETIQUETAS_AGENTE,
-  marcar, marcosDoRegistro, Marcos,
+  marcar, marcosDoRegistro, Marcos, paradoParaRetomar,
 } from "./agenteLeads"
 import { corrigirCumprimento } from "./atendente"
+import { mudarConfig } from "./configAtomica"
 
 const DIAS_CONVERSA_NOVA = 4
+const HORAS_RETOMAR = 72
 const DIAS_FOLLOW_UP = 14            // follow-up vale para lead que chegou nos últimos 14 dias
 const MINUTOS_VOCE_NA_CONVERSA = 10
 const MAX_REGISTROS = 300
+const MAX_IDS_AGENTE = 1500
+const MAX_POR_DIA_DIGITAL = 25
+// Travas em que a resposta ficou para você decidir: essas viram aviso no seu WhatsApp
+const TRAVAS_COM_AVISO = ["precisa de você", "a IA pediu", "citou valor", "resposta longa", "já respondeu"]
 const MIN_ENTRE_RODADAS = 10         // follow-ups: no máximo uma rodada a cada 10 min
 
 export type Registro = RegistroAgente & { ids?: string[] }
-export type CfgAgente = { pedidosDigitais?: PedidoDigital[]; digital?: RegraDigital; agenteAuto?: AgenteAuto; agenteLog?: Registro[]; agenteMarcos?: Marcos; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string; agenteSemCreditoEm?: string; agenteRetomadaEm?: string; agenteRetomadas?: string[] }
+export type CfgAgente = { pedidosDigitais?: PedidoDigital[]; digital?: RegraDigital; agenteAuto?: AgenteAuto; agenteLog?: Registro[]; agenteMarcos?: Marcos; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string; agenteSemCreditoEm?: string; agenteRetomadaEm?: string; agenteRetomadas?: string[]; agenteIds?: string[] }
 export type Conversa = { jid: string; nome: string | null; telefone: string | null; etiquetas: string[] | null; status_lead: string | null }
 
 export async function lerCfg() { return await lerConfigAtendente() as Awaited<ReturnType<typeof lerConfigAtendente>> & CfgAgente }
 
 export async function gravarCfg(mudar: (d: Record<string, unknown> & CfgAgente) => Partial<CfgAgente>) {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
-  const d = (data?.data ?? {}) as Record<string, unknown> & CfgAgente
-  await supabase.from("AppConfig").update({ data: { ...d, ...mudar(d) } }).eq("id", 1)
+  await mudarConfig(d => mudar(d as Record<string, unknown> & CfgAgente))
 }
 
 // Registro + garante que as etiquetas do agente existem (com cor) na lista de etiquetas do WhatsApp
@@ -132,6 +136,8 @@ export async function enviar(c: Conversa, texto: string, lida?: string): Promise
     if (!env.ok || !env.corpo?.key?.id) return { ids, erro: `não enviou (${env.status})` }
     ids.push(env.corpo.key.id)
     await gravarLote([{ ...env.corpo, key: { ...env.corpo.key, remoteJid: c.jid, fromMe: true } }])
+    // Guarda à parte tudo o que o agente mandou: é assim que ele distingue a mensagem dele da sua
+    await gravarCfg(d => ({ agenteIds: [env.corpo!.key.id, ...(d.agenteIds ?? [])].slice(0, MAX_IDS_AGENTE) })).catch(() => null)
   }
   return { ids }
 }
@@ -164,6 +170,15 @@ async function avisarMql(cfg: CfgAgente, c: Conversa, r: { lead: { perfil: Perfi
 }
 
 // A IA ficou sem crédito: avisa você no WhatsApp (no máximo a cada 6 h). As saudações seguem saindo sem IA.
+// Aviso de resposta segurada: quem é, por quê e o que a IA ia mandar (você copia, ajusta e manda)
+async function avisarSegurado(cfg: CfgAgente, c: Conversa, motivo: string, sugestao: string) {
+  const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
+  if (!destino) return
+  const tel = (c.telefone || c.jid).replace(/@.*/, "")
+  const texto = [`⏸️ *Segurei a resposta* · ${c.nome ?? tel}`, `wa.me/${tel}`, `Motivo: ${motivo}`, sugestao.trim() ? `\nIa mandar:\n${sugestao.trim()}` : ""].filter(Boolean).join("\n")
+  await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: texto }) })
+}
+
 async function avisarSemCredito(cfg: CfgAgente) {
   if (cfg.agenteSemCreditoEm && Date.now() - new Date(cfg.agenteSemCreditoEm).getTime() < 6 * 3_600_000) return
   await gravarCfg(() => ({ agenteSemCreditoEm: new Date().toISOString() }))
@@ -179,8 +194,8 @@ const ultimaDa = async (jid: string) =>
 const primeiraDa = async (jid: string) =>
   (await supabase.from("whatsapp_mensagens").select("ts").eq("jid", jid).order("ts", { ascending: true }).limit(1).maybeSingle()).data
 
-async function voceNaConversa(jid: string, log: Registro[]) {
-  const idsDoAgente = new Set(log.flatMap(l => l.ids ?? []))
+async function voceNaConversa(jid: string, log: Registro[], cfg?: CfgAgente) {
+  const idsDoAgente = new Set([...log.flatMap(l => l.ids ?? []), ...(cfg?.agenteIds ?? [])])
   const desde = new Date(Date.now() - MINUTOS_VOCE_NA_CONVERSA * 60_000).toISOString()
   const { data: minhas } = await supabase.from("whatsapp_mensagens").select("id, corpo").eq("jid", jid).eq("from_me", true).gte("ts", desde)
   return (minhas ?? []).some(m => !idsDoAgente.has(m.id) && !ehMensagemAutomaticaDoWhatsapp(m.corpo))
@@ -247,7 +262,7 @@ export async function responderSozinho(msgId: string) {
   if (!conversaNova || c.status_lead === "mql") return   // MQL: daqui em diante é você
 
   const log = (cfg.agenteLog ?? []).filter(l => l.jid === jid)
-  const manualRecente = await voceNaConversa(jid, log)
+  const manualRecente = await voceNaConversa(jid, log, cfg)
   if (manualRecente) return
 
   const a = await atender(jid, { cfg, automatico: true }).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
@@ -260,9 +275,12 @@ export async function responderSozinho(msgId: string) {
   // Braço digital: lead pequeno com quantidade e ml (ou medidas) recebe o orçamento da tabela da Villa e o link do
   // sinal, sem você. Mandou as medidas do frasco ou mudou a quantidade antes de pagar: recota.
   let novoPedido: PedidoDigital | null = null
+  let semTabela: string | null = null
   const anterior = pedidoDaConversa(cfg.pedidosDigitais, jid)
-  if (auto.pequenoParceiro === false && r.lead.perfil === "pequeno" && !conversa.clienteCadastrado) {
+  const digitalPequeno = auto.pequenoParceiro === false && r.lead.perfil === "pequeno" && !conversa.clienteCadastrado
+  if (digitalPequeno) {
     const cot = cotarDigital(r.dados, cfg.digital)
+    if (!cot.ok && !cot.motivo.startsWith("falta")) semTabela = cot.motivo
     if (cot.ok && (!anterior || mudouACotacao(anterior, cot))) {
       novoPedido = montarPedido(cfg.pedidosDigitais ?? [], jid, conversa.nome, r.dados, cot)
       r.resposta = textoLinkPedido(novoPedido, linkPedido(novoPedido.id))
@@ -271,6 +289,11 @@ export async function responderSozinho(msgId: string) {
   }
   const ctx = contexto(cfg, log, jid)
   if (novoPedido) ctx.precosDoFiltro.push(...valoresDoPedido(novoPedido))
+  if (digitalPequeno) {
+    // Lead digital é todo do agente: conversa até o pagamento (mais mensagens por dia) e a IA hesitante não segura
+    ctx.maxPorDia = Math.max(ctx.maxPorDia, MAX_POR_DIA_DIGITAL)
+    if (!r.pode_enviar_sozinho && (r.alerta === "nenhum" || r.alerta === "preco")) r.pode_enviar_sozinho = true
+  }
 
   const trava = travaDoEnvio({
     ligado: true, resposta: r.resposta, alerta: r.alerta, podeSozinho: r.pode_enviar_sozinho, lead: r.lead,
@@ -314,6 +337,13 @@ export async function responderSozinho(msgId: string) {
     await marcarNaoLida(c, msgId)
     await avisarMql(cfg, c, r)
   }
+  // Segurou para você: aviso na hora no seu WhatsApp (nada fica esquecido no registro)
+  if (trava && !viraMql && TRAVAS_COM_AVISO.some(t => trava.startsWith(t))) await avisarSegurado(cfg, c, trava + (r.motivo_alerta ? ` · ${r.motivo_alerta}` : ""), r.resposta).catch(() => null)
+  // Digital sem preço na tabela (quantidade acima da tabela, caixa maior que A3): aviso uma vez por conversa
+  if (semTabela && !log.some(l => l.passo === "Sem tabela")) {
+    await avisarSegurado(cfg, c, `orçamento digital sem preço na tabela: ${semTabela}`, trava || velha ? "" : r.resposta).catch(() => null)
+    await registrar({ ...base, texto: "", enviou: false, motivo: `Digital sem preço na tabela (${semTabela}): avisei você`, passo: "Sem tabela" })
+  }
   if (trava || velha) return registrar({ ...base, enviou: false, motivo: trava ?? "chegou mensagem nova enquanto preparava" + (r.motivo_alerta ? ` · ${r.motivo_alerta}` : "") })
 
   const env = await enviar(c, r.resposta, msgId)
@@ -331,28 +361,41 @@ export async function responderSozinho(msgId: string) {
   return registrar({ ...base, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? r.lead.motivo })
 }
 
-// Lead sem resposta depois que você entrou na conversa: o agente se afasta por 10 min quando você escreve, e o que o
-// lead mandou nesse intervalo ficava parado. Rodada a cada 5 min (carona no webhook): conversa que o agente atendia
-// nas últimas 6 h, última mensagem do lead entre 2 min e 3 h, nada registrado depois dela e você fora há 10 min →
-// o agente responde (cada mensagem uma vez só).
+// Nenhum lead novo fica sem resposta. Rodada a cada 5 min (carona no webhook): conversa nova (até 72 h) cuja última
+// mensagem é do lead e que ninguém respondeu — o agente perdeu o gatilho, você entrou e saiu (ele se afasta 10 min),
+// a IA falhou — volta para o agente. Fica com você se você escreveu do celular nas últimas 24 h (exceto lead digital,
+// que é todo do agente), se é MQL, descartado, perdido ou fornecedor. Cada mensagem é retomada uma vez só.
 export async function talvezRetomarParados(origem: string) {
   const cfg = await lerCfg()
   if (!cfg.agenteAuto?.ligado) return
   if (cfg.agenteRetomadaEm && Date.now() - new Date(cfg.agenteRetomadaEm).getTime() < 5 * 60_000) return
   await gravarCfg(() => ({ agenteRetomadaEm: new Date().toISOString() }))
+  const agora = Date.now()
+  const { data: convs } = await supabase.from("whatsapp_conversas").select("jid, etiquetas, status_lead, ultima_recebida_at, ultima_enviada_at")
+    .gte("ultima_recebida_at", new Date(agora - HORAS_RETOMAR * 3_600_000).toISOString()).order("ultima_recebida_at", { ascending: false }).limit(300)
+  const candidatas = (convs ?? []).filter(c => !deveIgnorar(c.jid) && !["mql", "descartado", "perdido"].includes(c.status_lead ?? "")
+    && !(c.etiquetas ?? []).includes("Fornecedora") && (!c.ultima_enviada_at || c.ultima_enviada_at <= c.ultima_recebida_at))
   const logTodo = cfg.agenteLog ?? []
-  const desde = Date.now() - 6 * 3_600_000
-  const jids = [...new Set(logTodo.filter(l => l.enviou && new Date(l.em).getTime() > desde && (l.perfil === "pequeno" || l.perfil === "indefinido")).map(l => l.jid))]
   const feitas = new Set(cfg.agenteRetomadas ?? [])
-  for (const jid of jids.slice(0, 8)) {
-    const u = await ultimaDa(jid)
-    if (!u || u.from_me || feitas.has(u.id)) continue
-    const idade = Date.now() - new Date(u.ts).getTime()
-    if (idade < 2 * 60_000 || idade > 3 * 3_600_000) continue
-    const log = logTodo.filter(l => l.jid === jid)
-    if (log[0] && new Date(log[0].em).getTime() > new Date(u.ts).getTime()) continue
-    if (await voceNaConversa(jid, log)) continue
-    await gravarCfg(d => ({ agenteRetomadas: [u.id, ...(d.agenteRetomadas ?? [])].slice(0, 100) }))
+  const digital = cfg.agenteAuto.pequenoParceiro === false
+  let disparadas = 0
+  for (const c of candidatas) {
+    if (disparadas >= 6) break
+    const { data: ms } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts").eq("jid", c.jid).order("ts", { ascending: false }).limit(40)
+    const u = ms?.[0]
+    if (!u) continue
+    const primeira = await primeiraDa(c.jid)
+    const log = logTodo.filter(l => l.jid === c.jid)
+    const ehDigital = digital && ((c.etiquetas ?? []).includes(ETIQUETAS_AGENTE.digital) || log[0]?.perfil === "pequeno")
+    const ok = paradoParaRetomar({
+      ultima: u, agora, feitas, primeiraEm: primeira?.ts ?? null, diasConversaNova: DIAS_CONVERSA_NOVA, horas: HORAS_RETOMAR,
+      ultimoRegistro: log[0] ?? null, digital: ehDigital,
+      suasDoCelular: (ms ?? []).filter(m => m.from_me && !/^3EB0/i.test(m.id) && agora - new Date(m.ts).getTime() < 86_400_000).length,
+    })
+    if (!ok) continue
+    if (await voceNaConversa(c.jid, log, cfg)) continue
+    disparadas++
+    await gravarCfg(d => ({ agenteRetomadas: [u.id, ...(d.agenteRetomadas ?? [])].slice(0, 300) }))
     await fetch(`${origem}/api/whatsapp/webhook/responder?token=${encodeURIComponent(process.env.WHATSAPP_WEBHOOK_SECRET ?? "")}`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ msgId: u.id }), signal: AbortSignal.timeout(8000),
     }).catch(() => null)
@@ -430,7 +473,7 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     const { r, conversa } = a
     const trava = travaDoEnvio({
       ligado: true, resposta: r.resposta, alerta: r.alerta, podeSozinho: r.pode_enviar_sozinho, lead: r.lead,
-      conversaNova: recente, clienteCadastrado: conversa.clienteCadastrado, manualRecente: await voceNaConversa(c.jid, log), emMql: false,
+      conversaNova: recente, clienteCadastrado: conversa.clienteCadastrado, manualRecente: await voceNaConversa(c.jid, log, cfg), emMql: false,
       ...contexto(cfg, log, c.jid),
     })
     const dados = { ...base, perfil: r.lead.perfil, texto: r.resposta, passo: `F${nivel}` }

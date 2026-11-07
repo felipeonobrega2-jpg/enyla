@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { cidades, lalamoveConfigurada, ambienteLalamove } from "@/app/lib/lalamove"
 import { infoVeiculo, nomeAdicional } from "@/app/lib/frete"
 import { supabase } from "@/app/lib/supabase"
+import { gravarCampos } from "@/app/lib/configAtomica"
 
 // Veículos da Lalamove em São Paulo, em português e organizados: entrega normal primeiro, aluguel por período depois.
 // Cada um com capacidade, medidas e os adicionais (ajuda na carga etc.). A lista vem da API e muda com o tempo.
@@ -26,6 +27,6 @@ export async function GET() {
   // Guarda a lista crua (chaves reais da Lalamove) para ajustar os nomes quando aparecer algo novo
   const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
   const cfg = (cfgRow?.data ?? {}) as Record<string, unknown>
-  await supabase.from("AppConfig").update({ data: { ...cfg, lalamoveServicos: { em: new Date().toISOString(), cidade: sp?.name, servicos: sp?.services ?? [] } } }).eq("id", 1)
+  await gravarCampos({ lalamoveServicos: { em: new Date().toISOString(), cidade: sp?.name, servicos: sp?.services ?? [] } })
   return NextResponse.json({ configurada: true, ambiente: ambienteLalamove(), cidade: sp?.name ?? null, servicos })
 }

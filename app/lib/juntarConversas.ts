@@ -3,6 +3,7 @@
 // para as próximas mensagens já caírem no lugar certo. Só roda no servidor.
 
 import { supabase } from "./supabase"
+import { gravarCampos } from "./configAtomica"
 
 export type Apelidos = Record<string, string>   // jid que some → jid que fica
 
@@ -53,7 +54,7 @@ export async function juntarConversas(sai: string, fica: string) {
   for (const [k, v] of Object.entries(apelidos)) if (v === sai) apelidos[k] = fica   // corrente: x → sai → fica
   const vinculos = { ...((cfg.vinculosWhatsapp as Record<string, string>) ?? {}) }
   if (sai in vinculos) { if (!(fica in vinculos)) vinculos[fica] = vinculos[sai]; delete vinculos[sai] }
-  await supabase.from("AppConfig").update({ data: { ...cfg, apelidosWhatsapp: apelidos, vinculosWhatsapp: vinculos } }).eq("id", 1)
+  await gravarCampos({ apelidosWhatsapp: apelidos, vinculosWhatsapp: vinculos })
   return { ok: true as const, fica }
 }
 

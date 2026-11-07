@@ -3,6 +3,7 @@
 
 import { supabase } from "./supabase"
 import { telefoneNaResposta } from "./contatos"
+import { gravarCampos } from "./configAtomica"
 
 // Estado da conexão do número (Painel avisa quando cai). Grava só quando muda.
 export async function registrarConexao(estado: string) {
@@ -10,7 +11,7 @@ export async function registrarConexao(estado: string) {
   const cfg = (data?.data as Record<string, unknown>) ?? {}
   const atual = cfg.whatsappConexao as { estado?: string } | undefined
   if (atual?.estado === estado) return
-  await supabase.from("AppConfig").update({ data: { ...cfg, whatsappConexao: { estado, em: new Date().toISOString() } } }).eq("id", 1)
+  await gravarCampos({ whatsappConexao: { estado, em: new Date().toISOString() } })
 }
 
 const STATUS: Record<string, string> = { SERVER_ACK: "enviada", DELIVERY_ACK: "entregue", READ: "lida", PLAYED: "lida" }

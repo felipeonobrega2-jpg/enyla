@@ -3,7 +3,7 @@
 // único (para reconhecer o Pix no extrato) e o texto que vai para o cliente.
 
 import type { DadosPedido } from "./atendente"
-import { facaAberta, folhaDaFaca, precoDigital, quantidadesDa, Folha, RegraDigital, REGRA_DIGITAL_PADRAO } from "./precoDigital"
+import { custoVilla, facaAberta, folhaDaFaca, precoDigital, quantidadesDa, Folha, RegraDigital, REGRA_DIGITAL_PADRAO } from "./precoDigital"
 
 // Caixa padrão por ml (altura × largura × profundidade, cm), tirada das cotações com a Villa; o cliente confirma
 export const MEDIDA_PADRAO: { ml: number; a: number; l: number; p: number }[] = [
@@ -58,8 +58,10 @@ export function cotarDigital(d: DadosPedido | null, regra: RegraDigital = REGRA_
   if (!cx && !pad) return { ok: false, motivo: "faltam as medidas (ou o ml)" }
   const medidas = cx ? { a: cx.altura, l: cx.frente, p: cx.lateral } : caberFrasco(pad!, d.frasco_cm, d.caixa_cm?.altura)
   const faca = facaAberta(medidas.a, medidas.l, medidas.p)
-  const folha = folhaDaFaca(faca.largura, faca.altura)
-  if (!folha) return { ok: false, motivo: "caixa maior que A3 (consultar a Villa)" }
+  const naFolha = folhaDaFaca(faca.largura, faca.altura)
+  if (!naFolha) return { ok: false, motivo: "caixa maior que A3 (consultar a Villa)" }
+  // Cabe na A4 mas a quantidade passa da tabela A4 (só vai até 100): usa a tabela A3, que é mais cara (nunca cobra a menos)
+  const folha = naFolha === "A4" && !custoVilla(d.quantidade, "A4") ? "A3" : naFolha
   const p = precoDigital(d.quantidade, folha, regra)
   if (!p) return { ok: false, motivo: `acima de ${Math.max(...quantidadesDa(folha))} un na ${folha} (fora da tabela da Villa)` }
   return { ok: true, medidas, padrao: !cx, ml: d.volume_ml ?? pad?.ml ?? null, folha, quantidade: p.faixa, faixa: p.faixa, custo: p.custo, arte: p.arte, margem: p.margem, total: p.total }

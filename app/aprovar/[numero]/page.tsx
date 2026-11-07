@@ -8,6 +8,7 @@ import { somarDiasUteis, definirFeriadosLocais } from "@/app/lib/diasUteis"
 import { normalizarProducao } from "@/app/lib/producao"
 import { CONFIG_PADRAO } from "@/app/config"
 import type { VisitaProposta } from "@/app/types"
+import { gravarCampos } from "@/app/lib/configAtomica"
 
 // Registra que o cliente abriu a proposta (não quando é a Enyla logada; no máximo uma vez a cada 30 min):
 // conta em config.visitasProposta (o Painel avisa) e deixa a marca no rastreio do pedido
@@ -21,7 +22,7 @@ async function registrarVisita(numero: string) {
   visitas[numero] = { primeira: v?.primeira ?? agora.toISOString(), ultima: agora.toISOString(), vezes: (v?.vezes ?? 0) + 1 }
   // Esquece visitas de mais de 60 dias
   for (const [n, x] of Object.entries(visitas)) if (agora.getTime() - new Date(x.ultima).getTime() > 60 * 86_400_000) delete visitas[n]
-  await supabase.from("AppConfig").update({ data: { ...cfg, visitasProposta: visitas } }).eq("id", 1)
+  await gravarCampos({ visitasProposta: visitas })
 
   const { data: t } = await supabase.from("Tracking").select("etapas, colunaAtual").eq("numero", numero).maybeSingle()
   if (!t) return

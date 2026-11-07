@@ -6,6 +6,7 @@
 import { supabase } from "./supabase"
 import { clienteClaude, MODELO } from "./claude"
 import { Conhecimento, TEMAS } from "./agenteLeads"
+import { gravarCampos } from "./configAtomica"
 export { conhecimentoNoPrompt, type Conhecimento } from "./agenteLeads"
 
 const MAX_ITENS = 200
@@ -107,7 +108,7 @@ ${atual.map(i => `- ${i.texto}`).join("\n") || "(vazio)"}
   // Grava relendo a configuração (não atropela o que mudou enquanto a IA lia)
   const { data: fresco } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
   const d = (fresco?.data ?? {}) as Record<string, unknown> & { conhecimentoAgente?: Conhecimento[] }
-  await supabase.from("AppConfig").update({ data: { ...d, conhecimentoAgente: [...(d.conhecimentoAgente ?? []), ...novos].slice(-MAX_ITENS), agenteAprendeuEm: em } }).eq("id", 1)
+  await gravarCampos({ conhecimentoAgente: [...(d.conhecimentoAgente ?? []), ...novos].slice(-MAX_ITENS), agenteAprendeuEm: em })
   return { conversas: validos.length, novos: novos.length }
 }
 

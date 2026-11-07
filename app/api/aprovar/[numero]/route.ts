@@ -7,6 +7,7 @@ import { CONFIG_PADRAO } from "@/app/config"
 import { normalizarProducao } from "@/app/lib/producao"
 import { COL_FECHADO, COL_HOT, COLUNAS_KANBAN } from "@/app/types"
 import { isAberto } from "@/app/lib/negocio"
+import { gravarCampos } from "@/app/lib/configAtomica"
 
 // Cliente aprova o orçamento pela página pública. Fecha o card, registra no rastreio
 // e deixa a aprovação para o painel avisar (sinal e lote ficam com a Enyla).
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ num
     quantidade: opcao.quantidade, preco: opcao.preco, sinal, em: new Date().toISOString(),
   }
   const lista = [aprovacao, ...((cfg.aprovacoesOnline as AprovacaoOnline[] | undefined) ?? [])].slice(0, 100)
-  await supabase.from("AppConfig").update({ data: { ...cfg, aprovacoesOnline: lista } }).eq("id", 1)
+  await gravarCampos({ aprovacoesOnline: lista })
 
   const pix = `/pix/${encodeURIComponent(numero)}?v=${sinal.toFixed(2)}&c=${encodeURIComponent(p.card.nomeCliente)}`
   return NextResponse.json({ ok: true, sinal, pix, rastreio: `/track/${encodeURIComponent(numero)}` })

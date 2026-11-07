@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { gravarStatus } from "@/app/lib/metaToken"
+import { gravarCampos } from "@/app/lib/configAtomica"
 
 const ACCOUNT    = process.env.META_AD_ACCOUNT_ID
 const APP_ID     = process.env.META_APP_ID
@@ -40,12 +41,7 @@ async function autoRefresh(currentToken: string, expiry: number | null) {
     ? Math.floor(Date.now() / 1000) + Number(body.expires_in)
     : null
 
-  const { data: existing } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
-  const current = (existing?.data as Record<string, unknown>) ?? {}
-  await supabase.from("AppConfig").upsert(
-    { id: 1, data: { ...current, metaToken: body.access_token, metaTokenExpiry: newExpiry } },
-    { onConflict: "id" }
-  )
+  await gravarCampos({ metaToken: body.access_token, metaTokenExpiry: newExpiry })
 }
 
 export async function GET(request: Request) {

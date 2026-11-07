@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/app/lib/supabase"
+import { gravarCampos } from "@/app/lib/configAtomica"
 
 // Chave do Groq (transcrição de áudios): fica só no servidor; a tela só sabe se está configurada.
 async function gravar(campos: Record<string, unknown>) {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
-  await supabase.from("AppConfig").upsert({ id: 1, data: { ...((data?.data as object) ?? {}), ...campos } }, { onConflict: "id" })
+  await gravarCampos(campos)
 }
 
 export async function POST(req: NextRequest) {

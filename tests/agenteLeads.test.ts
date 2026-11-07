@@ -146,3 +146,21 @@ describe("lead pequeno: parceiro ou digital", async () => {
     expect(org(["Digital", "Lead pequeno"], "icp")).toEqual({ etiquetas: ["MQL", "ICP"], etapa: "mql" })
   })
 })
+
+describe("retomada: lead que ficou sem resposta", async () => {
+  const { paradoParaRetomar } = await import("../app/lib/agenteLeads")
+  const agora = Date.parse("2026-11-06T20:00:00Z")
+  const base = {
+    ultima: { id: "m1", from_me: false, ts: "2026-11-06T19:30:00Z" }, agora, feitas: new Set<string>(), primeiraEm: "2026-11-06T18:00:00Z",
+    diasConversaNova: 4, horas: 72, ultimoRegistro: { em: "2026-11-06T19:00:00Z" }, digital: false, suasDoCelular: 0,
+  }
+  it("lead respondeu e ninguém mais falou: retoma", () => expect(paradoParaRetomar(base)).toBe(true))
+  it("acabou de chegar (resposta normal a caminho): espera", () => expect(paradoParaRetomar({ ...base, ultima: { ...base.ultima, ts: "2026-11-06T19:59:00Z" } })).toBe(false))
+  it("o agente já registrou algo depois (enviou ou segurou): não retoma", () => expect(paradoParaRetomar({ ...base, ultimoRegistro: { em: "2026-11-06T19:31:00Z", motivo: "nada a responder" } })).toBe(false))
+  it("a IA falhou depois: retoma", () => expect(paradoParaRetomar({ ...base, ultimoRegistro: { em: "2026-11-06T19:31:00Z", motivo: "IA falhou: timeout" } })).toBe(true))
+  it("já retomada uma vez: não repete", () => expect(paradoParaRetomar({ ...base, feitas: new Set(["m1"]) })).toBe(false))
+  it("contato antigo: não", () => expect(paradoParaRetomar({ ...base, primeiraEm: "2026-10-01T10:00:00Z" })).toBe(false))
+  it("mais de 72 h: não", () => expect(paradoParaRetomar({ ...base, ultima: { ...base.ultima, ts: "2026-11-03T10:00:00Z" }, primeiraEm: "2026-11-03T09:00:00Z" })).toBe(false))
+  it("você escreveu do celular: a conversa é sua", () => expect(paradoParaRetomar({ ...base, suasDoCelular: 1 })).toBe(false))
+  it("lead digital: é do agente mesmo se você escreveu", () => expect(paradoParaRetomar({ ...base, suasDoCelular: 1, digital: true })).toBe(true))
+})

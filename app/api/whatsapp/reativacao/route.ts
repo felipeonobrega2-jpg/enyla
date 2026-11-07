@@ -3,6 +3,7 @@ import { supabase } from "@/app/lib/supabase"
 import { lerCfg } from "@/app/lib/agenteAuto"
 import { candidatos, preparar, enviarRetomada, pular, enviadasHoje, CfgReativacao } from "@/app/lib/reativacaoServidor"
 import { POR_DIA_PADRAO } from "@/app/lib/reativacao"
+import { gravarCampos } from "@/app/lib/configAtomica"
 
 export const maxDuration = 60
 
@@ -35,6 +36,6 @@ export async function POST(req: NextRequest) {
     ...(typeof b.ligado === "boolean" ? { ligado: b.ligado } : {}),
     ...(b.porDia ? { porDia: Math.min(10, Math.max(1, Math.round(b.porDia))) } : {}),
   }
-  await supabase.from("AppConfig").update({ data: { ...d, reativacaoAuto: auto } }).eq("id", 1)
+  await gravarCampos({ reativacaoAuto: auto })
   return NextResponse.json({ auto })
 }

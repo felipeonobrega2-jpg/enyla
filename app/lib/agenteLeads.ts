@@ -228,6 +228,7 @@ export const SECAO_DIGITAL = `LEAD PEQUENO (menos de 1.000): VENDEMOS EM IMPRESS
 - Não escreva preço da impressão digital: com a quantidade e o ml (ou as medidas), o sistema manda o orçamento com o link do sinal de 50% pelo Pix. Depois que ele foi, você pode repetir os valores que estão nele.
 - Frete: não fale dele por conta própria. Só se ele perguntar: é calculado no final do pedido, pelo CEP. Prazo: começa depois do sinal; a designer manda a arte para ele aprovar antes de imprimir.
 - Hot stamping em digital não dá: sugira simular o hot stamping na arte.
+- Modelos ou fragrâncias diferentes: dá para fazer artes diferentes no mesmo pedido (a designer ajusta o nome de cada uma). Pergunte quantas de cada, mas o orçamento é pela quantidade total.
 - Deixe a porta aberta para frasco, essência, válvula ou envase (só vira oportunidade em volume: 1.000+ ou recorrente).
 - Se ele topar 1.000 ou mais, vira lead normal (offset).`
 export function filtroDoModo(filtro: string, parceiro: boolean): string {
@@ -308,3 +309,22 @@ export function marcar(m: Marcos, r: RegistroAgente, agora = Date.now()): Marcos
 
 // Primeira vez: monta a partir do registro que existe (do mais velho para o mais novo)
 export const marcosDoRegistro = (log: RegistroAgente[], agora = Date.now()) => [...log].reverse().reduce((m, r) => marcar(m, r, agora), {} as Marcos)
+
+
+// ── Retomada: lead que ficou sem resposta ────────────────────────────────────
+// Puro (testável): a última mensagem é do lead, tem entre 2 min (a resposta normal ainda pode estar a caminho) e
+// `horas`, a conversa é nova, ninguém registrou nada depois dela (falha da IA não conta), não foi retomada antes e
+// você não escreveu do celular nas últimas 24 h (lead digital é todo do agente: aí não importa).
+export function paradoParaRetomar(o: {
+  ultima: { id: string; from_me: boolean; ts: string }; agora: number; feitas: Set<string>; primeiraEm: string | null
+  diasConversaNova: number; horas: number; ultimoRegistro: { em: string; motivo?: string } | null; digital: boolean; suasDoCelular: number
+}): boolean {
+  if (o.ultima.from_me || o.feitas.has(o.ultima.id)) return false
+  const idade = o.agora - new Date(o.ultima.ts).getTime()
+  if (idade < 2 * 60_000 || idade > o.horas * 3_600_000) return false
+  if (!o.primeiraEm || o.agora - new Date(o.primeiraEm).getTime() > o.diasConversaNova * 86_400_000) return false
+  const reg = o.ultimoRegistro
+  if (reg && new Date(reg.em).getTime() > new Date(o.ultima.ts).getTime() && !/^IA falhou/.test(reg.motivo ?? "")) return false
+  if (o.suasDoCelular > 0 && !o.digital) return false
+  return true
+}

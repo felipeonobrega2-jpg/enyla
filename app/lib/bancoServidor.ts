@@ -10,6 +10,7 @@ import { MARCA } from "./conciliacao"
 import { clienteClaude, FALLBACK, MODELO } from "./claude"
 import type { LancamentoFinanceiro, KanbanCard } from "../types"
 import type { Configuracoes } from "../config"
+import { gravarCampos } from "./configAtomica"
 
 export type ConfigPluggy = { itens?: { id: string; nome?: string }[]; dataCorte?: string; automatico?: boolean; documentosProprios?: string[] }
 export type StatusPluggy = { em: string; contas: { id: string; nome: string; banco: string; saldo: number | null }[]; novas: number; erro?: string | null }
@@ -22,8 +23,7 @@ async function lerConfig() {
   return (data?.data ?? {}) as Configuracoes & { pluggy?: ConfigPluggy; pluggyStatus?: StatusPluggy; regrasBanco?: RegraBanco[]; licoesBanco?: Aprendizado["licoes"]; exemplosBanco?: Aprendizado["exemplos"] }
 }
 async function salvarCampos(campos: Record<string, unknown>) {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
-  await supabase.from("AppConfig").update({ data: { ...((data?.data as object) ?? {}), ...campos } }).eq("id", 1)
+  await gravarCampos(campos)
 }
 async function todos<T>(tabela: string, colunas = "*"): Promise<T[]> {
   const out: T[] = []

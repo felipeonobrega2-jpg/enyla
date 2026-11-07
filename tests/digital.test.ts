@@ -20,7 +20,7 @@ describe("braço digital", () => {
   it("não cota sem quantidade, sem medida ou fora da tabela", () => {
     expect(cotarDigital(dados({ volume_ml: 50 })).ok).toBe(false)
     expect(cotarDigital(dados({ quantidade: 100 })).ok).toBe(false)
-    expect(cotarDigital(dados({ volume_ml: 50, quantidade: 300 }))).toMatchObject({ ok: false })   // A4 só até 100
+    expect(cotarDigital(dados({ volume_ml: 50, quantidade: 300 }))).toMatchObject({ ok: true, folha: "A3", quantidade: 300 })   // A4 só até 100: vai para a tabela A3
   })
   it("sinal de 50% com centavos únicos", () => {
     expect(sinalUnico(619.95, [])).toBe(309.98)
@@ -83,5 +83,18 @@ describe("caixa padrão cresce até caber o frasco", () => {
     expect(c.ok && c.medidas).toEqual({ a: 10, l: 4, p: 4 })
     expect(c.ok && c.folha).toBe("A4")
     expect(c.ok && c.total).toBe(339.94)
+  })
+})
+
+describe("quantidade acima da tabela A4", () => {
+  it("150 caixinhas de 30 ml (cabe na A4, que só vai até 100): cota na tabela A3, faixa de 300", async () => {
+    const { cotarDigital } = await import("../app/lib/digital")
+    const c = cotarDigital({ produto: "", volume_ml: 30, caixa_cm: null, frasco_cm: null, quantidade: 150, tem_arte: null, resumo: "" } as never)
+    expect(c.ok && [c.folha, c.quantidade, c.total]).toEqual(["A3", 300, 1419.85])
+  })
+  it("acima de 500: sem preço (avisa você)", async () => {
+    const { cotarDigital } = await import("../app/lib/digital")
+    const c = cotarDigital({ produto: "", volume_ml: 30, caixa_cm: null, frasco_cm: null, quantidade: 600, tem_arte: null, resumo: "" } as never)
+    expect(c.ok).toBe(false)
   })
 })
