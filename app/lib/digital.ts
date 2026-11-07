@@ -57,6 +57,7 @@ export type PedidoDigital = {
   frete?: number; entrega?: Entrega
   restante?: number; restantePagoEm?: string; pagamentoFinal?: { txId: string; valor: number; data: string; nome: string | null }
   acertadoEm?: string
+  lembreteDepois?: string; lembreteParado?: boolean           // lead adiou (espera) · você assumiu a conversa (sem lembrete)
   documento?: string                                         // CPF/CNPJ (cobrança no Asaas e nota)
   teste?: boolean                                            // pedido de teste (você paga para você): fora de Villa, designer, acerto e margem
   asaas?: { cliente?: string; sinal?: CobrancaPix; restante?: CobrancaPix }
@@ -205,14 +206,40 @@ const primeiroNome = (n: string | null) => {
   const x = (n ?? "").trim().split(/\s+/)[0] ?? ""
   return /^[A-Za-zÀ-ÿ]{2,}$/.test(x) ? x[0].toUpperCase() + x.slice(1).toLowerCase() : ""
 }
-export function textoLembreteDigital(p: Pick<PedidoDigital, "nome" | "quantidade" | "total" | "em" | "vistoEm">, nivel: 1 | 2 | 3, link: string): string {
-  const oi = primeiroNome(p.nome) ? `Oi, ${primeiroNome(p.nome)}!` : "Oi!"
+// Calibrado em 07/11 (estava repetitivo e insistente): no máximo 2 lembretes por pedido, o 1º depois de ~1 dia,
+// o 2º 3 dias depois, textos que variam de lead para lead, nunca "segue o link de novo" para todo mundo.
+// Lead que disse que vai se organizar/pagar depois: um lembrete só, sem pressa, 3 dias depois. Você entrou na
+// conversa depois da cotação: o pedido é seu, sem lembrete automático.
+export const MAX_LEMBRETES_DIGITAL = 2
+export const HORAS_LEMBRETE = [20, 72]
+export const ADIOU = /amanh[ãa]|semana que vem|m[êe]s que vem|fim do m[êe]s|vou me organizar|me organizar|quando (eu )?receber|depois (eu )?te|te (aviso|chamo|falo|mando)|vou ver|vou pensar|mais pra frente|mais tarde|ainda n[ãa]o (posso|d[áa])|sal[áa]rio|dia \d{1,2}\b/i
+
+// Pronto para lembrar agora? (sem banco: o servidor checa depois se você escreveu na conversa)
+export function lembreteDigitalAgora(p: Pick<PedidoDigital, "em" | "lembretes" | "lembreteDepois" | "lembreteParado">, ultimaEnviada: string, agora = Date.now()): 1 | 2 | null {
+  const feitos = p.lembretes?.length ?? 0
+  if (p.lembreteParado || feitos >= MAX_LEMBRETES_DIGITAL) return null
+  if (p.lembreteDepois && agora < new Date(p.lembreteDepois).getTime()) return null
+  const desde = Math.max(new Date(ultimaEnviada).getTime(), new Date(p.em).getTime(), feitos ? new Date(p.lembretes![feitos - 1].em).getTime() : 0)
+  return agora - desde >= HORAS_LEMBRETE[feitos] * 3_600_000 ? (feitos + 1) as 1 | 2 : null
+}
+
+const semente = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7)
+export function textoLembreteDigital(p: Pick<PedidoDigital, "nome" | "quantidade" | "total" | "em"> & { jid?: string }, nivel: 1 | 2, link: string, opts: { adiou?: boolean } = {}): string {
+  const n = primeiroNome(p.nome)
   const ate = new Date(new Date(p.em).getTime() + DIAS_VALIDADE_DIGITAL * 86_400_000).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })
-  if (nivel === 1) return p.vistoEm
-    ? `${oi} Ficou alguma dúvida no orçamento das caixinhas? Se quiser outra quantidade, dá pra escolher lá mesmo:\n${link}`
-    : `${oi} Conseguiu abrir o orçamento das caixinhas? Segue o link de novo:\n${link}`
-  if (nivel === 2) return `${oi} Passando pra lembrar do seu orçamento: *${p.quantidade.toLocaleString("pt-BR")} caixinhas* por *${brl(p.total)}*, com a arte inclusa. Assim que o sinal cair, a designer já começa a sua arte.\n${link}`
-  return `${oi} Consigo segurar esse valor até ${ate}. Se ainda fizer sentido, é só pagar o sinal pelo link:\n${link}\n\nSe mudou alguma coisa (quantidade ou medida), me fala que eu ajusto.`
+  const q = p.quantidade.toLocaleString("pt-BR")
+  const oi = n ? `Oi, ${n}.` : "Oi, tudo bem?"
+  const escolher = (xs: string[]) => xs[semente((p.jid ?? p.nome ?? "") + nivel) % xs.length]
+  if (opts.adiou) return `${oi} Sem pressa, só pra você ter à mão: o orçamento das ${q} caixinhas fica valendo até ${ate}.\n${link}`
+  if (nivel === 1) return escolher([
+    `${oi} Ficou alguma dúvida no orçamento das caixinhas? Se quiser mudar a quantidade ou a medida, me fala.\n${link}`,
+    `${n ? `${n}, ` : ""}conseguiu dar uma olhada no orçamento? Qualquer dúvida sobre a arte ou o tamanho, é só me chamar.\n${link}`,
+    `${oi} Passando por causa das suas caixinhas. Se precisar de algum ajuste no orçamento, me avisa.\n${link}`,
+  ])
+  return escolher([
+    `${oi} Consigo segurar o valor das ${q} caixinhas até ${ate}. Se ainda fizer sentido, é por aqui:\n${link}`,
+    `${oi} Último lembrete do seu orçamento: o valor fica garantido até ${ate}. Se mudou alguma coisa, me fala que eu ajusto.\n${link}`,
+  ])
 }
 
 // Avanço de status pelo painel (o sinal pago vem do extrato; daí em diante, até as próximas fases, é você)

@@ -139,7 +139,7 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
         <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
           <Segmentado valor={filtro} onChange={setFiltro} opcoes={[{ v: "abertos", nome: "Abertos" }, { v: "pagos", nome: "Pagos" }, { v: "enviados", nome: "Enviados" }, { v: "acerto", nome: `Acerto${acerto.ids.length ? ` (${acerto.ids.length})` : ""}` }, { v: "todos", nome: "Todos" }]} />
           <div className="flex items-center gap-3">
-            <p className="text-[11px] text-[#898892] hidden sm:block">Quem não paga recebe lembrete em 3 h, 24 h e 72 h</p>
+            <p className="text-[11px] text-[#898892] hidden sm:block">Quem não paga recebe até 2 lembretes (1 dia e 3 dias depois); se você entra na conversa, para</p>
             <Botao disabled={!!ocupado} onClick={() => { if (confirm("Criar um pedido de teste de R$ 20 (sinal R$ 10 + restante R$ 10) e mandar o link no seu WhatsApp?")) void acao("teste", { teste: true }) }}>Pedido de teste</Botao>
           </div>
         </div>

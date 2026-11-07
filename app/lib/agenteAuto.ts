@@ -4,7 +4,7 @@
 // sem resposta → F1, F2, F3 e Sem resposta. As etiquetas vão também para o WhatsApp Business, quando existem lá.
 // Tudo fica registrado (Configurações → Agente de leads) com o motivo de ter enviado ou segurado.
 
-import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital } from "./digital"
+import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital, lembreteDigitalAgora, ADIOU } from "./digital"
 import { linkPedido } from "./digitalLink"
 import type { RegraDigital } from "./precoDigital"
 import { supabase } from "./supabase"
@@ -503,9 +503,11 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     .map(c => ({ c: c as Conversa, enviada: c.ultima_enviada_at as string, passo: proximoFollowUp(c.etiquetas ?? [], (Date.now() - new Date(c.ultima_enviada_at).getTime()) / 3_600_000) }))
     // já tentou este passo depois da sua última mensagem (e segurou): não tenta de novo
     .filter(x => x.passo && !((marcos[x.c.jid]?.passos?.[x.passo!.tipo === "encerrar" ? "Sem resposta" : `F${x.passo!.nivel}`] ?? "") > x.enviada))
+    // Orçamento digital esperando o sinal segue o ritmo dele (2 lembretes, espaçados) e não ocupa a vez dos outros
+    .filter(x => { const pd = pedidoPendente(cfg.pedidosDigitais, x.c.jid); return !pd || lembreteDigitalAgora(pd, x.enviada) != null })
     .slice(0, 3)   // cabe no minuto da Vercel; o resto vai na próxima rodada
 
-  await Promise.all(candidatos.map(async ({ c, passo }) => {
+  await Promise.all(candidatos.map(async ({ c, passo, enviada }) => {
     const base = { em: new Date().toISOString(), jid: c.jid, nome: c.nome }
     if (passo!.tipo === "encerrar") {
       await aplicar(c, passo!.etiquetas, "perdido")
@@ -522,8 +524,26 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     // Orçamento digital esperando o sinal: o follow-up é o lembrete do pedido (texto fixo com o link, sem IA)
     const pd = pedidoPendente(cfg.pedidosDigitais, c.jid)
     if (pd) {
+      const lemb = lembreteDigitalAgora(pd, enviada)
+      if (!lemb) return
+      const marcarPd = (m: Partial<PedidoDigital>) => gravarCfg(d => ({ pedidosDigitais: (d.pedidosDigitais ?? []).map(p => p.id === pd.id ? { ...p, ...m } : p) }))
+      // Você escreveu na conversa depois da cotação (celular ou tela): o pedido é seu, sem lembrete automático
+      const { data: depois } = await supabase.from("whatsapp_mensagens").select("id, from_me, corpo, ts").eq("jid", c.jid).gt("ts", pd.em).order("ts", { ascending: false }).limit(40)
+      const ids = new Set(cfg.agenteIds ?? [])
+      if ((depois ?? []).some(m => m.from_me && !ids.has(m.id))) {
+        await marcarPd({ lembreteParado: true })
+        return registrar({ ...base, perfil: "pequeno", enviou: false, texto: "", motivo: `Lembrete do ${pd.id} parado: você assumiu a conversa`, passo: `F${nivel}` })
+      }
+      // Disse que vai se organizar / pagar depois: um lembrete só, sem pressa, 3 dias depois do que ele falou
+      const doLead = (depois ?? []).filter(m => !m.from_me).slice(0, 4)
+      const adiou = doLead.some(m => ADIOU.test(m.corpo ?? ""))
+      if (adiou && !pd.lembreteDepois) {
+        await marcarPd({ lembreteDepois: new Date(new Date(doLead[0].ts).getTime() + 72 * 3_600_000).toISOString() })
+        return
+      }
       if (await voceNaConversa(c.jid, log, cfg)) return registrar({ ...base, perfil: "pequeno", enviou: false, texto: "", motivo: `F${nivel} segurado: você está nessa conversa agora`, passo: `F${nivel}` })
-      const texto = textoLembreteDigital(pd, nivel, linkPedido(pd.id))
+      const texto = textoLembreteDigital({ ...pd, jid: c.jid }, adiou ? 2 : lemb, linkPedido(pd.id), { adiou })
+      if (adiou) await marcarPd({ lembreteParado: true })   // depois deste, para
       const env = await enviar(c, texto)
       if (env.ids.length) {
         await aplicar(c, passo!.etiquetas, null)

@@ -103,19 +103,32 @@ describe("quantidade acima da tabela A4", () => {
 describe("lembrete do pedido e painel", async () => {
   const { textoLembreteDigital, pedidoPendente, mudarStatus } = await import("../app/lib/digital")
   const base = { nome: "MARIA silva", quantidade: 100, total: 619.95, em: "2026-11-06T18:00:00Z", vistoEm: undefined as string | undefined }
-  it("F1: não abriu → manda o link de novo; abriu → pergunta se ficou dúvida (sem contar que viu)", () => {
-    expect(textoLembreteDigital(base, 1, "L")).toBe("Oi, Maria! Conseguiu abrir o orçamento das caixinhas? Segue o link de novo:\nL")
-    const t = textoLembreteDigital({ ...base, vistoEm: "x" }, 1, "L")
-    expect(t).toContain("Ficou alguma dúvida")
-    expect(t).not.toMatch(/vi que|abriu|viu/i)
+  it("lembrete varia entre leads e nunca diz que viu a página", () => {
+    const textos = new Set(["a@s", "b@s", "c@s", "d@s", "e@s", "f@s"].map(jid => textoLembreteDigital({ ...base, jid }, 1, "L")))
+    expect(textos.size).toBeGreaterThan(1)
+    for (const t of textos) { expect(t).not.toMatch(/vi que|abriu|viu|de novo/i); expect(t).toContain("Maria") }
   })
-  it("F2 lembra quantidade e valor; F3 dá a validade", () => {
-    expect(textoLembreteDigital(base, 2, "L")).toContain("*100 caixinhas* por *R$ 619,95*")
-    expect(textoLembreteDigital(base, 3, "L")).toContain("até 21/11")
+  it("2º lembrete dá a validade; quem adiou recebe um sem pressa", () => {
+    expect(textoLembreteDigital({ ...base, jid: "a" }, 2, "L")).toContain("até 21/11")
+    expect(textoLembreteDigital(base, 1, "L", { adiou: true })).toContain("Sem pressa")
   })
   it("nunca fala de sistema", async () => {
     const { FALA_DE_SISTEMA } = await import("../app/lib/agenteLeads")
-    for (const n of [1, 2, 3] as const) expect(FALA_DE_SISTEMA.test(textoLembreteDigital(base, n, "L"))).toBe(false)
+    for (const n of [1, 2] as const) for (const jid of ["a", "b", "c"]) expect(FALA_DE_SISTEMA.test(textoLembreteDigital({ ...base, jid }, n, "L"))).toBe(false)
+  })
+  it("ritmo: 1º com ~1 dia, 2º 3 dias depois, no máximo 2; adiou ou parado espera", async () => {
+    const { lembreteDigitalAgora, ADIOU } = await import("../app/lib/digital")
+    const p = { em: "2026-11-06T18:00:00Z", lembretes: [] as { nivel: number; em: string }[] }
+    expect(lembreteDigitalAgora(p, p.em, Date.parse("2026-11-06T23:00:00Z"))).toBeNull()
+    expect(lembreteDigitalAgora(p, p.em, Date.parse("2026-11-07T15:00:00Z"))).toBe(1)
+    const p1 = { ...p, lembretes: [{ nivel: 1, em: "2026-11-07T15:00:00Z" }] }
+    expect(lembreteDigitalAgora(p1, p.em, Date.parse("2026-11-08T15:00:00Z"))).toBeNull()
+    expect(lembreteDigitalAgora(p1, p.em, Date.parse("2026-11-10T16:00:00Z"))).toBe(2)
+    expect(lembreteDigitalAgora({ ...p, lembretes: [p1.lembretes[0], p1.lembretes[0]] }, p.em, Date.parse("2026-11-20T00:00:00Z"))).toBeNull()
+    expect(lembreteDigitalAgora({ ...p, lembreteParado: true }, p.em, Date.parse("2026-11-09T00:00:00Z"))).toBeNull()
+    expect(ADIOU.test("Vou me organizar financeiramente!")).toBe(true)
+    expect(ADIOU.test("Cara eu posso fechar com você amanhã")).toBe(true)
+    expect(ADIOU.test("100ml")).toBe(false)
   })
   it("pedido pendente: esperando sinal e dentro da validade", () => {
     const p = { jid: "a", status: "aguardando_sinal", em: "2026-11-06T18:00:00Z" } as never
