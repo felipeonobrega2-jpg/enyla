@@ -106,3 +106,30 @@ export async function classificarOrigens() {
     clientes,
   }
 }
+
+// Na hora: mensagem do contato que começa com a frase pronta do anúncio (ou do botão do site) marca a origem da
+// conversa (a campanha exata vem na classificação do dia). O sinal de clique do WhatsApp quase nunca vem no
+// webhook: a frase é o que identifica o lead do anúncio.
+export async function marcarOrigemPelaFrase(jid: string, corpo: string | null, ts: string) {
+  const e = entradaDaMensagem(corpo)
+  if (!e) return false
+  const { data } = await supabase.from("whatsapp_conversas").update({ campanha: JSON.stringify({ canal: e.canal, entrada: ts }) })
+    .eq("jid", jid).is("campanha", null).select("jid")
+  return !!data?.length
+}
+
+// Repasse (a cada 30 min, carona no webhook): conversas dos últimos 3 dias ainda sem origem, pela 1ª mensagem do contato
+let repasseLocal = 0
+export async function talvezMarcarOrigens() {
+  if (Date.now() - repasseLocal < 30 * 60_000) return
+  repasseLocal = Date.now()
+  const { data: convs } = await supabase.from("whatsapp_conversas").select("jid").is("campanha", null).not("jid", "like", "%@g.us")
+    .gte("criado_em", new Date(Date.now() - 3 * 86_400_000).toISOString()).limit(500)
+  let n = 0
+  for (const c of convs ?? []) {
+    const { data: m } = await supabase.from("whatsapp_mensagens").select("corpo, ts").eq("jid", c.jid).eq("from_me", false).not("corpo", "is", null)
+      .order("ts", { ascending: true }).limit(1).maybeSingle()
+    if (m && await marcarOrigemPelaFrase(c.jid, m.corpo, m.ts)) n++
+  }
+  return n
+}

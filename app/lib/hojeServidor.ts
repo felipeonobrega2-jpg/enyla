@@ -11,6 +11,7 @@ import { marcosDoRegistro } from "./agenteLeads"
 import { quemResponder, doAnuncio, doDigital, deveOrcamento, etapaDaConversa, dadosDaConversa, ConvHoje, Hoje, ItemHoje, Passos } from "./hoje"
 import { qualidadeDoLead } from "./marketing"
 import { nomeChave } from "./negocio"
+import { gastosAtuais } from "./gastosServidor"
 
 export async function montarHoje(): Promise<Hoje> {
   const desde = new Date(Date.now() - DIAS_PERDIDO * 86_400_000).toISOString()
@@ -29,7 +30,9 @@ export async function montarHoje(): Promise<Hoje> {
   const t = rel ? total(rel.dia1) : null
   const auto = cfg.reativacaoAuto ?? { ligado: false, porDia: POR_DIA_PADRAO }
   const fila = await candidatos(cfg).catch(() => [])
+  const gastos = await gastosAtuais().then(g => ({ alertas: g.alertas, totalDia: g.totalDia })).catch(() => undefined)
   return {
+    gastos,
     orcar, responder: responder.filter(x => !devendo.has(x.jid)), retomar: retomar.filter(x => !devendo.has(x.jid)), outrosEsperando: outros, anuncio: doAnuncio(convs),
     marketing: rel?.leitura?.acao ? { dia: rel.dia, acao: rel.leitura.acao, custoMql: t ? custoPor(t.gasto, t.mql) : null } : null,
     reativacao: {

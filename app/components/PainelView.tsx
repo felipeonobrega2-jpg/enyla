@@ -69,7 +69,7 @@ export function PainelView({
   config: Configuracoes
   onAbrirCard: (card: KanbanCard) => void
   onAbrirCliente: (nome: string) => void
-  onNavegar: (view: "orcamentos" | "pedidos" | "financeiro" | "fornecedores" | "clientes" | "meta" | "whatsapp" | "config") => void
+  onNavegar: (view: "orcamentos" | "pedidos" | "financeiro" | "fornecedores" | "clientes" | "meta" | "whatsapp" | "config" | "gastos") => void
   onNovoOrcamento: () => void
   onLancarCobranca?: (prefill: Partial<LancamentoFinanceiro>) => void
   onSalvarMeta?: (metaMensal: number) => void

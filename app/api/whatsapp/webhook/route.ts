@@ -8,6 +8,8 @@ import { talvezAprender } from "@/app/lib/agenteAprende"
 import { talvezReativar } from "@/app/lib/reativacaoServidor"
 import { talvezRelatorio } from "@/app/lib/marketingServidor"
 import { conferirSinais } from "@/app/lib/digitalServidor"
+import { marcarOrigemPelaFrase, talvezMarcarOrigens } from "@/app/lib/origensWhatsappServidor"
+import { talvezAvisarGastos } from "@/app/lib/gastosServidor"
 
 // Espera do modo automático (o lead termina de digitar) + resposta da IA + envio
 export const maxDuration = 60
@@ -33,6 +35,10 @@ export async function POST(req: NextRequest) {
     after(() => talvezRelatorio(req.nextUrl.origin).catch(e => console.error("[marketing]", e)))
     // Braço digital: confere no extrato os sinais esperando Pix (no máximo a cada 5 min; só se há pedido esperando)
     after(() => conferirSinais().then(() => undefined).catch(e => console.error("[digital]", e)))
+    // Leads do anúncio: conversas recentes sem origem são marcadas pela frase do anúncio (no máximo a cada 30 min)
+    after(() => talvezMarcarOrigens().then(() => undefined).catch(e => console.error("[origens]", e)))
+    // Gastos: aviso no seu WhatsApp quando IA ou anúncios estão para acabar (confere no máximo a cada 30 min)
+    after(() => talvezAvisarGastos().catch(e => console.error("[gastos]", e)))
 
     // ── messages.upsert — mensagem nova em tempo real
     if (event === "messages.upsert") {
@@ -44,6 +50,11 @@ export async function POST(req: NextRequest) {
       if (data?.key?.id && novas.has(data.key.id) && !data.key.fromMe && /externalAdReply|conversionSource|"ctwa/i.test(JSON.stringify(data))) {
         const { data: salva } = await supabase.from("whatsapp_mensagens").select("jid").eq("id", data.key.id).maybeSingle()
         if (salva?.jid) await supabase.from("whatsapp_conversas").update({ campanha: JSON.stringify({ canal: "anuncio", entrada: new Date().toISOString() }) }).eq("jid", salva.jid).is("campanha", null)
+      }
+      // Frase pronta do anúncio (o jeito que quase sempre identifica o lead): marca na hora
+      else if (data?.key?.id && novas.has(data.key.id) && !data.key.fromMe && !deveIgnorar(data.key.remoteJid ?? "")) {
+        const { data: salva } = await supabase.from("whatsapp_mensagens").select("jid, ts").eq("id", data.key.id).maybeSingle()
+        if (salva?.jid) await marcarOrigemPelaFrase(salva.jid, extractBody(data).corpo, salva.ts).catch(() => null)
       }
       // Áudio novo: transcreve depois de responder ao Evolution (não atrasa o recebimento)
       if (data?.message?.audioMessage && data.key?.id) after(() => transcreverPendentes({ ids: [data.key.id] }).catch(() => {}))

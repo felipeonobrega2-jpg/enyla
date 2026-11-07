@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
-import { Ruler, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb, Truck } from "lucide-react"
+import { Ruler, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb, Truck, Gauge } from "lucide-react"
 import { IdeiasView } from "./components/IdeiasView"
 import { signOut } from "next-auth/react"
 import WhatsAppView, { ConversaLateral } from "./components/WhatsAppView"
@@ -68,6 +68,7 @@ import { ClientesView } from "./components/ClientesView"
 import { ConfigView } from "./components/ConfigView"
 import { KanbanView } from "./components/KanbanView"
 import { FinanceiroView, ModalLancamento } from "./components/FinanceiroView"
+import GastosView from "./components/GastosView"
 import { ClienteCombobox, ClienteContactCard } from "./components/ClienteFields"
 import { ModalPersonalizarProposta } from "./components/ModalPersonalizarProposta"
 import { ModalPropostaCustom, BoxPreview3D } from "./components/ModalPropostaCustom"
@@ -190,7 +191,7 @@ export default function Home() {
   const [editandoHistorico, setEditandoHistorico] = useState<string | null>(null)
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
   const [contador, setContador] = useState<number>(0)
-  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias" | "entregas">("painel")
+  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias" | "entregas" | "gastos">("painel")
   const [perfilClienteExterno, setPerfilClienteExterno] = useState<string | null>(null)
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
   definirFeriadosLocais(config.feriados)
@@ -314,7 +315,7 @@ export default function Home() {
     // Link direto (ex.: resumo de marketing no WhatsApp abre em Campanhas: /?aba=meta)
     const aba = new URLSearchParams(window.location.search).get("aba")
     const saved = aba ?? sessionStorage.getItem("app:view")
-    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias"]
+    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias","entregas","gastos"]
     // Conquistas virou o cartão "Meta do mês" do Painel
     if (saved === "conquistas") setView("painel")
     else if (saved && valid.includes(saved)) setView(saved as typeof view)
@@ -1487,6 +1488,8 @@ export default function Home() {
           <NavGroup label="Gestão" />
           <NavItem active={view === "financeiro"} onClick={() => navigate("financeiro")} label="Financeiro"
             icon={<Wallet className="w-4 h-4" strokeWidth={1.8} />} />
+          <NavItem active={view === "gastos"} onClick={() => navigate("gastos")} label="Gastos"
+            icon={<Gauge className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "dashboard"} onClick={() => navigate("dashboard")} label="Relatórios"
             icon={<BarChart3 className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "parceiros" || view === "terceirizados"} onClick={() => navigate("parceiros")} label="Parceiros"
@@ -2391,6 +2394,8 @@ export default function Home() {
               }}
               onPersonalizar={personalizarHistorico}
             />
+          ) : view === "gastos" ? (
+            <GastosView />
           ) : view === "financeiro" ? (
             <FinanceiroView
               historico={historico}

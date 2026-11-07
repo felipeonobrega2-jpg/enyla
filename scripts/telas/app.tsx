@@ -38,6 +38,8 @@ import MarketingRelatorio from "@/app/components/MarketingRelatorio"
 import { ParceriasView } from "@/app/components/ParceriasView"
 import { ModalVenda } from "@/app/components/parceiros/ModalVenda"
 import DigitalClient from "@/app/d/[id]/DigitalClient"
+import GastosView from "@/app/components/GastosView"
+import { montarGastos, ultimosDias } from "@/app/lib/gastos"
 import { OrcamentoDigitalView } from "@/app/components/OrcamentoDigitalView"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas, ConversaLateral } from "@/app/components/WhatsAppView"
 
@@ -94,9 +96,24 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
   if (u.startsWith("/api/whatsapp/destino")) return new Response(JSON.stringify(u.includes("Sem%20Conversa") ? { jid: null } : { jid: "1@lid", nome: "Perfumaria Modelo", como: "conversa" }))
   if (u.startsWith("/api/aprovacao/link")) return new Response(JSON.stringify({ url: "https://app.enyla.com.br/aprovar/ORC-2026-999?t=exemplo" }))
   if (u.startsWith("/api/whatsapp/proximo-passo")) return new Response(JSON.stringify({ passo: { tipo: "lembrar", em: new Date().toISOString(), ate: "2026-11-12T12:00:00Z", nota: "vai mandar a arte" } }))
+  if (u.startsWith("/api/gastos")) {
+    const d14 = ultimosDias(14)
+    const ia = Object.fromEntries(d14.map((d, i) => [d, { usd: 1.6 + (i % 4) * 0.35, chamadas: 120 + i * 3 }]))
+    const meta = Object.fromEntries(d14.map((d, i) => [d, i >= 12 ? (i === 13 ? 0 : 0) : 95 + (i % 5) * 18]))
+    const g = montarGastos({ agora: new Date(), alertaDias: 3,
+      ia: { dias: ia, recarga: { valor: 40, em: new Date(Date.now() - 5 * 86_400_000).toISOString() }, cotacao: 5.42 },
+      meta: { saldo: 0.49, dias: meta, em: new Date().toISOString() },
+      pedidos: [
+        { status: "sinal_pago", margem: 150, arte: 70, total: 619.95, sinalPagoEm: new Date().toISOString(), em: new Date().toISOString() },
+        { status: "producao", margem: 150, arte: 70, total: 339.94, sinalPagoEm: new Date(Date.now() - 2 * 86_400_000).toISOString(), em: new Date().toISOString() },
+        { status: "sinal_pago", margem: 150, arte: 70, total: 569.95, sinalPagoEm: new Date(Date.now() - 4 * 86_400_000).toISOString(), em: new Date().toISOString() },
+      ] })
+    return new Response(JSON.stringify({ ...g, alertaDias: 3 }))
+  }
   if (u.startsWith("/api/hoje")) {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
     return new Response(JSON.stringify({
+      gastos: { totalDia: 140, alertas: [{ tipo: "meta", nivel: "perigo", texto: "Anúncios da Meta: saldo para menos de 1 dia (R$ 0,49). Recarregue para a operação não parar." }] },
       responder: [
         { jid: "9@lid", nome: "Essências Exemplo", mensagem: "Oi! Ainda quero sim, dá pra atualizar pra 5 mil?", desde: h(40), rotulo: "Retomada", retomada: true, lista: "responder" },
         { jid: "1@lid", nome: "Perfumaria Modelo", mensagem: "Preciso de 3 mil caixinhas de 50ml com hot stamping", desde: h(190), rotulo: "ICP", retomada: false, lista: "responder", cliente: null, dados: { produto: "caixinha", volume_ml: 50, caixa_cm: null, frasco_cm: null, quantidade: 3000, tem_arte: true, resumo: "" } },
@@ -253,6 +270,7 @@ function Telas() {
       <ConversaLateral jid="1@lid" nome="Perfumaria Modelo" onFechar={() => {}} onAbrir={() => {}}
         dados={{ produto: "perfume árabe 100ml", volume_ml: 100, caixa_cm: { frente: 6, lateral: 3, altura: 10.5 }, frasco_cm: null, quantidade: 2000, tem_arte: true, resumo: "Perfume árabe 100ml, 2 mil caixas, verniz localizado no logo; precisa para a semana que vem." }} />
     </div>
+    case "gastos": case "gastos-m": return pagina(<GastosView />)
     case "hoje": case "hoje-m": case "hoje-passo": return pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)
     case "marketing": case "marketing-m": return pagina(<div className="max-w-[1100px]"><MarketingRelatorio /></div>)
     case "reativacao": return pagina(<div className="max-w-[860px]"><ReativacaoCard /></div>)

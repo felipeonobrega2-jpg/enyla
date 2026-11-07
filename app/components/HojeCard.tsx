@@ -4,7 +4,7 @@
 // respondeu à retomada primeiro), o que o anúncio trouxe em 24 h, a ação do relatório de marketing e a reativação.
 
 import { useEffect, useState } from "react"
-import { Sun, MessageCircle, RotateCcw, Megaphone, ArrowRight, CheckCircle2, CalendarClock, FileText, Printer } from "lucide-react"
+import { Sun, MessageCircle, RotateCcw, Megaphone, ArrowRight, CheckCircle2, CalendarClock, FileText, Printer, AlertTriangle } from "lucide-react"
 import { Cartao, TituloCartao, LinhaLista, Selo, Botao, Tom } from "./ds"
 import { Hoje, ItemHoje, haQuanto } from "../lib/hoje"
 import { ProximoPasso } from "./ProximoPasso"
@@ -35,7 +35,7 @@ function doPedido(d: DadosPedido | null) {
 export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
   onAbrirConversa: (jid: string) => void
   onOrcar?: (nome: string, jid: string, dados?: DadosPedido) => void
-  onNavegar: (view: "whatsapp" | "meta" | "config") => void
+  onNavegar: (view: "whatsapp" | "meta" | "config" | "gastos") => void
 }) {
   const [d, setD] = useState<Hoje | null>(null)
   const [verTodos, setVerTodos] = useState(false)
@@ -78,6 +78,14 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
 
   return (
     <Cartao padding={false} className="ds-entrada">
+      {/* Saldo de IA ou anúncios acabando: a operação para */}
+      {d.gastos?.alertas?.length ? (
+        <button onClick={() => onNavegar("gastos")} className={`w-full flex items-start gap-2.5 text-left px-5 py-3 text-[12.5px] rounded-t-[inherit] transition-colors ${d.gastos.alertas.some(a => a.nivel === "perigo") ? "bg-[#d33a3c]/8 text-[#b42d2f] hover:bg-[#d33a3c]/12" : "bg-[#c57800]/8 text-[#9a5e00] hover:bg-[#c57800]/12"}`}>
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-px" />
+          <span className="flex-1 min-w-0 leading-snug">{d.gastos.alertas.map(a => a.texto).join(" ")}</span>
+          <ArrowRight className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+        </button>
+      ) : null}
       <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr]">
         {/* Responder e retomar */}
         <div className="min-w-0">
