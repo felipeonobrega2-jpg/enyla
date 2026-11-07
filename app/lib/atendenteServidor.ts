@@ -191,6 +191,7 @@ Lead pequeno (menos de 1.000) no modo digital — vale sobre as regras gerais ac
 - A venda é sua do começo ao fim: o Felipe não entra. Responda sempre que ele perguntar algo ou mandar um dado, com alerta "nenhum" e pode_enviar_sozinho true. Não use "decisao_sua" nem pode_enviar_sozinho false para dúvidas de caixa, medidas, arte, modelos ou fragrâncias diferentes, acabamento, prazo, pagamento ou frete: responda com a seção LEAD PEQUENO do filtro.
 - Ele nunca está "já orientado": a conversa segue até o pagamento. "Resposta" vazia só se ele mandou apenas "ok"/"obrigado"/figurinha e não há nada pendente.
 - Nunca fale em "sistema", "automático", "link automático" ou algo que dê a entender que não é você digitando.
+- Pedido com mais de um tamanho de caixa (ex.: modelos de 30 ml e de 50 ml): confirme quantas caixinhas de cada tamanho e use alerta "decisao_sua" (o Felipe monta esse orçamento). Não diga que vai preparar nem quando vai mandar.
 - Nunca prometa algo para depois (separar fotos, ver e te falar, ligar, mandar amostra): ninguém vai cumprir. Responda com o que sabe; para ver trabalhos, o Instagram.
 - Alerta só para desconto ou condição especial ("desconto"), amostra física ("decisao_sua") e reclamação ("reclamacao"): o Felipe recebe o aviso na hora.
 ` : ""}

@@ -194,6 +194,14 @@ const ultimaDa = async (jid: string) =>
 const primeiraDa = async (jid: string) =>
   (await supabase.from("whatsapp_mensagens").select("ts").eq("jid", jid).order("ts", { ascending: true }).limit(1).maybeSingle()).data
 
+// Você mandou mensagem nesta conversa nas últimas `horas` (o que não foi o agente)
+async function voceAtende(jid: string, cfg: CfgAgente, horas = 24) {
+  const ids = new Set([...(cfg.agenteLog ?? []).flatMap(l => l.ids ?? []), ...(cfg.agenteIds ?? [])])
+  const desde = new Date(Date.now() - horas * 3_600_000).toISOString()
+  const { data } = await supabase.from("whatsapp_mensagens").select("id, corpo").eq("jid", jid).eq("from_me", true).gte("ts", desde).limit(200)
+  return (data ?? []).some(m => !ids.has(m.id) && !ehMensagemAutomaticaDoWhatsapp(m.corpo))
+}
+
 async function voceNaConversa(jid: string, log: Registro[], cfg?: CfgAgente) {
   const idsDoAgente = new Set([...log.flatMap(l => l.ids ?? []), ...(cfg?.agenteIds ?? [])])
   const desde = new Date(Date.now() - MINUTOS_VOCE_NA_CONVERSA * 60_000).toISOString()
@@ -273,6 +281,10 @@ export async function responderSozinho(msgId: string) {
   await aplicar(c, semFollowUp(c.etiquetas ?? []), null)
   await respondeuRetomada(cfg, c, msgId).catch(() => null)
   if (!conversaNova || c.status_lead === "mql") return   // MQL: daqui em diante é você
+  // Você escreveu nesta conversa nas últimas 24 h (celular ou tela do sistema): a conversa é sua, o agente não entra.
+  // Lead do digital é a exceção: esse é todo do agente.
+  if (!(c.etiquetas ?? []).includes(ETIQUETAS_AGENTE.digital) && await voceAtende(jid, cfg))
+    return registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: "indefinido", enviou: false, texto: "", motivo: "conversa sua (você escreveu nas últimas 24 h)" })
 
   const log = (cfg.agenteLog ?? []).filter(l => l.jid === jid)
   const manualRecente = await voceNaConversa(jid, log, cfg)
@@ -333,7 +345,9 @@ export async function responderSozinho(msgId: string) {
   // Vitrine: todo lead recebe o Instagram uma vez, logo depois da primeira resposta.
   // Bom negócio (que o agente não responde) recebe só o Instagram, como quem manda o portfólio antes de você chegar.
   const vitrine = (auto.vitrine ?? VITRINE_PADRAO).trim()
-  const querVitrine = !!vitrine && organiza && !jaViuVitrine(conversa.mensagens.filter(m => m.from_me).map(m => m.corpo))
+  // Só no começo da conversa (no máximo 2 mensagens nossas até aqui): no meio do papo soa robótico
+  const nossas = conversa.mensagens.filter(m => m.from_me)
+  const querVitrine = !!vitrine && organiza && nossas.length <= 2 && !jaViuVitrine(nossas.map(m => m.corpo))
   const mandarVitrine = async () => {
     await new Promise(res => setTimeout(res, 1500 + Math.random() * 2000))
     return enviar(c, vitrine)
@@ -479,6 +493,8 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
       return registrar({ ...base, perfil: "icp", enviou: false, texto: "", motivo: `F${nivel}: MQL sem resposta, é com você`, passo: `F${nivel}` })
     }
     const log = (cfg.agenteLog ?? []).filter(l => l.jid === c.jid)
+    // Conversa que você está atendendo (escreveu nas últimas 24 h): sem follow-up do agente (o digital segue)
+    if (!(c.etiquetas ?? []).includes(ETIQUETAS_AGENTE.digital) && await voceAtende(c.jid, cfg)) return
     // Orçamento digital esperando o sinal: o follow-up é o lembrete do pedido (texto fixo com o link, sem IA)
     const pd = pedidoPendente(cfg.pedidosDigitais, c.jid)
     if (pd) {
