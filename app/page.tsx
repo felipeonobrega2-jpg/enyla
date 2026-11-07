@@ -222,6 +222,8 @@ export default function Home() {
   // Conversa do cliente do orçamento (botão "Ver conversa"): vem do Orçar ou é achada pelo nome
   const [conversaOrc, setConversaOrc] = useState<{ jid: string; nome: string; dados: DadosPedido | null; cliente: string } | null>(null)
   const [verConversa, setVerConversa] = useState(false)
+  // DXF do Pacdora: clicar, arrastar no quadro ou soltar em qualquer lugar da tela do orçamento
+  const [dxfArrastando, setDxfArrastando] = useState(false)
   // Janelinha do Hoje: a conversa abre ao lado do painel, com a resposta embaixo
   const [conversaHoje, setConversaHoje] = useState<{ jid: string; nome: string; dados: DadosPedido | null } | null>(null)
   const nomeOrc = form.nomeCliente.trim()
@@ -589,6 +591,34 @@ export default function Home() {
     setToast(msg)
     setTimeout(() => setToast(""), 2800)
   }
+
+  function lerArquivoDxf(file: File) {
+    if (!/\.dxf$/i.test(file.name)) { showToast("Esse arquivo não é .dxf. No Pacdora, baixe a faca em DXF."); return }
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const result = parseDXF(ev.target?.result as string)
+      if (!result) { showToast("Não foi possível ler o DXF — tente exportar em formato AutoCAD 2000 ou 2004."); return }
+      setDxfPreview({ result, nome: file.name })
+    }
+    reader.readAsText(file)
+  }
+  const lerDxfRef = useRef(lerArquivoDxf)
+  lerDxfRef.current = lerArquivoDxf
+  // Soltou o .dxf em qualquer lugar da tela do orçamento: lê (e o navegador não abre o arquivo no lugar do sistema)
+  useEffect(() => {
+    if (view !== "orcamento") return
+    const temArquivo = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files")
+    const sobre = (e: DragEvent) => { if (temArquivo(e)) e.preventDefault() }
+    const soltar = (e: DragEvent) => {
+      if (!temArquivo(e)) return
+      e.preventDefault()
+      const f = Array.from(e.dataTransfer?.files ?? []).find(x => /\.dxf$/i.test(x.name))
+      if (f) lerDxfRef.current(f)
+    }
+    window.addEventListener("dragover", sobre)
+    window.addEventListener("drop", soltar)
+    return () => { window.removeEventListener("dragover", sobre); window.removeEventListener("drop", soltar) }
+  }, [view])
 
   async function criarTracking(card: KanbanCard) {
     try {
@@ -1761,26 +1791,18 @@ export default function Home() {
                 </button>
               </div>
             ) : (
-              <label className="flex flex-col items-center gap-1.5 px-4 py-5 rounded-xl border-2 border-dashed border-[rgba(60,60,67,0.14)] hover:border-[#8456e8]/40 hover:bg-[#8456e8]/[0.02] cursor-pointer transition-all">
+              <label
+                onDragOver={e => { e.preventDefault(); setDxfArrastando(true) }}
+                onDragLeave={() => setDxfArrastando(false)}
+                onDrop={e => { e.preventDefault(); e.stopPropagation(); setDxfArrastando(false); const f = e.dataTransfer.files?.[0]; if (f) lerArquivoDxf(f) }}
+                className={`flex flex-col items-center gap-1.5 px-4 py-5 rounded-xl border-2 border-dashed cursor-pointer transition-all ${dxfArrastando ? "border-[#8456e8] bg-[#8456e8]/[0.06]" : "border-[rgba(60,60,67,0.14)] hover:border-[#8456e8]/40 hover:bg-[#8456e8]/[0.02]"}`}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8456e8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.7">
                   <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
-                <span className="text-[12px] font-semibold text-[#8456e8]/80">Importar .dxf do Pacdora</span>
+                <span className="text-[12px] font-semibold text-[#8456e8]/80">{dxfArrastando ? "Solte para ler" : "Arraste ou clique: .dxf do Pacdora"}</span>
                 <span className="text-[10px] text-[#8E8E93] text-center leading-relaxed">Blank size extraído automaticamente<br/>Calcula nesting e preço na hora</span>
                 <input type="file" accept=".dxf,.DXF" className="hidden"
-                  onChange={e => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-                    const reader = new FileReader()
-                    reader.onload = ev => {
-                      const text = ev.target?.result as string
-                      const result = parseDXF(text)
-                      if (!result) { showToast("Não foi possível ler o DXF — tente exportar em formato AutoCAD 2000 ou 2004."); return }
-                      setDxfPreview({ result, nome: file.name })
-                    }
-                    reader.readAsText(file)
-                    e.target.value = ""
-                  }}
+                  onChange={e => { const file = e.target.files?.[0]; if (file) lerArquivoDxf(file); e.target.value = "" }}
                 />
               </label>
             )}
