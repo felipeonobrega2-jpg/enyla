@@ -1637,6 +1637,7 @@ export function ConversaLateral({ jid, nome, dados, onFechar, onAbrir, responder
           <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-main)" }}>{nome}</p>
           <p className="text-[10.5px]" style={{ color: "var(--text-faint)" }}>Conversa no WhatsApp · Esc fecha</p>
         </div>
+        {responder && <ProximoPasso jid={jid} />}
         <button onClick={onAbrir} className="text-[11.5px] font-semibold px-2.5 h-7 rounded-lg hover:bg-black/5 flex items-center gap-1" style={{ color: "#8456e8" }}>
           Abrir<ChevronRight className="w-3.5 h-3.5" />
         </button>

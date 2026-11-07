@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
-import { DIAS_ESPERANDO, Passos, ProximoPasso } from "@/app/lib/hoje"
+import { DIAS_ESPERANDO, DIAS_ORCAR_MANUAL, Passos, ProximoPasso } from "@/app/lib/hoje"
 import { gravarCampos } from "@/app/lib/configAtomica"
 
 // O próximo passo de uma conversa (Hoje e topo da conversa do WhatsApp). (Rota protegida pelo login.)
@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
   if (!b.jid || !b.tipo) return NextResponse.json({ erro: "jid e tipo obrigatórios" }, { status: 400 })
   const agora = new Date()
   let passo: ProximoPasso | null = null
-  if (b.tipo === "esperando") passo = { tipo: "esperando", em: agora.toISOString(), ate: new Date(agora.getTime() + DIAS_ESPERANDO * 86_400_000).toISOString() }
+  if (b.tipo === "orcar") passo = { tipo: "orcar", em: agora.toISOString(), ate: new Date(agora.getTime() + DIAS_ORCAR_MANUAL * 86_400_000).toISOString(), ...(b.nota?.trim() ? { nota: b.nota.trim().slice(0, 120) } : {}) }
+  else if (b.tipo === "esperando") passo = { tipo: "esperando", em: agora.toISOString(), ate: new Date(agora.getTime() + DIAS_ESPERANDO * 86_400_000).toISOString() }
   else if (b.tipo === "lembrar") {
     const dia = b.data && /^\d{4}-\d{2}-\d{2}$/.test(b.data) ? b.data : diaSP(new Date(agora.getTime() + Math.min(90, Math.max(1, Number(b.dias) || 1)) * 86_400_000))
     passo = { tipo: "lembrar", em: agora.toISOString(), ate: nove(dia), ...(b.nota?.trim() ? { nota: b.nota.trim().slice(0, 120) } : {}) }

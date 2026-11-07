@@ -70,7 +70,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
       acao={<div className="flex items-center shrink-0 mr-1">
         {onOrcar && <button onClick={() => onOrcar(x.cliente || x.nome || x.jid.split("@")[0], x.jid, x.dados ?? undefined)} title="Novo orçamento com o que o cliente já contou"
           className="h-8 px-2 rounded-lg text-[11.5px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors whitespace-nowrap">Orçar</button>}
-        <ProximoPasso jid={x.jid} onFeito={() => setFeitos(f => new Set(f).add(x.jid))} />
+        <ProximoPasso jid={x.jid} onFeito={t => { if (t === "orcar") { fetch("/api/hoje").then(r => r.ok ? r.json() : null).then(n => { if (n) setD(n) }).catch(() => {}) } else setFeitos(f => new Set(f).add(x.jid)) }} />
       </div>} />
   )
   const a = d.anuncio

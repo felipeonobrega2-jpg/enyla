@@ -5,10 +5,10 @@
 
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { CalendarClock, Hourglass, CheckCircle2, XCircle, Loader2, RotateCcw, ListChecks } from "lucide-react"
+import { CalendarClock, Hourglass, CheckCircle2, XCircle, Loader2, RotateCcw, ListChecks, FileText } from "lucide-react"
 import type { ProximoPasso as Passo } from "../lib/hoje"
 
-export type TipoPasso = "esperando" | "lembrar" | "fechou" | "perdido" | "limpar"
+export type TipoPasso = "esperando" | "lembrar" | "orcar" | "fechou" | "perdido" | "limpar"
 const LARGURA = 288
 const dm = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })
 const amanha = () => new Date(Date.now() + 86_400_000).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
@@ -44,7 +44,7 @@ export function ProximoPasso({ jid, rotulo, onFeito, className = "" }: {
   async function marcar(tipo: TipoPasso, extra: { dias?: number; data?: string } = {}) {
     setSalvando(tipo + (extra.dias ?? extra.data ?? "")); setErro(null)
     const r = await fetch("/api/whatsapp/proximo-passo", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jid, tipo, ...extra, ...(tipo === "lembrar" && nota.trim() ? { nota } : {}) }) }).catch(() => null)
+      body: JSON.stringify({ jid, tipo, ...extra, ...((tipo === "lembrar" || tipo === "orcar") && nota.trim() ? { nota } : {}) }) }).catch(() => null)
     setSalvando(null)
     if (!r?.ok) return setErro("Não salvou. Tente de novo.")
     setPos(null); setNota(""); setData("")
@@ -77,11 +77,12 @@ export function ProximoPasso({ jid, rotulo, onFeito, className = "" }: {
           {atual && (
             <div className="flex items-start gap-2 mx-1.5 mt-1 mb-1.5 px-2.5 py-2 rounded-lg bg-[rgba(132,86,232,0.06)]">
               <p className="flex-1 text-[11.5px] text-[#5e5c68] leading-snug">
-                {atual.tipo === "esperando" ? "Esperando o cliente" : "Lembrete"} até <b className="text-[#191625]">{dm(atual.ate)}</b>{atual.nota ? ` · ${atual.nota}` : ""}
+                {atual.tipo === "esperando" ? "Esperando o cliente" : atual.tipo === "orcar" ? "Esperando o seu orçamento" : "Lembrete"} até <b className="text-[#191625]">{dm(atual.ate)}</b>{atual.nota ? ` · ${atual.nota}` : ""}
               </p>
               <button onClick={() => marcar("limpar")} title="Tirar (volta para a regra automática)" className="text-[#898892] hover:text-[#191625] shrink-0"><RotateCcw className="w-3.5 h-3.5" /></button>
             </div>
           )}
+          {opcao("orcar", <FileText className="w-4 h-4" />, "Esperando meu orçamento", "Vai para “Orçamento para fazer” no Hoje e sai sozinho quando você manda o PDF ou cria o orçamento. A nota do Lembrar vale aqui também.", "#c57800")}
           {opcao("esperando", <Hourglass className="w-4 h-4" />, "Resolvido, esperando o cliente", "Sai do Hoje. Volta se ele escrever algo (um “ok” não conta) ou em 3 dias.", "#8456e8")}
           <div className="px-3 py-2">
             <p className="text-[12.5px] font-semibold text-[#191625] flex items-center gap-2"><CalendarClock className="w-4 h-4 text-[#1f7ae0]" />Lembrar</p>

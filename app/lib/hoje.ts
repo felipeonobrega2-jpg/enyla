@@ -17,7 +17,7 @@ export type ConvHoje = {
 
 // O próximo passo que você marcou na conversa
 export type ProximoPasso = {
-  tipo: "esperando" | "lembrar"   // esperando o cliente (volta em 3 dias) · lembrar em tal dia
+  tipo: "esperando" | "lembrar" | "orcar"   // esperando o cliente (volta em 3 dias) · lembrar em tal dia · orçamento meu (você marcou)
   em: string                      // quando você marcou
   ate: string                     // quando volta para o Hoje se nada acontecer
   nota?: string                   // "vai mandar a arte"
@@ -52,6 +52,15 @@ export function deveOrcamento(c: ConvHoje, depois: { documento: boolean; orcamen
   if (etapaDaConversa(c.proxima_acao) !== "orcamento" || qualidadeDoLead(c) !== "mql") return false
   if (agora - new Date(recebida).getTime() > DIAS_ORCAR * 86_400_000) return false
   if (passo && passo.em > recebida) return false
+  return !depois.documento && !depois.orcamentoNoSistema
+}
+
+// Você marcou "esperando meu orçamento": fica em "Orçamento para fazer" até você mandar PDF/documento ou criar o
+// orçamento no sistema (depois de marcar), fechar/perder a conversa, ou passar o prazo (14 dias)
+export const DIAS_ORCAR_MANUAL = 14
+export function aguardaOrcamentoMarcado(c: Pick<ConvHoje, "status_lead">, passo: ProximoPasso | undefined, depois: { documento: boolean; orcamentoNoSistema: boolean }, agora = Date.now()) {
+  if (passo?.tipo !== "orcar" || agora > new Date(passo.ate).getTime()) return false
+  if (["pedido", "perdido"].includes(c.status_lead ?? "")) return false
   return !depois.documento && !depois.orcamentoNoSistema
 }
 
@@ -100,6 +109,7 @@ export function listaDoHoje(c: ConvHoje, passo: ProximoPasso | undefined, agora 
   const eleFalouPorUltimo = !!recebida && (!enviada || recebida > enviada)
   // Ele escreveu algo de verdade (não só "ok") e é a última mensagem
   const escreveu = eleFalouPorUltimo && !ehSoConfirmacao(c.ultima_msg) && dias(recebida!) < DIAS_PERDIDO
+  if (passo?.tipo === "orcar") return null   // está em "Orçamento para fazer"
   if (passo) {
     if (escreveu && recebida! > passo.em) return { lista: "responder", desde: recebida! }
     // O dia chegou e você não falou com ele depois disso

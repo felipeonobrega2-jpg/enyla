@@ -8,7 +8,7 @@ import { POR_DIA_PADRAO } from "./reativacao"
 import { DIAS_PERDIDO } from "./funilWhatsapp"
 import { total, custoPor, Relatorio } from "./marketing"
 import { marcosDoRegistro } from "./agenteLeads"
-import { quemResponder, doAnuncio, doDigital, deveOrcamento, etapaDaConversa, dadosDaConversa, ConvHoje, Hoje, ItemHoje, Passos } from "./hoje"
+import { quemResponder, doAnuncio, doDigital, deveOrcamento, aguardaOrcamentoMarcado, etapaDaConversa, dadosDaConversa, ConvHoje, Hoje, ItemHoje, Passos } from "./hoje"
 import { qualidadeDoLead } from "./marketing"
 import { nomeChave } from "./negocio"
 import { gastosAtuais } from "./gastosServidor"
@@ -50,17 +50,33 @@ export async function montarHoje(): Promise<Hoje> {
 
 // Quem passou tudo para cotar e ainda não recebeu: sem PDF/documento seu e sem orçamento no sistema depois da última dele
 async function orcamentosParaFazer(convs: ConvHoje[], passos: Passos, vinculos: Record<string, string>): Promise<ItemHoje[]> {
-  const pre = convs.filter(c => etapaDaConversa(c.proxima_acao) === "orcamento" && qualidadeDoLead(c) === "mql" && c.ultima_recebida_at
-    && Date.now() - new Date(c.ultima_recebida_at).getTime() < 7 * 86_400_000).slice(0, 40)
+  const marcados = new Set(Object.entries(passos).filter(([, p]) => p.tipo === "orcar").map(([j]) => j))
+  const pre = convs.filter(c => marcados.has(c.jid) || (etapaDaConversa(c.proxima_acao) === "orcamento" && qualidadeDoLead(c) === "mql" && c.ultima_recebida_at
+    && Date.now() - new Date(c.ultima_recebida_at).getTime() < 7 * 86_400_000)).slice(0, 60)
   if (!pre.length) return []
   const { data: cards } = await supabase.from("KanbanCard").select("nomeCliente, createdAt")
   const out: ItemHoje[] = []
   await Promise.all(pre.map(async c => {
+    // Marcado por você: conta a partir de quando marcou; senão, da última mensagem dele
+    const p = passos[c.jid]
+    const marcado = p?.tipo === "orcar"
+    const desde = marcado ? p.em : c.ultima_recebida_at
+    if (!desde) return
     const { count } = await supabase.from("whatsapp_mensagens").select("id", { count: "exact", head: true })
-      .eq("jid", c.jid).eq("from_me", true).in("tipo", ["document", "documentMessage", "documentWithCaptionMessage"]).gt("ts", c.ultima_recebida_at!)
+      .eq("jid", c.jid).eq("from_me", true).in("tipo", ["document", "documentMessage", "documentWithCaptionMessage"]).gt("ts", desde)
     const cli = vinculos[c.jid]
-    const noSistema = !!cli && (cards ?? []).some(k => nomeChave(k.nomeCliente) === nomeChave(cli) && !!k.createdAt && new Date(k.createdAt) > new Date(c.ultima_recebida_at!))
-    if (!deveOrcamento(c, { documento: (count ?? 0) > 0, orcamentoNoSistema: noSistema }, passos[c.jid])) return
+    const noSistema = !!cli && (cards ?? []).some(k => nomeChave(k.nomeCliente) === nomeChave(cli) && !!k.createdAt && new Date(k.createdAt) > new Date(desde))
+    const depois = { documento: (count ?? 0) > 0, orcamentoNoSistema: noSistema }
+    if (marcado) {
+      if (!aguardaOrcamentoMarcado(c, p, depois)) return
+      out.push({
+        jid: c.jid, nome: c.nome, mensagem: p.nota ? `Você marcou: ${p.nota}` : c.ultima_msg, desde: p.em, retomada: false, lista: "orcar",
+        rotulo: ["ICP", "Oportunidade", "Lead médio"].find(e => (c.etiquetas ?? []).includes(e)) ?? "Você marcou",
+        dados: dadosDaConversa(c.proxima_acao), cliente: cli || null,
+      })
+      return
+    }
+    if (!deveOrcamento(c, depois, p)) return
     out.push({
       jid: c.jid, nome: c.nome, mensagem: c.ultima_msg, desde: c.ultima_recebida_at!, retomada: false, lista: "orcar",
       rotulo: ["ICP", "Oportunidade", "Lead médio"].find(e => (c.etiquetas ?? []).includes(e)) ?? "MQL",
