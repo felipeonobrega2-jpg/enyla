@@ -57,7 +57,10 @@ export type PedidoDigital = {
   frete?: number; entrega?: Entrega
   restante?: number; restantePagoEm?: string; pagamentoFinal?: { txId: string; valor: number; data: string; nome: string | null }
   acertadoEm?: string
+  documento?: string                                         // CPF/CNPJ (cobrança no Asaas e nota)
+  asaas?: { cliente?: string; sinal?: CobrancaPix; restante?: CobrancaPix }
 }
+export type CobrancaPix = { id: string; valor: number; payload: string; imagem: string; fatura: string; em: string }
 export type Arte = { url: string; nome: string; em: string }
 export type Ajuste = { texto: string; em: string }
 export type Entrega = { cep: string; endereco: string; em: string }

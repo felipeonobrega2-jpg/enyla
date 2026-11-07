@@ -101,6 +101,10 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       ajustes: dz ? [{ texto: "Trocar o dourado por um tom mais claro e aumentar o nome", em: new Date().toISOString() }] : [],
       restante: prod ? 334.96 : null, frete: prod ? 25 : null, restantePagoEm: null, entrega: null, designer: dz }))
   }
+  if (u.startsWith("/api/d/") && u.includes("ASAAS")) return new Response(JSON.stringify({ id: "DIG-0004", nome: "Ana Exemplo", ml: 50, produto: "perfume", medidas: { a: 10, l: 5, p: 5 }, padrao: true, folha: "A4",
+    quantidade: 100, total: 619.95, sinal: 309.98, status: "aguardando_sinal", sinalPagoEm: null, briefing: { marca: "", cores: "", referencias: "", laminacao: "fosca", arquivos: [] },
+    opcoes: [{ quantidade: 50, total: 419.95, unit: 8.4 }, { quantidade: 100, total: 619.95, unit: 6.2 }], arte: null, aprovar: false, arteAprovadaEm: null, arteEnviadaEm: null, ajustes: [], restante: null, frete: null, restantePagoEm: null, entrega: null, designer: false,
+    asaas: true, documento: null, cobranca: null }))
   if (u.startsWith("/api/d/")) {
     const pago = u.includes("PAGO")
     return new Response(JSON.stringify({ id: pago ? "DIG-0002" : "DIG-0001", nome: "Ana Exemplo", ml: 50, produto: "perfume", medidas: { a: 10, l: 5, p: 5 }, padrao: true, folha: "A4",
@@ -297,6 +301,7 @@ function Telas() {
         onFechar={() => {}} /></div>
     }
     case "pedidodigital": case "pedidodigital-pago": return <DigitalClient id={tela.endsWith("pago") ? "DIG-PAGO" : "DIG-0001"} t="x" />
+    case "pedidodigital-asaas": return <DigitalClient id="DIG-ASAAS" t="x" />
     case "pedidodigital-arte": return <DigitalClient id="DIG-ARTE" t="x" />
     case "pedidodigital-prod": return <DigitalClient id="DIG-PROD" t="x" />
     case "pedidodigital-designer": return <DigitalClient id="DIG-DZ" t="x" dz="y" />

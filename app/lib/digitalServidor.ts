@@ -12,6 +12,9 @@ import {
 } from "./digital"
 import { sincronizar } from "./bancoServidor"
 import { pluggyConfigurada, atualizarItem } from "./pluggy"
+import { asaas, asaasConfigurado, PAGO, CobrancaAsaas } from "./asaas"
+import { soNumeros, documentoValido } from "./documento"
+import type { CobrancaPix } from "./digital"
 
 
 export type ContatosDigital = { villa?: string; designer?: string; designerNome?: string }
@@ -199,5 +202,57 @@ export async function pagoPeloAsaas(id: string, parte: "sinal" | "restante", tx:
   } else {
     if (c) await enviar(c, textoRestantePago(p)).catch(() => null)
     await avisarVoce(cfg, `💰 *Digital ${p.id}* · restante pago pelo Asaas ${brl(tx.valor)}\n${p.nome ?? ""}${p.entrega ? `\nEntrega: ${p.entrega.endereco} · CEP ${p.entrega.cep}` : "\nSem endereço de entrega ainda"}`)
+  }
+}
+
+// ── Cobrança no Asaas (Pix na hora + cartão pela fatura) ─────────────────────
+// Cria (ou reaproveita, se o valor não mudou) a cobrança do sinal ou do restante. Sem Asaas ou com erro, devolve
+// erro e a página fica no Pix de antes (conferido pelo extrato): nenhum pedido trava.
+export async function cobrarNoAsaas(id: string, parte: "sinal" | "restante", doc?: string): Promise<{ cobranca?: CobrancaPix; erro?: string }> {
+  if (!asaasConfigurado()) return { erro: "sem asaas" }
+  const { pedido } = await lerPedido(id)
+  if (!pedido) return { erro: "Pedido não encontrado." }
+  const valor = parte === "sinal" ? pedido.sinal : pedido.restante
+  if (parte === "sinal" ? pedido.status !== "aguardando_sinal" : !valor || !!pedido.restantePagoEm) return { erro: "Nada a pagar agora." }
+  const documento = doc ? soNumeros(doc) : pedido.documento
+  if (!documento || !documentoValido(documento)) return { erro: "Confira o CPF ou CNPJ." }
+  const atual = pedido.asaas?.[parte]
+  if (atual && Math.round(atual.valor * 100) === Math.round(valor! * 100) && documento === pedido.documento) return { cobranca: atual }
+
+  // Cliente no Asaas (pelo documento; sem e-mail/SMS do Asaas: quem fala com o cliente é você)
+  let cliente = documento === pedido.documento ? pedido.asaas?.cliente : undefined
+  if (!cliente) {
+    const achado = await asaas<{ data?: { id: string }[] }>(`/customers?cpfCnpj=${documento}`)
+    cliente = achado.corpo?.data?.[0]?.id
+    if (!cliente) {
+      const novo = await asaas<{ id?: string; errors?: { description: string }[] }>("/customers", { method: "POST", body: JSON.stringify({ name: (pedido.briefing?.marca || pedido.nome || "Cliente Enyla").slice(0, 100), cpfCnpj: documento, notificationDisabled: true, externalReference: pedido.id }) })
+      cliente = novo.corpo?.id
+      if (!cliente) return { erro: novo.corpo?.errors?.[0]?.description ?? "Asaas não criou o cliente." }
+    }
+  }
+  if (atual) await asaas(`/payments/${atual.id}`, { method: "DELETE" }).catch(() => null)   // valor mudou: a antiga sai
+  const vence = new Date(Date.now() + (parte === "sinal" ? 3 : 7) * 86_400_000 - 3 * 3_600_000).toISOString().slice(0, 10)
+  const cob = await asaas<CobrancaAsaas & { invoiceUrl?: string; errors?: { description: string }[] }>("/payments", { method: "POST", body: JSON.stringify({
+    customer: cliente, billingType: "UNDEFINED", value: valor, dueDate: vence,
+    description: `${parte === "sinal" ? "Sinal" : "Restante"} do pedido ${pedido.id} · ${pedido.quantidade} caixinhas`, externalReference: `${pedido.id}:${parte}`,
+  }) })
+  if (!cob.ok || !cob.corpo?.id) return { erro: cob.corpo?.errors?.[0]?.description ?? "Asaas não criou a cobrança." }
+  const qr = await asaas<{ encodedImage?: string; payload?: string }>(`/payments/${cob.corpo.id}/pixQrCode`)
+  if (!qr.corpo?.payload) return { erro: "Asaas não gerou o Pix (confira se há chave Pix cadastrada na conta)." }
+  const nova: CobrancaPix = { id: cob.corpo.id, valor: valor!, payload: qr.corpo.payload, imagem: qr.corpo.encodedImage ?? "", fatura: cob.corpo.invoiceUrl ?? "", em: new Date().toISOString() }
+  await gravarPedido(id, p => ({ ...p, documento, asaas: { ...(p.asaas ?? {}), cliente, [parte]: nova } }))
+  return { cobranca: nova }
+}
+
+// "Já paguei" com cobrança no Asaas: consulta a cobrança na hora
+export async function conferirNoAsaas(id: string) {
+  const { pedido } = await lerPedido(id)
+  if (!pedido?.asaas || !asaasConfigurado()) return
+  for (const parte of ["sinal", "restante"] as const) {
+    const c = pedido.asaas[parte]
+    if (!c) continue
+    const r = await asaas<CobrancaAsaas>(`/payments/${c.id}`)
+    if (r.corpo && PAGO.has(r.corpo.status) && Math.round(r.corpo.value * 100) === Math.round(c.valor * 100))
+      await pagoPeloAsaas(id, parte, { txId: `asaas:${c.id}`, valor: r.corpo.value, data: (r.corpo.clientPaymentDate ?? r.corpo.paymentDate ?? new Date().toISOString()).slice(0, 10) })
   }
 }

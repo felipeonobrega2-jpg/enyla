@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { auth } from "@/auth"
-import { lerPedido, gravarPedido, tokenDigitalValido, tokenDesignerValido, conferirSinais, aprovarPeloCliente, ajustePeloCliente, mandarArte, avisarDesigner } from "@/app/lib/digitalServidor"
+import { lerPedido, gravarPedido, tokenDigitalValido, tokenDesignerValido, conferirSinais, conferirNoAsaas, cobrarNoAsaas, aprovarPeloCliente, ajustePeloCliente, mandarArte, avisarDesigner } from "@/app/lib/digitalServidor"
 import { opcoesDoPedido, trocarQuantidade, gravarEntrega, arteAtual, esperandoAprovacao, PedidoComBriefing } from "@/app/lib/digital"
 import type { RegraDigital } from "@/app/lib/precoDigital"
+import { asaasConfigurado } from "@/app/lib/asaas"
+import { mascararDocumento } from "@/app/lib/documento"
 
 // Página pública do pedido digital (/d/DIG-0001?t=…): só com o link assinado. Nunca devolve custo nem margem.
 const publico = (p: PedidoComBriefing, regra?: RegraDigital, designer = false) => ({
@@ -17,6 +19,15 @@ const publico = (p: PedidoComBriefing, regra?: RegraDigital, designer = false) =
   restante: p.restante ?? null, frete: p.frete ?? null, restantePagoEm: p.restantePagoEm ?? null,
   entrega: p.entrega ? { cep: p.entrega.cep, endereco: p.entrega.endereco } : null,
   designer,
+  // Cobrança no Asaas: só a que vale para o valor de agora (se mudou, a página pede de novo)
+  asaas: asaasConfigurado(),
+  documento: p.documento ? mascararDocumento(p.documento) : null,
+  cobranca: (() => {
+    const parte = p.status === "aguardando_sinal" ? "sinal" : p.restante && !p.restantePagoEm ? "restante" : null
+    const c = parte ? p.asaas?.[parte] : null
+    const valor = parte === "sinal" ? p.sinal : p.restante
+    return c && valor != null && Math.round(c.valor * 100) === Math.round(valor * 100) ? { parte, payload: c.payload, imagem: c.imagem, fatura: c.fatura } : null
+  })(),
 })
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -35,7 +46,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const id = decodeURIComponent((await params).id)
-  const b = await req.json().catch(() => ({})) as { t?: string; dz?: string; acao?: string; quantidade?: number; marca?: string; cores?: string; referencias?: string; laminacao?: string; texto?: string; cep?: string; endereco?: string }
+  const b = await req.json().catch(() => ({})) as { t?: string; dz?: string; acao?: string; quantidade?: number; marca?: string; cores?: string; referencias?: string; laminacao?: string; texto?: string; cep?: string; endereco?: string; documento?: string }
   if (!tokenDigitalValido(id, b.t)) return NextResponse.json({ erro: "Link inválido." }, { status: 403 })
   const { pedido, cfg } = await lerPedido(id)
   if (!pedido || pedido.status === "cancelado") return NextResponse.json({ erro: "Orçamento indisponível." }, { status: 404 })
@@ -70,7 +81,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (r.erro) return NextResponse.json({ erro: r.erro }, { status: 400 })
     return NextResponse.json(publico(r.pedido ?? pedido, cfg.digital, true))
   }
+  if (b.acao === "cobrar") {
+    const parte = pedido.status === "aguardando_sinal" ? "sinal" : "restante"
+    const r = await cobrarNoAsaas(id, parte, b.documento)
+    if (r.erro) return NextResponse.json({ erro: r.erro === "sem asaas" ? "Pagamento indisponível agora: use o Pix abaixo." : r.erro, semAsaas: true }, { status: 400 })
+    const { pedido: atual } = await lerPedido(id)
+    return NextResponse.json(publico(atual ?? pedido, cfg.digital))
+  }
   if (b.acao === "conferir") {
+    await conferirNoAsaas(id).catch(() => null)
     await conferirSinais({ forcar: true }).catch(() => null)
     const { pedido: atual } = await lerPedido(id)
     return NextResponse.json(publico(atual ?? pedido, cfg.digital))

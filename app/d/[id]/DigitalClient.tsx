@@ -21,6 +21,8 @@ type Pedido = {
   restante: number | null; frete: number | null; restantePagoEm: string | null
   entrega: { cep: string; endereco: string } | null
   designer: boolean
+  asaas: boolean; documento: string | null
+  cobranca: { parte: "sinal" | "restante"; payload: string; imagem: string; fatura: string } | null
 }
 const ehPdf = (u: string) => /\.pdf($|\?)/i.test(u)
 
@@ -32,8 +34,6 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
   const [p, setP] = useState<Pedido | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [mudando, setMudando] = useState<number | null>(null)
-  const [qr, setQr] = useState<string | null>(null)
-  const [copiado, setCopiado] = useState(false)
   const [conferindo, setConferindo] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
   const [br, setBr] = useState<{ marca: string; cores: string; referencias: string; laminacao: "fosca" | "brilho" }>({ marca: "", cores: "", referencias: "", laminacao: "fosca" })
@@ -51,8 +51,6 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
     }).catch(() => setErro("Sem conexão. Tente de novo."))
   }, [id, t, dz])
 
-  const payload = useMemo(() => p ? gerarPixPayload({ chave: "financeiro@enyla.com.br", nome: "Enyla", cidade: "Natal", valor: p.sinal, txid: p.id.replace(/\W/g, ""), descricao: `Sinal ${p.id}` }) : "", [p])
-  useEffect(() => { if (payload) QRCode.toDataURL(payload, { width: 220, margin: 1, color: { dark: "#191625", light: "#ffffff" } }).then(setQr).catch(() => setQr(null)) }, [payload])
 
   const post = async (corpo: Record<string, unknown>) => {
     const r = await fetch(`/api/d/${encodeURIComponent(id)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ t, dz: dz || undefined, ...corpo }) })
@@ -166,22 +164,8 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
           })}
         </div>
 
-        <div className="bg-white rounded-2xl ds-borda p-5 flex flex-col items-center text-center">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">Sinal de 50% pelo Pix</p>
-          <p className="text-[28px] font-bold text-[#191625] ds-num mt-1">{brl(p.sinal)}</p>
-          <p className="text-[12px] text-[#898892]">O restante ({brl(p.total - p.sinal)}) no final, antes do envio</p>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {qr && <img src={qr} alt="QR Code do Pix" width={200} height={200} className="mt-4 rounded-xl" />}
-          <button onClick={() => navigator.clipboard.writeText(payload).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000) })}
-            className="mt-4 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-colors">
-            {copiado ? <><Check className="w-5 h-5" />Código copiado</> : <><Copy className="w-5 h-5" />Copiar Pix copia e cola</>}
-          </button>
-          <p className="text-[11.5px] text-[#898892] mt-2">Pague exatamente {brl(p.sinal)}: é por esse valor que o sistema reconhece o seu pedido.</p>
-          <button onClick={conferir} disabled={conferindo}
-            className="mt-3 w-full h-11 rounded-xl text-[14px] font-semibold text-[#8456e8] bg-[#8456e8]/[0.08] hover:bg-[#8456e8]/[0.14] disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
-            {conferindo ? <><Loader2 className="w-4 h-4 animate-spin" />Conferindo…</> : "Já paguei"}
-          </button>
-        </div>
+        <Pagamento p={p} titulo="Sinal de 50%" valor={p.sinal} txid={p.id} descricao={`Sinal ${p.id}`} sub={`O restante (${brl(p.total - p.sinal)}) no final, antes do envio`}
+          post={post} setP={setP} onConferir={conferir} conferindo={conferindo} />
       </>)}
 
 
@@ -242,9 +226,9 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
       {!p.designer && p.restante != null && (
         p.restantePagoEm
           ? <div className="bg-white rounded-2xl ds-borda p-5"><p className="text-[13px] text-[#009351] font-semibold flex items-center gap-1.5"><Check className="w-4 h-4" />Restante de {brl(p.restante)} recebido. Pedido quitado.</p></div>
-          : <PixBloco titulo="Restante pelo Pix" valor={p.restante} txid={`${p.id}F`} descricao={`Restante ${p.id}`}
+          : <Pagamento p={p} titulo="Restante" valor={p.restante} txid={`${p.id}F`} descricao={`Restante ${p.id}`}
               sub={p.frete ? `${brl(p.restante - p.frete)} + frete ${brl(p.frete)}` : "Pague quando quiser: o envio sai depois que o restante cair"}
-              onConferir={() => acao("conferir", { acao: "conferir" })} conferindo={ocupado === "conferir"} />
+              post={post} setP={setP} onConferir={() => acao("conferir", { acao: "conferir" })} conferindo={ocupado === "conferir"} />
       )}
 
       {!p.designer && p.arteAprovadaEm && !p.restantePagoEm && (
@@ -332,11 +316,54 @@ function ArtePreview({ arte }: { arte: { url: string; nome: string } }) {
   )
 }
 
-function PixBloco({ titulo, valor, txid, descricao, sub, onConferir, conferindo }: { titulo: string; valor: number; txid: string; descricao: string; sub: string; onConferir: () => void; conferindo: boolean }) {
-  const payload = useMemo(() => gerarPixPayload({ chave: "financeiro@enyla.com.br", nome: "Enyla", cidade: "Natal", valor, txid: txid.replace(/\W/g, ""), descricao }), [valor, txid, descricao])
-  const [qr, setQr] = useState<string | null>(null)
+// Pagamento: com o Asaas ligado, pede o CPF/CNPJ e mostra o Pix da cobrança (confirma na hora) e o cartão;
+// sem Asaas ou se ele falhar, o Pix de sempre (conferido pelo extrato)
+function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConferir, conferindo }: {
+  p: Pedido; titulo: string; valor: number; txid: string; descricao: string; sub: string
+  post: (c: Record<string, unknown>) => Promise<Pedido>; setP: (p: Pedido) => void; onConferir: () => void; conferindo: boolean
+}) {
+  const [doc, setDoc] = useState("")
+  const [gerando, setGerando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const [semAsaas, setSemAsaas] = useState(false)
+  const gerar = async (d?: string) => {
+    setGerando(true); setErro(null)
+    try { setP(await post({ acao: "cobrar", documento: d })) }
+    catch (e) { const m = (e as Error).message; setErro(m); if (/indispon|Asaas/i.test(m)) setSemAsaas(true) }
+    setGerando(false)
+  }
+  const precisa = p.asaas && !semAsaas && !p.cobranca
+
+  if (p.asaas && !semAsaas && p.cobranca)
+    return <PixBloco titulo={`${titulo} pelo Pix`} valor={valor} txid={txid} descricao={descricao} sub={sub} pronto={{ payload: p.cobranca.payload, imagem: p.cobranca.imagem }} cartao={p.cobranca.fatura}
+      aviso="Assim que o Pix cair, a confirmação chega no seu WhatsApp." onConferir={onConferir} conferindo={conferindo} />
+  if (precisa)
+    return (
+      <div className="bg-white rounded-2xl ds-borda p-5 flex flex-col items-center text-center">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">{titulo}</p>
+        <p className="text-[28px] font-bold text-[#191625] ds-num mt-1">{brl(valor)}</p>
+        <p className="text-[12px] text-[#898892]">{sub}</p>
+        {p.documento && !doc ? <p className="self-stretch text-left mt-4 text-[12.5px] text-[#5e5c68]">No nome do CPF/CNPJ {p.documento}. <button className="text-[#8456e8] font-semibold" onClick={() => setDoc(" ")}>Trocar</button></p> : <>
+        <label className="self-stretch text-left mt-4 text-[12px] font-semibold text-[#191625]">CPF ou CNPJ de quem vai pagar</label>
+        <input value={doc.trim() ? doc : ""} autoFocus={!!p.documento} onChange={e => setDoc(e.target.value)} inputMode="numeric" maxLength={18} placeholder="000.000.000-00"
+          className="self-stretch mt-1 h-12 rounded-xl px-3.5 text-[15px] text-[#191625] bg-[rgba(116,116,128,0.06)] outline-none focus:ring-2 focus:ring-[#8456e8]/20" /></>}
+        <button onClick={() => void gerar(doc.trim() ? doc : undefined)} disabled={gerando || (!(p.documento && !doc.trim()) && doc.replace(/\D/g, "").length < 11)}
+          className="mt-3 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-60">
+          {gerando ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Gerar Pix (ou pagar no cartão)
+        </button>
+        <p className="text-[11.5px] text-[#898892] mt-2">É para a cobrança sair no seu nome. A confirmação do pagamento é na hora.</p>
+        {erro && <p className="text-[12px] text-[#d33a3c] mt-2">{erro}</p>}
+      </div>
+    )
+  return <PixBloco titulo={`${titulo} pelo Pix`} valor={valor} txid={txid} descricao={descricao} sub={sub} onConferir={onConferir} conferindo={conferindo} />
+}
+
+function PixBloco({ titulo, valor, txid, descricao, sub, onConferir, conferindo, pronto, cartao, aviso }: { titulo: string; valor: number; txid: string; descricao: string; sub: string; onConferir: () => void; conferindo: boolean; pronto?: { payload: string; imagem: string }; cartao?: string; aviso?: string }) {
+  const payload = useMemo(() => pronto?.payload ?? gerarPixPayload({ chave: "financeiro@enyla.com.br", nome: "Enyla", cidade: "Natal", valor, txid: txid.replace(/\W/g, ""), descricao }), [valor, txid, descricao, pronto?.payload])
+  const [qrGerado, setQr] = useState<string | null>(null)
   const [copiado, setCopiado] = useState(false)
-  useEffect(() => { QRCode.toDataURL(payload, { width: 220, margin: 1, color: { dark: "#191625", light: "#ffffff" } }).then(setQr).catch(() => setQr(null)) }, [payload])
+  useEffect(() => { if (!pronto?.imagem) QRCode.toDataURL(payload, { width: 220, margin: 1, color: { dark: "#191625", light: "#ffffff" } }).then(setQr).catch(() => setQr(null)) }, [payload, pronto?.imagem])
+  const qr = pronto?.imagem ? `data:image/png;base64,${pronto.imagem}` : qrGerado
   return (
     <div className="bg-white rounded-2xl ds-borda p-5 flex flex-col items-center text-center">
       <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">{titulo}</p>
@@ -348,7 +375,8 @@ function PixBloco({ titulo, valor, txid, descricao, sub, onConferir, conferindo 
         className="mt-4 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-colors">
         {copiado ? <><Check className="w-5 h-5" />Código copiado</> : <><Copy className="w-5 h-5" />Copiar Pix copia e cola</>}
       </button>
-      <p className="text-[11.5px] text-[#898892] mt-2">Pague exatamente {brl(valor)}: é por esse valor que o sistema reconhece o seu pedido.</p>
+      {cartao && <a href={cartao} target="_blank" rel="noreferrer" className="mt-2 w-full h-11 rounded-xl text-[14px] font-semibold text-[#191625] bg-[rgba(116,116,128,0.08)] flex items-center justify-center">Prefiro pagar no cartão</a>}
+      <p className="text-[11.5px] text-[#898892] mt-2">{aviso ?? `Pague exatamente ${brl(valor)}: é por esse valor que o sistema reconhece o seu pedido.`}</p>
       <button onClick={onConferir} disabled={conferindo}
         className="mt-3 w-full h-11 rounded-xl text-[14px] font-semibold text-[#8456e8] bg-[#8456e8]/[0.08] hover:bg-[#8456e8]/[0.14] disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
         {conferindo ? <><Loader2 className="w-4 h-4 animate-spin" />Conferindo…</> : "Já paguei"}
