@@ -345,11 +345,11 @@ export function semanaDe(d: Date) {
   return `${x.getUTCFullYear()}-W${String(Math.ceil(((x.getTime() - ini.getTime()) / 86_400_000 + 1) / 7)).padStart(2, "0")}`
 }
 
-// Pedido de teste: R$ 10 (sinal R$ 5 + restante R$ 5, o mínimo do Asaas), na sua própria conversa
+// Pedido de teste: R$ 20 (sinal R$ 10 + restante R$ 10; o Asaas não cobra menos de R$ 10), na sua própria conversa
 export function pedidoDeTeste(pedidos: PedidoDigital[], jid: string, agora = new Date()): PedidoDigital {
   return {
     id: proximoIdDigital(pedidos), jid, nome: "Teste (você)", em: agora.toISOString(), produto: "teste", ml: 50,
     medidas: { a: 10, l: 5, p: 5 }, padrao: true, folha: "A4", quantidade: 20, faixa: 20,
-    custo: 0, arte: 0, margem: 0, total: 10, sinal: 5, status: "aguardando_sinal", teste: true,
+    custo: 0, arte: 0, margem: 0, total: 20, sinal: 10, status: "aguardando_sinal", teste: true,
   }
 }

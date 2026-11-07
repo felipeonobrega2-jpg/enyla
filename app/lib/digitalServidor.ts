@@ -57,7 +57,7 @@ const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 export async function conferirSinais(opts: { forcar?: boolean } = {}): Promise<{ pagos: string[]; pendentes: number; motivo?: string }> {
   const cfg = await lerDados()
   const agora = Date.now()
-  // Teste (R$ 5) só confirma pelo Asaas: no extrato qualquer Pix de R$ 5 seria confundido com ele
+  // Teste (R$ 10) só confirma pelo Asaas: no extrato qualquer Pix de R$ 10 seria confundido com ele
   const pendentes = (cfg.pedidosDigitais ?? []).filter(p => !p.teste && p.status === "aguardando_sinal" && agora - new Date(p.em).getTime() < 15 * 86_400_000)
   const restantes = (cfg.pedidosDigitais ?? []).filter(p => !p.teste && p.restante && !p.restantePagoEm && p.status !== "cancelado" && p.arteAprovadaEm)
   if (!pendentes.length && !restantes.length) return { pagos: [], pendentes: 0 }
