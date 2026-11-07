@@ -7,10 +7,11 @@ import { supabase } from "./supabase"
 import { clienteClaude, MODELO } from "./claude"
 import { Conhecimento, TEMAS } from "./agenteLeads"
 import { gravarCampos } from "./configAtomica"
+import { transcreverPendentes } from "./transcricao"
 export { conhecimentoNoPrompt, type Conhecimento } from "./agenteLeads"
 
 const MAX_ITENS = 200
-const MAX_CONVERSAS = 24
+const MAX_CONVERSAS = 40
 const POR_LOTE = 6
 
 const ESQUEMA = {
@@ -37,16 +38,19 @@ const linha = (m: { from_me: boolean; corpo: string | null; tipo: string }) => {
 
 export async function aprenderComConversas(desde: string): Promise<{ conversas: number; novos: number; erro?: string }> {
   const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
-  const cfg = (cfgRow?.data ?? {}) as { apiKey?: string; conhecimentoAgente?: Conhecimento[]; agenteLog?: { ids?: string[] }[] }
+  const cfg = (cfgRow?.data ?? {}) as { apiKey?: string; conhecimentoAgente?: Conhecimento[]; agenteLog?: { ids?: string[] }[]; agenteIds?: string[] }
   if (!cfg.apiKey) return { conversas: 0, novos: 0, erro: "Chave da IA não configurada." }
 
   // Conversas em que você mandou mensagem no período (as do agente não contam: ele não ensina a si mesmo)
-  const doAgente = new Set((cfg.agenteLog ?? []).flatMap(l => l.ids ?? []))
+  const doAgente = new Set([...(cfg.agenteLog ?? []).flatMap(l => l.ids ?? []), ...(cfg.agenteIds ?? [])])
+  // Seus áudios do período ainda sem texto: transcreve antes (é onde você mais ensina)
+  const { data: semTexto } = await supabase.from("whatsapp_mensagens").select("id").eq("from_me", true).in("tipo", ["audio", "audioMessage"]).is("corpo", null).gte("ts", desde).limit(40)
+  if (semTexto?.length) await transcreverPendentes({ ids: semTexto.map(m => m.id) }, 40).catch(() => null)
   const { data: minhas } = await supabase.from("whatsapp_mensagens").select("id, jid, tipo").eq("from_me", true).gte("ts", desde).limit(3000)
   const peso = new Map<string, number>()
   for (const m of minhas ?? []) {
     if (doAgente.has(m.id) || m.jid.endsWith("@g.us")) continue
-    peso.set(m.jid, (peso.get(m.jid) ?? 0) + (m.tipo === "audio" || m.tipo === "audioMessage" ? 3 : 1))   // áudio ensina mais
+    peso.set(m.jid, (peso.get(m.jid) ?? 0) + (m.tipo === "audio" || m.tipo === "audioMessage" ? 100 : 1))   // conversa com áudio seu vem primeiro
   }
   if (!peso.size) return { conversas: 0, novos: 0 }
   const { data: convs } = await supabase.from("whatsapp_conversas").select("jid, status_lead, etiquetas").in("jid", [...peso.keys()].slice(0, 400))
@@ -114,13 +118,17 @@ ${atual.map(i => `- ${i.texto}`).join("\n") || "(vazio)"}
 
 // Uma vez por noite (depois das 21h de São Paulo), aproveitando os eventos do webhook
 let ultimaTentativa = 0
+const VERSAO_APRENDIZADO = 2
 export async function talvezAprender() {
   if (Date.now() - ultimaTentativa < 30 * 60_000) return
   ultimaTentativa = Date.now()
   const h = Number(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false }))
-  if (h < 21) return
+  if (h < 21 && h >= 6) return
   const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
-  const em = (data?.data as { agenteAprendeuEm?: string } | undefined)?.agenteAprendeuEm
-  if (em && Date.now() - new Date(em).getTime() < 20 * 3_600_000) return
+  const dd = data?.data as { agenteAprendeuEm?: string; agenteAprendeuVersao?: number } | undefined
+  // Versão nova do aprendizado (todos os seus áudios, sem confundir com o agente): refaz o dia uma vez, já
+  const refazer = (dd?.agenteAprendeuVersao ?? 1) < VERSAO_APRENDIZADO
+  if (!refazer && dd?.agenteAprendeuEm && Date.now() - new Date(dd.agenteAprendeuEm).getTime() < 20 * 3_600_000) return
+  await gravarCampos({ agenteAprendeuVersao: VERSAO_APRENDIZADO })
   await aprenderComConversas(new Date(Date.now() - 24 * 3_600_000).toISOString())
 }
