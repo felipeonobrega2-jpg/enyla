@@ -255,6 +255,8 @@ export type EntradaRotas = {
   vernizPor2000Legado: number          // estimativa antiga, usada só sem tabela
   opcoes: OpcoesRota
   producao: ConfigProducao
+  corte?: "faca" | "guilhotina"        // peça plana com corte reto: refile na guilhotina, sem faca nem batidas
+  pecaPlana?: boolean                  // não é caixa: sem colagem por padrão
 }
 
 // ── Resultado ─────────────────────────────────────────────────────────────────
@@ -586,18 +588,25 @@ function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaEx
   }
 
   // Corte e vinco: batidas = folhas impressas × golpes por folha (faca menor que a passada = mais golpes)
-  const batidas = passadas.reduce((s, ps) => s + ps.folhas * ps.batidasPorFolha, 0)
+  const batidas = e.corte === "guilhotina" ? 0 : passadas.reduce((s, ps) => s + ps.folhas * ps.batidasPorFolha, 0)
   const fCorte = fornecedorDaEtapa(e, "corteVinco", "corteVinco")
   const regraCorte = fCorte?.servicos.corteVinco ?? { tipo: "acerto_milheiro" as const, acerto: 70, milheiro: 70 }
+  if (e.corte === "guilhotina") {
+    // Refile: corte reto das folhas impressas (estimativa; ajuste o valor na rota se o seu fornecedor cobra diferente)
+    const folhasCorte = passadas.reduce((s, ps) => s + ps.folhas, 0)
+    itens.push({ etapa: "corteVinco", descricao: `Refile na guilhotina · ${folhasCorte.toLocaleString("pt-BR")} folhas`,
+      valor: cobrar({ tipo: "acerto_milheiro", acerto: 30, milheiro: 30 }, { folhas: folhasCorte, m2, unidades: qtd, fracaoChapa: 1 }), estimado: true })
+  } else {
   if (fCorte) sequencia.push(fCorte)
   itens.push({
     etapa: "corteVinco", fornecedor: fCorte?.nome, fornecedorId: fCorte?.id,
     descricao: `${batidas.toLocaleString("pt-BR")} batidas · faca de ${k}`,
     valor: cobrar(regraCorte, { folhas: batidas, m2, unidades: qtd, fracaoChapa: 1 }), estimado: !fCorte,
   })
+  }
 
   // Colagem
-  const modo = e.opcoes.colagemModo ?? (e.tipoCaixa === "aviao" ? "nenhuma" : "fornecedor")
+  const modo = e.opcoes.colagemModo ?? (e.pecaPlana || e.tipoCaixa === "aviao" ? "nenhuma" : "fornecedor")
   if (modo === "fornecedor") {
     const f = fornecedorDaEtapa(e, "colagem", "colagem")
     const regra = f?.servicos.colagem
@@ -689,6 +698,7 @@ function aplicarDecisoes(e: EntradaRotas, r: Rota): Rota {
 function opcoesDeFaca(base: RotaBase, e: EntradaRotas, existente: Ferramental | null): number[] {
   if (existente) return [existente.cavidades]
   const kCheio = Math.max(...base.passadas.map(ps => ps.cavidades))
+  if (e.corte === "guilhotina") return [kCheio]   // sem faca: uma rota só
   const ks = new Set<number>([kCheio, Math.ceil(kCheio / 2)])
   if (e.opcoes.facaCavidades && e.opcoes.facaCavidades > 0) ks.add(Math.min(e.opcoes.facaCavidades, kCheio))
   for (const ps of base.passadas) ks.add(ps.cavidades)

@@ -1,3 +1,5 @@
+// Peça plana (cm): fita, tag, cinta, cartão. Corte reto na guilhotina (sem faca) ou com faca (formato especial).
+export type PecaPlana = { nome: string; largura: number; comprimento: number; corte: "guilhotina" | "faca" }
 export type TipoCaixa = "simples" | "aviao" | "fundo-automatico" | "americano"
 
 export type FormatoPapel = {
@@ -32,6 +34,7 @@ export type FormData = {
   customPecasChapa: number | null
   blankOverride: { largura: number; altura: number } | null  // mm — importado do DXF Pacdora
   caixaDxf?: { largura: number; altura: number; profundidade: number; modelo?: string } | null  // mm — caixa montada, do nome do arquivo ou dos vincos
+  pecaPlana?: PecaPlana | null   // não é caixa: fita, tag, cinta… (sem dobra nem colagem)
   obsInterna: string
   obsCliente: string
   validadeDias: number

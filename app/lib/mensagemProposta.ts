@@ -11,8 +11,9 @@ const n = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
 
 // "Caixa com fundo automático · 6 × 10,5 × 3 cm (L × A × P)", "Material: …", "Acabamentos: …", "Acompanha: …"
 export function especificacaoDaProposta(form: FormData): string[] {
-  const tipo = form.caixaDxf?.modelo ?? (form.blankOverride ? null : TIPO_CAIXA[form.tipoCaixa] ?? null)
-  const medidas = form.frente ? `${n(form.frente)} × ${n(form.alturaBox)} × ${n(form.lateral)} cm (L × A × P)`
+  const tipo = form.pecaPlana?.nome || (form.caixaDxf?.modelo ?? (form.blankOverride ? null : TIPO_CAIXA[form.tipoCaixa] ?? null))
+  const medidas = form.pecaPlana ? `${n(form.pecaPlana.largura)} × ${n(form.pecaPlana.comprimento)} cm`
+    : form.frente ? `${n(form.frente)} × ${n(form.alturaBox)} × ${n(form.lateral)} cm (L × A × P)`
     : form.caixaDxf ? `${[form.caixaDxf.largura, form.caixaDxf.altura, form.caixaDxf.profundidade].map(v => n(v / 10)).join(" × ")} cm (L × A × P)` : null
   const acabamentos = [
     form.incluirVerniz && form.vernizTipo ? `verniz ${form.vernizTipo}` : null,

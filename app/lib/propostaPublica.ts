@@ -30,8 +30,9 @@ function especificar(card: KanbanCard, form?: FormData): string[] {
     card.acabamentos?.length ? `Acabamentos: ${card.acabamentos.join(", ")}` : null,
   ].filter(Boolean) as string[]
   return [
-    form.caixaDxf?.modelo ?? (form.blankOverride ? null : TIPO_CAIXA[form.tipoCaixa] ?? null),
-    form.frente ? `Dimensões: ${form.frente} × ${form.alturaBox} × ${form.lateral} cm (L × A × P)`
+    form.pecaPlana?.nome || (form.caixaDxf?.modelo ?? (form.blankOverride ? null : TIPO_CAIXA[form.tipoCaixa] ?? null)),
+    form.pecaPlana ? `Medidas: ${cm(form.pecaPlana.largura * 10)} × ${cm(form.pecaPlana.comprimento * 10)} cm`
+    : form.frente ? `Dimensões: ${form.frente} × ${form.alturaBox} × ${form.lateral} cm (L × A × P)`
       : form.caixaDxf ? `Dimensões: ${[form.caixaDxf.largura, form.caixaDxf.altura, form.caixaDxf.profundidade].map(cm).join(" × ")} cm (L × A × P)` : null,
     form.materialNome ? `Material: ${form.materialNome}` : null,
     form.laminacao && form.laminacaoTipo ? `Laminação ${form.laminacaoTipo.toLowerCase()}` : null,
@@ -56,7 +57,8 @@ export async function carregarProposta(numero: string): Promise<PropostaPublica 
   const limite = validaAte(card.data ?? card.createdAt, form?.validadeDias ?? 15)
 
   // Caixa 3D: medidas do orçamento (ou do card) e a primeira imagem de arte/mockup do pedido, se houver
-  const dims: number[] = form?.frente ? [form.frente, form.alturaBox, form.lateral]
+  // Peça plana não tem caixa 3D
+  const dims: number[] = form?.pecaPlana ? [] : form?.frente ? [form.frente, form.alturaBox, form.lateral]
     : form?.caixaDxf ? [form.caixaDxf.largura / 10, form.caixaDxf.altura / 10, form.caixaDxf.profundidade / 10]
     : (card.dimensoes ?? "").split(/[×x]/).map((n: string) => parseFloat(n.replace(",", ".")))
   const { data: imgs } = await supabase.from("pedido_arquivos").select("url, nome, tipo").eq("card_id", card.id).in("tipo", ["arte", "mockup"])

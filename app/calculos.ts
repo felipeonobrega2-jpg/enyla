@@ -181,8 +181,9 @@ function alternativasCompactas(todas: Rota[], melhor: Rota): Rota[] {
 
 export function calcular(form: FormData, config: Configuracoes): Calculo | null {
   // Permite calcular com só o DXF importado (sem L/A/P)
+  const plana = form.pecaPlana && form.pecaPlana.largura > 0 && form.pecaPlana.comprimento > 0 ? form.pecaPlana : null
   const temDim = form.frente > 0 && form.lateral > 0 && form.alturaBox > 0
-  if (!temDim && !form.blankOverride) return null
+  if (!temDim && !form.blankOverride && !plana) return null
 
   const dielineCalc = calcularDieline(
     (form.frente  || 1) * 10,
@@ -192,7 +193,10 @@ export function calcular(form: FormData, config: Configuracoes): Calculo | null 
     form.tipoCaixa,
   )
   // Se o usuário importou um DXF real (Pacdora), usa as dimensões reais do blank
-  const dieline = form.blankOverride
+  // Peça plana: a própria peça é o "blank" (sem abas); senão, o DXF real (Pacdora) ou a conta da caixa
+  const dieline = plana
+    ? { ...dielineCalc, largura: plana.largura * 10, altura: plana.comprimento * 10, abaColagem: 0, abaSuperior: 0, abaInferior: 0 }
+    : form.blankOverride
     ? { ...dielineCalc, largura: form.blankOverride.largura, altura: form.blankOverride.altura }
     : dielineCalc
 
@@ -216,8 +220,10 @@ export function calcular(form: FormData, config: Configuracoes): Calculo | null 
     numArtes: Math.max(1, form.numArtes),
     tipoCaixa: form.tipoCaixa,
     cliente: form.nomeCliente,
-    comFaca: form.comFaca,
-    valorFaca: form.comFaca ? form.valorFaca : 0,
+    comFaca: plana?.corte === "guilhotina" ? false : form.comFaca,
+    valorFaca: plana?.corte === "guilhotina" ? 0 : form.comFaca ? form.valorFaca : 0,
+    corte: plana ? plana.corte : "faca",
+    pecaPlana: !!plana,
     laminacaoTipo: form.laminacao ? (form.laminacaoTipo || "Fosca") : null,
     vernizTipo: form.incluirVerniz ? (form.vernizTipo || "UV Total") : null,
     hotStamping: (form.outrosAcabamentos ?? []).includes("Hot Stamping"),

@@ -149,7 +149,7 @@ export function RotasProducao({ calculo, form, producao, multiplicadorPadrao, co
     { etapa: "acabamento",  nome: "Laminação / verniz", servico: "laminacao",  mostrar: form.laminacao || form.incluirVerniz },
     { etapa: "hotStamping", nome: "Hot stamping",       servico: "hotStamping", mostrar: form.outrosAcabamentos.includes("Hot Stamping") },
     { etapa: "corteVinco",  nome: "Corte e vinco",      servico: "corteVinco", mostrar: true },
-    { etapa: "colagem",     nome: "Colagem",            servico: "colagem",    mostrar: (opcoes.colagemModo ?? (form.tipoCaixa === "aviao" ? "nenhuma" : "fornecedor")) === "fornecedor" },
+    { etapa: "colagem",     nome: "Colagem",            servico: "colagem",    mostrar: (opcoes.colagemModo ?? (form.pecaPlana || form.tipoCaixa === "aviao" ? "nenhuma" : "fornecedor")) === "fornecedor" },
   ]
 
   // Decisões manuais
@@ -343,7 +343,7 @@ export function RotasProducao({ calculo, form, producao, multiplicadorPadrao, co
               <Seletor label="Faca" valor={opcoes.facaCavidades ?? 0}
                 opcoes={[{ v: 0, nome: "Automático" }, ...facasDisponiveis.map(k => ({ v: k, nome: `${k} cavidades` }))]}
                 onChange={v => set({ facaCavidades: v || null })} />
-              <Seletor<ColagemModo> label="Colagem" valor={opcoes.colagemModo ?? (form.tipoCaixa === "aviao" ? "nenhuma" : "fornecedor")}
+              <Seletor<ColagemModo> label="Colagem" valor={opcoes.colagemModo ?? (form.pecaPlana || form.tipoCaixa === "aviao" ? "nenhuma" : "fornecedor")}
                 opcoes={[{ v: "fornecedor", nome: "No fornecedor" }, { v: "manual", nome: "Manual (por unidade)" }, { v: "nenhuma", nome: "Sem colagem" }]}
                 onChange={v => set({ colagemModo: v })} />
               {etapasFornecedor.filter(e => e.mostrar).map(e => {

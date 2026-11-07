@@ -103,13 +103,13 @@ export function gerarHtmlOrcamento(item: HistoricoItem): string {
     <p style="color:#64748b;font-size:11px;margin-top:3px">Gerado em ${data}</p>
   </div>
 
-  <h2>Dimensões da Caixa</h2>
+  <h2>${form.pecaPlana ? "Dimensões da Peça" : "Dimensões da Caixa"}</h2>
   <div class="kpis">
     ${form.frente > 0 ? `<div class="kpi"><div class="kpi-label">Largura</div><div class="kpi-value">${form.frente} cm</div></div>` : ""}
     ${form.alturaBox > 0 ? `<div class="kpi"><div class="kpi-label">Altura</div><div class="kpi-value">${form.alturaBox} cm</div></div>` : ""}
     ${form.lateral > 0 ? `<div class="kpi"><div class="kpi-label">Profundidade</div><div class="kpi-value">${form.lateral} cm</div></div>` : ""}
-    ${!(form.frente > 0 || form.alturaBox > 0 || form.lateral > 0) ? `<div class="kpi"><div class="kpi-label">Blank aberto</div><div class="kpi-value" style="font-size:13px">${(dieline.largura/10).toFixed(1)} × ${(dieline.altura/10).toFixed(1)} cm</div><div class="kpi-sub">DXF Pacdora</div></div>` : ""}
-    <div class="kpi"><div class="kpi-label">Aba de Colagem</div><div class="kpi-value">${form.abaColagem} cm</div></div>
+    ${!(form.frente > 0 || form.alturaBox > 0 || form.lateral > 0) ? `<div class="kpi"><div class="kpi-label">Blank aberto</div><div class="kpi-value" style="font-size:13px">${(dieline.largura/10).toFixed(1)} × ${(dieline.altura/10).toFixed(1)} cm</div><div class="kpi-sub">${form.pecaPlana ? form.pecaPlana.nome : "DXF Pacdora"}</div></div>` : ""}
+    ${form.pecaPlana ? "" : `<div class="kpi"><div class="kpi-label">Aba de Colagem</div><div class="kpi-value">${form.abaColagem} cm</div></div>`}
     ${form.materialNome ? `<div class="kpi"><div class="kpi-label">Material</div><div class="kpi-value" style="font-size:13px">${form.materialNome}</div></div>` : ""}
     <div class="kpi"><div class="kpi-label">Verniz UV</div><div class="kpi-value">${form.incluirVerniz ? "Sim" : "Não"}</div></div>
     <div class="kpi"><div class="kpi-label">Faca</div><div class="kpi-value">${form.comFaca ? brl(form.valorFaca) : "Sem faca"}</div></div>
@@ -605,9 +605,11 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
 
   <div class="section-bar">Informações Técnicas</div>
   <div class="kv-grid">
-    <div class="kv"><span class="lbl">Produto:</span><span class="val">${form.caixaDxf?.modelo ?? (form.blankOverride ? "Embalagem Personalizada" : TIPO_CAIXA_PDF[form.tipoCaixa] ?? "Embalagem Personalizada")}</span></div>
+    <div class="kv"><span class="lbl">Produto:</span><span class="val">${form.pecaPlana?.nome || (form.caixaDxf?.modelo ?? (form.blankOverride ? "Embalagem Personalizada" : TIPO_CAIXA_PDF[form.tipoCaixa] ?? "Embalagem Personalizada"))}</span></div>
     <div class="kv"><span class="lbl">Material:</span><span class="val">${form.materialNome || "—"}</span></div>
-    ${!temDims3D && form.caixaDxf
+    ${form.pecaPlana
+      ? `<div class="kv"><span class="lbl">Medidas:</span><span class="val">${form.pecaPlana.largura.toLocaleString("pt-BR")} × ${form.pecaPlana.comprimento.toLocaleString("pt-BR")} cm</span></div>`
+      : !temDims3D && form.caixaDxf
       ? `<div class="kv"><span class="lbl">Medidas (L × A × P):</span><span class="val">${[form.caixaDxf.largura, form.caixaDxf.altura, form.caixaDxf.profundidade].map(n => (n / 10).toLocaleString("pt-BR", { maximumFractionDigits: 1 })).join(" × ")} cm</span></div>`
       : temDims3D
       ? `<div class="kv"><span class="lbl">Largura:</span><span class="val">${form.frente} cm</span></div>

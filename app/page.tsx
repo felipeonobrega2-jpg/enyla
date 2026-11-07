@@ -570,7 +570,7 @@ export default function Home() {
         ...(f?.incluirVerniz ? ["verniz" as const] : []),
         ...(f?.outrosAcabamentos?.includes("Hot Stamping") ? ["hotStamping" as const] : []),
         "corteVinco",
-        ...((f?.rota?.colagemModo ?? (f?.tipoCaixa === "aviao" ? "nenhuma" : "fornecedor")) === "fornecedor" ? ["colagem" as const] : []),
+        ...((f?.rota?.colagemModo ?? (f?.pecaPlana || f?.tipoCaixa === "aviao" ? "nenhuma" : "fornecedor")) === "fornecedor" ? ["colagem" as const] : []),
       ]
       const movs = movimentosPorEtapa(prod, pedidoKey, label, coluna, rota?.impressorId ?? null, hojeIso, servicosAcab)
       if (movs) {
@@ -963,7 +963,7 @@ export default function Home() {
       id: Date.now().toString(),
       numero,
       nomeCliente: form.nomeCliente || "Sem nome",
-      dimensoes: `${form.frente}×${form.alturaBox}×${form.lateral}`,
+      dimensoes: form.pecaPlana ? `${form.pecaPlana.nome} ${form.pecaPlana.largura}×${form.pecaPlana.comprimento} cm` : `${form.frente}×${form.alturaBox}×${form.lateral}`,
       materialNome: form.materialNome,
       preco: form.comFaca ? ideal.precoComFaca : ideal.precoSemFaca,
       quantidade: ideal.quantidade,
@@ -1058,7 +1058,7 @@ export default function Home() {
       const aindaNaoFechado = card.coluna < COL_FECHADO
       const updates = {
         nomeCliente: form.nomeCliente || "Sem nome",
-        dimensoes: `${form.frente}×${form.alturaBox}×${form.lateral}`,
+        dimensoes: form.pecaPlana ? `${form.pecaPlana.nome} ${form.pecaPlana.largura}×${form.pecaPlana.comprimento} cm` : `${form.frente}×${form.alturaBox}×${form.lateral}`,
         materialNome: form.materialNome,
         opcoes: result.tabela.map(l => ({
           quantidade: l.quantidade,
@@ -1768,6 +1768,7 @@ export default function Home() {
           </FormSection>
 
           {/* Seção: Dieline Pacdora */}
+{!form.pecaPlana && (
           <FormSection label="Dieline Pacdora">
             {form.blankOverride ? (
               <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl border-2 border-[#009351]/25 bg-[#009351]/[0.04]">
@@ -1807,10 +1808,56 @@ export default function Home() {
               </label>
             )}
           </FormSection>
+          )}
 
           {/* Seção: Tipo de caixa — só aparece sem DXF */}
           {!form.blankOverride && (
-            <FormSection label="Tipo de caixa">
+            <FormSection label={form.pecaPlana ? "Peça plana" : "Tipo de caixa"}>
+              <div className="grid grid-cols-2 gap-1 p-1 mb-2 rounded-xl bg-[rgba(116,116,128,0.08)]">
+                {([["caixa", "Caixa"], ["plana", "Não é caixa"]] as const).map(([v, nome]) => {
+                  const ativo = v === "plana" ? !!form.pecaPlana : !form.pecaPlana
+                  return (
+                    <button key={v} type="button"
+                      onClick={() => setForm(p => {
+                        const next: FormData = v === "plana"
+                          ? { ...p, frente: 0, alturaBox: 0, lateral: 0, caixaDxf: null, pecaPlana: p.pecaPlana ?? { nome: "Fita personalizada", largura: 0, comprimento: 0, corte: "guilhotina" }, rota: { ...(p.rota ?? {}), colagemModo: "nenhuma" } }
+                          : { ...p, pecaPlana: null, rota: { ...(p.rota ?? {}), colagemModo: undefined } }
+                        setResult(calcular(next, config)); return next
+                      })}
+                      className={`h-8 rounded-lg text-[12px] font-semibold transition-all ${ativo ? "bg-white shadow-sm text-[#191625]" : "text-[#5e5c68]"}`}>{nome}</button>
+                  )
+                })}
+              </div>
+              {form.pecaPlana ? (() => {
+                const pp = form.pecaPlana
+                const mudar = (m: Partial<typeof pp>) => setForm(p => { const next = { ...p, pecaPlana: { ...p.pecaPlana!, ...m } }; setResult(calcular(next, config)); return next })
+                return (
+                  <div className="space-y-2">
+                    <div>
+                      <Label>O que é</Label>
+                      <input value={pp.nome} onChange={e => mudar({ nome: e.target.value })} placeholder="Fita personalizada, tag, cinta…"
+                        className="w-full h-9 rounded-xl px-3 text-[13px] text-[#191625] bg-white ds-borda focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><Label>Largura (cm)</Label><NumberInput value={pp.largura} onChange={v => mudar({ largura: v })} /></div>
+                      <div><Label>Comprimento (cm)</Label><NumberInput value={pp.comprimento} onChange={v => mudar({ comprimento: v })} /></div>
+                    </div>
+                    <div>
+                      <Label>Corte</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {([["guilhotina", "Reto (guilhotina)", "Sem faca, só refile"], ["faca", "Formato (faca)", "Ponta, furo, recorte"]] as const).map(([c, nome, desc]) => (
+                          <button key={c} type="button" onClick={() => mudar({ corte: c })}
+                            className={`flex flex-col items-start gap-0.5 px-3 py-2 rounded-xl border-2 text-left transition-all ${pp.corte === c ? "border-[#8456e8]/30 bg-[#8456e8]/[0.04]" : "border-[rgba(60,60,67,0.08)]"}`}>
+                            <span className={`text-[12px] font-semibold ${pp.corte === c ? "text-[#8456e8]" : "text-[#5e5c68]"}`}>{nome}</span>
+                            <span className="text-[10px] text-[#8E8E93]">{desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-[10.5px] text-[#8E8E93] leading-snug">Sem dobra e sem colagem. As peças são encaixadas lado a lado na folha (corte reto aproveita o papel inteiro). O refile é estimado: ajuste o valor nas rotas de produção se o seu fornecedor cobrar diferente.</p>
+                  </div>
+                )
+              })() : (
               <div className="grid grid-cols-2 gap-2">
                 {([
                   ["simples",          "Cartucho Simples",    "Tuck encaixe topo/fundo"],
@@ -1837,11 +1884,12 @@ export default function Home() {
                   </button>
                 ))}
               </div>
+              )}
             </FormSection>
           )}
 
-          {/* Seção: Dimensões — só aparece sem DXF */}
-          {!form.blankOverride && (
+          {/* Seção: Dimensões — só aparece sem DXF (e quando é caixa) */}
+          {!form.blankOverride && !form.pecaPlana && (
             <FormSection label="Dimensões da caixa (cm)">
               <div className="grid grid-cols-3 gap-2">
                 {(["frente","alturaBox","lateral"] as const).map(c => (
