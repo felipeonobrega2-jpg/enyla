@@ -15,6 +15,8 @@ import { Pagina, CabecalhoPagina, Cartao, TituloCartao, Segmentado, Botao } from
 import AgenteLeadsCard from "./AgenteLeadsCard"
 import ContatosProtegidosCard from "./ContatosProtegidosCard"
 import ReativacaoCard from "./ReativacaoCard"
+import DependeDeVoceCard from "./DependeDeVoceCard"
+import MidiaAgenteCard from "./MidiaAgenteCard"
 
 const inputCls = "h-9 rounded-lg px-2.5 text-[12.5px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] transition-colors ds-borda"
 
@@ -50,7 +52,8 @@ function abaGuardada(): AbaConfig {
   try { const a = sessionStorage.getItem(CHAVE_ABA); return ABAS.some(x => x.v === a) ? a as AbaConfig : "negocio" } catch { return "negocio" }
 }
 
-export function ConfigView({ config, onSave, onExportar, onImportar, clientes = [] }: {
+export function ConfigView({ config, onSave, onExportar, onImportar, clientes = [], onIr }: {
+  onIr?: (view: string) => void
   config: Configuracoes
   clientes?: string[]
   onSave: (c: Configuracoes) => void
@@ -211,6 +214,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <div className="space-y-4">
           <AgenteLeadsCard filtro={draft.filtroLeads} onFiltro={t => setDraft(d => ({ ...d, filtroLeads: t }))} />
+          <MidiaAgenteCard />
           <ContatosProtegidosCard />
         </div>
         <div className="space-y-4">
@@ -232,6 +236,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
       {aba === "sistema" && (
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <div className="space-y-4">
+          <DependeDeVoceCard onIr={onIr} />
           {/* Aparência */}
           <Cartao className="ds-entrada">
             <TituloCartao titulo="Aparência" icone={<Palette className="w-4 h-4" />} sub="“Sistema” acompanha a preferência do seu dispositivo. Vale só para este navegador." />

@@ -51,7 +51,16 @@ export type PedidoDigital = {
   vistoEm?: string; ultimaVista?: string; vistas?: number   // quando o cliente abriu a página (só para o seu painel)
   lembretes?: { nivel: number; em: string }[]                // lembretes que o follow-up mandou
   statusEm?: string                                          // última mudança de status
+  // Fases 4–6: arte, produção na Villa, restante (com frete) e acerto semanal
+  artes?: Arte[]; arteEnviadaEm?: string; arteAprovadaEm?: string; ajustes?: Ajuste[]
+  designerAvisadoEm?: string; villaEnviadoEm?: string
+  frete?: number; entrega?: Entrega
+  restante?: number; restantePagoEm?: string; pagamentoFinal?: { txId: string; valor: number; data: string; nome: string | null }
+  acertadoEm?: string
 }
+export type Arte = { url: string; nome: string; em: string }
+export type Ajuste = { texto: string; em: string }
+export type Entrega = { cep: string; endereco: string; em: string }
 
 export type Cotacao =
   | { ok: true; medidas: { a: number; l: number; p: number }; padrao: boolean; ml: number | null; folha: Folha; quantidade: number; faixa: number; custo: number; arte: number; margem: number; total: number }
@@ -129,7 +138,7 @@ export const mudouACotacao = (p: PedidoDigital, c: Extract<Cotacao, { ok: true }
   p.status === "aguardando_sinal" && (p.quantidade !== c.quantidade || p.medidas.a !== c.medidas.a || p.medidas.l !== c.medidas.l || p.medidas.p !== c.medidas.p)
 
 // ── Página do pedido ─────────────────────────────────────────────────────────
-export type Briefing = { marca?: string; cores?: string; referencias?: string; arquivos?: { nome: string; url: string }[]; em?: string }
+export type Briefing = { marca?: string; cores?: string; referencias?: string; laminacao?: "fosca" | "brilho"; arquivos?: { nome: string; url: string }[]; em?: string }
 export type PedidoComBriefing = PedidoDigital & { briefing?: Briefing; pagamento?: { txId: string; valor: number; data: string; nome: string | null } }
 
 // As quantidades da tabela da folha deste pedido, com o preço de cada uma
@@ -210,4 +219,124 @@ export const ROTULO_STATUS: Record<StatusDigital, string> = {
 export function mudarStatus(p: PedidoDigital, para: StatusDigital, agora = new Date()): PedidoDigital | null {
   const ok = para === "cancelado" ? p.status !== "enviado" && p.status !== "cancelado" : PROXIMO_STATUS[p.status] === para
   return ok ? { ...p, status: para, statusEm: agora.toISOString() } : null
+}
+
+// ── Arte (fase 4) ────────────────────────────────────────────────────────────
+// Designer sobe a arte → vai para o cliente aprovar pela página → aprovada, vai para a Villa e o pedido entra em produção.
+export const arteAtual = (p: Pick<PedidoDigital, "artes">) => (p.artes ?? []).at(-1) ?? null
+export const esperandoAprovacao = (p: Pick<PedidoDigital, "status" | "artes" | "arteEnviadaEm" | "arteAprovadaEm">) =>
+  p.status === "arte" && !!arteAtual(p) && !!p.arteEnviadaEm && !p.arteAprovadaEm
+
+export function novaArte(p: PedidoDigital, a: Arte): PedidoDigital | null {
+  if (!["sinal_pago", "arte"].includes(p.status)) return null
+  return { ...p, artes: [...(p.artes ?? []), a].slice(-10), arteEnviadaEm: undefined, arteAprovadaEm: undefined }
+}
+export function marcarArteEnviada(p: PedidoDigital, agora = new Date()): PedidoDigital | null {
+  if (!arteAtual(p) || !["sinal_pago", "arte"].includes(p.status)) return null
+  return { ...p, status: "arte", statusEm: p.status === "arte" ? p.statusEm : agora.toISOString(), arteEnviadaEm: agora.toISOString() }
+}
+export function pedirAjuste(p: PedidoDigital, texto: string, agora = new Date()): PedidoDigital | null {
+  if (!esperandoAprovacao(p) || !texto.trim()) return null
+  return { ...p, ajustes: [...(p.ajustes ?? []), { texto: texto.trim().slice(0, 1000), em: agora.toISOString() }].slice(-20), arteEnviadaEm: undefined }
+}
+
+// Valores ainda esperando Pix (sinais e restantes): os centavos de um pedido não podem repetir em outro
+const emAberto = (todos: PedidoDigital[], menos: string) => todos.filter(o => o.id !== menos).flatMap(o =>
+  o.status === "aguardando_sinal" ? [o.sinal] : o.restante && !o.restantePagoEm && o.status !== "cancelado" ? [o.restante] : [])
+export function restanteUnico(p: Pick<PedidoDigital, "id" | "total" | "sinal" | "frete">, todos: PedidoDigital[]): number {
+  let v = Math.round((p.total - p.sinal + (p.frete ?? 0)) * 100)
+  const usados = new Set(emAberto(todos, p.id).map(x => Math.round(x * 100)))
+  while (usados.has(v)) v -= 1
+  return v / 100
+}
+export function aprovarArte(p: PedidoDigital, todos: PedidoDigital[], agora = new Date()): PedidoDigital | null {
+  if (!esperandoAprovacao(p)) return null
+  return { ...p, status: "producao", statusEm: agora.toISOString(), arteAprovadaEm: agora.toISOString(), restante: restanteUnico(p, todos) }
+}
+
+// ── Restante e frete (fase 5) ────────────────────────────────────────────────
+// O frete entra no restante; enquanto o restante não foi pago dá para mudar (o centavo único é refeito)
+export function trocarFrete(p: PedidoDigital, todos: PedidoDigital[], frete: number): PedidoDigital | null {
+  if (p.restantePagoEm || p.status === "cancelado" || !(frete >= 0) || frete > 2000) return null
+  const n = { ...p, frete: Math.round(frete * 100) / 100 }
+  return p.restante != null ? { ...n, restante: restanteUnico(n, todos) } : n
+}
+export function gravarEntrega(p: PedidoDigital, cep: string, endereco: string, agora = new Date()): PedidoDigital | null {
+  const c = cep.replace(/\D/g, "")
+  if (c.length !== 8 || endereco.trim().length < 5 || p.status === "cancelado") return null
+  return { ...p, entrega: { cep: c, endereco: endereco.trim().slice(0, 300), em: agora.toISOString() } }
+}
+// Restante com o valor exato no extrato, depois da aprovação da arte
+export function restantesPagos(pedidos: PedidoDigital[], extrato: EntradaBanco[], usadas: Set<string>): { id: string; tx: EntradaBanco }[] {
+  const out: { id: string; tx: EntradaBanco }[] = []
+  const ja = new Set(usadas)
+  for (const p of pedidos.filter(x => x.restante && !x.restantePagoEm && x.status !== "cancelado" && x.arteAprovadaEm)) {
+    const dia = new Date(new Date(p.arteAprovadaEm!).getTime() - 3 * 3_600_000).toISOString().slice(0, 10)
+    const tx = extrato.find(t => t.tipo === "entrada" && !ja.has(t.id) && t.data >= dia && Math.round(t.valor * 100) === Math.round(p.restante! * 100))
+    if (tx) { out.push({ id: p.id, tx }); ja.add(tx.id) }
+  }
+  return out
+}
+
+// ── Textos (cliente, Villa, designer, você) ──────────────────────────────────
+export const textoArteParaAprovar = (p: Pick<PedidoDigital, "nome" | "ajustes">, link: string) => {
+  const oi = primeiroNome(p.nome) ? `${primeiroNome(p.nome)}, ` : ""
+  return (p.ajustes?.length
+    ? `${oi}fiz os ajustes que você pediu. Dá uma olhada e me diz se ficou do jeito que queria:`
+    : `${oi}sua arte ficou pronta. Dá uma olhada com calma e, se estiver tudo certo, é só aprovar aqui:`) + `\n${link}\n\nSe quiser mudar alguma coisa, pode pedir pelo mesmo link ou me falar aqui.`
+}
+export const textoArteAprovada = (p: Pick<PedidoDigital, "restante" | "entrega">, link: string) => [
+  `Arte aprovada, já mandei para a produção.`,
+  `Quando ficar pronto, fica o restante de *${brl(p.restante ?? 0)}* pelo Pix, antes do envio.${p.entrega ? "" : " Me deixa o CEP e o endereço de entrega no link:"}`,
+  p.entrega ? null : link,
+].filter(Boolean).join("\n\n")
+export const textoRestantePago = (p: Pick<PedidoDigital, "restante">) =>
+  `Recebi o restante (${brl(p.restante ?? 0)}). Obrigado! Assim que sair para entrega eu te aviso aqui.`
+
+const lam = (b?: Briefing) => b?.laminacao === "brilho" ? "laminação brilho" : "laminação fosca"
+export function textoParaVilla(p: PedidoComBriefing, arte: string | null) {
+  return [
+    `*Pedido Enyla ${p.id}*`,
+    `${p.quantidade.toLocaleString("pt-BR")} caixas · ${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm (A × L × P)`,
+    `Folha ${p.folha} · triplex 300g · ${lam(p.briefing)}`,
+    arte ? `Arte aprovada: ${arte}` : null,
+    `Valor da tabela: ${brl(p.custo)}`,
+  ].filter(Boolean).join("\n")
+}
+export function textoParaDesigner(p: PedidoComBriefing, link: string) {
+  const b = p.briefing ?? {}
+  return [
+    `*Arte nova · ${p.id}*`,
+    `${p.quantidade.toLocaleString("pt-BR")} caixas · ${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm · folha ${p.folha} · ${lam(b)}`,
+    b.marca ? `Marca: ${b.marca}` : null,
+    b.cores ? `Cores: ${b.cores}` : null,
+    b.referencias ? `Referências: ${b.referencias}` : null,
+    b.arquivos?.length ? `Arquivos do cliente: ${b.arquivos.length} (no link)` : null,
+    p.ajustes?.length ? `\n*Ajuste pedido:* ${p.ajustes.at(-1)!.texto}` : null,
+    ``,
+    `Briefing completo e envio da arte: ${link}`,
+  ].filter(x => x !== null).join("\n")
+}
+
+// ── Acerto semanal com a Villa (fase 6) ──────────────────────────────────────
+// Toda segunda: o que foi para a Villa e ainda não foi acertado
+export function acertoDaSemana(pedidos: PedidoDigital[]) {
+  const itens = pedidos.filter(p => p.villaEnviadoEm && !p.acertadoEm && p.status !== "cancelado").sort((a, b) => a.villaEnviadoEm!.localeCompare(b.villaEnviadoEm!))
+  return { itens, total: itens.reduce((a, p) => a + p.custo, 0) }
+}
+export function textoAcerto(itens: PedidoDigital[], total: number) {
+  return [
+    `*Acerto da semana com a Villa* · ${itens.length} ${itens.length === 1 ? "pedido" : "pedidos"} · ${brl(total)}`,
+    ...itens.map(p => `· ${p.id} · ${p.quantidade.toLocaleString("pt-BR")} caixas ${p.folha} · ${brl(p.custo)}`),
+    ``,
+    `Para marcar como pago, abra Digital → Acerto.`,
+  ].join("\n")
+}
+// Semana ISO (2026-W45) para mandar o acerto uma vez por semana
+export function semanaDe(d: Date) {
+  const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+  const dia = x.getUTCDay() || 7
+  x.setUTCDate(x.getUTCDate() + 4 - dia)
+  const ini = new Date(Date.UTC(x.getUTCFullYear(), 0, 1))
+  return `${x.getUTCFullYear()}-W${String(Math.ceil(((x.getTime() - ini.getTime()) / 86_400_000 + 1) / 7)).padStart(2, "0")}`
 }

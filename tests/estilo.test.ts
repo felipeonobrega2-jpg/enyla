@@ -30,3 +30,19 @@ describe("estilo medido", () => {
   })
   it("pouca mensagem: não mede", () => expect(medirEstilo(["oi"])).toBeNull())
 })
+
+describe("aprimora em cima do que funcionou", () => {
+  it("emoji que você usa passa; 🙌 nunca", () => {
+    expect(limparEmojis("Fechado 🫡", { primeira: false, leadRindo: false, seus: ["🫡", "👊"] })).toBe("Fechado 🫡")
+    expect(limparEmojis("Show 🙌", { primeira: false, leadRindo: false, seus: ["🙌"] })).toBe("Show")
+  })
+  it("guarda as mensagens do agente que tiveram resposta, sem as com cara de robô", () => {
+    const msgs = [...Array(40)].map((_, i) => i % 3 ? "Show meu irmão" : "Bom dia, me passa as medidas do frasco")
+    const ag = [...Array(24)].map((_, i) => ({ texto: i % 2 ? `Massa, quantas caixinhas você pensa em fazer? ${i}` : "Como posso te ajudar hoje com as embalagens?", respondeu: i % 4 !== 0 }))
+    const e = medirEstilo(msgs, new Date(), undefined, ag)!
+    expect(e.nAgente).toBe(24)
+    expect(e.funcionou!.length).toBeGreaterThan(0)
+    expect(e.funcionou!.some(x => /como posso/i.test(x))).toBe(false)
+    expect(textoEstilo(e)).toContain("RESPONDEU")
+  })
+})

@@ -1,3 +1,4 @@
+import { pendencias } from "../../app/lib/pendenciasDono"
 // Telas principais com dados fictícios, para conferência visual (npm run telas).
 import React from "react"
 import { createRoot } from "react-dom/client"
@@ -82,6 +83,24 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       c("5511977776666@s.whatsapp.net", "Raniere Péricles", "Bom dia, chegou?", 0.02, 0.5),
     ]))
   }
+  if (u.startsWith("/api/pendencias")) {
+    return new Response(JSON.stringify({ pendencias: pendencias({ env: { asaas: false, pluggy: true, lalamoveProducao: false, cronSecret: false }, pluggyItens: 1, metaSaldo: 0.49, metaDiasRestantes: 0, metaTokenExpira: "2026-12-31T00:00:00Z", metaTokenTipo: "usuario", iaRecargaEm: new Date().toISOString(), iaDiasRestantes: 11, designer: false, villa: false, videos: 0, feitos: {} }) }))
+  }
+  if (u.startsWith("/api/midia")) return new Response(JSON.stringify({ midia: [
+    { id: "m1", url: "#", mime: "video/mp4", nome: "v1.mp4", descricao: "Caixa rígida preta sendo montada", tipo: "video", em: "2026-11-07", usos: 4, ativo: true },
+    { id: "m2", url: "#", mime: "image/jpeg", nome: "f1.jpg", descricao: "Caixinhas 50 ml prontas, laminação fosca", tipo: "foto", em: "2026-11-07", usos: 0, ativo: false },
+  ] }))
+  if (u.startsWith("/api/d/") && /DIG-(ARTE|PROD|DZ)/.test(u)) {
+    const arte = u.includes("ARTE"), prod = u.includes("PROD"), dz = u.includes("DZ")
+    const img = "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="#191625"/><rect x="200" y="60" width="200" height="280" fill="#2a2440" stroke="#c9a96e" stroke-width="3"/><text x="300" y="210" fill="#c9a96e" font-family="Georgia" font-size="28" text-anchor="middle">Essência Rara</text></svg>')
+    return new Response(JSON.stringify({ id: "DIG-0003", nome: "Ana Exemplo", ml: 50, produto: "perfume", medidas: { a: 10, l: 5, p: 5 }, padrao: true, folha: "A4",
+      quantidade: 100, total: 619.95, sinal: 309.98, status: prod ? "producao" : "arte", sinalPagoEm: new Date().toISOString(),
+      briefing: { marca: "Essência Rara", cores: "preto e dourado", referencias: "Nome grande na frente, linha fina dourada", laminacao: "fosca", arquivos: [{ nome: "logo-essencia.png", url: "#" }] },
+      opcoes: [{ quantidade: 100, total: 619.95, unit: 6.2 }],
+      arte: { url: img, nome: "arte-v2.svg", em: new Date().toISOString() }, aprovar: arte, arteAprovadaEm: prod ? new Date().toISOString() : null, arteEnviadaEm: dz ? null : new Date().toISOString(),
+      ajustes: dz ? [{ texto: "Trocar o dourado por um tom mais claro e aumentar o nome", em: new Date().toISOString() }] : [],
+      restante: prod ? 334.96 : null, frete: prod ? 25 : null, restantePagoEm: null, entrega: null, designer: dz }))
+  }
   if (u.startsWith("/api/d/")) {
     const pago = u.includes("PAGO")
     return new Response(JSON.stringify({ id: pago ? "DIG-0002" : "DIG-0001", nome: "Ana Exemplo", ml: 50, produto: "perfume", medidas: { a: 10, l: 5, p: 5 }, padrao: true, folha: "A4",
@@ -99,12 +118,16 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
   if (u.startsWith("/api/whatsapp/proximo-passo")) return new Response(JSON.stringify({ passo: { tipo: "lembrar", em: new Date().toISOString(), ate: "2026-11-12T12:00:00Z", nota: "vai mandar a arte" } }))
   if (u.startsWith("/api/digital")) {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
-    const base = { ml: 30, medidas: { a: 10, l: 4, p: 4 }, padrao: true, folha: "A4", custo: 399.95, arte: 70, margem: 150, statusEm: null, link: "https://app.enyla.com.br/d/DIG-0001?t=x", vence: new Date(Date.now() + 10 * 86_400_000).toISOString() }
+    const extra = { linkDesigner: "https://app.enyla.com.br/d/DIG-0001?t=x&dz=y", arteAtual: null, versoes: 0, arteEnviadaEm: null, arteAprovadaEm: null, ajustes: [], designerAvisadoEm: null, villaEnviadoEm: null, frete: null, restante: null, restantePagoEm: null, entrega: null, acertadoEm: null }
+    const base = { ...extra, ml: 30, medidas: { a: 10, l: 4, p: 4 }, padrao: true, folha: "A4", custo: 399.95, arte: 70, margem: 150, statusEm: null, link: "https://app.enyla.com.br/d/DIG-0001?t=x", vence: new Date(Date.now() + 10 * 86_400_000).toISOString() }
     return new Response(JSON.stringify({ pedidos: [
       { ...base, id: "DIG-0011", jid: "1@lid", nome: "Perfumaria Exemplo", em: h(50), quantidade: 100, total: 619.95, sinal: 309.98, status: "aguardando_sinal", sinalPagoEm: null, vistoEm: null, ultimaVista: null, vistas: 0, lembretes: [], briefing: null },
       { ...base, id: "DIG-0010", jid: "2@lid", nome: "Aromas Modelo", em: h(60 * 30), quantidade: 50, total: 469.95, sinal: 234.97, status: "aguardando_sinal", sinalPagoEm: null, vistoEm: h(60 * 29), ultimaVista: h(60 * 5), vistas: 3, lembretes: [{ nivel: 1, em: h(60 * 27) }, { nivel: 2, em: h(60 * 6) }], briefing: { marca: "Aromas Modelo", cores: "", referencias: "", arquivos: 0 } },
-      { ...base, id: "DIG-0009", jid: "3@lid", nome: "Body Splash Fictícia", em: h(60 * 50), quantidade: 100, total: 619.95, sinal: 309.98, status: "sinal_pago", sinalPagoEm: h(60 * 20), vistoEm: h(60 * 49), ultimaVista: h(60 * 20), vistas: 2, lembretes: [{ nivel: 1, em: h(60 * 47) }], briefing: { marca: "Fictícia Body", cores: "branco e dourado", referencias: "Caixa limpa, nome da marca na frente e numeração das fragrâncias", arquivos: 2 } },
-    ] }))
+      { ...base, ...extra, id: "DIG-0009", jid: "3@lid", nome: "Body Splash Fictícia", em: h(60 * 50), quantidade: 100, total: 619.95, sinal: 309.98, status: "arte", sinalPagoEm: h(60 * 20), vistoEm: h(60 * 49), ultimaVista: h(60 * 20), vistas: 2, lembretes: [{ nivel: 1, em: h(60 * 47) }], briefing: { marca: "Fictícia Body", cores: "branco e dourado", referencias: "Caixa limpa, nome da marca na frente e numeração das fragrâncias", laminacao: "fosca", arquivos: 2 },
+        arteAtual: { url: "/brand/enyla-wordmark-dark.png", nome: "arte.png", em: h(90) }, versoes: 2, arteEnviadaEm: h(80), ajustes: [{ texto: "Aumentar o nome da marca", em: h(60 * 5) }], designerAvisadoEm: h(60 * 19) },
+      { ...base, ...extra, id: "DIG-0007", jid: "4@lid", nome: "Óleos Modelo", em: h(60 * 90), quantidade: 50, total: 469.95, sinal: 234.97, custo: 249.95, status: "producao", sinalPagoEm: h(60 * 80), vistoEm: h(60 * 89), ultimaVista: h(60 * 20), vistas: 4, lembretes: [], briefing: { marca: "Óleos Modelo", cores: "verde", referencias: "", laminacao: "brilho", arquivos: 1 },
+        arteAtual: { url: "/brand/enyla-wordmark-dark.png", nome: "arte.png", em: h(60 * 30) }, versoes: 1, arteEnviadaEm: h(60 * 30), arteAprovadaEm: h(60 * 26), villaEnviadoEm: h(60 * 26), restante: 259.96, frete: 25, entrega: { cep: "59000000", endereco: "Rua Exemplo, 100, Centro, Natal/RN" } },
+    ], contatos: { designer: "5584999990000", designerNome: "Designer Exemplo" }, acerto: { ids: ["DIG-0007"], total: 249.95 } }))
   }
   if (u.startsWith("/api/gastos")) {
     const d14 = ultimosDias(14)
@@ -274,6 +297,9 @@ function Telas() {
         onFechar={() => {}} /></div>
     }
     case "pedidodigital": case "pedidodigital-pago": return <DigitalClient id={tela.endsWith("pago") ? "DIG-PAGO" : "DIG-0001"} t="x" />
+    case "pedidodigital-arte": return <DigitalClient id="DIG-ARTE" t="x" />
+    case "pedidodigital-prod": return <DigitalClient id="DIG-PROD" t="x" />
+    case "pedidodigital-designer": return <DigitalClient id="DIG-DZ" t="x" dz="y" />
     case "digital": return <div style={{ height: "100vh", display: "flex", background: "#f5f5f7" }}><OrcamentoDigitalView regra={{ arte: 70, margem: 150 }} onRegra={() => {}} onVerKanban={() => {}} onSalvar={d => ({ ...d, id: "x", numero: "DIG-001", cardId: "c" })} /></div>
     case "conversalateral": case "conversalateral-busca": case "conversalateral-m": return <div style={{ height: "100vh", background: "#f5f5f7" }}>
       <aside className="w-72 h-full bg-white border-r p-4"><p className="text-[12px] font-semibold">Cliente</p><div className="mt-2 h-9 rounded-xl border px-3 flex items-center text-[13px]">Perfumaria Modelo</div></aside>
@@ -281,7 +307,7 @@ function Telas() {
         dados={{ produto: "perfume árabe 100ml", volume_ml: 100, caixa_cm: { frente: 6, lateral: 3, altura: 10.5 }, frasco_cm: null, quantidade: 2000, tem_arte: true, resumo: "Perfume árabe 100ml, 2 mil caixas, verniz localizado no logo; precisa para a semana que vem." }} />
     </div>
     case "gastos": case "gastos-m": return pagina(<GastosView />)
-    case "digitalpainel": case "digitalpainel-m": case "digitalpainel-aberto": return pagina(<DigitalPainelView onAbrirConversa={() => {}} />)
+    case "digitalpainel": case "digitalpainel-m": case "digitalpainel-aberto": case "digitalpainel-prod": case "digitalpainel-acerto": return pagina(<DigitalPainelView onAbrirConversa={() => {}} />)
     case "hoje": case "hoje-m": case "hoje-passo": return pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)
     case "marketing": case "marketing-m": return pagina(<div className="max-w-[1100px]"><MarketingRelatorio /></div>)
     case "reativacao": return pagina(<div className="max-w-[860px]"><ReativacaoCard /></div>)

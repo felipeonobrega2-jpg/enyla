@@ -21,6 +21,7 @@ import {
 import { corrigirCumprimento } from "./atendente"
 import { mudarConfig } from "./configAtomica"
 import { limparEmojis, leadEstaRindo } from "./estilo"
+import { escolherMidia, MidiaAgente } from "./midiaAgente"
 
 const DIAS_CONVERSA_NOVA = 4
 const HORAS_RETOMAR = 24
@@ -143,6 +144,17 @@ export async function enviar(c: Conversa, texto: string, lida?: string): Promise
   return { ids }
 }
 
+// Imagem ou PDF pela URL (arte para aprovar), com legenda; também fica guardada como mensagem do agente
+export async function enviarArquivo(c: Conversa, url: string, mime: string, legenda: string, nome = "arte"): Promise<{ ids: string[]; erro?: string }> {
+  const number = c.telefone || c.jid
+  const mediatype = mime.startsWith("image/") ? "image" : mime.startsWith("video/") ? "video" : "document"
+  const env = await evo<WaMessage>("/message/sendMedia/{i}", { method: "POST", body: JSON.stringify({ number, mediatype, mimetype: mime, media: url, caption: legenda || undefined, fileName: mediatype === "document" ? nome : undefined }) })
+  if (!env.ok || !env.corpo?.key?.id) return { ids: [], erro: `não enviou (${env.status})` }
+  await gravarLote([{ ...env.corpo, key: { ...env.corpo.key, remoteJid: c.jid, fromMe: true } }])
+  await gravarCfg(d => ({ agenteIds: [env.corpo!.key.id, ...(d.agenteIds ?? [])].slice(0, MAX_IDS_AGENTE) })).catch(() => null)
+  return { ids: [env.corpo.key.id] }
+}
+
 // ── Aviso de MQL no seu WhatsApp ───────────────────────────────────────────────
 // O seu número (dono da conexão), para o aviso ir no chat "Você" quando não há outro número configurado
 let cacheDono: string | null = null
@@ -250,9 +262,10 @@ export async function agendarResposta(msgId: string, origem: string) {
   }).catch(() => null)
 }
 
-const emojiCtx = (ms: { from_me: boolean; corpo: string | null }[]) => ({
+const emojiCtx = (ms: { from_me: boolean; corpo: string | null }[], cfg: { estiloFelipe?: { emojis?: string[] } }) => ({
   primeira: !ms.some(m => m.from_me),
   leadRindo: leadEstaRindo(ms.filter(m => !m.from_me).slice(-3).map(m => m.corpo)),
+  seus: cfg.estiloFelipe?.emojis ?? [],
 })
 
 // Reserva atômica da mensagem: se outra execução já pegou esta mensagem, esta desiste
@@ -319,7 +332,7 @@ export async function responderSozinho(msgId: string) {
     }
   }
   // Emoji só do jeito que você usa (👋 na primeira mensagem, risada quando o lead ri)
-  if (!novoPedido) r.resposta = limparEmojis(r.resposta, emojiCtx(conversa.mensagens))
+  if (!novoPedido) r.resposta = limparEmojis(r.resposta, emojiCtx(conversa.mensagens, cfg))
   const ctx = contexto(cfg, log, jid)
   if (novoPedido) ctx.precosDoFiltro.push(...valoresDoPedido(novoPedido))
   if (digitalPequeno) {
@@ -520,7 +533,7 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     const a = await atender(c.jid, { cfg, automatico: true, followUp: nivel }).catch(() => null)
     if (!a?.ok) return
     const { r, conversa } = a
-    r.resposta = limparEmojis(r.resposta, emojiCtx(conversa.mensagens))
+    r.resposta = limparEmojis(r.resposta, emojiCtx(conversa.mensagens, cfg))
     const trava = travaDoEnvio({
       ligado: true, resposta: r.resposta, alerta: r.alerta, podeSozinho: r.pode_enviar_sozinho, lead: r.lead,
       conversaNova: recente, clienteCadastrado: conversa.clienteCadastrado, manualRecente: await voceNaConversa(c.jid, log, cfg), emMql: false,
@@ -530,6 +543,19 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     if (trava) return registrar({ ...dados, enviou: false, motivo: `F${nivel} segurado: ${trava}` })
     const env = await enviar(c, r.resposta)
     if (env.ids.length) await aplicar(c, passo!.etiquetas, null)
-    return registrar({ ...dados, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? `F${nivel}: sem resposta` })
+    // F2 leva junto um vídeo de produção da biblioteca (o menos usado), quando houver
+    let video = ""
+    if (env.ids.length && nivel === 2) {
+      const v = escolherMidia((cfg as { midiaAgente?: MidiaAgente[] }).midiaAgente, "video")
+      if (v) {
+        await new Promise(res => setTimeout(res, 2500 + Math.random() * 2500))
+        const ev = await enviarArquivo(c, v.url, v.mime, "", v.nome).catch(() => null)
+        if (ev?.ids.length) {
+          env.ids.push(...ev.ids); video = ` + vídeo “${v.descricao.slice(0, 40)}”`
+          await gravarCfg(d => ({ midiaAgente: ((d as { midiaAgente?: MidiaAgente[] }).midiaAgente ?? []).map(m => m.id === v.id ? { ...m, usos: (m.usos ?? 0) + 1 } : m) } as Partial<CfgAgente>)).catch(() => null)
+        }
+      }
+    }
+    return registrar({ ...dados, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? `F${nivel}: sem resposta${video}` })
   }))
 }

@@ -2120,6 +2120,7 @@ export default function Home() {
               onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }} />
           ) : view === "config" ? (
             <ConfigView
+              onIr={v => navigate(v as typeof view)}
               config={config}
               clientes={[...new Set([...clientes.map(c => c.nome), ...kanban.map(c => c.nomeCliente)].filter(Boolean))].sort()}
               onSave={cfg => {

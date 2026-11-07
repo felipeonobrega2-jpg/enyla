@@ -6,23 +6,29 @@
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import QRCode from "qrcode"
-import { Check, Copy, Loader2, Upload, FileText, AlertCircle, Sparkles } from "lucide-react"
+import { Check, Copy, Loader2, Upload, FileText, AlertCircle, Sparkles, Palette, Truck, Send } from "lucide-react"
 import { Caixa3D } from "@/app/components/Caixa3D"
 import { gerarPixPayload } from "@/app/lib/pix"
 
 type Opcao = { quantidade: number; total: number; unit: number }
 type Pedido = {
-  id: string; nome: string | null; ml: number | null; produto: string | null; medidas: { a: number; l: number; p: number }; padrao: boolean
+  id: string; nome: string | null; ml: number | null; produto: string | null; medidas: { a: number; l: number; p: number }; padrao: boolean; folha: string
   quantidade: number; total: number; sinal: number; status: string; sinalPagoEm: string | null
-  briefing: { marca: string; cores: string; referencias: string; arquivos: { nome: string; url: string }[] }
+  briefing: { marca: string; cores: string; referencias: string; laminacao: "fosca" | "brilho"; arquivos: { nome: string; url: string }[] }
   opcoes: Opcao[]
+  arte: { url: string; nome: string; em: string } | null; aprovar: boolean; arteAprovadaEm: string | null; arteEnviadaEm: string | null
+  ajustes: { texto: string; em: string }[]
+  restante: number | null; frete: number | null; restantePagoEm: string | null
+  entrega: { cep: string; endereco: string } | null
+  designer: boolean
 }
+const ehPdf = (u: string) => /\.pdf($|\?)/i.test(u)
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 const cm = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
 const ETAPAS = [["sinal_pago", "Sinal pago"], ["arte", "Arte"], ["producao", "Produção"], ["enviado", "Enviado"]] as const
 
-export default function DigitalClient({ id, t }: { id: string; t: string }) {
+export default function DigitalClient({ id, t, dz = "" }: { id: string; t: string; dz?: string }) {
   const [p, setP] = useState<Pedido | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [mudando, setMudando] = useState<number | null>(null)
@@ -30,23 +36,26 @@ export default function DigitalClient({ id, t }: { id: string; t: string }) {
   const [copiado, setCopiado] = useState(false)
   const [conferindo, setConferindo] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
-  const [br, setBr] = useState({ marca: "", cores: "", referencias: "" })
+  const [br, setBr] = useState<{ marca: string; cores: string; referencias: string; laminacao: "fosca" | "brilho" }>({ marca: "", cores: "", referencias: "", laminacao: "fosca" })
+  const [ajuste, setAjuste] = useState<string | null>(null)
+  const [ocupado, setOcupado] = useState<string | null>(null)
+  const [ent, setEnt] = useState({ cep: "", endereco: "" })
   const [salvo, setSalvo] = useState(false)
   const [enviando, setEnviando] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/d/${encodeURIComponent(id)}?t=${encodeURIComponent(t)}`).then(async r => {
+    fetch(`/api/d/${encodeURIComponent(id)}?t=${encodeURIComponent(t)}${dz ? `&dz=${encodeURIComponent(dz)}` : ""}`).then(async r => {
       const d = await r.json().catch(() => null)
       if (!r.ok) return setErro(d?.erro ?? "Não consegui abrir o orçamento.")
-      setP(d); setBr({ marca: d.briefing.marca, cores: d.briefing.cores, referencias: d.briefing.referencias })
+      setP(d); setBr({ marca: d.briefing.marca, cores: d.briefing.cores, referencias: d.briefing.referencias, laminacao: d.briefing.laminacao ?? "fosca" })
     }).catch(() => setErro("Sem conexão. Tente de novo."))
-  }, [id, t])
+  }, [id, t, dz])
 
   const payload = useMemo(() => p ? gerarPixPayload({ chave: "financeiro@enyla.com.br", nome: "Enyla", cidade: "Natal", valor: p.sinal, txid: p.id.replace(/\W/g, ""), descricao: `Sinal ${p.id}` }) : "", [p])
   useEffect(() => { if (payload) QRCode.toDataURL(payload, { width: 220, margin: 1, color: { dark: "#191625", light: "#ffffff" } }).then(setQr).catch(() => setQr(null)) }, [payload])
 
   const post = async (corpo: Record<string, unknown>) => {
-    const r = await fetch(`/api/d/${encodeURIComponent(id)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ t, ...corpo }) })
+    const r = await fetch(`/api/d/${encodeURIComponent(id)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ t, dz: dz || undefined, ...corpo }) })
     const d = await r.json().catch(() => null)
     if (!r.ok) throw new Error(d?.erro ?? "Não deu certo. Tente de novo.")
     return d as Pedido
@@ -77,6 +86,21 @@ export default function DigitalClient({ id, t }: { id: string; t: string }) {
     const d = await r?.json().catch(() => null)
     if (r?.ok) setP({ ...p, briefing: { ...p.briefing, arquivos: d.arquivos } }); else setAviso(d?.erro ?? "Não consegui mandar o arquivo.")
     setEnviando(false)
+  }
+
+  async function acao(nome: string, corpo: Record<string, unknown>, depois?: () => void) {
+    setOcupado(nome); setAviso(null)
+    try { setP(await post(corpo)); depois?.() } catch (e) { setAviso((e as Error).message) }
+    setOcupado(null)
+  }
+  async function subirArte(f: File | undefined) {
+    if (!f || !p) return
+    setOcupado("arte"); setAviso(null)
+    const fd = new FormData(); fd.append("t", t); fd.append("dz", dz); fd.append("file", f)
+    const r = await fetch(`/api/d/${encodeURIComponent(id)}/arte`, { method: "POST", body: fd }).catch(() => null)
+    const d = await r?.json().catch(() => null)
+    if (r?.ok) setP({ ...p, arte: d.arte, arteEnviadaEm: null, aprovar: false }); else setAviso(d?.erro ?? "Não consegui subir a arte.")
+    setOcupado(null)
   }
 
   if (erro) return <Tela><div className="flex items-start gap-3 bg-white rounded-2xl p-5 ds-borda"><AlertCircle className="w-5 h-5 text-[#d33a3c] shrink-0" /><p className="text-[14px] text-[#191625]">{erro}</p></div></Tela>
@@ -160,9 +184,90 @@ export default function DigitalClient({ id, t }: { id: string; t: string }) {
         </div>
       </>)}
 
+
+      {p.designer && (
+        <div className="bg-white rounded-2xl ds-borda p-5">
+          <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Palette className="w-4 h-4 text-[#8456e8]" />Arte (área da designer)</p>
+          <p className="text-[12.5px] text-[#5e5c68] mt-1">Folha {p.folha} · {cm(p.medidas.a)} × {cm(p.medidas.l)} × {cm(p.medidas.p)} cm · laminação {p.briefing.laminacao === "brilho" ? "brilho" : "fosca"}. O briefing do cliente está logo abaixo.</p>
+          {p.ajustes.length > 0 && (
+            <div className="mt-3 rounded-xl bg-[#c57800]/[0.08] px-3.5 py-2.5 space-y-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#c57800]">Ajustes pedidos</p>
+              {p.ajustes.map(a => <p key={a.em} className="text-[12.5px] text-[#191625] whitespace-pre-wrap">{a.texto}</p>)}
+            </div>
+          )}
+          {p.arte && <ArtePreview arte={p.arte} />}
+          {p.arte && <p className="text-[12px] mt-2 text-center text-[#5e5c68]">{p.arteAprovadaEm ? "Aprovada pelo cliente" : p.arteEnviadaEm ? "Enviada, esperando o cliente aprovar" : "Ainda não foi para o cliente"}</p>}
+          {!p.arteAprovadaEm && (<>
+            <label className={`mt-3 flex items-center justify-center gap-2 h-11 rounded-xl border border-dashed border-[rgba(60,60,67,0.25)] text-[13px] font-semibold text-[#5e5c68] cursor-pointer hover:bg-[rgba(116,116,128,0.04)] ${ocupado ? "opacity-60 pointer-events-none" : ""}`}>
+              {ocupado === "arte" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}{p.arte ? "Subir nova versão (JPG, PNG ou PDF)" : "Subir a arte (JPG, PNG ou PDF)"}
+              <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden" onChange={e => subirArte(e.target.files?.[0])} />
+            </label>
+            {p.arte && !p.arteEnviadaEm && (
+              <button onClick={() => acao("mandar", { acao: "mandarArte" })} disabled={!!ocupado}
+                className="mt-2 w-full h-11 rounded-xl bg-[#8456e8] text-white text-[14px] font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
+                {ocupado === "mandar" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}Mandar para o cliente aprovar
+              </button>
+            )}
+          </>)}
+        </div>
+      )}
+
+      {!p.designer && p.arte && (p.aprovar || p.arteAprovadaEm) && (
+        <div className="bg-white rounded-2xl ds-borda p-5">
+          <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Palette className="w-4 h-4 text-[#8456e8]" />{p.arteAprovadaEm ? "Sua arte (aprovada)" : "Sua arte ficou pronta"}</p>
+          <ArtePreview arte={p.arte} />
+          {p.aprovar && (ajuste == null ? (
+            <div className="mt-3 space-y-2">
+              <button onClick={() => acao("aprovar", { acao: "aprovar" })} disabled={!!ocupado}
+                className="w-full h-12 rounded-xl bg-[#009351] text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-60">
+                {ocupado === "aprovar" ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}Aprovar a arte
+              </button>
+              <button onClick={() => setAjuste("")} className="w-full h-11 rounded-xl text-[14px] font-semibold text-[#5e5c68] bg-[rgba(116,116,128,0.08)]">Quero mudar alguma coisa</button>
+              <p className="text-[11.5px] text-[#898892] text-center">Confira nomes, textos e cores: depois de aprovada, vai direto para a impressão.</p>
+            </div>
+          ) : (
+            <div className="mt-3 space-y-2">
+              <textarea value={ajuste} onChange={e => setAjuste(e.target.value)} rows={3} maxLength={1000} placeholder="O que você quer mudar? Ex.: aumentar o nome, trocar o dourado por prata…"
+                className="w-full rounded-xl px-3.5 py-2.5 text-[14px] text-[#191625] bg-[rgba(116,116,128,0.06)] outline-none focus:ring-2 focus:ring-[#8456e8]/20 resize-y" />
+              <button onClick={() => acao("ajuste", { acao: "ajuste", texto: ajuste }, () => { setAjuste(null); setAviso("Recebido. A designer ajusta e te mandamos a nova versão no WhatsApp.") })} disabled={!!ocupado || !ajuste.trim()}
+                className="w-full h-11 rounded-xl bg-[#191625] text-white text-[14px] font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
+                {ocupado === "ajuste" && <Loader2 className="w-4 h-4 animate-spin" />}Mandar o pedido de ajuste
+              </button>
+              <button onClick={() => setAjuste(null)} className="w-full text-[12.5px] text-[#898892]">Voltar</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!p.designer && p.restante != null && (
+        p.restantePagoEm
+          ? <div className="bg-white rounded-2xl ds-borda p-5"><p className="text-[13px] text-[#009351] font-semibold flex items-center gap-1.5"><Check className="w-4 h-4" />Restante de {brl(p.restante)} recebido. Pedido quitado.</p></div>
+          : <PixBloco titulo="Restante pelo Pix" valor={p.restante} txid={`${p.id}F`} descricao={`Restante ${p.id}`}
+              sub={p.frete ? `${brl(p.restante - p.frete)} + frete ${brl(p.frete)}` : "Pague quando quiser: o envio sai depois que o restante cair"}
+              onConferir={() => acao("conferir", { acao: "conferir" })} conferindo={ocupado === "conferir"} />
+      )}
+
+      {!p.designer && p.arteAprovadaEm && !p.restantePagoEm && (
+        <div className="bg-white rounded-2xl ds-borda p-5">
+          <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Truck className="w-4 h-4 text-[#8456e8]" />Entrega</p>
+          {p.entrega ? (
+            <p className="text-[13px] text-[#5e5c68] mt-1">{p.entrega.endereco} · CEP {p.entrega.cep.replace(/(\d{5})(\d{3})/, "$1-$2")}</p>
+          ) : (<>
+            <p className="text-[12.5px] text-[#5e5c68] mt-1">Para onde a gente manda as suas caixinhas?</p>
+            <input value={ent.cep} onChange={e => setEnt({ ...ent, cep: e.target.value })} inputMode="numeric" maxLength={9} placeholder="CEP"
+              className="mt-3 w-full h-11 rounded-xl px-3.5 text-[14px] text-[#191625] bg-[rgba(116,116,128,0.06)] outline-none focus:ring-2 focus:ring-[#8456e8]/20" />
+            <textarea value={ent.endereco} onChange={e => setEnt({ ...ent, endereco: e.target.value })} rows={2} maxLength={300} placeholder="Rua, número, complemento, bairro e cidade"
+              className="mt-2 w-full rounded-xl px-3.5 py-2.5 text-[14px] text-[#191625] bg-[rgba(116,116,128,0.06)] outline-none focus:ring-2 focus:ring-[#8456e8]/20 resize-y" />
+            <button onClick={() => acao("entrega", { acao: "entrega", ...ent })} disabled={!!ocupado}
+              className="mt-2 w-full h-11 rounded-xl bg-[#191625] text-white text-[14px] font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
+              {ocupado === "entrega" && <Loader2 className="w-4 h-4 animate-spin" />}Salvar endereço
+            </button>
+          </>)}
+        </div>
+      )}
       {aviso && <p className="text-[12.5px] text-[#5e5c68] bg-white rounded-xl ds-borda px-4 py-3">{aviso}</p>}
 
-      <div className="bg-white rounded-2xl ds-borda p-5">
+      {!p.arteAprovadaEm && <div className="bg-white rounded-2xl ds-borda p-5">
         <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Sparkles className="w-4 h-4 text-[#8456e8]" />Como você quer a sua arte</p>
         <p className="text-[12.5px] text-[#5e5c68] mt-1">A designer começa assim que o sinal cair. Quanto mais você contar, mais rápido fica do seu jeito.</p>
         <label className="block mt-4 text-[12px] font-semibold text-[#191625]">Nome da marca</label>
@@ -174,6 +279,15 @@ export default function DigitalClient({ id, t }: { id: string; t: string }) {
         <label className="block mt-3 text-[12px] font-semibold text-[#191625]">O que vai na caixa e referências</label>
         <textarea value={br.referencias} onChange={e => setBr({ ...br, referencias: e.target.value })} maxLength={1000} rows={3} placeholder="Nome do perfume, frases, estilo que você gosta, link do seu Instagram…"
           className="mt-1 w-full rounded-xl px-3.5 py-2.5 text-[14px] text-[#191625] bg-[rgba(116,116,128,0.06)] outline-none focus:ring-2 focus:ring-[#8456e8]/20 resize-y" />
+        <label className="block mt-3 text-[12px] font-semibold text-[#191625]">Acabamento</label>
+        <div className="mt-1 grid grid-cols-2 gap-2">
+          {(["fosca", "brilho"] as const).map(l => (
+            <button key={l} onClick={() => setBr({ ...br, laminacao: l })}
+              className={`h-10 rounded-xl text-[13px] font-semibold ${br.laminacao === l ? "bg-[#8456e8] text-white" : "bg-[rgba(116,116,128,0.06)] text-[#5e5c68]"}`}>
+              {l === "fosca" ? "Laminação fosca" : "Laminação brilho"}
+            </button>
+          ))}
+        </div>
         <div className="mt-3 space-y-1.5">
           {p.briefing.arquivos.map(a => (
             <a key={a.url} href={a.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[12.5px] text-[#191625] bg-[rgba(116,116,128,0.06)] rounded-lg px-3 py-2">
@@ -188,7 +302,7 @@ export default function DigitalClient({ id, t }: { id: string; t: string }) {
         <button onClick={salvarBriefing} className="mt-4 w-full h-11 rounded-xl bg-[#191625] text-white text-[14px] font-semibold flex items-center justify-center gap-2">
           {salvo ? <><Check className="w-4 h-4" />Salvo</> : "Salvar"}
         </button>
-      </div>
+      </div>}
     </Tela>
   )
 }
@@ -201,6 +315,44 @@ function Tela({ children }: { children: React.ReactNode }) {
         {children}
         <p className="text-center text-[11px] text-[#898892] pt-2">Enyla Embalagens · dúvidas, é só responder no WhatsApp</p>
       </div>
+    </div>
+  )
+}
+
+function ArtePreview({ arte }: { arte: { url: string; nome: string } }) {
+  return ehPdf(arte.url) ? (
+    <a href={arte.url} target="_blank" rel="noreferrer" className="mt-3 flex items-center gap-2 text-[13px] font-semibold text-[#191625] bg-[rgba(116,116,128,0.06)] rounded-xl px-3.5 py-3">
+      <FileText className="w-5 h-5 text-[#8456e8] shrink-0" /><span className="truncate">Abrir a arte ({arte.nome})</span>
+    </a>
+  ) : (
+    <a href={arte.url} target="_blank" rel="noreferrer" className="block mt-3">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={arte.url} alt="Arte da caixa" className="w-full rounded-xl ds-borda bg-[#f5f5f7]" />
+    </a>
+  )
+}
+
+function PixBloco({ titulo, valor, txid, descricao, sub, onConferir, conferindo }: { titulo: string; valor: number; txid: string; descricao: string; sub: string; onConferir: () => void; conferindo: boolean }) {
+  const payload = useMemo(() => gerarPixPayload({ chave: "financeiro@enyla.com.br", nome: "Enyla", cidade: "Natal", valor, txid: txid.replace(/\W/g, ""), descricao }), [valor, txid, descricao])
+  const [qr, setQr] = useState<string | null>(null)
+  const [copiado, setCopiado] = useState(false)
+  useEffect(() => { QRCode.toDataURL(payload, { width: 220, margin: 1, color: { dark: "#191625", light: "#ffffff" } }).then(setQr).catch(() => setQr(null)) }, [payload])
+  return (
+    <div className="bg-white rounded-2xl ds-borda p-5 flex flex-col items-center text-center">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">{titulo}</p>
+      <p className="text-[28px] font-bold text-[#191625] ds-num mt-1">{brl(valor)}</p>
+      <p className="text-[12px] text-[#898892]">{sub}</p>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {qr && <img src={qr} alt="QR Code do Pix" width={200} height={200} className="mt-4 rounded-xl" />}
+      <button onClick={() => navigator.clipboard.writeText(payload).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000) })}
+        className="mt-4 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-colors">
+        {copiado ? <><Check className="w-5 h-5" />Código copiado</> : <><Copy className="w-5 h-5" />Copiar Pix copia e cola</>}
+      </button>
+      <p className="text-[11.5px] text-[#898892] mt-2">Pague exatamente {brl(valor)}: é por esse valor que o sistema reconhece o seu pedido.</p>
+      <button onClick={onConferir} disabled={conferindo}
+        className="mt-3 w-full h-11 rounded-xl text-[14px] font-semibold text-[#8456e8] bg-[#8456e8]/[0.08] hover:bg-[#8456e8]/[0.14] disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
+        {conferindo ? <><Loader2 className="w-4 h-4 animate-spin" />Conferindo…</> : "Já paguei"}
+      </button>
     </div>
   )
 }

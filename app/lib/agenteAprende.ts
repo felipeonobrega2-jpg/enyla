@@ -127,24 +127,42 @@ const REVISAO_1 = ["pt3qpfus", "b89mm3cl", "wm0s5umr", "crvnwipp", "dkqf28eq", "
 // anúncio nos últimos 30 dias. Refeito uma vez por dia.
 async function medirEstiloFelipe() {
   const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
-  const atual = (cfgRow?.data as { estiloFelipe?: EstiloFelipe } | undefined)?.estiloFelipe
+  const cfgD = cfgRow?.data as { estiloFelipe?: EstiloFelipe; agenteIds?: string[] } | undefined
+  const atual = cfgD?.estiloFelipe
   if (atual && Date.now() - new Date(atual.em).getTime() < 20 * 3_600_000) return
+  const doAgente = new Set(cfgD?.agenteIds ?? [])
   const { data: convs } = await supabase.from("whatsapp_conversas").select("jid").ilike("campanha", "%anuncio%").gte("ultima_at", new Date(Date.now() - 30 * 86_400_000).toISOString()).limit(1000)
   const jids = (convs ?? []).map(c => c.jid)
-  const textos: string[] = [], inicio: string[] = []
-  for (let i = 0; i < jids.length; i += 100) {
-    const { data } = await supabase.from("whatsapp_mensagens").select("id, jid, corpo, ts").in("jid", jids.slice(i, i + 100)).eq("from_me", true).eq("tipo", "text")
-      .gte("ts", new Date(Date.now() - 30 * 86_400_000).toISOString()).order("ts").limit(2000)
+  const textos: string[] = [], inicio: string[] = [], respostas: { texto: string; respondeu: boolean }[] = []
+  for (let i = 0; i < jids.length; i += 50) {
+    const { data } = await supabase.from("whatsapp_mensagens").select("id, jid, corpo, ts, from_me, tipo").in("jid", jids.slice(i, i + 50))
+      .gte("ts", new Date(Date.now() - 30 * 86_400_000).toISOString()).order("ts").limit(5000)
+    const ms = data ?? []
     const primeiro = new Map<string, number>()
-    for (const m of data ?? []) {
+    for (const [k, m] of ms.entries()) {
+      if (!m.from_me) continue
       if (!primeiro.has(m.jid)) primeiro.set(m.jid, new Date(m.ts).getTime())
-      if (!m.corpo || /^3EB0/i.test(m.id)) continue
+      if (!m.corpo || m.tipo !== "text") continue
+      if (doAgente.has(m.id)) {
+        // Mensagem do agente: o lead respondeu (de verdade, não "ok") em até 6 h, antes de outra nossa?
+        const t = new Date(m.ts).getTime()
+        let respondeu = false
+        for (const n of ms.slice(k + 1)) {
+          if (n.jid !== m.jid) continue
+          if (new Date(n.ts).getTime() - t > 6 * 3_600_000) break
+          if (n.from_me) { if (doAgente.has(n.id)) continue; break }
+          if (n.tipo !== "text" || (n.corpo ?? "").trim().length > 3) { respondeu = true; break }
+        }
+        respostas.push({ texto: m.corpo, respondeu })
+        continue
+      }
+      if (/^3EB0/i.test(m.id)) continue
       textos.push(m.corpo)
       // Exemplos: só o começo da conversa (as primeiras 48 h), que é a qualificação que o agente faz
       if (new Date(m.ts).getTime() - primeiro.get(m.jid)! < 48 * 3_600_000) inicio.push(m.corpo)
     }
   }
-  const e = medirEstilo(textos, new Date(), inicio)
+  const e = medirEstilo(textos, new Date(), inicio, respostas)
   if (e) await gravarCampos({ estiloFelipe: e })
 }
 
