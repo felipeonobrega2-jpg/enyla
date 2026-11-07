@@ -182,3 +182,22 @@ export async function talvezAcertoSemanal() {
   const { itens, total } = acertoDaSemana(cfg.pedidosDigitais ?? [])
   if (itens.length) await avisarVoce(cfg, textoAcerto(itens, total))
 }
+
+// Pago pelo Asaas (webhook, já conferido na API): marca o sinal ou o restante e avisa igual ao extrato
+export async function pagoPeloAsaas(id: string, parte: "sinal" | "restante", tx: { txId: string; valor: number; data: string }) {
+  const { cfg } = await lerPedido(id)
+  const agora = new Date().toISOString()
+  const p = await gravarPedido(id, x => parte === "sinal"
+    ? (x.status !== "aguardando_sinal" ? null : { ...x, status: "sinal_pago", sinalPagoEm: agora, pagamento: { ...tx, nome: null } })
+    : (x.restantePagoEm || x.status === "cancelado" ? null : { ...x, restantePagoEm: agora, pagamentoFinal: { ...tx, nome: null } }))
+  if (!p) return
+  const c = await conversa(p.jid)
+  if (parte === "sinal") {
+    if (c) await enviar(c, textoSinalPago(p, linkPedido(p.id), !!(p.briefing?.marca || p.briefing?.arquivos?.length))).catch(() => null)
+    const designer = await avisarDesigner(cfg, p)
+    await avisarVoce(cfg, `💰 *Digital ${p.id}* · sinal pago pelo Asaas ${brl(tx.valor)}\n${p.nome ?? ""} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas${designer ? "" : "\n\nSem designer cadastrada: link do briefing:\n" + linkDesigner(p.id)}`)
+  } else {
+    if (c) await enviar(c, textoRestantePago(p)).catch(() => null)
+    await avisarVoce(cfg, `💰 *Digital ${p.id}* · restante pago pelo Asaas ${brl(tx.valor)}\n${p.nome ?? ""}${p.entrega ? `\nEntrega: ${p.entrega.endereco} · CEP ${p.entrega.cep}` : "\nSem endereço de entrega ainda"}`)
+  }
+}
