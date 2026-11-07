@@ -8,6 +8,7 @@ import { clienteClaude, MODELO } from "./claude"
 import { Conhecimento, TEMAS } from "./agenteLeads"
 import { gravarCampos, mudarConfig } from "./configAtomica"
 import { transcreverPendentes } from "./transcricao"
+import { medirEstilo, type EstiloFelipe } from "./estilo"
 export { conhecimentoNoPrompt, type Conhecimento } from "./agenteLeads"
 
 const MAX_ITENS = 200
@@ -122,6 +123,31 @@ let ultimaTentativa = 0
 const REVISAO_1 = ["pt3qpfus", "b89mm3cl", "wm0s5umr", "crvnwipp", "dkqf28eq", "v4lopoba", "6lqg4cul", "6iandlry", "nt3zdloy", "28n38avg",
   "ve1t4k5m", "xxcoojvv", "lk725met", "42kr59ov", "ydte8n0x", "lkw7lkrz", "m6ehqgzn", "767k14u5", "opqazlhm", "jaay3mqt", "ai6acwcl", "f4j2vywl",
   "ilh05ulp", "l3xfgf3p", "vqt53a28", "3ibhnqr2", "10ad5eaz", "31hz132l", "6hofxgps", "q09kpvq3"]
+// Como você escreve de verdade: mensagens digitadas no celular (não as do agente nem as da tela) para leads do
+// anúncio nos últimos 30 dias. Refeito uma vez por dia.
+async function medirEstiloFelipe() {
+  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const atual = (cfgRow?.data as { estiloFelipe?: EstiloFelipe } | undefined)?.estiloFelipe
+  if (atual && Date.now() - new Date(atual.em).getTime() < 20 * 3_600_000) return
+  const { data: convs } = await supabase.from("whatsapp_conversas").select("jid").ilike("campanha", "%anuncio%").gte("ultima_at", new Date(Date.now() - 30 * 86_400_000).toISOString()).limit(1000)
+  const jids = (convs ?? []).map(c => c.jid)
+  const textos: string[] = [], inicio: string[] = []
+  for (let i = 0; i < jids.length; i += 100) {
+    const { data } = await supabase.from("whatsapp_mensagens").select("id, jid, corpo, ts").in("jid", jids.slice(i, i + 100)).eq("from_me", true).eq("tipo", "text")
+      .gte("ts", new Date(Date.now() - 30 * 86_400_000).toISOString()).order("ts").limit(2000)
+    const primeiro = new Map<string, number>()
+    for (const m of data ?? []) {
+      if (!primeiro.has(m.jid)) primeiro.set(m.jid, new Date(m.ts).getTime())
+      if (!m.corpo || /^3EB0/i.test(m.id)) continue
+      textos.push(m.corpo)
+      // Exemplos: só o começo da conversa (as primeiras 48 h), que é a qualificação que o agente faz
+      if (new Date(m.ts).getTime() - primeiro.get(m.jid)! < 48 * 3_600_000) inicio.push(m.corpo)
+    }
+  }
+  const e = medirEstilo(textos, new Date(), inicio)
+  if (e) await gravarCampos({ estiloFelipe: e })
+}
+
 async function revisarConhecimento() {
   await mudarConfig((d: Record<string, unknown> & { conhecimentoAgente?: Conhecimento[]; agenteRevisaoConhecimento?: number }) =>
     (d.agenteRevisaoConhecimento ?? 0) >= 1 ? null
@@ -132,6 +158,7 @@ export async function talvezAprender() {
   if (Date.now() - ultimaTentativa < 30 * 60_000) return
   ultimaTentativa = Date.now()
   await revisarConhecimento().catch(() => null)
+  await medirEstiloFelipe().catch(() => null)
   const h = Number(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false }))
   if (h < 21 && h >= 6) return
   const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()

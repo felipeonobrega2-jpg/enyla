@@ -20,6 +20,7 @@ import {
 } from "./agenteLeads"
 import { corrigirCumprimento } from "./atendente"
 import { mudarConfig } from "./configAtomica"
+import { limparEmojis, leadEstaRindo } from "./estilo"
 
 const DIAS_CONVERSA_NOVA = 4
 const HORAS_RETOMAR = 24
@@ -249,6 +250,11 @@ export async function agendarResposta(msgId: string, origem: string) {
   }).catch(() => null)
 }
 
+const emojiCtx = (ms: { from_me: boolean; corpo: string | null }[]) => ({
+  primeira: !ms.some(m => m.from_me),
+  leadRindo: leadEstaRindo(ms.filter(m => !m.from_me).slice(-3).map(m => m.corpo)),
+})
+
 // Reserva atômica da mensagem: se outra execução já pegou esta mensagem, esta desiste
 async function reservarMensagem(msgId: string): Promise<boolean> {
   let minha = false
@@ -312,6 +318,8 @@ export async function responderSozinho(msgId: string) {
       r.alerta = "nenhum"; r.pode_enviar_sozinho = true
     }
   }
+  // Emoji só do jeito que você usa (👋 na primeira mensagem, risada quando o lead ri)
+  if (!novoPedido) r.resposta = limparEmojis(r.resposta, emojiCtx(conversa.mensagens))
   const ctx = contexto(cfg, log, jid)
   if (novoPedido) ctx.precosDoFiltro.push(...valoresDoPedido(novoPedido))
   if (digitalPequeno) {
@@ -512,6 +520,7 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     const a = await atender(c.jid, { cfg, automatico: true, followUp: nivel }).catch(() => null)
     if (!a?.ok) return
     const { r, conversa } = a
+    r.resposta = limparEmojis(r.resposta, emojiCtx(conversa.mensagens))
     const trava = travaDoEnvio({
       ligado: true, resposta: r.resposta, alerta: r.alerta, podeSozinho: r.pode_enviar_sozinho, lead: r.lead,
       conversaNova: recente, clienteCadastrado: conversa.clienteCadastrado, manualRecente: await voceNaConversa(c.jid, log, cfg), emMql: false,

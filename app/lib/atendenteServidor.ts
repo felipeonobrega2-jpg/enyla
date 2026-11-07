@@ -13,6 +13,7 @@ import { LeadAvaliado, filtroDoAgente, soAbertura, saudacaoDoFiltro } from "./ag
 import { transcreverPendentes } from "./transcricao"
 import { Conhecimento, conhecimentoNoPrompt } from "./agenteAprende"
 import { instrucaoDoMotivo } from "./reativacao"
+import { textoEstilo, type EstiloFelipe } from "./estilo"
 
 const ESQUEMA = {
   type: "object",
@@ -69,7 +70,7 @@ export type ConversaLida = {
   mensagens: { id: string; from_me: boolean; corpo: string | null; tipo: string; ts: string }[]
 }
 
-type Cfg = { apiKey?: string; guiaAtendimento?: string; filtroLeads?: string; agenteAuto?: { pequenoParceiro?: boolean }; vinculosWhatsapp?: Vinculos; conhecimentoAgente?: Conhecimento[] }
+type Cfg = { apiKey?: string; guiaAtendimento?: string; filtroLeads?: string; agenteAuto?: { pequenoParceiro?: boolean }; vinculosWhatsapp?: Vinculos; conhecimentoAgente?: Conhecimento[]; estiloFelipe?: EstiloFelipe }
 
 export async function lerConfigAtendente(): Promise<Cfg> {
   const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
@@ -164,7 +165,11 @@ Siga o guia de atendimento: é a voz e o método dele.
 <guia>
 ${cfg.guiaAtendimento?.trim() || "Mensagens curtas, cordiais, em primeira pessoa. Espelhe o tom do cliente."}
 </guia>
-
+${cfg.estiloFelipe ? `
+<estilo_real>
+${textoEstilo(cfg.estiloFelipe)}
+</estilo_real>
+` : ""}
 Seu trabalho principal com quem chega do anúncio é descobrir os bons negócios e poupar o tempo dele, com o mínimo de mensagens: descobrir rápido o volume e separar quem é bom negócio de quem não é. Bom negócio é caixa em volume ou os outros produtos do ramo em que ele também ganha (frasco, essência, válvula, envase, produto pronto). Cerca de 90% dos leads querem poucas caixas e não são o nosso cliente. Siga o filtro:
 
 <filtro_leads>
