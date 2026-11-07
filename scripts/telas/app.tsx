@@ -314,6 +314,9 @@ function Telas() {
     case "gastos": case "gastos-m": return pagina(<GastosView />)
     case "digitalpainel": case "digitalpainel-m": case "digitalpainel-aberto": case "digitalpainel-prod": case "digitalpainel-acerto": return pagina(<DigitalPainelView onAbrirConversa={() => {}} />)
     case "hoje": case "hoje-m": case "hoje-passo": return pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)
+    case "hoje-conversa": case "hoje-conversa-m": return <>{pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)}
+      <ConversaLateral jid="1@lid" nome="Perfumaria Modelo" responder onFechar={() => {}} onAbrir={() => {}} onOrcamento={() => {}}
+        dados={{ produto: "caixinha", volume_ml: 50, caixa_cm: null, frasco_cm: null, quantidade: 3000, tem_arte: true, resumo: "3 mil caixinhas de 50 ml com hot stamping" }} /></>
     case "marketing": case "marketing-m": return pagina(<div className="max-w-[1100px]"><MarketingRelatorio /></div>)
     case "reativacao": return pagina(<div className="max-w-[860px]"><ReativacaoCard /></div>)
     case "contatos": return pagina(<div className="max-w-[860px]"><ContatosProtegidosCard /></div>)

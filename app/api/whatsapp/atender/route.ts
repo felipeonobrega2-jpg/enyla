@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { erroClaude } from "@/app/lib/claude"
-import { atender } from "@/app/lib/atendenteServidor"
+import { atender, lerConfigAtendente } from "@/app/lib/atendenteServidor"
+import { limparEmojis, leadEstaRindo } from "@/app/lib/estilo"
 
 export const maxDuration = 60
 
@@ -13,7 +14,11 @@ export async function POST(req: NextRequest) {
   try {
     const a = await atender(jid, { outra })   // "Outra": gera de novo; senão reaproveita a da mesma mensagem
     if (!a.ok) return NextResponse.json({ erro: a.erro }, { status: a.status })
-    return NextResponse.json(a.r)
+    // Sugestão também passa pela trava de emoji (o seu jeito: 👋 só na primeira, risada só se o lead ri)
+    const ms = a.conversa.mensagens
+    const estilo = (await lerConfigAtendente().catch(() => null) as { estiloFelipe?: { emojis?: string[] } } | null)?.estiloFelipe
+    const resposta = a.r.resposta ? limparEmojis(a.r.resposta, { primeira: !ms.some(m => m.from_me), leadRindo: leadEstaRindo(ms.filter(m => !m.from_me).slice(-3).map(m => m.corpo)), seus: estilo?.emojis ?? [] }) : a.r.resposta
+    return NextResponse.json({ ...a.r, resposta })
   } catch (e) {
     const { error, status } = erroClaude(e)
     return NextResponse.json({ erro: error }, { status })

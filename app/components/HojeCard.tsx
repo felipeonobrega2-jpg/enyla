@@ -33,7 +33,7 @@ function doPedido(d: DadosPedido | null) {
 }
 
 export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
-  onAbrirConversa: (jid: string) => void
+  onAbrirConversa: (jid: string, nome?: string, dados?: DadosPedido) => void
   onOrcar?: (nome: string, jid: string, dados?: DadosPedido) => void
   onNavegar: (view: "whatsapp" | "meta" | "config" | "gastos" | "digital") => void
 }) {
@@ -66,7 +66,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
         ? `${x.nota ? `Lembrete: ${x.nota} · ` : `Sem resposta ${haQuanto(x.desde)} · `}${doPedido(x.dados)}${x.mensagem ?? ""}`
         : `${doPedido(x.dados)}${x.mensagem ?? ""}` || undefined}
       valor={<span className="hidden sm:inline"><Selo tom={TOM[x.rotulo] ?? "acento"}>{x.rotulo}</Selo></span>} valorSub={x.lista === "responder" ? haQuanto(x.desde) : undefined}
-      onClick={() => onAbrirConversa(x.jid)}
+      onClick={() => onAbrirConversa(x.jid, x.nome || x.jid.split("@")[0], x.dados ?? undefined)}
       acao={<div className="flex items-center shrink-0 mr-1">
         {onOrcar && <button onClick={() => onOrcar(x.cliente || x.nome || x.jid.split("@")[0], x.jid, x.dados ?? undefined)} title="Novo orçamento com o que o cliente já contou"
           className="h-8 px-2 rounded-lg text-[11.5px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors whitespace-nowrap">Orçar</button>}

@@ -74,7 +74,7 @@ export function PainelView({
   onLancarCobranca?: (prefill: Partial<LancamentoFinanceiro>) => void
   onSalvarMeta?: (metaMensal: number) => void
   onAprovacaoOnline?: (a: AprovacaoOnline) => void
-  onAbrirConversa?: (jid: string) => void
+  onAbrirConversa?: (jid: string, nome?: string, dados?: import("../lib/atendente").DadosPedido) => void
   onOrcarConversa?: (nome: string, jid: string, dados?: import("../lib/atendente").DadosPedido) => void
 }) {
   const [periodoId, setPeriodoId] = React.useState<PeriodoId>("mes")

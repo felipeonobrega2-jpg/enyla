@@ -1587,12 +1587,15 @@ function BarraGravacao({ grav, onEnviar }: { grav: ReturnType<typeof useGravador
 // Painel fixo à direita, sem cobrir o formulário: o que a IA tirou da conversa no topo, as mensagens (áudios com
 // a transcrição) e uma busca ("verniz", "medida") para achar o detalhe que faltou sem sair do orçamento.
 const diaDe = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "America/Sao_Paulo" })
-export function ConversaLateral({ jid, nome, dados, onFechar, onAbrir }: {
+export function ConversaLateral({ jid, nome, dados, onFechar, onAbrir, responder, onOrcamento, onEnviou }: {
   jid: string
   nome: string
   dados?: DadosPedido | null
   onFechar: () => void
   onAbrir: () => void
+  responder?: boolean                       // caixa de resposta embaixo (com a sugestão da IA): responde sem sair da tela
+  onOrcamento?: (d: DadosPedido) => void
+  onEnviou?: () => void
 }) {
   const [msgs, setMsgs] = useState<Mensagem[] | null>(null)
   const [busca, setBusca] = useState("")
@@ -1680,6 +1683,14 @@ export function ConversaLateral({ jid, nome, dados, onFechar, onAbrir }: {
         })}
         <div ref={fimRef} />
       </div>
+      {responder && msgs && (
+        <div className="shrink-0 pb-2" style={{ background: "var(--bg-surface)" }}>
+          <RespostaComSugestao compacto autoFoco jid={jid} contato={nome}
+            ultima={msgs[msgs.length - 1]} auto onOrcamento={onOrcamento} onEnviou={onEnviou}
+            onOtimista={m => { setBusca(""); setMsgs(prev => [...(prev ?? []), m]) }}
+            onResultado={(tmp, real) => setMsgs(prev => (prev ?? []).map(x => x.id !== tmp ? x : real ? { ...x, id: real, status: "enviada" } : { ...x, status: "erro" }))} />
+        </div>
+      )}
     </div>
   )
 }

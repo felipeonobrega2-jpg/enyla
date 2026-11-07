@@ -222,6 +222,8 @@ export default function Home() {
   // Conversa do cliente do orçamento (botão "Ver conversa"): vem do Orçar ou é achada pelo nome
   const [conversaOrc, setConversaOrc] = useState<{ jid: string; nome: string; dados: DadosPedido | null; cliente: string } | null>(null)
   const [verConversa, setVerConversa] = useState(false)
+  // Janelinha do Hoje: a conversa abre ao lado do painel, com a resposta embaixo
+  const [conversaHoje, setConversaHoje] = useState<{ jid: string; nome: string; dados: DadosPedido | null } | null>(null)
   const nomeOrc = form.nomeCliente.trim()
   useEffect(() => {
     if (view !== "orcamento" || nomeOrc.length < 3 || conversaOrc?.cliente === nomeOrc) return
@@ -1674,6 +1676,12 @@ export default function Home() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ──── SIDEBAR ──────────────────────────────────────────────────────── */}
+        {view === "painel" && conversaHoje && (
+          <ConversaLateral key={conversaHoje.jid} jid={conversaHoje.jid} nome={conversaHoje.nome} dados={conversaHoje.dados} responder
+            onFechar={() => setConversaHoje(null)}
+            onOrcamento={d => { const c = conversaHoje; setConversaHoje(null); orcamentoDaConversa(c.nome, c.jid, d) }}
+            onAbrir={() => { const c = conversaHoje; setConversaHoje(null); setWhatsAbrir({ jid: c.jid, vez: Date.now() }); navigate("whatsapp") }} />
+        )}
         {view === "orcamento" && verConversa && conversaDoOrc && (
           <ConversaLateral key={conversaDoOrc.jid} jid={conversaDoOrc.jid} nome={conversaDoOrc.nome} dados={conversaDoOrc.dados}
             onFechar={() => setVerConversa(false)}
@@ -2111,7 +2119,7 @@ export default function Home() {
               onLancarCobranca={prefill => setModalLancPedidos(prefill)}
               onSalvarMeta={metaMensal => salvarConfigTudo({ ...configAtual.current, metaMensal })}
               onAprovacaoOnline={concluirAprovacaoOnline}
-              onAbrirConversa={jid => { setWhatsAbrir({ jid, vez: Date.now() }); navigate("whatsapp") }}
+              onAbrirConversa={(jid, nome, dados) => setConversaHoje({ jid, nome: nome || jid.split("@")[0], dados: dados ?? null })}
               onOrcarConversa={orcamentoDaConversa}
             />
           ) : view === "dashboard" ? (
