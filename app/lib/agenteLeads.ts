@@ -85,6 +85,10 @@ export function valoresEmReais(t: string): string[] {
 }
 
 // Pode sair sem você? Devolve o motivo quando não pode.
+// "fundo automático" é tipo de caixa e "ia" é verbo: só o que entrega atendimento automático
+const SISTEMA_TEXTO = /\bsistemas?\b|\brob[oô]s?(?![a-z])|\bchatbot|\bbot\b|assistente virtual|intelig[eê]ncia artificial|(atendimento|resposta|mensagem|envio|orçamento)s? autom[aá]tic/i
+export const FALA_DE_SISTEMA = { test: (s: string) => SISTEMA_TEXTO.test(s) || /\bIA\b/.test(s) }
+
 export function travaDoEnvio(c: ContextoEnvio): string | null {
   if (!c.ligado) return "modo automático desligado"
   if (!c.resposta.trim()) return "nada a responder"
@@ -99,6 +103,8 @@ export function travaDoEnvio(c: ContextoEnvio): string | null {
   if (c.enviadasHoje >= c.maxPorDia) return `já respondeu ${c.enviadasHoje}× hoje`
   if (c.jaEncerrouPequeno && c.lead.perfil === "pequeno") return "lead pequeno já foi orientado"
   if (c.resposta.length > 900) return "resposta longa demais"
+  // Você é o Felipe: nunca fala de sistema, automático, robô ou IA para o cliente
+  if (FALA_DE_SISTEMA.test(c.resposta)) return "precisa de você: a resposta falava de sistema/automático"
   const permitidos = new Set(c.precosDoFiltro)
   const fora = valoresEmReais(c.resposta).filter(v => !permitidos.has(v))
   if (fora.length) return `citou valor que não está no filtro (R$ ${fora.join(", ")})`
@@ -225,7 +231,7 @@ export const SECAO_DIGITAL = `LEAD PEQUENO (menos de 1.000): VENDEMOS EM IMPRESS
 - Poucas unidades a gente também faz, em impressão digital: triplex 300g com laminação fosca ou brilhante, arte inclusa (nossa designer cria). Não indique outra gráfica e não passe contato de parceiro.
 - Pedido mínimo: em offset fica em torno de 1.000; abaixo disso, de 20 a 500 caixas, a gente faz em impressão digital.
 - O que precisa para o orçamento: a quantidade e o ml do frasco (ou as medidas da caixa: altura x largura x profundidade). Pergunte o que faltar, uma coisa por vez.
-- Não escreva preço da impressão digital: com a quantidade e o ml (ou as medidas), o sistema manda o orçamento com o link do sinal de 50% pelo Pix. Depois que ele foi, você pode repetir os valores que estão nele.
+- Não escreva preço da impressão digital. Assim que tiver a quantidade e o ml (ou as medidas), o orçamento com o link do sinal de 50% pelo Pix sai na sua próxima mensagem — não anuncie isso, só pergunte o que falta. Depois que ele foi, você pode repetir os valores que estão nele.
 - Frete: não fale dele por conta própria. Só se ele perguntar: é calculado no final do pedido, pelo CEP. Prazo: começa depois do sinal; a designer manda a arte para ele aprovar antes de imprimir.
 - Hot stamping em digital não dá: sugira simular o hot stamping na arte.
 - Modelos ou fragrâncias diferentes: dá para fazer artes diferentes no mesmo pedido (a designer ajusta o nome de cada uma). Pergunte quantas de cada, mas o orçamento é pela quantidade total.
@@ -321,7 +327,7 @@ export function paradoParaRetomar(o: {
 }): boolean {
   if (o.ultima.from_me || o.feitas.has(o.ultima.id)) return false
   const idade = o.agora - new Date(o.ultima.ts).getTime()
-  if (idade < 2 * 60_000 || idade > o.horas * 3_600_000) return false
+  if (idade < 5 * 60_000 || idade > o.horas * 3_600_000) return false
   if (!o.primeiraEm || o.agora - new Date(o.primeiraEm).getTime() > o.diasConversaNova * 86_400_000) return false
   const reg = o.ultimoRegistro
   if (reg && new Date(reg.em).getTime() > new Date(o.ultima.ts).getTime() && !/^IA falhou/.test(reg.motivo ?? "")) return false

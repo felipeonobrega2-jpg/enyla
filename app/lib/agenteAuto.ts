@@ -22,7 +22,7 @@ import { corrigirCumprimento } from "./atendente"
 import { mudarConfig } from "./configAtomica"
 
 const DIAS_CONVERSA_NOVA = 4
-const HORAS_RETOMAR = 72
+const HORAS_RETOMAR = 24
 const DIAS_FOLLOW_UP = 14            // follow-up vale para lead que chegou nos últimos 14 dias
 const MINUTOS_VOCE_NA_CONVERSA = 10
 const MAX_REGISTROS = 300
@@ -33,7 +33,7 @@ const TRAVAS_COM_AVISO = ["precisa de você", "a IA pediu", "citou valor", "resp
 const MIN_ENTRE_RODADAS = 10         // follow-ups: no máximo uma rodada a cada 10 min
 
 export type Registro = RegistroAgente & { ids?: string[] }
-export type CfgAgente = { pedidosDigitais?: PedidoDigital[]; digital?: RegraDigital; agenteAuto?: AgenteAuto; agenteLog?: Registro[]; agenteMarcos?: Marcos; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string; agenteSemCreditoEm?: string; agenteRetomadaEm?: string; agenteRetomadas?: string[]; agenteIds?: string[] }
+export type CfgAgente = { pedidosDigitais?: PedidoDigital[]; digital?: RegraDigital; agenteAuto?: AgenteAuto; agenteLog?: Registro[]; agenteMarcos?: Marcos; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string; agenteSemCreditoEm?: string; agenteRetomadaEm?: string; agenteRetomadas?: string[]; agenteIds?: string[]; agenteTratadas?: string[] }
 export type Conversa = { jid: string; nome: string | null; telefone: string | null; etiquetas: string[] | null; status_lead: string | null }
 
 export async function lerCfg() { return await lerConfigAtendente() as Awaited<ReturnType<typeof lerConfigAtendente>> & CfgAgente }
@@ -241,6 +241,17 @@ export async function agendarResposta(msgId: string, origem: string) {
   }).catch(() => null)
 }
 
+// Reserva atômica da mensagem: se outra execução já pegou esta mensagem, esta desiste
+async function reservarMensagem(msgId: string): Promise<boolean> {
+  let minha = false
+  await mudarConfig((d: Record<string, unknown> & CfgAgente) => {
+    if ((d.agenteTratadas ?? []).includes(msgId)) { minha = false; return null }
+    minha = true
+    return { agenteTratadas: [msgId, ...(d.agenteTratadas ?? [])].slice(0, 500) }
+  })
+  return minha
+}
+
 // 2ª etapa: mais um tempo (como quem viu e vai responder), pensa, lê e digita
 export async function responderSozinho(msgId: string) {
   const cfg = await lerCfg()
@@ -250,6 +261,8 @@ export async function responderSozinho(msgId: string) {
   await espera(10, 25)
   const jid = await aindaEhAUltima(msgId)
   if (!jid) return
+  // Cada mensagem do lead é respondida uma vez só (dois disparos ao mesmo tempo: só um passa)
+  if (!await reservarMensagem(msgId)) return
 
   // Filtro barato antes de chamar a IA: só contato novo (fornecedor e cliente antigo nunca)
   const primeira = await primeiraDa(jid)

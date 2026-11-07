@@ -79,6 +79,7 @@ describe("caixa padrão cresce até caber o frasco", () => {
     expect(caberFrasco({ a: 9, l: 4, p: 4 }, "9,6 com a válvula")).toEqual({ a: 10, l: 4, p: 4 })
     expect(caberFrasco({ a: 9, l: 4, p: 4 }, "30 ml, 3,2 x 8 cm")).toEqual({ a: 9, l: 4, p: 4 })
     expect(caberFrasco({ a: 9, l: 4, p: 4 }, "4,5 x 10 cm")).toEqual({ a: 10.4, l: 4.8, p: 4.8 })
+    expect(caberFrasco({ a: 9, l: 4, p: 4 }, "9,5 de altura / 4,5 largura / 2,5 de profundidade")).toEqual({ a: 9.9, l: 4.8, p: 2.8 })
     const c = cotarDigital({ produto: "", volume_ml: 30, caixa_cm: null, frasco_cm: "9,6 com válvula", quantidade: 20, tem_arte: null, resumo: "" } as never)
     expect(c.ok && c.medidas).toEqual({ a: 10, l: 4, p: 4 })
     expect(c.ok && c.folha).toBe("A4")

@@ -155,12 +155,22 @@ describe("retomada: lead que ficou sem resposta", async () => {
     diasConversaNova: 4, horas: 72, ultimoRegistro: { em: "2026-11-06T19:00:00Z" }, digital: false, suasDoCelular: 0,
   }
   it("lead respondeu e ninguém mais falou: retoma", () => expect(paradoParaRetomar(base)).toBe(true))
-  it("acabou de chegar (resposta normal a caminho): espera", () => expect(paradoParaRetomar({ ...base, ultima: { ...base.ultima, ts: "2026-11-06T19:59:00Z" } })).toBe(false))
+  it("acabou de chegar (resposta normal a caminho): espera", () => expect(paradoParaRetomar({ ...base, ultima: { ...base.ultima, ts: "2026-11-06T19:57:00Z" } })).toBe(false))
   it("o agente já registrou algo depois (enviou ou segurou): não retoma", () => expect(paradoParaRetomar({ ...base, ultimoRegistro: { em: "2026-11-06T19:31:00Z", motivo: "nada a responder" } })).toBe(false))
   it("a IA falhou depois: retoma", () => expect(paradoParaRetomar({ ...base, ultimoRegistro: { em: "2026-11-06T19:31:00Z", motivo: "IA falhou: timeout" } })).toBe(true))
   it("já retomada uma vez: não repete", () => expect(paradoParaRetomar({ ...base, feitas: new Set(["m1"]) })).toBe(false))
   it("contato antigo: não", () => expect(paradoParaRetomar({ ...base, primeiraEm: "2026-10-01T10:00:00Z" })).toBe(false))
-  it("mais de 72 h: não", () => expect(paradoParaRetomar({ ...base, ultima: { ...base.ultima, ts: "2026-11-03T10:00:00Z" }, primeiraEm: "2026-11-03T09:00:00Z" })).toBe(false))
+  it("fora da janela: não", () => expect(paradoParaRetomar({ ...base, ultima: { ...base.ultima, ts: "2026-11-03T10:00:00Z" }, primeiraEm: "2026-11-03T09:00:00Z" })).toBe(false))
   it("você escreveu do celular: a conversa é sua", () => expect(paradoParaRetomar({ ...base, suasDoCelular: 1 })).toBe(false))
   it("lead digital: é do agente mesmo se você escreveu", () => expect(paradoParaRetomar({ ...base, suasDoCelular: 1, digital: true })).toBe(true))
+})
+
+describe("nunca fala de sistema", async () => {
+  const { FALA_DE_SISTEMA } = await import("../app/lib/agenteLeads")
+  it("segura", () => {
+    for (const t of ["Com a quantidade e o ml, o sistema já te manda o orçamento", "É um atendimento automático", "sou um robô", "a IA montou"]) expect(FALA_DE_SISTEMA.test(t)).toBe(true)
+  })
+  it("não confunde com caixa e verbo", () => {
+    for (const t of ["Caixa com fundo automático 5x8", "eu ia te mandar agora", "Me passa a quantidade"]) expect(FALA_DE_SISTEMA.test(t)).toBe(false)
+  })
 })

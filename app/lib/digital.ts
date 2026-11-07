@@ -24,8 +24,12 @@ export function caberFrasco(pad: { a: number; l: number; p: number }, frasco: st
   const nums = (frasco ?? "").replace(/(\d+(?:[.,]\d+)?)\s*ml/gi, " ").match(/\d+(?:[.,]\d+)?/g)?.map(n => Number(n.replace(",", "."))).filter(n => n >= 1 && n <= 30) ?? []
   const r1 = (n: number) => Math.round(n * 10) / 10
   let { a, l, p } = pad
-  if (nums.length) a = Math.max(a, r1(Math.max(...nums) + 0.4))
-  if (nums.length >= 2) { const d = r1(Math.min(...nums) + 0.3); l = Math.max(l, d); p = Math.max(p, d) }
+  const ord = [...nums].sort((x, y) => y - x)
+  if (ord.length >= 3) { a = r1(ord[0] + 0.4); l = r1(ord[1] + 0.3); p = r1(ord[2] + 0.3) }   // altura × largura × profundidade: caixa justa
+  else if (ord.length) {
+    a = Math.max(a, r1(ord[0] + 0.4))
+    if (ord.length === 2) { const d = r1(ord[1] + 0.3); l = Math.max(l, d); p = Math.max(p, d) }   // altura e diâmetro
+  }
   if (alturaCaixa && alturaCaixa > 0 && alturaCaixa <= 30) a = Math.max(a, alturaCaixa)
   return { a, l, p }
 }
