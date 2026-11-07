@@ -4,7 +4,7 @@
 // sem resposta → F1, F2, F3 e Sem resposta. As etiquetas vão também para o WhatsApp Business, quando existem lá.
 // Tudo fica registrado (Configurações → Agente de leads) com o motivo de ter enviado ou segurado.
 
-import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital } from "./digital"
+import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital } from "./digital"
 import { linkPedido } from "./digitalLink"
 import type { RegraDigital } from "./precoDigital"
 import { supabase } from "./supabase"
@@ -479,6 +479,18 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
       return registrar({ ...base, perfil: "icp", enviou: false, texto: "", motivo: `F${nivel}: MQL sem resposta, é com você`, passo: `F${nivel}` })
     }
     const log = (cfg.agenteLog ?? []).filter(l => l.jid === c.jid)
+    // Orçamento digital esperando o sinal: o follow-up é o lembrete do pedido (texto fixo com o link, sem IA)
+    const pd = pedidoPendente(cfg.pedidosDigitais, c.jid)
+    if (pd) {
+      if (await voceNaConversa(c.jid, log, cfg)) return registrar({ ...base, perfil: "pequeno", enviou: false, texto: "", motivo: `F${nivel} segurado: você está nessa conversa agora`, passo: `F${nivel}` })
+      const texto = textoLembreteDigital(pd, nivel, linkPedido(pd.id))
+      const env = await enviar(c, texto)
+      if (env.ids.length) {
+        await aplicar(c, passo!.etiquetas, null)
+        await gravarCfg(d => ({ pedidosDigitais: (d.pedidosDigitais ?? []).map(p => p.id === pd.id ? { ...p, lembretes: [...(p.lembretes ?? []), { nivel, em: new Date().toISOString() }] } : p) }))
+      }
+      return registrar({ ...base, perfil: "pequeno", texto, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? `F${nivel}: lembrete do pedido ${pd.id}`, passo: `F${nivel}` })
+    }
     const primeira = await primeiraDa(c.jid)
     const recente = !!primeira && Date.now() - new Date(primeira.ts).getTime() < DIAS_FOLLOW_UP * 86_400_000
     const a = await atender(c.jid, { cfg, automatico: true, followUp: nivel }).catch(() => null)

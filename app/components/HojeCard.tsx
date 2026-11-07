@@ -35,7 +35,7 @@ function doPedido(d: DadosPedido | null) {
 export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
   onAbrirConversa: (jid: string) => void
   onOrcar?: (nome: string, jid: string, dados?: DadosPedido) => void
-  onNavegar: (view: "whatsapp" | "meta" | "config" | "gastos") => void
+  onNavegar: (view: "whatsapp" | "meta" | "config" | "gastos" | "digital") => void
 }) {
   const [d, setD] = useState<Hoje | null>(null)
   const [verTodos, setVerTodos] = useState(false)
@@ -158,7 +158,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
                 <span className="font-semibold text-[#191625]">Digital</span>
                 {[` · ${d.digital.aguardandoSinal ?? 0} esperando o sinal`, d.digital.pagos ? `${d.digital.pagos} ${d.digital.pagos === 1 ? "pago" : "pagos"}` : "", `${d.digital.ativos} na semana`].filter(Boolean).join(" · ")}
               </p>
-              <Botao variante="fantasma" className="h-7 px-2 text-[11.5px] shrink-0" onClick={() => onNavegar("whatsapp")}>Abrir <ArrowRight className="w-3.5 h-3.5" /></Botao>
+              <Botao variante="fantasma" className="h-7 px-2 text-[11.5px] shrink-0" onClick={() => onNavegar("digital")}>Abrir <ArrowRight className="w-3.5 h-3.5" /></Botao>
             </div>
           )}
 

@@ -39,6 +39,7 @@ import { ParceriasView } from "@/app/components/ParceriasView"
 import { ModalVenda } from "@/app/components/parceiros/ModalVenda"
 import DigitalClient from "@/app/d/[id]/DigitalClient"
 import GastosView from "@/app/components/GastosView"
+import DigitalPainelView from "@/app/components/DigitalPainelView"
 import { montarGastos, ultimosDias } from "@/app/lib/gastos"
 import { OrcamentoDigitalView } from "@/app/components/OrcamentoDigitalView"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas, ConversaLateral } from "@/app/components/WhatsAppView"
@@ -96,6 +97,15 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
   if (u.startsWith("/api/whatsapp/destino")) return new Response(JSON.stringify(u.includes("Sem%20Conversa") ? { jid: null } : { jid: "1@lid", nome: "Perfumaria Modelo", como: "conversa" }))
   if (u.startsWith("/api/aprovacao/link")) return new Response(JSON.stringify({ url: "https://app.enyla.com.br/aprovar/ORC-2026-999?t=exemplo" }))
   if (u.startsWith("/api/whatsapp/proximo-passo")) return new Response(JSON.stringify({ passo: { tipo: "lembrar", em: new Date().toISOString(), ate: "2026-11-12T12:00:00Z", nota: "vai mandar a arte" } }))
+  if (u.startsWith("/api/digital")) {
+    const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
+    const base = { ml: 30, medidas: { a: 10, l: 4, p: 4 }, padrao: true, folha: "A4", custo: 399.95, arte: 70, margem: 150, statusEm: null, link: "https://app.enyla.com.br/d/DIG-0001?t=x", vence: new Date(Date.now() + 10 * 86_400_000).toISOString() }
+    return new Response(JSON.stringify({ pedidos: [
+      { ...base, id: "DIG-0011", jid: "1@lid", nome: "Perfumaria Exemplo", em: h(50), quantidade: 100, total: 619.95, sinal: 309.98, status: "aguardando_sinal", sinalPagoEm: null, vistoEm: null, ultimaVista: null, vistas: 0, lembretes: [], briefing: null },
+      { ...base, id: "DIG-0010", jid: "2@lid", nome: "Aromas Modelo", em: h(60 * 30), quantidade: 50, total: 469.95, sinal: 234.97, status: "aguardando_sinal", sinalPagoEm: null, vistoEm: h(60 * 29), ultimaVista: h(60 * 5), vistas: 3, lembretes: [{ nivel: 1, em: h(60 * 27) }, { nivel: 2, em: h(60 * 6) }], briefing: { marca: "Aromas Modelo", cores: "", referencias: "", arquivos: 0 } },
+      { ...base, id: "DIG-0009", jid: "3@lid", nome: "Body Splash Fictícia", em: h(60 * 50), quantidade: 100, total: 619.95, sinal: 309.98, status: "sinal_pago", sinalPagoEm: h(60 * 20), vistoEm: h(60 * 49), ultimaVista: h(60 * 20), vistas: 2, lembretes: [{ nivel: 1, em: h(60 * 47) }], briefing: { marca: "Fictícia Body", cores: "branco e dourado", referencias: "Caixa limpa, nome da marca na frente e numeração das fragrâncias", arquivos: 2 } },
+    ] }))
+  }
   if (u.startsWith("/api/gastos")) {
     const d14 = ultimosDias(14)
     const ia = Object.fromEntries(d14.map((d, i) => [d, { usd: 1.6 + (i % 4) * 0.35, chamadas: 120 + i * 3 }]))
@@ -271,6 +281,7 @@ function Telas() {
         dados={{ produto: "perfume árabe 100ml", volume_ml: 100, caixa_cm: { frente: 6, lateral: 3, altura: 10.5 }, frasco_cm: null, quantidade: 2000, tem_arte: true, resumo: "Perfume árabe 100ml, 2 mil caixas, verniz localizado no logo; precisa para a semana que vem." }} />
     </div>
     case "gastos": case "gastos-m": return pagina(<GastosView />)
+    case "digitalpainel": case "digitalpainel-m": case "digitalpainel-aberto": return pagina(<DigitalPainelView onAbrirConversa={() => {}} />)
     case "hoje": case "hoje-m": case "hoje-passo": return pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)
     case "marketing": case "marketing-m": return pagina(<div className="max-w-[1100px]"><MarketingRelatorio /></div>)
     case "reativacao": return pagina(<div className="max-w-[860px]"><ReativacaoCard /></div>)

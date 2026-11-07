@@ -48,6 +48,9 @@ export type PedidoDigital = {
   sinal: number                    // valor exato do Pix do sinal (centavos únicos entre os abertos)
   status: StatusDigital
   sinalPagoEm?: string
+  vistoEm?: string; ultimaVista?: string; vistas?: number   // quando o cliente abriu a página (só para o seu painel)
+  lembretes?: { nivel: number; em: string }[]                // lembretes que o follow-up mandou
+  statusEm?: string                                          // última mudança de status
 }
 
 export type Cotacao =
@@ -175,4 +178,36 @@ export function textoLinkPedido(p: Pick<PedidoDigital, "quantidade" | "ml" | "me
     `Veja a caixa, escolha a quantidade e pague o sinal de 50% pelo Pix aqui: ${link}`,
     p.padrao ? `Usei a medida padrão de caixa ${oque}. Se o seu frasco for diferente, me manda as medidas que eu ajusto.` : null,
   ].filter(x => x !== null).join("\n\n")
+}
+
+
+// ── Lembrete do pedido (follow-up de quem não pagou o sinal) ─────────────────
+// O follow-up do agente (3 h, 24 h, 72 h sem resposta) vira lembrete deste pedido: texto fixo, na voz do Felipe,
+// com o link. Nunca conta que viu o cliente abrir a página.
+export const DIAS_VALIDADE_DIGITAL = 15
+export function pedidoPendente(pedidos: PedidoDigital[] | undefined, jid: string, agora = Date.now()): PedidoDigital | null {
+  return (pedidos ?? []).find(p => p.jid === jid && p.status === "aguardando_sinal" && agora - new Date(p.em).getTime() < DIAS_VALIDADE_DIGITAL * 86_400_000) ?? null
+}
+const primeiroNome = (n: string | null) => {
+  const x = (n ?? "").trim().split(/\s+/)[0] ?? ""
+  return /^[A-Za-zÀ-ÿ]{2,}$/.test(x) ? x[0].toUpperCase() + x.slice(1).toLowerCase() : ""
+}
+export function textoLembreteDigital(p: Pick<PedidoDigital, "nome" | "quantidade" | "total" | "em" | "vistoEm">, nivel: 1 | 2 | 3, link: string): string {
+  const oi = primeiroNome(p.nome) ? `Oi, ${primeiroNome(p.nome)}!` : "Oi!"
+  const ate = new Date(new Date(p.em).getTime() + DIAS_VALIDADE_DIGITAL * 86_400_000).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })
+  if (nivel === 1) return p.vistoEm
+    ? `${oi} Ficou alguma dúvida no orçamento das caixinhas? Se quiser outra quantidade, dá pra escolher lá mesmo:\n${link}`
+    : `${oi} Conseguiu abrir o orçamento das caixinhas? Segue o link de novo:\n${link}`
+  if (nivel === 2) return `${oi} Passando pra lembrar do seu orçamento: *${p.quantidade.toLocaleString("pt-BR")} caixinhas* por *${brl(p.total)}*, com a arte inclusa. Assim que o sinal cair, a designer já começa a sua arte.\n${link}`
+  return `${oi} Consigo segurar esse valor até ${ate}. Se ainda fizer sentido, é só pagar o sinal pelo link:\n${link}\n\nSe mudou alguma coisa (quantidade ou medida), me fala que eu ajusto.`
+}
+
+// Avanço de status pelo painel (o sinal pago vem do extrato; daí em diante, até as próximas fases, é você)
+export const PROXIMO_STATUS: Partial<Record<StatusDigital, StatusDigital>> = { sinal_pago: "arte", arte: "producao", producao: "enviado" }
+export const ROTULO_STATUS: Record<StatusDigital, string> = {
+  aguardando_sinal: "Esperando sinal", sinal_pago: "Sinal pago", arte: "Arte", producao: "Produção", enviado: "Enviado", cancelado: "Cancelado",
+}
+export function mudarStatus(p: PedidoDigital, para: StatusDigital, agora = new Date()): PedidoDigital | null {
+  const ok = para === "cancelado" ? p.status !== "enviado" && p.status !== "cancelado" : PROXIMO_STATUS[p.status] === para
+  return ok ? { ...p, status: para, statusEm: agora.toISOString() } : null
 }

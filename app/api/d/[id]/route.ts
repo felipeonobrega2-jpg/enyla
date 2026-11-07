@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
+import { auth } from "@/auth"
 import { lerPedido, gravarPedido, tokenDigitalValido, conferirSinais } from "@/app/lib/digitalServidor"
 import { opcoesDoPedido, trocarQuantidade, PedidoComBriefing } from "@/app/lib/digital"
 import type { RegraDigital } from "@/app/lib/precoDigital"
@@ -16,6 +17,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!tokenDigitalValido(id, req.nextUrl.searchParams.get("t"))) return NextResponse.json({ erro: "Link inválido." }, { status: 403 })
   const { pedido, cfg } = await lerPedido(id)
   if (!pedido || pedido.status === "cancelado") return NextResponse.json({ erro: "Este orçamento não está mais disponível. Fale com a gente no WhatsApp." }, { status: 404 })
+  // Quando o cliente abriu a página (para o seu painel; no máximo uma gravação a cada 10 min)
+  // Você logado (abrindo pelo painel) não conta
+  const voce = !!(await auth().catch(() => null))
+  if (!voce && (!pedido.ultimaVista || Date.now() - new Date(pedido.ultimaVista).getTime() > 10 * 60_000))
+    after(() => gravarPedido(id, p => ({ ...p, vistoEm: p.vistoEm ?? new Date().toISOString(), ultimaVista: new Date().toISOString(), vistas: (p.vistas ?? 0) + 1 })).then(() => undefined).catch(() => undefined))
   return NextResponse.json(publico(pedido, cfg.digital))
 }
 

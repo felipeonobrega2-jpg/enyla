@@ -99,3 +99,33 @@ describe("quantidade acima da tabela A4", () => {
     expect(c.ok).toBe(false)
   })
 })
+
+describe("lembrete do pedido e painel", async () => {
+  const { textoLembreteDigital, pedidoPendente, mudarStatus } = await import("../app/lib/digital")
+  const base = { nome: "MARIA silva", quantidade: 100, total: 619.95, em: "2026-11-06T18:00:00Z", vistoEm: undefined as string | undefined }
+  it("F1: não abriu → manda o link de novo; abriu → pergunta se ficou dúvida (sem contar que viu)", () => {
+    expect(textoLembreteDigital(base, 1, "L")).toBe("Oi, Maria! Conseguiu abrir o orçamento das caixinhas? Segue o link de novo:\nL")
+    const t = textoLembreteDigital({ ...base, vistoEm: "x" }, 1, "L")
+    expect(t).toContain("Ficou alguma dúvida")
+    expect(t).not.toMatch(/vi que|abriu|viu/i)
+  })
+  it("F2 lembra quantidade e valor; F3 dá a validade", () => {
+    expect(textoLembreteDigital(base, 2, "L")).toContain("*100 caixinhas* por *R$ 619,95*")
+    expect(textoLembreteDigital(base, 3, "L")).toContain("até 21/11")
+  })
+  it("nunca fala de sistema", async () => {
+    const { FALA_DE_SISTEMA } = await import("../app/lib/agenteLeads")
+    for (const n of [1, 2, 3] as const) expect(FALA_DE_SISTEMA.test(textoLembreteDigital(base, n, "L"))).toBe(false)
+  })
+  it("pedido pendente: esperando sinal e dentro da validade", () => {
+    const p = { jid: "a", status: "aguardando_sinal", em: "2026-11-06T18:00:00Z" } as never
+    expect(pedidoPendente([p], "a", Date.parse("2026-11-08T00:00:00Z"))).toBe(p)
+    expect(pedidoPendente([p], "a", Date.parse("2026-11-25T00:00:00Z"))).toBeNull()
+  })
+  it("status só avança na ordem; cancelar só antes de enviado", () => {
+    const p = { status: "sinal_pago" } as never
+    expect(mudarStatus(p, "arte")?.status).toBe("arte")
+    expect(mudarStatus(p, "enviado")).toBeNull()
+    expect(mudarStatus({ status: "enviado" } as never, "cancelado")).toBeNull()
+  })
+})
