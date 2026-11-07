@@ -32,6 +32,7 @@ const MAX_IDS_AGENTE = 1500
 const MAX_POR_DIA_DIGITAL = 25
 // Travas em que a resposta ficou para você decidir: essas viram aviso no seu WhatsApp
 const TRAVAS_COM_AVISO = ["precisa de você", "a IA pediu", "citou valor", "resposta longa", "já respondeu"]
+export const PRODUTO_RECUSADO = /cigarr|tabaco|\bmaços?\b|palheiro/i
 const MIN_ENTRE_RODADAS = 10         // follow-ups: no máximo uma rodada a cada 10 min
 
 export type Registro = RegistroAgente & { ids?: string[] }
@@ -322,7 +323,9 @@ export async function responderSozinho(msgId: string) {
   let semTabela: string | null = null
   const anterior = pedidoDaConversa(cfg.pedidosDigitais, jid)
   const digitalPequeno = auto.pequenoParceiro === false && r.lead.perfil === "pequeno" && !conversa.clienteCadastrado
-  if (digitalPequeno) {
+  // Produto que não fazemos (cigarro): nunca cota sozinho, a resposta da IA recusa com educação
+  const naoFazemos = PRODUTO_RECUSADO.test([r.dados?.produto, r.dados?.resumo, ...conversa.mensagens.filter(m => !m.from_me).slice(-6).map(m => m.corpo)].filter(Boolean).join(" "))
+  if (digitalPequeno && !naoFazemos) {
     const cot = cotarDigital(r.dados, cfg.digital)
     if (!cot.ok && !cot.motivo.startsWith("falta")) semTabela = cot.motivo
     if (cot.ok && (!anterior || mudouACotacao(anterior, cot))) {

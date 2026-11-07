@@ -166,10 +166,21 @@ async function medirEstiloFelipe() {
   if (e) await gravarCampos({ estiloFelipe: e })
 }
 
+// O que você ensinou direto (pediu ao Claude): entra uma vez, pela versão
+const ENSINADO: { v: number; item: Conhecimento }[] = [
+  { v: 2, item: { id: "felipe-cigarro", tema: "recusa", em: "2026-11-07T00:00:00.000Z",
+    texto: "Não trabalhamos com embalagem de cigarro (maço, caixa de cigarro, tabaco). Se o lead pedir, diga com educação que esse tipo de embalagem a gente não faz e não siga com o orçamento." } },
+]
 async function revisarConhecimento() {
-  await mudarConfig((d: Record<string, unknown> & { conhecimentoAgente?: Conhecimento[]; agenteRevisaoConhecimento?: number }) =>
-    (d.agenteRevisaoConhecimento ?? 0) >= 1 ? null
-      : { conhecimentoAgente: (d.conhecimentoAgente ?? []).filter(c => !REVISAO_1.includes(c.id)), agenteRevisaoConhecimento: 1 })
+  const ultima = Math.max(1, ...ENSINADO.map(e => e.v))
+  await mudarConfig((d: Record<string, unknown> & { conhecimentoAgente?: Conhecimento[]; agenteRevisaoConhecimento?: number }) => {
+    const v = d.agenteRevisaoConhecimento ?? 0
+    if (v >= ultima) return null
+    let lista = d.conhecimentoAgente ?? []
+    if (v < 1) lista = lista.filter(c => !REVISAO_1.includes(c.id))
+    for (const e of ENSINADO) if (e.v > v && !lista.some(c => c.id === e.item.id)) lista = [...lista, e.item]
+    return { conhecimentoAgente: lista, agenteRevisaoConhecimento: ultima }
+  })
 }
 const VERSAO_APRENDIZADO = 2
 export async function talvezAprender() {

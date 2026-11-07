@@ -3,8 +3,8 @@ import { supabase } from "@/app/lib/supabase"
 import { atender, lerConfigAtendente } from "@/app/lib/atendenteServidor"
 import { enviarEtiquetasAoWhatsapp } from "@/app/lib/agenteAuto"
 import { aprenderComConversas, Conhecimento } from "@/app/lib/agenteAprende"
-import { AgenteAuto, RegistroAgente, travaDoEnvio, valoresEmReais, PerfilLead, filtroEfetivo } from "@/app/lib/agenteLeads"
-import { gravarCampos } from "@/app/lib/configAtomica"
+import { AgenteAuto, RegistroAgente, travaDoEnvio, valoresEmReais, PerfilLead, filtroEfetivo, TEMAS } from "@/app/lib/agenteLeads"
+import { gravarCampos, mudarConfig } from "@/app/lib/configAtomica"
 
 export const maxDuration = 60
 
@@ -40,12 +40,20 @@ export async function GET() {
 export type Simulacao = { jid: string; nome: string | null; ultima: string; perfil: PerfilLead; quantidade: number | null; motivo: string; resposta: string; enviaria: boolean; trava: string | null }
 
 export async function POST(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as Partial<AgenteAuto> & { simular?: boolean; etiquetasWhatsapp?: number; aprender?: number; tirarConhecimento?: string }
+  const b = await req.json().catch(() => ({})) as Partial<AgenteAuto> & { simular?: boolean; etiquetasWhatsapp?: number; aprender?: number; tirarConhecimento?: string; ensinar?: { texto?: string; tema?: string } }
   // Aprender agora com as suas conversas dos últimos N dias (padrão 1)
   if (typeof b.aprender === "number") {
     const r = await aprenderComConversas(new Date(Date.now() - Math.min(7, Math.max(1, b.aprender)) * 86_400_000).toISOString())
     const cfg = await lerConfigAtendente() as Cfg
     return NextResponse.json({ ...r, conhecimento: cfg.conhecimentoAgente ?? [] })
+  }
+  // Ensinar direto: uma regra sua entra na base que a IA lê em toda resposta
+  if (b.ensinar?.texto?.trim()) {
+    const texto = b.ensinar.texto.trim().slice(0, 400)
+    const tema = TEMAS.includes(b.ensinar.tema as typeof TEMAS[number]) ? b.ensinar.tema! : "outro"
+    let conhecimento: Conhecimento[] = []
+    await mudarConfig(d => { conhecimento = [...((d as Cfg).conhecimentoAgente ?? []), { id: `felipe-${Date.now().toString(36)}`, tema, texto, em: new Date().toISOString() }]; return { conhecimentoAgente: conhecimento } })
+    return NextResponse.json({ conhecimento })
   }
   if (b.tirarConhecimento) {
     const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()

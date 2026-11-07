@@ -18,3 +18,12 @@ describe("esperando meu orçamento (marcado por você)", () => {
     expect(listaDoHoje(c as never, passo, agora)).toBeNull()
   })
 })
+
+import { PRODUTO_RECUSADO } from "../app/lib/agenteAuto"
+describe("produto que não fazemos", () => {
+  it("cigarro não cota", () => {
+    expect(PRODUTO_RECUSADO.test("quero 500 caixas de cigarro personalizadas")).toBe(true)
+    expect(PRODUTO_RECUSADO.test("maço com a minha marca")).toBe(true)
+    expect(PRODUTO_RECUSADO.test("caixinha de perfume 50 ml")).toBe(false)
+  })
+})

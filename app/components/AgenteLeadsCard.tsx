@@ -69,6 +69,12 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
     if (d?.conhecimento) setConhecimento(d.conhecimento)
     setAprendendo(d ? (d.erro ?? `Leu ${d.conversas} conversas e aprendeu ${d.novos} coisas novas.`) : "Sem conexão.")
   }
+  const [ensinar, setEnsinar] = useState("")
+  async function ensinarAgora() {
+    if (!ensinar.trim()) return
+    const d = await post({ ensinar: { texto: ensinar } })
+    if (d?.conhecimento) { setConhecimento(d.conhecimento); setEnsinar("") }
+  }
   async function tirar(id: string) {
     const d = await post({ tirarConhecimento: id })
     if (d?.conhecimento) setConhecimento(d.conhecimento)
@@ -198,6 +204,12 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
         </div>
         <p className="text-[11px] text-[#898892] mb-2">Toda noite ele lê as conversas em que você atendeu (os seus áudios transcritos, MQLs primeiro) e guarda o que vale para o negócio. Apague o que estiver errado.{aprendeuEm ? ` Última vez: ${hora(aprendeuEm)}.` : ""}</p>
         {aprendendo && <p className="text-[11.5px] text-[#5e5c68] mb-2">{aprendendo}</p>}
+        <div className="flex gap-2 mb-2">
+          <input value={ensinar} onChange={e => setEnsinar(e.target.value)} onKeyDown={e => { if (e.key === "Enter") void ensinarAgora() }} maxLength={400}
+            placeholder="Ensinar uma regra: ex.: cigarro não trabalhamos"
+            className="flex-1 h-9 rounded-lg px-3 text-[12.5px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] ds-borda" />
+          <Botao disabled={!ensinar.trim()} onClick={() => void ensinarAgora()}>Ensinar</Botao>
+        </div>
         <div className="space-y-1 max-h-[280px] overflow-y-auto">
           {[...conhecimento].reverse().map(i => (
             <div key={i.id} className="flex items-start gap-2 text-[12px] group">
