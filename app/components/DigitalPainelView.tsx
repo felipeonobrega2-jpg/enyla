@@ -20,6 +20,7 @@ type Pedido = {
   arteAtual: { url: string; nome: string; em: string } | null; versoes: number; arteEnviadaEm: string | null; arteAprovadaEm: string | null
   ajustes: { texto: string; em: string }[]; designerAvisadoEm: string | null; villaEnviadoEm: string | null
   frete: number | null; restante: number | null; restantePagoEm: string | null; entrega: { cep: string; endereco: string } | null; acertadoEm: string | null
+  teste?: boolean
 }
 type Contatos = { villa?: string; designer?: string; designerNome?: string }
 type Filtro = "abertos" | "pagos" | "enviados" | "acerto" | "todos"
@@ -62,7 +63,7 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
   const [agora] = useState(() => Date.now())
   const d30 = agora - 30 * 86_400_000
   const resumo = useMemo(() => {
-    const ps = pedidos ?? []
+    const ps = (pedidos ?? []).filter(p => !p.teste)
     const abertos = ps.filter(p => p.status === "aguardando_sinal" && new Date(p.vence).getTime() > agora)
     const pagos30 = ps.filter(p => p.sinalPagoEm && new Date(p.sinalPagoEm).getTime() >= d30)
     return {
@@ -137,14 +138,17 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
       <Cartao className="mt-3">
         <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
           <Segmentado valor={filtro} onChange={setFiltro} opcoes={[{ v: "abertos", nome: "Abertos" }, { v: "pagos", nome: "Pagos" }, { v: "enviados", nome: "Enviados" }, { v: "acerto", nome: `Acerto${acerto.ids.length ? ` (${acerto.ids.length})` : ""}` }, { v: "todos", nome: "Todos" }]} />
-          <p className="text-[11px] text-[#898892]">Quem não paga recebe lembrete em 3 h, 24 h e 72 h</p>
+          <div className="flex items-center gap-3">
+            <p className="text-[11px] text-[#898892] hidden sm:block">Quem não paga recebe lembrete em 3 h, 24 h e 72 h</p>
+            <Botao disabled={!!ocupado} onClick={() => { if (confirm("Criar um pedido de teste de R$ 10 (sinal R$ 5 + restante R$ 5) e mandar o link no seu WhatsApp?")) void acao("teste", { teste: true }) }}>Pedido de teste</Botao>
+          </div>
         </div>
         {erro ? <Vazio icone={<X className="w-5 h-5" />} titulo="Não deu para carregar" sub={erro} />
           : !pedidos ? <p className="text-[12.5px] text-[#898892] px-3 py-2">Carregando…</p>
           : !lista.length ? <Vazio icone={<Printer className="w-5 h-5" />} titulo="Nada por aqui" sub={filtro === "abertos" ? "Nenhum orçamento esperando o sinal." : filtro === "acerto" ? "Nada para acertar com a Villa." : "Nenhum pedido nesta lista."} />
           : <div className="-mx-2">{lista.map(p => (
               <LinhaLista key={p.id} onClick={() => setAberto(p.id)} icone={ICONE[p.status]} tom={TOM_STATUS[p.status]}
-                titulo={<>{p.nome || p.jid.split("@")[0]} <span className="text-[#898892] font-normal">· {p.id}</span></>}
+                titulo={<>{p.nome || p.jid.split("@")[0]} <span className="text-[#898892] font-normal">· {p.id}</span>{p.teste && <Selo tom="info" className="ml-1.5">teste</Selo>}</>}
                 sub={subDe(p)} valor={brl(p.total)}
                 valorSub={<span className="hidden sm:inline"><Selo tom={TOM_STATUS[p.status]}>{ROTULO_STATUS[p.status]}</Selo></span>} />
             ))}</div>}

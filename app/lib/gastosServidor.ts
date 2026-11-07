@@ -71,7 +71,7 @@ export async function gastosAtuais(opts: { forcarMeta?: boolean } = {}): Promise
   const g = montarGastos({
     agora: new Date(), alertaDias,
     ia: { dias: cfg.gastosIA ?? {}, recarga: cfg.gastosCfg?.recargaIA ?? null, cotacao: cot, semCreditoEm: cfg.agenteSemCreditoEm ?? null },
-    meta, pedidos: cfg.pedidosDigitais ?? [],
+    meta, pedidos: (cfg.pedidosDigitais ?? []).filter(p => !(p as { teste?: boolean }).teste),
   })
   return { ...g, alertaDias }
 }

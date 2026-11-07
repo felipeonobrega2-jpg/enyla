@@ -57,8 +57,9 @@ const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 export async function conferirSinais(opts: { forcar?: boolean } = {}): Promise<{ pagos: string[]; pendentes: number; motivo?: string }> {
   const cfg = await lerDados()
   const agora = Date.now()
-  const pendentes = (cfg.pedidosDigitais ?? []).filter(p => p.status === "aguardando_sinal" && agora - new Date(p.em).getTime() < 15 * 86_400_000)
-  const restantes = (cfg.pedidosDigitais ?? []).filter(p => p.restante && !p.restantePagoEm && p.status !== "cancelado" && p.arteAprovadaEm)
+  // Teste (R$ 5) só confirma pelo Asaas: no extrato qualquer Pix de R$ 5 seria confundido com ele
+  const pendentes = (cfg.pedidosDigitais ?? []).filter(p => !p.teste && p.status === "aguardando_sinal" && agora - new Date(p.em).getTime() < 15 * 86_400_000)
+  const restantes = (cfg.pedidosDigitais ?? []).filter(p => !p.teste && p.restante && !p.restantePagoEm && p.status !== "cancelado" && p.arteAprovadaEm)
   if (!pendentes.length && !restantes.length) return { pagos: [], pendentes: 0 }
   const desdeUltima = cfg.digitalConferidoEm ? agora - new Date(cfg.digitalConferidoEm).getTime() : Infinity
   if (desdeUltima < (opts.forcar ? 60_000 : 5 * 60_000)) return { pagos: [], pendentes: pendentes.length, motivo: "conferido agora há pouco" }
@@ -112,6 +113,7 @@ const mimeDe = (url: string) => /\.pdf($|\?)/i.test(url) ? "application/pdf" : /
 
 // Briefing para a designer (sinal pago ou ajuste pedido). Devolve false se não há designer cadastrada.
 export async function avisarDesigner(cfg: CfgDigital, p: PedidoComBriefing) {
+  if (p.teste) return true   // teste: a designer não recebe
   const num = soDigitos(cfg.digitalContatos?.designer)
   if (!num) return false
   const ok = await paraNumero(num, textoParaDesigner(p, linkDesigner(p.id)))
@@ -156,7 +158,8 @@ export async function aprovarPeloCliente(id: string) {
 export async function mandarParaVilla(cfg: CfgDigital, p: PedidoComBriefing) {
   const a = arteAtual(p)
   const texto = textoParaVilla(p, a?.url ?? null)
-  const villa = soDigitos(cfg.digitalContatos?.villa)
+  const villa = p.teste ? "" : soDigitos(cfg.digitalContatos?.villa)
+  if (p.teste) { await avisarVoce(cfg, `✅ *Digital ${p.id}* (teste) · arte aprovada. Num pedido de verdade, isto iria para a Villa:\n\n${texto}`); return }
   const ok = villa ? await paraNumero(villa, texto, a ? { url: a.url, mime: mimeDe(a.url), nome: a.nome } : undefined) : false
   if (ok) await gravarPedido(p.id, x => ({ ...x, villaEnviadoEm: new Date().toISOString() }))
   await avisarVoce(cfg, ok

@@ -58,6 +58,7 @@ export type PedidoDigital = {
   restante?: number; restantePagoEm?: string; pagamentoFinal?: { txId: string; valor: number; data: string; nome: string | null }
   acertadoEm?: string
   documento?: string                                         // CPF/CNPJ (cobrança no Asaas e nota)
+  teste?: boolean                                            // pedido de teste (você paga para você): fora de Villa, designer, acerto e margem
   asaas?: { cliente?: string; sinal?: CobrancaPix; restante?: CobrancaPix }
 }
 export type CobrancaPix = { id: string; valor: number; payload: string; imagem: string; fatura: string; em: string }
@@ -324,7 +325,7 @@ export function textoParaDesigner(p: PedidoComBriefing, link: string) {
 // ── Acerto semanal com a Villa (fase 6) ──────────────────────────────────────
 // Toda segunda: o que foi para a Villa e ainda não foi acertado
 export function acertoDaSemana(pedidos: PedidoDigital[]) {
-  const itens = pedidos.filter(p => p.villaEnviadoEm && !p.acertadoEm && p.status !== "cancelado").sort((a, b) => a.villaEnviadoEm!.localeCompare(b.villaEnviadoEm!))
+  const itens = pedidos.filter(p => p.villaEnviadoEm && !p.acertadoEm && p.status !== "cancelado" && !p.teste).sort((a, b) => a.villaEnviadoEm!.localeCompare(b.villaEnviadoEm!))
   return { itens, total: itens.reduce((a, p) => a + p.custo, 0) }
 }
 export function textoAcerto(itens: PedidoDigital[], total: number) {
@@ -342,4 +343,13 @@ export function semanaDe(d: Date) {
   x.setUTCDate(x.getUTCDate() + 4 - dia)
   const ini = new Date(Date.UTC(x.getUTCFullYear(), 0, 1))
   return `${x.getUTCFullYear()}-W${String(Math.ceil(((x.getTime() - ini.getTime()) / 86_400_000 + 1) / 7)).padStart(2, "0")}`
+}
+
+// Pedido de teste: R$ 10 (sinal R$ 5 + restante R$ 5, o mínimo do Asaas), na sua própria conversa
+export function pedidoDeTeste(pedidos: PedidoDigital[], jid: string, agora = new Date()): PedidoDigital {
+  return {
+    id: proximoIdDigital(pedidos), jid, nome: "Teste (você)", em: agora.toISOString(), produto: "teste", ml: 50,
+    medidas: { a: 10, l: 5, p: 5 }, padrao: true, folha: "A4", quantidade: 20, faixa: 20,
+    custo: 0, arte: 0, margem: 0, total: 10, sinal: 5, status: "aguardando_sinal", teste: true,
+  }
 }

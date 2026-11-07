@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { lerPedido, gravarPedido, linkPedido, linkDesigner, mandarArte, mandarParaVilla, avisarDesigner, ContatosDigital } from "@/app/lib/digitalServidor"
+import { seuNumero, enviar } from "@/app/lib/agenteAuto"
+import { pedidoDeTeste, textoLinkPedido } from "@/app/lib/digital"
 import { supabase } from "@/app/lib/supabase"
 import { mudarStatus, trocarFrete, restanteUnico, arteAtual, acertoDaSemana, PedidoComBriefing, StatusDigital, DIAS_VALIDADE_DIGITAL } from "@/app/lib/digital"
 import { mudarConfig } from "@/app/lib/configAtomica"
@@ -18,6 +20,7 @@ export async function GET() {
     status: p.status, sinalPagoEm: p.sinalPagoEm ?? null, statusEm: p.statusEm ?? null,
     vistoEm: p.vistoEm ?? null, ultimaVista: p.ultimaVista ?? null, vistas: p.vistas ?? 0, lembretes: p.lembretes ?? [],
     briefing: p.briefing ? { marca: p.briefing.marca ?? "", cores: p.briefing.cores ?? "", referencias: p.briefing.referencias ?? "", laminacao: p.briefing.laminacao ?? "fosca", arquivos: (p.briefing.arquivos ?? []).length } : null,
+    teste: !!p.teste,
     vence: new Date(new Date(p.em).getTime() + DIAS_VALIDADE_DIGITAL * 86_400_000).toISOString(),
     link: linkPedido(p.id), linkDesigner: linkDesigner(p.id),
     arteAtual: arteAtual(p), versoes: (p.artes ?? []).length, arteEnviadaEm: p.arteEnviadaEm ?? null, arteAprovadaEm: p.arteAprovadaEm ?? null,
@@ -30,8 +33,19 @@ export async function GET() {
 
 // POST { id, status } avança ou cancela · { id, acao } frete, arte, Villa, designer · { acertar: ids } · { contatos }
 export async function POST(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as { id?: string; status?: StatusDigital; acao?: string; frete?: number; acertar?: string[]; contatos?: ContatosDigital }
+  const b = await req.json().catch(() => ({})) as { teste?: boolean; id?: string; status?: StatusDigital; acao?: string; frete?: number; acertar?: string[]; contatos?: ContatosDigital }
 
+  // Pedido de teste: na sua conversa com você mesmo, com o link do pedido
+  if (b.teste) {
+    const num = await seuNumero()
+    if (!num) return NextResponse.json({ erro: "Não achei o seu número no WhatsApp conectado." }, { status: 400 })
+    const jid = `${num}@s.whatsapp.net`
+    let novo: PedidoComBriefing | null = null
+    await mudarConfig(d => { const todos = (d as Dados).pedidosDigitais ?? []; novo = pedidoDeTeste(todos, jid) as PedidoComBriefing; return { pedidosDigitais: [...todos, novo] } })
+    const p = novo as unknown as PedidoComBriefing
+    await enviar({ jid, nome: "Você", telefone: num, etiquetas: null, status_lead: null }, `*Teste* · ${textoLinkPedido(p, linkPedido(p.id))}`).catch(() => null)
+    return NextResponse.json({ ok: true, id: p.id, link: linkPedido(p.id), linkDesigner: linkDesigner(p.id) })
+  }
   if (b.contatos) {
     const num = (s?: string) => (s ?? "").replace(/\D/g, "").slice(0, 15)
     const c: ContatosDigital = { villa: num(b.contatos.villa), designer: num(b.contatos.designer), designerNome: (b.contatos.designerNome ?? "").trim().slice(0, 60) }
