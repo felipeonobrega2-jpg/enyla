@@ -69,3 +69,11 @@ describe("seção de gastos", () => {
     expect(g.digital.porDiaFalta).toBe(0.7)   // R$ 100/dia ÷ R$ 150 por pedido
   })
 })
+
+import { campanhaPeloGasto, SEM_CAMPANHA } from "../app/lib/marketing"
+describe("atribuição pelo gasto", () => {
+  it("uma campanha gastando: o lead sem campanha é dela; duas: não chuta", () => {
+    expect(campanhaPeloGasto([{ id: "a", gasto: 114 }, { id: "b", gasto: 0 }, { id: SEM_CAMPANHA, gasto: 0 }])).toBe("a")
+    expect(campanhaPeloGasto([{ id: "a", gasto: 114 }, { id: "b", gasto: 20 }])).toBeNull()
+  })
+})

@@ -8,6 +8,7 @@ import { talvezAprender } from "@/app/lib/agenteAprende"
 import { talvezReativar } from "@/app/lib/reativacaoServidor"
 import { talvezRelatorio } from "@/app/lib/marketingServidor"
 import { conferirSinais, talvezAcertoSemanal } from "@/app/lib/digitalServidor"
+import { talvezAdicionarIdeias } from "@/app/lib/ideiasServidor"
 import { marcarOrigemPelaFrase, talvezMarcarOrigens } from "@/app/lib/origensWhatsappServidor"
 import { talvezAvisarGastos } from "@/app/lib/gastosServidor"
 
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest) {
     after(() => talvezRelatorio(req.nextUrl.origin).catch(e => console.error("[marketing]", e)))
     // Braço digital: confere no extrato os sinais esperando Pix (no máximo a cada 5 min; só se há pedido esperando)
     after(() => conferirSinais().then(() => undefined).catch(e => console.error("[digital]", e)))
+    after(() => talvezAdicionarIdeias().catch(e => console.error("[ideias]", e)))
     after(() => talvezAcertoSemanal().catch(e => console.error("[digital acerto]", e)))
     // Leads do anúncio: conversas recentes sem origem são marcadas pela frase do anúncio (no máximo a cada 30 min)
     after(() => talvezMarcarOrigens().then(() => undefined).catch(e => console.error("[origens]", e)))

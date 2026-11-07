@@ -11,7 +11,7 @@ import { filtroEfetivo } from "./agenteLeads"
 import { montarHoje } from "./hojeServidor"
 import { mudarConfig } from "./configAtomica"
 import {
-  LinhaCampanha, Periodo, Relatorio, SEM_CAMPANHA, linhaVazia, qualidadeDoLead, periodos, dentro, diaSP, somarDias,
+  LinhaCampanha, Periodo, Relatorio, SEM_CAMPANHA, campanhaPeloGasto, linhaVazia, qualidadeDoLead, periodos, dentro, diaSP, somarDias,
   numerosParaIA, textoResumoWhatsapp, horaDoRelatorio,
 } from "./marketing"
 
@@ -81,8 +81,11 @@ async function leadsDoAnuncio(cfg: Cfg): Promise<Lead[]> {
 
 function juntar(meta: Map<string, LinhaCampanha>, leads: Lead[], p: Periodo): LinhaCampanha[] {
   const linhas = new Map([...meta].map(([k, v]) => [k, { ...v }]))
+  const unica = campanhaPeloGasto([...meta.values()])
   for (const l of leads.filter(x => dentro(x.entrada, p))) {
-    const linha = linhas.get(l.campanhaId) ?? linhaVazia(l.campanhaId, l.campanhaNome)
+    const id = l.campanhaId === SEM_CAMPANHA && unica ? unica : l.campanhaId
+    const linha = linhas.get(id) ?? linhaVazia(l.campanhaId, l.campanhaNome)
+    if (id !== l.campanhaId) linha.peloGasto = (linha.peloGasto ?? 0) + 1
     linha.leads++
     if (l.qualidade === "mql") linha.mql++
     else if (l.qualidade === "descartado") linha.descartados++
@@ -91,7 +94,7 @@ function juntar(meta: Map<string, LinhaCampanha>, leads: Lead[], p: Periodo): Li
     if (l.orcamentos) linha.orcamentos++
     if (l.pedidos) linha.pedidos++
     linha.faturamento += l.faturamento
-    linhas.set(l.campanhaId, linha)
+    linhas.set(id, linha)
   }
   return [...linhas.values()].filter(l => l.gasto > 0 || l.leads > 0).sort((a, b) => b.gasto - a.gasto || b.leads - a.leads)
 }

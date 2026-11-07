@@ -17,6 +17,7 @@ export type LinhaCampanha = {
   orcamentos: number
   pedidos: number
   faturamento: number         // valor dos pedidos fechados
+  peloGasto?: number          // leads sem campanha no clique, atribuídos a esta por ser a única com gasto no período
 }
 
 export type Periodo = { de: string; ate: string }   // datas YYYY-MM-DD (São Paulo)
@@ -32,6 +33,13 @@ export type Relatorio = {
 }
 
 export const SEM_CAMPANHA = "sem-campanha"
+
+// Lead que veio do anúncio mas sem a campanha no clique (o WhatsApp quase nunca manda): se no período só uma
+// campanha gastou, ele é dela. Com mais de uma campanha gastando, continua "a identificar" (não chuta).
+export function campanhaPeloGasto(meta: { id: string; gasto: number }[]): string | null {
+  const ativas = meta.filter(m => m.id !== SEM_CAMPANHA && m.gasto > 0)
+  return ativas.length === 1 ? ativas[0].id : null
+}
 
 // Qualidade do lead pelo que o agente (ou você) marcou. "Sumiu" = não respondeu nem aos follow-ups: separado de
 // "aberto" (ainda conversando) para o custo por MQL não esconder quem nunca ia responder.
@@ -85,7 +93,7 @@ export function numerosParaIA(r: Pick<Relatorio, "dia" | "dia1" | "semana" | "se
   const bloco = (titulo: string, linhas: LinhaCampanha[]) => {
     const t = total(linhas)
     return [`${titulo}: gasto ${brl(t.gasto)}, ${t.cliques} cliques, ${t.conversasMeta} conversas (Meta), ${t.leads} leads no WhatsApp, ${t.mql} MQL, ${t.descartados} descartados, ${t.sumiram} sumiram (não responderam nem aos follow-ups), ${t.semClassificar} ainda conversando sem dizer o volume, ${t.orcamentos} orçamentos, ${t.pedidos} pedidos (${brl(t.faturamento)}).`,
-      ...linhas.filter(l => l.gasto || l.leads).map(l => `- ${l.nome}: gasto ${brl(l.gasto)}, ${l.cliques} cliques, ${l.conversasMeta} conversas (Meta), ${l.leads} leads, ${l.mql} MQL, ${l.descartados} descartados, ${l.orcamentos} orçamentos, ${l.pedidos} pedidos (${brl(l.faturamento)})${custoPor(l.gasto, l.mql) != null ? `, custo por MQL ${brl(custoPor(l.gasto, l.mql)!)}` : ""}`)].join("\n")
+      ...linhas.filter(l => l.gasto || l.leads).map(l => `- ${l.nome}: gasto ${brl(l.gasto)}, ${l.cliques} cliques, ${l.conversasMeta} conversas (Meta), ${l.leads} leads, ${l.mql} MQL, ${l.descartados} descartados, ${l.orcamentos} orçamentos, ${l.pedidos} pedidos (${brl(l.faturamento)})${custoPor(l.gasto, l.mql) != null ? `, custo por MQL ${brl(custoPor(l.gasto, l.mql)!)}` : ""}${l.peloGasto ? ` (${l.peloGasto} destes leads chegaram sem a campanha no clique e foram atribuídos a ela por ser a única campanha com gasto no período: a atribuição está certa, não é problema de rastreio)` : ""}`)].join("\n")
   }
   return [bloco(`Dia ${dm(r.dia)}`, r.dia1), bloco(`Últimos 7 dias`, r.semana), bloco(`7 dias anteriores`, r.semanaAnterior)].join("\n\n")
 }
