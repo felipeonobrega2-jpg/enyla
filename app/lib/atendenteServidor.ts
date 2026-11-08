@@ -10,6 +10,7 @@ import { COLUNAS_KANBAN, COL_PERDIDO, COL_FECHADO, COL_ENTREGUE } from "../types
 import type { Atendimento } from "./atendente"
 import { agoraParaIA, corrigirCumprimento } from "./atendente"
 import { LeadAvaliado, filtroDoAgente, soAbertura, saudacaoDoFiltro } from "./agenteLeads"
+import { aberturaPara, type TesteAbertura } from "./aberturaAB"
 import { transcreverPendentes } from "./transcricao"
 import { Conhecimento, conhecimentoNoPrompt } from "./agenteAprende"
 import { instrucaoDoMotivo } from "./reativacao"
@@ -71,7 +72,7 @@ export type ConversaLida = {
   mensagens: { id: string; from_me: boolean; corpo: string | null; tipo: string; ts: string }[]
 }
 
-type Cfg = { apiKey?: string; guiaAtendimento?: string; filtroLeads?: string; agenteAuto?: { pequenoParceiro?: boolean }; vinculosWhatsapp?: Vinculos; conhecimentoAgente?: Conhecimento[]; estiloFelipe?: EstiloFelipe }
+type Cfg = { aberturaTeste?: TesteAbertura; apiKey?: string; guiaAtendimento?: string; filtroLeads?: string; agenteAuto?: { pequenoParceiro?: boolean }; vinculosWhatsapp?: Vinculos; conhecimentoAgente?: Conhecimento[]; estiloFelipe?: EstiloFelipe }
 
 export async function lerConfigAtendente(): Promise<Cfg> {
   const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
@@ -141,7 +142,9 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
     } catch { /* texto antigo nesse campo: ignora */ }
   }
   // 2. Lead novo que só mandou a mensagem do anúncio (ou "oi"): a resposta é sempre a sua saudação do filtro
-  const saudacao = saudacaoDoFiltro(filtroDoAgente(cfg))
+  // (teste A/B ligado: metade dos leads recebe a desafiante; cada lead sempre a mesma)
+  const saudacaoA = saudacaoDoFiltro(filtroDoAgente(cfg))
+  const saudacao = saudacaoA ? aberturaPara(jid, saudacaoA, cfg.aberturaTeste).texto : null
   if (!outraPergunta && !opts.outra && saudacao && !clienteAtivo && soAbertura(mensagens)) {
     const r: ResultadoAtendente = {
       resposta: saudacao, etapa: "primeiro_contato", alerta: "nenhum", motivo_alerta: "", sugere_video: false,

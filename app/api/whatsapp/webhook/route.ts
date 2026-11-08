@@ -9,6 +9,7 @@ import { talvezReativar } from "@/app/lib/reativacaoServidor"
 import { talvezRelatorio } from "@/app/lib/marketingServidor"
 import { conferirSinais, talvezAcertoSemanal } from "@/app/lib/digitalServidor"
 import { talvezAdicionarIdeias } from "@/app/lib/ideiasServidor"
+import { talvezTesteAbertura } from "@/app/lib/aberturaABServidor"
 import { marcarOrigemPelaFrase, talvezMarcarOrigens } from "@/app/lib/origensWhatsappServidor"
 import { talvezAvisarGastos } from "@/app/lib/gastosServidor"
 
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest) {
     after(() => conferirSinais().then(() => undefined).catch(e => console.error("[digital]", e)))
     after(() => talvezAdicionarIdeias().catch(e => console.error("[ideias]", e)))
     after(() => talvezAcertoSemanal().catch(e => console.error("[digital acerto]", e)))
+    after(() => talvezTesteAbertura().catch(e => console.error("[abertura A/B]", e)))
     // Leads do anúncio: conversas recentes sem origem são marcadas pela frase do anúncio (no máximo a cada 30 min)
     after(() => talvezMarcarOrigens().then(() => undefined).catch(e => console.error("[origens]", e)))
     // Gastos: aviso no seu WhatsApp quando IA ou anúncios estão para acabar (confere no máximo a cada 30 min)

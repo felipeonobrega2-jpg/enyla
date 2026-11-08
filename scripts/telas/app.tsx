@@ -147,6 +147,13 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       ] })
     return new Response(JSON.stringify({ ...g, alertaDias: 3 }))
   }
+  if (u.startsWith("/api/abertura")) {
+    return new Response(JSON.stringify({ minimo: 60,
+      a: "Oi, tudo bem? aqui é o Luiz Felipe, da Jerograf / ENYLA👋 Você já tá vendendo seu produto ou tá lançando agora? E que volume você precisa?",
+      teste: { ligado: true, b: "Oi, tudo bem? Aqui é o Luiz Felipe, da Jerograf / ENYLA 👋 Quantas caixinhas você precisa, mais ou menos? Umas 500, 1.000, 5.000 ou mais?", inicio: new Date(Date.now() - 3 * 86_400_000).toISOString() },
+      medida: { em: new Date(Date.now() - 2 * 3_600_000).toISOString(), A: { leads: 41, responderam: 27, volume: 15, mql: 9 }, B: { leads: 38, responderam: 27, volume: 21, mql: 10 } },
+    }))
+  }
   if (u.startsWith("/api/hoje")) {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
     return new Response(JSON.stringify({
@@ -280,7 +287,7 @@ function Telas() {
   const pagina = (filho: React.ReactNode) => <div style={{ padding: 24, background: "#f5f5f7", minHeight: "100vh" }}><div className="max-w-[1320px] mx-auto">{filho}</div></div>
   switch (tela) {
     case "caixa": return pagina(<CaixaView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onUpdateConfig={setCfg} onAddLancamento={l => setLancs(p => [l, ...p])} />)
-    case "config-agentes": case "config-sistema": try { sessionStorage.setItem("config:aba", tela.slice(7)) } catch {} // falls through
+    case "config-agentes": case "config-sistema": case "abertura": try { sessionStorage.setItem("config:aba", tela === "abertura" ? "agentes" : tela.slice(7)) } catch {} // falls through
     case "config": return <ThemeProvider><div style={{ height: "100vh" }}><ConfigView config={cfg} onSave={setCfg} onExportar={() => {}} onImportar={() => {}} clientes={["Cliente Relacionamento", "Outro Cliente"]} /></div></ThemeProvider>
     case "lancamento": return <ModalLancamento inicial={{ tipo: "despesa", descricao: "Impressão + Papel", valor: 3100 }} kanban={dados.kanban} onSave={() => {}} onClose={() => {}} />
     case "parceiros": case "parceiros-modal": {
