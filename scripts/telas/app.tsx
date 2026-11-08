@@ -41,6 +41,8 @@ import { ModalVenda } from "@/app/components/parceiros/ModalVenda"
 import DigitalClient from "@/app/d/[id]/DigitalClient"
 import GastosView from "@/app/components/GastosView"
 import DigitalPainelView from "@/app/components/DigitalPainelView"
+import ChapasView from "@/app/components/ChapasView"
+import { alocar } from "@/app/lib/chapas"
 import { montarGastos, ultimosDias } from "@/app/lib/gastos"
 import { OrcamentoDigitalView } from "@/app/components/OrcamentoDigitalView"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas, ConversaLateral } from "@/app/components/WhatsAppView"
@@ -120,6 +122,22 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
   if (u.startsWith("/api/whatsapp/destino")) return new Response(JSON.stringify(u.includes("Sem%20Conversa") ? { jid: null } : { jid: "1@lid", nome: "Perfumaria Modelo", como: "conversa" }))
   if (u.startsWith("/api/aprovacao/link")) return new Response(JSON.stringify({ url: "https://app.enyla.com.br/aprovar/ORC-2026-999?t=exemplo" }))
   if (u.startsWith("/api/whatsapp/proximo-passo")) return new Response(JSON.stringify({ passo: { tipo: "lembrar", em: new Date().toISOString(), ate: "2026-11-12T12:00:00Z", nota: "vai mandar a arte" } }))
+  if (u.startsWith("/api/chapas")) {
+    const d = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
+    const ch = (prazoId = "economico", acabId = "laminacao-fosca", porChapa = 4, rodada = 1340) => ({ prazoId, acabId, porChapa, formato: "66x48", rodada, colagemPorMil: 75, arte: 70, frete: 0 })
+    const it = (n: number, cliente: string, slug: string, nome: string, qtd: number, total: number, dias: number, c = ch(), marca?: string) =>
+      ({ pedidoId: "p" + n, pedido: `CX-261108-${n}A`, itemIdx: 0, pagoEm: d(dias), cliente, telefone: "11999990000", slug, nome, qtd, total, forma: "pix", chapa: c, marca })
+    const r = alocar([], [
+      it(1, "Perfumaria Modelo", "caixa-perfume-100ml", "Caixa para perfume 100 ml", 1000, 1289.9, 9, ch(), "Noir 1987"),
+      it(2, "Essências do Brás", "caixa-perfume-100ml", "Caixa para perfume 100 ml", 2000, 2299.9, 6, ch(), "Oud Real"),
+      it(3, "Bella Pele", "caixa-serum-conta-gotas", "Caixa para sérum 30 ml", 1000, 989.9, 4, ch("economico", "laminacao-fosca", 6, 1340), "Pure Skin"),
+      it(4, "Clínica Vitta", "caixa-caneta-aplicadora", "Caixa para caneta aplicadora", 1000, 839.9, 1, ch("padrao", "laminacao-brilho", 8, 1340)),
+      it(5, "Atelier Lumi", "caixa-perfume-100ml", "Caixa para perfume 100 ml", 1000, 1289.9, 2, ch("economico", "laminacao-brilho"), "Lumi"),
+    ], d(10))
+    r.chapas[0].ocupacao.forEach(o => { o.arteAprovadaEm = d(8) })
+    r.chapas[1].ocupacao[0].arteAprovadaEm = d(3)
+    return new Response(JSON.stringify({ chapas: r.chapas, semDados: 0 }))
+  }
   if (u.startsWith("/api/digital")) {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
     const extra = { linkDesigner: "https://app.enyla.com.br/d/DIG-0001?t=x&dz=y", arteAtual: null, versoes: 0, arteEnviadaEm: null, arteAprovadaEm: null, ajustes: [], designerAvisadoEm: null, villaEnviadoEm: null, frete: null, restante: null, restantePagoEm: null, entrega: null, acertadoEm: null }
@@ -324,6 +342,7 @@ function Telas() {
         dados={{ produto: "perfume árabe 100ml", volume_ml: 100, caixa_cm: { frente: 6, lateral: 3, altura: 10.5 }, frasco_cm: null, quantidade: 2000, tem_arte: true, resumo: "Perfume árabe 100ml, 2 mil caixas, verniz localizado no logo; precisa para a semana que vem." }} />
     </div>
     case "gastos": case "gastos-m": return pagina(<GastosView />)
+    case "chapas": case "chapas-m": case "chapas-aberta": return pagina(<ChapasView />)
     case "digitalpainel": case "digitalpainel-m": case "digitalpainel-aberto": case "digitalpainel-prod": case "digitalpainel-acerto": return pagina(<DigitalPainelView onAbrirConversa={() => {}} />)
     case "hoje": case "hoje-m": case "hoje-passo": return pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)
     case "hoje-conversa": case "hoje-conversa-m": return <>{pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)}
