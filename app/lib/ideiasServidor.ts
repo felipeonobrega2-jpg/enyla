@@ -18,6 +18,9 @@ const LOTES: { v: number; ideias: string[] }[] = [
     "Digital: Asaas para o Pix confirmar na hora (webhook) e abrir cartão parcelado no sinal e no restante.",
     "Digital: recompra automática. 45 dias depois da entrega, o agente oferece repetir o pedido com a mesma arte e o mesmo preço.",
   ] },
+  { v: 2, ideias: [
+    "Robustez (prioridade): proteger o sistema. Cópia diária da configuração (preços, contatos, conhecimento da IA, próximos passos, pedidos digitais) guardando 30 dias, com botão \"voltar para ontem\" em Configurações. E aviso no seu WhatsApp quando algo para: WhatsApp 2 h sem receber mensagem no horário comercial, Asaas recusando o aviso de pagamento ou envio automático falhando.",
+  ] },
 ]
 
 export async function talvezAdicionarIdeias() {
