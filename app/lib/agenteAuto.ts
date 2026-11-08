@@ -203,8 +203,13 @@ async function avisarSemCredito(cfg: CfgAgente) {
     "⚠️ *A IA do sistema parou: sem crédito ou limite de gasto atingido na Anthropic.*\nO agente parou de responder os leads (as saudações do anúncio continuam saindo). Em console.anthropic.com, confira o saldo (Billing) e o limite de gasto mensal (Limits); se puder, ligue a recarga automática." }) }).catch(() => null)
 }
 
-const ultimaDa = async (jid: string) =>
-  (await supabase.from("whatsapp_mensagens").select("id, from_me, ts").eq("jid", jid).order("ts", { ascending: false }).limit(1).maybeSingle()).data
+// A última mensagem de verdade: o "Estou fora do horário" do WhatsApp Business sai na hora, como se fosse sua, e
+// fazia o agente achar que você já tinha respondido (o lead da noite ficava sem a abertura)
+const ultimaDa = async (jid: string) => {
+  const { data } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo").eq("jid", jid).order("ts", { ascending: false }).limit(6)
+  const m = (data ?? []).find(x => !(x.from_me && ehMensagemAutomaticaDoWhatsapp(x.corpo)))
+  return m ? { id: m.id as string, from_me: m.from_me as boolean, ts: m.ts as string } : null
+}
 
 const primeiraDa = async (jid: string) =>
   (await supabase.from("whatsapp_mensagens").select("ts").eq("jid", jid).order("ts", { ascending: true }).limit(1).maybeSingle()).data
@@ -426,15 +431,18 @@ export async function talvezRetomarParados(origem: string) {
   const { data: convs } = await supabase.from("whatsapp_conversas").select("jid, etiquetas, status_lead, ultima_recebida_at, ultima_enviada_at")
     .gte("ultima_recebida_at", new Date(agora - HORAS_RETOMAR * 3_600_000).toISOString()).order("ultima_recebida_at", { ascending: false }).limit(300)
   const candidatas = (convs ?? []).filter(c => !deveIgnorar(c.jid) && !["mql", "descartado", "perdido"].includes(c.status_lead ?? "")
-    && !(c.etiquetas ?? []).includes("Fornecedora") && (!c.ultima_enviada_at || c.ultima_enviada_at <= c.ultima_recebida_at))
+    && !(c.etiquetas ?? []).includes("Fornecedora") && (!c.ultima_enviada_at || !c.ultima_recebida_at
+      // até 2 min depois dele pode ser só o "fora do horário" automático (a mensagem certa é conferida abaixo)
+      || new Date(c.ultima_enviada_at).getTime() <= new Date(c.ultima_recebida_at).getTime() + 120_000))
   const logTodo = cfg.agenteLog ?? []
   const feitas = new Set(cfg.agenteRetomadas ?? [])
   const digital = cfg.agenteAuto.pequenoParceiro === false
   let disparadas = 0
   for (const c of candidatas) {
     if (disparadas >= 6) break
-    const { data: ms } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts").eq("jid", c.jid).order("ts", { ascending: false }).limit(40)
-    const u = ms?.[0]
+    const { data: todas } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo").eq("jid", c.jid).order("ts", { ascending: false }).limit(40)
+    const ms = (todas ?? []).filter(m => !(m.from_me && ehMensagemAutomaticaDoWhatsapp(m.corpo)))
+    const u = ms[0]
     if (!u) continue
     const primeira = await primeiraDa(c.jid)
     const log = logTodo.filter(l => l.jid === c.jid)
