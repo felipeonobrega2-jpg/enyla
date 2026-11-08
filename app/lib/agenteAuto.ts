@@ -32,7 +32,8 @@ const MAX_IDS_AGENTE = 1500
 const MAX_POR_DIA_DIGITAL = 25
 // Travas em que a resposta ficou para você decidir: essas viram aviso no seu WhatsApp
 const TRAVAS_COM_AVISO = ["precisa de você", "a IA pediu", "citou valor", "resposta longa", "já respondeu"]
-export const PRODUTO_RECUSADO = /cigarr|tabaco|\bmaços?\b|palheiro/i
+export { PRODUTO_RECUSADO } from "./metaMql"
+import { PRODUTO_RECUSADO } from "./metaMql"
 const MIN_ENTRE_RODADAS = 10         // follow-ups: no máximo uma rodada a cada 10 min
 
 export type Registro = RegistroAgente & { ids?: string[] }

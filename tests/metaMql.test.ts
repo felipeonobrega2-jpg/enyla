@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { estadoDoMql, resumirMeta, comMedidaPadrao, textoDoTravado, MsgMeta } from "../app/lib/metaMql"
+import { estadoDoMql, resumirMeta, comMedidaPadrao, textoDoTravado, momentoDoLead, MsgMeta } from "../app/lib/metaMql"
 import type { DadosPedido } from "../app/lib/atendente"
 
 const agora = new Date("2026-11-07T15:00:00Z").getTime()
@@ -36,8 +36,25 @@ describe("meta: orçar todo MQL em 24 h", () => {
     const cx = { frente: 6, lateral: 3, altura: 10 }
     expect(comMedidaPadrao(dados({ volume_ml: 100, caixa_cm: cx })).caixa_cm).toBe(cx)
   })
+  it("não é a sua vez: ficou de mandar ou decidir, sem pressa, produto que não fazemos", () => {
+    const d = dados({ quantidade: 1000 })
+    expect(momentoDoLead(null, ["1000", "Amanhã te envio as medidas das caixas"], d)).toBe("com_ele")
+    expect(momentoDoLead(null, ["Entendo ! Eu vou conversar com meu irmão"], d)).toBe("com_ele")
+    expect(momentoDoLead(null, ["a ideia é mais iniciar esse contato", "Para botarmos em prática o lançamento até janeiro"], d)).toBe("sem_pressa")
+    expect(momentoDoLead(null, ["1000 Maços / 100 display"], d)).toBe("nao_atende")
+    expect(momentoDoLead("sem_pressa", ["quero 1000"], d)).toBe("sem_pressa")          // a leitura da IA vale
+    expect(momentoDoLead(null, ["Amanhã te envio as medidas", "10x5x5"], d)).toBe("agora")  // mandou depois: volta
+    expect(momentoDoLead(null, ["Quero 1.000 caixinhas de 50ml"], d)).toBe("agora")
+  })
+  it("falta dado e você falou por último: a vez é dele", () => {
+    const m = [lead("2026-11-06T10:00:00Z", "1000"), eu("2026-11-06T11:00:00Z", "Qual a medida?")]
+    expect(estadoDoMql(m, dados({ quantidade: 1000 }), [], agora)!.momento).toBe("com_ele")
+    expect(estadoDoMql([m[0]], dados({ quantidade: 1000 }), [], agora)!.momento).toBe("agora")
+    expect(estadoDoMql([lead("2026-11-06T10:00:00Z", "1000 maços de cigarro")], dados({}), [], agora)).toBeNull()
+  })
   it("placar: orçados, no prazo e atrasados", () => {
-    expect(resumirMeta([{ estado: "orcado", horas: 10 }, { estado: "orcado", horas: 30 }, { estado: "falta", horas: 40 }, { estado: "padrao", horas: 5 }]))
-      .toEqual({ total: 4, orcados: 2, noPrazo: 1, atrasados: 1, prontos: 0, padrao: 1, falta: 1 })
+    expect(resumirMeta([{ estado: "orcado", horas: 10 }, { estado: "orcado", horas: 30 }, { estado: "falta", horas: 40 }, { estado: "padrao", horas: 5 },
+      { estado: "falta", horas: 50, momento: "com_ele" }, { estado: "pronto", horas: 60, momento: "sem_pressa" }]))
+      .toEqual({ total: 4, orcados: 2, noPrazo: 1, atrasados: 1, prontos: 0, padrao: 1, falta: 1, comEle: 1, semPressa: 1 })
   })
 })

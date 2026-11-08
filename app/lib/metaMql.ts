@@ -5,6 +5,24 @@
 import type { DadosPedido } from "./atendente"
 import { padraoDoMl, caberFrasco } from "./digital"
 
+// Produto que não fazemos (a IA aprendeu: cigarro não trabalhamos)
+export const PRODUTO_RECUSADO = /cigarr|tabaco|\bmaços?\b|palheiro/i
+
+// De quem é a vez (a IA diz em "momento"; conversa lida antes disso cai na leitura das últimas mensagens dele)
+export type Momento = "agora" | "com_ele" | "sem_pressa" | "nao_atende"
+const COM_ELE = /\b(vou (conversar|falar|ver|ligar|medir|pensar|analisar|mandar|enviar|passar|chegar|viajar)|te (mando|envio|passo|falo|ligo|retorno)|(amanh[ãa]|depois|mais tarde|segunda|semana que vem) (eu )?(te )?(envio|mando|passo|falo|ligo)|assim que (eu )?(tiver|chegar|estiver)|quando (eu )?(chegar|tiver|voltar)|t[ôo] (em viagem|viajando)|fico de|fico no aguardo de)/i
+const SEM_PRESSA = /(mais pra frente|mais para frente|ano que vem|pr[óo]ximo ano|daqui (a |uns |umas )?\d+ ?(semanas|meses)|at[ée] (janeiro|fevereiro|mar[çc]o|abril)|futuramente|s[óo] (pesquisando|cotando|pra ter (uma )?no[çc][ãa]o)|iniciar (esse )?contato|(fazer|precisa fazer|preciso fazer) uns testes|sem pressa|n[ãa]o tenho pressa)/i
+
+export function momentoDoLead(ia: Momento | null | undefined, textoDoLead: string[], dados: DadosPedido | null): Momento {
+  if (PRODUTO_RECUSADO.test([dados?.produto, dados?.resumo, ...textoDoLead.slice(-6)].filter(Boolean).join(" "))) return "nao_atende"
+  if (ia) return ia
+  if (SEM_PRESSA.test(textoDoLead.join(" \n "))) return "sem_pressa"
+  // Só o que ele disse por último (as duas últimas se a última não traz número): se mandou a medida depois, volta
+  const ult = textoDoLead.at(-1) ?? ""
+  if (COM_ELE.test(/\d/.test(ult) ? ult : textoDoLead.slice(-2).join(" \n "))) return "com_ele"
+  return "agora"
+}
+
 export const META_HORAS = 24
 export const DIAS_META = 7
 
@@ -44,9 +62,9 @@ export function comMedidaPadrao(d: DadosPedido): DadosPedido {
   return { ...d, caixa_cm: { frente: m.l, lateral: m.p, altura: m.a } }
 }
 
-// Um MQL: quando chegou (primeira mensagem dele), quando recebeu o orçamento e o estado agora.
-// null = não é lead novo da janela (já falava antes) ou ainda não escreveu.
-export function estadoDoMql(msgs: MsgMeta[], dados: DadosPedido | null, orcamentoNoSistemaEm: string[] = [], agora = Date.now()) {
+// Um MQL: quando chegou (primeira mensagem dele), quando recebeu o orçamento, de quem é a vez e o estado agora.
+// null = não é lead novo da janela (já falava antes), ainda não escreveu ou é produto que não fazemos.
+export function estadoDoMql(msgs: MsgMeta[], dados: DadosPedido | null, orcamentoNoSistemaEm: string[] = [], agora = Date.now(), ia?: Momento | null) {
   const ord = [...msgs].sort((a, b) => a.ts.localeCompare(b.ts))
   const primeira = ord.find(m => !m.from_me)?.ts
   if (!primeira || agora - new Date(primeira).getTime() > DIAS_META * 86_400_000) return null
@@ -54,18 +72,27 @@ export function estadoDoMql(msgs: MsgMeta[], dados: DadosPedido | null, orcament
   const noSistema = orcamentoNoSistemaEm.filter(t => t > primeira).sort()[0]
   const orcadoEm = [porMsg, noSistema].filter(Boolean).sort()[0] ?? null
   const horas = ((orcadoEm ? new Date(orcadoEm).getTime() : agora) - new Date(primeira).getTime()) / 3_600_000
-  if (orcadoEm) return { primeira, orcadoEm, horas, estado: "orcado" as EstadoMql, falta: [] as string[], padraoMl: null }
+  if (orcadoEm) return { primeira, orcadoEm, horas, estado: "orcado" as EstadoMql, momento: "agora" as Momento, falta: [] as string[], padraoMl: null }
+  const momento = momentoDoLead(ia, ord.filter(m => !m.from_me && m.corpo).map(m => m.corpo!), dados)
+  if (momento === "nao_atende") return null
   const { falta, padraoMl } = faltaParaOrcar(dados)
   const estado: EstadoMql = falta.length ? "falta" : padraoMl ? "padrao" : "pronto"
-  return { primeira, orcadoEm: null, horas, estado, falta, padraoMl }
+  // Falta dado e a última mensagem é sua: você já pediu, a vez é dele (volta para a lista quando ele responder)
+  const vez: Momento = momento === "agora" && estado === "falta" && ord.at(-1)?.from_me ? "com_ele" : momento
+  return { primeira, orcadoEm: null, horas, estado, momento: vez, falta, padraoMl }
 }
 
-export type ResumoMeta = { total: number; orcados: number; noPrazo: number; atrasados: number; prontos: number; padrao: number; falta: number }
+// Placar da meta: conta só o que está (ou esteve) na sua mão. Quem ficou de mandar algo ou decidir (com o cliente)
+// e quem não tem pressa ficam de fora do total e do atraso, só aparecem contados.
+export type ResumoMeta = { total: number; orcados: number; noPrazo: number; atrasados: number; prontos: number; padrao: number; falta: number; comEle: number; semPressa: number }
 
-export function resumirMeta(estados: { estado: EstadoMql; horas: number }[]): ResumoMeta {
-  const r: ResumoMeta = { total: estados.length, orcados: 0, noPrazo: 0, atrasados: 0, prontos: 0, padrao: 0, falta: 0 }
+export function resumirMeta(estados: { estado: EstadoMql; horas: number; momento?: Momento }[]): ResumoMeta {
+  const r: ResumoMeta = { total: 0, orcados: 0, noPrazo: 0, atrasados: 0, prontos: 0, padrao: 0, falta: 0, comEle: 0, semPressa: 0 }
   for (const e of estados) {
-    if (e.estado === "orcado") { r.orcados++; if (e.horas <= META_HORAS) r.noPrazo++; continue }
+    if (e.estado === "orcado") { r.total++; r.orcados++; if (e.horas <= META_HORAS) r.noPrazo++; continue }
+    if (e.momento === "com_ele") { r.comEle++; continue }
+    if (e.momento === "sem_pressa") { r.semPressa++; continue }
+    r.total++
     if (e.horas > META_HORAS) r.atrasados++
     if (e.estado === "pronto") r.prontos++
     else if (e.estado === "padrao") r.padrao++

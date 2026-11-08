@@ -18,10 +18,11 @@ import { textoEstilo, type EstiloFelipe } from "./estilo"
 const ESQUEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["resposta", "etapa", "alerta", "motivo_alerta", "sugere_video", "dados", "lead", "pode_enviar_sozinho"],
+  required: ["resposta", "etapa", "momento", "alerta", "motivo_alerta", "sugere_video", "dados", "lead", "pode_enviar_sozinho"],
   properties: {
     resposta: { type: "string", description: "Mensagem pronta para enviar. Linha em branco separa mensagens. Vazia se não há o que responder." },
     etapa: { type: "string", enum: ["primeiro_contato", "levantando_dados", "orcamento", "negociacao", "pedido", "pos_venda", "outro"] },
+    momento: { type: "string", enum: ["agora", "com_ele", "sem_pressa", "nao_atende"], description: "De quem é a vez para o orçamento sair: agora (o cliente quer o preço e o próximo passo é do Felipe ou da conversa), com_ele (o cliente ficou de mandar algo ou decidir: medidas, arte, conversar com sócio/família, ligar depois, viajando), sem_pressa (só pesquisando, sem data ou para mais pra frente: lançamento em meses, testes antes), nao_atende (produto que não fazemos ou pedido fora do que atendemos)." },
     alerta: { type: "string", enum: ["nenhum", "desconto", "preco", "prazo", "reclamacao", "decisao_sua"] },
     motivo_alerta: { type: "string", description: "Uma frase curta explicando o alerta para o Felipe, ou vazio." },
     sugere_video: { type: "boolean", description: "Se vale mandar um vídeo de produção/caixinha junto." },
@@ -58,7 +59,7 @@ const ESQUEMA = {
   },
 } as const
 
-export type ResultadoAtendente = Atendimento & { lead: LeadAvaliado; pode_enviar_sozinho: boolean; uso?: { entrada: number; cache: number; gravouCache: number; saida: number } }
+export type ResultadoAtendente = Atendimento & { momento?: "agora" | "com_ele" | "sem_pressa" | "nao_atende"; lead: LeadAvaliado; pode_enviar_sozinho: boolean; uso?: { entrada: number; cache: number; gravouCache: number; saida: number } }
 
 // Impressão digital curta (djb2) do que a IA leu
 const assinar = (t: string) => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return `${t.length}:${(h >>> 0).toString(36)}` }

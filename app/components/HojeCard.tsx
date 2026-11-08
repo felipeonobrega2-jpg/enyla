@@ -4,7 +4,7 @@
 // respondeu à retomada primeiro), o que o anúncio trouxe em 24 h, a ação do relatório de marketing e a reativação.
 
 import { useEffect, useState } from "react"
-import { Sun, MessageCircle, RotateCcw, Megaphone, ArrowRight, CheckCircle2, CalendarClock, FileText, Printer, AlertTriangle } from "lucide-react"
+import { Sun, Clock, MessageCircle, RotateCcw, Megaphone, ArrowRight, CheckCircle2, CalendarClock, FileText, Printer, AlertTriangle } from "lucide-react"
 import { Cartao, TituloCartao, LinhaLista, Selo, Botao, Tom } from "./ds"
 import { Hoje, ItemHoje, ItemMeta, haQuanto } from "../lib/hoje"
 import { comMedidaPadrao, textoDoTravado, META_HORAS } from "../lib/metaMql"
@@ -77,6 +77,12 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
         <ProximoPasso jid={x.jid} onFeito={t => { if (t === "orcar") { fetch("/api/hoje").then(r => r.ok ? r.json() : null).then(n => { if (n) setD(n) }).catch(() => {}) } else setFeitos(f => new Set(f).add(x.jid)) }} />
       </div>} />
   )
+  // Um toque: lembrete em 30 dias (sai do Hoje e da meta); o servidor confirma na próxima atualização
+  const naoEAgora = (jid: string) => {
+    setFeitos(f => new Set(f).add(jid))
+    fetch("/api/whatsapp/proximo-passo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid, tipo: "lembrar", dias: 30, nota: "Não era o momento do orçamento" }) })
+      .then(r => { if (!r.ok) throw 0 }).catch(() => setFeitos(f => { const n = new Set(f); n.delete(jid); return n }))
+  }
   const travado = (x: ItemMeta) => (
     <LinhaLista key={x.jid} titulo={x.nome || x.jid.split("@")[0]}
       icone={<FileText className="w-4 h-4" />} tom={x.estado === "falta" ? "info" : "alerta"}
@@ -87,6 +93,8 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
         {onOrcar && x.estado !== "falta" && x.dados && <button onClick={() => onOrcar(x.cliente || x.nome || x.jid.split("@")[0], x.jid, x.estado === "padrao" ? comMedidaPadrao(x.dados!) : x.dados!)}
           title={x.estado === "padrao" ? `Novo orçamento com a caixa padrão de ${x.padraoMl} ml (o cliente confirma a medida depois)` : "Novo orçamento com o que o cliente já contou"}
           className="h-8 px-2 rounded-lg text-[11.5px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors whitespace-nowrap">Orçar{x.estado === "padrao" && <span className="hidden sm:inline">{` ${x.padraoMl}\u00a0ml`}</span>}</button>}
+        <button onClick={e => { e.stopPropagation(); naoEAgora(x.jid) }} title="Não é agora: sai da lista e da meta e volta como lembrete em 30 dias"
+          className="h-8 px-2 rounded-lg text-[11.5px] font-semibold text-[#72707d] hover:bg-[rgba(116,116,128,0.1)] transition-colors whitespace-nowrap flex items-center gap-1"><Clock className="w-3.5 h-3.5" /><span className="hidden sm:inline">Não é agora</span></button>
         <ProximoPasso jid={x.jid} onFeito={() => setFeitos(f => new Set(f).add(x.jid))} />
       </div>} />
   )
@@ -130,9 +138,9 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
                 <div className="mt-1.5 h-1.5 rounded-full bg-[rgba(116,116,128,0.12)] overflow-hidden">
                   <div className="h-full rounded-full bg-[#009351]" style={{ width: `${pct}%` }} />
                 </div>
-                {(m.prontos + m.padrao + m.falta) > 0 && (
+                {(m.prontos + m.padrao + m.falta + m.comEle + m.semPressa) > 0 && (
                   <p className="mt-1.5 text-[11px] text-[#898892] leading-snug">
-                    {[m.prontos ? `${m.prontos} com tudo para orçar` : "", m.padrao ? `${m.padrao} dá para orçar com a caixa padrão do ml` : "", m.falta ? `${m.falta} esperando a medida ou a quantidade` : "", m.atrasados ? `${m.atrasados} já passaram de ${META_HORAS}\u00a0h` : ""].filter(Boolean).join(" · ")}
+                    {[m.prontos ? `${m.prontos} com tudo para orçar` : "", m.padrao ? `${m.padrao} dá para orçar com a caixa padrão do ml` : "", m.falta ? `${m.falta} esperando a medida ou a quantidade` : "", m.atrasados ? `${m.atrasados} já passaram de ${META_HORAS}\u00a0h` : "", m.comEle ? `${m.comEle} com o cliente (ficou de mandar ou decidir)` : "", m.semPressa ? `${m.semPressa} sem pressa` : ""].filter(Boolean).join(" · ")}
                   </p>
                 )}
               </div>

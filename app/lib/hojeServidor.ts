@@ -12,7 +12,10 @@ import { quemResponder, doAnuncio, doDigital, deveOrcamento, aguardaOrcamentoMar
 import { qualidadeDoLead } from "./marketing"
 import { nomeChave } from "./negocio"
 import { gastosAtuais } from "./gastosServidor"
-import { estadoDoMql, resumirMeta, DIAS_META, MsgMeta } from "./metaMql"
+import { estadoDoMql, resumirMeta, DIAS_META, MsgMeta, Momento } from "./metaMql"
+
+// O "momento" da última leitura da IA (de quem é a vez); conversa lida antes disso não tem
+const momentoDaConversa = (pa: string | null | undefined): Momento | null => { try { return (JSON.parse(pa ?? "") as { r?: { momento?: Momento } }).r?.momento ?? null } catch { return null } }
 import type { ItemMeta } from "./hoje"
 
 export async function montarHoje(): Promise<Hoje> {
@@ -54,7 +57,7 @@ export async function montarHoje(): Promise<Hoje> {
 // Quem passou tudo para cotar e ainda não recebeu: sem PDF/documento seu e sem orçamento no sistema depois da última dele
 async function orcamentosParaFazer(convs: ConvHoje[], passos: Passos, vinculos: Record<string, string>): Promise<ItemHoje[]> {
   const marcados = new Set(Object.entries(passos).filter(([, p]) => p.tipo === "orcar").map(([j]) => j))
-  const pre = convs.filter(c => marcados.has(c.jid) || (etapaDaConversa(c.proxima_acao) === "orcamento" && qualidadeDoLead(c) === "mql" && c.ultima_recebida_at
+  const pre = convs.filter(c => marcados.has(c.jid) || (etapaDaConversa(c.proxima_acao) === "orcamento" && qualidadeDoLead(c) === "mql" && (momentoDaConversa(c.proxima_acao) ?? "agora") === "agora" && c.ultima_recebida_at
     && Date.now() - new Date(c.ultima_recebida_at).getTime() < 7 * 86_400_000)).slice(0, 60)
   if (!pre.length) return []
   const { data: cards } = await supabase.from("KanbanCard").select("nomeCliente, createdAt")
@@ -117,13 +120,14 @@ async function metaDoMql(convs: ConvHoje[], passos: Passos, vinculos: Record<str
     const dados = dadosDaConversa(c.proxima_acao)
     const cli = vinculos[c.jid]
     const noSistema = cli ? (cards ?? []).filter(k => k.createdAt && nomeChave(k.nomeCliente) === nomeChave(cli)).map(k => new Date(k.createdAt).toISOString()) : []
-    const e = estadoDoMql(cacheMeta.porJid.get(c.jid) ?? [], dados, noSistema, agora)
+    const e = estadoDoMql(cacheMeta.porJid.get(c.jid) ?? [], dados, noSistema, agora, momentoDaConversa(c.proxima_acao))
     if (!e) continue
     if (c.status_lead === "perdido" && e.estado !== "orcado") continue      // não vai rolar: sai da meta
-    estados.push(e)
-    if (e.estado === "orcado" || jaNoOrcar.has(c.jid) || c.status_lead === "pedido") continue
+    // Você marcou esperando/lembrar ("Não é agora"): a vez é dele, sai do total e da lista
     const p = passos[c.jid]
-    if (p && p.tipo !== "orcar" && new Date(p.ate).getTime() > agora) continue   // você marcou esperando/lembrar
+    if (e.estado !== "orcado" && p && p.tipo !== "orcar" && new Date(p.ate).getTime() > agora) e.momento = p.tipo === "lembrar" ? "sem_pressa" : "com_ele"
+    estados.push(e)
+    if (e.estado === "orcado" || e.momento !== "agora" || jaNoOrcar.has(c.jid) || c.status_lead === "pedido") continue
     travados.push({
       jid: c.jid, nome: c.nome, mensagem: c.ultima_msg, desde: e.primeira, retomada: false, lista: "orcar",
       rotulo: ["ICP", "Oportunidade", "Lead médio"].find(x => (c.etiquetas ?? []).includes(x)) ?? "MQL",
