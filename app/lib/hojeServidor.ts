@@ -12,6 +12,8 @@ import { quemResponder, doAnuncio, doDigital, deveOrcamento, aguardaOrcamentoMar
 import { qualidadeDoLead } from "./marketing"
 import { nomeChave } from "./negocio"
 import { gastosAtuais } from "./gastosServidor"
+import { estadoDoMql, resumirMeta, DIAS_META, MsgMeta } from "./metaMql"
+import type { ItemMeta } from "./hoje"
 
 export async function montarHoje(): Promise<Hoje> {
   const desde = new Date(Date.now() - DIAS_PERDIDO * 86_400_000).toISOString()
@@ -30,9 +32,10 @@ export async function montarHoje(): Promise<Hoje> {
   const t = rel ? total(rel.dia1) : null
   const auto = cfg.reativacaoAuto ?? { ligado: false, porDia: POR_DIA_PADRAO }
   const fila = await candidatos(cfg).catch(() => [])
+  const meta = await metaDoMql(convs, cfg.proximosPassos ?? {}, cfg.vinculosWhatsapp ?? {}, devendo).catch(() => undefined)
   const gastos = await gastosAtuais().then(g => ({ alertas: g.alertas, totalDia: g.totalDia })).catch(() => undefined)
   return {
-    gastos,
+    gastos, meta,
     orcar, responder: responder.filter(x => !devendo.has(x.jid)), retomar: retomar.filter(x => !devendo.has(x.jid)), outrosEsperando: outros, anuncio: doAnuncio(convs),
     marketing: rel?.leitura?.acao ? { dia: rel.dia, acao: rel.leitura.acao, custoMql: t ? custoPor(t.gasto, t.mql) : null } : null,
     reativacao: {
@@ -85,4 +88,50 @@ async function orcamentosParaFazer(convs: ConvHoje[], passos: Passos, vinculos: 
   }))
   // O mais antigo primeiro: quem está esperando há mais tempo
   return out.sort((a, b) => a.desde.localeCompare(b.desde))
+}
+
+// Meta de orçar todo MQL em 24 h: lê as mensagens dos MQLs novos (no máximo a cada 10 min, o Hoje atualiza a cada
+// minuto) e devolve o placar da semana e quem está travado (sem orçamento, fora os que já estão em "Orçamento para fazer")
+let cacheMeta: { em: number; chave: string; porJid: Map<string, MsgMeta[]> } | null = null
+const CACHE_META_MS = 10 * 60_000
+
+async function metaDoMql(convs: ConvHoje[], passos: Passos, vinculos: Record<string, string>, jaNoOrcar: Set<string>): Promise<Hoje["meta"]> {
+  const agora = Date.now()
+  const corte = agora - (DIAS_META + 1) * 86_400_000
+  const cand = convs.filter(c => qualidadeDoLead(c) === "mql" && c.criado_em && new Date(c.criado_em).getTime() > corte).slice(0, 150)
+  const chave = cand.map(c => c.jid).sort().join(",")
+  if (!cacheMeta || agora - cacheMeta.em > CACHE_META_MS || cacheMeta.chave !== chave) {
+    const porJid = new Map<string, MsgMeta[]>()
+    for (let i = 0; i < cand.length; i += 10) {
+      await Promise.all(cand.slice(i, i + 10).map(async c => {
+        const { data } = await supabase.from("whatsapp_mensagens").select("from_me, tipo, ts, corpo").eq("jid", c.jid).order("ts").limit(300)
+        porJid.set(c.jid, (data ?? []) as MsgMeta[])
+      }))
+    }
+    cacheMeta = { em: agora, chave, porJid }
+  }
+  const { data: cards } = await supabase.from("KanbanCard").select("nomeCliente, createdAt")
+  const estados: Parameters<typeof resumirMeta>[0] = []
+  const travados: ItemMeta[] = []
+  for (const c of cand) {
+    const dados = dadosDaConversa(c.proxima_acao)
+    const cli = vinculos[c.jid]
+    const noSistema = cli ? (cards ?? []).filter(k => k.createdAt && nomeChave(k.nomeCliente) === nomeChave(cli)).map(k => new Date(k.createdAt).toISOString()) : []
+    const e = estadoDoMql(cacheMeta.porJid.get(c.jid) ?? [], dados, noSistema, agora)
+    if (!e) continue
+    if (c.status_lead === "perdido" && e.estado !== "orcado") continue      // não vai rolar: sai da meta
+    estados.push(e)
+    if (e.estado === "orcado" || jaNoOrcar.has(c.jid) || c.status_lead === "pedido") continue
+    const p = passos[c.jid]
+    if (p && p.tipo !== "orcar" && new Date(p.ate).getTime() > agora) continue   // você marcou esperando/lembrar
+    travados.push({
+      jid: c.jid, nome: c.nome, mensagem: c.ultima_msg, desde: e.primeira, retomada: false, lista: "orcar",
+      rotulo: ["ICP", "Oportunidade", "Lead médio"].find(x => (c.etiquetas ?? []).includes(x)) ?? "MQL",
+      dados, cliente: cli || null, estado: e.estado, falta: e.falta, padraoMl: e.padraoMl, horas: e.horas,
+    })
+  }
+  // Primeiro o que dá para orçar já (tem tudo, depois medida padrão); dentro de cada um, quem chegou antes
+  const ordem = { pronto: 0, padrao: 1, falta: 2, orcado: 3 }
+  travados.sort((a, b) => ordem[a.estado] - ordem[b.estado] || a.desde.localeCompare(b.desde))
+  return { resumo: resumirMeta(estados), travados }
 }

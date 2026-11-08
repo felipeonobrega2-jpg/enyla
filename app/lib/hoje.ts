@@ -8,6 +8,7 @@ export { ehSoConfirmacao }
 import { qualidadeDoLead } from "./marketing"
 import type { Marcos } from "./agenteLeads"
 import type { DadosPedido } from "./atendente"
+import type { EstadoMql, ResumoMeta } from "./metaMql"
 
 export type ConvHoje = {
   jid: string; nome: string | null; ultima_msg: string | null; ultima_recebida_at: string | null; ultima_enviada_at: string | null
@@ -36,6 +37,9 @@ export type ItemHoje = {
   dados: DadosPedido | null          // o que a IA já tirou da conversa (para o orçamento sair preenchido)
   cliente: string | null             // cliente do cadastro ligado à conversa
 }
+
+// MQL da semana ainda sem orçamento: o que trava e há quantas horas ele chegou
+export type ItemMeta = ItemHoje & { estado: EstadoMql; falta: string[]; padraoMl: number | null; horas: number }
 
 // Etapa da conversa na última leitura da IA ("orcamento" = o cliente já passou o que precisa para cotar)
 export function etapaDaConversa(proximaAcao: string | null | undefined): string | null {
@@ -78,6 +82,7 @@ export type Hoje = {
   marketing: { dia: string; acao: string; custoMql: number | null } | null
   reativacao: { ligado: boolean; hoje: number; porDia: number; fila: number; orcamentosSemResposta?: number }
   gastos?: { alertas: { tipo: "ia" | "meta"; nivel: "alerta" | "perigo"; texto: string }[]; totalDia: number }   // saldo de IA/anúncios acabando
+  meta?: { resumo: ResumoMeta; travados: ItemMeta[] }   // meta de orçar todo MQL em 24 h (7 dias) e quem está travado
   digital?: { ligado: boolean; ativos: number; paraOrcar: number; esperando: number; aguardandoSinal?: number; pagos?: number }   // leads pequenos que você vende em digital (7 dias)
 }
 

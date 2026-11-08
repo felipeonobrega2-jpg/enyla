@@ -169,6 +169,8 @@ export async function talvezRelatorio(origem: string) {
     esperando: hoje.responder.map(x => ({ nome: x.nome, jid: x.jid, rotulo: x.rotulo, quantidade: x.dados?.quantidade }))
       .sort((a, b) => ORDEM_RESUMO.indexOf(a.rotulo) - ORDEM_RESUMO.indexOf(b.rotulo) || (b.quantidade ?? 0) - (a.quantidade ?? 0)),
     orcamentosSemResposta: hoje.reativacao.orcamentosSemResposta ?? 0, retomar: hoje.retomar?.length ?? 0, orcar: (hoje.orcar ?? []).map(x => ({ nome: x.nome, jid: x.jid, quantidade: x.dados?.quantidade })), linkHoje: `${base}/?aba=painel`,
+    meta: hoje.meta ? { total: hoje.meta.resumo.total, orcados: hoje.meta.resumo.orcados, noPrazo: hoje.meta.resumo.noPrazo,
+      jaDa: hoje.meta.travados.filter(x => x.estado !== "falta").length, travados: hoje.meta.travados.length } : undefined,
   } : undefined
   if (destino) await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: textoResumoWhatsapp(rel, `${base}/?aba=meta`, dia) }) }).catch(() => null)
 }

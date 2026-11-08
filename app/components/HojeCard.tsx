@@ -6,7 +6,8 @@
 import { useEffect, useState } from "react"
 import { Sun, MessageCircle, RotateCcw, Megaphone, ArrowRight, CheckCircle2, CalendarClock, FileText, Printer, AlertTriangle } from "lucide-react"
 import { Cartao, TituloCartao, LinhaLista, Selo, Botao, Tom } from "./ds"
-import { Hoje, ItemHoje, haQuanto } from "../lib/hoje"
+import { Hoje, ItemHoje, ItemMeta, haQuanto } from "../lib/hoje"
+import { comMedidaPadrao, textoDoTravado, META_HORAS } from "../lib/metaMql"
 import { ProximoPasso } from "./ProximoPasso"
 import { DadosPedido } from "../lib/atendente"
 
@@ -41,6 +42,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
   const [verTodos, setVerTodos] = useState(false)
   const [verRetomar, setVerRetomar] = useState(false)
   const [feitos, setFeitos] = useState<Set<string>>(new Set())
+  const [verTravados, setVerTravados] = useState(false)
 
   useEffect(() => {
     const carregar = () => fetch("/api/hoje").then(r => r.ok ? r.json() : null).then(x => { if (x) { setD(x); setFeitos(new Set()) } }).catch(() => {})
@@ -55,6 +57,8 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
   const retomar = (d.retomar ?? []).filter(x => !feitos.has(x.jid))
   const orcar = (d.orcar ?? []).filter(x => !feitos.has(x.jid))
   const retomadas = responder.filter(x => x.retomada).length
+  const travados = (d.meta?.travados ?? []).filter(x => !feitos.has(x.jid))
+  const m = d.meta?.resumo
 
   const linha = (x: ItemHoje) => (
     <LinhaLista key={x.jid} titulo={x.nome || x.jid.split("@")[0]}
@@ -71,6 +75,19 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
         {onOrcar && <button onClick={() => onOrcar(x.cliente || x.nome || x.jid.split("@")[0], x.jid, x.dados ?? undefined)} title="Novo orçamento com o que o cliente já contou"
           className="h-8 px-2 rounded-lg text-[11.5px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors whitespace-nowrap">Orçar</button>}
         <ProximoPasso jid={x.jid} onFeito={t => { if (t === "orcar") { fetch("/api/hoje").then(r => r.ok ? r.json() : null).then(n => { if (n) setD(n) }).catch(() => {}) } else setFeitos(f => new Set(f).add(x.jid)) }} />
+      </div>} />
+  )
+  const travado = (x: ItemMeta) => (
+    <LinhaLista key={x.jid} titulo={x.nome || x.jid.split("@")[0]}
+      icone={<FileText className="w-4 h-4" />} tom={x.estado === "falta" ? "info" : "alerta"}
+      sub={`${textoDoTravado(x)} · chegou ${haQuanto(x.desde)} · ${doPedido(x.dados)}${x.dados?.resumo || x.mensagem || ""}`}
+      valor={<span className="hidden sm:inline"><Selo tom={x.horas > META_HORAS ? "perigo" : "alerta"}>{x.horas > META_HORAS ? `${Math.floor(x.horas)} h` : `${Math.max(0, Math.ceil(META_HORAS - x.horas))} h p/ meta`}</Selo></span>}
+      onClick={() => onAbrirConversa(x.jid, x.nome || x.jid.split("@")[0], x.dados ?? undefined)}
+      acao={<div className="flex items-center shrink-0 mr-1">
+        {onOrcar && x.estado !== "falta" && x.dados && <button onClick={() => onOrcar(x.cliente || x.nome || x.jid.split("@")[0], x.jid, x.estado === "padrao" ? comMedidaPadrao(x.dados!) : x.dados!)}
+          title={x.estado === "padrao" ? `Novo orçamento com a caixa padrão de ${x.padraoMl} ml (o cliente confirma a medida depois)` : "Novo orçamento com o que o cliente já contou"}
+          className="h-8 px-2 rounded-lg text-[11.5px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors whitespace-nowrap">Orçar{x.estado === "padrao" && <span className="hidden sm:inline">{` ${x.padraoMl}\u00a0ml`}</span>}</button>}
+        <ProximoPasso jid={x.jid} onFeito={() => setFeitos(f => new Set(f).add(x.jid))} />
       </div>} />
   )
   const a = d.anuncio
@@ -99,12 +116,43 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
               ].filter(Boolean).join(", ")}
               acao={orcar.length + responder.length + retomar.length > 0 ? <Selo tom={orcar.length ? "alerta" : retomadas ? "sucesso" : "acento"}>{orcar.length + responder.length + retomar.length}</Selo> : undefined} />
           </div>
+          {m && m.total > 0 && (() => {
+            const pct = Math.round((m.orcados / m.total) * 100)
+            return (
+              <div className="mx-5 mb-3 rounded-xl px-3.5 py-2.5 bg-[rgba(116,116,128,0.06)]">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-[11.5px] text-[#5e5c68] leading-snug min-w-0">
+                    <span className="font-semibold text-[#191625]">Meta: orçar todo MQL em {META_HORAS} h</span>
+                    {` · 7 dias: ${m.orcados} de ${m.total} orçados, ${m.noPrazo} no prazo`}
+                  </p>
+                  <span className="text-[15px] font-semibold ds-num shrink-0" style={{ color: pct >= 80 ? "#009351" : pct >= 50 ? "#c57800" : "#d33a3c" }}>{pct}%</span>
+                </div>
+                <div className="mt-1.5 h-1.5 rounded-full bg-[rgba(116,116,128,0.12)] overflow-hidden">
+                  <div className="h-full rounded-full bg-[#009351]" style={{ width: `${pct}%` }} />
+                </div>
+                {(m.prontos + m.padrao + m.falta) > 0 && (
+                  <p className="mt-1.5 text-[11px] text-[#898892] leading-snug">
+                    {[m.prontos ? `${m.prontos} com tudo para orçar` : "", m.padrao ? `${m.padrao} dá para orçar com a caixa padrão do ml` : "", m.falta ? `${m.falta} esperando a medida ou a quantidade` : "", m.atrasados ? `${m.atrasados} já passaram de ${META_HORAS}\u00a0h` : ""].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+              </div>
+            )
+          })()}
           <div className="px-2 pb-2 -mt-1">
             {orcar.length > 0 && (<>
               <p className="px-3 pt-1 pb-1 text-[11px] font-bold uppercase tracking-wider text-[#c57800]">Orçamento para fazer</p>
               {orcar.map(linha)}
-              <p className="px-3 pt-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-[#898892]">Responder</p>
             </>)}
+            {travados.length > 0 && (<>
+              <p className="px-3 pt-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-[#c57800]">MQL sem orçamento</p>
+              {(verTravados ? travados : travados.slice(0, MOSTRAR)).map(travado)}
+              {travados.length > MOSTRAR && (
+                <button onClick={() => setVerTravados(v => !v)} className="w-full py-2 text-[12px] font-medium text-[#8456e8] hover:bg-[#8456e8]/[0.04] rounded-lg transition-colors">
+                  {verTravados ? "Mostrar menos" : `Ver todos (${travados.length})`}
+                </button>
+              )}
+            </>)}
+            {(orcar.length > 0 || travados.length > 0) && <p className="px-3 pt-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-[#898892]">Responder</p>}
             {responder.length === 0
               ? <div className="flex items-center gap-2 px-3 pb-3 text-[12px] text-[#5e5c68]"><CheckCircle2 className="w-4 h-4 text-[#009351]" />Em dia: nenhum bom negócio esperando sua resposta.</div>
               : (verTodos ? responder : responder.slice(0, MOSTRAR)).map(linha)}

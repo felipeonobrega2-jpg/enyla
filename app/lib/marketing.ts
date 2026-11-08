@@ -105,6 +105,7 @@ export type DiaNoResumo = {
   retomar?: number                 // lembretes que venceram e bons negócios sem resposta há 3+ dias
   orcar?: { nome: string | null; jid: string; quantidade?: number | null }[]   // passaram tudo e esperam o seu orçamento
   linkHoje: string
+  meta?: { total: number; orcados: number; noPrazo: number; jaDa: number; travados: number }   // meta de orçar todo MQL em 24 h (7 dias)
 }
 const MOSTRAR_NO_RESUMO = 5
 
@@ -118,12 +119,13 @@ export function textoResumoWhatsapp(r: Relatorio, link: string, dia?: DiaNoResum
   const bloco = dia ? [
     orc.length ? `📄 *${orc.length} ${orc.length === 1 ? "orçamento para fazer" : "orçamentos para fazer"}* (já passaram tudo)` : null,
     ...orc.slice(0, MOSTRAR_NO_RESUMO).map(x => `• ${x.nome || x.jid.split("@")[0]}${x.quantidade ? ` · ${x.quantidade.toLocaleString("pt-BR")} un` : ""}`),
+    dia.meta?.total ? `🎯 Meta 24 h (7 dias): ${dia.meta.orcados} de ${dia.meta.total} MQL orçados, ${dia.meta.noPrazo} no prazo${dia.meta.jaDa ? ` · ${dia.meta.jaDa} dá para orçar já` : ""}${dia.meta.travados - dia.meta.jaDa > 0 ? ` · ${dia.meta.travados - dia.meta.jaDa} esperando medida` : ""}` : null,
     n ? `☀️ *${n} ${n === 1 ? "bom negócio esperando" : "bons negócios esperando"} sua resposta*` : "☀️ *Nenhum bom negócio esperando resposta*",
     ...dia.esperando.slice(0, MOSTRAR_NO_RESUMO).map(x => `• ${x.nome || x.jid.split("@")[0]} · ${x.rotulo}${x.quantidade ? ` · ${x.quantidade.toLocaleString("pt-BR")} un` : ""}`),
     n > MOSTRAR_NO_RESUMO ? `• e mais ${n - MOSTRAR_NO_RESUMO}` : null,
     dia.orcamentosSemResposta ? `📄 ${dia.orcamentosSemResposta} ${dia.orcamentosSemResposta === 1 ? "orçamento sem resposta" : "orçamentos sem resposta"} há 2 dias ou mais (retomada pronta em Reativação)` : null,
     dia.retomar ? `🔁 ${dia.retomar} para retomar hoje (lembretes e sem resposta há 3+ dias)` : null,
-    n || orc.length || dia.orcamentosSemResposta || dia.retomar ? `👉 ${dia.linkHoje}` : null,
+    n || orc.length || dia.orcamentosSemResposta || dia.retomar || dia.meta?.travados ? `👉 ${dia.linkHoje}` : null,
     "",
   ] : []
   return [
