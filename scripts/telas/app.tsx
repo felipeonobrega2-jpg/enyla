@@ -359,6 +359,7 @@ function Telas() {
     case "cx-pedidos": case "cx-pedidos-aberto": return pagina(<PedidosSiteView onVerChapas={() => {}} />)
     case "cx-app": return <div style={{ display: "flex", minHeight: "100vh", background: "#f5f5f7" }}>
       <aside style={{ width: 220, background: "#17151f", padding: 8 }}>
+        <div className="px-2 pt-3 pb-4"><img src="../../../public/brand/enyla-wordmark-light.png" style={{ height: 20 }} /></div>
         <SeletorArea caixaria onTrocar={() => {}} />
         <p className="px-2.5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">Caixaria</p>
         <div className="px-2.5 py-2 rounded-lg bg-white/[0.08] text-[13px] text-white">Pedidos do site</div>
