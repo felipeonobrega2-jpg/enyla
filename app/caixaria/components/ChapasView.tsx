@@ -6,8 +6,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Layers, Clock, CheckCircle2, Factory, Package, Wallet, AlertTriangle, Plus, X, Palette, Loader2, RotateCcw, Zap } from "lucide-react"
-import { Pagina, CabecalhoPagina, Cartao, Kpi, GradeKpis, Selo, Botao, Segmentado, Vazio, Gaveta, type Tom } from "./ds"
-import { contas, prazo, vagos, ocupados, ROTULO_ACAB, ROTULO_STATUS, PRODUCAO_DU, type Chapa, type Ocupacao, type StatusChapa } from "@/app/lib/chapas"
+import { Pagina, CabecalhoPagina, Cartao, Kpi, GradeKpis, Selo, Botao, Segmentado, Vazio, Gaveta, type Tom } from "@/app/components/ds"
+import { contas, prazo, vagos, ocupados, ROTULO_ACAB, ROTULO_STATUS, PRODUCAO_DU, type Chapa, type Ocupacao, type StatusChapa } from "@/app/caixaria/lib/chapas"
 
 type Filtro = "aberta" | "producao" | "pronta" | "todas"
 
@@ -65,13 +65,13 @@ export default function ChapasView() {
     if (j.erro) { setErro(j.erro); return }
     setErro(""); setChapas(j.chapas ?? []); setSemDados(j.semDados ?? 0)
   }
-  const buscar = useCallback(() => fetch("/api/chapas").then(r => r.json()).then(receber).catch(() => setErro("Sem conexão")), [])
+  const buscar = useCallback(() => fetch("/api/caixaria/chapas").then(r => r.json()).then(receber).catch(() => setErro("Sem conexão")), [])
   useEffect(() => { buscar() }, [buscar])
 
   const agir = async (corpo: Record<string, unknown>) => {
     setSalvando(true)
     try {
-      const j = await fetch("/api/chapas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }).then(r => r.json())
+      const j = await fetch("/api/caixaria/chapas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }).then(r => r.json())
       receber(j)
       return !j.erro
     } finally { setSalvando(false) }

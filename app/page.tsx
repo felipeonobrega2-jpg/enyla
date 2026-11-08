@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
-import { Layers, Ruler, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb, Truck, Gauge, Printer } from "lucide-react"
+import { Layers, ShoppingBag, Ruler, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb, Truck, Gauge, Printer } from "lucide-react"
 import { IdeiasView } from "./components/IdeiasView"
 import { signOut } from "next-auth/react"
 import WhatsAppView, { ConversaLateral } from "./components/WhatsAppView"
@@ -70,7 +70,9 @@ import { KanbanView } from "./components/KanbanView"
 import { FinanceiroView, ModalLancamento } from "./components/FinanceiroView"
 import GastosView from "./components/GastosView"
 import DigitalPainelView from "./components/DigitalPainelView"
-import ChapasView from "./components/ChapasView"
+import ChapasView from "./caixaria/components/ChapasView"
+import PedidosSiteView from "./caixaria/components/PedidosSiteView"
+import SeletorArea from "./caixaria/components/SeletorArea"
 import { ClienteCombobox, ClienteContactCard } from "./components/ClienteFields"
 import { ModalPersonalizarProposta } from "./components/ModalPersonalizarProposta"
 import { ModalPropostaCustom, BoxPreview3D } from "./components/ModalPropostaCustom"
@@ -193,7 +195,7 @@ export default function Home() {
   const [editandoHistorico, setEditandoHistorico] = useState<string | null>(null)
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
   const [contador, setContador] = useState<number>(0)
-  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias" | "entregas" | "gastos" | "digital" | "chapas">("painel")
+  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias" | "entregas" | "gastos" | "digital" | "cx-pedidos" | "cx-chapas">("painel")
   const [perfilClienteExterno, setPerfilClienteExterno] = useState<string | null>(null)
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
   definirFeriadosLocais(config.feriados)
@@ -321,7 +323,7 @@ export default function Home() {
     // Link direto (ex.: resumo de marketing no WhatsApp abre em Campanhas: /?aba=meta)
     const aba = new URLSearchParams(window.location.search).get("aba")
     const saved = aba ?? sessionStorage.getItem("app:view")
-    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias","entregas","gastos","digital","chapas"]
+    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias","entregas","gastos","digital","cx-pedidos","cx-chapas"]
     // Conquistas virou o cartão "Meta do mês" do Painel
     if (saved === "conquistas") setView("painel")
     else if (saved && valid.includes(saved)) setView(saved as typeof view)
@@ -1502,6 +1504,15 @@ export default function Home() {
             <kbd className="text-[9px] bg-white/[0.07] text-zinc-500 group-hover:text-zinc-400 px-1.5 py-0.5 rounded font-medium shrink-0">⌘K</kbd>
           </button>
 
+          <SeletorArea caixaria={view.startsWith("cx-")} onTrocar={cx => navigate(cx ? "cx-pedidos" : "painel")} />
+
+          {view.startsWith("cx-") ? (<>
+          <NavGroup label="Caixaria" />
+          <NavItem active={view === "cx-pedidos"} onClick={() => navigate("cx-pedidos")} label="Pedidos do site"
+            icon={<ShoppingBag className="w-4 h-4" strokeWidth={1.8} />} />
+          <NavItem active={view === "cx-chapas"} onClick={() => navigate("cx-chapas")} label="Chapas"
+            icon={<Layers className="w-4 h-4" strokeWidth={1.8} />} />
+          </>) : (<>
           <NavItem active={view === "painel"} onClick={() => navigate("painel")} label="Painel"
             icon={<LayoutDashboard className="w-4 h-4" strokeWidth={1.8} />} />
 
@@ -1536,12 +1547,11 @@ export default function Home() {
             icon={<MessageCircle className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "digital"} onClick={() => navigate("digital")} label="Digital"
             icon={<Printer className="w-4 h-4" strokeWidth={1.8} />} />
-          <NavItem active={view === "chapas"} onClick={() => navigate("chapas")} label="Chapas Caixaria"
-            icon={<Layers className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "forma"} onClick={() => navigate("forma")} label="Forma IA"
             icon={<Box className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "ideias"} onClick={() => navigate("ideias")} label="Ideias"
             icon={<Lightbulb className="w-4 h-4" strokeWidth={1.8} />} badge={(config.ideias ?? []).filter(i => i.status !== "feita").length || undefined} />
+          </>)}
         </div>
 
         {/* Sidebar gamificação widgets */}
@@ -2479,8 +2489,10 @@ export default function Home() {
               }}
               onPersonalizar={personalizarHistorico}
             />
-          ) : view === "chapas" ? (
+          ) : view === "cx-chapas" ? (
             <ChapasView />
+          ) : view === "cx-pedidos" ? (
+            <PedidosSiteView onVerChapas={() => navigate("cx-chapas")} />
           ) : view === "digital" ? (
             <DigitalPainelView onAbrirConversa={jid => { setWhatsAbrir({ jid, vez: Date.now() }); navigate("whatsapp") }} />
           ) : view === "gastos" ? (

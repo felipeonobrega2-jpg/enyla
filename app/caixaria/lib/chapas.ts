@@ -9,7 +9,7 @@
 // - Lugar vago pode ser preenchido com trabalho da ENYLA ou com estoque de caixas similares.
 // - O cliente nunca vê nada disso: no site só aparecem preço e prazo.
 
-import { somarDiasUteis, diasUteisEntre } from "./diasUteis"
+import { somarDiasUteis, diasUteisEntre } from "@/app/lib/diasUteis"
 
 export const PRODUCAO_DU = 15          // dias úteis de produção na gráfica
 export const PROMESSA_NORMAL_DU = 30   // prazo máximo prometido na produção normal
@@ -27,6 +27,7 @@ export type Ocupacao = {
   pedido?: string          // número CX-...
   pedidoId?: string
   itemIdx?: number
+  parte?: number           // pedido maior que uma chapa: 0, 1, 2...
   cliente?: string
   telefone?: string
   marca?: string
@@ -66,7 +67,7 @@ export type ItemPago = {
 export const ROTULO_ACAB: Record<string, string> = { "laminacao-fosca": "Laminação fosca", "laminacao-brilho": "Laminação brilho" }
 export const ROTULO_STATUS: Record<StatusChapa, string> = { aberta: "Montando", producao: "Em produção", pronta: "Pronta" }
 
-const id = () => Math.random().toString(36).slice(2, 10)
+const id = () => crypto.randomUUID()
 export const ocupados = (c: Chapa) => c.ocupacao.reduce((s, o) => s + o.lugares, 0)
 export const vagos = (c: Chapa) => Math.max(0, c.lugares - ocupados(c))
 const chaveItem = (pedidoId: string, itemIdx: number) => `${pedidoId}#${itemIdx}`
@@ -87,6 +88,7 @@ export function alocar(chapas: Chapa[], itens: ItemPago[], agora = new Date().to
     let falta = Math.max(1, Math.round(it.qtd / 1000))
     const totalLugares = falta
     let primeiro = true
+    let parteIdx = 0
     let exclusiva: Chapa | undefined   // expressa: chapa(s) só deste item
 
     while (falta > 0) {
@@ -110,7 +112,7 @@ export function alocar(chapas: Chapa[], itens: ItemPago[], agora = new Date().to
       alvo.ocupacao.push({
         id: id(), tipo: "cliente", lugares: n,
         descricao: `${it.nome}${it.marca ? ` · ${it.marca}` : ""}`,
-        pedido: it.pedido, pedidoId: it.pedidoId, itemIdx: it.itemIdx, cliente: it.cliente, telefone: it.telefone, marca: it.marca,
+        pedido: it.pedido, pedidoId: it.pedidoId, itemIdx: it.itemIdx, parte: parteIdx++, cliente: it.cliente, telefone: it.telefone, marca: it.marca,
         receita: Math.round(receitaTotal * parte * 100) / 100,
         frete: Math.round((ch.frete ?? 0) * parte * 100) / 100,
         arte: primeiro ? ch.arte : 0,
