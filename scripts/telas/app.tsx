@@ -42,6 +42,7 @@ import DigitalClient from "@/app/d/[id]/DigitalClient"
 import GastosView from "@/app/components/GastosView"
 import DigitalPainelView from "@/app/components/DigitalPainelView"
 import ChapasView from "@/app/caixaria/components/ChapasView"
+import FacasView from "@/app/caixaria/components/FacasView"
 import PedidosSiteView from "@/app/caixaria/components/PedidosSiteView"
 import SeletorArea from "@/app/caixaria/components/SeletorArea"
 import { alocar } from "@/app/caixaria/lib/chapas"
@@ -133,6 +134,25 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       { id: "2", numero: "CX-261107-B2QX", status: "pago", forma: "cartao", criadoEm: h(30), total: 2479.9, pago: 2479.9, cliente: cli("Essências do Brás"), cidade: "São Paulo/SP", metodo: "Cartão de crédito", itens: [item("Caixa para perfume 100 ml", "6,5 × 6,5 × 13 cm", 2000, 2479.9, "Oud Real")] },
       { id: "3", numero: "CX-261106-M4TA", status: "pago", forma: "pix", criadoEm: h(55), total: 1079.9, pago: 1079.9, cliente: cli("Bella Pele"), cidade: "Curitiba/PR", metodo: "Pix", itens: [item("Caixa para sérum 30 ml", "4 × 4 × 11 cm", 1000, 1079.9, "Pure Skin", true)] },
       { id: "4", numero: "CX-261108-Z9WE", status: "aguardando_pagamento", forma: "pix", criadoEm: h(1), total: 839.9, pago: 0, cliente: cli("Clínica Vitta"), cidade: "Barueri/SP", metodo: null, itens: [item("Caixa para caneta aplicadora", "4 × 3 × 17,5 cm", 1000, 839.9, null)] },
+    ] }))
+  }
+  if (u.startsWith("/api/caixaria/facas")) {
+    const P = (slug: string, codigo: string, nome: string, categoria: string, tipo: string, f: number, l: number, a: number) => ({ slug, codigo, nome, categoria, uso: "", tipo, frente_mm: f, lateral_mm: l, altura_mm: a, foto: `/fotos/${slug}-1.webp` })
+    const produtos = [
+      P("caixa-perfume-50ml", "CX-101", "Caixa para perfume 50 ml", "perfumaria", "simples", 55, 55, 110),
+      P("caixa-perfume-100ml", "CX-102", "Caixa para perfume 100 ml", "perfumaria", "simples", 65, 65, 130),
+      P("caixa-perfume-30ml", "CX-103", "Caixa para perfume 30 ml", "perfumaria", "simples", 40, 40, 100),
+      P("caixa-body-splash", "CX-104", "Caixa para body splash 200 ml", "perfumaria", "fundo-automatico", 60, 60, 200),
+      P("caixa-serum-conta-gotas", "CX-107", "Caixa para sérum 30 ml", "cosmeticos", "simples", 40, 40, 110),
+      P("caixa-caneta-aplicadora", "CX-111", "Caixa para caneta aplicadora", "saude-e-bem-estar", "simples", 40, 30, 175),
+    ]
+    const F = (id: string, codigo: string, nome: string, tipo: string, f: number, l: number, a: number, lugares: number | null, produto_slug: string | null, tem_faca = true, no_site = true) =>
+      ({ id, codigo, nome, tipo, frente_mm: f, lateral_mm: l, altura_mm: a, lugares, planificacao: null, produto_slug, tem_faca, no_site, obs: "", atualizada_em: new Date().toISOString() })
+    return new Response(JSON.stringify({ produtos, erroSite: "", facas: [
+      F("1", "F-012", "Caixa perfume 100 ml", "simples", 66, 66, 128, 4, "caixa-perfume-100ml"),
+      F("2", "F-007", "Caixa perfume 50 ml", "simples", 56, 54, 112, 6, "caixa-perfume-50ml"),
+      F("3", "SEM-CX-104", "Caixa body splash 200 ml", "fundo-automatico", 60, 60, 200, null, "caixa-body-splash", false, false),
+      F("4", "F-031", "Similar decant 10 ml", "simples", 25, 25, 90, 18, null),
     ] }))
   }
   if (u.startsWith("/api/caixaria/chapas")) {
@@ -356,6 +376,7 @@ function Telas() {
     </div>
     case "gastos": case "gastos-m": return pagina(<GastosView />)
     case "chapas": case "chapas-m": case "chapas-aberta": return pagina(<ChapasView />)
+    case "facas": case "facas-m": case "facas-aberta": case "facas-nova": case "facas-lista": return pagina(<FacasView />)
     case "cx-pedidos": case "cx-pedidos-aberto": return pagina(<PedidosSiteView onVerChapas={() => {}} />)
     case "cx-app": return <div style={{ display: "flex", minHeight: "100vh", background: "#f5f5f7" }}>
       <aside style={{ width: 220, background: "#17151f", padding: 8 }}>

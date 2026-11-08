@@ -2,9 +2,11 @@
 //   caixaria_pedidos        pedidos do site (o site grava; aqui só lemos)
 //   caixaria_chapas         chapas compartilhadas
 //   caixaria_chapa_lugares  o que ocupa cada chapa (item de pedido, ENYLA ou estoque)
+//   caixaria_facas          cadastro de facas (o site lê: medidas reais, lugares por chapa, à venda ou não)
 // SQL em supabase/migrations/20261108_caixaria_chapas.sql.
 
 import { supabase } from "@/app/lib/supabase"
+import { erroFaca, type DadosFaca, type Faca, type ProdutoSite } from "./facas"
 import { alocar, vagos, type Chapa, type ItemPago, type Ocupacao, type StatusChapa, type TipoLugar } from "./chapas"
 
 // ── Pedidos do site ───────────────────────────────────────────────────────────
@@ -159,4 +161,59 @@ export async function aplicar(a: AcaoChapa) {
     if (a.status === "aberta") { mud.fechada_em = null; mud.pronta_em = null }
     ok(await supabase.from("caixaria_chapas").update(mud).eq("id", c.id))
   }
+}
+
+// ── Facas ─────────────────────────────────────────────────────────────────────
+// caixaria_facas (SQL em supabase/migrations/20261108_caixaria_facas.sql). O site lê a tabela;
+// depois de salvar, avisamos o site (/api/revalidar) para a loja atualizar na hora.
+
+
+const SITE_CAIXARIA = process.env.CAIXARIA_SITE_URL ?? "https://caixaria.com"
+
+export async function listarFacas(): Promise<Faca[]> {
+  const { data, error } = await supabase.from("caixaria_facas").select("*").order("codigo")
+  if (error) throw new Error("caixaria_facas: " + error.message)
+  return ((data ?? []) as Faca[]).map(f => ({ ...f, frente_mm: Number(f.frente_mm), lateral_mm: Number(f.lateral_mm), altura_mm: Number(f.altura_mm) }))
+}
+
+export async function produtosDoSite(): Promise<ProdutoSite[]> {
+  const r = await fetch(`${SITE_CAIXARIA}/api/catalogo`, { cache: "no-store", signal: AbortSignal.timeout(8000) })
+  if (!r.ok) throw new Error(`caixaria.com respondeu ${r.status}`)
+  return ((await r.json()).produtos ?? []) as ProdutoSite[]
+}
+
+async function avisarSite(): Promise<boolean> {
+  const segredo = process.env.CAIXARIA_REVALIDAR_SEGREDO
+  if (!segredo) return false
+  try {
+    const r = await fetch(`${SITE_CAIXARIA}/api/revalidar`, { method: "POST", headers: { "x-segredo": segredo }, signal: AbortSignal.timeout(8000) })
+    return r.ok
+  } catch { return false }
+}
+
+export async function salvarFaca(d: DadosFaca): Promise<{ siteAtualizado: boolean }> {
+  const erro = erroFaca(d)
+  if (erro) throw new Error(erro)
+  const linha = {
+    codigo: d.codigo.trim().toUpperCase().slice(0, 30), nome: d.nome.trim().slice(0, 80), tipo: d.tipo,
+    frente_mm: Number(d.frente_mm), lateral_mm: Number(d.lateral_mm), altura_mm: Number(d.altura_mm),
+    lugares: d.lugares ?? null, planificacao: d.planificacao?.slice(0, 40) || null,
+    produto_slug: d.produto_slug || null, tem_faca: !!d.tem_faca, no_site: !!d.no_site && !!d.tem_faca,
+    obs: (d.obs ?? "").slice(0, 500), atualizada_em: new Date().toISOString(),
+  }
+  const r = d.id
+    ? await supabase.from("caixaria_facas").update(linha).eq("id", d.id)
+    : await supabase.from("caixaria_facas").insert(linha)
+  if (r.error) {
+    if (/duplicate key.*codigo/i.test(r.error.message)) throw new Error("Já existe uma faca com esse código")
+    if (/duplicate key.*produto_slug/i.test(r.error.message)) throw new Error("Essa caixa do site já tem outra faca")
+    throw new Error(r.error.message)
+  }
+  return { siteAtualizado: await avisarSite() }
+}
+
+export async function apagarFaca(id: string): Promise<{ siteAtualizado: boolean }> {
+  const { error } = await supabase.from("caixaria_facas").delete().eq("id", id)
+  if (error) throw new Error(error.message)
+  return { siteAtualizado: await avisarSite() }
 }

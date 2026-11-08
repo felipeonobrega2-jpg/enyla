@@ -72,6 +72,7 @@ import GastosView from "./components/GastosView"
 import DigitalPainelView from "./components/DigitalPainelView"
 import ChapasView from "./caixaria/components/ChapasView"
 import PedidosSiteView from "./caixaria/components/PedidosSiteView"
+import FacasView from "./caixaria/components/FacasView"
 import SeletorArea from "./caixaria/components/SeletorArea"
 import { ClienteCombobox, ClienteContactCard } from "./components/ClienteFields"
 import { ModalPersonalizarProposta } from "./components/ModalPersonalizarProposta"
@@ -195,7 +196,7 @@ export default function Home() {
   const [editandoHistorico, setEditandoHistorico] = useState<string | null>(null)
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
   const [contador, setContador] = useState<number>(0)
-  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias" | "entregas" | "gastos" | "digital" | "cx-pedidos" | "cx-chapas">("painel")
+  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias" | "entregas" | "gastos" | "digital" | "cx-pedidos" | "cx-chapas" | "cx-facas">("painel")
   const [perfilClienteExterno, setPerfilClienteExterno] = useState<string | null>(null)
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
   definirFeriadosLocais(config.feriados)
@@ -323,7 +324,7 @@ export default function Home() {
     // Link direto (ex.: resumo de marketing no WhatsApp abre em Campanhas: /?aba=meta)
     const aba = new URLSearchParams(window.location.search).get("aba")
     const saved = aba ?? sessionStorage.getItem("app:view")
-    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias","entregas","gastos","digital","cx-pedidos","cx-chapas"]
+    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias","entregas","gastos","digital","cx-pedidos","cx-chapas","cx-facas"]
     // Conquistas virou o cartão "Meta do mês" do Painel
     if (saved === "conquistas") setView("painel")
     else if (saved && valid.includes(saved)) setView(saved as typeof view)
@@ -1512,6 +1513,8 @@ export default function Home() {
             icon={<ShoppingBag className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "cx-chapas"} onClick={() => navigate("cx-chapas")} label="Chapas"
             icon={<Layers className="w-4 h-4" strokeWidth={1.8} />} />
+          <NavItem active={view === "cx-facas"} onClick={() => navigate("cx-facas")} label="Facas"
+            icon={<Ruler className="w-4 h-4" strokeWidth={1.8} />} />
           </>) : (<>
           <NavItem active={view === "painel"} onClick={() => navigate("painel")} label="Painel"
             icon={<LayoutDashboard className="w-4 h-4" strokeWidth={1.8} />} />
@@ -2489,6 +2492,8 @@ export default function Home() {
               }}
               onPersonalizar={personalizarHistorico}
             />
+          ) : view === "cx-facas" ? (
+            <FacasView />
           ) : view === "cx-chapas" ? (
             <ChapasView />
           ) : view === "cx-pedidos" ? (
