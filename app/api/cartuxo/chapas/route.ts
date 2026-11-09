@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { chapasAtualizadas, aplicar, type AcaoChapa } from "@/app/caixaria/lib/servidor"
+import { chapasAtualizadas, aplicar, type AcaoChapa } from "@/app/cartuxo/lib/servidor"
 
 // Cartuxo · chapas (rota protegida pelo login)
-const SEM_TABELA = "As tabelas da Cartuxo ainda não existem. Rode supabase/migrations/20261108_caixaria_chapas.sql no SQL Editor do Supabase."
+const SEM_TABELA = "As tabelas da Cartuxo ainda não existem. Rode supabase/migrations/20261108_cartuxo_chapas.sql no SQL Editor do Supabase."
 const mensagem = (e: unknown) => {
   const m = (e as Error).message ?? String(e)
   return /does not exist|could not find the table|schema cache/i.test(m) ? SEM_TABELA : m
@@ -12,7 +12,7 @@ export async function GET() {
   try {
     return NextResponse.json(await chapasAtualizadas())
   } catch (e) {
-    console.error("caixaria/chapas", e)
+    console.error("cartuxo/chapas", e)
     return NextResponse.json({ erro: mensagem(e) }, { status: 500 })
   }
 }

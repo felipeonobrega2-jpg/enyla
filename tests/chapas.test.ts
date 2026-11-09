@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { alocar, contas, prazo, vagos, type ItemPago } from "@/app/caixaria/lib/chapas"
+import { alocar, contas, prazo, vagos, type ItemPago } from "@/app/cartuxo/lib/chapas"
 
 const ch = (prazoId = "economico", acabId = "laminacao-fosca") => ({ prazoId, acabId, porChapa: 4, formato: "66x48", rodada: 1340, colagemPorMil: 75, arte: 70, frete: 0 })
 const item = (n: number, qtd: number, extra: Partial<ItemPago> = {}): ItemPago => ({

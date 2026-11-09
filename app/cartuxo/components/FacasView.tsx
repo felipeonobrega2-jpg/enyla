@@ -1,10 +1,11 @@
 "use client"
 
 // Cartuxo · cadastro de facas. O que a produção tem de verdade: medidas, quantas cabem na chapa 66×48
-// e se a caixa pode ser vendida no site. O site caixaria.com lê daqui e atualiza na hora.
+// e se a caixa pode ser vendida no site. O site da loja lê daqui e atualiza na hora.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Ruler, RotateCcw, Plus, AlertTriangle, CheckCircle2, Upload, ExternalLink, Trash2 } from "lucide-react"
+import { SITE_CARTUXO } from "../lib/site"
 import { Pagina, CabecalhoPagina, Cartao, Kpi, GradeKpis, Selo, Botao, Segmentado, LinhaLista, Vazio, Gaveta } from "@/app/components/ds"
 import { parseDXF, caixaDoDxf } from "@/app/lib/dxf"
 import {
@@ -12,7 +13,7 @@ import {
   type Faca, type ProdutoSite, type TipoFaca, type DadosFaca,
 } from "../lib/facas"
 
-const SITE = "https://caixaria.com"
+const SITE = SITE_CARTUXO
 const inteiro = (n: number) => n.toLocaleString("pt-BR")
 type Aba = "site" | "facas"
 type Form = Omit<DadosFaca, "lugares" | "frente_mm" | "lateral_mm" | "altura_mm"> & { frente_mm: string; lateral_mm: string; altura_mm: string; lugares: string; dxfCabem?: number }
@@ -70,7 +71,7 @@ export default function FacasView() {
     setErro(""); setFacas(j.facas ?? []); setProdutos(j.produtos ?? []); setErroSite(j.erroSite ?? "")
     return true
   }
-  const buscar = useCallback(() => fetch("/api/caixaria/facas").then(r => r.json()).then(receber).catch(() => setErro("Sem conexão")), [])
+  const buscar = useCallback(() => fetch("/api/cartuxo/facas").then(r => r.json()).then(receber).catch(() => setErro("Sem conexão")), [])
   useEffect(() => { buscar() }, [buscar])
 
   const porSlug = useMemo(() => new Map((facas ?? []).filter(f => f.produto_slug).map(f => [f.produto_slug!, f])), [facas])
@@ -90,7 +91,7 @@ export default function FacasView() {
   async function enviar(corpo: object, msg: string) {
     setSalvando(true); setErroForm("")
     try {
-      const j = await fetch("/api/caixaria/facas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }).then(x => x.json())
+      const j = await fetch("/api/cartuxo/facas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }).then(x => x.json())
       if (j.erro) { setErroForm(j.erro); return }
       receber(j); setForm(null)
       setAviso(j.siteAtualizado ? `${msg} O site já está com a mudança.` : `${msg} O site atualiza em até 5 minutos.`)
@@ -154,7 +155,7 @@ export default function FacasView() {
       <Cartao padding={false}>
         {!facas ? <p className="p-5 text-[13px] text-[#8E8E93]">Lendo as facas</p>
           : aba === "site" ? (
-            produtos.length === 0 ? <Vazio icone={<Ruler className="w-9 h-9 text-[#c7c7cc]" />} titulo="Sem a lista do site" sub="Não deu para ler as caixas de caixaria.com agora." />
+            produtos.length === 0 ? <Vazio icone={<Ruler className="w-9 h-9 text-[#c7c7cc]" />} titulo="Sem a lista do site" sub="Não deu para ler as caixas do site agora." />
               : produtos.map(p => {
                 const f = porSlug.get(p.slug), s = situacao(f), base = f ?? p
                 const lug = f?.lugares ?? lugaresCalculados(base.tipo, base.frente_mm, base.lateral_mm, base.altura_mm)

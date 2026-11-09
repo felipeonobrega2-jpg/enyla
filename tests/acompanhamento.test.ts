@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { estadoArte, etapaAtual, avisos, type Acompanhamento } from "@/app/caixaria/lib/acompanhamento"
+import { estadoArte, etapaAtual, avisos, type Acompanhamento } from "@/app/cartuxo/lib/acompanhamento"
 
 const em = (h: number) => new Date(Date.UTC(2026, 10, 8, h)).toISOString()
 const v = { url: "https://x/a.png", nome: "a.png", em: em(1) }

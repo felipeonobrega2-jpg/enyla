@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { pedidosSite, lerRecuperacao, registrarRecuperacao, linkEnvioArte, aplicarArte, type AcaoRecuperacao, type AcaoArte, type PedidoSite } from "@/app/caixaria/lib/servidor"
+import { pedidosSite, lerRecuperacao, registrarRecuperacao, linkEnvioArte, aplicarArte, type AcaoRecuperacao, type AcaoArte, type PedidoSite } from "@/app/cartuxo/lib/servidor"
 
 // Cartuxo · pedidos do site, últimos 90 dias, e a recuperação de quem parou no pagamento (rota protegida pelo login)
-const SEM_TABELA = "Para registrar os contatos, rode supabase/migrations/20261108_caixaria_config.sql no SQL Editor do Supabase."
+const SEM_TABELA = "Para registrar os contatos, rode supabase/migrations/20261108_cartuxo_config.sql no SQL Editor do Supabase."
 
 const paraTela = (p: PedidoSite) => ({
   id: p.id, numero: p.numero, status: p.status, forma: p.forma, criadoEm: p.criado_em, total: Number(p.subtotal), pago: Number(p.valor_pago),
@@ -18,7 +18,7 @@ export async function GET() {
     const [pedidos, rec] = await Promise.all([pedidosSite(90), lerRecuperacao().then(r => ({ r, aviso: "" })).catch(() => ({ r: {}, aviso: SEM_TABELA }))])
     return NextResponse.json({ pedidos: pedidos.map(paraTela), recuperacao: rec.r, avisoRecuperacao: rec.aviso })
   } catch (e) {
-    console.error("caixaria/pedidos", e)
+    console.error("cartuxo/pedidos", e)
     return NextResponse.json({ erro: (e as Error).message }, { status: 500 })
   }
 }

@@ -1,6 +1,6 @@
 "use client"
 
-// Cartuxo · pedidos feitos no site (caixaria.com). Quem pagou, quem ficou no meio do caminho e o que cada um levou.
+// Cartuxo · pedidos feitos no site da loja. Quem pagou, quem ficou no meio do caminho e o que cada um levou.
 // Pedido pago entra sozinho na chapa (tela Chapas).
 
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -9,6 +9,7 @@ import ArtePedido, { resumoArte } from "./ArtePedido"
 import type { Acompanhamento } from "../lib/acompanhamento"
 import { situacao, esfriouDeVez, mensagem, linkWhats, quandoTexto, MOTIVOS, type Recuperacao, type Situacao } from "../lib/recuperacao"
 import { Pagina, CabecalhoPagina, Cartao, Kpi, GradeKpis, Selo, Botao, Segmentado, LinhaLista, Vazio, Gaveta, type Tom } from "@/app/components/ds"
+import { SITE_CARTUXO, DOMINIO_CARTUXO } from "../lib/site"
 
 type Item = { nome: string; medida: string; qtd: number; acab: string; prazo: string; marca: string | null; freteIncluso: boolean; total: number }
 type Pedido = {
@@ -18,7 +19,7 @@ type Pedido = {
 }
 type Filtro = "pagos" | "arte" | "aguardando" | "arquivados" | "todos"
 
-const SITE = "https://caixaria.com"
+const SITE = SITE_CARTUXO
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 const n = (x: number) => x.toLocaleString("pt-BR")
 const quando = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
@@ -41,7 +42,7 @@ export default function PedidosSiteView({ onVerChapas }: { onVerChapas?: () => v
   const [motivo, setMotivo] = useState("")
   const [agora, setAgora] = useState(() => Date.now())
 
-  const buscar = useCallback(() => fetch("/api/caixaria/pedidos").then(r => r.json())
+  const buscar = useCallback(() => fetch("/api/cartuxo/pedidos").then(r => r.json())
     .then(j => { if (j.erro) setErro(j.erro); else { setErro(""); setPedidos(j.pedidos ?? []); setRec(j.recuperacao ?? {}); setAvisoRec(j.avisoRecuperacao ?? ""); setAgora(Date.now()) } })
     .catch(() => setErro("Sem conexão")), [])
   useEffect(() => { buscar() }, [buscar])
@@ -59,7 +60,7 @@ export default function PedidosSiteView({ onVerChapas }: { onVerChapas?: () => v
 
   async function agir(acao: "toque" | "desfazer" | "arquivar" | "reabrir", p: Pedido, extra: object = {}) {
     try {
-      const j = await fetch("/api/caixaria/pedidos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao, pedido: p.id, ...extra }) }).then(x => x.json())
+      const j = await fetch("/api/cartuxo/pedidos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao, pedido: p.id, ...extra }) }).then(x => x.json())
       if (j.erro) { setAvisoRec(j.erro); return false }
       setRec(j.recuperacao ?? {}); setAgora(Date.now()); return true
     } catch { setAvisoRec("Sem conexão"); return false }
@@ -96,7 +97,7 @@ export default function PedidosSiteView({ onVerChapas }: { onVerChapas?: () => v
 
   return (
     <Pagina>
-      <CabecalhoPagina titulo="Pedidos do site" sub="Pedidos feitos em caixaria.com nos últimos 90 dias. Pedido pago entra sozinho na chapa."
+      <CabecalhoPagina titulo="Pedidos do site" sub={`Pedidos feitos em ${DOMINIO_CARTUXO} nos últimos 90 dias. Pedido pago entra sozinho na chapa.`}
         acoes={<div className="flex gap-2">
           <Botao icone={<RotateCcw className="w-3.5 h-3.5" />} onClick={buscar}>Atualizar</Botao>
           <a href={SITE} target="_blank" rel="noopener"><Botao icone={<ExternalLink className="w-3.5 h-3.5" />}>Abrir o site</Botao></a>
@@ -123,7 +124,7 @@ export default function PedidosSiteView({ onVerChapas }: { onVerChapas?: () => v
       <Cartao padding={false}>
         {!pedidos ? <p className="p-5 text-[13px] text-[#8E8E93]">Lendo os pedidos do site</p>
           : lista.length === 0 ? <Vazio icone={<ShoppingBag className="w-9 h-9 text-[#c7c7cc]" />} titulo="Nenhum pedido aqui"
-            sub={filtro === "aguardando" ? "Ninguém parou no pagamento." : filtro === "arquivados" ? "Quem desistir aparece aqui, com o motivo." : "Os pedidos de caixaria.com aparecem aqui."} />
+            sub={filtro === "aguardando" ? "Ninguém parou no pagamento." : filtro === "arquivados" ? "Quem desistir aparece aqui, com o motivo." : `Os pedidos de ${DOMINIO_CARTUXO} aparecem aqui.`} />
           : lista.map(p => {
             const s = STATUS[p.status] ?? { tom: "neutro" as Tom, texto: p.status }
             const caixas = p.itens.reduce((a, i) => a + i.qtd, 0)

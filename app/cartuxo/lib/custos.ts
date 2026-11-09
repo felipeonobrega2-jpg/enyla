@@ -1,5 +1,5 @@
 // Cartuxo · custos e preço (lógica pura, usada na tela, no servidor e nos testes).
-// É a mesma conta do site (caixaria/lib/preco.ts: Custos, custoRodada, cotar): se mudar lá, mudar aqui.
+// É a mesma conta do site (cartuxo/lib/preco.ts: Custos, custoRodada, cotar): se mudar lá, mudar aqui.
 // O teste tests/custos.test.ts trava os preços de referência.
 
 import { planificacao, cabemNaChapa, type TipoFaca } from "./facas"

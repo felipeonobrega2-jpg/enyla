@@ -49,7 +49,7 @@ export default function ArtePedido({ p, onPedidos }: { p: PedidoArte; onPedidos:
   useEffect(() => { const l = avisos(p, p.acompanhamento); const ult = l.at(-1); setAviso(ult?.id ?? ""); setTexto(ult?.texto ?? "") }, [p])
 
   async function post(corpo: object) {
-    const j = await fetch("/api/caixaria/pedidos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }).then(r => r.json())
+    const j = await fetch("/api/cartuxo/pedidos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }).then(r => r.json())
     if (j.erro) throw new Error(j.erro)
     return j
   }

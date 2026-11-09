@@ -1,12 +1,13 @@
 // Módulo Cartuxo no servidor. Tabelas próprias no Supabase (nada na configuração da ENYLA):
-//   caixaria_pedidos        pedidos do site (o site grava; aqui só lemos)
-//   caixaria_chapas         chapas compartilhadas
-//   caixaria_chapa_lugares  o que ocupa cada chapa (item de pedido, ENYLA ou estoque)
-//   caixaria_config         custos e regras de preço (chave "custos"); o site lê
-//   caixaria_facas          cadastro de facas (o site lê: medidas reais, lugares por chapa, à venda ou não)
-// SQL em supabase/migrations/20261108_caixaria_chapas.sql.
+//   cartuxo_pedidos        pedidos do site (o site grava; aqui só lemos)
+//   cartuxo_chapas         chapas compartilhadas
+//   cartuxo_chapa_lugares  o que ocupa cada chapa (item de pedido, ENYLA ou estoque)
+//   cartuxo_config         custos e regras de preço (chave "custos"); o site lê
+//   cartuxo_facas          cadastro de facas (o site lê: medidas reais, lugares por chapa, à venda ou não)
+// SQL em supabase/migrations/20261108_cartuxo_chapas.sql.
 
 import { supabase } from "@/app/lib/supabase"
+import { SITE_CARTUXO, DOMINIO_CARTUXO } from "./site"
 import type { Recuperacao } from "./recuperacao"
 import type { Acompanhamento } from "./acompanhamento"
 import { normalizarCustos, type Custos } from "./custos"
@@ -27,18 +28,18 @@ export type PedidoSite = {
 
 export async function pedidosSite(dias = 90): Promise<PedidoSite[]> {
   const desde = new Date(Date.now() - dias * 86_400_000).toISOString()
-  const { data, error } = await supabase.from("caixaria_pedidos")
+  const { data, error } = await supabase.from("cartuxo_pedidos")
     .select("*")
     .gte("criado_em", desde).order("criado_em", { ascending: false }).limit(500)
-  if (error) throw new Error("caixaria_pedidos: " + error.message)
+  if (error) throw new Error("cartuxo_pedidos: " + error.message)
   return (data ?? []) as PedidoSite[]
 }
 
 async function itensPagos(): Promise<ItemPago[]> {
-  const { data, error } = await supabase.from("caixaria_pedidos")
+  const { data, error } = await supabase.from("cartuxo_pedidos")
     .select("id, numero, status, forma, criado_em, atualizado_em, cliente, itens, mp_pagamentos")
     .in("status", ["pago", "sinal_pago"]).order("criado_em", { ascending: true }).limit(2000)
-  if (error) throw new Error("caixaria_pedidos: " + error.message)
+  if (error) throw new Error("cartuxo_pedidos: " + error.message)
   return ((data ?? []) as PedidoSite[]).flatMap(p => {
     const aprovado = (p.mp_pagamentos ?? []).filter(x => x.status === "approved").map(x => x.em).sort()[0]
     return (p.itens ?? []).map((i, idx) => ({
@@ -80,10 +81,10 @@ function deLinha(c: LinhaChapa, lugares: LinhaLugar[]): Chapa {
 
 async function lerChapas(): Promise<Chapa[]> {
   const [{ data: cs, error: e1 }, { data: ls, error: e2 }] = await Promise.all([
-    supabase.from("caixaria_chapas").select("*").order("numero", { ascending: true }),
-    supabase.from("caixaria_chapa_lugares").select("*"),
+    supabase.from("cartuxo_chapas").select("*").order("numero", { ascending: true }),
+    supabase.from("cartuxo_chapa_lugares").select("*"),
   ])
-  if (e1 || e2) throw new Error("caixaria_chapas: " + (e1 ?? e2)!.message)
+  if (e1 || e2) throw new Error("cartuxo_chapas: " + (e1 ?? e2)!.message)
   return ((cs ?? []) as LinhaChapa[]).map(c => deLinha(c, (ls ?? []) as LinhaLugar[]))
 }
 
@@ -101,13 +102,13 @@ async function sincronizarArtes(chapas: Chapa[]): Promise<boolean> {
   const faltam = chapas.flatMap(c => c.ocupacao).filter(o => o.tipo === "cliente" && o.pedidoId && !o.arteAprovadaEm)
   if (!faltam.length) return false
   const ids = [...new Set(faltam.map(o => o.pedidoId!))]
-  const { data } = await supabase.from("caixaria_pedidos").select("id, acompanhamento").in("id", ids)
+  const { data } = await supabase.from("cartuxo_pedidos").select("id, acompanhamento").in("id", ids)
   const acomp = new Map(((data ?? []) as { id: string; acompanhamento: Acompanhamento | null }[]).map(p => [p.id, p.acompanhamento]))
   let mudou = false
   for (const o of faltam) {
     const em = acomp.get(o.pedidoId!)?.artes?.[o.itemIdx ?? -1]?.aprovadaEm
     if (!em) continue
-    await supabase.from("caixaria_chapa_lugares").update({ arte_aprovada_em: em }).eq("pedido_id", o.pedidoId!).eq("item_idx", o.itemIdx!).is("arte_aprovada_em", null)
+    await supabase.from("cartuxo_chapa_lugares").update({ arte_aprovada_em: em }).eq("pedido_id", o.pedidoId!).eq("item_idx", o.itemIdx!).is("arte_aprovada_em", null)
     mudou = true
   }
   return mudou
@@ -123,21 +124,21 @@ export async function chapasAtualizadas(): Promise<{ chapas: Chapa[]; semDados: 
   const antes = new Set(atuais.flatMap(c => c.ocupacao.map(o => o.id)))
   const novasChapas = chapas.filter(c => !existentes.has(c.id))
   if (novasChapas.length) {
-    const { error } = await supabase.from("caixaria_chapas").insert(novasChapas.map(c => ({
+    const { error } = await supabase.from("cartuxo_chapas").insert(novasChapas.map(c => ({
       id: c.id, modelo: c.modelo, modelo_nome: c.modeloNome, acabamento: c.acabamento, expressa: c.expressa, lugares: c.lugares,
       formato: c.formato, rodada: c.rodada, colagem_por_mil: c.colagemPorMil, status: c.status,
     })))
-    if (error) throw new Error("caixaria_chapas: " + error.message)
+    if (error) throw new Error("cartuxo_chapas: " + error.message)
   }
   const novosLugares = chapas.flatMap(c => c.ocupacao.filter(o => !antes.has(o.id)).map(o => paraLinhaLugar(c.id, o)))
-  const { error } = await supabase.from("caixaria_chapa_lugares").upsert(novosLugares, { onConflict: "pedido_id,item_idx,parte", ignoreDuplicates: true })
-  if (error) throw new Error("caixaria_chapa_lugares: " + error.message)
+  const { error } = await supabase.from("cartuxo_chapa_lugares").upsert(novosLugares, { onConflict: "pedido_id,item_idx,parte", ignoreDuplicates: true })
+  if (error) throw new Error("cartuxo_chapa_lugares: " + error.message)
   // Chapa criada por uma leitura que perdeu a corrida fica vazia: apaga
   if (novasChapas.length) {
-    const { data: ocupadas } = await supabase.from("caixaria_chapa_lugares").select("chapa_id").in("chapa_id", novasChapas.map(c => c.id))
+    const { data: ocupadas } = await supabase.from("cartuxo_chapa_lugares").select("chapa_id").in("chapa_id", novasChapas.map(c => c.id))
     const comLugar = new Set((ocupadas ?? []).map(l => l.chapa_id))
     const vazias = novasChapas.filter(c => !comLugar.has(c.id)).map(c => c.id)
-    if (vazias.length) await supabase.from("caixaria_chapas").delete().in("id", vazias)
+    if (vazias.length) await supabase.from("cartuxo_chapas").delete().in("id", vazias)
   }
   const lidas = await lerChapas()
   return { chapas: (await sincronizarArtes(lidas).catch(() => false)) ? await lerChapas() : lidas, semDados }
@@ -159,20 +160,20 @@ export async function aplicar(a: AcaoChapa) {
     // A arte é do item do pedido: marca em todas as partes dele
     const o = c.ocupacao.find(x => x.id === a.ocupacao)
     if (!o?.pedidoId) throw new Error("Lugar sem pedido")
-    ok(await supabase.from("caixaria_chapa_lugares").update({ arte_aprovada_em: a.aprovada ? agora : null })
+    ok(await supabase.from("cartuxo_chapa_lugares").update({ arte_aprovada_em: a.aprovada ? agora : null })
       .eq("pedido_id", o.pedidoId).eq("item_idx", o.itemIdx!))
   } else if (a.acao === "preencher") {
     if (c.status !== "aberta") throw new Error("A chapa já fechou")
     if (!vagos(c)) throw new Error("A chapa está cheia")
     const n = Math.max(1, Math.min(Math.round(a.lugares), vagos(c)))
-    ok(await supabase.from("caixaria_chapa_lugares").insert({
+    ok(await supabase.from("cartuxo_chapa_lugares").insert({
       chapa_id: c.id, tipo: a.tipo, lugares: n,
       descricao: a.descricao.trim().slice(0, 80) || (a.tipo === "enyla" ? "Pedido ENYLA" : "Estoque"),
     }))
   } else if (a.acao === "liberar") {
     const o = c.ocupacao.find(x => x.id === a.ocupacao)
     if (!o || o.tipo === "cliente") throw new Error("Só dá para liberar lugar da ENYLA ou de estoque")
-    ok(await supabase.from("caixaria_chapa_lugares").delete().eq("id", o.id))
+    ok(await supabase.from("cartuxo_chapa_lugares").delete().eq("id", o.id))
   } else if (a.acao === "status") {
     const mud: Record<string, unknown> = { status: a.status }
     if (a.status === "producao") {
@@ -182,34 +183,34 @@ export async function aplicar(a: AcaoChapa) {
     }
     if (a.status === "pronta") mud.pronta_em = agora
     if (a.status === "aberta") { mud.fechada_em = null; mud.pronta_em = null }
-    ok(await supabase.from("caixaria_chapas").update(mud).eq("id", c.id))
+    ok(await supabase.from("cartuxo_chapas").update(mud).eq("id", c.id))
   }
 }
 
 // ── Facas ─────────────────────────────────────────────────────────────────────
-// caixaria_facas (SQL em supabase/migrations/20261108_caixaria_facas.sql). O site lê a tabela;
+// cartuxo_facas (SQL em supabase/migrations/20261108_cartuxo_facas.sql). O site lê a tabela;
 // depois de salvar, avisamos o site (/api/revalidar) para a loja atualizar na hora.
 
 
-const SITE_CAIXARIA = process.env.CAIXARIA_SITE_URL ?? "https://caixaria.com"
+const SITE_CARTUXO_SRV = SITE_CARTUXO
 
 export async function listarFacas(): Promise<Faca[]> {
-  const { data, error } = await supabase.from("caixaria_facas").select("*").order("codigo")
-  if (error) throw new Error("caixaria_facas: " + error.message)
+  const { data, error } = await supabase.from("cartuxo_facas").select("*").order("codigo")
+  if (error) throw new Error("cartuxo_facas: " + error.message)
   return ((data ?? []) as Faca[]).map(f => ({ ...f, frente_mm: Number(f.frente_mm), lateral_mm: Number(f.lateral_mm), altura_mm: Number(f.altura_mm) }))
 }
 
 export async function produtosDoSite(): Promise<ProdutoSite[]> {
-  const r = await fetch(`${SITE_CAIXARIA}/api/catalogo`, { cache: "no-store", signal: AbortSignal.timeout(8000) })
-  if (!r.ok) throw new Error(`caixaria.com respondeu ${r.status}`)
+  const r = await fetch(`${SITE_CARTUXO_SRV}/api/catalogo`, { cache: "no-store", signal: AbortSignal.timeout(8000) })
+  if (!r.ok) throw new Error(`${DOMINIO_CARTUXO} respondeu ${r.status}`)
   return ((await r.json()).produtos ?? []) as ProdutoSite[]
 }
 
 async function avisarSite(): Promise<boolean> {
-  const segredo = process.env.CAIXARIA_REVALIDAR_SEGREDO
+  const segredo = process.env.CARTUXO_REVALIDAR_SEGREDO
   if (!segredo) return false
   try {
-    const r = await fetch(`${SITE_CAIXARIA}/api/revalidar`, { method: "POST", headers: { "x-segredo": segredo }, signal: AbortSignal.timeout(8000) })
+    const r = await fetch(`${SITE_CARTUXO_SRV}/api/revalidar`, { method: "POST", headers: { "x-segredo": segredo }, signal: AbortSignal.timeout(8000) })
     return r.ok
   } catch { return false }
 }
@@ -225,8 +226,8 @@ export async function salvarFaca(d: DadosFaca): Promise<{ siteAtualizado: boolea
     obs: (d.obs ?? "").slice(0, 500), atualizada_em: new Date().toISOString(),
   }
   const r = d.id
-    ? await supabase.from("caixaria_facas").update(linha).eq("id", d.id)
-    : await supabase.from("caixaria_facas").insert(linha)
+    ? await supabase.from("cartuxo_facas").update(linha).eq("id", d.id)
+    : await supabase.from("cartuxo_facas").insert(linha)
   if (r.error) {
     if (/duplicate key.*codigo/i.test(r.error.message)) throw new Error("Já existe uma faca com esse código")
     if (/duplicate key.*produto_slug/i.test(r.error.message)) throw new Error("Essa caixa do site já tem outra faca")
@@ -236,7 +237,7 @@ export async function salvarFaca(d: DadosFaca): Promise<{ siteAtualizado: boolea
 }
 
 export async function apagarFaca(id: string): Promise<{ siteAtualizado: boolean }> {
-  const { error } = await supabase.from("caixaria_facas").delete().eq("id", id)
+  const { error } = await supabase.from("cartuxo_facas").delete().eq("id", id)
   if (error) throw new Error(error.message)
   return { siteAtualizado: await avisarSite() }
 }
@@ -244,15 +245,15 @@ export async function apagarFaca(id: string): Promise<{ siteAtualizado: boolean 
 // ── Custos ────────────────────────────────────────────────────────────────────
 
 export async function lerCustos(): Promise<{ custos: Custos; salvoEm: string | null }> {
-  const { data, error } = await supabase.from("caixaria_config").select("dados, atualizada_em").eq("chave", "custos").maybeSingle()
-  if (error) throw new Error("caixaria_config: " + error.message)
+  const { data, error } = await supabase.from("cartuxo_config").select("dados, atualizada_em").eq("chave", "custos").maybeSingle()
+  if (error) throw new Error("cartuxo_config: " + error.message)
   return { custos: normalizarCustos(data?.dados as Partial<Custos> | undefined), salvoEm: data?.atualizada_em ?? null }
 }
 
 export async function salvarCustos(c: Partial<Custos>): Promise<{ siteAtualizado: boolean }> {
   const custos = normalizarCustos(c)
-  const { error } = await supabase.from("caixaria_config").upsert({ chave: "custos", dados: custos, atualizada_em: new Date().toISOString() })
-  if (error) throw new Error("caixaria_config: " + error.message)
+  const { error } = await supabase.from("cartuxo_config").upsert({ chave: "custos", dados: custos, atualizada_em: new Date().toISOString() })
+  if (error) throw new Error("cartuxo_config: " + error.message)
   return { siteAtualizado: await avisarSite() }
 }
 
@@ -358,12 +359,12 @@ export async function referenciasENYLA(): Promise<{ referencias: Referencia[]; a
 }
 
 // ── Recuperação de quem parou no pagamento ────────────────────────────────────
-// caixaria_config, chave "recuperacao": { [pedido id]: { toques: [ISO], arquivado?: { em, motivo } } }
+// cartuxo_config, chave "recuperacao": { [pedido id]: { toques: [ISO], arquivado?: { em, motivo } } }
 
 
 export async function lerRecuperacao(): Promise<Recuperacao> {
-  const { data, error } = await supabase.from("caixaria_config").select("dados").eq("chave", "recuperacao").maybeSingle()
-  if (error) throw new Error("caixaria_config: " + error.message)
+  const { data, error } = await supabase.from("cartuxo_config").select("dados").eq("chave", "recuperacao").maybeSingle()
+  if (error) throw new Error("cartuxo_config: " + error.message)
   return (data?.dados ?? {}) as Recuperacao
 }
 
@@ -382,20 +383,20 @@ export async function registrarRecuperacao(a: AcaoRecuperacao): Promise<Recupera
   else if (a.acao === "arquivar") reg.arquivado = { em: agora, motivo: String(a.motivo).slice(0, 60) || "Outro" }
   else if (a.acao === "reabrir") delete reg.arquivado
   r[a.pedido] = reg
-  const { error } = await supabase.from("caixaria_config").upsert({ chave: "recuperacao", dados: r, atualizada_em: agora })
-  if (error) throw new Error("caixaria_config: " + error.message)
+  const { error } = await supabase.from("cartuxo_config").upsert({ chave: "recuperacao", dados: r, atualizada_em: agora })
+  if (error) throw new Error("cartuxo_config: " + error.message)
   return r
 }
 
 // ── Arte e envio (o cliente vê na página do pedido) ───────────────────────────
-// Arquivos no bucket caixaria-arquivos (o site cria). Coluna caixaria_pedidos.acompanhamento.
+// Arquivos no bucket cartuxo-arquivos (o site cria). Coluna cartuxo_pedidos.acompanhamento.
 
-const BUCKET_CX = "caixaria-arquivos"
+const BUCKET_CX = "cartuxo-arquivos"
 const urlCx = (path: string) => supabase.storage.from(BUCKET_CX).getPublicUrl(path).data.publicUrl
 
 async function pedidoPorId(id: string) {
-  const { data, error } = await supabase.from("caixaria_pedidos").select("id, numero, status, itens, acompanhamento").eq("id", id).maybeSingle()
-  if (error) throw new Error(/acompanhamento/.test(error.message) ? "Falta a coluna de acompanhamento: rode supabase/migrations/20261108_caixaria_acompanhamento.sql" : error.message)
+  const { data, error } = await supabase.from("cartuxo_pedidos").select("id, numero, status, itens, acompanhamento").eq("id", id).maybeSingle()
+  if (error) throw new Error(/acompanhamento/.test(error.message) ? "Falta a coluna de acompanhamento: rode supabase/migrations/20261108_cartuxo_acompanhamento.sql" : error.message)
   if (!data) throw new Error("Pedido não encontrado")
   return data as { id: string; numero: string; status: string; itens: unknown[]; acompanhamento: Acompanhamento | null }
 }
@@ -428,6 +429,6 @@ export async function aplicarArte(a: AcaoArte) {
   } else if (a.acao === "envio") {
     acomp.envio = { em: agora, transportadora: a.transportadora.trim().slice(0, 60) || "transportadora", rastreio: a.rastreio.trim().slice(0, 60) }
   } else delete acomp.envio
-  const { error } = await supabase.from("caixaria_pedidos").update({ acompanhamento: acomp, atualizado_em: agora }).eq("id", p.id)
+  const { error } = await supabase.from("cartuxo_pedidos").update({ acompanhamento: acomp, atualizado_em: agora }).eq("id", p.id)
   if (error) throw new Error(error.message)
 }

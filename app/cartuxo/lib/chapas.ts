@@ -56,7 +56,7 @@ export type Chapa = {
   prontaEm?: string | null
 }
 
-// Item pago vindo do site (caixaria_pedidos.itens[n])
+// Item pago vindo do site (cartuxo_pedidos.itens[n])
 export type ItemPago = {
   pedidoId: string; pedido: string; itemIdx: number; pagoEm: string
   cliente: string; telefone: string

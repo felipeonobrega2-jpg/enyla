@@ -1,11 +1,12 @@
 "use client"
 
-// Cartuxo · custos e regras de preço. O site caixaria.com calcula os preços com estes números.
+// Cartuxo · custos e regras de preço. O site da loja calcula os preços com estes números.
 // Ao lado de cada campo, o que a ENYLA já sabe (configuração da ferramenta de orçamentos e o que foi pago por lote).
 // A simulação mostra, antes de salvar, o preço e o que sobra de cada pedido.
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Calculator, RotateCcw, AlertTriangle, CheckCircle2, Info } from "lucide-react"
+import { DOMINIO_CARTUXO } from "../lib/site"
 import { Pagina, CabecalhoPagina, Cartao, Selo, Botao, Segmentado } from "@/app/components/ds"
 import {
   CUSTOS_PADRAO, REFERENCIA, custoRodada, partesRodada, preco, lucro, multiplicadorParaManter, normalizarCustos, lugaresDa,
@@ -83,7 +84,7 @@ export default function CustosView() {
   const [salvando, setSalvando] = useState(false)
   const [qtd, setQtd] = useState<"1000" | "2000" | "4000">("1000")
 
-  const buscar = useCallback(() => fetch("/api/caixaria/custos").then(r => r.json()).then(j => {
+  const buscar = useCallback(() => fetch("/api/cartuxo/custos").then(r => r.json()).then(j => {
     setErro(j.erro ?? "")
     const c = normalizarCustos(j.custos); setSalvo(c); setSalvoEm(j.salvoEm ?? null); setForm(paraForm(c))
     setRefs(j.referencias ?? []); setAvisos(j.avisos ?? [])
@@ -100,7 +101,7 @@ export default function CustosView() {
     if (antes !== depois && !confirm(`Os preços do site vão mudar. A caixa de 100 ml (1.000 un, Pix) passa de ${brl(antes)} para ${brl(depois)}. Salvar?`)) return
     setSalvando(true)
     try {
-      const j = await fetch("/api/caixaria/custos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ custos: atual }) }).then(r => r.json())
+      const j = await fetch("/api/cartuxo/custos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ custos: atual }) }).then(r => r.json())
       if (j.erro) { setErro(j.erro); return }
       const c = normalizarCustos(j.custos); setSalvo(c); setSalvoEm(j.salvoEm); setForm(paraForm(c)); setErro("")
       setAviso(j.siteAtualizado ? "Custos salvos. O site já está com os preços novos." : "Custos salvos. O site atualiza em até 5 minutos.")
@@ -131,7 +132,7 @@ export default function CustosView() {
 
   return (
     <Pagina>
-      <CabecalhoPagina titulo="Custos" sub={<>Os preços de caixaria.com saem destes números. Ao lado de cada campo, o que a ENYLA já sabe.{salvoEm ? ` Salvo em ${new Date(salvoEm).toLocaleDateString("pt-BR")}.` : " Ainda no padrão da conversa de 08/11."}</>}
+      <CabecalhoPagina titulo="Custos" sub={<>Os preços de {DOMINIO_CARTUXO} saem destes números. Ao lado de cada campo, o que a ENYLA já sabe.{salvoEm ? ` Salvo em ${new Date(salvoEm).toLocaleDateString("pt-BR")}.` : " Ainda no padrão da conversa de 08/11."}</>}
         acoes={<div className="flex gap-2">
           <Botao icone={<RotateCcw className="w-3.5 h-3.5" />} disabled={!mudou} onClick={() => setForm(paraForm(salvo))}>Desfazer</Botao>
           <Botao variante="primario" disabled={!mudou || salvando} onClick={salvar}>{salvando ? "Salvando" : "Salvar e atualizar o site"}</Botao>

@@ -1,6 +1,6 @@
 // Acompanhamento do pedido depois de pago: briefing da marca, arte de cada caixa (versões, ajustes, aprovação)
-// e envio. Fica na coluna `acompanhamento` (jsonb) de caixaria_pedidos.
-// Cópia de caixaria/lib/acompanhamento.ts (site): se mudar lá, mudar aqui.
+// e envio. Fica na coluna `acompanhamento` (jsonb) de cartuxo_pedidos.
+// Cópia de cartuxo/lib/acompanhamento.ts (site): se mudar lá, mudar aqui.
 
 export type Arquivo = { url: string; nome: string; em: string }
 
@@ -69,9 +69,11 @@ export const ehImagem = (url: string) => /\.(png|jpe?g|webp|svg)($|\?)/i.test(ur
 
 // ── Avisos ao cliente (sistema) ───────────────────────────────────────────────
 
+import { SITE_CARTUXO } from "./site"
+
 export type Aviso = { id: string; nome: string; texto: string }
 
-export function avisos(p: { numero: string; cliente: { nome: string }; itens: { nome: string; prazo: string }[] }, a: Acompanhamento | null | undefined, site = "https://caixaria.com"): Aviso[] {
+export function avisos(p: { numero: string; cliente: { nome: string }; itens: { nome: string; prazo: string }[] }, a: Acompanhamento | null | undefined, site = SITE_CARTUXO): Aviso[] {
   const n = p.cliente.nome.trim().split(/\s+/)[0] ?? ""
   const oi = n ? `Oi, ${n.charAt(0).toUpperCase()}${n.slice(1).toLowerCase()}!` : "Oi!"
   const link = `${site}/pedido/${p.numero}`

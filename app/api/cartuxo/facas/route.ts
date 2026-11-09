@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { listarFacas, produtosDoSite, salvarFaca, apagarFaca } from "@/app/caixaria/lib/servidor"
-import type { DadosFaca } from "@/app/caixaria/lib/facas"
+import { listarFacas, produtosDoSite, salvarFaca, apagarFaca } from "@/app/cartuxo/lib/servidor"
+import type { DadosFaca } from "@/app/cartuxo/lib/facas"
 
 // Cartuxo · cadastro de facas (rota protegida pelo login)
-const SEM_TABELA = "A tabela de facas ainda não existe. Rode supabase/migrations/20261108_caixaria_facas.sql no SQL Editor do Supabase."
+const SEM_TABELA = "A tabela de facas ainda não existe. Rode supabase/migrations/20261108_cartuxo_facas.sql no SQL Editor do Supabase."
 const mensagem = (e: unknown) => {
   const m = (e as Error).message ?? String(e)
   return /does not exist|could not find the table|schema cache/i.test(m) ? SEM_TABELA : m
@@ -21,7 +21,7 @@ export async function GET() {
   try {
     return NextResponse.json(await tudo())
   } catch (e) {
-    console.error("caixaria/facas", e)
+    console.error("cartuxo/facas", e)
     return NextResponse.json({ erro: mensagem(e) }, { status: 500 })
   }
 }

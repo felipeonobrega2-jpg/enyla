@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { lerCustos, salvarCustos, referenciasENYLA } from "@/app/caixaria/lib/servidor"
-import type { Custos } from "@/app/caixaria/lib/custos"
+import { lerCustos, salvarCustos, referenciasENYLA } from "@/app/cartuxo/lib/servidor"
+import type { Custos } from "@/app/cartuxo/lib/custos"
 
 // Cartuxo · custos e regras de preço (rota protegida pelo login)
-const SEM_TABELA = "A tabela de configuração da Cartuxo ainda não existe. Rode supabase/migrations/20261108_caixaria_config.sql no SQL Editor do Supabase."
+const SEM_TABELA = "A tabela de configuração da Cartuxo ainda não existe. Rode supabase/migrations/20261108_cartuxo_config.sql no SQL Editor do Supabase."
 const mensagem = (e: unknown) => {
   const m = (e as Error).message ?? String(e)
   return /does not exist|could not find the table|schema cache/i.test(m) ? SEM_TABELA : m

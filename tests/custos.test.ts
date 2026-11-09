@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest"
-import { CUSTOS_PADRAO, preco, lucro, custoRodada, multiplicadorParaManter, normalizarCustos, REFERENCIA, type CaixaRef } from "@/app/caixaria/lib/custos"
+import { CUSTOS_PADRAO, preco, lucro, custoRodada, multiplicadorParaManter, normalizarCustos, REFERENCIA, type CaixaRef } from "@/app/cartuxo/lib/custos"
 
-// Valores tirados do site (caixaria/lib/preco.ts) com os custos padrão: as duas contas têm de bater
+// Valores tirados do site (cartuxo/lib/preco.ts) com os custos padrão: as duas contas têm de bater
 const cem: CaixaRef = REFERENCIA
 const cinquenta: CaixaRef = { tipo: "simples", frente_mm: 55, lateral_mm: 55, altura_mm: 110 }
 
-describe("custos da Caixaria = conta do site", () => {
+describe("custos da Cartuxo = conta do site", () => {
   test("rodada padrão R$ 1.340", () => expect(custoRodada(CUSTOS_PADRAO)).toBe(1340))
   test("100 ml", () => {
     expect(preco(CUSTOS_PADRAO, cem, 1000)!.pix).toBeCloseTo(1289.9)

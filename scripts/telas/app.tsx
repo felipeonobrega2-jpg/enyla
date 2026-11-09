@@ -41,12 +41,12 @@ import { ModalVenda } from "@/app/components/parceiros/ModalVenda"
 import DigitalClient from "@/app/d/[id]/DigitalClient"
 import GastosView from "@/app/components/GastosView"
 import DigitalPainelView from "@/app/components/DigitalPainelView"
-import ChapasView from "@/app/caixaria/components/ChapasView"
-import CustosView from "@/app/caixaria/components/CustosView"
-import FacasView from "@/app/caixaria/components/FacasView"
-import PedidosSiteView from "@/app/caixaria/components/PedidosSiteView"
-import SeletorArea from "@/app/caixaria/components/SeletorArea"
-import { alocar } from "@/app/caixaria/lib/chapas"
+import ChapasView from "@/app/cartuxo/components/ChapasView"
+import CustosView from "@/app/cartuxo/components/CustosView"
+import FacasView from "@/app/cartuxo/components/FacasView"
+import PedidosSiteView from "@/app/cartuxo/components/PedidosSiteView"
+import SeletorArea from "@/app/cartuxo/components/SeletorArea"
+import { alocar } from "@/app/cartuxo/lib/chapas"
 import { montarGastos, ultimosDias } from "@/app/lib/gastos"
 import { OrcamentoDigitalView } from "@/app/components/OrcamentoDigitalView"
 import WhatsAppView, { ConexaoWhats, Compositor, ClienteDaConversa, SeloOrigem, OrigemDaConversa, FunilConversas, ConversaLateral } from "@/app/components/WhatsAppView"
@@ -126,7 +126,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
   if (u.startsWith("/api/whatsapp/destino")) return new Response(JSON.stringify(u.includes("Sem%20Conversa") ? { jid: null } : { jid: "1@lid", nome: "Perfumaria Modelo", como: "conversa" }))
   if (u.startsWith("/api/aprovacao/link")) return new Response(JSON.stringify({ url: "https://app.enyla.com.br/aprovar/ORC-2026-999?t=exemplo" }))
   if (u.startsWith("/api/whatsapp/proximo-passo")) return new Response(JSON.stringify({ passo: { tipo: "lembrar", em: new Date().toISOString(), ate: "2026-11-12T12:00:00Z", nota: "vai mandar a arte" } }))
-  if (u.startsWith("/api/caixaria/pedidos")) {
+  if (u.startsWith("/api/cartuxo/pedidos")) {
     const h = (d: number) => new Date(Date.now() - d * 3_600_000).toISOString()
     const cli = (nome: string) => ({ nome, email: "contato@exemplo.com", telefone: "11999990000", documento: "12.345.678/0001-90" })
     const item = (nome: string, medida: string, qtd: number, total: number, marca: string | null, freteIncluso = false) => ({ nome, medida, qtd, acab: "Laminação fosca", prazo: "Produção normal", marca, freteIncluso, total })
@@ -142,7 +142,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       { id: "6", numero: "CX-261107-P0QA", status: "aguardando_pagamento", forma: "pix", criadoEm: h(20), total: 1079.9, pago: 0, cliente: cli("Pele de Seda"), cidade: "Goiânia/GO", metodo: null, itens: [item("Caixa para sérum 30 ml", "4 × 4 × 11 cm", 1000, 1079.9, null)] },
     ], recuperacao: { "5": { toques: [h(48)] }, "6": { toques: [h(19)] }, "2": { toques: [h(29)] } } }))
   }
-  if (u.startsWith("/api/caixaria/custos")) {
+  if (u.startsWith("/api/cartuxo/custos")) {
     const R = (campo: string, valor: number, fonte: string, detalhe: string) => ({ campo, valor, fonte, detalhe })
     return new Response(JSON.stringify({ custos: null, salvoEm: null, avisos: ["Nenhum fornecedor da ENYLA tem tabela de laminação cadastrada. O valor da laminação ainda é estimado: confirme com quem lamina."], referencias: [
       R("papelPorFolha", 0.85, "Configuração da ENYLA", "Cartão 300g: R$ 170 o cento de 66×96 (meia folha = 66×48)"), R("impressao", 350, "Configuração da ENYLA", "Jerograf: valor fixo por chapa"),
@@ -154,7 +154,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       R("logistica", 49.58, "Pago em 16 lotes da ENYLA", "mediana de R$ 50 por lote (Lalamove, motoboy, carro)"),
     ] }))
   }
-  if (u.startsWith("/api/caixaria/facas")) {
+  if (u.startsWith("/api/cartuxo/facas")) {
     const P = (slug: string, codigo: string, nome: string, categoria: string, tipo: string, f: number, l: number, a: number) => ({ slug, codigo, nome, categoria, uso: "", tipo, frente_mm: f, lateral_mm: l, altura_mm: a, foto: `/fotos/${slug}-1.webp` })
     const produtos = [
       P("caixa-perfume-50ml", "CX-101", "Caixa para perfume 50 ml", "perfumaria", "simples", 55, 55, 110),
@@ -173,7 +173,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       F("4", "F-031", "Similar decant 10 ml", "simples", 25, 25, 90, 18, null),
     ] }))
   }
-  if (u.startsWith("/api/caixaria/chapas")) {
+  if (u.startsWith("/api/cartuxo/chapas")) {
     const d = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
     const ch = (prazoId = "economico", acabId = "laminacao-fosca", porChapa = 4, rodada = 1340) => ({ prazoId, acabId, porChapa, formato: "66x48", rodada, colagemPorMil: 75, arte: 70, frete: 0 })
     const it = (n: number, cliente: string, slug: string, nome: string, qtd: number, total: number, dias: number, c = ch(), marca?: string) =>
@@ -400,7 +400,7 @@ function Telas() {
     case "cx-app": return <div style={{ display: "flex", minHeight: "100vh", background: "#f5f5f7" }}>
       <aside style={{ width: 220, background: "#17151f", padding: 8 }}>
         <div className="px-2 pt-3 pb-4"><img src="../../../public/brand/enyla-wordmark-light.png" style={{ height: 20 }} /></div>
-        <SeletorArea caixaria onTrocar={() => {}} />
+        <SeletorArea cartuxo onTrocar={() => {}} />
         <p className="px-2.5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">Cartuxo</p>
         <div className="px-2.5 py-2 rounded-lg bg-white/[0.08] text-[13px] text-white">Pedidos do site</div>
         <div className="px-2.5 py-2 text-[13px] text-zinc-400">Chapas</div>

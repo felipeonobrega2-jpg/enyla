@@ -1,12 +1,12 @@
 import { describe, expect, test } from "vitest"
-import { lugaresCalculados, cabemNaChapa, situacao, erroFaca, type Faca } from "@/app/caixaria/lib/facas"
+import { lugaresCalculados, cabemNaChapa, situacao, erroFaca, type Faca } from "@/app/cartuxo/lib/facas"
 
 const faca = (m: Partial<Faca> = {}): Faca => ({
   id: "1", codigo: "F-1", nome: "Caixa", tipo: "simples", frente_mm: 65, lateral_mm: 65, altura_mm: 130,
   lugares: null, planificacao: null, produto_slug: "caixa-perfume-100ml", tem_faca: true, no_site: true, obs: "", atualizada_em: "", ...m,
 })
 
-describe("facas da Caixaria", () => {
+describe("facas da Cartuxo", () => {
   test("caixa de 100 ml dá 4 por chapa 66×48 (base dos custos)", () => {
     expect(lugaresCalculados("simples", 65, 65, 130)).toBe(4)
   })

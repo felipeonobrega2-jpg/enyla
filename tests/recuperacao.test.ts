@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest"
-import { situacao, esfriouDeVez, mensagem, linkWhats, type PedidoParado } from "@/app/caixaria/lib/recuperacao"
+import { SITE_CARTUXO } from "@/app/cartuxo/lib/site"
+import { situacao, esfriouDeVez, mensagem, linkWhats, type PedidoParado } from "@/app/cartuxo/lib/recuperacao"
 
 const H = 3_600_000
 const t0 = Date.parse("2026-11-08T12:00:00Z")
@@ -32,7 +33,7 @@ describe("recuperar quem parou no pagamento", () => {
   test("mensagens: nome, link e sem falar de chapa", () => {
     const m1 = mensagem(p, 1)
     expect(m1).toContain("Oi, Maria!")
-    expect(m1).toContain("https://caixaria.com/pedido/CX-261108-Z9WE")
+    expect(m1).toContain(`${SITE_CARTUXO}/pedido/CX-261108-Z9WE`)
     expect(m1).toContain("1.000 caixas para caneta aplicadora")
     expect(mensagem({ ...p, recusado: true }, 1)).toContain("nada foi cobrado")
     for (const t of [1, 2, 3] as const) expect(mensagem(p, t)).not.toMatch(/chapa/i)

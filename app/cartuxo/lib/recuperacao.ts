@@ -2,8 +2,10 @@
 // Três toques no WhatsApp: logo depois, no dia seguinte e três dias depois. Tom de equipe, sem pressão,
 // sem falar de chapa nem de prazo "para juntar pedidos". Depois do 3º toque, uma semana de espera e o pedido esfria.
 
+import { SITE_CARTUXO } from "./site"
+
 export type Registro = { toques: string[]; arquivado?: { em: string; motivo: string } }
-export type Recuperacao = Record<string, Registro>   // pedido id → registro (caixaria_config, chave "recuperacao")
+export type Recuperacao = Record<string, Registro>   // pedido id → registro (cartuxo_config, chave "recuperacao")
 
 export const MOTIVOS = ["Achou caro", "Prazo não serve", "Só estava pesquisando", "Comprou em outro lugar", "Medida não serve", "Não respondeu", "Outro"] as const
 
@@ -50,7 +52,7 @@ const resumo = (p: PedidoParado) => {
   return p.itens.length > 1 ? `${p.itens.length} modelos de caixa` : `${i.qtd.toLocaleString("pt-BR")} ${nome}`
 }
 
-export function mensagem(p: PedidoParado, toque: 1 | 2 | 3, site = "https://caixaria.com", agora = new Date()) {
+export function mensagem(p: PedidoParado, toque: 1 | 2 | 3, site = SITE_CARTUXO, agora = new Date()) {
   const nome = p.cliente.nome.trim().split(/\s+/)[0]
   const primeiro = nome ? nome.charAt(0).toUpperCase() + nome.slice(1).toLowerCase() : ""
   const link = `${site}/pedido/${p.numero}`

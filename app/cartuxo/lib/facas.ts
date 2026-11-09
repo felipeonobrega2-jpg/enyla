@@ -1,5 +1,5 @@
 // Cartuxo · cadastro de facas (lógica pura, usada na tela e nos testes).
-// A planificação é a mesma regra do site (caixaria/lib/preco.ts): se mudar lá, mudar aqui.
+// A planificação é a mesma regra do site (cartuxo/lib/preco.ts): se mudar lá, mudar aqui.
 
 export type TipoFaca = "simples" | "fundo-automatico" | "tampa-aviao"
 
@@ -26,7 +26,7 @@ export type Faca = {
   atualizada_em: string
 }
 
-// Caixa do site (caixaria.com/api/catalogo), com as medidas de partida
+// Caixa do site (/api/catalogo da loja), com as medidas de partida
 export type ProdutoSite = {
   slug: string; codigo: string; nome: string; categoria: string; uso: string
   tipo: TipoFaca; frente_mm: number; lateral_mm: number; altura_mm: number; foto: string

@@ -70,11 +70,11 @@ import { KanbanView } from "./components/KanbanView"
 import { FinanceiroView, ModalLancamento } from "./components/FinanceiroView"
 import GastosView from "./components/GastosView"
 import DigitalPainelView from "./components/DigitalPainelView"
-import ChapasView from "./caixaria/components/ChapasView"
-import PedidosSiteView from "./caixaria/components/PedidosSiteView"
-import FacasView from "./caixaria/components/FacasView"
-import CustosView from "./caixaria/components/CustosView"
-import SeletorArea from "./caixaria/components/SeletorArea"
+import ChapasView from "./cartuxo/components/ChapasView"
+import PedidosSiteView from "./cartuxo/components/PedidosSiteView"
+import FacasView from "./cartuxo/components/FacasView"
+import CustosView from "./cartuxo/components/CustosView"
+import SeletorArea from "./cartuxo/components/SeletorArea"
 import { ClienteCombobox, ClienteContactCard } from "./components/ClienteFields"
 import { ModalPersonalizarProposta } from "./components/ModalPersonalizarProposta"
 import { ModalPropostaCustom, BoxPreview3D } from "./components/ModalPropostaCustom"
@@ -1506,7 +1506,7 @@ export default function Home() {
             <kbd className="text-[9px] bg-white/[0.07] text-zinc-500 group-hover:text-zinc-400 px-1.5 py-0.5 rounded font-medium shrink-0">⌘K</kbd>
           </button>
 
-          <SeletorArea caixaria={view.startsWith("cx-")} onTrocar={cx => navigate(cx ? "cx-pedidos" : "painel")} />
+          <SeletorArea cartuxo={view.startsWith("cx-")} onTrocar={cx => navigate(cx ? "cx-pedidos" : "painel")} />
 
           {view.startsWith("cx-") ? (<>
           <NavGroup label="Cartuxo" />

@@ -13,7 +13,7 @@ procurar(path.join(raiz, ".next/static"))
 writeFileSync(path.join(saida, "next.css"), css.join("\n"))
 await build({
   entryPoints: [path.join(dir, "app.tsx")], bundle: true, outfile: path.join(saida, "app.js"), jsx: "automatic", logLevel: "error",
-  alias: { "@": raiz, "next/image": path.join(dir, "imagem.tsx"), "next/dynamic": path.join(dir, "dinamico.tsx") }, define: { "process.env.NODE_ENV": '"production"' }, loader: { ".png": "dataurl" },
+  alias: { "@": raiz, "next/image": path.join(dir, "imagem.tsx"), "next/dynamic": path.join(dir, "dinamico.tsx") }, define: { "process.env.NODE_ENV": '"production"', "process.env.NEXT_PUBLIC_CARTUXO_SITE_URL": "undefined" }, loader: { ".png": "dataurl" },
 })
 writeFileSync(path.join(saida, "index.html"), '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="next.css"><link rel="stylesheet" href="app.css"><body><div id="root"></div><script src="app.js"></script>')
 
