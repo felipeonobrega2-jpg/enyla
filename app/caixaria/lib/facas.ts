@@ -1,4 +1,4 @@
-// Caixaria · cadastro de facas (lógica pura, usada na tela e nos testes).
+// Cartuxo · cadastro de facas (lógica pura, usada na tela e nos testes).
 // A planificação é a mesma regra do site (caixaria/lib/preco.ts): se mudar lá, mudar aqui.
 
 export type TipoFaca = "simples" | "fundo-automatico" | "tampa-aviao"

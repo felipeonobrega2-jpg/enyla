@@ -1,4 +1,4 @@
-// Caixaria · recuperar quem parou no pagamento (lógica pura).
+// Cartuxo · recuperar quem parou no pagamento (lógica pura).
 // Três toques no WhatsApp: logo depois, no dia seguinte e três dias depois. Tom de equipe, sem pressão,
 // sem falar de chapa nem de prazo "para juntar pedidos". Depois do 3º toque, uma semana de espera e o pedido esfria.
 
@@ -56,9 +56,9 @@ export function mensagem(p: PedidoParado, toque: 1 | 2 | 3, site = "https://caix
   const link = `${site}/pedido/${p.numero}`
   const oi = primeiro ? `Oi, ${primeiro}!` : "Oi!"
   if (toque === 1 && p.recusado)
-    return `${oi} Aqui é da Caixaria. Vi que o pagamento do pedido ${p.numero} (${resumo(p)}) não passou, e nada foi cobrado. Quer tentar de novo? Pelo Pix costuma ser mais fácil: ${link}\n\nSe preferir, te ajudo por aqui.`
+    return `${oi} Aqui é da Cartuxo. Vi que o pagamento do pedido ${p.numero} (${resumo(p)}) não passou, e nada foi cobrado. Quer tentar de novo? Pelo Pix costuma ser mais fácil: ${link}\n\nSe preferir, te ajudo por aqui.`
   if (toque === 1)
-    return `${oi} Aqui é da Caixaria. O seu pedido ${p.numero} (${resumo(p)}) ficou guardado, faltando só o pagamento. Ficou alguma dúvida sobre a caixa, o prazo ou a arte? Se estiver tudo certo, é só pagar por aqui: ${link}`
+    return `${oi} Aqui é da Cartuxo. O seu pedido ${p.numero} (${resumo(p)}) ficou guardado, faltando só o pagamento. Ficou alguma dúvida sobre a caixa, o prazo ou a arte? Se estiver tudo certo, é só pagar por aqui: ${link}`
   if (toque === 2)
     return `${oi} Tudo bem? Passando para saber se você ainda quer as caixas do pedido ${p.numero}. Assim que o pagamento cair, nossa equipe de design já começa a sua arte. O pedido está aqui: ${link}`
   const ate = new Date(agora.getTime() + 7 * 24 * H).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })

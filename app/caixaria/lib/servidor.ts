@@ -1,4 +1,4 @@
-// Módulo Caixaria no servidor. Tabelas próprias no Supabase (nada na configuração da ENYLA):
+// Módulo Cartuxo no servidor. Tabelas próprias no Supabase (nada na configuração da ENYLA):
 //   caixaria_pedidos        pedidos do site (o site grava; aqui só lemos)
 //   caixaria_chapas         chapas compartilhadas
 //   caixaria_chapa_lugares  o que ocupa cada chapa (item de pedido, ENYLA ou estoque)

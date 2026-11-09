@@ -1,6 +1,6 @@
 "use client"
 
-// Caixaria · gaveta de um pedido pago: o que o cliente mandou (briefing), a arte de cada caixa, o envio e os avisos.
+// Cartuxo · gaveta de um pedido pago: o que o cliente mandou (briefing), a arte de cada caixa, o envio e os avisos.
 // A arte que sobe aqui aparece na hora para o cliente aprovar na página do pedido.
 
 import { useEffect, useRef, useState } from "react"

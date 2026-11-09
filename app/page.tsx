@@ -1509,7 +1509,7 @@ export default function Home() {
           <SeletorArea caixaria={view.startsWith("cx-")} onTrocar={cx => navigate(cx ? "cx-pedidos" : "painel")} />
 
           {view.startsWith("cx-") ? (<>
-          <NavGroup label="Caixaria" />
+          <NavGroup label="Cartuxo" />
           <NavItem active={view === "cx-pedidos"} onClick={() => navigate("cx-pedidos")} label="Pedidos do site"
             icon={<ShoppingBag className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "cx-chapas"} onClick={() => navigate("cx-chapas")} label="Chapas"

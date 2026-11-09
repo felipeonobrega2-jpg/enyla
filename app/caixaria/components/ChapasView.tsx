@@ -1,6 +1,6 @@
 "use client"
 
-// Painel de chapas da Caixaria. Cada pedido pago no site entra sozinho numa chapa do mesmo modelo e acabamento.
+// Painel de chapas da Cartuxo. Cada pedido pago no site entra sozinho numa chapa do mesmo modelo e acabamento.
 // Aqui você vê o que está montando, o que precisa fechar (prazo da produção normal), quanto cada chapa deixa e
 // preenche lugar vago com pedido da ENYLA ou estoque. O cliente do site nunca vê nada disso.
 
@@ -99,7 +99,7 @@ export default function ChapasView() {
 
   return (
     <Pagina>
-      <CabecalhoPagina titulo="Chapas da Caixaria"
+      <CabecalhoPagina titulo="Chapas da Cartuxo"
         sub="Os pedidos pagos no site entram sozinhos na chapa do mesmo modelo e acabamento. Cada lugar rende 1.000 caixas."
         acoes={<Botao icone={<RotateCcw className="w-3.5 h-3.5" />} onClick={buscar}>Atualizar</Botao>} />
 
@@ -122,7 +122,7 @@ export default function ChapasView() {
         <Cartao><p className="text-[13px] text-[#8E8E93] flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Lendo os pedidos do site</p></Cartao>
       ) : lista.length === 0 ? (
         <Cartao><Vazio icone={<Layers className="w-9 h-9 text-[#c7c7cc]" />} titulo={filtro === "aberta" ? "Nenhuma chapa montando" : "Nada aqui"}
-          sub="Quando um pedido for pago no site da Caixaria, ele aparece aqui na chapa do modelo." /></Cartao>
+          sub="Quando um pedido for pago no site da Cartuxo, ele aparece aqui na chapa do modelo." /></Cartao>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {lista.map(c => {

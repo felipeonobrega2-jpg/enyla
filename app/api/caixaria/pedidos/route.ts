@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { pedidosSite, lerRecuperacao, registrarRecuperacao, linkEnvioArte, aplicarArte, type AcaoRecuperacao, type AcaoArte, type PedidoSite } from "@/app/caixaria/lib/servidor"
 
-// Caixaria · pedidos do site, últimos 90 dias, e a recuperação de quem parou no pagamento (rota protegida pelo login)
+// Cartuxo · pedidos do site, últimos 90 dias, e a recuperação de quem parou no pagamento (rota protegida pelo login)
 const SEM_TABELA = "Para registrar os contatos, rode supabase/migrations/20261108_caixaria_config.sql no SQL Editor do Supabase."
 
 const paraTela = (p: PedidoSite) => ({

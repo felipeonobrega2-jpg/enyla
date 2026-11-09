@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { chapasAtualizadas, aplicar, type AcaoChapa } from "@/app/caixaria/lib/servidor"
 
-// Caixaria · chapas (rota protegida pelo login)
-const SEM_TABELA = "As tabelas da Caixaria ainda não existem. Rode supabase/migrations/20261108_caixaria_chapas.sql no SQL Editor do Supabase."
+// Cartuxo · chapas (rota protegida pelo login)
+const SEM_TABELA = "As tabelas da Cartuxo ainda não existem. Rode supabase/migrations/20261108_caixaria_chapas.sql no SQL Editor do Supabase."
 const mensagem = (e: unknown) => {
   const m = (e as Error).message ?? String(e)
   return /does not exist|could not find the table|schema cache/i.test(m) ? SEM_TABELA : m

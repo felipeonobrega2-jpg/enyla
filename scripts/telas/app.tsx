@@ -401,7 +401,7 @@ function Telas() {
       <aside style={{ width: 220, background: "#17151f", padding: 8 }}>
         <div className="px-2 pt-3 pb-4"><img src="../../../public/brand/enyla-wordmark-light.png" style={{ height: 20 }} /></div>
         <SeletorArea caixaria onTrocar={() => {}} />
-        <p className="px-2.5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">Caixaria</p>
+        <p className="px-2.5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">Cartuxo</p>
         <div className="px-2.5 py-2 rounded-lg bg-white/[0.08] text-[13px] text-white">Pedidos do site</div>
         <div className="px-2.5 py-2 text-[13px] text-zinc-400">Chapas</div>
       </aside>

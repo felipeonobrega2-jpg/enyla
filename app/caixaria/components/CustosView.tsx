@@ -1,6 +1,6 @@
 "use client"
 
-// Caixaria · custos e regras de preço. O site caixaria.com calcula os preços com estes números.
+// Cartuxo · custos e regras de preço. O site caixaria.com calcula os preços com estes números.
 // Ao lado de cada campo, o que a ENYLA já sabe (configuração da ferramenta de orçamentos e o que foi pago por lote).
 // A simulação mostra, antes de salvar, o preço e o que sobra de cada pedido.
 

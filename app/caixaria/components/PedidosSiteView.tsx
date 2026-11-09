@@ -1,6 +1,6 @@
 "use client"
 
-// Caixaria · pedidos feitos no site (caixaria.com). Quem pagou, quem ficou no meio do caminho e o que cada um levou.
+// Cartuxo · pedidos feitos no site (caixaria.com). Quem pagou, quem ficou no meio do caminho e o que cada um levou.
 // Pedido pago entra sozinho na chapa (tela Chapas).
 
 import { useCallback, useEffect, useMemo, useState } from "react"

@@ -2,11 +2,11 @@
 
 import Image from "next/image"
 
-// Seletor da área no menu lateral: ENYLA (embalagens sob medida) ou Caixaria (loja online, módulo próprio).
+// Seletor da área no menu lateral: ENYLA (embalagens sob medida) ou Cartuxo (loja online, módulo próprio).
 // Cada aba mostra a logo da marca (versões para fundo escuro).
 const AREAS = [
   { caixaria: false, nome: "ENYLA", logo: "/brand/enyla-wordmark-light.png", w: 1335, h: 328 },
-  { caixaria: true, nome: "Caixaria", logo: "/brand/caixaria-wordmark-light.png", w: 598, h: 120 },
+  { caixaria: true, nome: "Cartuxo", logo: "/brand/cartuxo-wordmark-light.png", w: 1400, h: 249 },
 ] as const
 
 export default function SeletorArea({ caixaria, onTrocar }: { caixaria: boolean; onTrocar: (paraCaixaria: boolean) => void }) {

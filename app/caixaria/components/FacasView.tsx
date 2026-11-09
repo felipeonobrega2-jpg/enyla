@@ -1,6 +1,6 @@
 "use client"
 
-// Caixaria · cadastro de facas. O que a produção tem de verdade: medidas, quantas cabem na chapa 66×48
+// Cartuxo · cadastro de facas. O que a produção tem de verdade: medidas, quantas cabem na chapa 66×48
 // e se a caixa pode ser vendida no site. O site caixaria.com lê daqui e atualiza na hora.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"

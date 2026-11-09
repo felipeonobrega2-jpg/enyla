@@ -1,4 +1,4 @@
-// Painel de chapas da Caixaria: montagem das chapas compartilhadas (gang run).
+// Painel de chapas da Cartuxo: montagem das chapas compartilhadas (gang run).
 //
 // Regras (Felipe, 08/11/2026):
 // - Faca pronta: cada chapa é de um modelo de caixa só (mesma faca) e de um acabamento só (laminação fosca ou brilho).
