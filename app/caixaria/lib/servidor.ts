@@ -8,6 +8,7 @@
 
 import { supabase } from "@/app/lib/supabase"
 import type { Recuperacao } from "./recuperacao"
+import type { Acompanhamento } from "./acompanhamento"
 import { normalizarCustos, type Custos } from "./custos"
 import { erroFaca, planificacao, cabemNaChapa, type DadosFaca, type Faca, type ProdutoSite } from "./facas"
 import { alocar, vagos, type Chapa, type ItemPago, type Ocupacao, type StatusChapa, type TipoLugar } from "./chapas"
@@ -21,12 +22,13 @@ export type PedidoSite = {
   entrega: { cidade: string; uf: string; cep: string }
   itens: { slug: string; nome: string; medida: string; qtd: number; acab: string; prazo: string; marca?: string; total: number; cartao?: number; freteIncluso?: boolean; chapa?: ItemPago["chapa"] }[]
   mp_pagamentos: { status: string; em: string; metodo: string; valor: number }[]
+  acompanhamento?: Acompanhamento | null
 }
 
 export async function pedidosSite(dias = 90): Promise<PedidoSite[]> {
   const desde = new Date(Date.now() - dias * 86_400_000).toISOString()
   const { data, error } = await supabase.from("caixaria_pedidos")
-    .select("id, numero, status, forma, criado_em, atualizado_em, subtotal, valor_pago, cliente, entrega, itens, mp_pagamentos")
+    .select("*")
     .gte("criado_em", desde).order("criado_em", { ascending: false }).limit(500)
   if (error) throw new Error("caixaria_pedidos: " + error.message)
   return (data ?? []) as PedidoSite[]
@@ -94,11 +96,28 @@ const paraLinhaLugar = (chapaId: string, o: Ocupacao) => ({
 
 // Lê as chapas e encaixa os itens pagos desde a última vez. O índice único (pedido_id, item_idx, parte) impede
 // que duas leituras ao mesmo tempo coloquem o mesmo item duas vezes.
+// Arte aprovada pelo cliente no site (acompanhamento do pedido) vale para os lugares da chapa
+async function sincronizarArtes(chapas: Chapa[]): Promise<boolean> {
+  const faltam = chapas.flatMap(c => c.ocupacao).filter(o => o.tipo === "cliente" && o.pedidoId && !o.arteAprovadaEm)
+  if (!faltam.length) return false
+  const ids = [...new Set(faltam.map(o => o.pedidoId!))]
+  const { data } = await supabase.from("caixaria_pedidos").select("id, acompanhamento").in("id", ids)
+  const acomp = new Map(((data ?? []) as { id: string; acompanhamento: Acompanhamento | null }[]).map(p => [p.id, p.acompanhamento]))
+  let mudou = false
+  for (const o of faltam) {
+    const em = acomp.get(o.pedidoId!)?.artes?.[o.itemIdx ?? -1]?.aprovadaEm
+    if (!em) continue
+    await supabase.from("caixaria_chapa_lugares").update({ arte_aprovada_em: em }).eq("pedido_id", o.pedidoId!).eq("item_idx", o.itemIdx!).is("arte_aprovada_em", null)
+    mudou = true
+  }
+  return mudou
+}
+
 export async function chapasAtualizadas(): Promise<{ chapas: Chapa[]; semDados: number }> {
   const [itens, atuais] = await Promise.all([itensPagos(), lerChapas()])
   const semDados = itens.filter(i => !i.chapa).length
   const { chapas, novos } = alocar(atuais, itens)
-  if (!novos) return { chapas: atuais, semDados }
+  if (!novos) return { chapas: (await sincronizarArtes(atuais).catch(() => false)) ? await lerChapas() : atuais, semDados }
 
   const existentes = new Set(atuais.map(c => c.id))
   const antes = new Set(atuais.flatMap(c => c.ocupacao.map(o => o.id)))
@@ -120,7 +139,8 @@ export async function chapasAtualizadas(): Promise<{ chapas: Chapa[]; semDados: 
     const vazias = novasChapas.filter(c => !comLugar.has(c.id)).map(c => c.id)
     if (vazias.length) await supabase.from("caixaria_chapas").delete().in("id", vazias)
   }
-  return { chapas: await lerChapas(), semDados }
+  const lidas = await lerChapas()
+  return { chapas: (await sincronizarArtes(lidas).catch(() => false)) ? await lerChapas() : lidas, semDados }
 }
 
 export type AcaoChapa =
@@ -365,4 +385,49 @@ export async function registrarRecuperacao(a: AcaoRecuperacao): Promise<Recupera
   const { error } = await supabase.from("caixaria_config").upsert({ chave: "recuperacao", dados: r, atualizada_em: agora })
   if (error) throw new Error("caixaria_config: " + error.message)
   return r
+}
+
+// ── Arte e envio (o cliente vê na página do pedido) ───────────────────────────
+// Arquivos no bucket caixaria-arquivos (o site cria). Coluna caixaria_pedidos.acompanhamento.
+
+const BUCKET_CX = "caixaria-arquivos"
+const urlCx = (path: string) => supabase.storage.from(BUCKET_CX).getPublicUrl(path).data.publicUrl
+
+async function pedidoPorId(id: string) {
+  const { data, error } = await supabase.from("caixaria_pedidos").select("id, numero, status, itens, acompanhamento").eq("id", id).maybeSingle()
+  if (error) throw new Error(/acompanhamento/.test(error.message) ? "Falta a coluna de acompanhamento: rode supabase/migrations/20261108_caixaria_acompanhamento.sql" : error.message)
+  if (!data) throw new Error("Pedido não encontrado")
+  return data as { id: string; numero: string; status: string; itens: unknown[]; acompanhamento: Acompanhamento | null }
+}
+
+export async function linkEnvioArte(id: string, nome: string) {
+  const p = await pedidoPorId(id)
+  const { data: b } = await supabase.storage.getBucket(BUCKET_CX)
+  if (!b) await supabase.storage.createBucket(BUCKET_CX, { public: true, fileSizeLimit: 50 * 1024 * 1024 })
+  const limpo = nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80)
+  const path = `${p.numero}/arte-${Date.now()}-${crypto.randomUUID().slice(0, 8)}-${limpo}`
+  const { data, error } = await supabase.storage.from(BUCKET_CX).createSignedUploadUrl(path)
+  if (error || !data) throw new Error("storage: " + (error?.message ?? "sem link"))
+  return { signedUrl: data.signedUrl, url: urlCx(path) }
+}
+
+export type AcaoArte =
+  | { acao: "arte"; pedido: string; item: number; url: string; nome: string }
+  | { acao: "envio"; pedido: string; transportadora: string; rastreio: string }
+  | { acao: "envio-desfazer"; pedido: string }
+
+export async function aplicarArte(a: AcaoArte) {
+  const p = await pedidoPorId(a.pedido)
+  const acomp: Acompanhamento = { ...(p.acompanhamento ?? {}), artes: { ...(p.acompanhamento?.artes ?? {}) } }
+  const agora = new Date().toISOString()
+  if (a.acao === "arte") {
+    if (!Number.isInteger(a.item) || a.item < 0 || a.item >= p.itens.length) throw new Error("Item inválido")
+    if (!a.url.startsWith(urlCx(`${p.numero}/`))) throw new Error("Arquivo fora da pasta do pedido")
+    const x = acomp.artes![a.item] ?? { versoes: [], ajustes: [] }
+    acomp.artes![a.item] = { ...x, versoes: [...x.versoes, { url: a.url, nome: a.nome.slice(0, 120), em: agora }], enviadaEm: agora, aprovadaEm: undefined }
+  } else if (a.acao === "envio") {
+    acomp.envio = { em: agora, transportadora: a.transportadora.trim().slice(0, 60) || "transportadora", rastreio: a.rastreio.trim().slice(0, 60) }
+  } else delete acomp.envio
+  const { error } = await supabase.from("caixaria_pedidos").update({ acompanhamento: acomp, atualizado_em: agora }).eq("id", p.id)
+  if (error) throw new Error(error.message)
 }

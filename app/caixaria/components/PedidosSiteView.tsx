@@ -5,6 +5,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ShoppingBag, Wallet, Clock, Receipt, MessageCircle, ExternalLink, AlertTriangle, RotateCcw, Truck, Archive, Undo2 } from "lucide-react"
+import ArtePedido, { resumoArte } from "./ArtePedido"
+import type { Acompanhamento } from "../lib/acompanhamento"
 import { situacao, esfriouDeVez, mensagem, linkWhats, quandoTexto, MOTIVOS, type Recuperacao, type Situacao } from "../lib/recuperacao"
 import { Pagina, CabecalhoPagina, Cartao, Kpi, GradeKpis, Selo, Botao, Segmentado, LinhaLista, Vazio, Gaveta, type Tom } from "@/app/components/ds"
 
@@ -12,9 +14,9 @@ type Item = { nome: string; medida: string; qtd: number; acab: string; prazo: st
 type Pedido = {
   id: string; numero: string; status: string; forma: string; criadoEm: string; total: number; pago: number
   cliente: { nome: string; email: string; telefone: string; documento: string }; cidade: string
-  itens: Item[]; metodo: string | null; recusado?: boolean
+  itens: Item[]; metodo: string | null; recusado?: boolean; acompanhamento?: Acompanhamento | null
 }
-type Filtro = "pagos" | "aguardando" | "arquivados" | "todos"
+type Filtro = "pagos" | "arte" | "aguardando" | "arquivados" | "todos"
 
 const SITE = "https://caixaria.com"
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -74,12 +76,13 @@ export default function PedidosSiteView({ onVerChapas }: { onVerChapas?: () => v
       aguardando: t.filter(p => p.status === "aguardando_pagamento" && !arquivado(p)),
       chamar: t.filter(p => p.status === "aguardando_pagamento" && sit(p).tipo === "chamar").length,
       recuperados: pagos30.filter(p => (rec[p.id]?.toques.length ?? 0) > 0).length,
+      arte: t.filter(p => pago(p) && resumoArte(p).suaVez).length,
     }
   }, [pedidos, rec, sit])
 
   const ordemSit = (s: Situacao) => (s.tipo === "chamar" ? 0 : s.tipo === "esperar" ? 1 : 2)
   const lista = (pedidos ?? [])
-    .filter(p => filtro === "todos" || (filtro === "pagos" ? pago(p)
+    .filter(p => filtro === "todos" || (filtro === "pagos" ? pago(p) : filtro === "arte" ? pago(p) && resumoArte(p).suaVez
       : filtro === "arquivados" ? p.status === "aguardando_pagamento" && arquivado(p)
       : p.status === "aguardando_pagamento" && !arquivado(p)))
     .sort((a, b) => filtro === "aguardando" ? ordemSit(sit(a)) - ordemSit(sit(b)) : 0)
@@ -114,7 +117,7 @@ export default function PedidosSiteView({ onVerChapas }: { onVerChapas?: () => v
 
       <div className="mt-6 mb-3">
         <Segmentado<Filtro> valor={filtro} onChange={setFiltro}
-          opcoes={[{ v: "pagos", nome: "Pagos" }, { v: "aguardando", nome: `Aguardando${r.aguardando.length ? ` (${r.aguardando.length})` : ""}` }, { v: "arquivados", nome: "Desistiram" }, { v: "todos", nome: "Todos" }]} />
+          opcoes={[{ v: "pagos", nome: "Pagos" }, { v: "arte", nome: `Arte para fazer${r.arte ? ` (${r.arte})` : ""}` }, { v: "aguardando", nome: `Aguardando${r.aguardando.length ? ` (${r.aguardando.length})` : ""}` }, { v: "arquivados", nome: "Desistiram" }, { v: "todos", nome: "Todos" }]} />
       </div>
 
       <Cartao padding={false}>
@@ -128,7 +131,7 @@ export default function PedidosSiteView({ onVerChapas }: { onVerChapas?: () => v
               <LinhaLista key={p.id} onClick={() => setAberto(p)}
                 titulo={`${p.cliente?.nome ?? "—"} · ${p.numero}`}
                 sub={`${p.itens.map(i => i.nome.replace(/^Caixa para /, "")).join(", ")} · ${n(caixas)} un · ${quando(p.criadoEm)}`}
-                valor={brl(p.total)} valorSub={p.status === "aguardando_pagamento" ? seloParado(p) : <Selo tom={s.tom}>{s.texto}</Selo>} />
+                valor={brl(p.total)} valorSub={p.status === "aguardando_pagamento" ? seloParado(p) : pago(p) ? (() => { const x = resumoArte(p); return <Selo tom={x.tom}>{x.texto}</Selo> })() : <Selo tom={s.tom}>{s.texto}</Selo>} />
             )
           })}
       </Cartao>
@@ -184,6 +187,7 @@ export default function PedidosSiteView({ onVerChapas }: { onVerChapas?: () => v
                 </div>
               )
             })()}
+            {pago(aberto) && <ArtePedido p={aberto} onPedidos={l => { const lista = l as Pedido[]; setPedidos(lista); setAberto(lista.find(x => x.id === aberto.id) ?? null) }} />}
             <div>
               <p className="text-[11px] uppercase tracking-wide font-bold text-[#8E8E93] mb-2">Itens</p>
               <div className="ds-borda rounded-lg divide-y divide-[rgba(0,0,0,0.06)]">

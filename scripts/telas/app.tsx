@@ -131,8 +131,11 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     const cli = (nome: string) => ({ nome, email: "contato@exemplo.com", telefone: "11999990000", documento: "12.345.678/0001-90" })
     const item = (nome: string, medida: string, qtd: number, total: number, marca: string | null, freteIncluso = false) => ({ nome, medida, qtd, acab: "Laminação fosca", prazo: "Produção normal", marca, freteIncluso, total })
     return new Response(JSON.stringify({ pedidos: [
-      { id: "1", numero: "CX-261108-K7P2", status: "pago", forma: "pix", criadoEm: h(3), total: 1289.9, pago: 1289.9, cliente: cli("Perfumaria Modelo"), cidade: "São Paulo/SP", metodo: "Pix", itens: [item("Caixa para perfume 100 ml", "6,5 × 6,5 × 13 cm", 1000, 1289.9, "Noir 1987")] },
-      { id: "2", numero: "CX-261107-B2QX", status: "pago", forma: "cartao", criadoEm: h(30), total: 2479.9, pago: 2479.9, cliente: cli("Essências do Brás"), cidade: "São Paulo/SP", metodo: "Cartão de crédito", itens: [item("Caixa para perfume 100 ml", "6,5 × 6,5 × 13 cm", 2000, 2479.9, "Oud Real")] },
+      { id: "1", numero: "CX-261108-K7P2", status: "pago", forma: "pix", criadoEm: h(3), total: 1289.9, pago: 1289.9, cliente: cli("Perfumaria Modelo"), cidade: "São Paulo/SP", metodo: "Pix", itens: [item("Caixa para perfume 100 ml", "6,5 × 6,5 × 13 cm", 1000, 1289.9, "Noir 1987")],
+        acompanhamento: { briefing: { marca: "Noir 1987", cores: "", texto: "", arquivos: [], em: h(2) }, artes: { 0: { versoes: [{ url: "/brand/enyla-wordmark-dark.png", nome: "arte.png", em: h(1) }], enviadaEm: h(1), ajustes: [] } } } },
+      { id: "2", numero: "CX-261107-B2QX", status: "pago", forma: "cartao", criadoEm: h(30), total: 2479.9, pago: 2479.9, cliente: cli("Essências do Brás"), cidade: "São Paulo/SP", metodo: "Cartão de crédito", itens: [item("Caixa para perfume 100 ml", "6,5 × 6,5 × 13 cm", 2000, 2479.9, "Oud Real")],
+        acompanhamento: { briefing: { marca: "Oud Real", cores: "preto e dourado", texto: "Nome grande na frente, 100 ml embaixo. Lateral com as notas: oud, âmbar e baunilha.", arquivos: [{ url: "/brand/enyla-wordmark-dark.png", nome: "logo-oud-real.png", em: h(28) }, { url: "x.pdf", nome: "referencia.pdf", em: h(28) }], em: h(28) },
+          artes: { 0: { versoes: [{ url: "/brand/enyla-wordmark-dark.png", nome: "arte-v1.png", em: h(20) }], enviadaEm: h(20), ajustes: [{ texto: "Aumentar o logo e trocar o dourado por um mais claro", em: h(6) }] } } } },
       { id: "3", numero: "CX-261106-M4TA", status: "pago", forma: "pix", criadoEm: h(55), total: 1079.9, pago: 1079.9, cliente: cli("Bella Pele"), cidade: "Curitiba/PR", metodo: "Pix", itens: [item("Caixa para sérum 30 ml", "4 × 4 × 11 cm", 1000, 1079.9, "Pure Skin", true)] },
       { id: "4", numero: "CX-261108-Z9WE", status: "aguardando_pagamento", forma: "pix", criadoEm: h(1), total: 839.9, pago: 0, cliente: cli("Clínica Vitta"), cidade: "Barueri/SP", metodo: null, itens: [item("Caixa para caneta aplicadora", "4 × 3 × 17,5 cm", 1000, 839.9, null)] },
       { id: "5", numero: "CX-261106-H3RT", status: "aguardando_pagamento", forma: "cartao", criadoEm: h(50), total: 2479.9, pago: 0, cliente: cli("Aroma Nobre"), cidade: "Recife/PE", metodo: null, recusado: true, itens: [item("Caixa para perfume 100 ml", "6,5 × 6,5 × 13 cm", 2000, 2479.9, "Nobre")] },
@@ -393,7 +396,7 @@ function Telas() {
     case "chapas": case "chapas-m": case "chapas-aberta": return pagina(<ChapasView />)
     case "custos": case "custos-m": case "custos-mudado": return pagina(<CustosView />)
     case "facas": case "facas-m": case "facas-aberta": case "facas-nova": case "facas-lista": return pagina(<FacasView />)
-    case "cx-pedidos": case "cx-pedidos-aberto": case "cx-parados": case "cx-parado-aberto": case "cx-parado-m": return pagina(<PedidosSiteView onVerChapas={() => {}} />)
+    case "cx-pedidos": case "cx-pedidos-aberto": case "cx-arte-aberto": case "cx-arte-m": case "cx-parados": case "cx-parado-aberto": case "cx-parado-m": return pagina(<PedidosSiteView onVerChapas={() => {}} />)
     case "cx-app": return <div style={{ display: "flex", minHeight: "100vh", background: "#f5f5f7" }}>
       <aside style={{ width: 220, background: "#17151f", padding: 8 }}>
         <div className="px-2 pt-3 pb-4"><img src="../../../public/brand/enyla-wordmark-light.png" style={{ height: 20 }} /></div>
