@@ -135,7 +135,9 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       { id: "2", numero: "CX-261107-B2QX", status: "pago", forma: "cartao", criadoEm: h(30), total: 2479.9, pago: 2479.9, cliente: cli("Essências do Brás"), cidade: "São Paulo/SP", metodo: "Cartão de crédito", itens: [item("Caixa para perfume 100 ml", "6,5 × 6,5 × 13 cm", 2000, 2479.9, "Oud Real")] },
       { id: "3", numero: "CX-261106-M4TA", status: "pago", forma: "pix", criadoEm: h(55), total: 1079.9, pago: 1079.9, cliente: cli("Bella Pele"), cidade: "Curitiba/PR", metodo: "Pix", itens: [item("Caixa para sérum 30 ml", "4 × 4 × 11 cm", 1000, 1079.9, "Pure Skin", true)] },
       { id: "4", numero: "CX-261108-Z9WE", status: "aguardando_pagamento", forma: "pix", criadoEm: h(1), total: 839.9, pago: 0, cliente: cli("Clínica Vitta"), cidade: "Barueri/SP", metodo: null, itens: [item("Caixa para caneta aplicadora", "4 × 3 × 17,5 cm", 1000, 839.9, null)] },
-    ] }))
+      { id: "5", numero: "CX-261106-H3RT", status: "aguardando_pagamento", forma: "cartao", criadoEm: h(50), total: 2479.9, pago: 0, cliente: cli("Aroma Nobre"), cidade: "Recife/PE", metodo: null, recusado: true, itens: [item("Caixa para perfume 100 ml", "6,5 × 6,5 × 13 cm", 2000, 2479.9, "Nobre")] },
+      { id: "6", numero: "CX-261107-P0QA", status: "aguardando_pagamento", forma: "pix", criadoEm: h(20), total: 1079.9, pago: 0, cliente: cli("Pele de Seda"), cidade: "Goiânia/GO", metodo: null, itens: [item("Caixa para sérum 30 ml", "4 × 4 × 11 cm", 1000, 1079.9, null)] },
+    ], recuperacao: { "5": { toques: [h(48)] }, "6": { toques: [h(19)] }, "2": { toques: [h(29)] } } }))
   }
   if (u.startsWith("/api/caixaria/custos")) {
     const R = (campo: string, valor: number, fonte: string, detalhe: string) => ({ campo, valor, fonte, detalhe })
@@ -391,7 +393,7 @@ function Telas() {
     case "chapas": case "chapas-m": case "chapas-aberta": return pagina(<ChapasView />)
     case "custos": case "custos-m": case "custos-mudado": return pagina(<CustosView />)
     case "facas": case "facas-m": case "facas-aberta": case "facas-nova": case "facas-lista": return pagina(<FacasView />)
-    case "cx-pedidos": case "cx-pedidos-aberto": return pagina(<PedidosSiteView onVerChapas={() => {}} />)
+    case "cx-pedidos": case "cx-pedidos-aberto": case "cx-parados": case "cx-parado-aberto": case "cx-parado-m": return pagina(<PedidosSiteView onVerChapas={() => {}} />)
     case "cx-app": return <div style={{ display: "flex", minHeight: "100vh", background: "#f5f5f7" }}>
       <aside style={{ width: 220, background: "#17151f", padding: 8 }}>
         <div className="px-2 pt-3 pb-4"><img src="../../../public/brand/enyla-wordmark-light.png" style={{ height: 20 }} /></div>

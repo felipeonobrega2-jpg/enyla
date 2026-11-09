@@ -7,6 +7,7 @@
 // SQL em supabase/migrations/20261108_caixaria_chapas.sql.
 
 import { supabase } from "@/app/lib/supabase"
+import type { Recuperacao } from "./recuperacao"
 import { normalizarCustos, type Custos } from "./custos"
 import { erroFaca, planificacao, cabemNaChapa, type DadosFaca, type Faca, type ProdutoSite } from "./facas"
 import { alocar, vagos, type Chapa, type ItemPago, type Ocupacao, type StatusChapa, type TipoLugar } from "./chapas"
@@ -334,4 +335,34 @@ export async function referenciasENYLA(): Promise<{ referencias: Referencia[]; a
   pago("logistica", "transporte", v => v, v => `mediana de R$ ${Math.round(v)} por lote (Lalamove, motoboy, carro)`, false)
 
   return { referencias: refs, avisos }
+}
+
+// ── Recuperação de quem parou no pagamento ────────────────────────────────────
+// caixaria_config, chave "recuperacao": { [pedido id]: { toques: [ISO], arquivado?: { em, motivo } } }
+
+
+export async function lerRecuperacao(): Promise<Recuperacao> {
+  const { data, error } = await supabase.from("caixaria_config").select("dados").eq("chave", "recuperacao").maybeSingle()
+  if (error) throw new Error("caixaria_config: " + error.message)
+  return (data?.dados ?? {}) as Recuperacao
+}
+
+export type AcaoRecuperacao =
+  | { acao: "toque"; pedido: string }
+  | { acao: "desfazer"; pedido: string }
+  | { acao: "arquivar"; pedido: string; motivo: string }
+  | { acao: "reabrir"; pedido: string }
+
+export async function registrarRecuperacao(a: AcaoRecuperacao): Promise<Recuperacao> {
+  const r = await lerRecuperacao()
+  const reg = r[a.pedido] ?? { toques: [] }
+  const agora = new Date().toISOString()
+  if (a.acao === "toque") { if (reg.toques.length < 3) reg.toques = [...reg.toques, agora] }
+  else if (a.acao === "desfazer") reg.toques = reg.toques.slice(0, -1)
+  else if (a.acao === "arquivar") reg.arquivado = { em: agora, motivo: String(a.motivo).slice(0, 60) || "Outro" }
+  else if (a.acao === "reabrir") delete reg.arquivado
+  r[a.pedido] = reg
+  const { error } = await supabase.from("caixaria_config").upsert({ chave: "recuperacao", dados: r, atualizada_em: agora })
+  if (error) throw new Error("caixaria_config: " + error.message)
+  return r
 }
