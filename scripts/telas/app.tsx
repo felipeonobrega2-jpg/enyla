@@ -42,6 +42,7 @@ import DigitalClient from "@/app/d/[id]/DigitalClient"
 import GastosView from "@/app/components/GastosView"
 import DigitalPainelView from "@/app/components/DigitalPainelView"
 import ChapasView from "@/app/caixaria/components/ChapasView"
+import CustosView from "@/app/caixaria/components/CustosView"
 import FacasView from "@/app/caixaria/components/FacasView"
 import PedidosSiteView from "@/app/caixaria/components/PedidosSiteView"
 import SeletorArea from "@/app/caixaria/components/SeletorArea"
@@ -134,6 +135,18 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       { id: "2", numero: "CX-261107-B2QX", status: "pago", forma: "cartao", criadoEm: h(30), total: 2479.9, pago: 2479.9, cliente: cli("Essências do Brás"), cidade: "São Paulo/SP", metodo: "Cartão de crédito", itens: [item("Caixa para perfume 100 ml", "6,5 × 6,5 × 13 cm", 2000, 2479.9, "Oud Real")] },
       { id: "3", numero: "CX-261106-M4TA", status: "pago", forma: "pix", criadoEm: h(55), total: 1079.9, pago: 1079.9, cliente: cli("Bella Pele"), cidade: "Curitiba/PR", metodo: "Pix", itens: [item("Caixa para sérum 30 ml", "4 × 4 × 11 cm", 1000, 1079.9, "Pure Skin", true)] },
       { id: "4", numero: "CX-261108-Z9WE", status: "aguardando_pagamento", forma: "pix", criadoEm: h(1), total: 839.9, pago: 0, cliente: cli("Clínica Vitta"), cidade: "Barueri/SP", metodo: null, itens: [item("Caixa para caneta aplicadora", "4 × 3 × 17,5 cm", 1000, 839.9, null)] },
+    ] }))
+  }
+  if (u.startsWith("/api/caixaria/custos")) {
+    const R = (campo: string, valor: number, fonte: string, detalhe: string) => ({ campo, valor, fonte, detalhe })
+    return new Response(JSON.stringify({ custos: null, salvoEm: null, avisos: ["Nenhum fornecedor da ENYLA tem tabela de laminação cadastrada. O valor da laminação ainda é estimado: confirme com quem lamina."], referencias: [
+      R("papelPorFolha", 0.85, "Configuração da ENYLA", "Cartão 300g: R$ 170 o cento de 66×96 (meia folha = 66×48)"), R("impressao", 350, "Configuração da ENYLA", "Jerograf: valor fixo por chapa"),
+      R("perdaPct", 10, "Configuração da ENYLA", "folhas a mais nos orçamentos"), R("impostoPct", 6, "Configuração da ENYLA", "imposto sobre o preço"),
+      R("corteAcerto", 50, "Configuração da ENYLA", "Rodrigo Corte e Vinco: R$ 50 de acerto + R$ 50 o milheiro"), R("corteMilheiro", 50, "Configuração da ENYLA", "Rodrigo Corte e Vinco"),
+      R("arte", 70, "Configuração da ENYLA", "Ludmila Designer, por trabalho"), R("papelPorFolha", 0.72, "Pago em 11 lotes da ENYLA", "mediana de R$ 0,72 por folha, já com a perda"),
+      R("laminacaoPorFolha", 0.18, "Pago em 13 lotes da ENYLA", "verniz: mediana de R$ 0,18 por folha. Laminação costuma custar mais que verniz"),
+      R("corteMilheiro", 94.96, "Pago em 10 lotes da ENYLA", "mediana de R$ 95 por mil folhas, acerto incluído"), R("colagemPorMil", 47.66, "Pago em 12 lotes da ENYLA", "mediana de R$ 48 por mil caixas"),
+      R("logistica", 49.58, "Pago em 16 lotes da ENYLA", "mediana de R$ 50 por lote (Lalamove, motoboy, carro)"),
     ] }))
   }
   if (u.startsWith("/api/caixaria/facas")) {
@@ -376,6 +389,7 @@ function Telas() {
     </div>
     case "gastos": case "gastos-m": return pagina(<GastosView />)
     case "chapas": case "chapas-m": case "chapas-aberta": return pagina(<ChapasView />)
+    case "custos": case "custos-m": case "custos-mudado": return pagina(<CustosView />)
     case "facas": case "facas-m": case "facas-aberta": case "facas-nova": case "facas-lista": return pagina(<FacasView />)
     case "cx-pedidos": case "cx-pedidos-aberto": return pagina(<PedidosSiteView onVerChapas={() => {}} />)
     case "cx-app": return <div style={{ display: "flex", minHeight: "100vh", background: "#f5f5f7" }}>

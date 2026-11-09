@@ -2,11 +2,13 @@
 //   caixaria_pedidos        pedidos do site (o site grava; aqui só lemos)
 //   caixaria_chapas         chapas compartilhadas
 //   caixaria_chapa_lugares  o que ocupa cada chapa (item de pedido, ENYLA ou estoque)
+//   caixaria_config         custos e regras de preço (chave "custos"); o site lê
 //   caixaria_facas          cadastro de facas (o site lê: medidas reais, lugares por chapa, à venda ou não)
 // SQL em supabase/migrations/20261108_caixaria_chapas.sql.
 
 import { supabase } from "@/app/lib/supabase"
-import { erroFaca, type DadosFaca, type Faca, type ProdutoSite } from "./facas"
+import { normalizarCustos, type Custos } from "./custos"
+import { erroFaca, planificacao, cabemNaChapa, type DadosFaca, type Faca, type ProdutoSite } from "./facas"
 import { alocar, vagos, type Chapa, type ItemPago, type Ocupacao, type StatusChapa, type TipoLugar } from "./chapas"
 
 // ── Pedidos do site ───────────────────────────────────────────────────────────
@@ -216,4 +218,120 @@ export async function apagarFaca(id: string): Promise<{ siteAtualizado: boolean 
   const { error } = await supabase.from("caixaria_facas").delete().eq("id", id)
   if (error) throw new Error(error.message)
   return { siteAtualizado: await avisarSite() }
+}
+
+// ── Custos ────────────────────────────────────────────────────────────────────
+
+export async function lerCustos(): Promise<{ custos: Custos; salvoEm: string | null }> {
+  const { data, error } = await supabase.from("caixaria_config").select("dados, atualizada_em").eq("chave", "custos").maybeSingle()
+  if (error) throw new Error("caixaria_config: " + error.message)
+  return { custos: normalizarCustos(data?.dados as Partial<Custos> | undefined), salvoEm: data?.atualizada_em ?? null }
+}
+
+export async function salvarCustos(c: Partial<Custos>): Promise<{ siteAtualizado: boolean }> {
+  const custos = normalizarCustos(c)
+  const { error } = await supabase.from("caixaria_config").upsert({ chave: "custos", dados: custos, atualizada_em: new Date().toISOString() })
+  if (error) throw new Error("caixaria_config: " + error.message)
+  return { siteAtualizado: await avisarSite() }
+}
+
+// O que a ENYLA já sabe: a configuração da ferramenta de orçamentos e o que foi pago de verdade por lote.
+export type Referencia = { campo: keyof Custos; valor: number; fonte: string; detalhe: string }
+
+type RegraENYLA = { tipo: string; acerto?: number; milheiro?: number; valor?: number }
+type FornecedorENYLA = { id: string; nome: string; ativo: boolean; servicos: Record<string, RegraENYLA | undefined> }
+
+const mediana = (xs: number[]) => {
+  const v = xs.filter(Number.isFinite).sort((a, b) => a - b)
+  if (!v.length) return NaN
+  const m = Math.floor(v.length / 2)
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2
+}
+
+export async function referenciasENYLA(): Promise<{ referencias: Referencia[]; avisos: string[] }> {
+  const refs: Referencia[] = []
+  const avisos: string[] = []
+  const r2 = (n: number) => Math.round(n * 100) / 100
+  const rs = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+  // 1) Configuração da ferramenta de orçamentos
+  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const cfg = (cfgRow?.data ?? {}) as {
+    materiais?: { id: string; nome: string; precos: Record<string, number> }[]
+    producao?: { fornecedores?: FornecedorENYLA[]; padroes?: Record<string, string>; perdaPct?: number; impostoPct?: number }
+  }
+  const prod = cfg.producao ?? {}
+  const forns = (prod.fornecedores ?? []).filter(f => f.ativo)
+  const cartao = (cfg.materiais ?? []).find(m => /cart[aã]o\s*300/i.test(m.nome))
+  if (cartao?.precos["66x96"]) refs.push({ campo: "papelPorFolha", valor: r2(cartao.precos["66x96"] / 100 / 2), fonte: "Configuração da ENYLA", detalhe: `${cartao.nome}: R$ ${cartao.precos["66x96"]} o cento de 66×96 (meia folha = 66×48)` })
+  const imp = forns.find(f => f.servicos.impressao?.tipo === "fixo_chapa")
+  if (imp?.servicos.impressao?.valor) refs.push({ campo: "impressao", valor: imp.servicos.impressao.valor, fonte: "Configuração da ENYLA", detalhe: `${imp.nome}: valor fixo por chapa` })
+  if (prod.perdaPct != null) refs.push({ campo: "perdaPct", valor: prod.perdaPct, fonte: "Configuração da ENYLA", detalhe: "folhas a mais nos orçamentos" })
+  if (prod.impostoPct != null) refs.push({ campo: "impostoPct", valor: prod.impostoPct, fonte: "Configuração da ENYLA", detalhe: "imposto sobre o preço" })
+  const corte = forns.filter(f => f.servicos.corteVinco?.tipo === "acerto_milheiro").sort((a, b) => (a.servicos.corteVinco!.acerto ?? 0) - (b.servicos.corteVinco!.acerto ?? 0))[0]
+  if (corte) {
+    const k = corte.servicos.corteVinco!
+    refs.push({ campo: "corteAcerto", valor: k.acerto ?? 0, fonte: "Configuração da ENYLA", detalhe: `${corte.nome}: R$ ${k.acerto} de acerto + R$ ${k.milheiro} o milheiro` })
+    refs.push({ campo: "corteMilheiro", valor: k.milheiro ?? 0, fonte: "Configuração da ENYLA", detalhe: `${corte.nome}` })
+  }
+  const arte = forns.map(f => ({ f, v: f.servicos.arte?.tipo === "por_trabalho" ? f.servicos.arte.valor ?? 0 : 0 })).filter(x => x.v > 0).sort((a, b) => a.v - b.v)[0]
+  if (arte) refs.push({ campo: "arte", valor: arte.v, fonte: "Configuração da ENYLA", detalhe: `${arte.f.nome}, por trabalho` })
+  const lam = forns.find(f => f.servicos.laminacao && Object.keys((f.servicos.laminacao as { precosPorTipo?: object }).precosPorTipo ?? {}).length)
+  if (!lam) avisos.push("Nenhum fornecedor da ENYLA tem tabela de laminação cadastrada. O valor da laminação ainda é estimado: confirme com quem lamina.")
+
+  // 2) O que foi pago: despesas por lote ÷ folhas do lote (lotes de 3.000 caixas ou mais, com medida conhecida)
+  const desde = new Date(Date.now() - 180 * 86_400_000).toISOString().slice(0, 10)
+  const [{ data: ls }, { data: cs }] = await Promise.all([
+    supabase.from("LancamentoFinanceiro").select("descricao, valor, categoria, subcategoria, loteNumero").eq("tipo", "despesa").not("loteNumero", "is", null).gte("dataVencimento", desde),
+    supabase.from("KanbanCard").select("loteNumero, dimensoes, quantidade").not("loteNumero", "is", null),
+  ])
+  const lotes = new Map<string, { qtd: number; folhas: number; ok: boolean }>()
+  for (const c of (cs ?? []) as { loteNumero: string; dimensoes: string | null; quantidade: number | null }[]) {
+    const L = lotes.get(c.loteNumero) ?? { qtd: 0, folhas: 0, ok: true }
+    const q = c.quantidade ?? 0
+    const m = (c.dimensoes ?? "").replace(/,/g, ".").match(/([\d.]+)\s*[×x]\s*([\d.]+)\s*[×x]\s*([\d.]+)/)
+    // Medidas da ENYLA: frente × altura × lateral, em cm
+    const n = m && +m[1] > 0 ? (() => { const p = planificacao("simples", +m[1] * 10, +m[3] * 10, +m[2] * 10); return cabemNaChapa(p.largura, p.altura) })() : 0
+    if (n) L.folhas += q / n; else L.ok = false
+    L.qtd += q
+    lotes.set(c.loteNumero, L)
+  }
+  const cat = (l: { descricao: string | null; categoria: string | null; subcategoria: string | null }) => {
+    const t = `${l.categoria} ${l.subcategoria} ${l.descricao}`.toLowerCase()
+    if (/transporte|lalamove|motoboy/.test(t)) return "transporte"
+    if (/lamina/.test(t)) return "laminacao"
+    if (/verniz/.test(t)) return "verniz"
+    if (/corte|vinco/.test(t)) return "corte"
+    if (/colag/.test(t)) return "colagem"
+    if (/papel/.test(t)) return "papel"
+    return null
+  }
+  const porLote = new Map<string, Record<string, number>>()
+  for (const l of (ls ?? []) as { descricao: string | null; valor: number; categoria: string | null; subcategoria: string | null; loteNumero: string }[]) {
+    const k = cat(l); if (!k) continue
+    const o = porLote.get(l.loteNumero) ?? {}
+    o[k] = (o[k] ?? 0) + Number(l.valor)
+    porLote.set(l.loteNumero, o)
+  }
+  const amostra = (k: string, fn: (v: number, L: { qtd: number; folhas: number }) => number, precisaFolhas = true) => {
+    const xs: number[] = []
+    for (const [n, o] of porLote) {
+      const L = lotes.get(n)
+      if (!L || o[k] == null || L.qtd < 3000 || (precisaFolhas && (!L.ok || !L.folhas))) continue
+      xs.push(fn(o[k], L))
+    }
+    return { v: mediana(xs), n: xs.length }
+  }
+  const pago = (campo: keyof Custos, k: string, fn: (v: number, L: { qtd: number; folhas: number }) => number, txt: (v: number, n: number) => string, precisaFolhas = true) => {
+    const { v, n } = amostra(k, fn, precisaFolhas)
+    if (n >= 2) refs.push({ campo, valor: r2(v), fonte: `Pago em ${n} lotes da ENYLA`, detalhe: txt(v, n) })
+  }
+  pago("papelPorFolha", "papel", (v, L) => v / L.folhas, v => `mediana de R$ ${rs(v)} por folha, já com a perda`)
+  pago("laminacaoPorFolha", "verniz", (v, L) => v / L.folhas, v => `verniz: mediana de R$ ${rs(v)} por folha. Laminação costuma custar mais que verniz`)
+  pago("laminacaoPorFolha", "laminacao", (v, L) => v / L.folhas, v => `laminação: mediana de R$ ${rs(v)} por folha`)
+  pago("corteMilheiro", "corte", (v, L) => v / L.folhas * 1000, v => `mediana de R$ ${Math.round(v)} por mil folhas, acerto incluído`)
+  pago("colagemPorMil", "colagem", (v, L) => v / L.qtd * 1000, v => `mediana de R$ ${Math.round(v)} por mil caixas`, false)
+  pago("logistica", "transporte", v => v, v => `mediana de R$ ${Math.round(v)} por lote (Lalamove, motoboy, carro)`, false)
+
+  return { referencias: refs, avisos }
 }
