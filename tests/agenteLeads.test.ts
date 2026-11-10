@@ -175,3 +175,11 @@ describe("nunca fala de sistema", async () => {
     for (const t of ["Caixa com fundo automático 5x8", "eu ia te mandar agora", "Me passa a quantidade"]) expect(FALA_DE_SISTEMA.test(t)).toBe(false)
   })
 })
+
+describe("mensagem automática do WhatsApp Business", async () => {
+  const { ehMensagemAutomaticaDoWhatsapp } = await import("../app/lib/agenteLeads")
+  it("fora do horário", () => expect(ehMensagemAutomaticaDoWhatsapp("Estou fora do horário de atendimento")).toBe(true))
+  it("botões sem texto, em rajada: automática", () => expect(ehMensagemAutomaticaDoWhatsapp(null, "interactiveMessage")).toBe(true))
+  it("você digitando: não", () => expect(ehMensagemAutomaticaDoWhatsapp("Oi, tudo bem?", "conversation")).toBe(false))
+  it("mensagem com botões e texto: não", () => expect(ehMensagemAutomaticaDoWhatsapp("Escolha uma opção", "interactiveMessage")).toBe(false))
+})

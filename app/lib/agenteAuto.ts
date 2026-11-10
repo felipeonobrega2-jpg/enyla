@@ -206,8 +206,8 @@ async function avisarSemCredito(cfg: CfgAgente) {
 // A última mensagem de verdade: o "Estou fora do horário" do WhatsApp Business sai na hora, como se fosse sua, e
 // fazia o agente achar que você já tinha respondido (o lead da noite ficava sem a abertura)
 const ultimaDa = async (jid: string) => {
-  const { data } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo").eq("jid", jid).order("ts", { ascending: false }).limit(6)
-  const m = (data ?? []).find(x => !(x.from_me && ehMensagemAutomaticaDoWhatsapp(x.corpo)))
+  const { data } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo, tipo").eq("jid", jid).order("ts", { ascending: false }).limit(6)
+  const m = (data ?? []).find(x => !(x.from_me && ehMensagemAutomaticaDoWhatsapp(x.corpo, x.tipo)))
   return m ? { id: m.id as string, from_me: m.from_me as boolean, ts: m.ts as string } : null
 }
 
@@ -218,15 +218,15 @@ const primeiraDa = async (jid: string) =>
 async function voceAtende(jid: string, cfg: CfgAgente, horas = 24) {
   const ids = new Set([...(cfg.agenteLog ?? []).flatMap(l => l.ids ?? []), ...(cfg.agenteIds ?? [])])
   const desde = new Date(Date.now() - horas * 3_600_000).toISOString()
-  const { data } = await supabase.from("whatsapp_mensagens").select("id, corpo").eq("jid", jid).eq("from_me", true).gte("ts", desde).limit(200)
-  return (data ?? []).some(m => !ids.has(m.id) && !ehMensagemAutomaticaDoWhatsapp(m.corpo))
+  const { data } = await supabase.from("whatsapp_mensagens").select("id, corpo, tipo").eq("jid", jid).eq("from_me", true).gte("ts", desde).limit(200)
+  return (data ?? []).some(m => !ids.has(m.id) && !ehMensagemAutomaticaDoWhatsapp(m.corpo, m.tipo))
 }
 
 async function voceNaConversa(jid: string, log: Registro[], cfg?: CfgAgente) {
   const idsDoAgente = new Set([...log.flatMap(l => l.ids ?? []), ...(cfg?.agenteIds ?? [])])
   const desde = new Date(Date.now() - MINUTOS_VOCE_NA_CONVERSA * 60_000).toISOString()
-  const { data: minhas } = await supabase.from("whatsapp_mensagens").select("id, corpo").eq("jid", jid).eq("from_me", true).gte("ts", desde)
-  return (minhas ?? []).some(m => !idsDoAgente.has(m.id) && !ehMensagemAutomaticaDoWhatsapp(m.corpo))
+  const { data: minhas } = await supabase.from("whatsapp_mensagens").select("id, corpo, tipo").eq("jid", jid).eq("from_me", true).gte("ts", desde)
+  return (minhas ?? []).some(m => !idsDoAgente.has(m.id) && !ehMensagemAutomaticaDoWhatsapp(m.corpo, m.tipo))
 }
 
 const contexto = (cfg: CfgAgente, log: Registro[], jid: string) => ({
@@ -440,8 +440,8 @@ export async function talvezRetomarParados(origem: string) {
   let disparadas = 0
   for (const c of candidatas) {
     if (disparadas >= 6) break
-    const { data: todas } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo").eq("jid", c.jid).order("ts", { ascending: false }).limit(40)
-    const ms = (todas ?? []).filter(m => !(m.from_me && ehMensagemAutomaticaDoWhatsapp(m.corpo)))
+    const { data: todas } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo, tipo").eq("jid", c.jid).order("ts", { ascending: false }).limit(40)
+    const ms = (todas ?? []).filter(m => !(m.from_me && ehMensagemAutomaticaDoWhatsapp(m.corpo, m.tipo)))
     const u = ms[0]
     if (!u) continue
     const primeira = await primeiraDa(c.jid)

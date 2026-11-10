@@ -65,7 +65,8 @@ export function comMedidaPadrao(d: DadosPedido): DadosPedido {
 // Um MQL: quando chegou (primeira mensagem dele), quando recebeu o orçamento, de quem é a vez e o estado agora.
 // null = não é lead novo da janela (já falava antes), ainda não escreveu ou é produto que não fazemos.
 export function estadoDoMql(msgs: MsgMeta[], dados: DadosPedido | null, orcamentoNoSistemaEm: string[] = [], agora = Date.now(), ia?: Momento | null) {
-  const ord = [...msgs].sort((a, b) => a.ts.localeCompare(b.ts))
+  // Mensagem com botões sem texto que o WhatsApp Business dispara sozinho não é sua (nem conta como orçamento)
+  const ord = [...msgs].filter(m => !(m.from_me && !m.corpo?.trim() && /interactive|template|buttons|list/i.test(m.tipo ?? ""))).sort((a, b) => a.ts.localeCompare(b.ts))
   const primeira = ord.find(m => !m.from_me)?.ts
   if (!primeira || agora - new Date(primeira).getTime() > DIAS_META * 86_400_000) return null
   const porMsg = ord.find(m => m.from_me && m.ts > primeira && (DOC.test(m.tipo ?? "") || PRECO.test(m.corpo ?? "")))?.ts

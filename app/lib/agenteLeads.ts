@@ -168,8 +168,11 @@ export const horarioDeFollowUp = (d = new Date()) => {
 // Mensagens separadas por linha em branco viram envios separados (no máximo 3)
 export const partesDaResposta = (r: string) => r.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean).slice(0, 3)
 
-// Respostas automáticas do WhatsApp Business ("fora do horário") não contam como você na conversa
-export const ehMensagemAutomaticaDoWhatsapp = (t: string | null) => !!t && /^estou fora do hor[aá]rio/i.test(t.trim())
+// Respostas automáticas do WhatsApp Business ("fora do horário") não contam como você na conversa. Nem as
+// mensagens com botões sem texto (interactive/template) que o app/Meta dispara sozinho em rajada para vários leads
+// no mesmo minuto: você digitando sempre tem texto.
+export const ehMensagemAutomaticaDoWhatsapp = (t: string | null, tipo?: string | null) =>
+  (!!t && /^estou fora do hor[aá]rio/i.test(t.trim())) || (!t?.trim() && /interactive|template|buttons|list/i.test(tipo ?? ""))
 
 // Filtro inicial, tirado das conversas reais do Felipe com os leads do anúncio (04/11/2026). Fica editável em Configurações.
 export const FILTRO_PADRAO = `OBJETIVO
@@ -276,7 +279,7 @@ export function saudacaoDoFiltro(filtro: string): string | null {
 
 export function soAbertura(msgs: { from_me: boolean; corpo: string | null; tipo: string }[]) {
   const doLead = msgs.filter(m => !m.from_me)
-  const minhas = msgs.filter(m => m.from_me && !ehMensagemAutomaticaDoWhatsapp(m.corpo))
+  const minhas = msgs.filter(m => m.from_me && !ehMensagemAutomaticaDoWhatsapp(m.corpo, m.tipo))
   return doLead.length > 0 && doLead.length <= 3 && minhas.length === 0
     && doLead.every(m => m.tipo === "text" && !!m.corpo && SO_ABERTURA.test(m.corpo.trim()))
 }

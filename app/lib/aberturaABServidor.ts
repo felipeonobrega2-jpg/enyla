@@ -31,7 +31,7 @@ export async function medirAbertura(cfg: Cfg): Promise<MedicaoAbertura | null> {
   for (let i = 0; i < lista.length; i += 15) {
     await Promise.all(lista.slice(i, i + 15).map(async c => {
       const { data: ms } = await supabase.from("whatsapp_mensagens").select("from_me, corpo, tipo, ts").eq("jid", c.jid).order("ts").limit(40)
-      const L = (ms ?? []).filter(x => !(x.from_me && ehMensagemAutomaticaDoWhatsapp(x.corpo)))
+      const L = (ms ?? []).filter(x => !(x.from_me && ehMensagemAutomaticaDoWhatsapp(x.corpo, x.tipo)))
       const p = L.findIndex(x => !x.from_me)
       if (p < 0 || L.slice(0, p).some(x => x.from_me) || L[p].ts < t.inicio) return
       const o = L.findIndex((x, k) => k > p && x.from_me)
