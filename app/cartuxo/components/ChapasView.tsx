@@ -5,7 +5,7 @@
 // preenche lugar vago com pedido da ENYLA ou estoque. O cliente do site nunca vê nada disso.
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Layers, Clock, CheckCircle2, Factory, Package, Wallet, AlertTriangle, Plus, X, Palette, Loader2, RotateCcw, Zap } from "lucide-react"
+import { Layers, Clock, CheckCircle2, Factory, Package, Wallet, AlertTriangle, Plus, X, Palette, Loader2, RotateCcw } from "lucide-react"
 import { Pagina, CabecalhoPagina, Cartao, Kpi, GradeKpis, Selo, Botao, Segmentado, Vazio, Gaveta, type Tom } from "@/app/components/ds"
 import { contas, prazo, vagos, ocupados, ROTULO_ACAB, ROTULO_STATUS, PRODUCAO_DU, type Chapa, type Ocupacao, type StatusChapa } from "@/app/cartuxo/lib/chapas"
 
@@ -46,7 +46,7 @@ function Lugares({ c, grande }: { c: Chapa; grande?: boolean }) {
 function seloAcao(c: Chapa): { tom: Tom; texto: string } | null {
   const p = prazo(c)
   if (c.status !== "aberta") return { tom: c.status === "pronta" ? "sucesso" : "info", texto: ROTULO_STATUS[c.status] }
-  if (p.acao === "fechar") return { tom: "perigo", texto: p.cheia ? "Cheia: pode fechar" : c.expressa ? "Expressa: fechar já" : "Fechar hoje" }
+  if (p.acao === "fechar") return { tom: "perigo", texto: p.cheia ? "Cheia: pode fechar" : "Fechar hoje" }
   if (p.acao === "fechar_logo") return { tom: "alerta", texto: `Fechar em ${p.diasRestantes} d.u.` }
   if (p.acao === "aguardar_arte") return { tom: "alerta", texto: `Esperando ${p.semArte} arte${p.semArte > 1 ? "s" : ""}` }
   return { tom: "neutro", texto: p.diasRestantes !== null ? `Montando · fecha até ${dataCurta(p.fecharAte)}` : "Montando" }
@@ -107,7 +107,7 @@ export default function ChapasView() {
 
       <GradeKpis>
         <Kpi rotulo="Chapas montando" valor={chapas ? resumo.abertas : null} formato={n} icone={<Layers className="w-3.5 h-3.5" />} onClick={() => setFiltro("aberta")} destaque={filtro === "aberta"} />
-        <Kpi rotulo="Para fechar" valor={chapas ? resumo.fechar : null} formato={n} tom={resumo.fechar ? "perigo" : "neutro"} sub="cheias, expressas ou no prazo" icone={<Clock className="w-3.5 h-3.5" />} onClick={() => setFiltro("aberta")} />
+        <Kpi rotulo="Para fechar" valor={chapas ? resumo.fechar : null} formato={n} tom={resumo.fechar ? "perigo" : "neutro"} sub="cheias ou no prazo" icone={<Clock className="w-3.5 h-3.5" />} onClick={() => setFiltro("aberta")} />
         <Kpi rotulo="Lugares vagos" valor={chapas ? resumo.vagos : null} formato={n} tom={resumo.vagos ? "alerta" : "neutro"} sub={`${n(resumo.vagos * 1000)} caixas para vender`} icone={<Package className="w-3.5 h-3.5" />} />
         <Kpi rotulo="Sobra das chapas montando" valor={chapas ? resumo.sobra : null} formato={brl} tom={resumo.sobra >= 0 ? "sucesso" : "perigo"} sub="se fechassem hoje, antes de imposto" icone={<Wallet className="w-3.5 h-3.5" />} />
       </GradeKpis>
@@ -133,7 +133,6 @@ export default function ChapasView() {
                   <div className="min-w-0">
                     <p className="text-[14px] font-semibold text-[#191625] flex items-center gap-1.5">
                       Chapa {c.numero} · {c.modeloNome}
-                      {c.expressa && <Zap className="w-3.5 h-3.5 text-[#c57800]" />}
                     </p>
                     <p className="text-[12px] text-[#8E8E93] mt-0.5">{ROTULO_ACAB[c.acabamento] ?? c.acabamento} · {ocupados(c)}/{c.lugares} lugares · {n(k.unidades)} caixas</p>
                   </div>
@@ -152,7 +151,7 @@ export default function ChapasView() {
 
       <Gaveta aberta={!!atual} onFechar={() => setAbertaId(null)}
         titulo={atual ? `Chapa ${atual.numero} · ${atual.modeloNome}` : ""}
-        sub={atual ? `${ROTULO_ACAB[atual.acabamento] ?? atual.acabamento} · formato ${atual.formato} · ${atual.expressa ? "expressa (exclusiva)" : "produção normal"}` : undefined}
+        sub={atual ? `${ROTULO_ACAB[atual.acabamento] ?? atual.acabamento} · formato ${atual.formato}` : undefined}
         rodape={atual && (
           <div className="flex gap-2 justify-end flex-wrap">
             {atual.status === "aberta" && (
@@ -184,7 +183,7 @@ export default function ChapasView() {
               <p className="text-[12px] text-[#8E8E93] -mt-2">
                 Custo: chapa {brl(atual.rodada)} + colagem {brl(k.colagem)} + arte {brl(k.arte)}{k.frete ? ` + frete incluso ${brl(k.frete)}` : ""}.
                 {k.equilibrio ? ` Com o preço médio desta chapa, ${k.equilibrio} lugar${k.equilibrio > 1 ? "es" : ""} de cliente já paga${k.equilibrio > 1 ? "m" : ""} a chapa.` : ""}
-                {atual.expressa && vagos(atual) > 0 ? " Expressa sozinha mal paga a chapa: vale preencher os vagos com ENYLA ou estoque." : ""}
+                
               </p>
 
               <div>

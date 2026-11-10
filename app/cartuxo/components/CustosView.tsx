@@ -24,7 +24,6 @@ const num = (n: number, d = 2) => n.toLocaleString("pt-BR", { maximumFractionDig
 const pct = (n: number) => `${(n * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`
 const lerNum = (s: string) => Number(String(s).replace(/\./g, "").replace(",", "."))
 const fracao = { paraTela: (v: number) => Math.round(v * 1000) / 10, doTela: (v: number) => v / 100 }
-const fator = { paraTela: (v: number) => Math.round((v - 1) * 1000) / 10, doTela: (v: number) => 1 + v / 100 }
 
 const GRUPOS: { titulo: string; sub: string; campos: Campo[] }[] = [
   { titulo: "Por rodada", sub: "Uma chapa 66×48 com 1.000 folhas boas. Dividida pelos lugares da chapa.", campos: [
@@ -43,7 +42,6 @@ const GRUPOS: { titulo: string; sub: string; campos: Campo[] }[] = [
   { titulo: "Preço", sub: "Preço no Pix = custo × multiplicador. É o que o cliente vê no site.", campos: [
     { k: "multiplicador", nome: "Multiplicador", un: "× o custo" },
     { k: "acrescimoCartao", nome: "Cartão em até 6x", un: "% sobre o Pix", ...fracao },
-    { k: "fatorExpressa", nome: "Produção expressa", un: "% sobre a normal", ...fator },
   ] },
   { titulo: "Para a conta de lucro", sub: "Não mudam o preço: só mostram quanto sobra.", campos: [
     { k: "impostoPct", nome: "Imposto", un: "% do preço" },
@@ -124,9 +122,8 @@ export default function CustosView() {
   const q = Number(qtd)
   const ref = { antes: preco(salvo, REFERENCIA, 1000)!, depois: preco(atual, REFERENCIA, 1000)! }
   const linhas = [
-    { nome: `${num(q, 0)} un · normal · Pix`, l: lucro(atual, REFERENCIA, q)! },
-    { nome: `${num(q, 0)} un · normal · cartão`, l: lucro(atual, REFERENCIA, q, false, true)! },
-    { nome: `${num(q, 0)} un · expressa · Pix`, l: lucro(atual, REFERENCIA, q, true)!, nota: "chapa só do cliente" },
+    { nome: `${num(q, 0)} un · Pix`, l: lucro(atual, REFERENCIA, q)! },
+    { nome: `${num(q, 0)} un · cartão`, l: lucro(atual, REFERENCIA, q, true)! },
   ]
   const porChapa = lugaresDa(REFERENCIA)
 
@@ -218,13 +215,12 @@ export default function CustosView() {
             <div className="mb-3"><Segmentado<"1000" | "2000" | "4000"> valor={qtd} onChange={setQtd} opcoes={[{ v: "1000", nome: "1.000" }, { v: "2000", nome: "2.000" }, { v: "4000", nome: "4.000" }]} /></div>
 
             <div className="space-y-3">
-              {linhas.map(({ nome, l, nota }) => (
+              {linhas.map(({ nome, l }) => (
                 <div key={nome} className="ds-borda rounded-lg p-3">
                   <div className="flex items-baseline justify-between gap-2">
                     <p className="text-[12.5px] font-semibold">{nome}</p>
                     <Selo tom={l.sobra <= 0 ? "perigo" : l.margem < 0.25 ? "alerta" : "sucesso"}>{l.sobra <= 0 ? "prejuízo" : `${pct(l.margem)} sobra`}</Selo>
                   </div>
-                  {nota && <p className="text-[11px] text-[#8E8E93]">{nota}</p>}
                   <dl className="mt-2 text-[12px] space-y-0.5 ds-num">
                     <div className="flex justify-between"><dt className="text-[#8E8E93]">Recebe</dt><dd>{brl(l.receita)}</dd></div>
                     <div className="flex justify-between"><dt className="text-[#8E8E93]">Produção (chapa, colagem, arte)</dt><dd>− {brl(l.producao)}</dd></div>

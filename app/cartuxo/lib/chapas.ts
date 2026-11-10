@@ -5,7 +5,7 @@
 // - Cada lugar da chapa rende 1.000 caixas (rodada de 1.000 folhas). Um pedido de 3.000 un ocupa 3 lugares.
 // - Produção normal: o cliente recebe em até 30 dias úteis depois de aprovar a arte; a produção leva 15 d.u.,
 //   então a chapa precisa fechar até 15 d.u. depois da primeira arte aprovada dentro dela.
-// - Produção expressa: chapa exclusiva do cliente, fecha assim que a arte é aprovada.
+// - Sem produção expressa (saiu em 09/11/2026): toda chapa é compartilhada.
 // - Lugar vago pode ser preenchido com trabalho da ENYLA ou com estoque de caixas similares.
 // - O cliente nunca vê nada disso: no site só aparecem preço e prazo.
 
@@ -44,7 +44,7 @@ export type Chapa = {
   modelo: string           // slug da caixa (faca)
   modeloNome: string
   acabamento: string       // "laminacao-fosca" | "laminacao-brilho"
-  expressa: boolean
+  expressa: boolean       // sempre false (a coluna fica no banco por compatibilidade)
   lugares: number          // caixas desse modelo por chapa
   formato: string
   rodada: number           // custo fixo da chapa inteira
@@ -82,30 +82,25 @@ export function alocar(chapas: Chapa[], itens: ItemPago[], agora = new Date().to
   for (const it of [...itens].sort((a, b) => a.pagoEm.localeCompare(b.pagoEm))) {
     if (ja.has(chaveItem(it.pedidoId, it.itemIdx)) || !it.chapa) continue
     const ch = it.chapa
-    const expressa = ch.prazoId === "padrao"
     // Receita do item: no cartão o cliente pagou o valor do cartão
     const receitaTotal = it.forma === "cartao" && it.cartao ? it.cartao : it.total
     let falta = Math.max(1, Math.round(it.qtd / 1000))
     const totalLugares = falta
     let primeiro = true
     let parteIdx = 0
-    let exclusiva: Chapa | undefined   // expressa: chapa(s) só deste item
 
     while (falta > 0) {
-      let alvo: Chapa | undefined = expressa
-        ? (exclusiva && vagos(exclusiva) > 0 ? exclusiva : undefined)
-        // Mesmo pedido fica numa chapa só (duas impressões da mesma arte podem sair com tom diferente).
-        // Só divide quando o pedido é maior que uma chapa inteira.
-        : lista.find(c => c.status === "aberta" && !c.expressa && c.modelo === it.slug && c.acabamento === ch.acabId
-            && vagos(c) >= Math.min(falta, c.lugares))
+      // Mesmo pedido fica numa chapa só (duas impressões da mesma arte podem sair com tom diferente).
+      // Só divide quando o pedido é maior que uma chapa inteira.
+      let alvo: Chapa | undefined = lista.find(c => c.status === "aberta" && !c.expressa && c.modelo === it.slug && c.acabamento === ch.acabId
+        && vagos(c) >= Math.min(falta, c.lugares))
       if (!alvo) {
         alvo = {
-          id: id(), numero: ++numero, modelo: it.slug, modeloNome: it.nome, acabamento: ch.acabId, expressa,
+          id: id(), numero: ++numero, modelo: it.slug, modeloNome: it.nome, acabamento: ch.acabId, expressa: false,
           lugares: ch.porChapa, formato: ch.formato, rodada: ch.rodada, colagemPorMil: ch.colagemPorMil,
           ocupacao: [], status: "aberta", criadaEm: agora,
         }
         lista.push(alvo)
-        if (expressa) exclusiva = alvo
       }
       const n = Math.min(falta, vagos(alvo))
       const parte = n / totalLugares
@@ -152,16 +147,16 @@ export function prazo(c: Chapa, hoje = new Date().toLocaleDateString("sv-SE")) {
   const aprovadas = clientes.filter(o => o.arteAprovadaEm).map(o => o.arteAprovadaEm!.slice(0, 10)).sort()
   const semArte = clientes.filter(o => !o.arteAprovadaEm).length
   const primeira = aprovadas[0] ?? null
-  const fecharAte = primeira ? (c.expressa ? primeira : somarDiasUteis(primeira, FOLGA_NORMAL_DU)) : null
+  const fecharAte = primeira ? somarDiasUteis(primeira, FOLGA_NORMAL_DU) : null
   const diasRestantes = fecharAte ? diasUteisEntre(hoje, fecharAte) : null
   const cheia = vagos(c) === 0
   const podeFechar = clientes.length > 0 && semArte === 0
   // O que fazer agora
   let acao: "fechar" | "fechar_logo" | "aguardar_arte" | "esperar" | null = null
   if (c.status === "aberta") {
-    if (podeFechar && (cheia || c.expressa || (diasRestantes !== null && diasRestantes <= 0))) acao = "fechar"
+    if (podeFechar && (cheia || (diasRestantes !== null && diasRestantes <= 0))) acao = "fechar"
     else if (podeFechar && diasRestantes !== null && diasRestantes <= 3) acao = "fechar_logo"
-    else if (semArte > 0 && (cheia || c.expressa || (diasRestantes !== null && diasRestantes <= 3))) acao = "aguardar_arte"
+    else if (semArte > 0 && (cheia || (diasRestantes !== null && diasRestantes <= 3))) acao = "aguardar_arte"
     else acao = "esperar"
   }
   return { fecharAte, diasRestantes, semArte, cheia, podeFechar, acao }

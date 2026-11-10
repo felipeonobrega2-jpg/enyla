@@ -7,7 +7,7 @@ import { planificacao, cabemNaChapa, type TipoFaca } from "./facas"
 export type Custos = {
   impressao: number; papelPorFolha: number; perdaPct: number; laminacaoPorFolha: number
   corteAcerto: number; corteMilheiro: number; logistica: number; colagemPorMil: number; arte: number
-  multiplicador: number; acrescimoCartao: number; fatorExpressa: number; descontos: Record<string, number>
+  multiplicador: number; acrescimoCartao: number; descontos: Record<string, number>
   freteFixo: number; fretePorKg: number
   impostoPct: number; taxaPixPct: number; taxaCartaoPct: number
 }
@@ -15,7 +15,7 @@ export type Custos = {
 export const CUSTOS_PADRAO: Custos = {
   impressao: 350, papelPorFolha: 0.64, perdaPct: 0, laminacaoPorFolha: 0.25,
   corteAcerto: 100, corteMilheiro: 0, logistica: 0, colagemPorMil: 75, arte: 70,
-  multiplicador: 2.6875, acrescimoCartao: 0.08, fatorExpressa: 1.155,
+  multiplicador: 2.6875, acrescimoCartao: 0.08,
   descontos: { 1000: 0, 2000: 0.05, 3000: 0.08, 4000: 0.1 },
   freteFixo: 35, fretePorKg: 3.5,
   impostoPct: 0, taxaPixPct: 0, taxaCartaoPct: 0,
@@ -33,7 +33,6 @@ export function normalizarCustos(c: Partial<Custos> | null | undefined): Custos 
     if (Number.isFinite(v) && v >= 0) (out[k] as number) = v
   }
   if (!(out.multiplicador > 0)) out.multiplicador = CUSTOS_PADRAO.multiplicador
-  if (!(out.fatorExpressa > 0)) out.fatorExpressa = CUSTOS_PADRAO.fatorExpressa
   for (const [q, d] of Object.entries(c.descontos ?? {})) if (Number(d) >= 0 && Number(d) < 0.5) out.descontos[q] = Number(d)
   return out
 }
@@ -66,23 +65,22 @@ export const lugaresDa = (cx: CaixaRef) => {
 }
 
 // Preço como o site calcula (sem frete embutido)
-export function preco(c: Custos, cx: CaixaRef, qtd: number, expressa = false) {
+export function preco(c: Custos, cx: CaixaRef, qtd: number) {
   const porChapa = lugaresDa(cx)
   if (!porChapa) return null
   const rodada = custoRodada(c)
   const custo = (qtd / 1000) * (rodada / porChapa + c.colagemPorMil) + c.arte
-  const base = custo * c.multiplicador * (expressa ? c.fatorExpressa : 1) * (1 - (c.descontos[qtd] ?? 0))
+  const base = custo * c.multiplicador * (1 - (c.descontos[qtd] ?? 0))
   const pix = arredondar(base)
   return { pix, cartao: arredondar(pix * (1 + c.acrescimoCartao)), custo, porChapa, rodada }
 }
 
-// O que sobra de um pedido. Normal: paga só a fatia da chapa que ocupa (os outros lugares são de outros clientes).
-// Expressa: chapa só dele, paga a rodada inteira.
-export function lucro(c: Custos, cx: CaixaRef, qtd: number, expressa = false, cartao = false) {
-  const p = preco(c, cx, qtd, expressa)
+// O que sobra de um pedido: paga só a fatia da chapa que ocupa (os outros lugares são de outros clientes).
+export function lucro(c: Custos, cx: CaixaRef, qtd: number, cartao = false) {
+  const p = preco(c, cx, qtd)
   if (!p) return null
   const lugares = qtd / 1000
-  const rodadas = expressa ? Math.ceil(lugares / p.porChapa) : lugares / p.porChapa
+  const rodadas = lugares / p.porChapa
   const producao = rodadas * p.rodada + lugares * c.colagemPorMil + c.arte
   const receita = cartao ? p.cartao : p.pix
   const imposto = receita * c.impostoPct / 100

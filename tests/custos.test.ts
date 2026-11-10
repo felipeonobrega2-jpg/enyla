@@ -9,18 +9,14 @@ describe("custos da Cartuxo = conta do site", () => {
   test("rodada padrão R$ 1.340", () => expect(custoRodada(CUSTOS_PADRAO)).toBe(1340))
   test("100 ml", () => {
     expect(preco(CUSTOS_PADRAO, cem, 1000)!.pix).toBeCloseTo(1289.9)
-    expect(preco(CUSTOS_PADRAO, cem, 1000, true)).toMatchObject({ pix: 1489.9, cartao: 1609.9 })
     expect(preco(CUSTOS_PADRAO, cem, 2000)).toMatchObject({ pix: 2279.9, cartao: 2469.9 })
     expect(preco(CUSTOS_PADRAO, cem, 4000)).toMatchObject({ pix: 4139.9, cartao: 4479.9 })
   })
   test("50 ml", () => {
     expect(preco(CUSTOS_PADRAO, cinquenta, 2000)).toMatchObject({ pix: 1709.9, cartao: 1849.9 })
-    expect(preco(CUSTOS_PADRAO, cinquenta, 2000, true)).toMatchObject({ pix: 1969.9 })
   })
-  test("expressa paga a chapa inteira", () => {
-    const n = lucro(CUSTOS_PADRAO, cem, 1000)!, e = lucro(CUSTOS_PADRAO, cem, 1000, true)!
-    expect(n.producao).toBeCloseTo(1340 / 4 + 75 + 70)
-    expect(e.producao).toBeCloseTo(1340 + 75 + 70)
+  test("pedido paga só a fatia da chapa", () => {
+    expect(lucro(CUSTOS_PADRAO, cem, 1000)!.producao).toBeCloseTo(1340 / 4 + 75 + 70)
   })
   test("manter o preço com custos maiores", () => {
     const novo = { ...CUSTOS_PADRAO, laminacaoPorFolha: 0.5, logistica: 100 }

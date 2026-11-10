@@ -81,7 +81,7 @@ export function avisos(p: { numero: string; cliente: { nome: string }; itens: { 
   const out: Aviso[] = []
   if (!a?.briefing) out.push({ id: "logo", nome: "Pedir o logo", texto: `${oi} Aqui é da Cartuxo. Recebemos o pagamento do pedido ${p.numero}, obrigado! Para a nossa equipe de design começar a sua arte, mande o seu logo por aqui ou pela página do pedido: ${link}` })
   if (estados.some(e => e === "para-aprovar")) out.push({ id: "arte", nome: "Arte pronta para aprovar", texto: `${oi} A arte da sua caixa ficou pronta. Veja e aprove por aqui: ${link}\n\nSe quiser mudar alguma coisa, é só pedir o ajuste na mesma página.` })
-  if (estados.length && estados.every(e => e === "aprovada") && !a?.envio) out.push({ id: "producao", nome: "Entrou na produção", texto: `${oi} Arte aprovada! A sua caixa entrou na produção (${p.itens[0]?.prazo.toLowerCase() ?? "no prazo escolhido"}). Você acompanha tudo por aqui: ${link}` })
+  if (estados.length && estados.every(e => e === "aprovada") && !a?.envio) out.push({ id: "producao", nome: "Entrou na produção", texto: `${oi} Arte aprovada! A sua caixa entrou na produção, que leva de 21 a 30 dias úteis. Você acompanha tudo por aqui: ${link}` })
   if (estados.length && estados.every(e => e === "aprovada") && !a?.envio) out.push({ id: "pronta", nome: "Caixas prontas", texto: `${oi} As suas caixas do pedido ${p.numero} ficaram prontas! Vamos combinar o envio?` })
   if (a?.envio) out.push({ id: "enviado", nome: "Pedido enviado", texto: `${oi} O pedido ${p.numero} foi enviado por ${a.envio.transportadora}.${a.envio.rastreio ? ` Código de rastreio: ${a.envio.rastreio}.` : ""} Qualquer coisa, estamos por aqui. ${link}` })
   return out
