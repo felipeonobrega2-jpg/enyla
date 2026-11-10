@@ -3,7 +3,7 @@
 import React from "react"
 import { AlertTriangle, ArrowRight, Check, Printer, Scissors, Layers, Truck, Wrench, Info, Pencil, Plus, RotateCcw, X } from "lucide-react"
 import { Calculo, FormData } from "../types"
-import { ConfigProducao, OpcoesRota, Rota, ItemCusto, ColagemModo, EtapaCusto, CustoExtra } from "../lib/producao"
+import { ConfigProducao, OpcoesRota, Rota, ItemCusto, ColagemModo, EtapaCusto, CustoExtra, chaveCavidades } from "../lib/producao"
 import { brl, num } from "../utils"
 import { Section } from "./ui"
 
@@ -100,16 +100,48 @@ function Seletor<T extends string | number>({ label, valor, opcoes, onChange }: 
   )
 }
 
-function Passadas({ rota }: { rota: Rota }) {
+// Cavidades de cada passada: dá para digitar (para mais ou para menos). Ao editar, a rota fica travada nesta.
+function CampoCavidades({ valor, onSalvar }: { valor: number; onSalvar: (n: number) => void }) {
+  const [txt, setTxt] = React.useState(String(valor))
+  React.useEffect(() => setTxt(String(valor)), [valor])
+  const salvar = () => {
+    const n = Math.round(lerNum(txt) ?? 0)
+    if (n >= 1 && n !== valor) onSalvar(n)
+    else setTxt(String(valor))
+  }
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <input aria-label="Cavidades" inputMode="numeric" value={txt}
+      onChange={e => setTxt(e.target.value.replace(/\D/g, ""))}
+      onBlur={salvar} onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur() }}
+      className="w-10 h-6 rounded-md px-1 text-center text-[11px] font-semibold ds-num text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20"
+      style={inputStyle} />
+  )
+}
+
+function Passadas({ rota, onCavidades }: { rota: Rota; onCavidades?: (lista: number[] | null) => void }) {
+  const editadas = rota.passadas.some(p => p.cavidadesAuto != null)
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
       {rota.passadas.map((p, i) => (
-        <span key={i} className="text-[11px] ds-num px-2 py-1 rounded-lg bg-[rgba(116,116,128,0.08)] text-[#5e5c68]">
-          Passada {i + 1}: <strong className="text-[#191625]">{p.cavidades} cav.</strong>
-          {" "}em {num(p.largura / 10, 1)}×{num(p.altura / 10, 1)} cm{p.porPeca > 1 ? ` (×${p.porPeca})` : ""}
-          {" · "}{num(p.folhas)} folhas
+        <span key={i} className="text-[11px] ds-num px-2 py-1 rounded-lg bg-[rgba(116,116,128,0.08)] text-[#5e5c68] inline-flex flex-wrap items-center gap-1">
+          Passada {i + 1}:
+          {onCavidades
+            ? <CampoCavidades valor={p.cavidades} onSalvar={n => onCavidades(rota.passadas.map((x, k) => (k === i ? n : x.cavidades)))} />
+            : <strong className="text-[#191625]">{p.cavidades}</strong>}
+          <span>cav.</span>
+          {p.cavidadesAuto != null && (
+            <span title={`O motor calculou ${p.cavidadesAuto} cavidades`} className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#8456e8]/10 text-[#8456e8] whitespace-nowrap">
+              manual · motor {p.cavidadesAuto}
+            </span>
+          )}
+          <span>em {num(p.largura / 10, 1)}×{num(p.altura / 10, 1)} cm{p.porPeca > 1 ? ` (×${p.porPeca})` : ""} · {num(p.folhas)} folhas</span>
         </span>
       ))}
+      {editadas && onCavidades && (
+        <button onClick={() => onCavidades(null)} className="text-[11px] text-[#898892] hover:text-[#8456e8] flex items-center gap-1">
+          <RotateCcw className="w-3 h-3" /> Cavidades do motor
+        </button>
+      )}
     </div>
   )
 }
@@ -218,7 +250,17 @@ export function RotasProducao({ calculo, form, producao, multiplicadorPadrao, co
             </div>
           </div>
 
-          <Passadas rota={melhor} />
+          <Passadas rota={melhor} onCavidades={lista => {
+            const chave = chaveCavidades(melhor.impressorId, melhor.formatoId, melhor.divisao)
+            const todas = { ...(opcoes.cavidades ?? {}) }
+            if (lista) todas[chave] = lista
+            else delete todas[chave]
+            set({
+              cavidades: Object.keys(todas).length ? todas : undefined,
+              impressorId: melhor.impressorId, formatoId: melhor.formatoId, divisao: melhor.divisao,
+              facaCavidades: lista ? null : opcoes.facaCavidades,
+            })
+          }} />
 
           <div className="grid grid-cols-3 gap-2 mt-4">
             {[
@@ -326,7 +368,7 @@ export function RotasProducao({ calculo, form, producao, multiplicadorPadrao, co
             <div className="flex items-center justify-between">
               <p className="text-[9.5px] font-semibold text-[#898892]">Escolhas da rota</p>
               {rotaManual && (
-                <button onClick={() => set({ impressorId: null, formatoId: null, divisao: null, facaCavidades: null })}
+                <button onClick={() => set({ impressorId: null, formatoId: null, divisao: null, facaCavidades: null, cavidades: undefined })}
                   className="text-[11px] text-[#898892] hover:text-[#8456e8] flex items-center gap-1"><RotateCcw className="w-3 h-3" /> Mais barata</button>
               )}
             </div>

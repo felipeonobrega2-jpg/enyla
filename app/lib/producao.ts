@@ -226,6 +226,7 @@ export type OpcoesRota = {
   formatoId?: string | null            // papel escolhido à mão
   divisao?: 1 | 2 | 4 | null           // divisão da folha escolhida à mão
   facaCavidades?: number | null        // null = automático
+  cavidades?: Record<string, number[]> // cavidades digitadas por passada, por rota ("impressor|papel|divisão")
   fornecedores?: Partial<Record<"acabamento" | "hotStamping" | "corteVinco" | "colagem", string>>
   colagemModo?: ColagemModo
   estimativaAcabamentoFolha?: number | null // R$ por folha impressa, quando não há tabela
@@ -265,6 +266,7 @@ export type Passada = {
   largura: number      // mm — folha impressa
   altura: number
   cavidades: number
+  cavidadesAuto?: number  // presente quando você digitou as cavidades: o que o motor calculou
   porPeca: number      // quantas folhas desse tamanho saem de cada peça de papel
   folhas: number       // folhas impressas nessa passada (preenchido por quantidade)
   batidasPorFolha: number
@@ -467,6 +469,8 @@ type RotaBase = {
   pecasPorPeca: number
 }
 
+export const chaveCavidades = (impressorId: string, formatoId: string, divisao: number) => `${impressorId}|${formatoId}|${divisao}`
+
 function rotasBase(e: EntradaRotas): RotaBase[] {
   const { producao: p } = e
   const impressores = p.fornecedores.filter(f => f.ativo && f.maquina && f.servicos.impressao)
@@ -488,6 +492,12 @@ function rotasBase(e: EntradaRotas): RotaBase[] {
           }).filter(ps => ps.cavidades > 0)
           if (!passadas.length) continue
         }
+        // Cavidades digitadas para esta rota (vale o que você disse, para mais ou para menos)
+        const dig = e.opcoes.cavidades?.[chaveCavidades(impressor.id, formato.id, divisao.d)]
+        if (dig?.length) passadas = passadas.map((ps, i) => {
+          const n = Math.round(dig[i] ?? 0)
+          return n >= 1 && n !== ps.cavidades ? { ...ps, cavidades: n, cavidadesAuto: ps.cavidades } : ps
+        })
         const pecasPorPeca = passadas.reduce((s, ps) => s + ps.cavidades * ps.porPeca, 0)
         out.push({ impressor, formato, divisao, passadas, pecasPorPeca })
       }
