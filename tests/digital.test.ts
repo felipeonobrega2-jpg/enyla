@@ -88,10 +88,10 @@ describe("caixa padrão cresce até caber o frasco", () => {
 })
 
 describe("quantidade acima da tabela A4", () => {
-  it("150 caixinhas de 30 ml (cabe na A4, que só vai até 100): cota na tabela A3, faixa de 300", async () => {
+  it("150 caixinhas de 30 ml (cabe na A4, que só vai até 100): cota na tabela A3, faixa de 200 (R$ 6,10)", async () => {
     const { cotarDigital } = await import("../app/lib/digital")
     const c = cotarDigital({ produto: "", volume_ml: 30, caixa_cm: null, frasco_cm: null, quantidade: 150, tem_arte: null, resumo: "" } as never)
-    expect(c.ok && [c.folha, c.quantidade, c.total]).toEqual(["A3", 300, 1419.85])
+    expect(c.ok && [c.folha, c.quantidade, c.total]).toEqual(["A3", 200, 1220])
   })
   it("acima de 500: sem preço (avisa você)", async () => {
     const { cotarDigital } = await import("../app/lib/digital")

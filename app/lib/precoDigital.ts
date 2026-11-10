@@ -9,7 +9,8 @@ export type Folha = "A4" | "A3"
 // Tabelas que o Leandro passou (A3 300 e 500 un: cotação dele de 04/07 para caixa em A3)
 export const TABELA_VILLA: Record<Folha, [number, number][]> = {
   A4: [[20, 119.94], [50, 199.95], [100, 399.95]],   // preços do site da Villa (06/11)
-  A3: [[20, 199.95], [50, 349.95], [100, 499.95], [300, 1199.85], [500, 1750]],
+  // 200 un: preço que você cobra (R$ 6,10/un = R$ 1.220 ao cliente → custo 1.000 com a arte e a margem padrão), 10/11
+  A3: [[20, 199.95], [50, 349.95], [100, 499.95], [200, 1000], [300, 1199.85], [500, 1750]],
 }
 // Área útil da folha (cm), com margem de 0,5 cm em volta
 const UTIL: Record<Folha, [number, number]> = { A4: [20, 28.7], A3: [28.7, 41] }
