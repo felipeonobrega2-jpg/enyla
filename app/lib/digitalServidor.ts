@@ -83,7 +83,7 @@ export async function conferirSinais(opts: { forcar?: boolean } = {}): Promise<{
     if (!p) continue
     pagos.push(id)
     const c = await conversa(p.jid)
-    if (c) await enviar(c, textoSinalPago(p, linkPedido(p.id), !!(p.briefing?.marca || p.briefing?.arquivos?.length))).catch(() => null)
+    if (c) await enviar(c, textoSinalPago(p, linkPedido(p.id), !!(p.briefing?.marca || p.briefing?.arquivos?.length)), undefined, { essencial: true }).catch(() => null)
     const designer = await avisarDesigner(cfg, p)
     await avisarVoce(cfg, `💰 *Digital ${p.id}* · sinal pago ${brl(p.sinal)}\n${p.nome ?? ""} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas · total ${brl(p.total)}${designer ? "" : "\n\nSem designer cadastrada: cadastre em Digital → Contatos, ou mande o briefing pelo link:\n" + linkDesigner(p.id)}`)
   }
@@ -92,7 +92,7 @@ export async function conferirSinais(opts: { forcar?: boolean } = {}): Promise<{
     if (!p) continue
     pagos.push(id)
     const c = await conversa(p.jid)
-    if (c) await enviar(c, textoRestantePago(p)).catch(() => null)
+    if (c) await enviar(c, textoRestantePago(p), undefined, { essencial: true }).catch(() => null)
     await avisarVoce(cfg, `💰 *Digital ${p.id}* · restante pago ${brl(p.restante ?? 0)}\n${p.nome ?? ""}${p.entrega ? `\nEntrega: ${p.entrega.endereco} · CEP ${p.entrega.cep}` : "\nSem endereço de entrega ainda"}`)
   }
   return { pagos, pendentes: pendentes.length + restantes.length - pagos.length }
@@ -138,7 +138,7 @@ export async function mandarArte(id: string) {
   if (!pedido || !a) return { erro: "Ainda não tem arte neste pedido." }
   const c = await conversa(pedido.jid)
   if (!c) return { erro: "Não achei a conversa do cliente." }
-  const r = await enviarArquivo(c, a.url, mimeDe(a.url), textoArteParaAprovar(pedido, linkPedido(id)), a.nome)
+  const r = await enviarArquivo(c, a.url, mimeDe(a.url), textoArteParaAprovar(pedido, linkPedido(id)), a.nome, { essencial: true })
   if (r.erro) return { erro: `WhatsApp: ${r.erro}` }
   const novo = await gravarPedido(id, p => marcarArteEnviada(p) as PedidoComBriefing | null)
   await avisarVoce(cfg, `🎨 *Digital ${id}* · arte enviada para ${pedido.nome ?? "o cliente"} aprovar`)
@@ -151,7 +151,7 @@ export async function aprovarPeloCliente(id: string) {
   if (!novo) return { erro: "Essa arte não está esperando aprovação." }
   const { cfg } = await lerPedido(id)
   const c = await conversa(novo.jid)
-  if (c) await enviar(c, textoArteAprovada(novo, linkPedido(id))).catch(() => null)
+  if (c) await enviar(c, textoArteAprovada(novo, linkPedido(id)), undefined, { essencial: true }).catch(() => null)
   await mandarParaVilla(cfg, novo)
   return { pedido: novo }
 }
@@ -199,11 +199,11 @@ export async function pagoPeloAsaas(id: string, parte: "sinal" | "restante", tx:
   if (!p) return
   const c = await conversa(p.jid)
   if (parte === "sinal") {
-    if (c) await enviar(c, textoSinalPago(p, linkPedido(p.id), !!(p.briefing?.marca || p.briefing?.arquivos?.length))).catch(() => null)
+    if (c) await enviar(c, textoSinalPago(p, linkPedido(p.id), !!(p.briefing?.marca || p.briefing?.arquivos?.length)), undefined, { essencial: true }).catch(() => null)
     const designer = await avisarDesigner(cfg, p)
     await avisarVoce(cfg, `💰 *Digital ${p.id}* · sinal pago pelo Asaas ${brl(tx.valor)}\n${p.nome ?? ""} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas${designer ? "" : "\n\nSem designer cadastrada: link do briefing:\n" + linkDesigner(p.id)}`)
   } else {
-    if (c) await enviar(c, textoRestantePago(p)).catch(() => null)
+    if (c) await enviar(c, textoRestantePago(p), undefined, { essencial: true }).catch(() => null)
     await avisarVoce(cfg, `💰 *Digital ${p.id}* · restante pago pelo Asaas ${brl(tx.valor)}\n${p.nome ?? ""}${p.entrega ? `\nEntrega: ${p.entrega.endereco} · CEP ${p.entrega.cep}` : "\nSem endereço de entrega ainda"}`)
   }
 }

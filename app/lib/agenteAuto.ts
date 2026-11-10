@@ -129,12 +129,45 @@ async function marcarLida(c: Conversa, msgId?: string) {
   await evo("/chat/markMessageAsRead/{i}", { method: "POST", body: JSON.stringify({ readMessages: [{ remoteJid: c.jid, fromMe: false, id: msgId }] }) }).catch(() => null)
 }
 
-export async function enviar(c: Conversa, texto: string, lida?: string): Promise<{ ids: string[]; erro?: string }> {
+// ── Proteção do número (Evolution no modo QR) ────────────────────────────────
+// O WhatsApp remove o aparelho conectado quando vê padrão de robô: muitas mensagens seguidas, logo depois de conectar.
+// Toda mensagem automática passa por aqui: no máximo LIMITE_HORA por hora (menos nas primeiras horas depois de
+// conectar de novo, o "aquecimento") e nunca duas a menos de INTERVALO_MIN_SEG uma da outra. O que passa do
+// limite não se perde: fica como "não enviou" e é tentado de novo nas próximas rodadas.
+const LIMITE_HORA = 30
+const LIMITE_HORA_AQUECENDO = 12
+const HORAS_AQUECENDO = 3
+const INTERVALO_MIN_SEG = 15
+export const ESPERA_MAX_VEZ_SEG = 15   // cabe no minuto da Vercel; passou disso, tenta na próxima rodada
+
+export async function reservarVezDeEnviar(essencial = false): Promise<{ esperaMs: number } | { erro: string }> {
+  let res: { esperaMs: number } | { erro: string } = { erro: "não enviou (limite por hora)" }
+  await mudarConfig((d: Record<string, unknown> & { agenteEnviosHora?: string[]; whatsappConexao?: { estado?: string; em?: string } }) => {
+    const agora = Date.now()
+    const lista = (d.agenteEnviosHora ?? []).filter(t => new Date(t).getTime() > agora - 3_600_000)
+    const con = d.whatsappConexao
+    const aquecendo = con?.estado === "open" && !!con.em && agora - new Date(con.em).getTime() < HORAS_AQUECENDO * 3_600_000
+    const limite = aquecendo ? LIMITE_HORA_AQUECENDO : LIMITE_HORA
+    if (!essencial && lista.length >= limite) { res = { erro: `não enviou (limite de ${limite} por hora${aquecendo ? ", aquecendo depois de conectar" : ""})` }; return null }
+    const ultima = Math.max(0, ...lista.map(t => new Date(t).getTime()))
+    const vez = Math.max(agora, ultima + (INTERVALO_MIN_SEG + Math.random() * 10) * 1000)
+    if (vez - agora > ESPERA_MAX_VEZ_SEG * 1000 && !essencial) { res = { erro: "não enviou (fila de envio cheia)" }; return null }
+    res = { esperaMs: vez - agora }
+    return { agenteEnviosHora: [...lista, new Date(vez).toISOString()].slice(-200) }
+  })
+  return res
+}
+
+export async function enviar(c: Conversa, texto: string, lida?: string, opcoes: { essencial?: boolean } = {}): Promise<{ ids: string[]; erro?: string }> {
   const number = c.telefone || c.jid
   const ids: string[] = []
+  const vez = await reservarVezDeEnviar(opcoes.essencial)
+  if ("erro" in vez) return { ids, erro: vez.erro }
+  if (vez.esperaMs > 0) await new Promise(res => setTimeout(res, vez.esperaMs))
   await marcarLida(c, lida)
+  // Uma mensagem só (as partes viram parágrafos): metade do volume, menos cara de robô.
   // Cumprimento pela hora do envio (a resposta pode ter sido preparada antes, ou a IA ter copiado o do cliente)
-  for (const [i, parte] of partesDaResposta(corrigirCumprimento(texto)).entries()) {
+  for (const [i, parte] of [partesDaResposta(corrigirCumprimento(texto)).join("\n\n")].filter(Boolean).entries()) {
     if (i) await new Promise(res => setTimeout(res, 800 + Math.random() * 1500))
     // "delay" faz o Evolution mostrar "digitando…" antes de enviar
     const env = await evo<WaMessage>("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number, text: parte, delay: Math.round(tempoDigitando(parte)) }) })
@@ -148,8 +181,11 @@ export async function enviar(c: Conversa, texto: string, lida?: string): Promise
 }
 
 // Imagem ou PDF pela URL (arte para aprovar), com legenda; também fica guardada como mensagem do agente
-export async function enviarArquivo(c: Conversa, url: string, mime: string, legenda: string, nome = "arte"): Promise<{ ids: string[]; erro?: string }> {
+export async function enviarArquivo(c: Conversa, url: string, mime: string, legenda: string, nome = "arte", opcoes: { essencial?: boolean } = {}): Promise<{ ids: string[]; erro?: string }> {
   const number = c.telefone || c.jid
+  const vez = await reservarVezDeEnviar(opcoes.essencial)
+  if ("erro" in vez) return { ids: [], erro: vez.erro }
+  if (vez.esperaMs > 0) await new Promise(res => setTimeout(res, vez.esperaMs))
   const mediatype = mime.startsWith("image/") ? "image" : mime.startsWith("video/") ? "video" : "document"
   const env = await evo<WaMessage>("/message/sendMedia/{i}", { method: "POST", body: JSON.stringify({ number, mediatype, mimetype: mime, media: url, caption: legenda || undefined, fileName: mediatype === "document" ? nome : undefined }) })
   if (!env.ok || !env.corpo?.key?.id) return { ids: [], erro: `não enviou (${env.status})` }
@@ -264,7 +300,7 @@ export async function agendarResposta(msgId: string, origem: string) {
     if (c) await respondeuRetomada(cfg, c, msgId).catch(() => null)
     return
   }
-  await espera(20, 28)
+  await espera(35, 50)   // ritmo de gente: ninguém responde em segundos (somado à 2ª etapa, ~1 a 1,5 min)
   if (!await aindaEhAUltima(msgId)) return   // chegou outra: a última é quem dispara
   await fetch(`${origem}/api/whatsapp/webhook/responder?token=${encodeURIComponent(process.env.WHATSAPP_WEBHOOK_SECRET ?? "")}`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ msgId }), signal: AbortSignal.timeout(8000),
