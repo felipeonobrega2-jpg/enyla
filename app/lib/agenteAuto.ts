@@ -424,11 +424,23 @@ export async function responderSozinho(msgId: string) {
 // mensagem é do lead e que ninguém respondeu — o agente perdeu o gatilho, você entrou e saiu (ele se afasta 10 min),
 // a IA falhou — volta para o agente. Fica com você se você escreveu do celular nas últimas 24 h (exceto lead digital,
 // que é todo do agente), se é MQL, descartado, perdido ou fornecedor. Cada mensagem é retomada uma vez só.
+// Trava atômica da rodada: com vários eventos ao mesmo tempo (reconexão, rajada), só uma execução passa.
+// Ler e depois gravar deixava duas passarem juntas e o mesmo follow-up saía duas vezes.
+async function pegarRodada(campo: "agenteRetomadaEm" | "agenteFollowupEm", minutos: number) {
+  let minha = false
+  await mudarConfig((d: Record<string, unknown> & CfgAgente) => {
+    const ult = d[campo]
+    if (ult && Date.now() - new Date(ult).getTime() < minutos * 60_000) return null
+    minha = true
+    return { [campo]: new Date().toISOString() }
+  })
+  return minha
+}
+
 export async function talvezRetomarParados(origem: string) {
   const cfg = await lerCfg()
   if (!cfg.agenteAuto?.ligado || !dentroDoHorario(cfg.agenteAuto.horario)) return
-  if (cfg.agenteRetomadaEm && Date.now() - new Date(cfg.agenteRetomadaEm).getTime() < 5 * 60_000) return
-  await gravarCfg(() => ({ agenteRetomadaEm: new Date().toISOString() }))
+  if (!await pegarRodada("agenteRetomadaEm", 5)) return
   const agora = Date.now()
   const { data: convs } = await supabase.from("whatsapp_conversas").select("jid, etiquetas, status_lead, ultima_recebida_at, ultima_enviada_at")
     .gte("ultima_recebida_at", new Date(agora - HORAS_RETOMAR * 3_600_000).toISOString()).order("ultima_recebida_at", { ascending: false }).limit(300)
@@ -501,8 +513,7 @@ export async function talvezFollowUps() {
   ultimaRodadaLocal = Date.now()
   const cfg = await lerCfg()
   if (!cfg.agenteAuto?.ligado || !horarioDeFollowUp() || !dentroDoHorario(cfg.agenteAuto.horario)) return
-  if (cfg.agenteFollowupEm && Date.now() - new Date(cfg.agenteFollowupEm).getTime() < MIN_ENTRE_RODADAS * 60_000) return
-  await gravarCfg(() => ({ agenteFollowupEm: new Date().toISOString() }))
+  if (!await pegarRodada("agenteFollowupEm", MIN_ENTRE_RODADAS)) return
   await followUps(cfg)
 }
 
@@ -544,6 +555,10 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
   }
 
   async function umFollowUp({ c, passo, enviada }: (typeof candidatos)[number]) {
+    // A data da última "enviada" pode ser só automática do WhatsApp Business (botões sem texto): se quem falou
+    // por último de verdade foi o lead, ele está esperando resposta (retomar parados), não é caso de cobrar
+    const ultimaDeVerdade = await ultimaDa(c.jid)
+    if (!ultimaDeVerdade?.from_me) return
     const base = { em: new Date().toISOString(), jid: c.jid, nome: c.nome }
     if (passo!.tipo === "encerrar") {
       await aplicar(c, passo!.etiquetas, "perdido")
