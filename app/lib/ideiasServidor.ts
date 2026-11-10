@@ -22,7 +22,7 @@ const LOTES: { v: number; ideias: string[] }[] = [
     "Robustez (prioridade): proteger o sistema. Cópia diária da configuração (preços, contatos, conhecimento da IA, próximos passos, pedidos digitais) guardando 30 dias, com botão \"voltar para ontem\" em Configurações. E aviso no seu WhatsApp quando algo para: WhatsApp 2 h sem receber mensagem no horário comercial, Asaas recusando o aviso de pagamento ou envio automático falhando.",
   ] },
   { v: 3, ideias: [
-    "Robustez (prioridade): aviso de servidor do WhatsApp fora do ar. Em 10/11 a Railway (onde roda a Evolution) tirou o servidor do ar quando o teste grátis acabou e os leads ficaram 2 h sem resposta. Checar a Evolution a cada 5 min e, se não responder ou o número desconectar, avisar no seu e-mail e no WhatsApp pessoal (por fora da Evolution). E lembrete 3 dias antes do vencimento do plano da Railway (dia 10).",
+    "Robustez (prioridade): aviso de WhatsApp fora do ar. Em 10/11, das 05:50 às 08:58, o número caiu da Evolution (VPS evo.enyla.com.br) e nenhum lead foi respondido até você ler o QR de novo. Checar a Evolution a cada 5 min e, se não responder ou o número desconectar, avisar no seu e-mail e no WhatsApp pessoal (por fora da Evolution).",
   ] },
 ]
 
@@ -34,15 +34,26 @@ const GASTOS_FIXOS: { v: number; gastos: GastoFixo[] }[] = [
   ] },
 ]
 
+// Textos de ideias do sistema corrigidos depois de entrar (a tela mostra o texto novo; o resto da ideia fica igual)
+const CORRECOES: { id: string; texto: string }[] = [
+  { id: "sis-3-0", texto: novoTexto(3, 0) },
+]
+function novoTexto(v: number, i: number) { return LOTES.find(l => l.v === v)!.ideias[i] }
+const CORRECAO_V = 1
+
 export async function talvezAdicionarIdeias() {
   const ultimo = LOTES.at(-1)!.v
-  await mudarConfig((d: Record<string, unknown> & { ideias?: Ideia[]; ideiasDoSistemaV?: number }) => {
+  await mudarConfig((d: Record<string, unknown> & { ideias?: Ideia[]; ideiasDoSistemaV?: number; ideiasCorrecaoV?: number }) => {
+    if ((d.ideiasCorrecaoV ?? 0) < CORRECAO_V && (d.ideiasDoSistemaV ?? 0) >= ultimo) {
+      const map = new Map(CORRECOES.map(c => [c.id, c.texto]))
+      return { ideias: (d.ideias ?? []).map(i => map.has(i.id) ? { ...i, texto: map.get(i.id)! } : i), ideiasCorrecaoV: CORRECAO_V }
+    }
     const v = d.ideiasDoSistemaV ?? 0
     if (v >= ultimo) return null
     const ja = new Set((d.ideias ?? []).map(i => i.texto))
     const agora = new Date().toISOString()
     const novas: Ideia[] = LOTES.filter(l => l.v > v).flatMap(l => l.ideias.filter(t => !ja.has(t)).map((texto, i) => ({ id: `sis-${l.v}-${i}`, texto, status: "ideia" as const, criadaEm: agora })))
-    return { ideias: [...novas, ...(d.ideias ?? [])], ideiasDoSistemaV: ultimo }
+    return { ideias: [...novas, ...(d.ideias ?? [])], ideiasDoSistemaV: ultimo, ideiasCorrecaoV: CORRECAO_V }
   })
 }
 
