@@ -24,6 +24,9 @@ const LOTES: { v: number; ideias: string[] }[] = [
   { v: 3, ideias: [
     "Robustez (prioridade): aviso de WhatsApp fora do ar. Em 10/11, das 05:50 às 08:58, o número caiu da Evolution (VPS evo.enyla.com.br) e nenhum lead foi respondido até você ler o QR de novo. Checar a Evolution a cada 5 min e, se não responder ou o número desconectar, avisar no seu e-mail e no WhatsApp pessoal (por fora da Evolution).",
   ] },
+  { v: 4, ideias: [
+    "PWA (app no celular): o sistema vira um ícone na tela do iPhone, com notificação do próprio sistema que abre direto na conversa ou no pedido (no lugar do ntfy). Começar por: Meta sem crédito, venda realizada do digital e novo MQL ou ICP.",
+  ] },
 ]
 
 // Gastos fixos que o sistema põe uma vez (marca no servidor); apagou ou editou, não volta

@@ -20,6 +20,7 @@ import {
 } from "./agenteLeads"
 import { corrigirCumprimento } from "./atendente"
 import { mudarConfig } from "./configAtomica"
+import { notificar } from "./notificar"
 import { limparEmojis, leadEstaRindo } from "./estilo"
 import { escolherMidia, MidiaAgente } from "./midiaAgente"
 
@@ -215,6 +216,9 @@ export async function marcarNaoLida(c: Conversa, msgId: string) {
 }
 
 async function avisarMql(cfg: CfgAgente, c: Conversa, r: { lead: { perfil: PerfilLead; quantidade_total: number | null; motivo: string }; dados?: { resumo?: string } }) {
+  // No celular pelo ntfy (chega mesmo com o WhatsApp caído): só perfil e quantidade, sem nome nem telefone
+  const rotulo = r.lead.perfil === "icp" ? "ICP" : r.lead.perfil === "oportunidade" ? "Oportunidade" : "MQL"
+  await notificar(`Novo ${rotulo}`, `${r.lead.quantidade_total ? `${r.lead.quantidade_total.toLocaleString("pt-BR")} caixas` : "Bom negócio"}${r.dados?.resumo ? ` · ${r.dados.resumo.slice(0, 90)}` : ""}`, { prioridade: "alta", tags: ["star"] }).catch(() => null)
   const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
   if (!destino) return
   const texto = textoAvisoMql({ nome: c.nome, telefone: c.telefone, perfil: r.lead.perfil, quantidade: r.lead.quantidade_total, motivo: r.lead.motivo, resumo: r.dados?.resumo })

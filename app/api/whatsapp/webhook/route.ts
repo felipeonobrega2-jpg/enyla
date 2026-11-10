@@ -9,6 +9,7 @@ import { talvezReativar } from "@/app/lib/reativacaoServidor"
 import { talvezRelatorio } from "@/app/lib/marketingServidor"
 import { conferirSinais, talvezAcertoSemanal } from "@/app/lib/digitalServidor"
 import { talvezAdicionarIdeias, talvezAdicionarGastosFixos } from "@/app/lib/ideiasServidor"
+import { talvezConferirMeta } from "@/app/lib/metaSaldoServidor"
 import { talvezTesteAbertura } from "@/app/lib/aberturaABServidor"
 import { marcarOrigemPelaFrase, talvezMarcarOrigens } from "@/app/lib/origensWhatsappServidor"
 import { talvezAvisarGastos } from "@/app/lib/gastosServidor"
@@ -39,6 +40,8 @@ export async function POST(req: NextRequest) {
     after(() => conferirSinais().then(() => undefined).catch(e => console.error("[digital]", e)))
     after(() => talvezAdicionarIdeias().catch(e => console.error("[ideias]", e)))
     after(() => talvezAdicionarGastosFixos().catch(e => console.error("[gastos fixos]", e)))
+    // Crédito dos anúncios na Meta (no máximo 1 vez por hora): avisa no celular antes de parar
+    after(() => talvezConferirMeta().catch(e => console.error("[meta saldo]", e)))
     after(() => talvezAcertoSemanal().catch(e => console.error("[digital acerto]", e)))
     after(() => talvezTesteAbertura().catch(e => console.error("[abertura A/B]", e)))
     // Leads do anúncio: conversas recentes sem origem são marcadas pela frase do anúncio (no máximo a cada 30 min)
