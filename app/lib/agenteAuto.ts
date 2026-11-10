@@ -135,21 +135,23 @@ async function marcarLida(c: Conversa, msgId?: string) {
 // Toda mensagem automática passa por aqui: no máximo LIMITE_HORA por hora (menos nas primeiras horas depois de
 // conectar de novo, o "aquecimento") e nunca duas a menos de INTERVALO_MIN_SEG uma da outra. O que passa do
 // limite não se perde: fica como "não enviou" e é tentado de novo nas próximas rodadas.
-const LIMITE_HORA = 30
-const LIMITE_HORA_AQUECENDO = 12
-const HORAS_AQUECENDO = 3
+const LIMITE_HORA = 40
+const LIMITE_HORA_AQUECENDO = 20
+const HORAS_AQUECENDO = 2
+const FRACAO_PROATIVO = 0.6        // follow-up e reativação só usam até 60% do limite: resposta a lead tem prioridade
 const INTERVALO_MIN_SEG = 15
 export const ESPERA_MAX_VEZ_SEG = 15   // cabe no minuto da Vercel; passou disso, tenta na próxima rodada
 
-export async function reservarVezDeEnviar(essencial = false): Promise<{ esperaMs: number } | { erro: string }> {
+export async function reservarVezDeEnviar(opcoes: { essencial?: boolean; proativo?: boolean } = {}): Promise<{ esperaMs: number } | { erro: string }> {
+  const { essencial = false, proativo = false } = opcoes
   let res: { esperaMs: number } | { erro: string } = { erro: "não enviou (limite por hora)" }
-  await mudarConfig((d: Record<string, unknown> & { agenteEnviosHora?: string[]; whatsappConexao?: { estado?: string; em?: string } }) => {
+  await mudarConfig((d: Record<string, unknown> & { agenteEnviosHora?: string[]; whatsappConexao?: { estado?: string; aquecerDesde?: string } }) => {
     const agora = Date.now()
     const lista = (d.agenteEnviosHora ?? []).filter(t => new Date(t).getTime() > agora - 3_600_000)
-    const con = d.whatsappConexao
-    const aquecendo = con?.estado === "open" && !!con.em && agora - new Date(con.em).getTime() < HORAS_AQUECENDO * 3_600_000
-    const limite = aquecendo ? LIMITE_HORA_AQUECENDO : LIMITE_HORA
-    if (!essencial && lista.length >= limite) { res = { erro: `não enviou (limite de ${limite} por hora${aquecendo ? ", aquecendo depois de conectar" : ""})` }; return null }
+    const desde = d.whatsappConexao?.aquecerDesde
+    const aquecendo = !!desde && agora - new Date(desde).getTime() < HORAS_AQUECENDO * 3_600_000
+    const limite = Math.floor((aquecendo ? LIMITE_HORA_AQUECENDO : LIMITE_HORA) * (proativo ? FRACAO_PROATIVO : 1))
+    if (!essencial && lista.length >= limite) { res = { erro: `não enviou (limite de ${limite} por hora${proativo ? " para follow-up" : ""}${aquecendo ? ", aquecendo depois de conectar" : ""})` }; return null }
     const ultima = Math.max(0, ...lista.map(t => new Date(t).getTime()))
     const vez = Math.max(agora, ultima + (INTERVALO_MIN_SEG + Math.random() * 10) * 1000)
     if (vez - agora > ESPERA_MAX_VEZ_SEG * 1000 && !essencial) { res = { erro: "não enviou (fila de envio cheia)" }; return null }
@@ -159,10 +161,10 @@ export async function reservarVezDeEnviar(essencial = false): Promise<{ esperaMs
   return res
 }
 
-export async function enviar(c: Conversa, texto: string, lida?: string, opcoes: { essencial?: boolean } = {}): Promise<{ ids: string[]; erro?: string }> {
+export async function enviar(c: Conversa, texto: string, lida?: string, opcoes: { essencial?: boolean; proativo?: boolean } = {}): Promise<{ ids: string[]; erro?: string }> {
   const number = c.telefone || c.jid
   const ids: string[] = []
-  const vez = await reservarVezDeEnviar(opcoes.essencial)
+  const vez = await reservarVezDeEnviar(opcoes)
   if ("erro" in vez) return { ids, erro: vez.erro }
   if (vez.esperaMs > 0) await new Promise(res => setTimeout(res, vez.esperaMs))
   await marcarLida(c, lida)
@@ -182,9 +184,9 @@ export async function enviar(c: Conversa, texto: string, lida?: string, opcoes: 
 }
 
 // Imagem ou PDF pela URL (arte para aprovar), com legenda; também fica guardada como mensagem do agente
-export async function enviarArquivo(c: Conversa, url: string, mime: string, legenda: string, nome = "arte", opcoes: { essencial?: boolean } = {}): Promise<{ ids: string[]; erro?: string }> {
+export async function enviarArquivo(c: Conversa, url: string, mime: string, legenda: string, nome = "arte", opcoes: { essencial?: boolean; proativo?: boolean } = {}): Promise<{ ids: string[]; erro?: string }> {
   const number = c.telefone || c.jid
-  const vez = await reservarVezDeEnviar(opcoes.essencial)
+  const vez = await reservarVezDeEnviar(opcoes)
   if ("erro" in vez) return { ids: [], erro: vez.erro }
   if (vez.esperaMs > 0) await new Promise(res => setTimeout(res, vez.esperaMs))
   const mediatype = mime.startsWith("image/") ? "image" : mime.startsWith("video/") ? "video" : "document"
@@ -480,7 +482,7 @@ async function pegarRodada(campo: "agenteRetomadaEm" | "agenteFollowupEm", minut
 export async function talvezRetomarParados(origem: string) {
   const cfg = await lerCfg()
   if (!cfg.agenteAuto?.ligado || !dentroDoHorario(cfg.agenteAuto.horario)) return
-  if (!await pegarRodada("agenteRetomadaEm", 5)) return
+  if (!await pegarRodada("agenteRetomadaEm", 3)) return
   const agora = Date.now()
   const { data: convs } = await supabase.from("whatsapp_conversas").select("jid, etiquetas, status_lead, ultima_recebida_at, ultima_enviada_at")
     .gte("ultima_recebida_at", new Date(agora - HORAS_RETOMAR * 3_600_000).toISOString()).order("ultima_recebida_at", { ascending: false }).limit(300)
@@ -635,7 +637,7 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
       if (await voceNaConversa(c.jid, log, cfg)) return registrar({ ...base, perfil: "pequeno", enviou: false, texto: "", motivo: `F${nivel} segurado: você está nessa conversa agora`, passo: `F${nivel}` })
       const texto = textoLembreteDigital({ ...pd, jid: c.jid }, adiou ? 2 : lemb, linkPedido(pd.id), { adiou })
       if (adiou) await marcarPd({ lembreteParado: true })   // depois deste, para
-      const env = await enviar(c, texto)
+      const env = await enviar(c, texto, undefined, { proativo: true })
       if (env.ids.length) {
         await aplicar(c, passo!.etiquetas, null)
         await gravarCfg(d => ({ pedidosDigitais: (d.pedidosDigitais ?? []).map(p => p.id === pd.id ? { ...p, lembretes: [...(p.lembretes ?? []), { nivel, em: new Date().toISOString() }] } : p) }))
@@ -655,7 +657,7 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     })
     const dados = { ...base, perfil: r.lead.perfil, texto: r.resposta, passo: `F${nivel}` }
     if (trava) return registrar({ ...dados, enviou: false, motivo: `F${nivel} segurado: ${trava}` })
-    const env = await enviar(c, r.resposta)
+    const env = await enviar(c, r.resposta, undefined, { proativo: true })
     if (env.ids.length) await aplicar(c, passo!.etiquetas, null)
     // F2 leva junto um vídeo de produção da biblioteca (o menos usado), quando houver
     let video = ""
@@ -663,7 +665,7 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
       const v = escolherMidia((cfg as { midiaAgente?: MidiaAgente[] }).midiaAgente, "video")
       if (v) {
         await new Promise(res => setTimeout(res, 2500 + Math.random() * 2500))
-        const ev = await enviarArquivo(c, v.url, v.mime, "", v.nome).catch(() => null)
+        const ev = await enviarArquivo(c, v.url, v.mime, "", v.nome, { proativo: true }).catch(() => null)
         if (ev?.ids.length) {
           env.ids.push(...ev.ids); video = ` + vídeo “${v.descricao.slice(0, 40)}”`
           await gravarCfg(d => ({ midiaAgente: ((d as { midiaAgente?: MidiaAgente[] }).midiaAgente ?? []).map(m => m.id === v.id ? { ...m, usos: (m.usos ?? 0) + 1 } : m) } as Partial<CfgAgente>)).catch(() => null)

@@ -94,7 +94,7 @@ export async function preparar(jid: string, cfg?: Cfg) {
 export async function enviarRetomada(jid: string, texto: string, quem: "voce" | "agente", perfil?: PerfilLead) {
   const c = await lerConversa(jid)
   if (!c) return { ok: false as const, erro: "Conversa não encontrada." }
-  const env = await enviar(c, texto.trim())
+  const env = await enviar(c, texto.trim(), undefined, { proativo: true })
   if (env.ids.length) await aplicar(c, [...new Set([...(c.etiquetas ?? []), ETIQUETA_REATIVACAO])], null)
   const p = perfil ?? PERFIL[(c.etiquetas ?? []).find(e => PERFIL[e]) ?? "MQL"] ?? "icp"
   await registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: p, enviou: env.ids.length > 0, ids: env.ids, texto, passo: "Reativação",

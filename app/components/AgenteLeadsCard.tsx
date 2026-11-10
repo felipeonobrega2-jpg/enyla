@@ -110,7 +110,7 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
           <p className="text-[13px] font-semibold text-[#191625]">Modo automático {ligado ? "ligado" : "desligado"}</p>
           <p className="text-[11.5px] text-[#5e5c68]">
             {ligado
-              ? "Responde sozinho só contato novo (até 4 dias), responde no ritmo de gente (1 a 1,5 min depois da última mensagem, variando, em uma mensagem só), lê, fica “digitando…” e segura tudo que é decisão sua. Para proteger o número: no máximo 30 mensagens por hora (12 nas 3 h depois de conectar de novo), nunca duas seguidas."
+              ? "Responde sozinho só contato novo (até 4 dias), responde no ritmo de gente (1 a 1,5 min depois da última mensagem, variando, em uma mensagem só), lê, fica “digitando…” e segura tudo que é decisão sua. Para proteger o número: no máximo 40 mensagens por hora (20 nas 2 h depois de reconectar), nunca duas seguidas, e resposta a lead sempre antes de follow-up."
               : "Desligado, ele só sugere a resposta na conversa. Ligado, responde sozinho os leads novos e organiza o funil."}
           </p>
         </div>
