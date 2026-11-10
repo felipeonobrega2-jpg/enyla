@@ -1,7 +1,7 @@
 // Ideias que o sistema (ou o Claude, a pedido seu) põe no seu banco de ideias. Entra uma vez por lote (marca no
 // servidor) e nunca duplica: o que você já apagou ou marcou não volta.
 import { mudarConfig } from "./configAtomica"
-import type { Ideia } from "../config"
+import type { Ideia, GastoFixo } from "../config"
 
 const LOTES: { v: number; ideias: string[] }[] = [
   { v: 1, ideias: [
@@ -21,6 +21,17 @@ const LOTES: { v: number; ideias: string[] }[] = [
   { v: 2, ideias: [
     "Robustez (prioridade): proteger o sistema. Cópia diária da configuração (preços, contatos, conhecimento da IA, próximos passos, pedidos digitais) guardando 30 dias, com botão \"voltar para ontem\" em Configurações. E aviso no seu WhatsApp quando algo para: WhatsApp 2 h sem receber mensagem no horário comercial, Asaas recusando o aviso de pagamento ou envio automático falhando.",
   ] },
+  { v: 3, ideias: [
+    "Robustez (prioridade): aviso de servidor do WhatsApp fora do ar. Em 10/11 a Railway (onde roda a Evolution) tirou o servidor do ar quando o teste grátis acabou e os leads ficaram 2 h sem resposta. Checar a Evolution a cada 5 min e, se não responder ou o número desconectar, avisar no seu e-mail e no WhatsApp pessoal (por fora da Evolution). E lembrete 3 dias antes do vencimento do plano da Railway (dia 10).",
+  ] },
+]
+
+// Gastos fixos que o sistema põe uma vez (marca no servidor); apagou ou editou, não volta
+const GASTOS_FIXOS: { v: number; gastos: GastoFixo[] }[] = [
+  { v: 1, gastos: [
+    { id: "sis-railway", nome: "Railway (servidor do WhatsApp)", categoriaId: "assinaturas", valor: 30, diaVencimento: 10, ativa: true,
+      obs: "Plano Hobby, US$ 5/mês no cartão (valor em reais aproximado, com IOF). Roda a Evolution, que liga o WhatsApp ao sistema: se a cobrança falhar, o agente para de responder." },
+  ] },
 ]
 
 export async function talvezAdicionarIdeias() {
@@ -32,5 +43,16 @@ export async function talvezAdicionarIdeias() {
     const agora = new Date().toISOString()
     const novas: Ideia[] = LOTES.filter(l => l.v > v).flatMap(l => l.ideias.filter(t => !ja.has(t)).map((texto, i) => ({ id: `sis-${l.v}-${i}`, texto, status: "ideia" as const, criadaEm: agora })))
     return { ideias: [...novas, ...(d.ideias ?? [])], ideiasDoSistemaV: ultimo }
+  })
+}
+
+export async function talvezAdicionarGastosFixos() {
+  const ultimo = GASTOS_FIXOS.at(-1)!.v
+  await mudarConfig((d: Record<string, unknown> & { gastosFixos?: GastoFixo[]; gastosFixosDoSistemaV?: number; gastosFixosDoSistemaEm?: string }) => {
+    const v = d.gastosFixosDoSistemaV ?? 0
+    if (v >= ultimo) return null
+    const ja = new Set((d.gastosFixos ?? []).map(g => g.id))
+    const novos = GASTOS_FIXOS.filter(l => l.v > v).flatMap(l => l.gastos.filter(g => !ja.has(g.id)))
+    return { gastosFixos: [...(d.gastosFixos ?? []), ...novos], gastosFixosDoSistemaV: ultimo, gastosFixosDoSistemaEm: new Date().toISOString() }
   })
 }
