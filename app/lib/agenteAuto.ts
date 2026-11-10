@@ -506,12 +506,20 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     .in("jid", jidsDoAgente.slice(0, 600))
     .not("ultima_enviada_at", "is", null)
     .gte("ultima_enviada_at", new Date(Date.now() - DIAS_FOLLOW_UP * 86_400_000).toISOString())
+  const falhas = new Set((cfg.agenteLog ?? []).filter(l => !l.enviou && /^não enviou/.test(l.motivo ?? "")).map(l => `${l.jid}|${l.em}`))
   const candidatos = (data ?? []).filter(c =>
     !c.fechada_em && !["descartado", "perdido", "orcamento", "negociando", "pedido"].includes(c.status_lead ?? "")
     && (!c.ultima_recebida_at || c.ultima_recebida_at < c.ultima_enviada_at))
     .map(c => ({ c: c as Conversa, enviada: c.ultima_enviada_at as string, passo: proximoFollowUp(c.etiquetas ?? [], (Date.now() - new Date(c.ultima_enviada_at).getTime()) / 3_600_000) }))
-    // já tentou este passo depois da sua última mensagem (e segurou): não tenta de novo
-    .filter(x => x.passo && !((marcos[x.c.jid]?.passos?.[x.passo!.tipo === "encerrar" ? "Sem resposta" : `F${x.passo!.nivel}`] ?? "") > x.enviada))
+    // já tentou este passo depois da sua última mensagem (e segurou): não tenta de novo.
+    // Tentativa que não saiu (WhatsApp fora do ar: "não enviou") não conta: tenta de novo quando voltar.
+    .filter(x => {
+      if (!x.passo) return false
+      const chave = x.passo.tipo === "encerrar" ? "Sem resposta" : `F${x.passo.nivel}`
+      const em = marcos[x.c.jid]?.passos?.[chave] ?? ""
+      if (!(em > x.enviada)) return true
+      return falhas.has(`${x.c.jid}|${em}`)
+    })
     // Orçamento digital esperando o sinal segue o ritmo dele (2 lembretes, espaçados) e não ocupa a vez dos outros
     .filter(x => { const pd = pedidoPendente(cfg.pedidosDigitais, x.c.jid); return !pd || lembreteDigitalAgora(pd, x.enviada) != null })
     .slice(0, 3)   // cabe no minuto da Vercel; o resto vai na próxima rodada

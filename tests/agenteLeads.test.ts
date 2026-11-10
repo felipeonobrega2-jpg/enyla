@@ -158,6 +158,7 @@ describe("retomada: lead que ficou sem resposta", async () => {
   it("acabou de chegar (resposta normal a caminho): espera", () => expect(paradoParaRetomar({ ...base, ultima: { ...base.ultima, ts: "2026-11-06T19:57:00Z" } })).toBe(false))
   it("o agente já registrou algo depois (enviou ou segurou): não retoma", () => expect(paradoParaRetomar({ ...base, ultimoRegistro: { em: "2026-11-06T19:31:00Z", motivo: "nada a responder" } })).toBe(false))
   it("a IA falhou depois: retoma", () => expect(paradoParaRetomar({ ...base, ultimoRegistro: { em: "2026-11-06T19:31:00Z", motivo: "IA falhou: timeout" } })).toBe(true))
+  it("WhatsApp fora do ar (não enviou): retoma quando voltar", () => expect(paradoParaRetomar({ ...base, ultimoRegistro: { em: "2026-11-06T19:31:00Z", motivo: "não enviou (400)" } })).toBe(true))
   it("já retomada uma vez: não repete", () => expect(paradoParaRetomar({ ...base, feitas: new Set(["m1"]) })).toBe(false))
   it("contato antigo: não", () => expect(paradoParaRetomar({ ...base, primeiraEm: "2026-10-01T10:00:00Z" })).toBe(false))
   it("fora da janela: não", () => expect(paradoParaRetomar({ ...base, ultima: { ...base.ultima, ts: "2026-11-03T10:00:00Z" }, primeiraEm: "2026-11-03T09:00:00Z" })).toBe(false))

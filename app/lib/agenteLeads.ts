@@ -330,7 +330,7 @@ export function paradoParaRetomar(o: {
   if (idade < 5 * 60_000 || idade > o.horas * 3_600_000) return false
   if (!o.primeiraEm || o.agora - new Date(o.primeiraEm).getTime() > o.diasConversaNova * 86_400_000) return false
   const reg = o.ultimoRegistro
-  if (reg && new Date(reg.em).getTime() > new Date(o.ultima.ts).getTime() && !/^IA falhou/.test(reg.motivo ?? "")) return false
+  if (reg && new Date(reg.em).getTime() > new Date(o.ultima.ts).getTime() && !/^(IA falhou|não enviou)/.test(reg.motivo ?? "")) return false
   if (o.suasDoCelular > 0 && !o.digital) return false
   return true
 }
