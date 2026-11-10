@@ -139,8 +139,8 @@ const LIMITE_HORA = 40
 const LIMITE_HORA_AQUECENDO = 20
 const HORAS_AQUECENDO = 2
 const FRACAO_PROATIVO = 0.6        // follow-up e reativação só usam até 60% do limite: resposta a lead tem prioridade
-const INTERVALO_MIN_SEG = 15
-export const ESPERA_MAX_VEZ_SEG = 15   // cabe no minuto da Vercel; passou disso, tenta na próxima rodada
+const INTERVALO_MIN_SEG = 8
+export const ESPERA_MAX_VEZ_SEG = 20   // cabe no minuto da Vercel; passou disso, tenta na próxima rodada
 
 export async function reservarVezDeEnviar(opcoes: { essencial?: boolean; proativo?: boolean } = {}): Promise<{ esperaMs: number } | { erro: string }> {
   const { essencial = false, proativo = false } = opcoes
@@ -153,7 +153,7 @@ export async function reservarVezDeEnviar(opcoes: { essencial?: boolean; proativ
     const limite = Math.floor((aquecendo ? LIMITE_HORA_AQUECENDO : LIMITE_HORA) * (proativo ? FRACAO_PROATIVO : 1))
     if (!essencial && lista.length >= limite) { res = { erro: `não enviou (limite de ${limite} por hora${proativo ? " para follow-up" : ""}${aquecendo ? ", aquecendo depois de conectar" : ""})` }; return null }
     const ultima = Math.max(0, ...lista.map(t => new Date(t).getTime()))
-    const vez = Math.max(agora, ultima + (INTERVALO_MIN_SEG + Math.random() * 10) * 1000)
+    const vez = Math.max(agora, ultima + (INTERVALO_MIN_SEG + Math.random() * 7) * 1000)
     if (vez - agora > ESPERA_MAX_VEZ_SEG * 1000 && !essencial) { res = { erro: "não enviou (fila de envio cheia)" }; return null }
     res = { esperaMs: vez - agora }
     return { agenteEnviosHora: [...lista, new Date(vez).toISOString()].slice(-200) }
