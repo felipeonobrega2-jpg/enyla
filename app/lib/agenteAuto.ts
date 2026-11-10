@@ -430,10 +430,10 @@ export async function talvezRetomarParados(origem: string) {
   const agora = Date.now()
   const { data: convs } = await supabase.from("whatsapp_conversas").select("jid, etiquetas, status_lead, ultima_recebida_at, ultima_enviada_at")
     .gte("ultima_recebida_at", new Date(agora - HORAS_RETOMAR * 3_600_000).toISOString()).order("ultima_recebida_at", { ascending: false }).limit(300)
+  // A última "enviada" da conversa pode ser só automática do WhatsApp Business ("fora do horário", botões sem
+  // texto, que chegam até horas depois): a conversa entra e a mensagem certa é conferida abaixo, ignorando essas
   const candidatas = (convs ?? []).filter(c => !deveIgnorar(c.jid) && !["mql", "descartado", "perdido"].includes(c.status_lead ?? "")
-    && !(c.etiquetas ?? []).includes("Fornecedora") && (!c.ultima_enviada_at || !c.ultima_recebida_at
-      // até 2 min depois dele pode ser só o "fora do horário" automático (a mensagem certa é conferida abaixo)
-      || new Date(c.ultima_enviada_at).getTime() <= new Date(c.ultima_recebida_at).getTime() + 120_000))
+    && !(c.etiquetas ?? []).includes("Fornecedora") && !!c.ultima_recebida_at)
   const logTodo = cfg.agenteLog ?? []
   const feitas = new Set(cfg.agenteRetomadas ?? [])
   const digital = cfg.agenteAuto.pequenoParceiro === false
@@ -443,7 +443,7 @@ export async function talvezRetomarParados(origem: string) {
     const { data: todas } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo, tipo").eq("jid", c.jid).order("ts", { ascending: false }).limit(40)
     const ms = (todas ?? []).filter(m => !(m.from_me && ehMensagemAutomaticaDoWhatsapp(m.corpo, m.tipo)))
     const u = ms[0]
-    if (!u) continue
+    if (!u || u.from_me || feitas.has(u.id) || agora - new Date(u.ts).getTime() < 5 * 60_000) continue   // já respondida, já retomada ou recém-chegada
     const primeira = await primeiraDa(c.jid)
     const log = logTodo.filter(l => l.jid === c.jid)
     const ehDigital = digital && ((c.etiquetas ?? []).includes(ETIQUETAS_AGENTE.digital) || log[0]?.perfil === "pequeno")
