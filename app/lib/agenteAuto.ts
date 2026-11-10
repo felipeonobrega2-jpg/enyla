@@ -15,7 +15,7 @@ import { garantirTelefone } from "./contatosServidor"
 import { textoAvisoReativacao } from "./reativacao"
 import {
   AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, filtroEfetivo,
-  organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, ehSemCredito, proximoFollowUp, horarioDeFollowUp, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE, ETIQUETAS_AGENTE,
+  organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, ehSemCredito, proximoFollowUp, horarioDeFollowUp, dentroDoHorario, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE, ETIQUETAS_AGENTE,
   marcar, marcosDoRegistro, Marcos, paradoParaRetomar,
 } from "./agenteLeads"
 import { corrigirCumprimento } from "./atendente"
@@ -25,6 +25,7 @@ import { escolherMidia, MidiaAgente } from "./midiaAgente"
 
 const DIAS_CONVERSA_NOVA = 4
 const HORAS_RETOMAR = 24
+const RETOMADAS_POR_RODADA = 2   // por rodada (a cada 5 min), uma de cada vez
 const DIAS_FOLLOW_UP = 14            // follow-up vale para lead que chegou nos últimos 14 dias
 const MINUTOS_VOCE_NA_CONVERSA = 10
 const MAX_REGISTROS = 300
@@ -255,8 +256,9 @@ async function aindaEhAUltima(msgId: string) {
 // 1ª etapa (no webhook): espera o lead terminar de escrever (costumam mandar 2–3 mensagens seguidas)
 export async function agendarResposta(msgId: string, origem: string) {
   const cfg = await lerCfg()
-  if (!cfg.agenteAuto?.ligado) {
-    // Desligado, o agente não responde; mas resposta a uma retomada ainda vira aviso para você
+  if (!cfg.agenteAuto?.ligado || !dentroDoHorario(cfg.agenteAuto.horario)) {
+    // Desligado (ou fora do horário dele), o agente não responde; mas resposta a uma retomada ainda vira aviso para você.
+    // Fora do horário, quem ficou esperando é respondido quando o horário abrir (retomar parados, aos poucos).
     const jid = await aindaEhAUltima(msgId)
     const c = jid ? await lerConversa(jid) : null
     if (c) await respondeuRetomada(cfg, c, msgId).catch(() => null)
@@ -290,7 +292,7 @@ async function reservarMensagem(msgId: string): Promise<boolean> {
 export async function responderSozinho(msgId: string) {
   const cfg = await lerCfg()
   const auto = cfg.agenteAuto
-  if (!auto?.ligado) return
+  if (!auto?.ligado || !dentroDoHorario(auto.horario)) return
   const inicio = Date.now()
   await espera(10, 25)
   const jid = await aindaEhAUltima(msgId)
@@ -424,7 +426,7 @@ export async function responderSozinho(msgId: string) {
 // que é todo do agente), se é MQL, descartado, perdido ou fornecedor. Cada mensagem é retomada uma vez só.
 export async function talvezRetomarParados(origem: string) {
   const cfg = await lerCfg()
-  if (!cfg.agenteAuto?.ligado) return
+  if (!cfg.agenteAuto?.ligado || !dentroDoHorario(cfg.agenteAuto.horario)) return
   if (cfg.agenteRetomadaEm && Date.now() - new Date(cfg.agenteRetomadaEm).getTime() < 5 * 60_000) return
   await gravarCfg(() => ({ agenteRetomadaEm: new Date().toISOString() }))
   const agora = Date.now()
@@ -439,7 +441,7 @@ export async function talvezRetomarParados(origem: string) {
   const digital = cfg.agenteAuto.pequenoParceiro === false
   let disparadas = 0
   for (const c of candidatas) {
-    if (disparadas >= 6) break
+    if (disparadas >= RETOMADAS_POR_RODADA) break
     const { data: todas } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo, tipo").eq("jid", c.jid).order("ts", { ascending: false }).limit(40)
     const ms = (todas ?? []).filter(m => !(m.from_me && ehMensagemAutomaticaDoWhatsapp(m.corpo, m.tipo)))
     const u = ms[0]
@@ -454,6 +456,8 @@ export async function talvezRetomarParados(origem: string) {
     })
     if (!ok) continue
     if (await voceNaConversa(c.jid, log, cfg)) continue
+    // Uma de cada vez, com intervalo: rajada de mensagens do mesmo número é o que faz o WhatsApp desconfiar
+    if (disparadas > 0) await new Promise(r => setTimeout(r, 25_000 + Math.random() * 15_000))
     disparadas++
     await gravarCfg(d => ({ agenteRetomadas: [u.id, ...(d.agenteRetomadas ?? [])].slice(0, 300) }))
     await fetch(`${origem}/api/whatsapp/webhook/responder?token=${encodeURIComponent(process.env.WHATSAPP_WEBHOOK_SECRET ?? "")}`, {
@@ -489,7 +493,7 @@ export async function talvezFollowUps() {
   if (Date.now() - ultimaRodadaLocal < MIN_ENTRE_RODADAS * 60_000) return
   ultimaRodadaLocal = Date.now()
   const cfg = await lerCfg()
-  if (!cfg.agenteAuto?.ligado || !horarioDeFollowUp()) return
+  if (!cfg.agenteAuto?.ligado || !horarioDeFollowUp() || !dentroDoHorario(cfg.agenteAuto.horario)) return
   if (cfg.agenteFollowupEm && Date.now() - new Date(cfg.agenteFollowupEm).getTime() < MIN_ENTRE_RODADAS * 60_000) return
   await gravarCfg(() => ({ agenteFollowupEm: new Date().toISOString() }))
   await followUps(cfg)
@@ -522,9 +526,17 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     })
     // Orçamento digital esperando o sinal segue o ritmo dele (2 lembretes, espaçados) e não ocupa a vez dos outros
     .filter(x => { const pd = pedidoPendente(cfg.pedidosDigitais, x.c.jid); return !pd || lembreteDigitalAgora(pd, x.enviada) != null })
-    .slice(0, 3)   // cabe no minuto da Vercel; o resto vai na próxima rodada
+    .slice(0, 2)   // cabe no minuto da Vercel; o resto vai na próxima rodada
 
-  await Promise.all(candidatos.map(async ({ c, passo, enviada }) => {
+  // Um de cada vez, com intervalo (nunca dois no mesmo segundo): ritmo de gente, para o WhatsApp não desconfiar
+  let primeiro = true
+  for (const x of candidatos) {
+    if (!primeiro) await new Promise(r => setTimeout(r, 15_000 + Math.random() * 10_000))
+    primeiro = false
+    await umFollowUp(x).catch(e => console.error("[follow-up]", e))
+  }
+
+  async function umFollowUp({ c, passo, enviada }: (typeof candidatos)[number]) {
     const base = { em: new Date().toISOString(), jid: c.jid, nome: c.nome }
     if (passo!.tipo === "encerrar") {
       await aplicar(c, passo!.etiquetas, "perdido")
@@ -597,5 +609,5 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
       }
     }
     return registrar({ ...dados, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? `F${nivel}: sem resposta${video}` })
-  }))
+  }
 }

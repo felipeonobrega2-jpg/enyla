@@ -30,6 +30,30 @@ export type AgenteAuto = {
   vitrine?: string            // mensagem do Instagram, mandada uma vez a cada lead depois da primeira resposta
   avisoNumero?: string        // número que recebe o aviso de MQL no WhatsApp (vazio = o seu próprio chat "Você")
   pequenoParceiro?: boolean   // lead pequeno (menos de 1.000): indica o parceiro digital (padrão) · false: você vende em digital
+  horario?: HorarioAgente     // quando ele trabalha (sem = todos os dias, 24 h)
+}
+
+// Dias da semana (0 = domingo) e faixa de horas de São Paulo em que o agente trabalha. "00:00"–"24:00" = dia todo;
+// início depois do fim atravessa a meia-noite (ex.: 20:00–02:00 vale até as 2 h do dia seguinte).
+export type HorarioAgente = { dias: number[]; inicio: string; fim: string }
+export const HORARIO_PADRAO: HorarioAgente = { dias: [0, 1, 2, 3, 4, 5, 6], inicio: "00:00", fim: "24:00" }
+
+const minutosDe = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return (h || 0) * 60 + (m || 0) }
+function agoraEmSP(d: Date) {
+  const p = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", weekday: "short", hour: "numeric", minute: "numeric", hour12: false }).formatToParts(d)
+  const dia = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(p.find(x => x.type === "weekday")!.value)
+  const h = Number(p.find(x => x.type === "hour")!.value) % 24
+  return { dia, min: h * 60 + Number(p.find(x => x.type === "minute")!.value) }
+}
+
+export function dentroDoHorario(h: HorarioAgente | null | undefined, d = new Date()): boolean {
+  if (!h) return true
+  if (!h.dias?.length) return false
+  const { dia, min } = agoraEmSP(d)
+  const ini = minutosDe(h.inicio), fim = minutosDe(h.fim)
+  if (ini === fim) return h.dias.includes(dia)                       // mesma hora nos dois = dia todo
+  if (ini < fim) return h.dias.includes(dia) && min >= ini && min < fim
+  return (h.dias.includes(dia) && min >= ini) || (h.dias.includes((dia + 6) % 7) && min < fim)   // atravessa a meia-noite
 }
 
 // Aviso de lead bom, mandado no seu WhatsApp: quem é, o que quer e o link para abrir a conversa

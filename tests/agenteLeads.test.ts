@@ -183,3 +183,21 @@ describe("mensagem automática do WhatsApp Business", async () => {
   it("você digitando: não", () => expect(ehMensagemAutomaticaDoWhatsapp("Oi, tudo bem?", "conversation")).toBe(false))
   it("mensagem com botões e texto: não", () => expect(ehMensagemAutomaticaDoWhatsapp("Escolha uma opção", "interactiveMessage")).toBe(false))
 })
+
+describe("horário do agente", async () => {
+  const { dentroDoHorario } = await import("../app/lib/agenteLeads")
+  // 10/11/2026 é terça; horários em São Paulo (UTC−3)
+  const sp = (iso: string) => new Date(iso + "-03:00")
+  it("sem horário: sempre", () => expect(dentroDoHorario(undefined, sp("2026-11-10T03:00:00"))).toBe(true))
+  it("24 h todos os dias", () => expect(dentroDoHorario({ dias: [0, 1, 2, 3, 4, 5, 6], inicio: "00:00", fim: "24:00" }, sp("2026-11-10T03:00:00"))).toBe(true))
+  const comercial = { dias: [1, 2, 3, 4, 5], inicio: "08:00", fim: "20:00" }
+  it("dentro da faixa", () => expect(dentroDoHorario(comercial, sp("2026-11-10T09:30:00"))).toBe(true))
+  it("madrugada: fora", () => expect(dentroDoHorario(comercial, sp("2026-11-10T03:00:00"))).toBe(false))
+  it("às 20h em ponto: fora", () => expect(dentroDoHorario(comercial, sp("2026-11-10T20:00:00"))).toBe(false))
+  it("domingo: fora", () => expect(dentroDoHorario(comercial, sp("2026-11-08T10:00:00"))).toBe(false))
+  const noite = { dias: [2], inicio: "20:00", fim: "02:00" }
+  it("atravessa a meia-noite: terça 23h dentro", () => expect(dentroDoHorario(noite, sp("2026-11-10T23:00:00"))).toBe(true))
+  it("atravessa a meia-noite: quarta 1h dentro (continuação da terça)", () => expect(dentroDoHorario(noite, sp("2026-11-11T01:00:00"))).toBe(true))
+  it("atravessa a meia-noite: quarta 3h fora", () => expect(dentroDoHorario(noite, sp("2026-11-11T03:00:00"))).toBe(false))
+  it("nenhum dia: nunca", () => expect(dentroDoHorario({ dias: [], inicio: "00:00", fim: "24:00" }, sp("2026-11-10T10:00:00"))).toBe(false))
+})

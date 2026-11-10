@@ -4,9 +4,9 @@
 // (liga na hora), a simulação nos leads que estão esperando e o registro do que ele fez sozinho.
 
 import { useEffect, useState } from "react"
-import { Bot, Loader2, Play, Power, Tag, Sparkles, X } from "lucide-react"
+import { Bot, Clock, Loader2, Play, Power, Tag, Sparkles, X } from "lucide-react"
 import { Cartao, TituloCartao, Botao, Selo, Tom, Segmentado } from "./ds"
-import { AgenteAuto, RegistroAgente, PerfilLead, ROTULO_PERFIL, FILTRO_PADRAO, VITRINE_PADRAO, ROTULO_TEMA } from "../lib/agenteLeads"
+import { AgenteAuto, RegistroAgente, PerfilLead, ROTULO_PERFIL, FILTRO_PADRAO, VITRINE_PADRAO, ROTULO_TEMA, HorarioAgente, HORARIO_PADRAO, dentroDoHorario } from "../lib/agenteLeads"
 
 type Simulacao = { jid: string; nome: string | null; ultima: string; perfil: PerfilLead; quantidade: number | null; motivo: string; resposta: string; enviaria: boolean; trava: string | null }
 
@@ -117,6 +117,8 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
         <Botao variante={ligado ? "secundario" : "primario"} disabled={!auto || mudando} onClick={alternar}
           icone={mudando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Power className="w-3.5 h-3.5" />}>{ligado ? "Desligar" : "Ligar"}</Botao>
       </div>
+
+      <HorarioDoAgente auto={auto} onSalvo={setAuto} />
 
       {/* Como ele organiza */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4 text-[11.5px]">
@@ -257,5 +259,64 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
         </div>
       )}
     </Cartao>
+  )
+}
+
+// Quando o agente trabalha: dias da semana e faixa de horas (São Paulo). Padrão: todos os dias, 24 h.
+const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
+function HorarioDoAgente({ auto, onSalvo }: { auto: AgenteAuto | null; onSalvo: (a: AgenteAuto) => void }) {
+  const salvo = auto?.horario ?? HORARIO_PADRAO
+  const [h, setH] = useState<HorarioAgente | null>(null)
+  const [salvando, setSalvando] = useState(false)
+  const atual = h ?? salvo
+  const diaTodo = atual.inicio === "00:00" && atual.fim === "24:00"
+  const mudou = !!h && JSON.stringify(h) !== JSON.stringify(salvo)
+  const dentro = dentroDoHorario(auto?.horario)
+  const mudar = (p: Partial<HorarioAgente>) => setH({ ...atual, ...p })
+  async function salvar() {
+    if (!h) return
+    setSalvando(true)
+    const d = await fetch("/api/whatsapp/agente", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ horario: h }) }).then(r => r.json()).catch(() => null)
+    if (d?.auto) { onSalvo(d.auto); setH(null) }
+    setSalvando(false)
+  }
+  const campo = "h-8 rounded-lg px-2 text-[12px] ds-num text-[#191625] bg-white ds-borda focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20"
+  return (
+    <div className="rounded-xl ds-borda px-4 py-3 mb-4 space-y-2.5">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Clock className="w-4 h-4 text-[#5e5c68]" />
+        <p className="text-[13px] font-semibold text-[#191625] flex-1">Horário de trabalho</p>
+        {auto?.ligado && <Selo tom={dentro ? "sucesso" : "neutro"}>{dentro ? "Trabalhando agora" : "Fora do horário agora"}</Selo>}
+      </div>
+      <p className="text-[11.5px] text-[#5e5c68]">Fora do horário ele não responde, não manda follow-up nem retoma. Quando o horário abre, responde quem ficou esperando, um de cada vez.</p>
+      <div className="flex flex-wrap gap-1.5">
+        {DIAS.map((n, i) => {
+          const on = atual.dias.includes(i)
+          return (
+            <button key={n} onClick={() => mudar({ dias: on ? atual.dias.filter(d => d !== i) : [...atual.dias, i].sort() })}
+              className={`h-8 min-w-[44px] px-2.5 rounded-lg text-[12px] font-semibold transition-colors ${on ? "bg-[#191625] text-white" : "bg-white text-[#898892] ds-borda"}`}>{n}</button>
+          )
+        })}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-[12px] text-[#5e5c68]">
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" checked={diaTodo} onChange={e => mudar(e.target.checked ? { inicio: "00:00", fim: "24:00" } : { inicio: "08:00", fim: "20:00" })} />
+          24 horas
+        </label>
+        {!diaTodo && (
+          <>
+            <span>das</span>
+            <input type="time" value={atual.inicio} onChange={e => mudar({ inicio: e.target.value || "00:00" })} className={campo} />
+            <span>às</span>
+            <input type="time" value={atual.fim === "24:00" ? "23:59" : atual.fim} onChange={e => mudar({ fim: e.target.value || "24:00" })} className={campo} />
+          </>
+        )}
+        {!atual.dias.length && <span className="text-[#d33a3c]">Nenhum dia marcado: ele não trabalha.</span>}
+        {mudou && (
+          <Botao variante="primario" disabled={salvando} onClick={salvar}
+            icone={salvando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : undefined}>Salvar horário</Botao>
+        )}
+      </div>
+    </div>
   )
 }

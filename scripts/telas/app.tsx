@@ -118,7 +118,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       briefing: { marca: pago ? "Essência Rara" : "", cores: "", referencias: "", arquivos: pago ? [{ nome: "logo-essencia.png", url: "#" }] : [] },
       opcoes: [{ quantidade: 20, total: 339.94, unit: 17 }, { quantidade: 50, total: 419.95, unit: 8.4 }, { quantidade: 100, total: 619.95, unit: 6.2 }] }))
   }
-  if (u.startsWith("/api/whatsapp/agente")) return new Response(JSON.stringify({ auto: { ligado: false, pequenoParceiro: false }, log: [
+  if (u.startsWith("/api/whatsapp/agente")) return new Response(JSON.stringify({ auto: { ligado: true, pequenoParceiro: false, horario: { dias: [1, 2, 3, 4, 5], inicio: "08:00", fim: "20:00" } }, log: [
     { em: new Date().toISOString(), jid: "1@lid", nome: "Camilo", perfil: "pequeno", enviou: true, texto: "Pô, essa quantidade a gente não roda porque é offset…", motivo: "100 unidades no total" },
     { em: new Date().toISOString(), jid: "2@lid", nome: "Marcio", perfil: "icp", enviou: false, texto: "Show! Vou preparar o seu orçamento.", motivo: "precisa de você (decisao_sua)" },
     { em: new Date().toISOString(), jid: "3@lid", nome: "Bia", perfil: "indefinido", enviou: true, passo: "F1", texto: "Oi! Conseguiu ver a quantidade?", motivo: "F1: sem resposta" },

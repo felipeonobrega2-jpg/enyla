@@ -3,7 +3,7 @@ import { supabase } from "@/app/lib/supabase"
 import { atender, lerConfigAtendente } from "@/app/lib/atendenteServidor"
 import { enviarEtiquetasAoWhatsapp } from "@/app/lib/agenteAuto"
 import { aprenderComConversas, Conhecimento } from "@/app/lib/agenteAprende"
-import { AgenteAuto, RegistroAgente, travaDoEnvio, valoresEmReais, PerfilLead, filtroEfetivo, TEMAS } from "@/app/lib/agenteLeads"
+import { AgenteAuto, RegistroAgente, travaDoEnvio, valoresEmReais, PerfilLead, filtroEfetivo, TEMAS, HorarioAgente } from "@/app/lib/agenteLeads"
 import { gravarCampos, mudarConfig } from "@/app/lib/configAtomica"
 
 export const maxDuration = 60
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   if (!b.simular) {
     const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
     const d = (data?.data ?? {}) as Record<string, unknown> & Cfg
-    const auto: AgenteAuto = { ...(d.agenteAuto ?? { ligado: false }), ...(typeof b.ligado === "boolean" ? { ligado: b.ligado } : {}), ...(b.esperaSeg ? { esperaSeg: b.esperaSeg } : {}), ...(b.maxPorDia ? { maxPorDia: b.maxPorDia } : {}), ...(typeof b.vitrine === "string" ? { vitrine: b.vitrine.trim().slice(0, 400) } : {}), ...(typeof b.pequenoParceiro === "boolean" ? { pequenoParceiro: b.pequenoParceiro } : {}), ...(typeof b.avisoNumero === "string" ? { avisoNumero: b.avisoNumero.replace(/\D/g, "").slice(0, 15) } : {}) }
+    const auto: AgenteAuto = { ...(d.agenteAuto ?? { ligado: false }), ...(typeof b.ligado === "boolean" ? { ligado: b.ligado } : {}), ...(b.esperaSeg ? { esperaSeg: b.esperaSeg } : {}), ...(b.maxPorDia ? { maxPorDia: b.maxPorDia } : {}), ...(typeof b.vitrine === "string" ? { vitrine: b.vitrine.trim().slice(0, 400) } : {}), ...(typeof b.pequenoParceiro === "boolean" ? { pequenoParceiro: b.pequenoParceiro } : {}), ...(typeof b.avisoNumero === "string" ? { avisoNumero: b.avisoNumero.replace(/\D/g, "").slice(0, 15) } : {}), ...(b.horario ? { horario: limparHorario(b.horario) } : {}) }
     await gravarCampos({ agenteAuto: auto })
     return NextResponse.json({ auto })
   }
@@ -91,4 +91,11 @@ export async function POST(req: NextRequest) {
     return { jid: c.jid, nome: c.nome, ultima: c.ultima_msg ?? "", perfil: r.lead.perfil, quantidade: r.lead.quantidade_total, motivo: r.lead.motivo, resposta: r.resposta, enviaria: !trava, trava }
   }))
   return NextResponse.json({ simulacao: out.filter(Boolean) })
+}
+
+// Horário do agente vindo da tela: dias 0–6 sem repetir, horas "HH:MM" (fim pode ser 24:00)
+function limparHorario(h: Partial<HorarioAgente>): HorarioAgente {
+  const hora = (x: unknown, padrao: string) => typeof x === "string" && /^([01]\d|2[0-3]):[0-5]\d$|^24:00$/.test(x) ? x : padrao
+  const dias = [...new Set((Array.isArray(h.dias) ? h.dias : []).map(Number).filter(n => Number.isInteger(n) && n >= 0 && n <= 6))].sort()
+  return { dias, inicio: hora(h.inicio, "00:00"), fim: hora(h.fim, "24:00") }
 }
