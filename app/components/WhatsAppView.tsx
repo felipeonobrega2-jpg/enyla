@@ -395,6 +395,15 @@ export default function WhatsAppView({
             </div>
           )}
           {status?.evolution?.conectado && <ImportarHistorico onFim={carregarConversas} />}
+          {/* Número desconectado ou webhook fora (com conversas na lista o painel do meio não aparece): conecta daqui */}
+          {status?.evolution && (!status.evolution.conectado || !status.evolution.webhookOk) && (
+            <div className="mt-2 rounded-xl p-3 space-y-2" style={{ background: "rgba(211,58,60,0.06)", border: "1px solid rgba(211,58,60,0.2)" }}>
+              <p className="text-[12px] font-semibold text-[#d33a3c]">
+                {status.evolution.conectado ? "As mensagens não estão chegando no sistema" : "WhatsApp desconectado: o sistema não recebe nem envia mensagens"}
+              </p>
+              <ConexaoWhats status={status} onAtualizar={setStatus} />
+            </div>
+          )}
         </div>
 
         {/* Lista */}
