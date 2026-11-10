@@ -437,11 +437,14 @@ export async function talvezRetomarParados(origem: string) {
   const candidatas = (convs ?? []).filter(c => !deveIgnorar(c.jid) && !["mql", "descartado", "perdido"].includes(c.status_lead ?? "")
     && !(c.etiquetas ?? []).includes("Fornecedora") && !!c.ultima_recebida_at)
   const logTodo = cfg.agenteLog ?? []
-  const feitas = new Set(cfg.agenteRetomadas ?? [])
+  // Retomada cuja resposta não saiu (WhatsApp fora do ar) não conta: tenta de novo
+  const naoSaiu = new Set(logTodo.filter((l, i) => /^não enviou/.test(l.motivo ?? "") && !logTodo.slice(0, i).some(x => x.jid === l.jid && x.enviou)).map(l => l.jid))
+  const feitasTodas = cfg.agenteRetomadas ?? []
   const digital = cfg.agenteAuto.pequenoParceiro === false
   let disparadas = 0
   for (const c of candidatas) {
     if (disparadas >= RETOMADAS_POR_RODADA) break
+    const feitas = new Set(naoSaiu.has(c.jid) ? [] : feitasTodas)
     const { data: todas } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo, tipo").eq("jid", c.jid).order("ts", { ascending: false }).limit(40)
     const ms = (todas ?? []).filter(m => !(m.from_me && ehMensagemAutomaticaDoWhatsapp(m.corpo, m.tipo)))
     const u = ms[0]
@@ -459,7 +462,11 @@ export async function talvezRetomarParados(origem: string) {
     // Uma de cada vez, com intervalo: rajada de mensagens do mesmo número é o que faz o WhatsApp desconfiar
     if (disparadas > 0) await new Promise(r => setTimeout(r, 25_000 + Math.random() * 15_000))
     disparadas++
-    await gravarCfg(d => ({ agenteRetomadas: [u.id, ...(d.agenteRetomadas ?? [])].slice(0, 300) }))
+    // Tentativa nova de uma que não saiu: libera a mensagem para ser respondida de novo
+    await gravarCfg(d => ({
+      agenteRetomadas: [u.id, ...(d.agenteRetomadas ?? []).filter(x => x !== u.id)].slice(0, 300),
+      ...(naoSaiu.has(c.jid) ? { agenteTratadas: (d.agenteTratadas ?? []).filter(x => x !== u.id) } : {}),
+    }))
     await fetch(`${origem}/api/whatsapp/webhook/responder?token=${encodeURIComponent(process.env.WHATSAPP_WEBHOOK_SECRET ?? "")}`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ msgId: u.id }), signal: AbortSignal.timeout(8000),
     }).catch(() => null)
