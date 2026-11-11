@@ -220,8 +220,9 @@ Regras que nunca quebram:
   ].filter(Boolean).join("\n")
 
   const r = await clienteClaude(cfg.apiKey).beta.messages.create({
-    model: MODELO, max_tokens: 4000, ...FALLBACK,
-    output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
+    model: MODELO, max_tokens: 6000, ...FALLBACK,
+    // "medium": pensa antes de responder (entender o lead e decidir como o Felipe); "low" respondia raso
+    output_config: { effort: "medium", format: { type: "json_schema", schema: ESQUEMA } },
     // 1 hora: os leads chegam espaçados e o manual (guia + filtro + aprendido) tem ~12 mil tokens
     system: [{ type: "text", text: system, cache_control: { type: "ephemeral", ttl: "1h" } }],
     messages: [{ role: "user", content: `${contexto}${origem}\n\nConversa (mais antiga primeiro):\n<conversa>\n${historico}\n</conversa>\n\n${extra ? extra + "\n\n" : ""}Prepare a próxima mensagem do Felipe.` }],

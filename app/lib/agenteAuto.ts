@@ -306,7 +306,9 @@ export async function agendarResposta(msgId: string, origem: string) {
     if (c) await respondeuRetomada(cfg, c, msgId).catch(() => null)
     return
   }
-  await espera(35, 50)   // ritmo de gente: ninguém responde em segundos (somado à 2ª etapa, ~1 a 1,5 min)
+  // Ritmo de gente (somado à 2ª etapa): de dia ~40 s a 1 min; de madrugada mais devagar (~1 a 1,5 min)
+  const hSP = Number(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false })) % 24
+  await (hSP >= 8 && hSP < 22 ? espera(20, 32) : espera(35, 50))
   if (!await aindaEhAUltima(msgId)) return   // chegou outra: a última é quem dispara
   await fetch(`${origem}/api/whatsapp/webhook/responder?token=${encodeURIComponent(process.env.WHATSAPP_WEBHOOK_SECRET ?? "")}`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ msgId }), signal: AbortSignal.timeout(8000),
