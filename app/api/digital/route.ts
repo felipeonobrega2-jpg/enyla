@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { lerPedido, gravarPedido, linkPedido, linkDesigner, mandarArte, mandarParaVilla, avisarDesigner, ContatosDigital } from "@/app/lib/digitalServidor"
+import { lerPedido, gravarPedido, linkPedido, linkDesigner, mandarArte, mandarParaVilla, avisarDesigner, conversaDoPedido, ContatosDigital } from "@/app/lib/digitalServidor"
 import { seuNumero, enviar } from "@/app/lib/agenteAuto"
-import { pedidoDeTeste, textoLinkPedido } from "@/app/lib/digital"
+import { pedidoDeTeste, textoLinkPedido, opcoesDoPedido, trocarQuantidade } from "@/app/lib/digital"
 import { supabase } from "@/app/lib/supabase"
 import { mudarStatus, trocarFrete, restanteUnico, arteAtual, acertoDaSemana, PedidoComBriefing, StatusDigital, DIAS_VALIDADE_DIGITAL } from "@/app/lib/digital"
 import { mudarConfig } from "@/app/lib/configAtomica"
 
-type Dados = { pedidosDigitais?: PedidoComBriefing[]; digitalContatos?: ContatosDigital }
+type Dados = { pedidosDigitais?: PedidoComBriefing[]; digitalContatos?: ContatosDigital; digital?: import("@/app/lib/precoDigital").RegraDigital }
 
 // Painel do braço digital (rota protegida pelo login): os pedidos dos últimos 45 dias com o link e o que o cliente fez
 export async function GET() {
@@ -23,6 +23,7 @@ export async function GET() {
     teste: !!p.teste,
     vence: new Date(new Date(p.em).getTime() + DIAS_VALIDADE_DIGITAL * 86_400_000).toISOString(),
     link: linkPedido(p.id), linkDesigner: linkDesigner(p.id),
+    opcoes: p.status === "aguardando_sinal" ? opcoesDoPedido(p, d.digital) : [],
     arteAtual: arteAtual(p), versoes: (p.artes ?? []).length, arteEnviadaEm: p.arteEnviadaEm ?? null, arteAprovadaEm: p.arteAprovadaEm ?? null,
     ajustes: p.ajustes ?? [], designerAvisadoEm: p.designerAvisadoEm ?? null, villaEnviadoEm: p.villaEnviadoEm ?? null,
     frete: p.frete ?? null, restante: p.restante ?? null, restantePagoEm: p.restantePagoEm ?? null, entrega: p.entrega ?? null, acertadoEm: p.acertadoEm ?? null,
@@ -33,7 +34,7 @@ export async function GET() {
 
 // POST { id, status } avança ou cancela · { id, acao } frete, arte, Villa, designer · { acertar: ids } · { contatos }
 export async function POST(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as { teste?: boolean; id?: string; status?: StatusDigital; acao?: string; frete?: number; acertar?: string[]; contatos?: ContatosDigital }
+  const b = await req.json().catch(() => ({})) as { teste?: boolean; id?: string; status?: StatusDigital; acao?: string; frete?: number; quantidade?: number; enviar?: boolean; acertar?: string[]; contatos?: ContatosDigital }
 
   // Pedido de teste: na sua conversa com você mesmo, com o link do pedido
   if (b.teste) {
@@ -66,6 +67,17 @@ export async function POST(req: NextRequest) {
   if (b.acao === "frete") {
     const novo = await gravarPedido(b.id, (p, todos) => trocarFrete(p, todos, Number(b.frete)) as PedidoComBriefing | null)
     return novo ? NextResponse.json({ ok: true }) : NextResponse.json({ erro: "Não dá para mudar o frete agora (restante já pago?)." }, { status: 400 })
+  }
+  // Você muda a quantidade (antes do sinal) e, se quiser, o cliente recebe o orçamento novo com o link
+  if (b.acao === "quantidade") {
+    const novo = await gravarPedido(b.id, (p, todos) => trocarQuantidade(todos, p, Number(b.quantidade), cfg.digital) as PedidoComBriefing | null)
+    if (!novo) return NextResponse.json({ erro: "Não dá para mudar a quantidade (sinal já pago, ou quantidade fora da tabela)." }, { status: 400 })
+    if (b.enviar) {
+      const c = await conversaDoPedido(novo.jid)
+      const env = c ? await enviar(c, textoLinkPedido(novo, linkPedido(novo.id)), undefined, { essencial: true }) : { ids: [], erro: "conversa não encontrada" }
+      if (!env.ids.length) return NextResponse.json({ erro: `Quantidade mudou, mas a mensagem não saiu (${env.erro ?? "erro"}). Mande o link à mão.` }, { status: 502 })
+    }
+    return NextResponse.json({ ok: true })
   }
   if (b.acao === "mandarArte") {
     const r = await mandarArte(b.id)

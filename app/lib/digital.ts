@@ -44,6 +44,7 @@ export type PedidoDigital = {
   produto: string | null; ml: number | null
   medidas: { a: number; l: number; p: number }; padrao: boolean   // padrão = medida da tabela por ml (cliente confirma)
   folha: Folha; quantidade: number; faixa: number
+  pedida?: number                  // quantidade que o cliente pediu (a cotação usa a faixa da tabela: 150 → 200)
   custo: number; arte: number; margem: number; total: number
   sinal: number                    // valor exato do Pix do sinal (centavos únicos entre os abertos)
   status: StatusDigital
@@ -68,7 +69,7 @@ export type Ajuste = { texto: string; em: string }
 export type Entrega = { cep: string; endereco: string; em: string }
 
 export type Cotacao =
-  | { ok: true; medidas: { a: number; l: number; p: number }; padrao: boolean; ml: number | null; folha: Folha; quantidade: number; faixa: number; custo: number; arte: number; margem: number; total: number }
+  | { ok: true; medidas: { a: number; l: number; p: number }; padrao: boolean; ml: number | null; folha: Folha; quantidade: number; faixa: number; pedida: number; custo: number; arte: number; margem: number; total: number }
   | { ok: false; motivo: string }
 
 // Cota pelo que a IA tirou da conversa: medidas da caixa (ou o padrão do ml) e a quantidade
@@ -85,7 +86,7 @@ export function cotarDigital(d: DadosPedido | null, regra: RegraDigital = REGRA_
   const folha = naFolha === "A4" && !custoVilla(d.quantidade, "A4") ? "A3" : naFolha
   const p = precoDigital(d.quantidade, folha, regra)
   if (!p) return { ok: false, motivo: `acima de ${Math.max(...quantidadesDa(folha))} un na ${folha} (fora da tabela da Villa)` }
-  return { ok: true, medidas, padrao: !cx, ml: d.volume_ml ?? pad?.ml ?? null, folha, quantidade: p.faixa, faixa: p.faixa, custo: p.custo, arte: p.arte, margem: p.margem, total: p.total }
+  return { ok: true, medidas, padrao: !cx, ml: d.volume_ml ?? pad?.ml ?? null, folha, quantidade: p.faixa, faixa: p.faixa, pedida: d.quantidade, custo: p.custo, arte: p.arte, margem: p.margem, total: p.total }
 }
 
 // Sinal com centavos únicos entre os pedidos esperando Pix (o extrato só mostra valor e nome: assim o Pix acha o pedido)
@@ -129,7 +130,7 @@ export function montarPedido(pedidos: PedidoDigital[], jid: string, nome: string
   const abertos = pedidos.filter(p => p.status === "aguardando_sinal").map(p => p.sinal)
   return {
     id: proximoIdDigital(pedidos), jid, nome, em: agora.toISOString(), produto: d?.produto ?? null, ml: c.ml,
-    medidas: c.medidas, padrao: c.padrao, folha: c.folha, quantidade: c.quantidade, faixa: c.faixa,
+    medidas: c.medidas, padrao: c.padrao, folha: c.folha, quantidade: c.quantidade, faixa: c.faixa, ...(c.pedida < c.quantidade ? { pedida: c.pedida } : {}),
     custo: c.custo, arte: c.arte, margem: c.margem, total: c.total, sinal: sinalUnico(c.total, abertos), status: "aguardando_sinal",
   }
 }
@@ -184,10 +185,15 @@ export function textoSinalPago(p: Pick<PedidoDigital, "id" | "sinal">, link: str
 }
 
 // Mensagem curta do orçamento: o preço e o link da página (a escolha da quantidade e o Pix ficam lá)
-export function textoLinkPedido(p: Pick<PedidoDigital, "quantidade" | "ml" | "medidas" | "padrao" | "total" | "produto">, link: string) {
+export function textoLinkPedido(p: Pick<PedidoDigital, "quantidade" | "ml" | "medidas" | "padrao" | "total" | "produto" | "pedida">, link: string) {
   const oque = p.ml ? `para frasco de ${p.ml} ml` : p.produto ? `para ${p.produto}` : ""
+  // Pediu entre duas faixas: diz com clareza que pelo mesmo valor sai a faixa de cima (nunca troca calado)
+  const faixa = p.pedida && p.pedida < p.quantidade
+    ? `Você pediu ${p.pedida.toLocaleString("pt-BR")}: na nossa tabela, até ${p.quantidade.toLocaleString("pt-BR")} sai pelo mesmo valor, então já coloquei ${p.quantidade.toLocaleString("pt-BR")} caixinhas pra você.`
+    : null
   return [
     `Montei o seu orçamento em impressão digital, com a *arte inclusa* (nossa designer cria pra você).`,
+    faixa,
     `*${p.quantidade.toLocaleString("pt-BR")} caixinhas* ${oque} (${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm): *${brl(p.total)}*`,
     `Veja a caixa, escolha a quantidade e pague o sinal de 50% pelo Pix aqui: ${link}`,
     p.padrao ? `Usei a medida padrão de caixa ${oque}. Se o seu frasco for diferente, me manda as medidas que eu ajusto.` : null,

@@ -11,6 +11,7 @@ import { ROTULO_STATUS, PROXIMO_STATUS, type StatusDigital } from "@/app/lib/dig
 import { haQuanto } from "@/app/lib/hoje"
 
 type Pedido = {
+  opcoes?: { quantidade: number; total: number; unit: number }[]
   id: string; jid: string; nome: string | null; em: string; ml: number | null; medidas: { a: number; l: number; p: number }; padrao: boolean; folha: string
   quantidade: number; total: number; sinal: number; custo: number; arte: number; margem: number
   status: StatusDigital; sinalPagoEm: string | null; statusEm: string | null
@@ -206,6 +207,22 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
               <Info rotulo="Villa + arte" valor={`${brl(sel.custo)} + ${brl(sel.arte)}`} />
               <Info rotulo="Sua margem" valor={brl(sel.margem)} />
             </div>
+
+            {sel.status === "aguardando_sinal" && (sel.opcoes?.length ?? 0) > 1 && (
+              <div className="rounded-xl ds-borda px-3.5 py-3 space-y-2">
+                <p className="text-[12px] font-semibold text-[#191625]">Mudar a quantidade</p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {sel.opcoes!.map(o => (
+                    <button key={o.quantidade} disabled={!!ocupado || o.quantidade === sel.quantidade}
+                      onClick={() => { if (confirm(`Mudar para ${o.quantidade.toLocaleString("pt-BR")} caixinhas (${brl(o.total)}) e mandar o orçamento novo com o link para o cliente?`)) void acao("quantidade", { id: sel.id, acao: "quantidade", quantidade: o.quantidade, enviar: true }) }}
+                      className={`h-8 px-2.5 rounded-lg text-[12px] font-semibold ds-num ${o.quantidade === sel.quantidade ? "bg-[#191625] text-white" : "bg-white text-[#191625] ds-borda hover:bg-[rgba(116,116,128,0.06)]"}`}>
+                      {ocupado === "quantidade" && o.quantidade !== sel.quantidade ? "…" : `${o.quantidade.toLocaleString("pt-BR")} · ${brl(o.total)}`}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-[#898892]">Ao trocar, o cliente recebe no WhatsApp o orçamento novo com o link do Pix.</p>
+              </div>
+            )}
 
             {sel.status === "aguardando_sinal" && (
               <div className="rounded-xl bg-[rgba(116,116,128,0.06)] px-3.5 py-3 space-y-1.5">

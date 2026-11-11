@@ -262,3 +262,5 @@ export async function conferirNoAsaas(id: string) {
       await pagoPeloAsaas(id, parte, { txId: `asaas:${c.id}`, valor: r.corpo.value, data: (r.corpo.clientPaymentDate ?? r.corpo.paymentDate ?? new Date().toISOString()).slice(0, 10) })
   }
 }
+
+export const conversaDoPedido = (jid: string) => conversa(jid)

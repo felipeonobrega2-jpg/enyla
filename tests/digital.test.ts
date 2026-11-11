@@ -142,3 +142,10 @@ describe("lembrete do pedido e painel", async () => {
     expect(mudarStatus({ status: "enviado" } as never, "cancelado")).toBeNull()
   })
 })
+
+describe("quantidade entre faixas", async () => {
+  const { textoLinkPedido } = await import("@/app/lib/digital")
+  const base = { quantidade: 200, ml: 50, medidas: { a: 11.4, l: 3.9, p: 3.9 }, padrao: false, total: 1220, produto: null }
+  it("pediu 150: explica que pelo mesmo valor sai 200", () => expect(textoLinkPedido({ ...base, pedida: 150 }, "L")).toMatch(/Você pediu 150: .*200 caixinhas/))
+  it("pediu exatamente a faixa: não fala de faixa", () => expect(textoLinkPedido({ ...base, pedida: undefined }, "L")).not.toMatch(/Você pediu/))
+})

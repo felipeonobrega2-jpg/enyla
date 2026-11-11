@@ -194,7 +194,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     const extra = { linkDesigner: "https://app.enyla.com.br/d/DIG-0001?t=x&dz=y", arteAtual: null, versoes: 0, arteEnviadaEm: null, arteAprovadaEm: null, ajustes: [], designerAvisadoEm: null, villaEnviadoEm: null, frete: null, restante: null, restantePagoEm: null, entrega: null, acertadoEm: null }
     const base = { ...extra, ml: 30, medidas: { a: 10, l: 4, p: 4 }, padrao: true, folha: "A4", custo: 399.95, arte: 70, margem: 150, statusEm: null, link: "https://app.enyla.com.br/d/DIG-0001?t=x", vence: new Date(Date.now() + 10 * 86_400_000).toISOString() }
     return new Response(JSON.stringify({ pedidos: [
-      { ...base, id: "DIG-0011", jid: "1@lid", nome: "Perfumaria Exemplo", em: h(50), quantidade: 100, total: 619.95, sinal: 309.98, status: "aguardando_sinal", sinalPagoEm: null, vistoEm: null, ultimaVista: null, vistas: 0, lembretes: [], briefing: null },
+      { ...base, id: "DIG-0011", jid: "1@lid", nome: "Perfumaria Exemplo", em: h(50), quantidade: 100, total: 619.95, sinal: 309.98, status: "aguardando_sinal", sinalPagoEm: null, vistoEm: null, ultimaVista: null, vistas: 0, lembretes: [], briefing: null, opcoes: [{ quantidade: 100, total: 719.95, unit: 7.2 }, { quantidade: 200, total: 1220, unit: 6.1 }, { quantidade: 300, total: 1419.85, unit: 4.73 }, { quantidade: 500, total: 1970, unit: 3.94 }] },
       { ...base, id: "DIG-0010", jid: "2@lid", nome: "Aromas Modelo", em: h(60 * 30), quantidade: 50, total: 469.95, sinal: 234.97, status: "aguardando_sinal", sinalPagoEm: null, vistoEm: h(60 * 29), ultimaVista: h(60 * 5), vistas: 3, lembretes: [{ nivel: 1, em: h(60 * 27) }, { nivel: 2, em: h(60 * 6) }], briefing: { marca: "Aromas Modelo", cores: "", referencias: "", arquivos: 0 } },
       { ...base, ...extra, id: "DIG-0009", jid: "3@lid", nome: "Body Splash Fictícia", em: h(60 * 50), quantidade: 100, total: 619.95, sinal: 309.98, status: "arte", sinalPagoEm: h(60 * 20), vistoEm: h(60 * 49), ultimaVista: h(60 * 20), vistas: 2, lembretes: [{ nivel: 1, em: h(60 * 47) }], briefing: { marca: "Fictícia Body", cores: "branco e dourado", referencias: "Caixa limpa, nome da marca na frente e numeração das fragrâncias", laminacao: "fosca", arquivos: 2 },
         arteAtual: { url: "/brand/enyla-wordmark-dark.png", nome: "arte.png", em: h(90) }, versoes: 2, arteEnviadaEm: h(80), ajustes: [{ texto: "Aumentar o nome da marca", em: h(60 * 5) }], designerAvisadoEm: h(60 * 19) },
@@ -407,7 +407,7 @@ function Telas() {
       </aside>
       <div style={{ flex: 1 }}>{pagina(<PedidosSiteView onVerChapas={() => {}} />)}</div>
     </div>
-    case "digitalpainel": case "digitalpainel-m": case "digitalpainel-aberto": case "digitalpainel-prod": case "digitalpainel-acerto": return pagina(<DigitalPainelView onAbrirConversa={() => {}} />)
+    case "digitalpainel": case "digitalpainel-m": case "digitalpainel-aberto": case "digitalpainel-qtd": case "digitalpainel-prod": case "digitalpainel-acerto": return pagina(<DigitalPainelView onAbrirConversa={() => {}} />)
     case "hoje": case "hoje-m": case "hoje-passo": return pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)
     case "hoje-conversa": case "hoje-conversa-m": return <>{pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)}
       <ConversaLateral jid="1@lid" nome="Perfumaria Modelo" responder onFechar={() => {}} onAbrir={() => {}} onOrcamento={() => {}}
