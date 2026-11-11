@@ -222,6 +222,8 @@ async function medirEstiloFelipe() {
 
 // O que você ensinou direto (pediu ao Claude): entra uma vez, pela versão
 const ENSINADO: { v: number; item: Conhecimento }[] = [
+  { v: 3, item: { id: "felipe-digital-sem-logo", tema: "venda", em: "2026-11-11T00:00:00.000Z",
+    texto: "No digital eu só preciso de quantidade e tamanho (ml até 120 ou as medidas do frasco) para mandar o orçamento com o link. Frasco acima de 120 ml, como body splash de 200 ml, eu peço a altura e a largura do frasco em cm. Não pergunto se tem logo nem peço arte antes do sinal: a arte está inclusa e a designer pega isso depois do pagamento." } },
   { v: 2, item: { id: "felipe-cigarro", tema: "recusa", em: "2026-11-07T00:00:00.000Z",
     texto: "Não trabalhamos com embalagem de cigarro (maço, caixa de cigarro, tabaco). Se o lead pedir, diga com educação que esse tipo de embalagem a gente não faz e não siga com o orçamento." } },
 ]
