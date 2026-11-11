@@ -93,7 +93,8 @@ export async function POST(req: NextRequest) {
     // ── connection.update — o número conectou ou caiu (Painel avisa)
     if (event === "connection.update") {
       const estado = (body.data?.state ?? body.data?.connection) as string | undefined
-      if (estado) await registrarConexao(estado)
+      const motivo = Number(body.data?.statusReason ?? body.data?.lastDisconnect?.error?.output?.statusCode ?? 0) || null
+      if (estado) await registrarConexao(estado, motivo)
       return NextResponse.json({ ok: true })
     }
 

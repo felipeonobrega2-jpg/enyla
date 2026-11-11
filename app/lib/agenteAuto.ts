@@ -145,10 +145,12 @@ export const ESPERA_MAX_VEZ_SEG = 20   // cabe no minuto da Vercel; passou disso
 export async function reservarVezDeEnviar(opcoes: { essencial?: boolean; proativo?: boolean } = {}): Promise<{ esperaMs: number } | { erro: string }> {
   const { essencial = false, proativo = false } = opcoes
   let res: { esperaMs: number } | { erro: string } = { erro: "não enviou (limite por hora)" }
-  await mudarConfig((d: Record<string, unknown> & { agenteEnviosHora?: string[]; whatsappConexao?: { estado?: string; aquecerDesde?: string } }) => {
+  await mudarConfig((d: Record<string, unknown> & { agenteEnviosHora?: string[]; whatsappConexao?: { estado?: string; aquecerDesde?: string; aquecimentoV?: number } }) => {
     const agora = Date.now()
     const lista = (d.agenteEnviosHora ?? []).filter(t => new Date(t).getTime() > agora - 3_600_000)
-    const desde = d.whatsappConexao?.aquecerDesde
+    const con = d.whatsappConexao as { aquecerDesde?: string; aquecimentoV?: number } | undefined
+    // Só vale o aquecimento marcado pela regra nova (aparelho removido); o antigo ligava em oscilação
+    const desde = con?.aquecimentoV === 2 ? con.aquecerDesde : undefined
     const aquecendo = !!desde && agora - new Date(desde).getTime() < HORAS_AQUECENDO * 3_600_000
     const limite = Math.floor((aquecendo ? LIMITE_HORA_AQUECENDO : LIMITE_HORA) * (proativo ? FRACAO_PROATIVO : 1))
     if (!essencial && lista.length >= limite) { res = { erro: `não enviou (limite de ${limite} por hora${proativo ? " para follow-up" : ""}${aquecendo ? ", aquecendo depois de conectar" : ""})` }; return null }

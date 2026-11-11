@@ -6,20 +6,19 @@ import { telefoneNaResposta } from "./contatos"
 import { gravarCampos } from "./configAtomica"
 
 // Estado da conexão do número (Painel avisa quando cai). Grava só quando muda.
-// Conectou de novo depois de ficar mais de 15 min fora (QR, aparelho removido): marca o início do "aquecimento"
-// (o agente manda menos mensagens por um tempo). Oscilação de segundos não conta.
-export async function registrarConexao(estado: string) {
+// Aquecimento (o agente manda menos por um tempo) só depois de o WhatsApp REMOVER o aparelho (401: precisou ler o
+// QR de novo, aparelho novo para o WhatsApp). Oscilação, reinício e "conectando" de passagem não contam.
+export async function registrarConexao(estado: string, motivo: number | null = null) {
   const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
   const cfg = (data?.data as Record<string, unknown>) ?? {}
-  const atual = cfg.whatsappConexao as { estado?: string; caiuEm?: string; aquecerDesde?: string } | undefined
-  if (atual?.estado === estado) return
+  const atual = cfg.whatsappConexao as { estado?: string; removido?: boolean; aquecerDesde?: string } | undefined
+  if (atual?.estado === estado && !(motivo === 401 && !atual?.removido)) return
   const agora = new Date().toISOString()
   if (estado !== "open") {
-    await gravarCampos({ whatsappConexao: { ...atual, estado, em: agora, caiuEm: atual?.caiuEm ?? agora } })
+    await gravarCampos({ whatsappConexao: { estado, em: agora, removido: atual?.removido || motivo === 401 || undefined, motivo: motivo ?? undefined } })
     return
   }
-  const fora = atual?.caiuEm ? Date.now() - new Date(atual.caiuEm).getTime() : 0
-  await gravarCampos({ whatsappConexao: { estado, em: agora, aquecerDesde: fora > 15 * 60_000 ? agora : atual?.aquecerDesde } })
+  await gravarCampos({ whatsappConexao: { estado, em: agora, ...(atual?.removido ? { aquecerDesde: agora, aquecimentoV: 2 } : {}) } })
 }
 
 const STATUS: Record<string, string> = { SERVER_ACK: "enviada", DELIVERY_ACK: "entregue", READ: "lida", PLAYED: "lida" }
