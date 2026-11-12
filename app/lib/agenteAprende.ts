@@ -222,6 +222,13 @@ async function medirEstiloFelipe() {
 
 // O que você ensinou direto (pediu ao Claude): entra uma vez, pela versão
 const ENSINADO: { v: number; item: Conhecimento }[] = [
+  // v5 (12/11, conversa com o Will)
+  { v: 5, item: { id: "felipe-digital-prazo", tema: "prazo", em: "2026-11-12T00:00:00.000Z",
+    texto: "Prazo do digital: de 3 a 5 dias úteis depois do sinal e da aprovação da arte. Muitas vezes sai antes: a arte fica pronta no mesmo dia, a prova também, e com a aprovação já roda no dia seguinte. Sábado a gente trabalha até meio-dia. O offset demora bem mais; o digital tem essa vantagem de ser rápido." } },
+  { v: 5, item: { id: "felipe-medida-por-foto", tema: "produto", em: "2026-11-12T00:00:00.000Z",
+    texto: "Muito cliente manda a medida em foto: o frasco em pé ao lado de uma régua (altura, contando a tampa ou a válvula) e deitado sobre a régua (largura ou diâmetro), às vezes escrevendo só \"Altura\" e \"Largura\". A medida está na foto: eu leio e monto a caixa uns 3 mm maior que o frasco. Nunca uso a medida padrão do ml quando o cliente mandou a medida dele." } },
+  { v: 5, item: { id: "felipe-digital-desconto", tema: "venda", em: "2026-11-12T00:00:00.000Z",
+    texto: "Quando o cliente do digital pede desconto (\"consegue arredondar?\"), eu não prometo na hora: digo que vou ver o que consigo e decido depois. Cliente que já pediu desconto quase sempre fecha, então vale a pena olhar com carinho." } },
   // v4 (12/11, primeira venda do digital, conversa com o Michel)
   { v: 4, item: { id: "felipe-digital-sem-logo", tema: "venda", em: "2026-11-12T00:00:00.000Z",
     texto: "No digital eu só preciso de quantidade e tamanho (ml até 120 ou as medidas do frasco) para mandar o orçamento com o link. Frasco acima de 120 ml, como body splash de 200 ml, eu peço a altura e a largura do frasco em cm. Não pergunto se tem logo nem peço arte antes do sinal: a arte está inclusa e é feita depois do pagamento, com o que o cliente coloca na página do pedido." } },

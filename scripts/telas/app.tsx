@@ -44,6 +44,7 @@ import DigitalPainelView from "@/app/components/DigitalPainelView"
 import { PropostasProntasCard } from "@/app/components/PropostasProntasCard"
 import { RetornoAnunciosCard } from "@/app/components/RetornoAnunciosCard"
 import { TempoAteFecharCard } from "@/app/components/TempoAteFecharCard"
+import { NegociacoesDigitalCard } from "@/app/components/NegociacoesDigitalCard"
 import ChapasView from "@/app/cartuxo/components/ChapasView"
 import CustosView from "@/app/cartuxo/components/CustosView"
 import FacasView from "@/app/cartuxo/components/FacasView"
@@ -435,6 +436,12 @@ function Telas() {
       <div style={{ flex: 1 }}>{pagina(<PedidosSiteView onVerChapas={() => {}} />)}</div>
     </div>
     case "digitalpainel": case "digitalpainel-m": case "digitalpainel-aberto": case "digitalpainel-qtd": case "digitalpainel-prod": case "digitalpainel-acerto": return pagina(<DigitalPainelView onAbrirConversa={() => {}} />)
+    case "negociacao": case "negociacao-m": return pagina(<div className="max-w-[1200px]"><NegociacoesDigitalCard onAbrirConversa={() => {}} iniciais={[
+      { id: "DIG-0052", jid: "1@lid", nome: "Will Exemplo", quantidade: 200, total: 1220, custo: 700, arte: 0, status: "aguardando_sinal",
+        negociacao: { em: new Date(Date.now() - 25 * 60_000).toISOString(), texto: "Tá saindo 6.10 consegue arredondar nos 5,00?", pedidoTotal: 1000, antes: 1220, status: "aguardando" } },
+      { id: "DIG-0049", jid: "2@lid", nome: "Pedro Exemplo", quantidade: 50, total: 419.95, custo: 175, arte: 0, status: "aguardando_sinal",
+        negociacao: { em: new Date(Date.now() - 3 * 3_600_000).toISOString(), texto: "Tem como melhorar esse valor?", pedidoTotal: null, antes: 419.95, status: "aguardando" } },
+    ]} /></div>)
     case "tempofechar": case "tempofechar-m": return pagina(<div className="max-w-[1300px]"><TempoAteFecharCard /></div>)
     case "propostas": case "propostas-m": return pagina(<div className="max-w-[1200px] flex flex-col gap-4"><PropostasProntasCard onAbrir={() => {}} onAbrirConversa={() => {}} />
       <RetornoAnunciosCard periodo={{ from: new Date("2026-11-01T12:00:00"), to: null }} nomePeriodo="mês" clientes={[{ id: "a", nome: "Perfumaria Modelo", origemCampanhaId: "c1" } as never, { id: "b", nome: "Óleos Exemplo", origemCampanhaId: "c2" } as never]}

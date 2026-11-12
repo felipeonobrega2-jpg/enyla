@@ -42,3 +42,45 @@ describe("digital com mais de uma caixa", () => {
     expect(t).toMatch(/medida padrão/)
   })
 })
+
+describe("medida do frasco lida da foto (caso Will, 12/11)", () => {
+  it("altura e diâmetro do frasco: caixa justa, sem o padrão do ml", async () => {
+    const { cotarDigital } = await import("@/app/lib/digital")
+    const c = cotarDigital({ ...base, quantidade: 200, volume_ml: 60, frasco_cm: "altura 11,7 x diâmetro 3,9" })
+    expect(c.ok).toBe(true)
+    if (!c.ok) return
+    expect(c.medidas).toEqual({ a: 12.1, l: 4.2, p: 4.2 })
+    expect(c.padrao).toBe(false)
+  })
+  it("só o ml continua usando o padrão (marcado para confirmar)", async () => {
+    const { cotarDigital } = await import("@/app/lib/digital")
+    const c = cotarDigital({ ...base, quantidade: 200, volume_ml: 60 })
+    expect(c.ok && c.padrao).toBe(true)
+  })
+})
+
+describe("negociação no digital", () => {
+  it("valor pedido: total direto ou por unidade × quantidade", async () => {
+    const { totalPedido } = await import("@/app/lib/digital")
+    expect(totalPedido({ total: null, unitario: 5 }, 200)).toBe(1000)
+    expect(totalPedido({ total: 950, unitario: null }, 200)).toBe(950)
+    expect(totalPedido({ total: null, unitario: null }, 200)).toBeNull()
+  })
+  it("registra uma vez, aprova (novo total, margem e sinal) ou recusa", async () => {
+    const d = await import("@/app/lib/digital")
+    const r = d.cotarItens({ ...base, itens: [item("a", 50, 200), item("b", 50, 100)] })!
+    if (!r.ok) throw new Error()
+    const [p, outro] = d.montarPedidosDoGrupo([], "1@lid", "Will", r.itens)
+    const n = d.registrarNegociacao(p, "consegue nos 5?", 1000)!
+    expect(n.negociacao).toMatchObject({ status: "aguardando", pedidoTotal: 1000, antes: p.total })
+    expect(d.registrarNegociacao(n, "consegue nos 5?", 1000)).toBeNull()   // não duplica o aviso
+    const ap = d.aprovarNegociacao(n, [n, outro], 1000)!
+    expect(ap.total).toBe(1000)
+    expect(ap.margem).toBeCloseTo(1000 - p.custo - p.arte)
+    expect(ap.sinal).not.toBe(outro.sinal)
+    expect(ap.negociacao?.status).toBe("aprovada")
+    expect(d.textoNegociacaoAprovada(ap, "L")).toMatch(/consegui sim[\s\S]*1\.000,00[\s\S]*L$/)
+    expect(d.aprovarNegociacao({ ...n, status: "sinal_pago" }, [n], 900)).toBeNull()
+    expect(d.recusarNegociacao(n)?.negociacao?.status).toBe("recusada")
+  })
+})

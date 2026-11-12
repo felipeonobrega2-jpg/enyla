@@ -8,6 +8,7 @@ import {
 import { EnviarWhatsapp, Envio } from "./EnviarWhatsapp"
 import { HojeCard } from "./HojeCard"
 import { PropostasProntasCard } from "./PropostasProntasCard"
+import { NegociacoesDigitalCard } from "./NegociacoesDigitalCard"
 import { RetornoAnunciosCard } from "./RetornoAnunciosCard"
 import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COL_HOT, AprovacaoOnline } from "../types"
 import { Configuracoes } from "../config"
@@ -273,6 +274,8 @@ export function PainelView({
           <Botao variante="primario" icone={<Plus className="w-4 h-4" />} onClick={onNovoOrcamento}>Novo orçamento</Botao>
         </>}
       />
+
+      <NegociacoesDigitalCard onAbrirConversa={onAbrirConversa} />
 
       {onPropostaPronta && <PropostasProntasCard onAbrir={onPropostaPronta} onAbrirConversa={onAbrirConversa} />}
 

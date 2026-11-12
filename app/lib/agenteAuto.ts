@@ -4,7 +4,7 @@
 // sem resposta → F1, F2, F3 e Sem resposta. As etiquetas vão também para o WhatsApp Business, quando existem lá.
 // Tudo fica registrado (Configurações → Agente de leads) com o motivo de ter enviado ou segurado.
 
-import { cotarItens, montarPedidosDoGrupo, mudouOGrupo, pedidosDoGrupo, textoLinkGrupo } from "./digital"
+import { cotarItens, montarPedidosDoGrupo, mudouOGrupo, pedidosDoGrupo, textoLinkGrupo, registrarNegociacao, totalPedido } from "./digital"
 import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital, lembreteDigitalAgora, ADIOU } from "./digital"
 import { linkPedido } from "./digitalLink"
 import { faltaParaProposta } from "./propostaPronta"
@@ -23,7 +23,7 @@ import {
 } from "./agenteLeads"
 import { corrigirCumprimento } from "./atendente"
 import { mudarConfig } from "./configAtomica"
-import { notificar } from "./notificar"
+import { notificar, LINK_SISTEMA } from "./notificar"
 import { limparEmojis, leadEstaRindo } from "./estilo"
 import { escolherMidia, MidiaAgente } from "./midiaAgente"
 
@@ -385,12 +385,15 @@ export async function responderSozinho(msgId: string) {
   // Produto que não fazemos (cigarro): nunca cota sozinho, a resposta da IA recusa com educação
   const naoFazemos = PRODUTO_RECUSADO.test([r.dados?.produto, r.dados?.resumo, ...conversa.mensagens.filter(m => !m.from_me).slice(-6).map(m => m.corpo)].filter(Boolean).join(" "))
   // Mais de uma caixa (ex.: 30 ml e 50 ml): um pedido para cada, mensagem única identificando cada caixa
+  // Mandou foto ou arquivo (frasco com régua, desenho da caixa): nunca cota pela medida padrão do ml; se a IA não leu
+  // a medida, a resposta dela pede altura e largura
+  const mandouArquivo = conversa.mensagens.slice(-12).some(m => !m.from_me && /image|document/i.test(m.tipo))
   let novoGrupo: PedidoDigital[] | null = null
   const grupo = digitalPequeno && !naoFazemos ? cotarItens(r.dados, cfg.digital) : null
   if (grupo) {
     if (!grupo.ok && !/falta/.test(grupo.motivo)) semTabela = grupo.motivo
     const anteriores = anterior ? pedidosDoGrupo(cfg.pedidosDigitais, anterior) : []
-    if (grupo.ok && (!anteriores.length || mudouOGrupo(anteriores, grupo.itens))) {
+    if (grupo.ok && !(mandouArquivo && grupo.itens.some(i => i.cot.padrao)) && (!anteriores.length || mudouOGrupo(anteriores, grupo.itens))) {
       novoGrupo = montarPedidosDoGrupo(cfg.pedidosDigitais ?? [], jid, conversa.nome, grupo.itens)
       r.resposta = textoLinkGrupo(novoGrupo, novoGrupo.map(p => linkPedido(p.id)))
       r.alerta = "nenhum"; r.pode_enviar_sozinho = true
@@ -400,13 +403,28 @@ export async function responderSozinho(msgId: string) {
     if (!cot.ok && !cot.motivo.startsWith("falta")) semTabela = cot.motivo
     // Já tem grupo (mais de uma caixa) aberto: uma leitura com uma caixa só não desfaz o grupo
     const emGrupo = !!anterior && pedidosDoGrupo(cfg.pedidosDigitais, anterior).length > 1
-    if (cot.ok && !emGrupo && (!anterior || mudouACotacao(anterior, cot))) {
+    if (cot.ok && !emGrupo && !(mandouArquivo && cot.padrao) && (!anterior || mudouACotacao(anterior, cot))) {
       novoPedido = montarPedido(cfg.pedidosDigitais ?? [], jid, conversa.nome, r.dados, cot)
       r.resposta = textoLinkPedido(novoPedido, linkPedido(novoPedido.id))
       r.alerta = "nenhum"; r.pode_enviar_sozinho = true
     }
   }
   if (novoGrupo) novoPedido = novoGrupo[0]
+  // Digital: cliente pediu desconto com orçamento esperando o sinal → fica no pedido para você decidir (Painel e
+  // celular); a resposta neutra dele ("vou ver aqui o que consigo") pode sair
+  if (digitalPequeno && !novoPedido && r.alerta === "desconto") {
+    const pend = pedidoPendente(cfg.pedidosDigitais, jid)
+    if (pend) {
+      const texto = [...conversa.mensagens].reverse().find(m => !m.from_me && m.corpo)?.corpo ?? ""
+      const pedidoTotal = totalPedido(r.contraproposta, pend.quantidade)
+      let registrou = false
+      await gravarCfg(d => ({ pedidosDigitais: (d.pedidosDigitais ?? []).map(p => { if (p.id !== pend.id) return p; const n = registrarNegociacao(p, texto, pedidoTotal); if (n) registrou = true; return n ?? p }) }))
+      if (registrou) await notificar(`Digital: ${conversa.nome ?? "cliente"} quer negociar`,
+        `${pend.id} · ${pend.quantidade.toLocaleString("pt-BR")} caixinhas · está ${pend.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}${pedidoTotal ? ` · pediu ${pedidoTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} (${(pedidoTotal / pend.quantidade).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}/un)` : ""}. Aprove ou recuse no Painel.`,
+        { prioridade: "alta", link: `${LINK_SISTEMA}/?aba=painel`, tags: ["handshake"] }).catch(() => null)
+      r.alerta = "nenhum"; r.pode_enviar_sozinho = true
+    }
+  }
   // Emoji só do jeito que você usa (👋 na primeira mensagem, risada quando o lead ri)
   if (!novoPedido) r.resposta = limparEmojis(r.resposta, emojiCtx(conversa.mensagens, cfg))
   const ctx = contexto(cfg, log, jid)

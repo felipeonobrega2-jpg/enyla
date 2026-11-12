@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { lerPedido, gravarPedido, linkPedido, linkDesigner, mandarArte, mandarParaVilla, avisarDesigner, conversaDoPedido, ContatosDigital } from "@/app/lib/digitalServidor"
 import { seuNumero, enviar } from "@/app/lib/agenteAuto"
-import { pedidoDeTeste, textoLinkPedido, opcoesDoPedido, trocarQuantidade } from "@/app/lib/digital"
+import { pedidoDeTeste, textoLinkPedido, opcoesDoPedido, trocarQuantidade, aprovarNegociacao, recusarNegociacao, textoNegociacaoAprovada, textoNegociacaoRecusada } from "@/app/lib/digital"
 import { supabase } from "@/app/lib/supabase"
 import { mudarStatus, trocarFrete, restanteUnico, arteAtual, acertoDaSemana, PedidoComBriefing, StatusDigital, DIAS_VALIDADE_DIGITAL } from "@/app/lib/digital"
 import { mudarConfig } from "@/app/lib/configAtomica"
@@ -27,6 +27,7 @@ export async function GET() {
     arteAtual: arteAtual(p), versoes: (p.artes ?? []).length, arteEnviadaEm: p.arteEnviadaEm ?? null, arteAprovadaEm: p.arteAprovadaEm ?? null,
     ajustes: p.ajustes ?? [], designerAvisadoEm: p.designerAvisadoEm ?? null, villaEnviadoEm: p.villaEnviadoEm ?? null,
     frete: p.frete ?? null, restante: p.restante ?? null, restantePagoEm: p.restantePagoEm ?? null, entrega: p.entrega ?? null, acertadoEm: p.acertadoEm ?? null,
+    negociacao: p.negociacao ?? null,
   }))
   const acerto = acertoDaSemana(todos)
   return NextResponse.json({ pedidos, contatos: d.digitalContatos ?? {}, acerto: { ids: acerto.itens.map(p => p.id), total: acerto.total } })
@@ -34,7 +35,7 @@ export async function GET() {
 
 // POST { id, status } avança ou cancela · { id, acao } frete, arte, Villa, designer · { acertar: ids } · { contatos }
 export async function POST(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as { teste?: boolean; id?: string; status?: StatusDigital; acao?: string; frete?: number; quantidade?: number; enviar?: boolean; acertar?: string[]; contatos?: ContatosDigital }
+  const b = await req.json().catch(() => ({})) as { teste?: boolean; id?: string; status?: StatusDigital; acao?: string; frete?: number; quantidade?: number; enviar?: boolean; acertar?: string[]; contatos?: ContatosDigital; decisao?: "aprovar" | "recusar" | "eu"; total?: number }
 
   // Pedido de teste: na sua conversa com você mesmo, com o link do pedido
   if (b.teste) {
@@ -76,6 +77,25 @@ export async function POST(req: NextRequest) {
       const c = await conversaDoPedido(novo.jid)
       const env = c ? await enviar(c, textoLinkPedido(novo, linkPedido(novo.id)), undefined, { essencial: true }) : { ids: [], erro: "conversa não encontrada" }
       if (!env.ids.length) return NextResponse.json({ erro: `Quantidade mudou, mas a mensagem não saiu (${env.erro ?? "erro"}). Mande o link à mão.` }, { status: 502 })
+    }
+    return NextResponse.json({ ok: true })
+  }
+  // Negociação: aprova um valor (o pedido muda e o cliente recebe o valor novo pelo mesmo link), recusa (o cliente
+  // recebe que esse já é o melhor valor) ou "eu" (você responde na conversa; só tira do painel)
+  if (b.acao === "negociacao") {
+    if (b.decisao === "aprovar") {
+      const novo = await gravarPedido(b.id, (p, todos) => aprovarNegociacao(p, todos, Number(b.total)) as PedidoComBriefing | null)
+      if (!novo) return NextResponse.json({ erro: "Não deu para mudar o valor (sinal já pago ou valor inválido)." }, { status: 400 })
+      const c = await conversaDoPedido(novo.jid)
+      const env = c ? await enviar(c, textoNegociacaoAprovada(novo, linkPedido(novo.id)), undefined, { essencial: true }) : { ids: [], erro: "conversa não encontrada" }
+      return env.ids.length ? NextResponse.json({ ok: true }) : NextResponse.json({ erro: `Valor mudou, mas a mensagem não saiu (${env.erro ?? "erro"}). Avise o cliente à mão.` }, { status: 502 })
+    }
+    const novo = await gravarPedido(b.id, p => recusarNegociacao(p) as PedidoComBriefing | null)
+    if (!novo) return NextResponse.json({ erro: "Essa negociação já foi decidida." }, { status: 400 })
+    if (b.decisao === "recusar") {
+      const c = await conversaDoPedido(novo.jid)
+      const env = c ? await enviar(c, textoNegociacaoRecusada(novo, linkPedido(novo.id)), undefined, { essencial: true }) : { ids: [], erro: "conversa não encontrada" }
+      if (!env.ids.length) return NextResponse.json({ erro: `A mensagem não saiu (${env.erro ?? "erro"}). Responda à mão.` }, { status: 502 })
     }
     return NextResponse.json({ ok: true })
   }

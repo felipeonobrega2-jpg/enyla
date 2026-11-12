@@ -46,6 +46,7 @@ export type PedidoDigital = {
   folha: Folha; quantidade: number; faixa: number
   folhaReal?: Folha                // onde a caixa cabe de verdade (custo); "folha" é a tabela do preço de venda
   pedida?: number                  // quantidade que o cliente pediu (a cotação usa a faixa da tabela: 150 → 200)
+  negociacao?: Negociacao          // cliente pediu desconto: espera a sua decisão no painel
   grupo?: string                   // mais de uma caixa na mesma conversa: todos os pedidos do grupo têm o id do 1º
   rotulo?: string                  // qual caixa é esta para o cliente ("30 ml", "difusor")
   custo: number; arte: number; margem: number; total: number
@@ -79,9 +80,12 @@ export type Cotacao =
 export function cotarDigital(d: DadosPedido | null, regra: RegraDigital = REGRA_DIGITAL_PADRAO): Cotacao {
   if (!d?.quantidade || d.quantidade < 1) return { ok: false, motivo: "falta a quantidade" }
   const cx = d.caixa_cm && d.caixa_cm.altura > 0 && d.caixa_cm.frente > 0 && d.caixa_cm.lateral > 0 ? d.caixa_cm : null
-  const pad = cx ? null : padraoDoMl(d.volume_ml)
-  if (!cx && !pad) return { ok: false, motivo: "faltam as medidas (ou o ml)" }
-  const medidas = cx ? { a: cx.altura, l: cx.frente, p: cx.lateral } : caberFrasco(pad!, d.frasco_cm, d.caixa_cm?.altura)
+  // Medida do frasco (altura e diâmetro, ou as três): a caixa sai justa por ela, sem partir do padrão do ml
+  const f = !cx && d.frasco_cm ? caberFrasco({ a: 0, l: 0, p: 0 }, d.frasco_cm, d.caixa_cm?.altura) : null
+  const doFrasco = f && f.a > 0 && f.l > 0 && f.p > 0 ? f : null
+  const pad = cx || doFrasco ? null : padraoDoMl(d.volume_ml)
+  if (!cx && !doFrasco && !pad) return { ok: false, motivo: "faltam as medidas (ou o ml)" }
+  const medidas = cx ? { a: cx.altura, l: cx.frente, p: cx.lateral } : doFrasco ?? caberFrasco(pad!, d.frasco_cm, d.caixa_cm?.altura)
   const faca = facaAberta(medidas.a, medidas.l, medidas.p)
   const naFolha = folhaDaFaca(faca.largura, faca.altura)
   if (!naFolha) return { ok: false, motivo: "caixa maior que A3 (consultar a Villa)" }
@@ -89,7 +93,7 @@ export function cotarDigital(d: DadosPedido | null, regra: RegraDigital = REGRA_
   const folha = naFolha === "A4" && !custoVilla(d.quantidade, "A4") ? "A3" : naFolha
   const p = precoDigital(d.quantidade, folha, regra, naFolha)
   if (!p) return { ok: false, motivo: `acima de ${Math.max(...quantidadesDa(folha))} un na ${folha} (fora da tabela da Villa)` }
-  return { ok: true, medidas, padrao: !cx, ml: d.volume_ml ?? pad?.ml ?? null, folha, folhaReal: naFolha, quantidade: p.faixa, faixa: p.faixa, pedida: d.quantidade, custo: p.custo, arte: p.arte, margem: p.margem, total: p.total }
+  return { ok: true, medidas, padrao: !cx && !doFrasco, ml: d.volume_ml ?? pad?.ml ?? null, folha, folhaReal: naFolha, quantidade: p.faixa, faixa: p.faixa, pedida: d.quantidade, custo: p.custo, arte: p.arte, margem: p.margem, total: p.total }
 }
 
 // Sinal com centavos únicos entre os pedidos esperando Pix (o extrato só mostra valor e nome: assim o Pix acha o pedido)
@@ -449,4 +453,55 @@ export function textoLinkGrupo(ps: Pick<PedidoDigital, "quantidade" | "ml" | "me
     `Cada caixa tem o seu pedido: pode fechar as duas juntas ou uma de cada vez.`.replace("as duas", ps.length === 2 ? "as duas" : "todas"),
     padrao.length ? `Usei a medida padrão de caixa para ${padrao.join(" e ")}. Se o seu frasco for diferente, me manda as medidas que eu ajusto.` : null,
   ].filter(x => x !== null).join("\n\n")
+}
+
+
+// ── Negociação (cliente pede desconto antes do sinal) ────────────────────────
+// A IA segura a resposta, o pedido guarda o que ele pediu e você decide no painel (avisado no celular). Aprovado,
+// o pedido muda de valor (sinal com centavos únicos de novo) e o cliente recebe o valor novo pelo mesmo link.
+export type Negociacao = {
+  em: string; texto: string                       // a mensagem dele
+  pedidoTotal: number | null                      // o total que ele pediu (do valor por unidade × quantidade, se veio assim)
+  antes: number                                   // o total do pedido quando ele pediu
+  status: "aguardando" | "aprovada" | "recusada"
+  decididaEm?: string; total?: number             // o que você aprovou
+}
+
+// Total pedido a partir do que a IA leu: total direto, ou por unidade × quantidade
+export function totalPedido(c: { total?: number | null; unitario?: number | null } | null | undefined, quantidade: number): number | null {
+  if (!c) return null
+  if (c.total && c.total > 0) return Math.round(c.total * 100) / 100
+  if (c.unitario && c.unitario > 0) return Math.round(c.unitario * quantidade * 100) / 100
+  return null
+}
+
+export function registrarNegociacao(p: PedidoDigital, texto: string, pedidoTotal: number | null, agora = new Date()): PedidoDigital | null {
+  if (p.status !== "aguardando_sinal") return null
+  // Já esperando você com o mesmo valor: não duplica o aviso
+  if (p.negociacao?.status === "aguardando" && p.negociacao.pedidoTotal === pedidoTotal) return null
+  return { ...p, negociacao: { em: agora.toISOString(), texto: texto.slice(0, 500), pedidoTotal, antes: p.total, status: "aguardando" } }
+}
+
+export function aprovarNegociacao(p: PedidoDigital, todos: PedidoDigital[], total: number, agora = new Date()): PedidoDigital | null {
+  if (p.status !== "aguardando_sinal" || !(total > 0) || total > p.total * 1.5) return null
+  const t = Math.round(total * 100) / 100
+  const abertos = todos.filter(o => o.id !== p.id && o.status === "aguardando_sinal").map(o => o.sinal)
+  return {
+    ...p, total: t, margem: Math.round((t - p.custo - (p.arte ?? 0)) * 100) / 100, sinal: sinalUnico(t, abertos),
+    negociacao: { ...(p.negociacao ?? { em: agora.toISOString(), texto: "", pedidoTotal: null, antes: p.total }), status: "aprovada", decididaEm: agora.toISOString(), total: t },
+  }
+}
+
+export function recusarNegociacao(p: PedidoDigital, agora = new Date()): PedidoDigital | null {
+  if (!p.negociacao || p.negociacao.status !== "aguardando") return null
+  return { ...p, negociacao: { ...p.negociacao, status: "recusada", decididaEm: agora.toISOString() } }
+}
+
+export const textoNegociacaoAprovada = (p: Pick<PedidoDigital, "nome" | "quantidade" | "total" | "sinal">, link: string) => {
+  const n = primeiroNome(p.nome)
+  return `${n ? `${n}, ` : ""}consegui sim! As ${p.quantidade.toLocaleString("pt-BR")} caixinhas ficam por *${brl(p.total)}* (${brl(p.total / p.quantidade)} a unidade).\n\nJá atualizei o seu pedido: o sinal de 50% fica *${brl(p.sinal)}*, pelo mesmo link:\n${link}`
+}
+export const textoNegociacaoRecusada = (p: Pick<PedidoDigital, "nome" | "quantidade" | "total">, link: string) => {
+  const n = primeiroNome(p.nome)
+  return `${n ? `${n}, ` : ""}olhei aqui com carinho, mas nessa quantidade esse já é o melhor valor que consigo: *${brl(p.total)}* pelas ${p.quantidade.toLocaleString("pt-BR")} caixinhas, com a arte inclusa. Se fizer sentido pra você, é só seguir pelo link:\n${link}`
 }

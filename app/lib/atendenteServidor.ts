@@ -12,6 +12,7 @@ import { agoraParaIA, corrigirCumprimento } from "./atendente"
 import { LeadAvaliado, filtroDoAgente, soAbertura, saudacaoDoFiltro } from "./agenteLeads"
 import { aberturaPara, type TesteAbertura } from "./aberturaAB"
 import { transcreverPendentes } from "./transcricao"
+import { obterMidia } from "./midiaWhatsapp"
 import { Conhecimento, conhecimentoNoPrompt } from "./agenteAprende"
 import { instrucaoDoMotivo } from "./reativacao"
 import { textoEstilo, type EstiloFelipe } from "./estilo"
@@ -19,8 +20,13 @@ import { textoEstilo, type EstiloFelipe } from "./estilo"
 const ESQUEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["resposta", "etapa", "momento", "alerta", "motivo_alerta", "sugere_video", "dados", "lead", "pode_enviar_sozinho"],
+  required: ["resposta", "etapa", "momento", "alerta", "motivo_alerta", "sugere_video", "dados", "lead", "pode_enviar_sozinho", "contraproposta"],
   properties: {
+    contraproposta: {
+      type: ["object", "null"], additionalProperties: false, required: ["total", "unitario"],
+      description: "Só quando o cliente pede desconto ou propõe outro valor: o valor que ele pediu (o total, ou o valor por unidade). Pediu desconto sem dizer valor: os dois null. Senão, null.",
+      properties: { total: { type: ["number", "null"] }, unitario: { type: ["number", "null"] } },
+    },
     resposta: { type: "string", description: "Mensagem pronta para enviar. Linha em branco separa mensagens. Vazia se não há o que responder." },
     etapa: { type: "string", enum: ["primeiro_contato", "levantando_dados", "orcamento", "negociacao", "pedido", "pos_venda", "outro"] },
     momento: { type: "string", enum: ["agora", "com_ele", "sem_pressa", "nao_atende"], description: "De quem é a vez para o orçamento sair: agora (o cliente quer o preço e o próximo passo é do Felipe ou da conversa), com_ele (o cliente ficou de mandar algo ou decidir: medidas, arte, conversar com sócio/família, ligar depois, viajando), sem_pressa (só pesquisando, sem data ou para mais pra frente: lançamento em meses, testes antes), nao_atende (produto que não fazemos ou pedido fora do que atendemos)." },
@@ -56,7 +62,7 @@ const ESQUEMA = {
           description: "Medidas da CAIXA em cm, só se o cliente deu medidas de caixa.",
           properties: { frente: { type: "number" }, lateral: { type: "number" }, altura: { type: "number" } },
         },
-        frasco_cm: { type: ["string", "null"], description: "Medidas do frasco/produto como o cliente disse, se deu." },
+        frasco_cm: { type: ["string", "null"], description: "Medidas do frasco/produto como o cliente disse ou como você leu nas fotos/arquivos dele (ex.: \"altura 11,7 x diâmetro 3,9\"), em cm." },
         quantidade: { type: ["number", "null"], description: "Quantidade de caixas que o cliente quer." },
         tem_arte: { type: ["boolean", "null"] },
         resumo: { type: "string", description: "Resumo do pedido em 1 linha para a observação interna do orçamento." },
@@ -77,7 +83,7 @@ const ESQUEMA = {
   },
 } as const
 
-export type ResultadoAtendente = Atendimento & { momento?: "agora" | "com_ele" | "sem_pressa" | "nao_atende"; lead: LeadAvaliado; pode_enviar_sozinho: boolean; uso?: { entrada: number; cache: number; gravouCache: number; saida: number } }
+export type ResultadoAtendente = Atendimento & { momento?: "agora" | "com_ele" | "sem_pressa" | "nao_atende"; lead: LeadAvaliado; pode_enviar_sozinho: boolean; contraproposta?: { total: number | null; unitario: number | null } | null; uso?: { entrada: number; cache: number; gravouCache: number; saida: number } }
 
 // Impressão digital curta (djb2) do que a IA leu
 const assinar = (t: string) => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return `${t.length}:${(h >>> 0).toString(36)}` }
@@ -90,6 +96,32 @@ export type ConversaLida = {
 }
 
 type Cfg = { aberturaTeste?: TesteAbertura; apiKey?: string; guiaAtendimento?: string; filtroLeads?: string; agenteAuto?: { pequenoParceiro?: boolean }; vinculosWhatsapp?: Vinculos; conhecimentoAgente?: Conhecimento[]; estiloFelipe?: EstiloFelipe }
+
+// Arquivos que o cliente mandou (foto do frasco com régua, desenho ou PDF da caixa): a IA vê junto da conversa,
+// para tirar as medidas. Até 4, os mais recentes; o que não for imagem ou PDF (ex.: .cdr) fica de fora.
+type Bloco = { type: "image"; source: { type: "base64"; media_type: "image/jpeg" | "image/png" | "image/webp" | "image/gif"; data: string } }
+  | { type: "document"; source: { type: "base64"; media_type: "application/pdf"; data: string } }
+  | { type: "text"; text: string }
+const IMAGENS = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const
+async function arquivosDoCliente(mensagens: { id: string; from_me: boolean; tipo: string; ts: string }[]) {
+  const blocos: Bloco[] = []
+  const numero = new Map<string, number>()
+  const alvo = mensagens.filter(m => !m.from_me && ["image", "document", "imageMessage", "documentMessage"].includes(m.tipo)).slice(-4)
+  for (const m of alvo) {
+    const md = await obterMidia(m.id).catch(() => null)
+    if (!md) continue
+    const tipo = md.tipo.toLowerCase()
+    const n = numero.size + 1
+    const quando = new Date(m.ts).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+    if ((IMAGENS as readonly string[]).includes(tipo) && md.bytes.length <= 4_500_000) {
+      blocos.push({ type: "text", text: `Arquivo ${n} (imagem que o cliente mandou em ${quando}):` }, { type: "image", source: { type: "base64", media_type: tipo as Bloco extends { type: "image"; source: { media_type: infer T } } ? T : never, data: md.bytes.toString("base64") } })
+    } else if (tipo === "application/pdf" && md.bytes.length <= 15_000_000) {
+      blocos.push({ type: "text", text: `Arquivo ${n} (PDF que o cliente mandou em ${quando}):` }, { type: "document", source: { type: "base64", media_type: "application/pdf", data: md.bytes.toString("base64") } })
+    } else continue
+    numero.set(m.id, n)
+  }
+  return { blocos, numero }
+}
 
 export async function lerConfigAtendente(): Promise<Cfg> {
   const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
@@ -172,10 +204,13 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
     return { ok: true, r, conversa: conversaLida }
   }
 
+  const anexos = await arquivosDoCliente(mensagens).catch(() => ({ blocos: [] as Bloco[], numero: new Map<string, number>() }))
   const historico = mensagens.map(m => {
     const quando = new Date(m.ts).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
     const audio = m.tipo === "audio" || m.tipo === "audioMessage"
-    const corpo = m.corpo ? (audio ? `(áudio transcrito) ${m.corpo}` : m.corpo).replace(/\s+/g, " ").slice(0, 600) : `[${m.tipo}${audio ? " sem transcrição" : ""}]`
+    const arq = anexos.numero.get(m.id)
+    const corpo = arq ? `[${m.tipo === "document" || m.tipo === "documentMessage" ? "PDF" : "imagem"}: arquivo ${arq}, anexado acima${m.corpo ? ` · ${m.corpo.replace(/\s+/g, " ").slice(0, 200)}` : ""}]`
+      : m.corpo ? (audio ? `(áudio transcrito) ${m.corpo}` : m.corpo).replace(/\s+/g, " ").slice(0, 600) : `[${m.tipo}${audio ? " sem transcrição" : ""}]`
     return `${quando} ${m.from_me ? "EU" : "CLIENTE"}: ${corpo}`
   }).join("\n")
 
@@ -216,6 +251,7 @@ ${cfg.agenteAuto?.pequenoParceiro === false ? `
 Lead pequeno (menos de 1.000) no modo digital — vale sobre as regras gerais acima:
 - A venda é sua do começo ao fim: o Felipe não entra. Responda sempre que ele perguntar algo ou mandar um dado, com alerta "nenhum" e pode_enviar_sozinho true. Não use "decisao_sua" nem pode_enviar_sozinho false para dúvidas de caixa, medidas, arte, modelos ou fragrâncias diferentes, acabamento, prazo, pagamento ou frete: responda com a seção LEAD PEQUENO do filtro.
 - Para mandar o orçamento você só precisa de DUAS coisas: a quantidade e o tamanho da caixa (o ml do frasco, de 5 a 120 ml, ou as medidas do frasco). Pergunte só o que falta disso, nada mais; assim que tiver as duas, o orçamento com o link sai na hora. "Umas 300 no máximo", "entre 200 e 300": a quantidade é o número maior.
+- Medidas em foto ou arquivo: quando o cliente manda foto do frasco com régua, desenho, faca ou PDF da caixa, os arquivos vêm anexados. Leia as medidas deles: na foto com régua, a altura é onde o topo do frasco (com a tampa ou válvula) cruza a régua, e a largura é o diâmetro na foto deitada ou de frente; legendas como "Altura" e "Largura" dizem o que cada foto mede. Coloque em frasco_cm ("altura 11,7 x diâmetro 3,9") ou, se for desenho da caixa, em caixa_cm. Medida lida no arquivo vale mais que o ml. Se não der para ler com segurança, peça a altura e a largura do frasco em cm; nunca deixe sair o orçamento pela medida padrão do ml quando o cliente mandou foto ou arquivo com medida.
 - Frasco acima de 120 ml (body splash de 200 ml, 250 ml…) ou formato diferente: não há caixa padrão. Peça direto a altura e a largura (ou o diâmetro) do frasco em cm, numa pergunta só.
 - NUNCA pergunte sobre logo, arte, cores, referências ou nome da marca antes de o cliente pagar o sinal, nem peça para mandar a logo: a arte está inclusa e é feita depois do pagamento, com o que ele colocar na página do pedido. Se ele mandar a logo antes, agradeça em poucas palavras e siga para o orçamento.
 - Ele nunca está "já orientado": a conversa segue até o pagamento. "Resposta" vazia só se ele mandou apenas "ok"/"obrigado"/figurinha e não há nada pendente.
@@ -223,6 +259,7 @@ Lead pequeno (menos de 1.000) no modo digital — vale sobre as regras gerais ac
 - Pedido com mais de uma caixa (tamanhos ou modelos diferentes, ex.: 30 ml e 50 ml): cada caixa vira um orçamento separado, e você continua sozinho (alerta "nenhum", pode_enviar_sozinho true; nunca "decisao_sua" por isso). Preencha "itens" com uma entrada por caixa. Para cada caixa você precisa da quantidade e do tamanho (ml de 5 a 120, ou as medidas do frasco): pergunte só o que falta, de todas as caixas numa mensagem só ("quantas de 30 ml e quantas de 50 ml?"). Assim que todas tiverem, os orçamentos saem na hora, identificados. Não diga que vai preparar nem quando vai mandar.
 - Nunca prometa algo para depois (separar fotos, ver e te falar, ligar, mandar amostra): ninguém vai cumprir. Responda com o que sabe; para ver trabalhos, o Instagram.
 - Alerta só para desconto ou condição especial ("desconto"), amostra física ("decisao_sua") e reclamação ("reclamacao"): o Felipe recebe o aviso na hora.
+- Cliente pediu desconto ou propôs outro valor ("consegue arredondar nos 5?", "faz por 1.000?", "tem como melhorar?"): alerta "desconto", preencha contraproposta com o valor que ele pediu, e a resposta é curta e neutra, sem prometer nada ("Vou ver aqui o que consigo e já te falo"). Quem decide é o Felipe; o sistema manda a resposta dele.
 ` : ""}
 Regras que nunca quebram:
 - Nunca ofereça ou aceite desconto, brinde, condição ou prazo especial: marque alerta "desconto" (ou "decisao_sua") e escreva uma resposta neutra que não promete nada ("vou ver aqui e já te falo").
@@ -245,7 +282,10 @@ Regras que nunca quebram:
     output_config: { effort: "medium", format: { type: "json_schema", schema: ESQUEMA } },
     // 1 hora: os leads chegam espaçados e o manual (guia + filtro + aprendido) tem ~12 mil tokens
     system: [{ type: "text", text: system, cache_control: { type: "ephemeral", ttl: "1h" } }],
-    messages: [{ role: "user", content: `${contexto}${origem}\n\nConversa (mais antiga primeiro):\n<conversa>\n${historico}\n</conversa>\n\n${extra ? extra + "\n\n" : ""}Prepare a próxima mensagem do Felipe.` }],
+    messages: [{ role: "user", content: [
+      ...anexos.blocos,
+      { type: "text" as const, text: `${contexto}${origem}\n\nConversa (mais antiga primeiro):\n<conversa>\n${historico}\n</conversa>\n\n${anexos.blocos.length ? "Os arquivos que o cliente mandou estão anexados acima (veja as medidas neles).\n\n" : ""}${extra ? extra + "\n\n" : ""}Prepare a próxima mensagem do Felipe.` },
+    ] }],
   })
   if (r.stop_reason === "refusal") return { ok: false, erro: "A IA não pôde responder a esse pedido.", status: 422 }
   const texto = r.content.flatMap(b => b.type === "text" ? [b.text] : []).join("")
