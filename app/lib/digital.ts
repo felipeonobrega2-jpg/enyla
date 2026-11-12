@@ -355,7 +355,7 @@ export function textoParaDesigner(p: PedidoComBriefing, link: string) {
     b.marca ? `Marca: ${b.marca}` : null,
     b.cores ? `Cores: ${b.cores}` : null,
     b.referencias ? `Referências: ${b.referencias}` : null,
-    b.arquivos?.length ? `Arquivos do cliente: ${b.arquivos.length} (vão logo abaixo e estão na página)` : null,
+    b.arquivos?.length ? `Arquivos do cliente: ${b.arquivos.length} (para baixar na página)` : null,
     p.ajustes?.length ? `\n*O que o cliente pediu para mudar:* ${p.ajustes.at(-1)!.texto}` : null,
     ``,
     `Página do pedido (briefing, arquivos e onde você sobe a arte): ${link}`,

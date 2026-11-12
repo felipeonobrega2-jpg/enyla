@@ -114,19 +114,15 @@ async function paraNumero(numero: string, texto: string, arquivo?: { url: string
 }
 const mimeDe = (url: string) => /\.pdf($|\?)/i.test(url) ? "application/pdf" : /\.png($|\?)/i.test(url) ? "image/png" : /\.webp($|\?)/i.test(url) ? "image/webp" : "image/jpeg"
 
-// Sinal pago ou ajuste pedido: o pedido vai para o Leandro (arte + produção) com o link da página da arte, que
-// não mostra nenhum valor de venda, e os arquivos que o cliente subiu. Número: o da designer, se cadastrado; senão o
+// Sinal pago ou ajuste pedido: o pedido vai para o Leandro (arte + produção) numa mensagem só, com o link da página
+// da arte (briefing e arquivos para baixar), que não mostra nenhum valor de venda. Número: o da designer, se cadastrado; senão o
 // da Villa (Leandro). Devolve false se não há nenhum.
 export async function avisarDesigner(cfg: CfgDigital, p: PedidoComBriefing) {
   if (p.teste) return true   // teste: o Leandro não recebe
   const num = soDigitos(cfg.digitalContatos?.designer) || soDigitos(cfg.digitalContatos?.villa)
   if (!num) return false
+  // Uma mensagem só: os arquivos do cliente ele vê e baixa pela página
   const ok = await paraNumero(num, textoParaDesigner(p, linkDesigner(p.id)))
-  // Os arquivos do cliente (logo, referências) logo depois, um a um (só no 1º envio; no ajuste ele já tem)
-  if (ok && !p.ajustes?.length) for (const a of (p.briefing?.arquivos ?? []).slice(0, 6)) {
-    await new Promise(r => setTimeout(r, 1200))
-    await paraNumero(num, a.nome, { url: a.url, mime: mimeDe(a.url), nome: a.nome }).catch(() => false)
-  }
   if (ok) await gravarPedido(p.id, x => ({ ...x, designerAvisadoEm: new Date().toISOString() }))
   return ok
 }
