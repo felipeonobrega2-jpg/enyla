@@ -249,6 +249,7 @@ export type EntradaRotas = {
   laminacaoTipo: string | null
   vernizTipo: string | null
   hotStamping: boolean
+  frenteVerso?: boolean                // impressão dos dois lados: o dobro da impressão
   limitePecasMeiaFolha: number | null  // ajuste manual de peças por meia folha
   formatos: FormatoPapelRota[]
   arte: number
@@ -554,9 +555,10 @@ function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaEx
     }) - fixo
     custoImp += fixo * jogos + variavel
   }
+  if (e.frenteVerso) custoImp *= 2
   itens.push({
     etapa: "impressao", fornecedor: imp.nome, fornecedorId: imp.id,
-    descricao: `${passadas.map(ps => ps.cavidades).join(" + ")} cavidades${jogos > 1 ? ` · ${jogos} jogos de chapa` : ""}`,
+    descricao: `${passadas.map(ps => ps.cavidades).join(" + ")} cavidades${jogos > 1 ? ` · ${jogos} jogos de chapa` : ""}${e.frenteVerso ? " · frente e verso" : ""}`,
     valor: custoImp, estimado: false,
   })
 

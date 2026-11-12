@@ -22,6 +22,7 @@ export type FormData = {
   incluirVerniz: boolean       // derivado de vernizTipo !== ""
   vernizTipo: string           // "UV Total" | "UV Localizado" | "Resinado" | "Holográfico" | ""
   laminacao: boolean
+  frenteVerso?: boolean         // impressão dos dois lados: dobra o custo da impressão
   laminacaoTipo: string        // "Fosca" | "Brilhante" | "Soft Touch" | "Holográfica" | ""
   acompanhamentos: string[]    // ["Berço interno", "Divisória", …]
   outrosAcabamentos: string[]  // ["Hot Stamping", "Alto Relevo", …]

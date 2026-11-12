@@ -24,3 +24,13 @@ describe("motor de orçamento com decisões manuais", () => {
     expect(rota({ ...FORM, rota: {} }).custoTotal).toBeCloseTo(rota().custoTotal)
   })
 })
+
+describe("impressão frente e verso", () => {
+  it("dobra só a impressão", () => {
+    const auto = rota()
+    const fv = rota({ ...FORM, frenteVerso: true })
+    const imp = (r: typeof auto) => r.itens.find(i => i.etapa === "impressao")!.valor
+    expect(imp(fv)).toBeCloseTo(imp(auto) * 2)
+    expect(fv.custoTotal - auto.custoTotal).toBeCloseTo(imp(auto))
+  })
+})

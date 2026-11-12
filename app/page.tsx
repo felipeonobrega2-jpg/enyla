@@ -1982,6 +1982,18 @@ export default function Home() {
               </div>
             </div>
 
+            {/* ── Frente e verso: impressão dos dois lados (dobra a impressão) ── */}
+            <div className="flex items-center gap-2 min-h-[28px]">
+              <label className="flex items-center gap-2 cursor-pointer select-none shrink-0"
+                onClick={() => mudarForm(p => ({ ...p, frenteVerso: !p.frenteVerso }))}>
+                <div className={`w-7 h-4 rounded-full transition-colors relative flex-shrink-0 ${form.frenteVerso ? "bg-[#8456e8]" : "bg-slate-200"}`}>
+                  <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${form.frenteVerso ? "translate-x-3" : "translate-x-0.5"}`} />
+                </div>
+                <span className="text-[12px] text-[#72707d]">Frente e verso</span>
+              </label>
+              <span className="text-[#8E8E93] text-[11px] ml-auto">{form.frenteVerso ? "impressão em dobro" : "só frente"}</span>
+            </div>
+
             {/* ── Verniz: toggle + tipos na mesma linha ── */}
             <div className="flex items-center gap-2 min-h-[28px]">
               <label className="flex items-center gap-2 cursor-pointer select-none shrink-0"

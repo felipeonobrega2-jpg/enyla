@@ -25,6 +25,7 @@ export function especificacaoDaProposta(form: FormData): string[] {
   return [
     [tipo ? `*${tipo}*` : null, medidas].filter(Boolean).join(" · ") || null,
     form.materialNome ? `Material: ${form.materialNome}` : null,
+    form.frenteVerso ? "Impressão frente e verso" : null,
     acabamentos.length ? `Acabamentos: ${cap(acabamentos.join(", "))}` : null,
     acomp.length ? `Acompanha: ${acomp.join(", ")}` : null,
     form.numSKUs > 1 ? `${form.numSKUs} modelos de arte` : null,

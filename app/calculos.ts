@@ -227,6 +227,7 @@ export function calcular(form: FormData, config: Configuracoes): Calculo | null 
     laminacaoTipo: form.laminacao ? (form.laminacaoTipo || "Fosca") : null,
     vernizTipo: form.incluirVerniz ? (form.vernizTipo || "UV Total") : null,
     hotStamping: (form.outrosAcabamentos ?? []).includes("Hot Stamping"),
+    frenteVerso: !!form.frenteVerso,
     limitePecasMeiaFolha: form.customPecasChapa,
     formatos: formatosComConfig.map(f => ({ id: f.id, nome: f.nome, largura: f.largura, altura: f.altura, precoPor100: f.precoPor100 })),
     arte: config.custos.arte,

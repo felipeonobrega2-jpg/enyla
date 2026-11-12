@@ -35,6 +35,7 @@ function especificar(card: KanbanCard, form?: FormData): string[] {
     : form.frente ? `Dimensões: ${form.frente} × ${form.alturaBox} × ${form.lateral} cm (L × A × P)`
       : form.caixaDxf ? `Dimensões: ${[form.caixaDxf.largura, form.caixaDxf.altura, form.caixaDxf.profundidade].map(cm).join(" × ")} cm (L × A × P)` : null,
     form.materialNome ? `Material: ${form.materialNome}` : null,
+    form.frenteVerso ? "Impressão frente e verso" : null,
     form.laminacao && form.laminacaoTipo ? `Laminação ${form.laminacaoTipo.toLowerCase()}` : null,
     form.incluirVerniz && form.vernizTipo ? `Verniz ${form.vernizTipo}` : null,
     form.outrosAcabamentos?.length ? form.outrosAcabamentos.join(", ") : null,

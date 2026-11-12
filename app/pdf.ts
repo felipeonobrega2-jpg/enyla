@@ -567,6 +567,7 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
   }).join("")
 
   const acabamentosPdf: string[] = []
+  if (form.frenteVerso)                       acabamentosPdf.push("Impressão frente e verso")
   if (form.incluirVerniz && form.vernizTipo)  acabamentosPdf.push(`Verniz ${form.vernizTipo}`)
   if (form.laminacao && form.laminacaoTipo)   acabamentosPdf.push(`Laminação ${form.laminacaoTipo}`)
   if (form.comFaca)                           acabamentosPdf.push("Faca de corte inclusa")
