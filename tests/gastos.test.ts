@@ -77,3 +77,20 @@ describe("atribuição pelo gasto", () => {
     expect(campanhaPeloGasto([{ id: "a", gasto: 114 }, { id: "b", gasto: 20 }])).toBeNull()
   })
 })
+
+describe("IA com recarga automática na Anthropic", () => {
+  const agora = new Date("2026-11-12T15:00:00Z")
+  const dias = ultimosDias(7, agora)
+  const ia = Object.fromEntries(dias.map(d => [d, { usd: 2, chamadas: 10 }]))
+  it("sem saldo a acompanhar nem alerta de saldo acabando", () => {
+    const g = montarGastos({ agora, alertaDias: 3, pedidos: [], meta: null, ia: { dias: ia, recarga: { valor: 1, em: `${dias[0]}T03:00:00Z` }, cotacao: 5, autoRecarga: true } })
+    expect(g.ia.restante).toBeNull()
+    expect(g.ia.autoRecarga).toBe(true)
+    expect(g.alertas).toEqual([])
+  })
+  it("a Anthropic recusou: avisa mesmo com a recarga automática", () => {
+    const g = montarGastos({ agora, alertaDias: 3, pedidos: [], meta: null, ia: { dias: ia, recarga: { valor: 50, em: "2026-11-12T14:00:00Z" }, cotacao: 5, autoRecarga: true, semCreditoEm: "2026-11-12T13:00:00Z" } })
+    expect(g.ia.semCredito).toBe(true)
+    expect(g.alertas[0].texto).toMatch(/recarga automática não cobriu/)
+  })
+})

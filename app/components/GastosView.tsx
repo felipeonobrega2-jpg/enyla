@@ -74,8 +74,11 @@ export default function GastosView() {
 
       <GradeKpis>
         <Kpi rotulo="Gasto por dia" valor={g.totalDia} formato={brl} icone={<Wallet className="w-3.5 h-3.5" />} sub="IA + anúncios" destaque />
-        <Kpi rotulo="IA · saldo" valor={ia.restante} formato={brl} tom={tomDias(ia.diasRestantes, g.alertaDias)} icone={<Bot className="w-3.5 h-3.5" />}
-          sub={ia.restante == null ? "informe o saldo abaixo" : `dá para ${dias(ia.diasRestantes)}`} />
+        {ia.autoRecarga
+          ? <Kpi rotulo="IA · por dia" valor={ia.media} formato={brl} tom={ia.semCredito ? "perigo" : "neutro"} icone={<Bot className="w-3.5 h-3.5" />}
+              sub={ia.semCredito ? "Anthropic recusou: veja o cartão" : "recarga automática ligada"} />
+          : <Kpi rotulo="IA · saldo" valor={ia.restante} formato={brl} tom={tomDias(ia.diasRestantes, g.alertaDias)} icone={<Bot className="w-3.5 h-3.5" />}
+              sub={ia.restante == null ? "informe o saldo abaixo" : `dá para ${dias(ia.diasRestantes)}`} />}
         <Kpi rotulo="Anúncios · saldo" valor={meta?.restante ?? null} formato={brl} tom={tomDias(meta?.diasRestantes ?? null, g.alertaDias)} icone={<Megaphone className="w-3.5 h-3.5" />}
           sub={!meta ? "Meta não conectada" : meta.restante == null ? "sem saldo informado pela Meta" : `dá para ${dias(meta.diasRestantes)}`} />
         <Kpi rotulo="Digital cobre" valor={digital.cobertura} formato={n => `${n}%`} tom={digital.cobertura == null ? "neutro" : digital.cobertura >= 100 ? "sucesso" : "alerta"} icone={<Printer className="w-3.5 h-3.5" />}
@@ -94,6 +97,13 @@ export default function GastosView() {
           </div>
           <Serie serie={ia.serie} />
           <div className="mt-4 pt-4 border-t border-[rgba(116,116,128,0.12)]">
+            <label className="flex items-start gap-2.5 cursor-pointer select-none mb-2">
+              <input type="checkbox" checked={ia.autoRecarga} onChange={e => void post({ autoRecargaIA: e.target.checked })} className="mt-0.5 accent-[#8456e8]" />
+              <span className="text-[12px] text-[#5e5c68] leading-snug">
+                <b className="text-[#191625]">Recarga automática ligada na Anthropic.</b> O saldo não precisa ser digitado: o sistema mostra o gasto e só avisa se ela recusar por falta de crédito (cartão recusado, limite).
+              </span>
+            </label>
+            {!ia.autoRecarga && <>
             <p className="text-[11.5px] text-[#898892] mb-2 leading-snug">
               A Anthropic não informa o saldo pela API. Quando recarregar, digite aqui o saldo que aparece no painel dela; o sistema desconta o gasto daí em diante.
               {ia.recarga && <> Último: <b className="text-[#5e5c68]">US$ {ia.recarga.valor.toLocaleString("pt-BR")}</b> em {new Date(ia.recarga.em).toLocaleDateString("pt-BR")}.</>}
@@ -106,6 +116,7 @@ export default function GastosView() {
               </div>
               <Botao variante="primario" onClick={salvarSaldo} disabled={!saldoIa.trim()} icone={salvo ? <Check className="w-3.5 h-3.5" /> : undefined}>Salvar</Botao>
             </div>
+            </>}
             <a href="https://console.anthropic.com/settings/billing" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 mt-2 text-[11.5px] text-[#8456e8] hover:underline">
               Abrir o painel da Anthropic <ExternalLink className="w-3 h-3" />
             </a>

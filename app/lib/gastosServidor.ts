@@ -6,7 +6,7 @@ import { mudarConfig } from "./configAtomica"
 import { custoUsd, somarUso, diaSP, saldoDoTexto, montarGastos, ultimosDias, GastoDia, Recarga, UsoIA, Gastos, PedidoParaGasto } from "./gastos"
 import { evo } from "./evolution"
 
-export type CfgGastos = { alertaDias?: number; recargaIA?: Recarga | null; cotacao?: number | null }
+export type CfgGastos = { alertaDias?: number; recargaIA?: Recarga | null; cotacao?: number | null; autoRecargaIA?: boolean }
 type Cfg = Record<string, unknown> & {
   gastosIA?: Record<string, GastoDia>; gastosCfg?: CfgGastos; gastosMeta?: MetaCache; gastosAvisoEm?: Record<string, string>
   cotacaoDolar?: { valor: number; em: string }; agenteSemCreditoEm?: string; metaToken?: string; metaContaId?: string
@@ -70,7 +70,7 @@ export async function gastosAtuais(opts: { forcarMeta?: boolean } = {}): Promise
   const alertaDias = cfg.gastosCfg?.alertaDias ?? 3
   const g = montarGastos({
     agora: new Date(), alertaDias,
-    ia: { dias: cfg.gastosIA ?? {}, recarga: cfg.gastosCfg?.recargaIA ?? null, cotacao: cot, semCreditoEm: cfg.agenteSemCreditoEm ?? null },
+    ia: { dias: cfg.gastosIA ?? {}, recarga: cfg.gastosCfg?.recargaIA ?? null, cotacao: cot, semCreditoEm: cfg.agenteSemCreditoEm ?? null, autoRecarga: cfg.gastosCfg?.autoRecargaIA ?? true },
     meta, pedidos: (cfg.pedidosDigitais ?? []).filter(p => !(p as { teste?: boolean }).teste),
   })
   return { ...g, alertaDias }

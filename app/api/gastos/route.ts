@@ -16,8 +16,9 @@ export async function GET(req: NextRequest) {
 
 // POST: { recargaIA: valor em US$ } (saldo que está na Anthropic agora), { alertaDias }, { cotacao } (null = automática)
 export async function POST(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as { recargaIA?: number | null; alertaDias?: number; cotacao?: number | null }
+  const b = await req.json().catch(() => ({})) as { recargaIA?: number | null; alertaDias?: number; cotacao?: number | null; autoRecargaIA?: boolean }
   const mudar: CfgGastos = {}
+  if (typeof b.autoRecargaIA === "boolean") mudar.autoRecargaIA = b.autoRecargaIA
   if (b.recargaIA === null) mudar.recargaIA = null
   else if (typeof b.recargaIA === "number" && b.recargaIA >= 0 && b.recargaIA < 100_000) mudar.recargaIA = { valor: b.recargaIA, em: new Date().toISOString() }
   if (typeof b.alertaDias === "number" && b.alertaDias >= 1 && b.alertaDias <= 30) mudar.alertaDias = Math.round(b.alertaDias)

@@ -209,7 +209,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     const ia = Object.fromEntries(d14.map((d, i) => [d, { usd: 1.6 + (i % 4) * 0.35, chamadas: 120 + i * 3 }]))
     const meta = Object.fromEntries(d14.map((d, i) => [d, i >= 12 ? (i === 13 ? 0 : 0) : 95 + (i % 5) * 18]))
     const g = montarGastos({ agora: new Date(), alertaDias: 3,
-      ia: { dias: ia, recarga: { valor: 40, em: new Date(Date.now() - 5 * 86_400_000).toISOString() }, cotacao: 5.42 },
+      ia: { dias: ia, recarga: { valor: 40, em: new Date(Date.now() - 5 * 86_400_000).toISOString() }, cotacao: 5.42, autoRecarga: true },
       meta: { saldo: 0.49, dias: meta, em: new Date().toISOString() },
       pedidos: [
         { status: "sinal_pago", margem: 150, arte: 70, total: 619.95, sinalPagoEm: new Date().toISOString(), em: new Date().toISOString() },

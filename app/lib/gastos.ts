@@ -55,7 +55,7 @@ export type PedidoParaGasto = { status: string; margem: number; arte: number; to
 
 export type EntradaGastos = {
   agora: Date
-  ia: { dias: Record<string, GastoDia>; recarga: Recarga | null; cotacao: number; semCreditoEm?: string | null }
+  ia: { dias: Record<string, GastoDia>; recarga: Recarga | null; cotacao: number; semCreditoEm?: string | null; autoRecarga?: boolean }
   meta: { saldo: number | null; dias: Record<string, number>; erro?: string | null; em?: string | null } | null
   pedidos: PedidoParaGasto[]
   alertaDias: number
@@ -64,7 +64,7 @@ export type EntradaGastos = {
 export type Linha = { media: number; hoje: number; ontem: number; restante: number | null; diasRestantes: number | null; serie: { dia: string; valor: number }[] }
 export type Alerta = { tipo: "ia" | "meta"; nivel: "alerta" | "perigo"; texto: string }
 export type Gastos = {
-  ia: Linha & { recarga: Recarga | null; cotacao: number; semCredito: boolean }
+  ia: Linha & { recarga: Recarga | null; cotacao: number; semCredito: boolean; autoRecarga: boolean }
   meta: (Linha & { erro: string | null; em: string | null }) | null
   totalDia: number
   digital: { pedidosPagos: number; margem: number; faturado: number; gasto30: number; cobertura: number | null; porDiaFalta: number }
@@ -91,8 +91,10 @@ export function montarGastos(e: EntradaGastos): Gastos {
   // IA em R$ (cotação do dólar)
   const iaBrl: Record<string, number> = Object.fromEntries(Object.entries(e.ia.dias).map(([d, g]) => [d, g.usd * e.ia.cotacao]))
   // Saldo da IA: o que você informou menos o gasto desde então (o dia da recarga conta a partir da hora)
+  // Recarga automática ligada na Anthropic: não há saldo a acompanhar (só o aviso se ela recusar por falta de crédito)
+  const auto = !!e.ia.autoRecarga
   let restanteIa: number | null = null
-  if (e.ia.recarga) {
+  if (e.ia.recarga && !auto) {
     const diaRec = diaSP(new Date(e.ia.recarga.em))
     const gastoDesde = Object.entries(e.ia.dias).filter(([d]) => d > diaRec).reduce((a, [, g]) => a + g.usd, 0)
     // No dia da recarga: só a parte proporcional depois da hora informada (estimativa)
@@ -102,9 +104,9 @@ export function montarGastos(e: EntradaGastos): Gastos {
     restanteIa = Math.max(0, (e.ia.recarga.valor - gastoDesde - doDia * fracaoDepois)) * e.ia.cotacao
   }
   const semCredito = !!e.ia.semCreditoEm && agora.getTime() - new Date(e.ia.semCreditoEm).getTime() < 6 * 3_600_000
-    && (!e.ia.recarga || new Date(e.ia.recarga.em) < new Date(e.ia.semCreditoEm))
+    && (auto || !e.ia.recarga || new Date(e.ia.recarga.em) < new Date(e.ia.semCreditoEm))
   if (semCredito) restanteIa = 0
-  const ia = { ...linha(iaBrl, agora, restanteIa), recarga: e.ia.recarga, cotacao: e.ia.cotacao, semCredito }
+  const ia = { ...linha(iaBrl, agora, restanteIa), recarga: e.ia.recarga, cotacao: e.ia.cotacao, semCredito, autoRecarga: auto }
   const meta = e.meta ? { ...linha(e.meta.dias, agora, e.meta.saldo), erro: e.meta.erro ?? null, em: e.meta.em ?? null } : null
 
   // Braço digital: margem dos pedidos com sinal pago nos últimos 30 dias contra o gasto (IA + anúncios) do período
@@ -129,7 +131,9 @@ export function montarGastos(e: EntradaGastos): Gastos {
     else if (l.diasRestantes != null && l.diasRestantes < e.alertaDias)
       alertas.push({ tipo, nivel: "alerta", texto: `${nome}: saldo para cerca de ${l.diasRestantes.toFixed(1).replace(".", ",")} dias (R$ ${l.restante.toFixed(2).replace(".", ",")}).` })
   }
-  if (semCredito) alertas.push({ tipo: "ia", nivel: "perigo", texto: "IA: a Anthropic recusou por falta de crédito. O agente parou de responder até você recarregar." })
+  if (semCredito) alertas.push({ tipo: "ia", nivel: "perigo", texto: auto
+    ? "IA: a Anthropic recusou por falta de crédito, e a recarga automática não cobriu (cartão recusado?). O agente parou até resolver no painel dela."
+    : "IA: a Anthropic recusou por falta de crédito. O agente parou de responder até você recarregar." })
   else avaliar("ia", ia, "IA (tokens)")
   if (meta) avaliar("meta", meta, "Anúncios da Meta")
   return { ia, meta, totalDia, digital, alertas }
