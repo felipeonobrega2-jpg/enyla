@@ -243,10 +243,9 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
           })}
         </div>
 
-        <Termos p={p} onAceitar={async () => { try { setP(await post({ acao: "termos" })) } catch (e) { setAviso((e as Error).message) } }} />
-        {p.termosAceitosEm && (
         <Pagamento p={p} titulo="Sinal de 50%" valor={p.sinal} txid={p.id} descricao={`Sinal ${p.id}`} sub={`O restante (${brl(p.total - p.sinal)}) no final, antes do envio`}
-          post={post} setP={setP} onConferir={conferir} conferindo={conferindo} />)}
+          post={post} setP={setP} onConferir={conferir} conferindo={conferindo} pedeTermos />
+        {p.termosAceitosEm && <TermosAceitos p={p} />}
       </>)}
 
 
@@ -372,13 +371,10 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
   )
 }
 
-// Termos do pedido: o cliente lê e aceita antes de ver o Pix do sinal
-function Termos({ p, onAceitar }: { p: Pedido; onAceitar: () => Promise<void> }) {
-  const [aberto, setAberto] = useState(false)
-  const [marcado, setMarcado] = useState(false)
-  const [salvando, setSalvando] = useState(false)
-  const lista = (
-    <div className="mt-3 space-y-3 max-h-[360px] overflow-y-auto pr-1 text-left">
+// Termos do pedido: o texto (abre ao tocar), a caixinha de aceite dentro do pagamento e o "aceitos em" depois
+function ListaTermos({ p }: { p: Pedido }) {
+  return (
+    <div className="mt-2 space-y-3 max-h-[360px] overflow-y-auto pr-1 text-left">
       {p.termos.map(s => (
         <div key={s.titulo}>
           <p className="text-[12.5px] font-semibold text-[#191625]">{s.titulo}</p>
@@ -389,30 +385,28 @@ function Termos({ p, onAceitar }: { p: Pedido; onAceitar: () => Promise<void> })
       ))}
     </div>
   )
-  if (p.termosAceitosEm) return (
-    <div className={aberto ? "bg-white rounded-2xl ds-borda p-5" : ""}>
-      <p className="text-[12px] text-[#5e5c68] text-center flex items-center justify-center gap-1.5">
-        <Check className="w-3.5 h-3.5 text-[#009351]" />Termos do pedido aceitos em {new Date(p.termosAceitosEm).toLocaleDateString("pt-BR")}
-        <button onClick={() => setAberto(a => !a)} className="text-[#8456e8] underline underline-offset-2">{aberto ? "fechar" : "ver"}</button>
-      </p>
-      {aberto && lista}
+}
+function AceiteTermos({ p, marcado, setMarcado }: { p: Pedido; marcado: boolean; setMarcado: (v: boolean) => void }) {
+  const [aberto, setAberto] = useState(false)
+  return (
+    <div className="self-stretch text-left mt-4 rounded-xl bg-[rgba(116,116,128,0.06)] px-3.5 py-3">
+      <label className="flex items-start gap-2.5 cursor-pointer select-none">
+        <input type="checkbox" checked={marcado} onChange={e => setMarcado(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#8456e8] shrink-0" />
+        <span className="text-[13px] text-[#191625] leading-snug">Li e aceito os <button type="button" onClick={e => { e.preventDefault(); setAberto(a => !a) }} className="text-[#8456e8] font-semibold underline underline-offset-2">termos do pedido</button></span>
+      </label>
+      {aberto && <ListaTermos p={p} />}
     </div>
   )
+}
+function TermosAceitos({ p }: { p: Pedido }) {
+  const [aberto, setAberto] = useState(false)
   return (
-    <div className="bg-white rounded-2xl ds-borda p-5">
-      <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><FileText className="w-4 h-4 text-[#8456e8]" />Termos do pedido</p>
-      <p className="text-[12.5px] text-[#5e5c68] mt-1">O que está incluído, prazo, arte, pagamento e desistência. Leia antes de pagar o sinal.</p>
-      {aberto ? lista : (
-        <button onClick={() => setAberto(true)} className="mt-2 text-[13px] font-semibold text-[#8456e8] underline underline-offset-2">Ler os termos</button>
-      )}
-      <label className="mt-4 flex items-start gap-2.5 cursor-pointer select-none">
-        <input type="checkbox" checked={marcado} onChange={e => setMarcado(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#8456e8]" />
-        <span className="text-[13px] text-[#191625] leading-snug">Li e aceito os termos do pedido</span>
-      </label>
-      <button onClick={async () => { setSalvando(true); await onAceitar(); setSalvando(false) }} disabled={!marcado || salvando}
-        className="mt-3 w-full h-11 rounded-xl bg-[#8456e8] text-white text-[14px] font-semibold flex items-center justify-center gap-2 disabled:opacity-40">
-        {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Aceitar e ir para o pagamento
-      </button>
+    <div className={aberto ? "bg-white rounded-2xl ds-borda p-5" : ""}>
+      <p className="text-[12px] text-[#5e5c68] text-center flex items-center justify-center gap-1.5">
+        <Check className="w-3.5 h-3.5 text-[#009351]" />Termos do pedido aceitos em {new Date(p.termosAceitosEm!).toLocaleDateString("pt-BR")}
+        <button onClick={() => setAberto(a => !a)} className="text-[#8456e8] underline underline-offset-2">{aberto ? "fechar" : "ver"}</button>
+      </p>
+      {aberto && <ListaTermos p={p} />}
     </div>
   )
 }
@@ -450,22 +444,41 @@ function ArtePreview({ arte }: { arte: { url: string; nome: string } }) {
 
 // Pagamento: com o Asaas ligado, pede o CPF/CNPJ e mostra o Pix da cobrança (confirma na hora) e o cartão;
 // sem Asaas ou se ele falhar, o Pix de sempre (conferido pelo extrato)
-function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConferir, conferindo }: {
+function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConferir, conferindo, pedeTermos }: {
   p: Pedido; titulo: string; valor: number; txid: string; descricao: string; sub: string
   post: (c: Record<string, unknown>) => Promise<Pedido>; setP: (p: Pedido) => void; onConferir: () => void; conferindo: boolean
+  pedeTermos?: boolean   // sinal: aceitar os termos antes do Pix
 }) {
+  const faltaTermos = !!pedeTermos && !p.termosAceitosEm
+  const [marcado, setMarcado] = useState(false)
+  const aceitar = async () => { if (faltaTermos) setP(await post({ acao: "termos" })) }
   const [doc, setDoc] = useState("")
   const [gerando, setGerando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [semAsaas, setSemAsaas] = useState(false)
   const gerar = async (d?: string) => {
     setGerando(true); setErro(null)
-    try { setP(await post({ acao: "cobrar", documento: d })) }
+    try { await aceitar(); setP(await post({ acao: "cobrar", documento: d })) }
     catch (e) { const m = (e as Error).message; setErro(m); if (/indispon|Asaas/i.test(m)) setSemAsaas(true) }
     setGerando(false)
   }
   const precisa = p.asaas && !semAsaas && !p.cobranca
 
+  // Pix sem pedir documento (ou cobrança já gerada) e termos ainda não aceitos: o aceite vem antes do QR
+  if (faltaTermos && !(p.asaas && !semAsaas && !p.cobranca))
+    return (
+      <div className="bg-white rounded-2xl ds-borda p-5 flex flex-col items-center text-center">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">{titulo}</p>
+        <p className="text-[28px] font-bold text-[#191625] ds-num mt-1">{brl(valor)}</p>
+        <p className="text-[12px] text-[#898892]">{sub}</p>
+        <AceiteTermos p={p} marcado={marcado} setMarcado={setMarcado} />
+        <button onClick={async () => { setGerando(true); setErro(null); try { await aceitar() } catch (e) { setErro((e as Error).message) } setGerando(false) }} disabled={!marcado || gerando}
+          className="mt-3 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40">
+          {gerando ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Ver o Pix
+        </button>
+        {erro && <p className="text-[12px] text-[#d33a3c] mt-2">{erro}</p>}
+      </div>
+    )
   if (p.asaas && !semAsaas && p.cobranca)
     return <PixBloco titulo={`${titulo} pelo Pix`} valor={valor} txid={txid} descricao={descricao} sub={sub} pronto={{ payload: p.cobranca.payload, imagem: p.cobranca.imagem }} cartao={p.cobranca.fatura}
       aviso="Assim que o Pix cair, a confirmação chega no seu WhatsApp." onConferir={onConferir} conferindo={conferindo} />
@@ -479,7 +492,8 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
         <label className="self-stretch text-left mt-4 text-[12px] font-semibold text-[#191625]">CPF ou CNPJ de quem vai pagar</label>
         <input value={doc.trim() ? doc : ""} autoFocus={!!p.documento} onChange={e => setDoc(e.target.value)} inputMode="numeric" maxLength={18} placeholder="000.000.000-00"
           className="self-stretch mt-1 h-12 rounded-xl px-3.5 text-[15px] text-[#191625] bg-[rgba(116,116,128,0.06)] outline-none focus:ring-2 focus:ring-[#8456e8]/20" /></>}
-        <button onClick={() => void gerar(doc.trim() ? doc : undefined)} disabled={gerando || (!(p.documento && !doc.trim()) && doc.replace(/\D/g, "").length < 11)}
+        {faltaTermos && <AceiteTermos p={p} marcado={marcado} setMarcado={setMarcado} />}
+        <button onClick={() => void gerar(doc.trim() ? doc : undefined)} disabled={gerando || (faltaTermos && !marcado) || (!(p.documento && !doc.trim()) && doc.replace(/\D/g, "").length < 11)}
           className="mt-3 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-60">
           {gerando ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Gerar Pix (ou pagar no cartão)
         </button>

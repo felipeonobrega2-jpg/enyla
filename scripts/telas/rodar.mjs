@@ -42,7 +42,7 @@ for (const [tela, largura] of telas.filter(([t]) => !so || so.includes(t))) {
   if (tela === "entregas-corrida") { await p.getByText("Fornecedor Papel → Gráfica").first().click(); await p.waitForTimeout(2500) }
   if (tela.startsWith("aviso")) { await p.waitForTimeout(800); await p.getByText("para responder").click(); await p.waitForTimeout(600); await p.getByText("Camilo").first().click(); await p.waitForTimeout(1200) }
   if (tela.startsWith("marketing") || tela.startsWith("hoje")) await p.waitForTimeout(1200)
-  if (tela === "pedidodigital-termos") { await p.waitForTimeout(800); await p.getByText("Ler os termos").click(); await p.waitForTimeout(400) }
+  if (tela === "pedidodigital-termos") { await p.waitForTimeout(800); await p.getByRole("button", { name: "termos do pedido" }).click(); await p.waitForTimeout(400) }
   if (tela === "digitalpainel-prod") { await p.getByRole("button", { name: "Pagos", exact: true }).click(); await p.waitForTimeout(500); await p.getByText("Óleos Modelo").first().click(); await p.waitForTimeout(700) }
   if (tela === "cx-pedidos-aberto") { await p.getByText("Bella Pele").first().click(); await p.waitForTimeout(700) }
   if (tela === "cx-app") await p.waitForTimeout(2500)

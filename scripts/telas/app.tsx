@@ -114,7 +114,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
   }
   if (u.startsWith("/api/d/") && u.includes("ASAAS")) return new Response(JSON.stringify({ id: "DIG-0004", nome: "Ana Exemplo", ml: 50, produto: "perfume", medidas: { a: 10, l: 5, p: 5 }, padrao: true, folha: "A4",
     quantidade: 100, total: 619.95, sinal: 309.98, status: "aguardando_sinal", sinalPagoEm: null, briefing: { marca: "", cores: "", referencias: "", laminacao: "fosca", arquivos: [] },
-    opcoes: [{ quantidade: 50, total: 419.95, unit: 8.4 }, { quantidade: 100, total: 619.95, unit: 6.2 }], arte: null, aprovar: false, arteAprovadaEm: null, arteEnviadaEm: null, ajustes: [], restante: null, frete: null, restantePagoEm: null, entrega: null, designer: false,
+    opcoes: [{ quantidade: 50, total: 419.95, unit: 8.4 }, { quantidade: 100, total: 619.95, unit: 6.2 }], arte: null, aprovar: false, arteAprovadaEm: null, arteEnviadaEm: null, ajustes: [], restante: null, frete: null, restantePagoEm: null, entrega: null, designer: false, termos: termosDigital({ quantidade: 100, medidas: { a: 10, l: 5, p: 5 }, validadeDias: 15 }), termosVersao: "2026-11-12.2", termosAceitosEm: null,
     asaas: true, documento: null, cobranca: null }))
   if (u.startsWith("/api/d/")) {
     const pago = u.includes("PAGO")
