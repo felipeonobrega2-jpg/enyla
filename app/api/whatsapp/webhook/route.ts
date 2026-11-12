@@ -17,6 +17,8 @@ import { talvezAvisarGastos } from "@/app/lib/gastosServidor"
 // Espera do modo automático (o lead termina de digitar) + resposta da IA + envio
 export const maxDuration = 60
 
+let ultimaRodada = 0
+
 // ── Handler principal ─────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -29,26 +31,33 @@ export async function POST(req: NextRequest) {
   try {
     const body  = await req.json()
     const event = body.event as string
-    // Follow-ups do agente de leads pegam carona nos eventos (no máximo uma rodada a cada 10 min)
-    after(() => talvezFollowUps().catch(e => console.error("[agente follow-up]", e)))
-    // Lead que respondeu enquanto você estava na conversa e ficou sem resposta: o agente retoma
-    after(() => talvezRetomarParados(req.nextUrl.origin).catch(e => console.error("[agente retoma]", e)))
-    after(() => talvezAprender().catch(e => console.error("[agente aprende]", e)))
-    after(() => talvezReativar().catch(e => console.error("[reativação]", e)))
-    after(() => talvezRelatorio(req.nextUrl.origin).catch(e => console.error("[marketing]", e)))
-    // Braço digital: confere no extrato os sinais esperando Pix (no máximo a cada 5 min; só se há pedido esperando)
-    after(() => conferirSinais().then(() => undefined).catch(e => console.error("[digital]", e)))
-    after(() => talvezAdicionarIdeias().catch(e => console.error("[ideias]", e)))
-    after(() => talvezAdicionarGastosFixos().catch(e => console.error("[gastos fixos]", e)))
-    // Crédito dos anúncios na Meta (no máximo 1 vez por hora): avisa no celular antes de parar
-    after(() => talvezConferirMeta().catch(e => console.error("[meta saldo]", e)))
-    after(() => talvezAcertoSemanal().catch(e => console.error("[digital acerto]", e)))
-    after(() => talvezCorrigirDigital().catch(e => console.error("[digital custo]", e)))
-    after(() => talvezTesteAbertura().catch(e => console.error("[abertura A/B]", e)))
-    // Leads do anúncio: conversas recentes sem origem são marcadas pela frase do anúncio (no máximo a cada 30 min)
-    after(() => talvezMarcarOrigens().then(() => undefined).catch(e => console.error("[origens]", e)))
-    // Gastos: aviso no seu WhatsApp quando IA ou anúncios estão para acabar (confere no máximo a cada 30 min)
-    after(() => talvezAvisarGastos().catch(e => console.error("[gastos]", e)))
+    // Tarefas periódicas pegam carona nos eventos, mas no máximo 1 vez por minuto (por instância) e só em mensagem
+    // nova ou mudança de conexão. Antes rodavam em todo evento (inclusive cada "lida"/"entregue"), e cada uma lê a
+    // configuração inteira: com muito volume isso sufocava o banco (12/11: leitura simples levando 20-120 s).
+    if ((event === "messages.upsert" || event === "connection.update") && Date.now() - ultimaRodada > 60_000) {
+      ultimaRodada = Date.now()
+      // Follow-ups do agente de leads pegam carona nos eventos (no máximo uma rodada a cada 10 min)
+      after(() => talvezFollowUps().catch(e => console.error("[agente follow-up]", e)))
+      // Lead que respondeu enquanto você estava na conversa e ficou sem resposta: o agente retoma
+      after(() => talvezRetomarParados(req.nextUrl.origin).catch(e => console.error("[agente retoma]", e)))
+      after(() => talvezAprender().catch(e => console.error("[agente aprende]", e)))
+      after(() => talvezReativar().catch(e => console.error("[reativação]", e)))
+      after(() => talvezRelatorio(req.nextUrl.origin).catch(e => console.error("[marketing]", e)))
+      // Braço digital: confere no extrato os sinais esperando Pix (no máximo a cada 5 min; só se há pedido esperando)
+      after(() => conferirSinais().then(() => undefined).catch(e => console.error("[digital]", e)))
+      after(() => talvezAdicionarIdeias().catch(e => console.error("[ideias]", e)))
+      after(() => talvezAdicionarGastosFixos().catch(e => console.error("[gastos fixos]", e)))
+      // Crédito dos anúncios na Meta (no máximo 1 vez por hora): avisa no celular antes de parar
+      after(() => talvezConferirMeta().catch(e => console.error("[meta saldo]", e)))
+      after(() => talvezAcertoSemanal().catch(e => console.error("[digital acerto]", e)))
+      after(() => talvezCorrigirDigital().catch(e => console.error("[digital custo]", e)))
+      after(() => talvezTesteAbertura().catch(e => console.error("[abertura A/B]", e)))
+      // Leads do anúncio: conversas recentes sem origem são marcadas pela frase do anúncio (no máximo a cada 30 min)
+      after(() => talvezMarcarOrigens().then(() => undefined).catch(e => console.error("[origens]", e)))
+      // Gastos: aviso no seu WhatsApp quando IA ou anúncios estão para acabar (confere no máximo a cada 30 min)
+      after(() => talvezAvisarGastos().catch(e => console.error("[gastos]", e)))
+
+    }
 
     // ── messages.upsert — mensagem nova em tempo real
     if (event === "messages.upsert") {
