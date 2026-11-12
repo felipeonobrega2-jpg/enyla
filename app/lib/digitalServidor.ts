@@ -10,6 +10,7 @@ import { enviar, enviarArquivo, gravarCfg, seuNumero, Conversa, CfgAgente } from
 import {
   sinaisPagos, textoSinalPago, PedidoComBriefing, EntradaBanco, restantesPagos, textoRestantePago, arteAtual, novaArte, marcarArteEnviada,
   aprovarArte, pedirAjuste, textoArteParaAprovar, textoArteAprovada, textoParaVilla, textoParaDesigner, acertoDaSemana, textoAcerto, semanaDe,
+  aprovarNegociacao, textoNegociacaoAprovada,
 } from "./digital"
 import { sincronizar } from "./bancoServidor"
 import { pluggyConfigurada, atualizarItem } from "./pluggy"
@@ -199,6 +200,33 @@ export async function talvezCorrigirDigital() {
     })
     return { pedidosDigitais, digitalCustoV: VERSAO_CUSTO_DIGITAL } as Partial<CfgAgente>
   })
+}
+
+// Ajuste pontual aprovado por você (uma vez, pela versão): DIG-0052 (Will) com a caixa no tamanho do frasco
+// (12,4 × 4 × 4) e o valor negociado (R$ 1.000 pelas 200); ele recebe o valor novo e o link
+const AJUSTE_PONTUAL = { v: 1, id: "DIG-0052", medidas: { a: 12.4, l: 4, p: 4 }, total: 1000 }
+export async function talvezAjustePontual() {
+  let minha = false
+  await gravarCfg(d0 => {
+    const d = d0 as CfgDigital & { digitalAjusteV?: number }
+    if ((d.digitalAjusteV ?? 0) >= AJUSTE_PONTUAL.v) return {}
+    minha = true
+    return { digitalAjusteV: AJUSTE_PONTUAL.v } as Partial<CfgAgente>
+  })
+  if (!minha) return
+  const novo = await gravarPedido(AJUSTE_PONTUAL.id, (p, todos) => {
+    if (p.status !== "aguardando_sinal") return null
+    const f = facaAberta(AJUSTE_PONTUAL.medidas.a, AJUSTE_PONTUAL.medidas.l, AJUSTE_PONTUAL.medidas.p)
+    const folhaReal = folhaDaFaca(f.largura, f.altura) ?? p.folhaReal ?? p.folha
+    const custo = custoReal(p.faixa ?? p.quantidade, folhaReal) ?? p.custo
+    const comMedida = { ...p, medidas: AJUSTE_PONTUAL.medidas, padrao: false, folhaReal, custo, arte: 0 }
+    return aprovarNegociacao(comMedida, todos, AJUSTE_PONTUAL.total) as PedidoComBriefing | null
+  })
+  if (!novo) return
+  const c = await conversa(novo.jid)
+  if (!c) return
+  const texto = `${textoNegociacaoAprovada(novo, linkPedido(novo.id)).replace("\n\nJá atualizei o seu pedido:", "\n\nJá ajustei também a caixa para o tamanho do seu frasco: *12,4 × 4 × 4 cm*. O pedido está atualizado:")}`
+  await enviar(c, texto, undefined, { essencial: true }).catch(() => null)
 }
 
 // Segunda-feira de manhã: o que foi para a Villa e falta acertar (uma vez por semana)

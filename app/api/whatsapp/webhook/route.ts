@@ -7,7 +7,7 @@ import { agendarResposta, talvezFollowUps, talvezRetomarParados } from "@/app/li
 import { talvezAprender } from "@/app/lib/agenteAprende"
 import { talvezReativar } from "@/app/lib/reativacaoServidor"
 import { talvezRelatorio } from "@/app/lib/marketingServidor"
-import { conferirSinais, talvezAcertoSemanal, talvezCorrigirDigital } from "@/app/lib/digitalServidor"
+import { conferirSinais, talvezAcertoSemanal, talvezCorrigirDigital, talvezAjustePontual } from "@/app/lib/digitalServidor"
 import { talvezAdicionarIdeias, talvezAdicionarGastosFixos } from "@/app/lib/ideiasServidor"
 import { talvezConferirMeta } from "@/app/lib/metaSaldoServidor"
 import { talvezTesteAbertura } from "@/app/lib/aberturaABServidor"
@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
       after(() => talvezConferirMeta().catch(e => console.error("[meta saldo]", e)))
       after(() => talvezAcertoSemanal().catch(e => console.error("[digital acerto]", e)))
       after(() => talvezCorrigirDigital().catch(e => console.error("[digital custo]", e)))
+      after(() => talvezAjustePontual().catch(e => console.error("[digital ajuste]", e)))
       after(() => talvezTesteAbertura().catch(e => console.error("[abertura A/B]", e)))
       // Leads do anúncio: conversas recentes sem origem são marcadas pela frase do anúncio (no máximo a cada 30 min)
       after(() => talvezMarcarOrigens().then(() => undefined).catch(e => console.error("[origens]", e)))
