@@ -45,6 +45,7 @@ import { PropostasProntasCard } from "@/app/components/PropostasProntasCard"
 import { RetornoAnunciosCard } from "@/app/components/RetornoAnunciosCard"
 import { TempoAteFecharCard } from "@/app/components/TempoAteFecharCard"
 import { NegociacoesDigitalCard } from "@/app/components/NegociacoesDigitalCard"
+import { termosDigital } from "@/app/lib/termosDigital"
 import ChapasView from "@/app/cartuxo/components/ChapasView"
 import CustosView from "@/app/cartuxo/components/CustosView"
 import FacasView from "@/app/cartuxo/components/FacasView"
@@ -120,7 +121,8 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     return new Response(JSON.stringify({ id: pago ? "DIG-0002" : "DIG-0001", nome: "Ana Exemplo", ml: 50, produto: "perfume", medidas: { a: 10, l: 5, p: 5 }, padrao: true, folha: "A4",
       quantidade: 100, total: 619.95, sinal: 309.98, status: pago ? "sinal_pago" : "aguardando_sinal", sinalPagoEm: pago ? new Date().toISOString() : null,
       briefing: { marca: pago ? "Essência Rara" : "", cores: "", referencias: "", arquivos: pago ? [{ nome: "logo-essencia.png", url: "#" }] : [] },
-      opcoes: [{ quantidade: 20, total: 339.94, unit: 17 }, { quantidade: 50, total: 419.95, unit: 8.4 }, { quantidade: 100, total: 619.95, unit: 6.2 }] }))
+      opcoes: [{ quantidade: 20, total: 339.94, unit: 17 }, { quantidade: 50, total: 419.95, unit: 8.4 }, { quantidade: 100, total: 619.95, unit: 6.2 }],
+      termos: termosDigital({ quantidade: 100, medidas: { a: 10, l: 5, p: 5 }, validadeDias: 15 }), termosVersao: "2026-11-12", termosAceitosEm: pago ? new Date().toISOString() : null }))
   }
   if (u.startsWith("/api/whatsapp/agente")) return new Response(JSON.stringify({ auto: { ligado: true, pequenoParceiro: false, horario: { dias: [1, 2, 3, 4, 5], inicio: "08:00", fim: "20:00" } }, log: [
     { em: new Date().toISOString(), jid: "1@lid", nome: "Camilo", perfil: "pequeno", enviou: true, texto: "Pô, essa quantidade a gente não roda porque é offset…", motivo: "100 unidades no total" },
@@ -409,7 +411,7 @@ function Telas() {
         mensagem={l => `Oi, Perfumaria! Segue a proposta ORC-2026-999 da sua embalagem.\n\n3.000 unidades · R$ 8.476,64 à vista (R$ 2,83/un)\n\nPara ver a caixa em 3D e aprovar: ${l}\n\nQualquer dúvida, é só me chamar.`}
         onFechar={() => {}} /></div>
     }
-    case "pedidodigital": case "pedidodigital-pago": return <DigitalClient id={tela.endsWith("pago") ? "DIG-PAGO" : "DIG-0001"} t="x" />
+    case "pedidodigital": case "pedidodigital-termos": case "pedidodigital-pago": return <DigitalClient id={tela.endsWith("pago") ? "DIG-PAGO" : "DIG-0001"} t="x" />
     case "pedidodigital-asaas": return <DigitalClient id="DIG-ASAAS" t="x" />
     case "pedidodigital-arte": return <DigitalClient id="DIG-ARTE" t="x" />
     case "pedidodigital-prod": return <DigitalClient id="DIG-PROD" t="x" />

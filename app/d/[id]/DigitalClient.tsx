@@ -21,6 +21,7 @@ type Pedido = {
   restante: number | null; frete: number | null; restantePagoEm: string | null
   entrega: { cep: string; endereco: string } | null
   designer: boolean
+  termos: { titulo: string; itens: string[] }[]; termosVersao: string; termosAceitosEm: string | null
   asaas: boolean; documento: string | null
   cobranca: { parte: "sinal" | "restante"; payload: string; imagem: string; fatura: string } | null
 }
@@ -242,8 +243,10 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
           })}
         </div>
 
+        <Termos p={p} onAceitar={async () => { try { setP(await post({ acao: "termos" })) } catch (e) { setAviso((e as Error).message) } }} />
+        {p.termosAceitosEm && (
         <Pagamento p={p} titulo="Sinal de 50%" valor={p.sinal} txid={p.id} descricao={`Sinal ${p.id}`} sub={`O restante (${brl(p.total - p.sinal)}) no final, antes do envio`}
-          post={post} setP={setP} onConferir={conferir} conferindo={conferindo} />
+          post={post} setP={setP} onConferir={conferir} conferindo={conferindo} />)}
       </>)}
 
 
@@ -366,6 +369,51 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
         </button>
       </div>}
     </Tela>
+  )
+}
+
+// Termos do pedido: o cliente lê e aceita antes de ver o Pix do sinal
+function Termos({ p, onAceitar }: { p: Pedido; onAceitar: () => Promise<void> }) {
+  const [aberto, setAberto] = useState(false)
+  const [marcado, setMarcado] = useState(false)
+  const [salvando, setSalvando] = useState(false)
+  const lista = (
+    <div className="mt-3 space-y-3 max-h-[360px] overflow-y-auto pr-1 text-left">
+      {p.termos.map(s => (
+        <div key={s.titulo}>
+          <p className="text-[12.5px] font-semibold text-[#191625]">{s.titulo}</p>
+          <ul className="mt-1 space-y-1 list-disc pl-4">
+            {s.itens.map(i => <li key={i} className="text-[12.5px] text-[#5e5c68] leading-snug">{i}</li>)}
+          </ul>
+        </div>
+      ))}
+    </div>
+  )
+  if (p.termosAceitosEm) return (
+    <div className={aberto ? "bg-white rounded-2xl ds-borda p-5" : ""}>
+      <p className="text-[12px] text-[#5e5c68] text-center flex items-center justify-center gap-1.5">
+        <Check className="w-3.5 h-3.5 text-[#009351]" />Termos do pedido aceitos em {new Date(p.termosAceitosEm).toLocaleDateString("pt-BR")}
+        <button onClick={() => setAberto(a => !a)} className="text-[#8456e8] underline underline-offset-2">{aberto ? "fechar" : "ver"}</button>
+      </p>
+      {aberto && lista}
+    </div>
+  )
+  return (
+    <div className="bg-white rounded-2xl ds-borda p-5">
+      <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><FileText className="w-4 h-4 text-[#8456e8]" />Termos do pedido</p>
+      <p className="text-[12.5px] text-[#5e5c68] mt-1">O que está incluído, prazo, arte, pagamento e desistência. Leia antes de pagar o sinal.</p>
+      {aberto ? lista : (
+        <button onClick={() => setAberto(true)} className="mt-2 text-[13px] font-semibold text-[#8456e8] underline underline-offset-2">Ler os termos</button>
+      )}
+      <label className="mt-4 flex items-start gap-2.5 cursor-pointer select-none">
+        <input type="checkbox" checked={marcado} onChange={e => setMarcado(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#8456e8]" />
+        <span className="text-[13px] text-[#191625] leading-snug">Li e aceito os termos do pedido</span>
+      </label>
+      <button onClick={async () => { setSalvando(true); await onAceitar(); setSalvando(false) }} disabled={!marcado || salvando}
+        className="mt-3 w-full h-11 rounded-xl bg-[#8456e8] text-white text-[14px] font-semibold flex items-center justify-center gap-2 disabled:opacity-40">
+        {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Aceitar e ir para o pagamento
+      </button>
+    </div>
   )
 }
 

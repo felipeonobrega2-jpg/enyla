@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { auth } from "@/auth"
 import { lerPedido, gravarPedido, tokenDigitalValido, tokenDesignerValido, conferirSinais, conferirNoAsaas, cobrarNoAsaas, aprovarPeloCliente, ajustePeloCliente, mandarArte, avisarDesigner } from "@/app/lib/digitalServidor"
-import { opcoesDoPedido, trocarQuantidade, gravarEntrega, arteAtual, esperandoAprovacao, PedidoComBriefing } from "@/app/lib/digital"
+import { opcoesDoPedido, trocarQuantidade, gravarEntrega, arteAtual, esperandoAprovacao, PedidoComBriefing, DIAS_VALIDADE_DIGITAL } from "@/app/lib/digital"
 import type { RegraDigital } from "@/app/lib/precoDigital"
 import { asaasConfigurado } from "@/app/lib/asaas"
+import { termosDigital, VERSAO_TERMOS } from "@/app/lib/termosDigital"
 import { mascararDocumento } from "@/app/lib/documento"
 
 // Página pública do pedido digital (/d/DIG-0001?t=…): só com o link assinado. Nunca devolve custo nem margem.
@@ -20,6 +21,9 @@ const dadosPublicos = (p: PedidoComBriefing, regra?: RegraDigital, designer = fa
   aprovar: esperandoAprovacao(p), arteAprovadaEm: p.arteAprovadaEm ?? null, arteEnviadaEm: p.arteEnviadaEm ?? null,
   ajustes: designer ? (p.ajustes ?? []) : [],
   restante: p.restante ?? null, frete: p.frete ?? null, restantePagoEm: p.restantePagoEm ?? null,
+  // Termos: o texto já na medida e quantidade deste pedido, e se (e quando) o cliente aceitou
+  termos: termosDigital({ quantidade: p.quantidade, medidas: p.medidas, validadeDias: DIAS_VALIDADE_DIGITAL }), termosVersao: VERSAO_TERMOS,
+  termosAceitosEm: p.termos?.em ?? null,
   entrega: p.entrega ? { cep: p.entrega.cep, endereco: p.entrega.endereco } : null,
   designer,
   // Cobrança no Asaas: só a que vale para o valor de agora (se mudou, a página pede de novo)
@@ -58,6 +62,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const novo = await gravarPedido(id, (p, todos) => trocarQuantidade(todos, p, Number(b.quantidade), cfg.digital) as PedidoComBriefing | null)
     if (!novo) return NextResponse.json({ erro: pedido.status === "aguardando_sinal" ? "Escolha uma das quantidades." : "O sinal já foi pago: para mudar a quantidade, fale com a gente." }, { status: 400 })
     return NextResponse.json(publico(novo, cfg.digital))
+  }
+  // Cliente aceitou os termos (só pelo link dele, antes de pagar): guarda a versão e quando
+  if (b.acao === "termos") {
+    if (tokenDesignerValido(id, b.dz)) return NextResponse.json({ erro: "Só o cliente aceita os termos." }, { status: 403 })
+    const novo = await gravarPedido(id, p => p.termos ? null : { ...p, termos: { versao: VERSAO_TERMOS, em: new Date().toISOString() } })
+    return NextResponse.json(publico(novo ?? pedido, cfg.digital))
   }
   if (b.acao === "briefing") {
     const corta = (s: unknown, n: number) => String(s ?? "").trim().slice(0, n)

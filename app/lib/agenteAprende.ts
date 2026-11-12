@@ -222,6 +222,9 @@ async function medirEstiloFelipe() {
 
 // O que você ensinou direto (pediu ao Claude): entra uma vez, pela versão
 const ENSINADO: { v: number; item: Conhecimento }[] = [
+  // v6 (12/11, termos do pedido digital, aceitos na página antes do sinal)
+  { v: 6, item: { id: "felipe-digital-termos", tema: "venda", em: "2026-11-12T00:00:00.000Z",
+    texto: "Termos do digital (o cliente aceita na página do pedido antes de pagar o sinal): a arte tem a primeira versão e até 2 rodadas de ajuste incluídas; nada é impresso sem a aprovação dele; a cor pode variar um pouco da tela; produção de 3 a 5 dias úteis depois do sinal e da arte aprovada, frete à parte; 50% de sinal e o restante com o frete antes do envio; a quantidade é exata. Se desistir antes de aprovar a arte, devolvo o sinal inteiro; depois da arte aprovada, não. Defeito de impressão ou corte: avisar em até 7 dias com fotos, e refazemos as unidades com problema." } },
   // v5 (12/11, conversa com o Will)
   { v: 5, item: { id: "felipe-digital-prazo", tema: "prazo", em: "2026-11-12T00:00:00.000Z",
     texto: "Prazo do digital: de 3 a 5 dias úteis depois do sinal e da aprovação da arte. Muitas vezes sai antes: a arte fica pronta no mesmo dia, a prova também, e com a aprovação já roda no dia seguinte. Sábado a gente trabalha até meio-dia. O offset demora bem mais; o digital tem essa vantagem de ser rápido." } },

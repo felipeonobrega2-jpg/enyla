@@ -11,6 +11,7 @@ import { ROTULO_STATUS, PROXIMO_STATUS, type StatusDigital } from "@/app/lib/dig
 import { haQuanto } from "@/app/lib/hoje"
 
 type Pedido = {
+  termosAceitosEm?: string | null
   opcoes?: { quantidade: number; total: number; unit: number }[]
   id: string; jid: string; nome: string | null; em: string; ml: number | null; medidas: { a: number; l: number; p: number }; padrao: boolean; folha: string
   quantidade: number; total: number; sinal: number; custo: number; arte: number; margem: number
@@ -206,6 +207,7 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
               <Info rotulo="Sinal (Pix)" valor={brl(sel.sinal)} />
               <Info rotulo="Villa + arte" valor={`${brl(sel.custo)} + ${brl(sel.arte)}`} />
               <Info rotulo="Sua margem" valor={brl(sel.margem)} />
+              <Info rotulo="Termos" valor={sel.termosAceitosEm ? `aceitos em ${new Date(sel.termosAceitosEm).toLocaleDateString("pt-BR")}` : sel.status === "aguardando_sinal" ? "ainda não aceitos" : "de antes dos termos"} />
             </div>
 
             {sel.status === "aguardando_sinal" && (sel.opcoes?.length ?? 0) > 1 && (

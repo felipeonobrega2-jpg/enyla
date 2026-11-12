@@ -27,7 +27,7 @@ export async function GET() {
     arteAtual: arteAtual(p), versoes: (p.artes ?? []).length, arteEnviadaEm: p.arteEnviadaEm ?? null, arteAprovadaEm: p.arteAprovadaEm ?? null,
     ajustes: p.ajustes ?? [], designerAvisadoEm: p.designerAvisadoEm ?? null, villaEnviadoEm: p.villaEnviadoEm ?? null,
     frete: p.frete ?? null, restante: p.restante ?? null, restantePagoEm: p.restantePagoEm ?? null, entrega: p.entrega ?? null, acertadoEm: p.acertadoEm ?? null,
-    negociacao: p.negociacao ?? null,
+    negociacao: p.negociacao ?? null, termosAceitosEm: p.termos?.em ?? null,
   }))
   const acerto = acertoDaSemana(todos)
   return NextResponse.json({ pedidos, contatos: d.digitalContatos ?? {}, acerto: { ids: acerto.itens.map(p => p.id), total: acerto.total } })
