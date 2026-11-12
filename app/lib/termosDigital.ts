@@ -3,13 +3,17 @@
 // Decisões do Felipe (12/11/2026): 2 rodadas de ajuste na arte; sinal devolvido até a aprovação da arte; quantidade
 // exata (o digital não tem perda).
 
-export const VERSAO_TERMOS = "2026-11-12"
+export const VERSAO_TERMOS = "2026-11-12.2"   // .2: quem vende (Jerograf, CNPJ e endereço)
 
 export type SecaoTermos = { titulo: string; itens: string[] }
 
 export function termosDigital(p: { quantidade: number; medidas: { a: number; l: number; p: number }; validadeDias: number }): SecaoTermos[] {
   const cm = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
   return [
+    { titulo: "Quem vende", itens: [
+      "ENYLA é a marca da Jerograf Embalagens Personalizadas, CNPJ 03.999.896/0001-52, com produção na Estrada Velha de Itapevi, 3614, Vila Militar, Barueri – SP.",
+      "O atendimento é pelo WhatsApp em que você recebeu este pedido.",
+    ] },
     { titulo: "O que está incluído", itens: [
       `${p.quantidade.toLocaleString("pt-BR")} caixas em impressão digital, papel triplex 300 g, na medida ${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm (altura × largura × profundidade).`,
       "Laminação fosca ou brilho, na caixa inteira (não dá para misturar fosco e brilho na mesma caixa).",
