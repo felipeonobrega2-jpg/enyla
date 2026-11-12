@@ -46,6 +46,7 @@ import { RetornoAnunciosCard } from "@/app/components/RetornoAnunciosCard"
 import { TempoAteFecharCard } from "@/app/components/TempoAteFecharCard"
 import { NegociacoesDigitalCard } from "@/app/components/NegociacoesDigitalCard"
 import { termosDigital } from "@/app/lib/termosDigital"
+import { BibliotecaFacasView } from "@/app/components/BibliotecaFacasView"
 import ChapasView from "@/app/cartuxo/components/ChapasView"
 import CustosView from "@/app/cartuxo/components/CustosView"
 import FacasView from "@/app/cartuxo/components/FacasView"
@@ -240,6 +241,29 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       { id: "PP-2", jid: "2@lid", nome: "Essências Exemplo", em: h(95), status: "aguardando", quantidade: 1500, custo: 980, preco: 2058, multiplicador: 2.1, origemMarkup: "configuracao", medidaPadrao: false,
         dados: { produto: "caixa", volume_ml: null, caixa_cm: { frente: 6, lateral: 6, altura: 13 }, frasco_cm: null, quantidade: 1500, tem_arte: false, resumo: "Difusor de ambiente, caixa 6x6x13" },
         form: form(6, 13, 6), opcoes: [{ quantidade: 1500, preco: 2058, unitario: 1.372 }, { quantidade: 2000, preco: 2390, unitario: 1.195 }, { quantidade: 3000, preco: 3050, unitario: 1.017 }] },
+    ] }))
+  }
+  if (u.startsWith("/api/biblioteca/")) {
+    // DXF fictício de um cartucho (L 52 · P 32 · A 85 mm): corpo com 4 painéis, abas em cima e embaixo
+    const L = 52, P = 32, A = 85, aba = 1.5
+    const linhas: [string, number, number, number, number][] = []
+    const xs = [0, aba, aba + L, aba + L + P, aba + 2 * L + P, aba + 2 * L + 2 * P]
+    const y0 = P, y1 = P + A
+    linhas.push(["CUT", 0, y0, 0, y1], ["CUT", xs[5], y0, xs[5], y1])
+    for (const x of xs.slice(1, 5)) linhas.push(["FOLD", x, y0, x, y1])
+    linhas.push(["FOLD", xs[1], y0, xs[5], y0], ["FOLD", xs[1], y1, xs[5], y1])
+    linhas.push(["CUT", 0, y0, xs[1], y0], ["CUT", 0, y1, xs[1], y1])
+    for (const [a, b] of [[xs[1], xs[2]], [xs[3], xs[4]]]) { linhas.push(["CUT", a, y1, a, y1 + P], ["CUT", b, y1, b, y1 + P], ["CUT", a, y1 + P, b, y1 + P], ["CUT", a, y0, a, 0], ["CUT", b, y0, b, 0], ["CUT", a, 0, b, 0]) }
+    for (const [a, b] of [[xs[2], xs[3]], [xs[4], xs[5]]]) { linhas.push(["CUT", a, y1, b, y1 + 12], ["CUT", a, y0, b, y0 - 12]) }
+    const ents = linhas.map(([l, x1, y1_, x2, y2]) => `0\nLINE\n8\n${l}\n10\n${x1}\n20\n${y1_}\n11\n${x2}\n21\n${y2}`).join("\n")
+    return new Response(`0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${ents}\n0\nENDSEC\n0\nEOF`)
+  }
+  if (u.startsWith("/api/biblioteca")) {
+    const d = (id: string, nome: string, modelo: string, c: [number, number, number], b: [number, number]) => ({ id, nome, modelo, caixa: { largura: c[0], altura: c[1], profundidade: c[2] }, blank: { largura: b[0], altura: b[1] }, criadoEm: new Date().toISOString() })
+    return new Response(JSON.stringify({ desenhos: [
+      d("a1b2c3d4e5f60001", "dieline_de_caixa_com_fundo_automático_52×32×85_mm.dxf", "Caixa com fundo automático", [52, 85, 32], [169.5, 149]),
+      d("a1b2c3d4e5f60002", "dieline_de_caixa_com_fecho_inverso_40×40×120_mm.dxf", "Caixa com fecho inverso", [40, 120, 40], [161.5, 200]),
+      d("a1b2c3d4e5f60003", "dieline_de_caixa_tuck_end_60×60×130_mm.dxf", "Caixa tuck end", [60, 130, 60], [241.5, 252]),
     ] }))
   }
   if (u.startsWith("/api/campanha-digital")) return new Response(JSON.stringify({
@@ -447,6 +471,12 @@ function Telas() {
       <div style={{ flex: 1 }}>{pagina(<PedidosSiteView onVerChapas={() => {}} />)}</div>
     </div>
     case "digitalpainel": case "digitalpainel-m": case "digitalpainel-aberto": case "digitalpainel-qtd": case "digitalpainel-prod": case "digitalpainel-acerto": return pagina(<DigitalPainelView onAbrirConversa={() => {}} />)
+    case "biblioteca": case "biblioteca-m": return <BibliotecaFacasView onUsar={() => {}} onRegistrarFaca={() => {}}
+      usos={[{ numero: "ORC-2026-201", cliente: "Perfumaria Modelo", desenhoId: "a1b2c3d4e5f60001" }]}
+      ferramentais={[
+        { id: "f1", tipo: "faca", cliente: "Perfumaria Modelo", produto: "Fundo automático 52×32×85", blankLargura: 169.5, blankAltura: 149, cavidades: 6, fornecedor: "Fornecedor Exemplo", custo: 450, data: "2026-09-01" },
+        { id: "f2", tipo: "faca", cliente: "", produto: "Cartucho antigo", blankLargura: 120, blankAltura: 90, cavidades: 8, fornecedor: "Corte Exemplo", custo: 380, data: "2026-06-01" },
+      ]} />
     case "negociacao": case "negociacao-m": return pagina(<div className="max-w-[1200px]"><NegociacoesDigitalCard onAbrirConversa={() => {}} iniciais={[
       { id: "DIG-0052", jid: "1@lid", nome: "Will Exemplo", quantidade: 200, total: 1220, custo: 700, arte: 0, status: "aguardando_sinal",
         negociacao: { em: new Date(Date.now() - 25 * 60_000).toISOString(), texto: "Tá saindo 6.10 consegue arredondar nos 5,00?", pedidoTotal: 1000, antes: 1220, status: "aguardando" } },

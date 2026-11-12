@@ -77,6 +77,7 @@ export type Ferramental = {
   fornecedor?: string
   custo: number
   data: string          // ISO
+  desenhoId?: string    // faca: o desenho (DXF) da biblioteca que ela repete em X cavidades
 }
 
 export type EtapaPedido = "arte" | "impressao" | "acabamento" | "corteVinco" | "colagem" | "outro"

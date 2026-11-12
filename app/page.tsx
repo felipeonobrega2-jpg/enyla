@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
-import { Layers, ShoppingBag, Ruler, Calculator, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb, Truck, Gauge, Printer } from "lucide-react"
+import { Layers, ShoppingBag, Ruler, Calculator, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb, Truck, Gauge, Printer , Scissors } from "lucide-react"
 import { IdeiasView } from "./components/IdeiasView"
 import { signOut } from "next-auth/react"
 import WhatsAppView, { ConversaLateral } from "./components/WhatsAppView"
@@ -55,6 +55,7 @@ import { linhasDeOrcamento } from "./lib/precoQueFecha"
 import { retornoPorCampanha } from "./lib/retornoCampanhas"
 import { normalizarMetas } from "./lib/metas"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
+import { BibliotecaFacasView } from "./components/BibliotecaFacasView"
 import FormaView from "./FormaView"
 import FormaBubble from "./components/FormaBubble"
 import { brl, num } from "./utils"
@@ -189,7 +190,7 @@ export default function Home() {
   const [result, setResult]   = useState<Calculo | null>(null)
   const [dxfNome, setDxfNome]       = useState<string | null>(null)
   const [dxfGeo, setDxfGeo]         = useState<DXFGeo | null>(null)
-  const [dxfPreview, setDxfPreview] = useState<{ result: DXFResult; nome: string } | null>(null)
+  const [dxfPreview, setDxfPreview] = useState<{ result: DXFResult; nome: string; texto: string } | null>(null)
   const [novaQtd, setNovaQtd] = useState("")
   const [toast, setToast]     = useState("")
   const [notifWA, setNotifWA] = useState<{ nomeCliente: string; numero: string; etapa: string; telefone: string; portal?: string } | null>(null)
@@ -197,7 +198,7 @@ export default function Home() {
   const [editandoHistorico, setEditandoHistorico] = useState<string | null>(null)
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
   const [contador, setContador] = useState<number>(0)
-  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias" | "entregas" | "gastos" | "digital" | "cx-pedidos" | "cx-chapas" | "cx-facas" | "cx-custos">("painel")
+  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias" | "entregas" | "gastos" | "digital" | "cx-pedidos" | "cx-chapas" | "cx-facas" | "cx-custos" | "biblioteca">("painel")
   const [perfilClienteExterno, setPerfilClienteExterno] = useState<string | null>(null)
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
   definirFeriadosLocais(config.feriados)
@@ -325,7 +326,7 @@ export default function Home() {
     // Link direto (ex.: resumo de marketing no WhatsApp abre em Campanhas: /?aba=meta)
     const aba = new URLSearchParams(window.location.search).get("aba")
     const saved = aba ?? sessionStorage.getItem("app:view")
-    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias","entregas","gastos","digital","cx-pedidos","cx-chapas","cx-facas","cx-custos"]
+    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias","entregas","gastos","digital","cx-pedidos","cx-chapas","cx-facas","cx-custos","biblioteca"]
     // Conquistas virou o cartão "Meta do mês" do Painel
     if (saved === "conquistas") setView("painel")
     else if (saved && valid.includes(saved)) setView(saved as typeof view)
@@ -601,11 +602,39 @@ export default function Home() {
     if (!/\.dxf$/i.test(file.name)) { showToast("Esse arquivo não é .dxf. No Pacdora, baixe a faca em DXF."); return }
     const reader = new FileReader()
     reader.onload = ev => {
-      const result = parseDXF(ev.target?.result as string)
+      const texto = ev.target?.result as string
+      const result = parseDXF(texto)
       if (!result) { showToast("Não foi possível ler o DXF — tente exportar em formato AutoCAD 2000 ou 2004."); return }
-      setDxfPreview({ result, nome: file.name })
+      setDxfPreview({ result, nome: file.name, texto })
     }
     reader.readAsText(file)
+  }
+  // Desenho (DXF) na mesa de orçamento: medidas da peça e da caixa montada
+  function aplicarDesenho(nome: string, result: DXFResult, desenhoId?: string) {
+    setDxfNome(nome)
+    setDxfGeo({ bounds: result.bounds, paths: result.paths })
+    setForm(p => {
+      const next = { ...p, blankOverride: { largura: result.largura, altura: result.altura }, caixaDxf: caixaDoDxf(nome, result), ...(desenhoId ? { desenhoId } : {}) }
+      setResult(calcular(next, config))
+      return next
+    })
+  }
+  async function guardarNaBiblioteca(nome: string, texto: string, result: DXFResult): Promise<string | null> {
+    const c = caixaDoDxf(nome, result)
+    const fd = new globalThis.FormData()
+    fd.set("arquivo", new Blob([texto], { type: "application/dxf" }), nome)
+    fd.set("meta", JSON.stringify({ nome, modelo: c?.modelo, caixa: c ? { largura: c.largura, altura: c.altura, profundidade: c.profundidade } : null, blank: { largura: result.largura, altura: result.altura } }))
+    const r = await fetch("/api/biblioteca", { method: "POST", body: fd }).then(r => r.json()).catch(() => null)
+    return r?.desenho?.id ?? null
+  }
+  // Biblioteca → "Usar no orçamento": abre a mesa com o desenho, sem o Pacdora
+  async function usarDesenho(id: string, nome: string) {
+    const texto = await fetch(`/api/biblioteca/${id}`).then(r => r.ok ? r.text() : null).catch(() => null)
+    const result = texto ? parseDXF(texto) : null
+    if (!result) { showToast("Não consegui abrir esse desenho."); return }
+    aplicarDesenho(nome, result, id)
+    navigate("orcamento")
+    showToast(`Desenho "${nome}" na mesa de orçamento`)
   }
   const lerDxfRef = useRef(lerArquivoDxf)
   lerDxfRef.current = lerArquivoDxf
@@ -1587,6 +1616,8 @@ export default function Home() {
             icon={<Factory className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "entregas"} onClick={() => { setEntregasPrefill(null); navigate("entregas") }} label="Entregas"
             icon={<Truck className="w-4 h-4" strokeWidth={1.8} />} />
+          <NavItem active={view === "biblioteca"} onClick={() => navigate("biblioteca")} label="Facas"
+            icon={<Scissors className="w-4 h-4" strokeWidth={1.8} />} />
 
           <NavGroup label="Gestão" />
           <NavItem active={view === "financeiro"} onClick={() => navigate("financeiro")} label="Financeiro"
@@ -1719,15 +1750,11 @@ export default function Home() {
                   Cancelar
                 </button>
                 <button onClick={() => {
-                  setDxfNome(nome)
-                  setDxfGeo({ bounds: result.bounds, paths: result.paths })
-                  setForm(p => {
-                    const next = { ...p, blankOverride: { largura: result.largura, altura: result.altura }, caixaDxf: caixaDoDxf(nome, result) }
-                    setResult(calcular(next, config))
-                    return next
-                  })
+                  aplicarDesenho(nome, result)
                   setDxfPreview(null)
-                  showToast(`DXF importado: ${(largura / 10).toFixed(1)} × ${(altura / 10).toFixed(1)} cm`)
+                  showToast(`DXF importado: ${(largura / 10).toFixed(1)} × ${(altura / 10).toFixed(1)} cm · guardado na biblioteca de facas`)
+                  // Guarda na biblioteca (o mesmo arquivo não duplica) e liga o orçamento ao desenho
+                  guardarNaBiblioteca(nome, dxfPreview.texto, result).then(id => { if (id) setForm(p => ({ ...p, desenhoId: id })) })
                 }}
                   className="flex-1 py-2.5 rounded-xl bg-[#8456e8] text-white text-[13px] font-semibold hover:bg-[#7343d9] transition-colors">
                   Importar dieline
@@ -2719,6 +2746,16 @@ export default function Home() {
                 fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) }).catch(() => {})
               }}
             />
+          ) : view === "biblioteca" ? (
+            <BibliotecaFacasView
+              ferramentais={normalizarProducao(config.producao).ferramentais}
+              usos={historico.filter(h => h.numero).map(h => ({ numero: h.numero!, cliente: h.form?.nomeCliente ?? "", desenhoId: h.form?.desenhoId ?? null }))}
+              onUsar={(id, nome) => { void usarDesenho(id, nome) }}
+              onRegistrarFaca={f => {
+                const prod = normalizarProducao(config.producao)
+                salvarConfigTudo({ ...config, producao: { ...prod, ferramentais: [...prod.ferramentais, f] } })
+                showToast(`Faca de ${f.cavidades} cavidades registrada`)
+              }} />
           ) : view === "fornecedores" ? (
             <FornecedoresView config={config} kanban={kanban} lancamentos={lancamentos} historico={historico} onSave={salvarConfigTudo}
               onDividir={(l, partes) => {

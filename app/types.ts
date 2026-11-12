@@ -34,6 +34,7 @@ export type FormData = {
   qualidades: Record<number, "Digital" | "Offset">
   customPecasChapa: number | null
   blankOverride: { largura: number; altura: number } | null  // mm — importado do DXF Pacdora
+  desenhoId?: string | null   // desenho da biblioteca de facas usado neste orçamento
   caixaDxf?: { largura: number; altura: number; profundidade: number; modelo?: string } | null  // mm — caixa montada, do nome do arquivo ou dos vincos
   pecaPlana?: PecaPlana | null   // não é caixa: fita, tag, cinta… (sem dobra nem colagem)
   obsInterna: string
