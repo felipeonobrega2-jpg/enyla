@@ -30,8 +30,25 @@ const ESQUEMA = {
     dados: {
       type: "object",
       additionalProperties: false,
-      required: ["produto", "volume_ml", "caixa_cm", "frasco_cm", "quantidade", "tem_arte", "resumo"],
+      required: ["itens", "produto", "volume_ml", "caixa_cm", "frasco_cm", "quantidade", "tem_arte", "resumo"],
       properties: {
+        itens: {
+          type: "array",
+          description: "Só quando o cliente quer MAIS DE UMA caixa diferente (tamanhos ou modelos diferentes, ex.: a de 30 ml e a de 50 ml): uma entrada por caixa, com a quantidade de cada uma. Uma caixa só (mesmo com várias fragrâncias na mesma caixa): lista vazia.",
+          items: {
+            type: "object", additionalProperties: false, required: ["rotulo", "volume_ml", "caixa_cm", "frasco_cm", "quantidade"],
+            properties: {
+              rotulo: { type: "string", description: "Como o cliente identifica esta caixa, curto (ex.: \"30 ml\", \"difusor\", \"perfume 100 ml\")." },
+              volume_ml: { type: ["number", "null"] },
+              caixa_cm: {
+                type: ["object", "null"], additionalProperties: false, required: ["frente", "lateral", "altura"],
+                properties: { frente: { type: "number" }, lateral: { type: "number" }, altura: { type: "number" } },
+              },
+              frasco_cm: { type: ["string", "null"] },
+              quantidade: { type: ["number", "null"], description: "Quantidade desta caixa." },
+            },
+          },
+        },
         produto: { type: "string", description: "O que vai na caixa (ex.: perfume árabe 100ml). Vazio se não disse." },
         volume_ml: { type: ["number", "null"] },
         caixa_cm: {
@@ -148,7 +165,7 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
   if (!outraPergunta && !opts.outra && saudacao && !clienteAtivo && soAbertura(mensagens)) {
     const r: ResultadoAtendente = {
       resposta: saudacao, etapa: "primeiro_contato", alerta: "nenhum", motivo_alerta: "", sugere_video: false,
-      dados: { produto: "", volume_ml: null, caixa_cm: null, frasco_cm: null, quantidade: null, tem_arte: null, resumo: "" },
+      dados: { itens: [], produto: "", volume_ml: null, caixa_cm: null, frasco_cm: null, quantidade: null, tem_arte: null, resumo: "" },
       lead: { perfil: "indefinido", quantidade_total: null, motivo: "Primeiro contato (mensagem do anúncio): saudação do filtro, sem IA.", fornecedor: false },
       pode_enviar_sozinho: true, ultimaId,
     }
@@ -203,7 +220,7 @@ Lead pequeno (menos de 1.000) no modo digital — vale sobre as regras gerais ac
 - NUNCA pergunte sobre logo, arte, cores, referências ou nome da marca antes de o cliente pagar o sinal, nem peça para mandar a logo: a arte está inclusa e a designer pega tudo isso depois do pagamento, pela página do pedido. Se ele mandar a logo antes, agradeça em poucas palavras e siga para o orçamento.
 - Ele nunca está "já orientado": a conversa segue até o pagamento. "Resposta" vazia só se ele mandou apenas "ok"/"obrigado"/figurinha e não há nada pendente.
 - Nunca fale em "sistema", "automático", "link automático" ou algo que dê a entender que não é você digitando.
-- Pedido com mais de um tamanho de caixa (ex.: modelos de 30 ml e de 50 ml): confirme quantas caixinhas de cada tamanho e use alerta "decisao_sua" (o Felipe monta esse orçamento). Não diga que vai preparar nem quando vai mandar.
+- Pedido com mais de uma caixa (tamanhos ou modelos diferentes, ex.: 30 ml e 50 ml): cada caixa vira um orçamento separado, e você continua sozinho (alerta "nenhum", pode_enviar_sozinho true; nunca "decisao_sua" por isso). Preencha "itens" com uma entrada por caixa. Para cada caixa você precisa da quantidade e do tamanho (ml de 5 a 120, ou as medidas do frasco): pergunte só o que falta, de todas as caixas numa mensagem só ("quantas de 30 ml e quantas de 50 ml?"). Assim que todas tiverem, os orçamentos saem na hora, identificados. Não diga que vai preparar nem quando vai mandar.
 - Nunca prometa algo para depois (separar fotos, ver e te falar, ligar, mandar amostra): ninguém vai cumprir. Responda com o que sabe; para ver trabalhos, o Instagram.
 - Alerta só para desconto ou condição especial ("desconto"), amostra física ("decisao_sua") e reclamação ("reclamacao"): o Felipe recebe o aviso na hora.
 ` : ""}

@@ -4,7 +4,17 @@ import type { FormData } from "../types"
 
 export type AlertaAtendimento = "nenhum" | "desconto" | "preco" | "prazo" | "reclamacao" | "decisao_sua"
 
+// Uma caixa do pedido quando o cliente quer mais de um tamanho/modelo (ex.: a de 30 ml e a de 50 ml)
+export type ItemPedido = {
+  rotulo: string                    // como identificar para o cliente ("30 ml", "difusor", "caixa do kit")
+  volume_ml: number | null
+  caixa_cm: { frente: number; lateral: number; altura: number } | null
+  frasco_cm: string | null
+  quantidade: number | null
+}
+
 export type DadosPedido = {
+  itens?: ItemPedido[]              // 2 ou mais caixas diferentes; vazio quando é uma caixa só
   produto: string
   volume_ml: number | null
   caixa_cm: { frente: number; lateral: number; altura: number } | null

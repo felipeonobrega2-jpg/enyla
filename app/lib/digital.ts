@@ -45,6 +45,8 @@ export type PedidoDigital = {
   medidas: { a: number; l: number; p: number }; padrao: boolean   // padrão = medida da tabela por ml (cliente confirma)
   folha: Folha; quantidade: number; faixa: number
   pedida?: number                  // quantidade que o cliente pediu (a cotação usa a faixa da tabela: 150 → 200)
+  grupo?: string                   // mais de uma caixa na mesma conversa: todos os pedidos do grupo têm o id do 1º
+  rotulo?: string                  // qual caixa é esta para o cliente ("30 ml", "difusor")
   custo: number; arte: number; margem: number; total: number
   sinal: number                    // valor exato do Pix do sinal (centavos únicos entre os abertos)
   status: StatusDigital
@@ -385,4 +387,61 @@ export function pedidoDeTeste(pedidos: PedidoDigital[], jid: string, agora = new
     medidas: { a: 10, l: 5, p: 5 }, padrao: true, folha: "A4", quantidade: 20, faixa: 20,
     custo: 0, arte: 0, margem: 0, total: 20, sinal: 10, status: "aguardando_sinal", teste: true,
   }
+}
+
+
+// ── Mais de uma caixa na mesma conversa ──────────────────────────────────────
+// Cada caixa vira um pedido próprio (cotação, página, sinal e produção separados), e o cliente recebe uma mensagem
+// só, com cada caixa identificada e o link dela.
+export type CotacaoItem = { rotulo: string; cot: Extract<Cotacao, { ok: true }>; dados: DadosPedido }
+export function cotarItens(d: DadosPedido | null, regra: RegraDigital = REGRA_DIGITAL_PADRAO): { ok: true; itens: CotacaoItem[] } | { ok: false; motivo: string } | null {
+  const itens = (d?.itens ?? []).filter(i => i && (i.quantidade || i.volume_ml || i.caixa_cm || i.frasco_cm))
+  if (!d || itens.length < 2) return null   // uma caixa só: o caminho de sempre
+  const out: CotacaoItem[] = []
+  for (const [n, it] of itens.entries()) {
+    const rotulo = (it.rotulo || "").trim() || `caixa ${n + 1}`
+    const dados: DadosPedido = { ...d, itens: [], volume_ml: it.volume_ml, caixa_cm: it.caixa_cm, frasco_cm: it.frasco_cm, quantidade: it.quantidade }
+    const cot = cotarDigital(dados, regra)
+    if (!cot.ok) return { ok: false, motivo: `${rotulo}: ${cot.motivo}` }
+    out.push({ rotulo, cot, dados })
+  }
+  return { ok: true, itens: out }
+}
+
+// Os pedidos do grupo, em sequência (ids e sinais únicos entre si e com os que já existem)
+export function montarPedidosDoGrupo(pedidos: PedidoDigital[], jid: string, nome: string | null, itens: CotacaoItem[], agora = new Date()): PedidoDigital[] {
+  const novos: PedidoDigital[] = []
+  for (const it of itens) {
+    const p = montarPedido([...novos, ...pedidos], jid, nome, it.dados, it.cot, agora)
+    novos.push({ ...p, grupo: novos[0]?.id ?? p.id, rotulo: it.rotulo })
+  }
+  return novos
+}
+
+// Mudou alguma caixa (quantidade, medida, ou o número de caixas)? Só antes de qualquer sinal
+export function mudouOGrupo(anteriores: PedidoDigital[], itens: CotacaoItem[]) {
+  if (anteriores.some(p => p.status !== "aguardando_sinal")) return false
+  if (anteriores.length !== itens.length) return true
+  return itens.some((it, i) => mudouACotacao(anteriores[i], it.cot))
+}
+
+// Os pedidos abertos do mesmo grupo (lembrete e recotação tratam o grupo junto)
+export const pedidosDoGrupo = (pedidos: PedidoDigital[] | undefined, p: Pick<PedidoDigital, "grupo" | "id">) =>
+  p.grupo ? (pedidos ?? []).filter(x => x.grupo === p.grupo && x.status !== "cancelado") : (pedidos ?? []).filter(x => x.id === p.id)
+
+const rot = (r: string) => r.charAt(0).toUpperCase() + r.slice(1)
+
+export function textoLinkGrupo(ps: Pick<PedidoDigital, "quantidade" | "ml" | "medidas" | "padrao" | "total" | "produto" | "pedida" | "rotulo">[], links: string[]) {
+  const blocos = ps.map((p, i) => [
+    `*${rot(p.rotulo ?? `caixa ${i + 1}`)}*: ${p.quantidade.toLocaleString("pt-BR")} caixinhas (${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm): *${brl(p.total)}*`,
+    p.pedida && p.pedida < p.quantidade ? `Você pediu ${p.pedida.toLocaleString("pt-BR")}: até ${p.quantidade.toLocaleString("pt-BR")} sai pelo mesmo valor, então já coloquei ${p.quantidade.toLocaleString("pt-BR")}.` : null,
+    `Para ver, escolher a quantidade e pagar o sinal de 50% desta: ${links[i]}`,
+  ].filter(Boolean).join("\n"))
+  const padrao = ps.filter(p => p.padrao).map((p, i) => p.rotulo ?? `caixa ${i + 1}`)
+  return [
+    `Montei os orçamentos em impressão digital, um para cada caixa, com a *arte inclusa* (nossa designer cria pra você):`,
+    ...blocos,
+    `Cada caixa tem o seu pedido: pode fechar as duas juntas ou uma de cada vez.`.replace("as duas", ps.length === 2 ? "as duas" : "todas"),
+    padrao.length ? `Usei a medida padrão de caixa para ${padrao.join(" e ")}. Se o seu frasco for diferente, me manda as medidas que eu ajusto.` : null,
+  ].filter(x => x !== null).join("\n\n")
 }

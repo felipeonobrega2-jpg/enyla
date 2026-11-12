@@ -4,6 +4,7 @@
 // sem resposta → F1, F2, F3 e Sem resposta. As etiquetas vão também para o WhatsApp Business, quando existem lá.
 // Tudo fica registrado (Configurações → Agente de leads) com o motivo de ter enviado ou segurado.
 
+import { cotarItens, montarPedidosDoGrupo, mudouOGrupo, pedidosDoGrupo, textoLinkGrupo } from "./digital"
 import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital, lembreteDigitalAgora, ADIOU } from "./digital"
 import { linkPedido } from "./digitalLink"
 import { faltaParaProposta } from "./propostaPronta"
@@ -383,19 +384,33 @@ export async function responderSozinho(msgId: string) {
   const digitalPequeno = auto.pequenoParceiro === false && r.lead.perfil === "pequeno" && !conversa.clienteCadastrado
   // Produto que não fazemos (cigarro): nunca cota sozinho, a resposta da IA recusa com educação
   const naoFazemos = PRODUTO_RECUSADO.test([r.dados?.produto, r.dados?.resumo, ...conversa.mensagens.filter(m => !m.from_me).slice(-6).map(m => m.corpo)].filter(Boolean).join(" "))
-  if (digitalPequeno && !naoFazemos) {
+  // Mais de uma caixa (ex.: 30 ml e 50 ml): um pedido para cada, mensagem única identificando cada caixa
+  let novoGrupo: PedidoDigital[] | null = null
+  const grupo = digitalPequeno && !naoFazemos ? cotarItens(r.dados, cfg.digital) : null
+  if (grupo) {
+    if (!grupo.ok && !/falta/.test(grupo.motivo)) semTabela = grupo.motivo
+    const anteriores = anterior ? pedidosDoGrupo(cfg.pedidosDigitais, anterior) : []
+    if (grupo.ok && (!anteriores.length || mudouOGrupo(anteriores, grupo.itens))) {
+      novoGrupo = montarPedidosDoGrupo(cfg.pedidosDigitais ?? [], jid, conversa.nome, grupo.itens)
+      r.resposta = textoLinkGrupo(novoGrupo, novoGrupo.map(p => linkPedido(p.id)))
+      r.alerta = "nenhum"; r.pode_enviar_sozinho = true
+    }
+  } else if (digitalPequeno && !naoFazemos) {
     const cot = cotarDigital(r.dados, cfg.digital)
     if (!cot.ok && !cot.motivo.startsWith("falta")) semTabela = cot.motivo
-    if (cot.ok && (!anterior || mudouACotacao(anterior, cot))) {
+    // Já tem grupo (mais de uma caixa) aberto: uma leitura com uma caixa só não desfaz o grupo
+    const emGrupo = !!anterior && pedidosDoGrupo(cfg.pedidosDigitais, anterior).length > 1
+    if (cot.ok && !emGrupo && (!anterior || mudouACotacao(anterior, cot))) {
       novoPedido = montarPedido(cfg.pedidosDigitais ?? [], jid, conversa.nome, r.dados, cot)
       r.resposta = textoLinkPedido(novoPedido, linkPedido(novoPedido.id))
       r.alerta = "nenhum"; r.pode_enviar_sozinho = true
     }
   }
+  if (novoGrupo) novoPedido = novoGrupo[0]
   // Emoji só do jeito que você usa (👋 na primeira mensagem, risada quando o lead ri)
   if (!novoPedido) r.resposta = limparEmojis(r.resposta, emojiCtx(conversa.mensagens, cfg))
   const ctx = contexto(cfg, log, jid)
-  if (novoPedido) ctx.precosDoFiltro.push(...valoresDoPedido(novoPedido))
+  for (const p of novoGrupo ?? (novoPedido ? [novoPedido] : [])) ctx.precosDoFiltro.push(...valoresDoPedido(p))
   if (digitalPequeno) {
     // Lead digital é todo do agente: conversa até o pagamento (mais mensagens por dia) e a IA hesitante não segura
     ctx.maxPorDia = Math.max(ctx.maxPorDia, MAX_POR_DIA_DIGITAL)
@@ -461,8 +476,8 @@ export async function responderSozinho(msgId: string) {
   await pequeno(env.ids.length > 0)
   // Orçamento digital enviado: o pedido fica esperando o sinal (o anterior desta conversa, se havia, é trocado)
   if (novoPedido && env.ids.length) {
-    const np = novoPedido
-    await gravarCfg(d => ({ pedidosDigitais: [np, ...(d.pedidosDigitais ?? []).map(p => p.jid === jid && p.status === "aguardando_sinal" ? { ...p, status: "cancelado" as const } : p)].slice(0, 500) }))
+    const novos = novoGrupo ?? [novoPedido]
+    await gravarCfg(d => ({ pedidosDigitais: [...novos, ...(d.pedidosDigitais ?? []).map(p => p.jid === jid && p.status === "aguardando_sinal" ? { ...p, status: "cancelado" as const } : p)].slice(0, 500) }))
   }
   // Instagram só se ainda cabe no minuto da Vercel (senão vai na próxima resposta)
   if (env.ids.length && querVitrine && Date.now() - inicio < 47_000) {
@@ -645,12 +660,16 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
         return
       }
       if (await voceNaConversa(c.jid, log, cfg)) return registrar({ ...base, perfil: "pequeno", enviou: false, texto: "", motivo: `F${nivel} segurado: você está nessa conversa agora`, passo: `F${nivel}` })
-      const texto = textoLembreteDigital({ ...pd, jid: c.jid }, adiou ? 2 : lemb, linkPedido(pd.id), { adiou })
+      // Grupo (mais de uma caixa): um lembrete só, com o link de cada caixa ainda esperando o sinal
+      const doGrupo = pedidosDoGrupo(cfg.pedidosDigitais, pd).filter(p => p.status === "aguardando_sinal")
+      const links = doGrupo.length > 1 ? doGrupo.map((p, i) => `${(p.rotulo ?? `caixa ${i + 1}`).replace(/^./, x => x.toUpperCase())}: ${linkPedido(p.id)}`).join("\n") : linkPedido(pd.id)
+      const texto = textoLembreteDigital({ ...pd, jid: c.jid, quantidade: doGrupo.reduce((s, p) => s + p.quantidade, 0) || pd.quantidade }, adiou ? 2 : lemb, links, { adiou })
       if (adiou) await marcarPd({ lembreteParado: true })   // depois deste, para
       const env = await enviar(c, texto, undefined, { proativo: true })
       if (env.ids.length) {
         await aplicar(c, passo!.etiquetas, null)
-        await gravarCfg(d => ({ pedidosDigitais: (d.pedidosDigitais ?? []).map(p => p.id === pd.id ? { ...p, lembretes: [...(p.lembretes ?? []), { nivel, em: new Date().toISOString() }] } : p) }))
+        const ids = new Set(doGrupo.map(p => p.id).concat(pd.id))
+        await gravarCfg(d => ({ pedidosDigitais: (d.pedidosDigitais ?? []).map(p => ids.has(p.id) ? { ...p, lembretes: [...(p.lembretes ?? []), { nivel, em: new Date().toISOString() }] } : p) }))
       }
       return registrar({ ...base, perfil: "pequeno", texto, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? `F${nivel}: lembrete do pedido ${pd.id}`, passo: `F${nivel}` })
     }
