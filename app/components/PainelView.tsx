@@ -7,6 +7,8 @@ import {
 } from "lucide-react"
 import { EnviarWhatsapp, Envio } from "./EnviarWhatsapp"
 import { HojeCard } from "./HojeCard"
+import { PropostasProntasCard } from "./PropostasProntasCard"
+import { RetornoAnunciosCard } from "./RetornoAnunciosCard"
 import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COL_HOT, AprovacaoOnline } from "../types"
 import { Configuracoes } from "../config"
 import {
@@ -270,6 +272,10 @@ export function PainelView({
           <Botao variante="primario" icone={<Plus className="w-4 h-4" />} onClick={onNovoOrcamento}>Novo orçamento</Botao>
         </>}
       />
+
+      <PropostasProntasCard onAbrirConversa={onAbrirConversa} />
+
+      <RetornoAnunciosCard pedidos={pedidos} clientes={clientes} periodo={periodo} nomePeriodo={nomePeriodo} onAbrir={() => onNavegar("meta")} />
 
       {onAbrirConversa && <HojeCard onAbrirConversa={onAbrirConversa} onNavegar={onNavegar} onOrcar={onOrcarConversa} />}
 

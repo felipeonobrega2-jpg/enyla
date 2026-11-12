@@ -6,6 +6,8 @@
 
 import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital, lembreteDigitalAgora, ADIOU } from "./digital"
 import { linkPedido } from "./digitalLink"
+import { faltaParaProposta } from "./propostaPronta"
+import { prepararProposta, talvezPropostaDoMql } from "./propostaProntaServidor"
 import type { RegraDigital } from "./precoDigital"
 import { supabase } from "./supabase"
 import { evo } from "./evolution"
@@ -354,7 +356,9 @@ export async function responderSozinho(msgId: string) {
   // Respondeu: sai do follow-up (vale também para lead que você está atendendo)
   await aplicar(c, semFollowUp(c.etiquetas ?? []), null)
   await respondeuRetomada(cfg, c, msgId).catch(() => null)
-  if (!conversaNova || c.status_lead === "mql") return   // MQL: daqui em diante é você
+  // MQL: daqui em diante é você (o agente não responde), mas com medida e quantidade a proposta já fica pronta para aprovar
+  if (conversaNova && c.status_lead === "mql") { await talvezPropostaDoMql(jid).catch(() => null); return }
+  if (!conversaNova) return
   // Você escreveu nesta conversa nas últimas 24 h (celular ou tela do sistema): a conversa é sua, o agente não entra.
   // Lead do digital é a exceção: esse é todo do agente.
   if (!(c.etiquetas ?? []).includes(ETIQUETAS_AGENTE.digital) && await voceAtende(jid, cfg))
@@ -441,6 +445,8 @@ export async function responderSozinho(msgId: string) {
     await garantirTelefone(c.jid).catch(() => null)   // MQL fica com o telefone guardado no sistema
     await marcarNaoLida(c, msgId)
     await avisarMql(cfg, c, r)
+    // Já tem medida e quantidade: a proposta fica pronta para você aprovar no celular
+    if (!conversa.clienteCadastrado && !faltaParaProposta(r.dados)) await prepararProposta(jid, r.dados, conversa.nome).catch(() => null)
   }
   // Segurou para você: aviso na hora no seu WhatsApp (nada fica esquecido no registro)
   if (trava && !viraMql && TRAVAS_COM_AVISO.some(t => trava.startsWith(t))) await avisarSegurado(cfg, c, trava + (r.motivo_alerta ? ` · ${r.motivo_alerta}` : ""), r.resposta).catch(() => null)

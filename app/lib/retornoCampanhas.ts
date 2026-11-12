@@ -37,3 +37,24 @@ export function retornoPorCampanha(pedidos: Pedido[], clientes: Pick<Cliente, "n
 
 export const roiReal = (r: RetornoCampanha | undefined, gasto: number) =>
   r && gasto > 0 ? (r.margem - gasto) / gasto : null
+
+// Retorno dos anúncios no período: pedidos fechados no período por clientes que vieram de anúncio, quanto
+// já entrou de dinheiro deles e a margem (custo lançado; sem custo, a margem média, marcada como estimada).
+// "Cada R$ 1 de anúncio virou R$ X de margem": margem ÷ gasto. Acima de 1, o anúncio se pagou.
+export type RetornoPeriodo = { pedidos: number; clientes: number; venda: number; recebido: number; margem: number; margemEstimada: boolean }
+
+export function retornoDoPeriodo(pedidos: Pedido[], clientes: Pick<Cliente, "nome" | "origemCampanhaId">[], dentro: (iso: string | undefined) => boolean): RetornoPeriodo {
+  const media = (margemContribuicao(pedidos).pct ?? 40) / 100
+  const doAnuncio = new Set(clientes.filter(c => c.origemCampanhaId).map(c => nomeChave(c.nome)))
+  const ps = pedidos.filter(p => p.dataFechamento && dentro(p.dataFechamento) && doAnuncio.has(nomeChave(p.nomeCliente)))
+  const r: RetornoPeriodo = { pedidos: ps.length, clientes: new Set(ps.map(p => nomeChave(p.nomeCliente))).size, venda: 0, recebido: 0, margem: 0, margemEstimada: false }
+  for (const p of ps) {
+    r.venda += p.venda
+    r.recebido += p.recebido
+    if (p.custoDireto > 0) r.margem += p.venda - p.custoDireto
+    else { r.margem += p.venda * media; r.margemEstimada = true }
+  }
+  return r
+}
+
+export const margemPorReal = (r: RetornoPeriodo, gasto: number) => gasto > 0 ? r.margem / gasto : null

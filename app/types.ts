@@ -292,6 +292,10 @@ export type AprovacaoOnline = {
   // recompra: cliente repetiu um pedido pela página dele (mesmo preço); recompra_qtd: quer outra quantidade (precisa de orçamento)
   tipo?: "aprovacao" | "recompra" | "recompra_qtd"
   pedidoOrigem?: string
+  // Fechamento automático: o servidor já criou o lote e a cobrança do sinal (pendente; o Pix concilia sozinho)
+  loteId?: string
+  loteNumero?: string
+  lancamentoSinal?: string
 }
 
 export type Lote = {

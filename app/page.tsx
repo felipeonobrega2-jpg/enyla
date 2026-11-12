@@ -916,19 +916,30 @@ export default function Home() {
     } catch { /* silently fail */ }
   }
 
-  function salvar() {
-    if (!result) return
+  const salvandoRef = useRef(false)
+  async function salvar() {
+    if (!result || salvandoRef.current) return
+    salvandoRef.current = true
+    // Número reservado no servidor (o agente também cria orçamentos): sem isso, dois iguais se sobrescrevem
+    let numero: string, novoContador: number, doServidor = false
+    try {
+      const r = await fetch("/api/historico/numero", { method: "POST" })
+      const j = r.ok ? await r.json() : null
+      if (!j?.numero) throw new Error()
+      numero = j.numero; novoContador = j.contador; doServidor = true
+    } catch {
+      const ano = new Date().getFullYear()
+      novoContador = Math.max(contador, ...historico.map(h => Number(h.numero?.match(new RegExp(`^ORC-${ano}-(\\d+)$`))?.[1] ?? 0))) + 1
+      numero = `ORC-${ano}-${String(novoContador).padStart(3, "0")}`
+    } finally { salvandoRef.current = false }
     const data  = new Date().toLocaleString("pt-BR")
-    const ano   = new Date().getFullYear()
-    const novoContador = contador + 1
-    const numero = `ORC-${ano}-${String(novoContador).padStart(3, "0")}`
     setContador(novoContador)
     const historicoItem = { form: { ...form }, calculo: compactarCalculo(result), data, numero }
     setHistorico(prev => [historicoItem, ...prev])
     fetch("/api/historico", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...historicoItem, contador: novoContador }),
+      body: JSON.stringify({ ...historicoItem, ...(doServidor ? {} : { contador: novoContador }) }),
     }).catch(() => {})
     const ideal = result.tabela.find(l => l.quantidade === result.sweetSpotIdealQtd) ?? result.tabela[result.tabela.length - 1]
 
@@ -1209,6 +1220,14 @@ export default function Home() {
       fetch("/api/aprovacao/visto", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ numeros: [a.numero] }) }).catch(() => {})
       abrirDetalheCard(card)
       showToast(`${a.nomeCliente} quer ${a.quantidade.toLocaleString("pt-BR")} un de ${a.pedidoOrigem}. Faça o orçamento e mande o link de aprovação.`)
+      return
+    }
+    // O servidor já criou o lote e a cobrança do sinal (o Pix concilia sozinho): só confirma
+    if (a.lancamentoSinal && a.loteId) {
+      setKanban(prev => prev.map(c => c.id === card.id ? { ...c, loteId: a.loteId, loteNumero: a.loteNumero } : c))
+      setConfig(c => ({ ...c, aprovacoesOnline: (c.aprovacoesOnline ?? []).map(x => x.numero === a.numero ? { ...x, visto: true } : x) }))
+      fetch("/api/aprovacao/visto", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ numeros: [a.numero] }) }).catch(() => {})
+      showToast(`${a.numero}: lote ${a.loteNumero} e cobrança do sinal (${brl(a.sinal)}) já criados. Quando o Pix cair, o banco reconhece.`)
       return
     }
     const abrirSinal = (loteId?: string, loteNumero?: string) =>
