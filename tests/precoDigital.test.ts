@@ -24,3 +24,23 @@ describe("preço digital (tabela da Villa)", () => {
     expect(precoDigital(200, "A4")).toBeNull()
   })
 })
+
+describe("custo real com o Leandro (12/11): preço de venda não muda", () => {
+  it("A4: R$ 3,50 a caixa, arte inclusa; o preço continua o mesmo", () => {
+    const p = precoDigital(100, "A4")!
+    expect(p.total).toBeCloseTo(399.95 + 70 + 150)
+    expect(p.custo).toBe(350)
+    expect(p.arte).toBe(0)
+    expect(p.margem).toBeCloseTo(p.total - 350)
+    expect(precoDigital(50, "A4")!.custo).toBe(175)
+  })
+  it("A4 vendida pela tabela A3 (acima de 100 un): preço da A3, custo da A4", () => {
+    const p = precoDigital(200, "A3", undefined, "A4")!
+    expect(p.total).toBeCloseTo(1220)
+    expect(p.custo).toBe(700)
+    expect(p.margem).toBeCloseTo(520)
+  })
+  it("A3 segue a tabela", () => {
+    expect(precoDigital(100, "A3")!.custo).toBeCloseTo(499.95)
+  })
+})

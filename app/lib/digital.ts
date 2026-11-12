@@ -44,6 +44,7 @@ export type PedidoDigital = {
   produto: string | null; ml: number | null
   medidas: { a: number; l: number; p: number }; padrao: boolean   // padrão = medida da tabela por ml (cliente confirma)
   folha: Folha; quantidade: number; faixa: number
+  folhaReal?: Folha                // onde a caixa cabe de verdade (custo); "folha" é a tabela do preço de venda
   pedida?: number                  // quantidade que o cliente pediu (a cotação usa a faixa da tabela: 150 → 200)
   grupo?: string                   // mais de uma caixa na mesma conversa: todos os pedidos do grupo têm o id do 1º
   rotulo?: string                  // qual caixa é esta para o cliente ("30 ml", "difusor")
@@ -71,7 +72,7 @@ export type Ajuste = { texto: string; em: string }
 export type Entrega = { cep: string; endereco: string; em: string }
 
 export type Cotacao =
-  | { ok: true; medidas: { a: number; l: number; p: number }; padrao: boolean; ml: number | null; folha: Folha; quantidade: number; faixa: number; pedida: number; custo: number; arte: number; margem: number; total: number }
+  | { ok: true; medidas: { a: number; l: number; p: number }; padrao: boolean; ml: number | null; folha: Folha; folhaReal: Folha; quantidade: number; faixa: number; pedida: number; custo: number; arte: number; margem: number; total: number }
   | { ok: false; motivo: string }
 
 // Cota pelo que a IA tirou da conversa: medidas da caixa (ou o padrão do ml) e a quantidade
@@ -86,9 +87,9 @@ export function cotarDigital(d: DadosPedido | null, regra: RegraDigital = REGRA_
   if (!naFolha) return { ok: false, motivo: "caixa maior que A3 (consultar a Villa)" }
   // Cabe na A4 mas a quantidade passa da tabela A4 (só vai até 100): usa a tabela A3, que é mais cara (nunca cobra a menos)
   const folha = naFolha === "A4" && !custoVilla(d.quantidade, "A4") ? "A3" : naFolha
-  const p = precoDigital(d.quantidade, folha, regra)
+  const p = precoDigital(d.quantidade, folha, regra, naFolha)
   if (!p) return { ok: false, motivo: `acima de ${Math.max(...quantidadesDa(folha))} un na ${folha} (fora da tabela da Villa)` }
-  return { ok: true, medidas, padrao: !cx, ml: d.volume_ml ?? pad?.ml ?? null, folha, quantidade: p.faixa, faixa: p.faixa, pedida: d.quantidade, custo: p.custo, arte: p.arte, margem: p.margem, total: p.total }
+  return { ok: true, medidas, padrao: !cx, ml: d.volume_ml ?? pad?.ml ?? null, folha, folhaReal: naFolha, quantidade: p.faixa, faixa: p.faixa, pedida: d.quantidade, custo: p.custo, arte: p.arte, margem: p.margem, total: p.total }
 }
 
 // Sinal com centavos únicos entre os pedidos esperando Pix (o extrato só mostra valor e nome: assim o Pix acha o pedido)
@@ -114,11 +115,11 @@ export function textoOrcamentoDigital(p: Pick<PedidoDigital, "quantidade" | "ml"
   return [
     `Fechou! Em impressão digital fica assim:`,
     ``,
-    `*${p.quantidade.toLocaleString("pt-BR")} caixinhas* ${oque} (${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm), triplex 300g com laminação fosca ou brilhante, *arte inclusa* (nossa designer cria pra você).`,
+    `*${p.quantidade.toLocaleString("pt-BR")} caixinhas* ${oque} (${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm), triplex 300g com laminação fosca ou brilhante, *arte inclusa* (a gente cria pra você).`,
     `Total: *${brl(p.total)}* (${brl(p.total / p.quantidade)} a unidade).`,
     ``,
     `Para começar, o sinal de 50% (*${brl(p.sinal)}*) pelo Pix: ${link}`,
-    `Assim que cair, a designer já começa a sua arte.`,
+    `Assim que cair, a sua arte já entra na fila.`,
     p.padrao ? `\nUsei a medida padrão de caixa ${oque}. Se o seu frasco for diferente, me manda as medidas que eu ajusto.` : null,
   ].filter(x => x !== null).join("\n")
 }
@@ -132,7 +133,7 @@ export function montarPedido(pedidos: PedidoDigital[], jid: string, nome: string
   const abertos = pedidos.filter(p => p.status === "aguardando_sinal").map(p => p.sinal)
   return {
     id: proximoIdDigital(pedidos), jid, nome, em: agora.toISOString(), produto: d?.produto ?? null, ml: c.ml,
-    medidas: c.medidas, padrao: c.padrao, folha: c.folha, quantidade: c.quantidade, faixa: c.faixa, ...(c.pedida < c.quantidade ? { pedida: c.pedida } : {}),
+    medidas: c.medidas, padrao: c.padrao, folha: c.folha, folhaReal: c.folhaReal, quantidade: c.quantidade, faixa: c.faixa, ...(c.pedida < c.quantidade ? { pedida: c.pedida } : {}),
     custo: c.custo, arte: c.arte, margem: c.margem, total: c.total, sinal: sinalUnico(c.total, abertos), status: "aguardando_sinal",
   }
 }
@@ -150,14 +151,14 @@ export type Briefing = { marca?: string; cores?: string; referencias?: string; l
 export type PedidoComBriefing = PedidoDigital & { briefing?: Briefing; pagamento?: { txId: string; valor: number; data: string; nome: string | null } }
 
 // As quantidades da tabela da folha deste pedido, com o preço de cada uma
-export function opcoesDoPedido(p: Pick<PedidoDigital, "folha">, regra: RegraDigital = REGRA_DIGITAL_PADRAO) {
-  return quantidadesDa(p.folha).map(q => precoDigital(q, p.folha, regra)!).map(x => ({ quantidade: x.faixa, total: x.total, unit: x.total / x.faixa }))
+export function opcoesDoPedido(p: Pick<PedidoDigital, "folha" | "folhaReal">, regra: RegraDigital = REGRA_DIGITAL_PADRAO) {
+  return quantidadesDa(p.folha).map(q => precoDigital(q, p.folha, regra, p.folhaReal)!).map(x => ({ quantidade: x.faixa, total: x.total, unit: x.total / x.faixa }))
 }
 
 // Cliente escolheu outra quantidade na página (só antes do sinal): refaz total e sinal
 export function trocarQuantidade(pedidos: PedidoDigital[], p: PedidoDigital, q: number, regra: RegraDigital = REGRA_DIGITAL_PADRAO): PedidoDigital | null {
   if (p.status !== "aguardando_sinal") return null
-  const x = precoDigital(q, p.folha, regra)
+  const x = precoDigital(q, p.folha, regra, p.folhaReal)
   if (!x || x.faixa !== q) return null
   const abertos = pedidos.filter(o => o.id !== p.id && o.status === "aguardando_sinal").map(o => o.sinal)
   return { ...p, quantidade: q, faixa: q, custo: x.custo, arte: x.arte, margem: x.margem, total: x.total, sinal: sinalUnico(x.total, abertos) }
@@ -177,12 +178,14 @@ export function sinaisPagos(pedidos: PedidoDigital[], extrato: EntradaBanco[], u
   return out
 }
 
+// Sinal pago: o pedido entrou na fila de design; a 1ª versão vem com o que ele preencheu na página, e qualquer coisa a
+// mais ele avisa por lá. Sem nada preenchido ainda: pede para preencher pela página.
 export function textoSinalPago(p: Pick<PedidoDigital, "id" | "sinal">, link: string, temBriefing: boolean) {
   return [
-    `Pagamento do sinal confirmado (${brl(p.sinal)}). Obrigado! ✅`,
+    `Pagamento do sinal confirmado (${brl(p.sinal)}). Obrigado!`,
     temBriefing
-      ? `A designer já está com as suas informações e começa a sua arte. Assim que ficar pronta, eu te mando aqui para aprovar.`
-      : `Para a designer começar a sua arte, me conta pelo link: o nome da marca, as cores e, se tiver, o logo e referências. ${link}`,
+      ? `Seu pedido já entrou na fila de design. Em breve te mando a primeira versão da arte, feita com as informações que você colocou na página do pedido. Se quiser acrescentar mais alguma coisa, é só avisar por lá:\n${link}`
+      : `Seu pedido já entrou na fila de design. Para a primeira versão sair do seu jeito, coloca na página do pedido o nome da marca, as cores e, se tiver, o logo e referências:\n${link}`,
   ].join("\n\n")
 }
 
@@ -194,7 +197,7 @@ export function textoLinkPedido(p: Pick<PedidoDigital, "quantidade" | "ml" | "me
     ? `Você pediu ${p.pedida.toLocaleString("pt-BR")}: na nossa tabela, até ${p.quantidade.toLocaleString("pt-BR")} sai pelo mesmo valor, então já coloquei ${p.quantidade.toLocaleString("pt-BR")} caixinhas pra você.`
     : null
   return [
-    `Montei o seu orçamento em impressão digital, com a *arte inclusa* (nossa designer cria pra você).`,
+    `Montei o seu orçamento em impressão digital, com a *arte inclusa* (a gente cria pra você).`,
     faixa,
     `*${p.quantidade.toLocaleString("pt-BR")} caixinhas* ${oque} (${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm): *${brl(p.total)}*`,
     `Veja a caixa, escolha a quantidade e pague o sinal de 50% pelo Pix aqui: ${link}`,
@@ -335,25 +338,27 @@ export const textoRestantePago = (p: Pick<PedidoDigital, "restante">) =>
 const lam = (b?: Briefing) => b?.laminacao === "brilho" ? "laminação brilho" : "laminação fosca"
 export function textoParaVilla(p: PedidoComBriefing, arte: string | null) {
   return [
-    `*Pedido Enyla ${p.id}*`,
+    `*Arte aprovada pelo cliente · ${p.id}* · pode imprimir`,
     `${p.quantidade.toLocaleString("pt-BR")} caixas · ${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm (A × L × P)`,
-    `Folha ${p.folha} · triplex 300g · ${lam(p.briefing)}`,
+    `Folha ${p.folhaReal ?? p.folha} · triplex 300g · ${lam(p.briefing)}`,
     arte ? `Arte aprovada: ${arte}` : null,
     `Valor da tabela: ${brl(p.custo)}`,
   ].filter(Boolean).join("\n")
 }
+// Para o Leandro (arte + produção): o pedido, o briefing do cliente e o link da página da arte. Nunca o valor de venda.
 export function textoParaDesigner(p: PedidoComBriefing, link: string) {
   const b = p.briefing ?? {}
   return [
-    `*Arte nova · ${p.id}*`,
-    `${p.quantidade.toLocaleString("pt-BR")} caixas · ${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm · folha ${p.folha} · ${lam(b)}`,
+    p.ajustes?.length ? `*Ajuste na arte · ${p.id}*` : `*Pedido novo Enyla · ${p.id}*`,
+    `${p.quantidade.toLocaleString("pt-BR")} caixas · ${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm (A × L × P) · folha ${p.folhaReal ?? p.folha} · triplex 300g · ${lam(b)}`,
+    p.ml ? `Frasco de ${p.ml} ml${p.produto ? ` (${p.produto})` : ""}` : p.produto ? `Produto: ${p.produto}` : null,
     b.marca ? `Marca: ${b.marca}` : null,
     b.cores ? `Cores: ${b.cores}` : null,
     b.referencias ? `Referências: ${b.referencias}` : null,
-    b.arquivos?.length ? `Arquivos do cliente: ${b.arquivos.length} (no link)` : null,
-    p.ajustes?.length ? `\n*Ajuste pedido:* ${p.ajustes.at(-1)!.texto}` : null,
+    b.arquivos?.length ? `Arquivos do cliente: ${b.arquivos.length} (vão logo abaixo e estão na página)` : null,
+    p.ajustes?.length ? `\n*O que o cliente pediu para mudar:* ${p.ajustes.at(-1)!.texto}` : null,
     ``,
-    `Briefing completo e envio da arte: ${link}`,
+    `Página do pedido (briefing, arquivos e onde você sobe a arte): ${link}`,
   ].filter(x => x !== null).join("\n")
 }
 
@@ -439,7 +444,7 @@ export function textoLinkGrupo(ps: Pick<PedidoDigital, "quantidade" | "ml" | "me
   ].filter(Boolean).join("\n"))
   const padrao = ps.filter(p => p.padrao).map((p, i) => p.rotulo ?? `caixa ${i + 1}`)
   return [
-    `Montei os orçamentos em impressão digital, um para cada caixa, com a *arte inclusa* (nossa designer cria pra você):`,
+    `Montei os orçamentos em impressão digital, um para cada caixa, com a *arte inclusa* (a gente cria pra você):`,
     ...blocos,
     `Cada caixa tem o seu pedido: pode fechar as duas juntas ou uma de cada vez.`.replace("as duas", ps.length === 2 ? "as duas" : "todas"),
     padrao.length ? `Usei a medida padrão de caixa para ${padrao.join(" e ")}. Se o seu frasco for diferente, me manda as medidas que eu ajusto.` : null,

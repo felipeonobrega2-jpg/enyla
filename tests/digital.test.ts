@@ -68,8 +68,9 @@ describe("página do pedido e sinal no extrato", async () => {
     const t = textoLinkPedido(p, "https://x/d/DIG-0001?t=a")
     expect(t).toContain("R$ 419,95"); expect(t).toContain("https://x/d/DIG-0001?t=a"); expect(t).not.toMatch(/frete/i)
     for (const v of valoresEmReais(t)) expect(valoresDoPedido(p)).toContain(v)
-    expect(textoSinalPago(p, "L", false)).toContain("L")
-    expect(textoSinalPago(p, "L", true)).not.toContain("L")
+    expect(textoSinalPago(p, "LINK", false)).toMatch(/fila de design[\s\S]*nome da marca[\s\S]*LINK/)
+    // Com o briefing preenchido: a 1ª versão vem com o que ele colocou, e o link para acrescentar algo por lá
+    expect(textoSinalPago(p, "LINK", true)).toMatch(/fila de design[\s\S]*primeira versão[\s\S]*avisar por lá:\nLINK/)
   })
 })
 

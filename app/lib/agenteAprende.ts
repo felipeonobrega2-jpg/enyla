@@ -222,8 +222,17 @@ async function medirEstiloFelipe() {
 
 // O que você ensinou direto (pediu ao Claude): entra uma vez, pela versão
 const ENSINADO: { v: number; item: Conhecimento }[] = [
-  { v: 3, item: { id: "felipe-digital-sem-logo", tema: "venda", em: "2026-11-11T00:00:00.000Z",
-    texto: "No digital eu só preciso de quantidade e tamanho (ml até 120 ou as medidas do frasco) para mandar o orçamento com o link. Frasco acima de 120 ml, como body splash de 200 ml, eu peço a altura e a largura do frasco em cm. Não pergunto se tem logo nem peço arte antes do sinal: a arte está inclusa e a designer pega isso depois do pagamento." } },
+  // v4 (12/11, primeira venda do digital, conversa com o Michel)
+  { v: 4, item: { id: "felipe-digital-sem-logo", tema: "venda", em: "2026-11-12T00:00:00.000Z",
+    texto: "No digital eu só preciso de quantidade e tamanho (ml até 120 ou as medidas do frasco) para mandar o orçamento com o link. Frasco acima de 120 ml, como body splash de 200 ml, eu peço a altura e a largura do frasco em cm. Não pergunto se tem logo nem peço arte antes do sinal: a arte está inclusa e é feita depois do pagamento, com o que o cliente coloca na página do pedido." } },
+  { v: 4, item: { id: "felipe-digital-acabamento", tema: "produto", em: "2026-11-12T00:00:00.000Z",
+    texto: "Na impressão digital o acabamento é na caixa inteira: ou tudo fosco ou tudo brilho (laminação). Não dá para fazer fosco com detalhe brilhoso, porque a caixa já sai pronta da impressora. Alto relevo, hot stamping e verniz localizado são acabamentos especiais que só existem no offset (clichê, outra máquina) e ficam caros abaixo de 1.000 unidades. Quando o cliente mostra caixa de marca grande com esses efeitos, explico isso com calma, sem desmerecer o pedido dele. Fosco costuma ficar mais sofisticado." } },
+  { v: 4, item: { id: "felipe-digital-formato", tema: "preco", em: "2026-11-12T00:00:00.000Z",
+    texto: "No digital o preço vai pelo formato da caixa aberta: se cabe numa folha A4 é um valor, se cabe na A3 é outro. Uma variação de alguns milímetros na medida quase nunca muda o preço. A caixa fica justa no frasco: uns 3 mm de folga para cada lado na largura e na profundidade (o papel já é 300 g); mais que 5 mm fica sobrando." } },
+  { v: 4, item: { id: "felipe-enderecos", tema: "empresa", em: "2026-11-12T00:00:00.000Z",
+    texto: "Temos dois endereços: a produção, onde a gente imprime, na Estrada Velha de Itapevi, 3614, Vila Militar, Barueri; e o escritório de reuniões no Brás, na Av. Celso Garcia, 928, perto da maioria dos clientes. O CNPJ é o da Jerograf (é a nossa empresa; ENYLA é a marca). Se o cliente quer confirmar se é confiável, passo os endereços e o CNPJ e digo que pode me ligar." } },
+  { v: 4, item: { id: "felipe-digital-depois-do-sinal", tema: "venda", em: "2026-11-12T00:00:00.000Z",
+    texto: "Depois que o cliente paga o sinal do digital: o pedido entra na fila de design, a primeira versão da arte chega para ele aqui no WhatsApp, feita com o que ele colocou na página do pedido, e ele aprova ou pede ajuste pela própria página. Aprovada, vai para a produção, e o restante é pago antes do envio. Se ele perguntar se alguém vai entrar em contato: a arte chega aqui no WhatsApp; se faltar alguma informação, a gente chama. Nunca falo para o cliente quem é o parceiro que faz a arte ou a produção: para ele é tudo nosso." } },
   { v: 2, item: { id: "felipe-cigarro", tema: "recusa", em: "2026-11-07T00:00:00.000Z",
     texto: "Não trabalhamos com embalagem de cigarro (maço, caixa de cigarro, tabaco). Se o lead pedir, diga com educação que esse tipo de embalagem a gente não faz e não siga com o orçamento." } },
 ]
@@ -234,7 +243,8 @@ async function revisarConhecimento() {
     if (v >= ultima) return null
     let lista = d.conhecimentoAgente ?? []
     if (v < 1) lista = lista.filter(c => !REVISAO_1.includes(c.id))
-    for (const e of ENSINADO) if (e.v > v && !lista.some(c => c.id === e.item.id)) lista = [...lista, e.item]
+    // Item ensinado de novo numa versão nova (mesmo id) substitui o antigo
+    for (const e of ENSINADO) if (e.v > v) lista = [...lista.filter(c => c.id !== e.item.id), e.item]
     return { conhecimentoAgente: lista, agenteRevisaoConhecimento: ultima }
   })
 }

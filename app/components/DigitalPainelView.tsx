@@ -166,17 +166,17 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
           <div className="min-w-0">
             <p className="text-[13px] font-semibold text-[#191625] flex items-center gap-2"><Users className="w-4 h-4 text-[#8456e8]" />Contatos do digital</p>
             <p className="text-[11.5px] text-[#898892] mt-0.5">
-              Designer: {contatos.designer ? `${contatos.designerNome || "cadastrada"} · ${contatos.designer}` : <span className="text-[#c57800]">falta cadastrar (o briefing vem para você)</span>}
-              {" · "}Villa: {contatos.villa ? contatos.villa : <span className="text-[#c57800]">falta cadastrar (a arte aprovada vem para você encaminhar)</span>}
+              Leandro (arte e produção): {contatos.villa ? contatos.villa : <span className="text-[#c57800]">falta cadastrar (o pedido vem para você encaminhar)</span>}
+              {contatos.designer ? <>{" · "}Arte com outra pessoa: {contatos.designerNome || "cadastrada"} · {contatos.designer}</> : null}
             </p>
           </div>
           {!editContatos && <Botao onClick={() => setEditContatos(contatos)}>Editar</Botao>}
         </div>
         {editContatos && (
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <input value={editContatos.designerNome ?? ""} onChange={e => setEditContatos({ ...editContatos, designerNome: e.target.value })} placeholder="Nome da designer"
+            <input value={editContatos.designerNome ?? ""} onChange={e => setEditContatos({ ...editContatos, designerNome: e.target.value })} placeholder="Nome de quem faz a arte (se não for o Leandro)"
               className="h-9 rounded-lg px-3 text-[12.5px] text-[#191625] bg-white ds-borda focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20" />
-            <input value={editContatos.designer ?? ""} onChange={e => setEditContatos({ ...editContatos, designer: e.target.value })} placeholder="WhatsApp da designer (5584…)" inputMode="numeric"
+            <input value={editContatos.designer ?? ""} onChange={e => setEditContatos({ ...editContatos, designer: e.target.value })} placeholder="WhatsApp da arte (vazio = o da Villa/Leandro)" inputMode="numeric"
               className="h-9 rounded-lg px-3 text-[12.5px] text-[#191625] bg-white ds-borda focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20" />
             <input value={editContatos.villa ?? ""} onChange={e => setEditContatos({ ...editContatos, villa: e.target.value })} placeholder="WhatsApp do Leandro / Villa" inputMode="numeric"
               className="h-9 rounded-lg px-3 text-[12.5px] text-[#191625] bg-white ds-borda focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20" />
@@ -260,7 +260,7 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
                       {sel.ajustes.length > 0 && <p className="whitespace-pre-wrap"><b className="text-[#c57800]">Ajuste pedido:</b> {sel.ajustes.at(-1)!.texto}</p>}
                     </div>
                   </div>
-                ) : <p className="text-[#898892]">{sel.designerAvisadoEm ? `Designer recebeu o briefing ${haQuanto(sel.designerAvisadoEm)}.` : "Nenhuma arte ainda."}</p>}
+                ) : <p className="text-[#898892]">{sel.designerAvisadoEm ? `Leandro recebeu o pedido ${haQuanto(sel.designerAvisadoEm)}.` : "Nenhuma arte ainda."}</p>}
                 {!sel.arteAprovadaEm && (
                   <div className="flex gap-2 flex-wrap mt-2">
                     <label className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg ds-borda text-[12px] font-semibold text-[#191625] cursor-pointer ${ocupado ? "opacity-60 pointer-events-none" : ""}`}>
@@ -268,9 +268,9 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
                       <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden" onChange={e => void subirArte(sel, e.target.files?.[0])} />
                     </label>
                     {sel.arteAtual && !sel.arteEnviadaEm && <Botao variante="primario" disabled={!!ocupado} onClick={() => void acao("mandarArte", { id: sel.id, acao: "mandarArte" })} icone={<Send className="w-3.5 h-3.5" />}>Mandar para aprovar</Botao>}
-                    <Botao disabled={!!ocupado} onClick={() => void acao("designer", { id: sel.id, acao: "designer" })}>Briefing à designer</Botao>
+                    <Botao disabled={!!ocupado} onClick={() => void acao("designer", { id: sel.id, acao: "designer" })}>Mandar ao Leandro</Botao>
                     <button onClick={() => copiar(sel.linkDesigner, "designer")} className="inline-flex items-center gap-1 text-[12px] text-[#8456e8] hover:underline">
-                      {copiado === "designer" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} Link da designer
+                      {copiado === "designer" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} Link da arte (sem valores)
                     </button>
                   </div>
                 )}

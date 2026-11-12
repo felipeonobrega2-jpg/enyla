@@ -264,7 +264,7 @@ export function OrcamentoDigitalView({
                     <div className="text-right">
                       <p className="text-[15px] font-bold text-[#191625] ds-num">{brl(prev.total)}</p>
                       <p className="text-[11px] text-[#8E8E93] ds-num">{brl(prev.unit)}/un</p>
-                      <p className="text-[10.5px] text-[#898892] ds-num mt-0.5" title="Só para você: não vai no PDF">Villa {brl(prev.custo)} · arte {brl(prev.arte)} · você <span className="font-semibold text-[#009351]">{brl(prev.margem)}</span></p>
+                      <p className="text-[10.5px] text-[#898892] ds-num mt-0.5" title="Só para você: não vai no PDF">Leandro {brl(prev.custo)} (arte inclusa) · você <span className="font-semibold text-[#009351]">{brl(prev.margem)}</span></p>
                     </div>
                   )}
                 </button>

@@ -39,10 +39,22 @@ export function custoVilla(q: number, folha: Folha): { faixa: number; custo: num
   return linha ? { faixa: linha[0], custo: linha[1] } : null
 }
 
+// Custo real (12/11/2026): o Leandro faz a arte junto e cobra R$ 350 a cada 100 caixas que cabem na A4 (a arte não
+// é mais custo à parte). A3 segue a tabela dele. A TABELA_VILLA acima continua sendo a base do PREÇO DE VENDA
+// (custo antigo + arte + margem): o preço ao cliente não muda, o que mudou vira margem.
+export const CUSTO_A4_POR_100 = 350
+export function custoReal(faixa: number, folhaReal: Folha): number | null {
+  if (folhaReal === "A4") return Math.round(faixa * CUSTO_A4_POR_100) / 100   // R$ 3,50 a caixa
+  return custoVilla(faixa, "A3")?.custo ?? null
+}
+
 export type PrecoDigital = { q: number; faixa: number; custo: number; arte: number; margem: number; total: number; unit: number }
-export function precoDigital(q: number, folha: Folha, regra: RegraDigital = REGRA_DIGITAL_PADRAO): PrecoDigital | null {
+// folha: a tabela do preço de venda; folhaReal: onde a caixa cabe de verdade (a A4 acima de 100 un é vendida pela
+// tabela A3, mas produzida e paga como A4)
+export function precoDigital(q: number, folha: Folha, regra: RegraDigital = REGRA_DIGITAL_PADRAO, folhaReal: Folha = folha): PrecoDigital | null {
   const c = custoVilla(q, folha)
   if (!c || q <= 0) return null
   const total = Math.round((c.custo + regra.arte + regra.margem) * 100) / 100
-  return { q, faixa: c.faixa, custo: c.custo, arte: regra.arte, margem: regra.margem, total, unit: total / q }
+  const custo = custoReal(c.faixa, folhaReal) ?? c.custo
+  return { q, faixa: c.faixa, custo, arte: 0, margem: Math.round((total - custo) * 100) / 100, total, unit: total / q }
 }

@@ -14,6 +14,7 @@ import {
 import { sincronizar } from "./bancoServidor"
 import { pluggyConfigurada, atualizarItem } from "./pluggy"
 import { asaas, asaasConfigurado, PAGO, CobrancaAsaas } from "./asaas"
+import { facaAberta, folhaDaFaca, custoReal } from "./precoDigital"
 import { soNumeros, documentoValido } from "./documento"
 import type { CobrancaPix } from "./digital"
 
@@ -87,7 +88,7 @@ export async function conferirSinais(opts: { forcar?: boolean } = {}): Promise<{
     if (c) await enviar(c, textoSinalPago(p, linkPedido(p.id), !!(p.briefing?.marca || p.briefing?.arquivos?.length)), undefined, { essencial: true }).catch(() => null)
     await notificar(`Venda digital: ${p.id}`, `Sinal pago ${brl(p.sinal)} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas · total ${brl(p.total)}`, { prioridade: "alta", tags: ["moneybag"] }).catch(() => null)
     const designer = await avisarDesigner(cfg, p)
-    await avisarVoce(cfg, `💰 *Digital ${p.id}* · sinal pago ${brl(p.sinal)}\n${p.nome ?? ""} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas · total ${brl(p.total)}${designer ? "" : "\n\nSem designer cadastrada: cadastre em Digital → Contatos, ou mande o briefing pelo link:\n" + linkDesigner(p.id)}`)
+    await avisarVoce(cfg, `💰 *Digital ${p.id}* · sinal pago ${brl(p.sinal)}\n${p.nome ?? ""} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas · total ${brl(p.total)}${designer ? "" : "\n\nSem o número do Leandro cadastrado (Digital → Contatos): mande para ele o link da arte (sem valores):\n" + linkDesigner(p.id)}`)
   }
   for (const { id, tx } of restantesPagos(restantes, (extrato ?? []) as EntradaBanco[], new Set([...usadas, ...achados.map(a => a.tx.id)]))) {
     const p = await gravarPedido(id, x => x.restantePagoEm ? null : { ...x, restantePagoEm: new Date().toISOString(), pagamentoFinal: { txId: tx.id, valor: tx.valor, data: tx.data, nome: tx.contraparte_nome ?? null } })
@@ -113,12 +114,19 @@ async function paraNumero(numero: string, texto: string, arquivo?: { url: string
 }
 const mimeDe = (url: string) => /\.pdf($|\?)/i.test(url) ? "application/pdf" : /\.png($|\?)/i.test(url) ? "image/png" : /\.webp($|\?)/i.test(url) ? "image/webp" : "image/jpeg"
 
-// Briefing para a designer (sinal pago ou ajuste pedido). Devolve false se não há designer cadastrada.
+// Sinal pago ou ajuste pedido: o pedido vai para o Leandro (arte + produção) com o link da página da arte, que
+// não mostra nenhum valor de venda, e os arquivos que o cliente subiu. Número: o da designer, se cadastrado; senão o
+// da Villa (Leandro). Devolve false se não há nenhum.
 export async function avisarDesigner(cfg: CfgDigital, p: PedidoComBriefing) {
-  if (p.teste) return true   // teste: a designer não recebe
-  const num = soDigitos(cfg.digitalContatos?.designer)
+  if (p.teste) return true   // teste: o Leandro não recebe
+  const num = soDigitos(cfg.digitalContatos?.designer) || soDigitos(cfg.digitalContatos?.villa)
   if (!num) return false
   const ok = await paraNumero(num, textoParaDesigner(p, linkDesigner(p.id)))
+  // Os arquivos do cliente (logo, referências) logo depois, um a um (só no 1º envio; no ajuste ele já tem)
+  if (ok && !p.ajustes?.length) for (const a of (p.briefing?.arquivos ?? []).slice(0, 6)) {
+    await new Promise(r => setTimeout(r, 1200))
+    await paraNumero(num, a.nome, { url: a.url, mime: mimeDe(a.url), nome: a.nome }).catch(() => false)
+  }
   if (ok) await gravarPedido(p.id, x => ({ ...x, designerAvisadoEm: new Date().toISOString() }))
   return ok
 }
@@ -174,8 +182,27 @@ export async function ajustePeloCliente(id: string, texto: string) {
   if (!novo) return { erro: "Escreva o que quer mudar." }
   const { cfg } = await lerPedido(id)
   const designer = await avisarDesigner(cfg, novo)
-  await avisarVoce(cfg, `✏️ *Digital ${id}* · ${novo.nome ?? "cliente"} pediu ajuste na arte:\n${texto.slice(0, 400)}${designer ? "\n(a designer já recebeu)" : ""}`)
+  await avisarVoce(cfg, `✏️ *Digital ${id}* · ${novo.nome ?? "cliente"} pediu ajuste na arte:\n${texto.slice(0, 400)}${designer ? "\n(o Leandro já recebeu)" : ""}`)
   return { pedido: novo }
+}
+
+// Uma vez (versão): custo real com o Leandro (R$ 3,50 a caixa na A4, arte inclusa) nos pedidos ainda não acertados.
+// O preço de venda não muda; a margem sobe.
+const VERSAO_CUSTO_DIGITAL = 1
+export async function talvezCorrigirDigital() {
+  await gravarCfg(d0 => {
+    const d = d0 as CfgDigital & { digitalCustoV?: number }
+    if ((d.digitalCustoV ?? 0) >= VERSAO_CUSTO_DIGITAL) return {}
+    const pedidosDigitais = (d.pedidosDigitais ?? []).map(p => {
+      if (p.status === "cancelado" || p.acertadoEm) return p
+      const f = facaAberta(p.medidas.a, p.medidas.l, p.medidas.p)
+      const folhaReal = folhaDaFaca(f.largura, f.altura) ?? p.folha
+      const custo = custoReal(p.faixa ?? p.quantidade, folhaReal)
+      if (custo == null) return p
+      return { ...p, folhaReal, custo, arte: 0, margem: Math.round((p.total - custo) * 100) / 100 }
+    })
+    return { pedidosDigitais, digitalCustoV: VERSAO_CUSTO_DIGITAL } as Partial<CfgAgente>
+  })
 }
 
 // Segunda-feira de manhã: o que foi para a Villa e falta acertar (uma vez por semana)
@@ -204,7 +231,7 @@ export async function pagoPeloAsaas(id: string, parte: "sinal" | "restante", tx:
     if (c) await enviar(c, textoSinalPago(p, linkPedido(p.id), !!(p.briefing?.marca || p.briefing?.arquivos?.length)), undefined, { essencial: true }).catch(() => null)
     await notificar(`Venda digital: ${p.id}`, `Sinal pago ${brl(tx.valor)} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas · total ${brl(p.total)}`, { prioridade: "alta", tags: ["moneybag"] }).catch(() => null)
     const designer = await avisarDesigner(cfg, p)
-    await avisarVoce(cfg, `💰 *Digital ${p.id}* · sinal pago pelo Asaas ${brl(tx.valor)}\n${p.nome ?? ""} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas${designer ? "" : "\n\nSem designer cadastrada: link do briefing:\n" + linkDesigner(p.id)}`)
+    await avisarVoce(cfg, `💰 *Digital ${p.id}* · sinal pago pelo Asaas ${brl(tx.valor)}\n${p.nome ?? ""} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas${designer ? "" : "\n\nSem o número do Leandro cadastrado (Digital → Contatos): mande para ele o link da arte (sem valores):\n" + linkDesigner(p.id)}`)
   } else {
     if (c) await enviar(c, textoRestantePago(p), undefined, { essencial: true }).catch(() => null)
     await avisarVoce(cfg, `💰 *Digital ${p.id}* · restante pago pelo Asaas ${brl(tx.valor)}\n${p.nome ?? ""}${p.entrega ? `\nEntrega: ${p.entrega.endereco} · CEP ${p.entrega.cep}` : "\nSem endereço de entrega ainda"}`)

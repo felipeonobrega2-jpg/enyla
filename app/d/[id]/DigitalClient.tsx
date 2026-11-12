@@ -121,15 +121,15 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
         <p className="text-[13px] font-semibold text-[#191625] mt-4">{cm(p.medidas.a)} × {cm(p.medidas.l)} × {cm(p.medidas.p)} cm <span className="font-normal text-[#898892]">(A × L × P)</span></p>
         <ul className="mt-3 space-y-1 text-[12.5px] text-[#5e5c68] text-center px-6">
           <li>Triplex 300g com laminação fosca ou brilhante</li>
-          <li>Arte criada pela nossa designer, você aprova antes de imprimir</li>
+          <li>{p.designer ? "Arte criada a partir do briefing abaixo; o cliente aprova antes de imprimir" : "Arte criada pela nossa equipe, você aprova antes de imprimir"}</li>
           {p.padrao && <li className="text-[#c57800]">Medida padrão para o seu frasco. Se for diferente, mande as medidas no WhatsApp que a gente ajusta.</li>}
         </ul>
       </div>
 
       {pago ? (
         <div className="bg-white rounded-2xl ds-borda p-5">
-          <p className="text-[15px] font-bold text-[#191625]">{p.quantidade.toLocaleString("pt-BR")} caixinhas · {brl(p.total)}</p>
-          <p className="text-[12.5px] text-[#009351] font-semibold mt-1 flex items-center gap-1.5"><Check className="w-4 h-4" />Sinal de {brl(p.sinal)} recebido</p>
+          <p className="text-[15px] font-bold text-[#191625]">{p.quantidade.toLocaleString("pt-BR")} caixinhas{p.designer ? "" : ` · ${brl(p.total)}`}</p>
+          {!p.designer && <p className="text-[12.5px] text-[#009351] font-semibold mt-1 flex items-center gap-1.5"><Check className="w-4 h-4" />Sinal de {brl(p.sinal)} recebido</p>}
           <div className="mt-4 grid grid-cols-4 gap-1.5">
             {ETAPAS.map(([s, nome], i) => (
               <div key={s} className="text-center">
@@ -171,7 +171,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
 
       {p.designer && (
         <div className="bg-white rounded-2xl ds-borda p-5">
-          <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Palette className="w-4 h-4 text-[#8456e8]" />Arte (área da designer)</p>
+          <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Palette className="w-4 h-4 text-[#8456e8]" />Arte</p>
           <p className="text-[12.5px] text-[#5e5c68] mt-1">Folha {p.folha} · {cm(p.medidas.a)} × {cm(p.medidas.l)} × {cm(p.medidas.p)} cm · laminação {p.briefing.laminacao === "brilho" ? "brilho" : "fosca"}. O briefing do cliente está logo abaixo.</p>
           {p.ajustes.length > 0 && (
             <div className="mt-3 rounded-xl bg-[#c57800]/[0.08] px-3.5 py-2.5 space-y-1">
@@ -213,7 +213,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
             <div className="mt-3 space-y-2">
               <textarea value={ajuste} onChange={e => setAjuste(e.target.value)} rows={3} maxLength={1000} placeholder="O que você quer mudar? Ex.: aumentar o nome, trocar o dourado por prata…"
                 className="w-full rounded-xl px-3.5 py-2.5 text-[14px] text-[#191625] bg-[rgba(116,116,128,0.06)] outline-none focus:ring-2 focus:ring-[#8456e8]/20 resize-y" />
-              <button onClick={() => acao("ajuste", { acao: "ajuste", texto: ajuste }, () => { setAjuste(null); setAviso("Recebido. A designer ajusta e te mandamos a nova versão no WhatsApp.") })} disabled={!!ocupado || !ajuste.trim()}
+              <button onClick={() => acao("ajuste", { acao: "ajuste", texto: ajuste }, () => { setAjuste(null); setAviso("Recebido. A gente ajusta e te manda a nova versão no WhatsApp.") })} disabled={!!ocupado || !ajuste.trim()}
                 className="w-full h-11 rounded-xl bg-[#191625] text-white text-[14px] font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
                 {ocupado === "ajuste" && <Loader2 className="w-4 h-4 animate-spin" />}Mandar o pedido de ajuste
               </button>
@@ -253,7 +253,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
 
       {!p.arteAprovadaEm && <div className="bg-white rounded-2xl ds-borda p-5">
         <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Sparkles className="w-4 h-4 text-[#8456e8]" />Como você quer a sua arte</p>
-        <p className="text-[12.5px] text-[#5e5c68] mt-1">A designer começa assim que o sinal cair. Quanto mais você contar, mais rápido fica do seu jeito.</p>
+        <p className="text-[12.5px] text-[#5e5c68] mt-1">A arte começa assim que o sinal cair. Quanto mais você contar, mais rápido fica do seu jeito.</p>
         <label className="block mt-4 text-[12px] font-semibold text-[#191625]">Nome da marca</label>
         <input value={br.marca} onChange={e => setBr({ ...br, marca: e.target.value })} maxLength={80} placeholder="Ex.: Essência Rara"
           className="mt-1 w-full h-11 rounded-xl px-3.5 text-[14px] text-[#191625] bg-[rgba(116,116,128,0.06)] outline-none focus:ring-2 focus:ring-[#8456e8]/20" />
