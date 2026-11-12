@@ -115,7 +115,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
     ) : null
     const situacao = p.arteAprovadaEm ? "Arte aprovada pelo cliente: pode imprimir" : p.arteEnviadaEm ? "Arte com o cliente, esperando aprovar" : p.ajustes.length && !p.arteEnviadaEm && p.arte ? "Cliente pediu ajuste" : p.arte ? "Arte ainda não foi para o cliente" : "Arte a fazer"
     return (
-      <Tela rodape="Enyla · pedido de produção">
+      <Tela rodape="Enyla × Villa Gráfica · pedido de produção" parceria>
         <div className="text-center">
           <p className="text-[12px] font-semibold text-[#898892]">{p.id}</p>
           <h1 className="text-[22px] font-bold text-[#191625] mt-1 leading-tight">Pedido de arte e produção</h1>
@@ -369,11 +369,17 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
   )
 }
 
-function Tela({ children, rodape = "Enyla Embalagens · dúvidas, é só responder no WhatsApp" }: { children: React.ReactNode; rodape?: string }) {
+function Tela({ children, rodape = "Enyla Embalagens · dúvidas, é só responder no WhatsApp", parceria = false }: { children: React.ReactNode; rodape?: string; parceria?: boolean }) {
   return (
     <div className="min-h-[100dvh] bg-[#f5f5f7]">
       <div className="max-w-md mx-auto px-4 py-6 space-y-4">
         <div className="flex justify-center"><Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1335} height={328} className="h-5 w-auto" priority /></div>
+        {parceria && (
+          <div className="flex flex-col items-center gap-1.5 -mt-1">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#898892]">em parceria com</p>
+            <Image src="/brand/villa-grafica.png" alt="Villa Gráfica" width={480} height={201} className="h-9 w-auto mix-blend-multiply" priority />
+          </div>
+        )}
         {children}
         <p className="text-center text-[11px] text-[#898892] pt-2">{rodape}</p>
       </div>
