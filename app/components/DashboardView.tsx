@@ -1,5 +1,6 @@
 "use client"
 
+import { TempoAteFecharCard } from "./TempoAteFecharCard"
 import React, { useMemo, useRef, useState, useEffect } from "react"
 import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart,
@@ -1638,6 +1639,9 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
           )}
         </div>
       </div>
+
+      {/* ── Tempo até fechar (ciclo de venda real) ── */}
+      <TempoAteFecharCard />
 
       {/* ── Analysis row ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-4">

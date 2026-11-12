@@ -1,6 +1,8 @@
 // Agente de marketing no servidor: junta Meta (gasto, cliques, conversas) com o sistema (leads, MQL, orçamentos,
 // pedidos) por campanha, pede a leitura à IA e guarda. Todo dia de manhã gera o de ontem e manda o resumo no seu WhatsApp.
 
+import { tempoAteFechar } from "./tempoAteFecharServidor"
+import { textoParaIA } from "./tempoAteFechar"
 import { supabase } from "./supabase"
 import { evo } from "./evolution"
 import { clienteClaude, FALLBACK, MODELO } from "./claude"
@@ -111,6 +113,8 @@ const ESQUEMA = {
 async function leitura(cfg: Cfg, r: Pick<Relatorio, "dia" | "dia1" | "semana" | "semanaAnterior">) {
   if (!cfg.apiKey) throw new Error("Chave da IA não configurada.")
   const filtro = filtroEfetivo(cfg.filtroLeads)
+  // Ciclo de venda real (tempo até fechar): a IA não julga campanha antes de dar tempo de fechar
+  const ciclo = await tempoAteFechar().then(textoParaIA).catch(() => "")
   const resp = await clienteClaude(cfg.apiKey).beta.messages.create({
     model: MODELO, max_tokens: 2000, ...FALLBACK,
     output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
@@ -121,8 +125,8 @@ Como ele qualifica os leads (resumo do filtro dele):
 ${filtro.slice(0, 2500)}
 </filtro>
 
-Escreva em português, direto, como um sócio que entende do negócio. Use só os números dados; não invente nada. "Sumiram" não responderam nem aos follow-ups (lead do anúncio que não leu); "ainda conversando" são os que falam mas não disseram o volume. Poucos dias e números pequenos variam muito: não tire conclusão forte de 1 ou 2 leads, e diga quando a amostra é pequena. Pedidos demoram semanas para fechar: não cobre pedido de lead de ontem.`,
-    messages: [{ role: "user", content: `${numerosParaIA(r)}\n\nEscreva a leitura de marketing do dia.` }],
+Escreva em português, direto, como um sócio que entende do negócio. Use só os números dados; não invente nada. "Sumiram" não responderam nem aos follow-ups (lead do anúncio que não leu); "ainda conversando" são os que falam mas não disseram o volume. Poucos dias e números pequenos variam muito: não tire conclusão forte de 1 ou 2 leads, e diga quando a amostra é pequena. Pedidos demoram para fechar (o ciclo real vem junto dos números, quando houver): não cobre pedido de lead de ontem nem condene campanha mais nova que o ciclo.`,
+    messages: [{ role: "user", content: `${numerosParaIA(r)}${ciclo ? `\n\n${ciclo}` : ""}\n\nEscreva a leitura de marketing do dia.` }],
   })
   const texto = resp.content.flatMap(b => b.type === "text" ? [b.text] : []).join("")
   return JSON.parse(texto) as NonNullable<Relatorio["leitura"]>

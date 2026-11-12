@@ -43,6 +43,7 @@ import GastosView from "@/app/components/GastosView"
 import DigitalPainelView from "@/app/components/DigitalPainelView"
 import { PropostasProntasCard } from "@/app/components/PropostasProntasCard"
 import { RetornoAnunciosCard } from "@/app/components/RetornoAnunciosCard"
+import { TempoAteFecharCard } from "@/app/components/TempoAteFecharCard"
 import ChapasView from "@/app/cartuxo/components/ChapasView"
 import CustosView from "@/app/cartuxo/components/CustosView"
 import FacasView from "@/app/cartuxo/components/FacasView"
@@ -238,6 +239,16 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
         form: form(6, 13, 6), opcoes: [{ quantidade: 1500, preco: 2058, unitario: 1.372 }, { quantidade: 2000, preco: 2390, unitario: 1.195 }, { quantidade: 3000, preco: 3050, unitario: 1.017 }] },
     ] }))
   }
+  if (u.startsWith("/api/tempo-fechar")) return new Response(JSON.stringify({
+    offset: { n: 10, mediana: 32, media: 62, p25: 14, p75: 97 }, digital: { n: 1, mediana: 3, media: 3, p25: 3, p75: 3 },
+    casos: [
+      { cliente: "Cliente Digital Exemplo", tipo: "digital", fechou: "2026-11-12", valor: 1220, dias: 3 },
+      { cliente: "Perfumaria Modelo", tipo: "offset", fechou: "2026-09-30", valor: 15936, dias: 97 },
+      { cliente: "Essências Exemplo", tipo: "offset", fechou: "2026-09-30", valor: 26979.3, dias: 223 },
+      { cliente: "Óleos Exemplo", tipo: "offset", fechou: "2026-09-04", valor: 4250, dias: 58 },
+      { cliente: "Aromas Fictícia", tipo: "offset", fechou: "2026-08-22", valor: 13920, dias: 26 },
+      { cliente: "Marca Teste", tipo: "offset", fechou: "2026-08-12", valor: 4176, dias: 120 },
+    ], semDado: ["Cliente Antigo A", "Cliente Antigo B", "Distribuidora Exemplo"] }))
   if (u.startsWith("/api/meta")) return new Response(JSON.stringify({ campaigns: [], totals: { spend: 1840, impressions: 0, clicks: 0, reach: 0, conversas: 96 } }))
   if (u.startsWith("/api/hoje")) {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
@@ -424,6 +435,7 @@ function Telas() {
       <div style={{ flex: 1 }}>{pagina(<PedidosSiteView onVerChapas={() => {}} />)}</div>
     </div>
     case "digitalpainel": case "digitalpainel-m": case "digitalpainel-aberto": case "digitalpainel-qtd": case "digitalpainel-prod": case "digitalpainel-acerto": return pagina(<DigitalPainelView onAbrirConversa={() => {}} />)
+    case "tempofechar": case "tempofechar-m": return pagina(<div className="max-w-[1300px]"><TempoAteFecharCard /></div>)
     case "propostas": case "propostas-m": return pagina(<div className="max-w-[1200px] flex flex-col gap-4"><PropostasProntasCard onAbrir={() => {}} onAbrirConversa={() => {}} />
       <RetornoAnunciosCard periodo={{ from: new Date("2026-11-01T12:00:00"), to: null }} nomePeriodo="mês" clientes={[{ id: "a", nome: "Perfumaria Modelo", origemCampanhaId: "c1" } as never, { id: "b", nome: "Óleos Exemplo", origemCampanhaId: "c2" } as never]}
         pedidos={[{ nomeCliente: "Perfumaria Modelo", venda: 4200, recebido: 2100, custoDireto: 1900, dataFechamento: "2026-11-04" } as never, { nomeCliente: "Óleos Exemplo", venda: 2800, recebido: 2800, custoDireto: 0, dataFechamento: "2026-11-08" } as never]} /></div>)
