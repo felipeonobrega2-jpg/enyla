@@ -230,7 +230,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
     const form = (f: number, a: number, l: number, extra = {}) => ({ nomeCliente: "", tipoCaixa: "simples", frente: f, lateral: l, alturaBox: a, abaColagem: 1, incluirVerniz: false, vernizTipo: "", laminacao: false, laminacaoTipo: "", acompanhamentos: [], outrosAcabamentos: [], comFaca: true, valorFaca: 0, numSKUs: 1, numArtes: 1, quantidades: [], qualidades: {}, customPecasChapa: null, blankOverride: null, obsInterna: "", obsCliente: "", validadeDias: 7, materialId: "cartao300", materialNome: "Cartão 300g", ...extra })
     return new Response(JSON.stringify({ propostas: [
-      { id: "PP-1", jid: "1@lid", nome: "Perfumaria Modelo", em: h(12), status: "aguardando", quantidade: 3000, custo: 1410, preco: 3384, multiplicador: 2.4, origemMarkup: "seus_orcamentos", medidaPadrao: true,
+      { id: "PP-1", jid: "1@lid", nome: "Perfumaria Modelo", em: h(12), status: "aguardando", quantidade: 3000, custo: 1410, preco: 3384, multiplicador: 2.4, origemMarkup: "seus_orcamentos", medidaPadrao: false,
         dados: { produto: "caixinha", volume_ml: 50, caixa_cm: null, frasco_cm: null, quantidade: 3000, tem_arte: true, resumo: "Linha nova de perfumes 50 ml, quer hot stamping dourado no logo" },
         form: form(5, 10, 5, { incluirVerniz: true, vernizTipo: "UV Total" }), opcoes: [{ quantidade: 3000, preco: 3384, unitario: 1.128 }, { quantidade: 5000, preco: 4650, unitario: 0.93 }, { quantidade: 10000, preco: 7900, unitario: 0.79 }] },
       { id: "PP-2", jid: "2@lid", nome: "Essências Exemplo", em: h(95), status: "aguardando", quantidade: 1500, custo: 980, preco: 2058, multiplicador: 2.1, origemMarkup: "configuracao", medidaPadrao: false,
@@ -424,7 +424,7 @@ function Telas() {
       <div style={{ flex: 1 }}>{pagina(<PedidosSiteView onVerChapas={() => {}} />)}</div>
     </div>
     case "digitalpainel": case "digitalpainel-m": case "digitalpainel-aberto": case "digitalpainel-qtd": case "digitalpainel-prod": case "digitalpainel-acerto": return pagina(<DigitalPainelView onAbrirConversa={() => {}} />)
-    case "propostas": case "propostas-m": return pagina(<div className="max-w-[1200px] flex flex-col gap-4"><PropostasProntasCard onAbrirConversa={() => {}} />
+    case "propostas": case "propostas-m": return pagina(<div className="max-w-[1200px] flex flex-col gap-4"><PropostasProntasCard onAbrir={() => {}} onAbrirConversa={() => {}} />
       <RetornoAnunciosCard periodo={{ from: new Date("2026-11-01T12:00:00"), to: null }} nomePeriodo="mês" clientes={[{ id: "a", nome: "Perfumaria Modelo", origemCampanhaId: "c1" } as never, { id: "b", nome: "Óleos Exemplo", origemCampanhaId: "c2" } as never]}
         pedidos={[{ nomeCliente: "Perfumaria Modelo", venda: 4200, recebido: 2100, custoDireto: 1900, dataFechamento: "2026-11-04" } as never, { nomeCliente: "Óleos Exemplo", venda: 2800, recebido: 2800, custoDireto: 0, dataFechamento: "2026-11-08" } as never]} /></div>)
     case "hoje": case "hoje-m": case "hoje-passo": return pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)

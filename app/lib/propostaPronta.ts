@@ -7,7 +7,7 @@ import type { Configuracoes } from "../config"
 import type { FormData, Calculo, KanbanOpcao } from "../types"
 import type { DadosPedido } from "./atendente"
 import { calcular } from "../calculos"
-import { padraoDoMl, caberFrasco } from "./digital"
+import { caberFrasco } from "./digital"
 import { QUANTIDADES_PADRAO } from "../dados"
 
 export type StatusProposta = "aguardando" | "enviada" | "descartada"
@@ -37,15 +37,13 @@ export type PropostaPronta = {
 // Medida plausível de caixa em cm
 const okCm = (n: number | undefined | null) => typeof n === "number" && n > 0.5 && n < 80
 
-// Caixa do que o cliente contou: medidas da caixa; senão o padrão do ml crescido até caber o frasco; senão só o frasco
+// Caixa do que o cliente contou: as medidas da caixa; senão as do frasco (altura e diâmetro, ou altura × largura ×
+// profundidade), com folga. Só o ml nunca basta: lead bom recebe proposta com a medida real, nunca com caixa padrão.
 export function caixaDosDados(d: DadosPedido): { frente: number; lateral: number; alturaBox: number; padrao: boolean } | null {
   const c = d.caixa_cm
   if (c && okCm(c.frente) && okCm(c.lateral) && okCm(c.altura)) return { frente: c.frente, lateral: c.lateral, alturaBox: c.altura, padrao: false }
-  const pad = padraoDoMl(d.volume_ml)
-  if (pad) { const m = caberFrasco(pad, d.frasco_cm, c?.altura); return { frente: m.l, lateral: m.p, alturaBox: m.a, padrao: true } }
-  // Só as medidas do frasco ("4 x 4 x 12"): três números viram a caixa justa
   if (d.frasco_cm) {
-    const m = caberFrasco({ a: 0, l: 0, p: 0 }, d.frasco_cm)
+    const m = caberFrasco({ a: 0, l: 0, p: 0 }, d.frasco_cm, c?.altura)
     if (m.a > 0 && m.l > 0 && m.p > 0) return { frente: m.l, lateral: m.p, alturaBox: m.a, padrao: false }
   }
   return null
@@ -55,7 +53,7 @@ export function caixaDosDados(d: DadosPedido): { frente: number; lateral: number
 export function faltaParaProposta(d: DadosPedido | null | undefined): string | null {
   if (!d) return "faltam os dados"
   if (!d.quantidade || d.quantidade < 1) return "falta a quantidade"
-  if (!caixaDosDados(d)) return "faltam as medidas (da caixa ou do frasco)"
+  if (!caixaDosDados(d)) return "faltam as medidas (da caixa ou do frasco; só o ml não basta)"
   return null
 }
 
@@ -138,7 +136,7 @@ export function montarProposta(d: DadosPedido, nome: string | null, config: Conf
   if (falta) return { ok: false, motivo: falta }
   const cx = caixaDosDados(d)!
   const q = Math.round(d.quantidade!)
-  const obs = [d.resumo, d.frasco_cm ? `Frasco: ${d.frasco_cm}` : "", cx.padrao ? "Medida padrão pelo ml (confirmar com o cliente)" : "", "Proposta montada pelo agente"].filter(Boolean).join(" · ")
+  const obs = [d.resumo, d.frasco_cm ? `Frasco: ${d.frasco_cm}` : "", "Proposta montada pelo agente"].filter(Boolean).join(" · ")
   const form: FormData = {
     ...FORM_PROPOSTA, ...base,
     nomeCliente: (nome ?? "").trim(),

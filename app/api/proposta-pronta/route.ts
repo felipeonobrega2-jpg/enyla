@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
-import { listarPropostas, aprovarProposta, descartarProposta, prepararProposta } from "@/app/lib/propostaProntaServidor"
+import { listarPropostas, propostaSalva, descartarProposta, prepararProposta } from "@/app/lib/propostaProntaServidor"
 import { atender } from "@/app/lib/atendenteServidor"
 
 export const maxDuration = 60
 
-// Propostas prontas (rota protegida pelo login): lista, aprova (com ou sem ajuste de preço), descarta, ou monta agora
+// Propostas prontas (rota protegida pelo login): lista, liga ao ORC salvo, descarta, ou monta agora
 export async function GET() {
   const lista = await listarPropostas()
   return NextResponse.json({ propostas: lista.slice(0, 60) })
 }
 
 export async function POST(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as { id?: string; acao?: string; preco?: number; jid?: string }
-  if (b.acao === "aprovar" && b.id) {
-    const r = await aprovarProposta(b.id, typeof b.preco === "number" ? b.preco : undefined)
-    return NextResponse.json(r, { status: r.ok ? 200 : 409 })
+  const b = await req.json().catch(() => ({})) as { id?: string; acao?: string; preco?: number; multiplicador?: number; numero?: string; jid?: string }
+  // A tela salvou o ORC a partir da proposta (o envio com o PDF é o de sempre)
+  if (b.acao === "salva" && b.id && b.numero) {
+    await propostaSalva(b.id, b.numero, b.preco, b.multiplicador)
+    return NextResponse.json({ ok: true })
   }
   if (b.acao === "descartar" && b.id) {
     await descartarProposta(b.id)

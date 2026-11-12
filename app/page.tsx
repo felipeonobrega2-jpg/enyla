@@ -203,7 +203,7 @@ export default function Home() {
   definirFeriadosLocais(config.feriados)
   const configAtual = useRef<Configuracoes>(CONFIG_PADRAO)
   useEffect(() => { configAtual.current = config }, [config])
-  const [envioProposta, setEnvioProposta] = useState<{ form: FormData; calculo: Calculo; numero: string; data: string } | null>(null)
+  const [envioProposta, setEnvioProposta] = useState<{ form: FormData; calculo: Calculo; numero: string; data: string; jid?: string } | null>(null)
   const [modalSalvar, setModalSalvar] = useState<{ form: FormData; calculo: Calculo; numero: string; data: string; cardId: string } | null>(null)
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [propostasCustom, setPropostasCustom] = useState<PropostaCustom[]>([])
@@ -917,7 +917,12 @@ export default function Home() {
   }
 
   const salvandoRef = useRef(false)
-  async function salvar() {
+  const formMesa = form, resultMesa = result, custosMesa = customCustos
+  // opts.f/opts.r: salvar um orçamento que não está na mesa (proposta pronta do agente); opts.enviar: abre o envio com o PDF
+  async function salvar(opts: { f?: FormData; r?: Calculo | null; enviar?: boolean; jid?: string } = {}) {
+    const form = opts.f ?? formMesa
+    const result = opts.r !== undefined ? opts.r : resultMesa
+    const customCustos: typeof custosMesa = opts.f ? {} : custosMesa
     if (!result || salvandoRef.current) return
     salvandoRef.current = true
     // Número reservado no servidor (o agente também cria orçamentos): sem isso, dois iguais se sobrescrevem
@@ -1015,8 +1020,36 @@ export default function Home() {
       }).catch(() => {})
     }
     showToast(`Orçamento ${numero} salvo.`)
-    setModalSalvar({ form: { ...form }, calculo: result, numero, data, cardId: card.id })
+    // Veio de uma proposta pronta do agente: ela fica ligada a este ORC (e o seu preço ensina o markup)
+    const pp = propostaNaMesa.current
+    if (pp && nomeClean.toLowerCase() === (pp.nome ?? "").trim().toLowerCase()) {
+      const linha = result.tabela.find(l => l.quantidade === pp.quantidade) ?? ideal
+      const custo = form.comFaca ? linha.custoTotalComFaca : linha.custoTotalSemFaca
+      const preco = form.comFaca ? linha.precoComFaca : linha.precoSemFaca
+      fetch("/api/proposta-pronta", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "salva", id: pp.id, numero, preco, multiplicador: custo > 0 ? preco / custo : undefined }) }).catch(() => {})
+      propostaNaMesa.current = null
+    }
+    if (opts.enviar) setEnvioProposta({ form: { ...form }, calculo: result, numero, data, jid: opts.jid })
+    else setModalSalvar({ form: { ...form }, calculo: result, numero, data, cardId: card.id })
   }
+
+  // Proposta pronta do agente → mesa de orçamento (Ajustar) ou direto para o envio com o PDF (Aprovar)
+  const propostaNaMesa = useRef<{ id: string; nome: string | null; quantidade: number } | null>(null)
+  function propostaParaMesa(p: import("./lib/propostaPronta").PropostaPronta, enviar: boolean) {
+    const f: FormData = { ...FORM_INICIAL, ...p.form, nomeCliente: (p.form.nomeCliente || p.nome || "").trim() }
+    const r = calcular(f, config)
+    // A conversa fica ligada ao cliente: o envio acha o WhatsApp certo
+    if (config.vinculosWhatsapp?.[p.jid] !== f.nomeCliente) salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [p.jid]: f.nomeCliente } })
+    propostaNaMesa.current = { id: p.id, nome: f.nomeCliente, quantidade: p.quantidade }
+    if (enviar) { void salvar({ f, r, enviar: true, jid: p.jid }); return }
+    setForm(f); setResult(r); setDxfNome(null)
+    setConversaOrc({ jid: p.jid, nome: p.nome ?? f.nomeCliente, dados: p.dados, cliente: f.nomeCliente })
+    navigate("orcamento")
+    showToast("Proposta do agente na mesa: ajuste e salve como sempre.")
+  }
+
+
 
   function replicar(item: { form: FormData; calculo: Calculo }) {
     setForm(item.form)
@@ -2185,7 +2218,7 @@ export default function Home() {
                 </button>
               </div>
             )}
-            <button onClick={editandoHistorico ? salvarEdicaoHistorico : salvar} disabled={!r}
+            <button onClick={editandoHistorico ? salvarEdicaoHistorico : () => { void salvar() }} disabled={!r}
               className="w-full h-11 bg-[#8456e8] hover:bg-[#7445d4] active:bg-[#6234bc] active:scale-[0.99] disabled:opacity-30 disabled:cursor-not-allowed text-white text-[13px] font-bold rounded-xl transition-all duration-150 shadow-sm shadow-[#8456e8]/15 disabled:shadow-none">
               {editandoHistorico ? "Salvar alterações" : "Salvar orçamento"}
             </button>
@@ -2241,6 +2274,7 @@ export default function Home() {
               onAprovacaoOnline={concluirAprovacaoOnline}
               onAbrirConversa={(jid, nome, dados) => setConversaHoje({ jid, nome: nome || jid.split("@")[0], dados: dados ?? null })}
               onOrcarConversa={orcamentoDaConversa}
+              onPropostaPronta={propostaParaMesa}
             />
           ) : view === "dashboard" ? (
             <RelatoriosView kanban={kanban} lancamentos={lancamentos} clientes={clientes} origensClientes={config.origensClientes} historico={historico}
@@ -2925,7 +2959,7 @@ export default function Home() {
 
       {/* ── Modal: personalizar proposta ──────────────────────────────────── */}
       {envioProposta && (
-        <EnviarProposta cliente={envioProposta.form.nomeCliente.trim() || "cliente"} numero={envioProposta.numero}
+        <EnviarProposta cliente={envioProposta.form.nomeCliente.trim() || "cliente"} jid={envioProposta.jid} numero={envioProposta.numero}
           gerarHtml={() => htmlPdfCliente(envioProposta)}
           mensagem={link => mensagemProposta(envioProposta.form, envioProposta.calculo, envioProposta.numero, link)}
           onFechar={() => setEnvioProposta(null)} />

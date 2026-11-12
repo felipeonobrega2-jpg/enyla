@@ -12,8 +12,9 @@ type Destino = { jid: string | null; nome?: string; como?: "conversa" | "telefon
 
 const kb = (n: number) => n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1).replace(".", ",")} MB` : `${Math.round(n / 1024)} KB`
 
-export function EnviarProposta({ cliente, numero, gerarHtml, mensagem, onFechar }: {
+export function EnviarProposta({ cliente, jid: jidConhecido, numero, gerarHtml, mensagem, onFechar }: {
   cliente: string
+  jid?: string             // conversa já conhecida (proposta do agente): vai direto para ela
   numero?: string
   gerarHtml: () => Promise<string>
   mensagem: (linkAprovacao: string | null) => string
@@ -31,7 +32,7 @@ export function EnviarProposta({ cliente, numero, gerarHtml, mensagem, onFechar 
 
   useEffect(() => {
     gerarHtml().then(h => htmlParaPdf(h, nomeArquivo)).then(setPdf).catch(e => setErroPdf(String(e?.message ?? e)))
-    fetch(`/api/whatsapp/destino?cliente=${encodeURIComponent(cliente)}`).then(r => r.json()).then(setDestino).catch(() => setDestino({ jid: null }))
+    fetch(jidConhecido ? `/api/whatsapp/destino?jid=${encodeURIComponent(jidConhecido)}` : `/api/whatsapp/destino?cliente=${encodeURIComponent(cliente)}`).then(r => r.json()).then(setDestino).catch(() => setDestino({ jid: null }))
     const link = numero ? fetch(`/api/aprovacao/link?numero=${encodeURIComponent(numero)}`).then(r => r.ok ? r.json() : null).then(d => d?.url ?? null).catch(() => null) : Promise.resolve(null)
     link.then(l => setTexto(mensagem(l)))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps

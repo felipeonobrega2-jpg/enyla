@@ -61,7 +61,7 @@ type Detalhe = { titulo: string; sub?: string; linhas: React.ReactNode; destino?
 
 export function PainelView({
   kanban, lancamentos, historico, propostasCustom, clientes, config,
-  onAbrirCard, onAbrirCliente, onNavegar, onNovoOrcamento, onLancarCobranca, onSalvarMeta, onAprovacaoOnline, onAbrirConversa, onOrcarConversa,
+  onAbrirCard, onAbrirCliente, onNavegar, onNovoOrcamento, onLancarCobranca, onSalvarMeta, onAprovacaoOnline, onAbrirConversa, onOrcarConversa, onPropostaPronta,
 }: {
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
@@ -78,6 +78,7 @@ export function PainelView({
   onAprovacaoOnline?: (a: AprovacaoOnline) => void
   onAbrirConversa?: (jid: string, nome?: string, dados?: import("../lib/atendente").DadosPedido) => void
   onOrcarConversa?: (nome: string, jid: string, dados?: import("../lib/atendente").DadosPedido) => void
+  onPropostaPronta?: (p: import("../lib/propostaPronta").PropostaPronta, enviar: boolean) => void
 }) {
   const [periodoId, setPeriodoId] = React.useState<PeriodoId>("mes")
   const [detalhe, setDetalhe] = React.useState<Detalhe | null>(null)
@@ -273,7 +274,7 @@ export function PainelView({
         </>}
       />
 
-      <PropostasProntasCard onAbrirConversa={onAbrirConversa} />
+      {onPropostaPronta && <PropostasProntasCard onAbrir={onPropostaPronta} onAbrirConversa={onAbrirConversa} />}
 
       <RetornoAnunciosCard pedidos={pedidos} clientes={clientes} periodo={periodo} nomePeriodo={nomePeriodo} onAbrir={() => onNavegar("meta")} />
 

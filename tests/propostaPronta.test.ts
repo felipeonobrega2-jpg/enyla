@@ -11,10 +11,11 @@ describe("proposta pronta: o que dá para montar", () => {
   it("usa a caixa que o cliente deu", () => {
     expect(caixaDosDados(dados({ caixa_cm: { frente: 6, lateral: 6, altura: 13 } }))).toEqual({ frente: 6, lateral: 6, alturaBox: 13, padrao: false })
   })
-  it("sem caixa, usa o padrão do ml (marcado para confirmar)", () => {
-    const c = caixaDosDados(dados({ volume_ml: 100 }))!
-    expect(c.padrao).toBe(true)
-    expect(c.alturaBox).toBeCloseTo(13.2)
+  it("só o ml nunca basta (lead bom recebe a medida real)", () => {
+    expect(caixaDosDados(dados({ volume_ml: 100 }))).toBeNull()
+  })
+  it("frasco com altura e diâmetro também serve", () => {
+    expect(caixaDosDados(dados({ volume_ml: 100, frasco_cm: "12 de altura, 5 de diâmetro" }))).toEqual({ frente: 5.3, lateral: 5.3, alturaBox: 12.4, padrao: false })
   })
   it("frasco com três medidas vira a caixa justa", () => {
     const c = caixaDosDados(dados({ frasco_cm: "4 x 4 x 12" }))!
@@ -23,7 +24,8 @@ describe("proposta pronta: o que dá para montar", () => {
   it("diz o que falta", () => {
     expect(faltaParaProposta(dados({ volume_ml: 50 }))).toMatch(/quantidade/)
     expect(faltaParaProposta(dados({ quantidade: 3000 }))).toMatch(/medidas/)
-    expect(faltaParaProposta(dados({ quantidade: 3000, volume_ml: 50 }))).toBeNull()
+    expect(faltaParaProposta(dados({ quantidade: 3000, volume_ml: 50 }))).toMatch(/medidas/)
+    expect(faltaParaProposta(dados({ quantidade: 3000, caixa_cm: { frente: 5, lateral: 5, altura: 10 } }))).toBeNull()
     expect(faltaParaProposta(dados({ quantidade: 3000, volume_ml: 200 }))).toMatch(/medidas/)   // acima de 120 ml não chuta
   })
   it("quantidades: a pedida e duas faixas acima", () => {

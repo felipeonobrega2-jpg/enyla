@@ -3,15 +3,13 @@
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
 import { notificar, LINK_SISTEMA } from "./notificar"
-import { tokenAprovacao } from "./aprovacao"
-import { especificacaoDaProposta } from "./mensagemProposta"
 import { CONFIG_PADRAO, type Configuracoes } from "../config"
-import { calcular, compactarCalculo } from "../calculos"
+import { calcular } from "../calculos"
 import type { DadosPedido } from "./atendente"
-import { COL_FECHADO, COL_ENTREGUE, type FormData, type KanbanCard } from "../types"
+import { COL_FECHADO, COL_ENTREGUE, type FormData } from "../types"
 import { brl, num } from "../utils"
 import {
-  PropostaPronta, AjusteProposta, AmostraMarkup, montarProposta, markupAprendido, baseDoHistorico, mudouAProposta, ajustarPreco, margemDe,
+  PropostaPronta, AjusteProposta, AmostraMarkup, montarProposta, markupAprendido, baseDoHistorico, mudouAProposta, margemDe,
 } from "./propostaPronta"
 
 type AjusteGuardado = AjusteProposta & { multiplicadorAprovado?: number }
@@ -105,76 +103,18 @@ export async function reservarNumeroOrc(): Promise<string> {
   throw new Error("não consegui reservar o número do orçamento")
 }
 
-export function textoDaProposta(p: Pick<PropostaPronta, "form" | "opcoes" | "quantidade">, numero: string, link: string) {
-  const primeiro = (p.form.nomeCliente ?? "").trim().split(/\s+/)[0]
-  const ok = primeiro && /^[A-Za-zÀ-ÿ]{2,}$/.test(primeiro)
-  const principal = p.opcoes.find(o => o.quantidade === p.quantidade) ?? p.opcoes[0]
-  const outras = p.opcoes.filter(o => o !== principal)
-  return [
-    `Oi${ok ? `, ${primeiro}` : ""}! Segue a proposta ${numero} da sua embalagem.`,
-    `\n${especificacaoDaProposta(p.form as FormData).join("\n")}`,
-    `\n${num(principal.quantidade)} unidades · ${brl(principal.preco)} (${brl(principal.unitario)}/un)`,
-    outras.length ? outras.map(o => `${num(o.quantidade)} unidades · ${brl(o.preco)} (${brl(o.unitario)}/un)`).join("\n") : null,
-    `\nPara ver a caixa em 3D e aprovar: ${link}`,
-    `\nQualquer dúvida, é só me chamar.`,
-  ].filter(Boolean).join("\n")
-}
-
-// Você aprovou (com ou sem ajuste de preço): cria ORC + card + rastreio e manda para o cliente
-export async function aprovarProposta(id: string, novoPreco?: number): Promise<{ ok: true; numero: string; enviou: boolean; erro?: string } | { ok: false; erro: string }> {
-  // Trava: só uma aprovação por proposta (dois toques não mandam duas vezes)
-  let p: PropostaPronta | null = null
+// Você salvou o orçamento a partir da proposta (aprovou direto ou ajustou na mesa): fica ligada ao ORC, e o preço
+// que você deixou (preço ÷ custo) ensina o markup das próximas
+export async function propostaSalva(id: string, numero: string, preco?: number, multiplicador?: number) {
   await mudarConfig((d: Cfg) => {
-    const x = (d.propostasProntas ?? []).find(y => y.id === id)
-    if (!x || x.status !== "aguardando") { p = null; return null }
-    p = x
-    return { propostasProntas: (d.propostasProntas ?? []).map(y => y.id === id ? { ...y, status: "enviada" as const, enviadaEm: new Date().toISOString() } : y) }
-  })
-  const prop = p as PropostaPronta | null
-  if (!prop) return { ok: false, erro: "Essa proposta já foi aprovada ou descartada." }
-
-  const ajuste = novoPreco && novoPreco > 0 && Math.abs(novoPreco - prop.preco) >= 0.01 ? ajustarPreco(prop, novoPreco) : null
-  const form: FormData = { ...prop.form, rota: { ...(prop.form.rota ?? {}), multiplicador: ajuste?.multiplicador ?? prop.multiplicador } }
-  try {
-    // Recalcula com o markup aprovado: o orçamento salvo fica igual ao que a tela calcularia
-    const { config } = await lerTudo()
-    const calc = calcular(form, config)
-    if (!calc) throw new Error("o motor não conseguiu calcular essa caixa")
-    const opcoes = calc.tabela.map(l => ({ quantidade: l.quantidade, preco: Math.round((form.comFaca ? l.precoComFaca : l.precoSemFaca) * 100) / 100, unitario: form.comFaca ? l.unitarioComFaca : l.unitarioSemFaca }))
-    const preco = ajuste?.preco ?? (opcoes.find(o => o.quantidade === prop.quantidade)?.preco ?? prop.preco)
-    const numero = await reservarNumeroOrc()
-    const data = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
-    const card: Partial<KanbanCard> = {
-      id: Date.now().toString(), numero, nomeCliente: form.nomeCliente || prop.nome || "Sem nome",
-      dimensoes: `${form.frente}×${form.alturaBox}×${form.lateral}`, materialNome: form.materialNome,
-      preco, quantidade: prop.quantidade, data, coluna: 0,
-      // Preço ajustado à mão: a opção principal fica com o valor que você aprovou
-      opcoes: opcoes.map(o => o.quantidade === prop.quantidade ? { ...o, preco, unitario: preco / o.quantidade } : o),
+    const p = (d.propostasProntas ?? []).find(x => x.id === id)
+    if (!p || p.status !== "aguardando") return null
+    const mult = multiplicador && multiplicador >= 1 && multiplicador <= 6 ? Math.round(multiplicador * 100) / 100 : undefined
+    return {
+      propostasProntas: (d.propostasProntas ?? []).map(x => x.id === id ? { ...x, status: "enviada" as const, enviadaEm: new Date().toISOString(), numero, precoAprovado: preco } : x),
+      propostasAjustes: mult ? [{ em: new Date().toISOString(), quantidade: p.quantidade, sugerido: p.preco, aprovado: preco ?? p.preco, multiplicadorAprovado: mult }, ...(d.propostasAjustes ?? [])].slice(0, 100) : d.propostasAjustes,
     }
-    const { error: e1 } = await supabase.from("HistoricoItem").insert({ id: crypto.randomUUID(), numero, form, calculo: compactarCalculo(calc), data })
-    if (e1) throw new Error(e1.message)
-    const { error: e2 } = await supabase.from("KanbanCard").insert({ ...card, motivoPerdido: null })
-    if (e2) throw new Error(e2.message)
-    await supabase.from("Tracking").upsert({
-      numero, nomeCliente: card.nomeCliente, descricao: card.dimensoes, materialNome: card.materialNome, quantidade: card.quantidade, preco,
-      colunaAtual: 0, etapas: [{ coluna: 0, nome: "Orçamento criado", dataHora: data, tipo: "criacao" }], criadoEm: data,
-    }, { onConflict: "numero" })
-
-    const link = `${LINK_SISTEMA}/aprovar/${encodeURIComponent(numero)}?t=${tokenAprovacao(numero)}`
-    const { enviar, lerConversa } = await import("./agenteAuto")
-    const conv = await lerConversa(prop.jid)
-    const env = conv ? await enviar(conv, textoDaProposta({ ...prop, form, opcoes: card.opcoes! }, numero, link), undefined, { essencial: true }) : { ids: [], erro: "conversa não encontrada" }
-    const enviou = env.ids.length > 0
-    await mudarConfig((d: Cfg) => ({
-      propostasProntas: (d.propostasProntas ?? []).map(y => y.id === id ? { ...y, numero, precoAprovado: preco, opcoes: card.opcoes!, erro: enviou ? undefined : `ORC criado, mas a mensagem não saiu: ${env.erro ?? "erro"}` } : y),
-      propostasAjustes: [{ em: new Date().toISOString(), quantidade: prop.quantidade, sugerido: prop.preco, aprovado: preco, multiplicadorAprovado: form.rota?.multiplicador ?? prop.multiplicador }, ...(d.propostasAjustes ?? [])].slice(0, 100),
-    }))
-    return { ok: true, numero, enviou, erro: enviou ? undefined : env.erro }
-  } catch (e) {
-    // Não criou: volta para aguardando (você tenta de novo)
-    await mudarConfig((d: Cfg) => ({ propostasProntas: (d.propostasProntas ?? []).map(y => y.id === id ? { ...y, status: "aguardando" as const, enviadaEm: undefined, erro: String(e).slice(0, 200) } : y) }))
-    return { ok: false, erro: `Não consegui criar o orçamento: ${String(e).slice(0, 160)}` }
-  }
+  })
 }
 
 export async function descartarProposta(id: string) {

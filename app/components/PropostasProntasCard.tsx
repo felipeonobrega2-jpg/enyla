@@ -1,8 +1,8 @@
 "use client"
 
 // Painel → Propostas para aprovar: o agente montou a proposta do lead bom (medida + quantidade, seu markup da faixa).
-// Você confere, ajusta o preço se quiser e aprova: o ORC é criado e a proposta com o link de aprovação vai para o
-// cliente no WhatsApp. Cada ajuste ensina o markup das próximas.
+// Aprovar: salva o ORC e abre o envio de sempre (PDF + mensagem + link). Ajustar: abre na mesa de orçamento, com o
+// destrinche, para você mexer e salvar. O preço que você salvar ensina o markup das próximas.
 
 import { useEffect, useState } from "react"
 import { FileCheck2, Send, X, MessageCircle, Pencil, AlertTriangle } from "lucide-react"
@@ -16,29 +16,12 @@ const haQuanto = (iso: string) => {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60_000)
   return m < 60 ? `há ${Math.max(1, m)} min` : m < 1440 ? `há ${Math.round(m / 60)} h` : `há ${Math.round(m / 1440)} d`
 }
-const parseValor = (s: string) => { const n = parseFloat(s.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : 0 }
 
-function Proposta({ p, onFeito, onAbrirConversa }: { p: PropostaPronta; onFeito: (msg: string) => void; onAbrirConversa?: (jid: string, nome?: string) => void }) {
-  const [editando, setEditando] = useState(false)
-  const [valor, setValor] = useState(p.preco.toFixed(2).replace(".", ","))
-  const [ocupado, setOcupado] = useState(false)
-  const [erro, setErro] = useState<string | null>(p.erro ?? null)
-  const novo = editando ? parseValor(valor) : p.preco
-  const margem = novo > 0 ? (novo - p.custo) / novo : 0
+function Proposta({ p, onAbrir, onDescartar, onAbrirConversa }: {
+  p: PropostaPronta; onAbrir: (p: PropostaPronta, enviar: boolean) => void; onDescartar: () => void; onAbrirConversa?: (jid: string, nome?: string) => void
+}) {
+  const margem = p.preco > 0 ? (p.preco - p.custo) / p.preco : 0
   const f = p.form
-
-  async function acao(acao: "aprovar" | "descartar") {
-    setOcupado(true); setErro(null)
-    const r = await fetch("/api/proposta-pronta", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: p.id, acao, ...(acao === "aprovar" && editando ? { preco: novo } : {}) }),
-    }).then(r => r.json()).catch(() => ({ ok: false, erro: "Sem conexão" }))
-    setOcupado(false)
-    if (acao === "descartar") return onFeito("Proposta descartada.")
-    if (!r.ok) return setErro(r.erro ?? "Não consegui aprovar.")
-    onFeito(r.enviou ? `${r.numero} criado e enviado ao cliente.` : `${r.numero} criado, mas a mensagem não saiu (${r.erro ?? "WhatsApp"}). Mande pelo orçamento.`)
-  }
-
   return (
     <div className="rounded-xl p-3.5" style={{ border: "1px solid rgba(25,22,37,0.1)" }}>
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1.5 sm:gap-3">
@@ -49,13 +32,12 @@ function Proposta({ p, onFeito, onAbrirConversa }: { p: PropostaPronta; onFeito:
           </p>
         </div>
         <div className="sm:text-right shrink-0">
-          <p className="text-[16px] font-semibold ds-num text-[#191625]">{brl(novo)}</p>
+          <p className="text-[16px] font-semibold ds-num text-[#191625]">{brl(p.preco)}</p>
           <p className="text-[11px] ds-num" style={{ color: margem >= 0.4 ? "#009351" : margem >= 0.25 ? "#c57800" : "#d92d20" }}>margem {pct(margem)} · custo {brl(p.custo)}</p>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-1.5 mt-2.5">
-        {p.medidaPadrao && <Selo tom="alerta">Medida padrão pelo ml: confirme com o cliente</Selo>}
         <Selo tom={p.origemMarkup === "seus_orcamentos" ? "sucesso" : "neutro"}>
           Markup {p.multiplicador.toLocaleString("pt-BR")}× {p.origemMarkup === "seus_orcamentos" ? "(como você cobra nos pedidos fechados dessa faixa)" : "(padrão das Configurações)"}
         </Selo>
@@ -63,53 +45,47 @@ function Proposta({ p, onFeito, onAbrirConversa }: { p: PropostaPronta; onFeito:
 
       {p.opcoes.length > 1 && (
         <p className="text-[11.5px] text-[#5d5b66] mt-2 ds-num">
-          Também vai: {p.opcoes.filter(o => o.quantidade !== p.quantidade).map(o => `${un(o.quantidade)} un ${brl(o.preco * (p.preco > 0 ? novo / p.preco : 1))}`).join(" · ")}
+          Também vai: {p.opcoes.filter(o => o.quantidade !== p.quantidade).map(o => `${un(o.quantidade)} un ${brl(o.preco)}`).join(" · ")}
         </p>
       )}
       {p.dados?.resumo && <p className="text-[11.5px] text-[#898892] mt-1.5 line-clamp-2">{p.dados.resumo}</p>}
-
-      {editando && (
-        <label className="flex items-center gap-2 mt-3">
-          <span className="text-[12px] text-[#5d5b66]">Preço das {un(p.quantidade)} un</span>
-          <input value={valor} onChange={e => setValor(e.target.value)} inputMode="decimal" autoFocus
-            className="h-9 w-32 rounded-lg border border-[rgba(25,22,37,0.15)] px-2.5 text-[13px] ds-num" />
-          <span className="text-[11px] text-[#898892]">as outras quantidades acompanham</span>
-        </label>
-      )}
-      {erro && <p className="text-[12px] text-[#d92d20] mt-2 flex items-center gap-1.5"><AlertTriangle size={13} />{erro}</p>}
+      {p.erro && <p className="text-[12px] text-[#d92d20] mt-2 flex items-center gap-1.5"><AlertTriangle size={13} />{p.erro}</p>}
 
       <div className="flex flex-wrap gap-2 mt-3">
-        <Botao variante="primario" icone={<Send size={14} />} disabled={ocupado || novo <= 0} onClick={() => acao("aprovar")}>
-          {ocupado ? "Enviando…" : "Aprovar e enviar"}
-        </Botao>
-        {!editando && <Botao icone={<Pencil size={14} />} onClick={() => setEditando(true)} disabled={ocupado}>Ajustar preço</Botao>}
+        <Botao variante="primario" icone={<Send size={14} />} onClick={() => onAbrir(p, true)}>Aprovar e enviar</Botao>
+        <Botao icone={<Pencil size={14} />} onClick={() => onAbrir(p, false)}>Ajustar no orçamento</Botao>
         {onAbrirConversa && <Botao variante="fantasma" icone={<MessageCircle size={14} />} onClick={() => onAbrirConversa(p.jid, p.nome ?? undefined)}>Conversa</Botao>}
-        <Botao variante="fantasma" icone={<X size={14} />} onClick={() => acao("descartar")} disabled={ocupado}>Descartar</Botao>
+        <Botao variante="fantasma" icone={<X size={14} />} onClick={onDescartar}>Descartar</Botao>
       </div>
     </div>
   )
 }
 
-export function PropostasProntasCard({ onAbrirConversa, iniciais }: { onAbrirConversa?: (jid: string, nome?: string) => void; iniciais?: PropostaPronta[] }) {
+export function PropostasProntasCard({ onAbrir, onAbrirConversa, iniciais }: {
+  onAbrir: (p: PropostaPronta, enviar: boolean) => void
+  onAbrirConversa?: (jid: string, nome?: string) => void
+  iniciais?: PropostaPronta[]
+}) {
   const [lista, setLista] = useState<PropostaPronta[] | null>(iniciais ?? null)
-  const [aviso, setAviso] = useState<string | null>(null)
   const carregar = () => fetch("/api/proposta-pronta").then(r => r.json()).then(d => setLista(d.propostas ?? [])).catch(() => setLista([]))
   useEffect(() => { if (!iniciais) carregar() }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const aguardando = (lista ?? []).filter(p => p.status === "aguardando")
   const enviadasSemana = (lista ?? []).filter(p => p.status === "enviada" && Date.now() - new Date(p.enviadaEm ?? p.em).getTime() < 7 * 86_400_000)
-  if (!aguardando.length && !aviso) return null
+  if (!aguardando.length) return null
+  const descartar = (id: string) => {
+    setLista(l => (l ?? []).map(x => x.id === id ? { ...x, status: "descartada" as const } : x))
+    fetch("/api/proposta-pronta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, acao: "descartar" }) }).catch(() => {})
+  }
+  // Aprovou ou levou para a mesa: some daqui (volta se você não salvar, na próxima vez que abrir o Painel)
+  const abrir = (p: PropostaPronta, enviar: boolean) => { setLista(l => (l ?? []).filter(x => x.id !== p.id)); onAbrir(p, enviar) }
 
   return (
     <Cartao>
       <TituloCartao icone={<FileCheck2 size={16} />} titulo="Propostas para aprovar"
-        sub={`O agente montou com medida, quantidade e o seu markup. Aprovou, vai para o cliente com o link de aprovação.${enviadasSemana.length ? ` ${enviadasSemana.length} enviada${enviadasSemana.length > 1 ? "s" : ""} nesta semana.` : ""}`} />
-      {aviso && <p className="text-[12.5px] text-[#009351] mb-3">{aviso}</p>}
+        sub={`O agente montou com a medida, a quantidade e o seu markup. Aprovar salva o orçamento e abre o envio com o PDF; ajustar abre na mesa de orçamento.${enviadasSemana.length ? ` ${enviadasSemana.length} enviada${enviadasSemana.length > 1 ? "s" : ""} nesta semana.` : ""}`} />
       <div className="flex flex-col gap-2.5">
-        {aguardando.map(p => (
-          <Proposta key={p.id} p={p} onAbrirConversa={onAbrirConversa}
-            onFeito={msg => { setAviso(msg); if (iniciais) setLista(l => (l ?? []).filter(x => x.id !== p.id)); else carregar() }} />
-        ))}
+        {aguardando.map(p => <Proposta key={p.id} p={p} onAbrir={abrir} onDescartar={() => descartar(p.id)} onAbrirConversa={onAbrirConversa} />)}
       </div>
     </Cartao>
   )
