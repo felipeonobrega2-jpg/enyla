@@ -222,6 +222,9 @@ async function medirEstiloFelipe() {
 
 // O que você ensinou direto (pediu ao Claude): entra uma vez, pela versão
 const ENSINADO: { v: number; item: Conhecimento }[] = [
+  // v7 (12/11, conversa com o Carlos Júnior)
+  { v: 7, item: { id: "felipe-cartonada", tema: "produto", em: "2026-11-12T00:00:00.000Z",
+    texto: "Caixa cartonada é outra coisa: papelão revestido, rígida, com aspecto de caixa de iPhone; bem mais cara que o cartucho de triplex. Berço interno, divisória, kit com mais de um frasco ou ampola, verniz localizado e hot stamping também fogem do digital padrão (um frasco por caixa, triplex 300 g). Quando o cliente pede ou manda foto disso, quem orça sou eu: não prometo que faço nem passo preço do digital, digo que vou ver o melhor formato e já falo." } },
   // v6 (12/11, termos do pedido digital, aceitos na página antes do sinal)
   { v: 6, item: { id: "felipe-digital-termos", tema: "venda", em: "2026-11-12T00:00:00.000Z",
     texto: "Termos do digital (o cliente aceita na página do pedido antes de pagar o sinal): a arte tem a primeira versão e até 2 rodadas de ajuste incluídas; nada é impresso sem a aprovação dele; a cor pode variar um pouco da tela; produção de 3 a 5 dias úteis depois do sinal e da arte aprovada, frete à parte; 50% de sinal e o restante com o frete antes do envio; a quantidade é exata. Se desistir antes de aprovar a arte, devolvo o sinal inteiro; depois da arte aprovada, não. Defeito de impressão ou corte: avisar em até 7 dias com fotos, e refazemos as unidades com problema." } },

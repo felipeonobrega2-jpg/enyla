@@ -40,7 +40,8 @@ const MAX_POR_DIA_DIGITAL = 25
 const TRAVAS_COM_AVISO = ["precisa de você", "a IA pediu", "citou valor", "resposta longa", "já respondeu"]
 export { PRODUTO_RECUSADO } from "./metaMql"
 import { PRODUTO_RECUSADO } from "./metaMql"
-const MIN_ENTRE_RODADAS = 10         // follow-ups: no máximo uma rodada a cada 10 min
+const MIN_ENTRE_RODADAS = 6          // follow-ups: no máximo uma rodada a cada 6 min (2 por rodada ≈ 20/h, dentro do limite de envios ativos)
+const HORAS_REPOUSO_TENTATIVA = 3     // tentado (enviou ou pulou): sai da frente por 3 h, para a fila andar
 
 export type Registro = RegistroAgente & { ids?: string[] }
 export type CfgAgente = { pedidosDigitais?: PedidoDigital[]; digital?: RegraDigital; agenteAuto?: AgenteAuto; agenteLog?: Registro[]; agenteMarcos?: Marcos; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string; agenteSemCreditoEm?: string; agenteRetomadaEm?: string; agenteRetomadas?: string[]; agenteIds?: string[]; agenteTratadas?: string[] }
@@ -393,7 +394,9 @@ export async function responderSozinho(msgId: string) {
   const mandouArquivo = conversa.mensagens.slice(-12).some(m => !m.from_me && /image|document/i.test(m.tipo))
   let novoGrupo: PedidoDigital[] | null = null
   const grupo = digitalPequeno && !naoFazemos ? cotarItens(r.dados, cfg.digital) : null
-  if (grupo) {
+  // A IA disse que é decisão sua (caixa cartonada/rígida, berço, kit, acabamento especial): nada de orçamento automático
+  const decisaoSua = r.alerta === "decisao_sua"
+  if (grupo && !decisaoSua) {
     if (!grupo.ok && !/falta/.test(grupo.motivo)) semTabela = grupo.motivo
     const anteriores = anterior ? pedidosDoGrupo(cfg.pedidosDigitais, anterior) : []
     if (grupo.ok && !(mandouArquivo && grupo.itens.some(i => i.cot.padrao)) && (!anteriores.length || mudouOGrupo(anteriores, grupo.itens))) {
@@ -401,7 +404,7 @@ export async function responderSozinho(msgId: string) {
       r.resposta = textoLinkGrupo(novoGrupo, novoGrupo.map(p => linkPedido(p.id)))
       r.alerta = "nenhum"; r.pode_enviar_sozinho = true
     }
-  } else if (digitalPequeno && !naoFazemos) {
+  } else if (digitalPequeno && !naoFazemos && !decisaoSua) {
     const cot = cotarDigital(r.dados, cfg.digital)
     if (!cot.ok && !cot.motivo.startsWith("falta")) semTabela = cot.motivo
     // Já tem grupo (mais de uma caixa) aberto: uma leitura com uma caixa só não desfaz o grupo
@@ -619,6 +622,7 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
   const falhas = new Set((cfg.agenteLog ?? []).filter(l => !l.enviou && /^não enviou/.test(l.motivo ?? "")).map(l => `${l.jid}|${l.em}`))
   // Campanha digital é uma mensagem só: quem recebeu e não respondeu não ganha follow-up (contato frio = risco ao número)
   const campanha = (cfg as { campanhaDigital?: EstadoCampanha }).campanhaDigital?.enviados ?? {}
+  const tentados = (cfg as { agenteFollowupTentados?: Record<string, string> }).agenteFollowupTentados ?? {}
   const candidatos = (data ?? []).filter(c =>
     !c.fechada_em && !["descartado", "perdido", "orcamento", "negociando", "pedido"].includes(c.status_lead ?? "")
     && !(campanha[c.jid] && !(c.ultima_recebida_at && c.ultima_recebida_at > campanha[c.jid].em))
@@ -635,7 +639,20 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     })
     // Orçamento digital esperando o sinal segue o ritmo dele (2 lembretes, espaçados) e não ocupa a vez dos outros
     .filter(x => { const pd = pedidoPendente(cfg.pedidosDigitais, x.c.jid); return !pd || lembreteDigitalAgora(pd, x.enviada) != null })
+    // Rodízio: quem foi tentado há pouco (enviou, ou foi pulado em silêncio) não fica travando a frente da fila
+    .filter(x => { const t = tentados[x.c.jid]; return !t || Date.now() - new Date(t).getTime() > HORAS_REPOUSO_TENTATIVA * 3_600_000 })
+    // Prioridade: lembrete de pedido digital esperando o sinal (dinheiro na mesa); depois quem espera há mais tempo
+    .sort((a, b) => (pedidoPendente(cfg.pedidosDigitais, b.c.jid) ? 1 : 0) - (pedidoPendente(cfg.pedidosDigitais, a.c.jid) ? 1 : 0) || a.enviada.localeCompare(b.enviada))
     .slice(0, 2)   // cabe no minuto da Vercel; o resto vai na próxima rodada
+  if (candidatos.length) {
+    const agoraIso = new Date().toISOString()
+    await gravarCfg(d => {
+      const t = (d as { agenteFollowupTentados?: Record<string, string> }).agenteFollowupTentados ?? {}
+      const vivos = Object.fromEntries(Object.entries(t).filter(([, em]) => Date.now() - new Date(em).getTime() < 86_400_000))
+      for (const x of candidatos) vivos[x.c.jid] = agoraIso
+      return { agenteFollowupTentados: vivos } as Partial<CfgAgente>
+    })
+  }
 
   // Um de cada vez, com intervalo (nunca dois no mesmo segundo): ritmo de gente, para o WhatsApp não desconfiar
   let primeiro = true
