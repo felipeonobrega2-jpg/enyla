@@ -104,6 +104,84 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
   if (erro) return <Tela><div className="flex items-start gap-3 bg-white rounded-2xl p-5 ds-borda"><AlertCircle className="w-5 h-5 text-[#d33a3c] shrink-0" /><p className="text-[14px] text-[#191625]">{erro}</p></div></Tela>
   if (!p) return <Tela><div className="flex justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-[#8456e8]" /></div></Tela>
 
+  // Link do Leandro (arte e produção): só o que ele precisa para trabalhar. Nada de cliente, preço ou pagamento.
+  if (p.designer) {
+    const b = p.briefing
+    const Linha = ({ rotulo, valor }: { rotulo: string; valor?: string | null }) => valor ? (
+      <div className="py-2.5 border-t border-[rgba(60,60,67,0.07)] first:border-t-0">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">{rotulo}</p>
+        <p className="text-[14px] text-[#191625] mt-0.5 whitespace-pre-wrap break-words">{valor}</p>
+      </div>
+    ) : null
+    const situacao = p.arteAprovadaEm ? "Arte aprovada pelo cliente: pode imprimir" : p.arteEnviadaEm ? "Arte com o cliente, esperando aprovar" : p.ajustes.length && !p.arteEnviadaEm && p.arte ? "Cliente pediu ajuste" : p.arte ? "Arte ainda não foi para o cliente" : "Arte a fazer"
+    return (
+      <Tela rodape="Enyla · pedido de produção">
+        <div className="text-center">
+          <p className="text-[12px] font-semibold text-[#898892]">{p.id}</p>
+          <h1 className="text-[22px] font-bold text-[#191625] mt-1 leading-tight">Pedido de arte e produção</h1>
+          <p className="text-[13px] text-[#5e5c68] mt-1">{situacao}</p>
+        </div>
+
+        <div className="bg-white rounded-2xl ds-borda py-6 flex flex-col items-center">
+          <Caixa3D largura={p.medidas.l} altura={p.medidas.a} profundidade={p.medidas.p} material="Triplex 300g" laminacao={b.laminacao === "brilho" ? "brilho" : "fosca"} tamanho={150} />
+          <p className="text-[13px] font-semibold text-[#191625] mt-4">{cm(p.medidas.a)} × {cm(p.medidas.l)} × {cm(p.medidas.p)} cm <span className="font-normal text-[#898892]">(A × L × P)</span></p>
+          <p className="text-[12.5px] text-[#5e5c68] mt-2 text-center px-6">
+            {p.quantidade.toLocaleString("pt-BR")} caixas · folha {p.folha} · triplex 300g · laminação {b.laminacao === "brilho" ? "brilho" : "fosca"}
+            {p.ml ? ` · frasco de ${p.ml} ml` : ""}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl ds-borda p-5">
+          <p className="text-[15px] font-bold text-[#191625] mb-1">Briefing do cliente</p>
+          {!(b.marca || b.cores || b.referencias || b.arquivos.length) && <p className="text-[13px] text-[#c57800] mt-1">O cliente ainda não preencheu. Assim que ele mandar, você recebe no WhatsApp.</p>}
+          <Linha rotulo="Marca" valor={b.marca} />
+          <Linha rotulo="Cores" valor={b.cores} />
+          <Linha rotulo="O que vai na caixa e referências" valor={b.referencias} />
+          {b.arquivos.length > 0 && (
+            <div className="pt-2.5 border-t border-[rgba(60,60,67,0.07)]">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">Arquivos do cliente ({b.arquivos.length})</p>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {b.arquivos.map((a, i) => (
+                  <a key={a.url} href={a.url} target="_blank" rel="noreferrer" download className="block rounded-xl overflow-hidden ds-borda bg-[#f5f5f7] aspect-square">
+                    {ehPdf(a.url)
+                      ? <span className="w-full h-full flex flex-col items-center justify-center gap-1 text-[11px] text-[#5e5c68]"><FileText className="w-5 h-5 text-[#8456e8]" />PDF {i + 1}</span>
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      : <img src={a.url} alt={`Arquivo ${i + 1}`} className="w-full h-full object-cover" />}
+                  </a>
+                ))}
+              </div>
+              <p className="text-[11px] text-[#898892] mt-1.5">Toque para abrir em tamanho real e baixar.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl ds-borda p-5">
+          <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Palette className="w-4 h-4 text-[#8456e8]" />Arte</p>
+          {p.ajustes.length > 0 && (
+            <div className="mt-3 rounded-xl bg-[#c57800]/[0.08] px-3.5 py-2.5 space-y-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#c57800]">Ajustes que o cliente pediu</p>
+              {p.ajustes.map(a => <p key={a.em} className="text-[12.5px] text-[#191625] whitespace-pre-wrap">{a.texto}</p>)}
+            </div>
+          )}
+          {p.arte ? <ArtePreview arte={p.arte} /> : <p className="text-[12.5px] text-[#5e5c68] mt-1">Suba a arte aqui. Depois é só tocar em mandar: ela vai para o cliente aprovar.</p>}
+          {!p.arteAprovadaEm && (<>
+            <label className={`mt-3 flex items-center justify-center gap-2 h-11 rounded-xl border border-dashed border-[rgba(60,60,67,0.25)] text-[13px] font-semibold text-[#5e5c68] cursor-pointer hover:bg-[rgba(116,116,128,0.04)] ${ocupado ? "opacity-60 pointer-events-none" : ""}`}>
+              {ocupado === "arte" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}{p.arte ? "Subir nova versão (JPG, PNG ou PDF)" : "Subir a arte (JPG, PNG ou PDF)"}
+              <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden" onChange={e => subirArte(e.target.files?.[0])} />
+            </label>
+            {p.arte && !p.arteEnviadaEm && (
+              <button onClick={() => acao("mandar", { acao: "mandarArte" })} disabled={!!ocupado}
+                className="mt-2 w-full h-11 rounded-xl bg-[#8456e8] text-white text-[14px] font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
+                {ocupado === "mandar" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}Mandar para o cliente aprovar
+              </button>
+            )}
+          </>)}
+        </div>
+        {aviso && <p className="text-[12.5px] text-[#5e5c68] bg-white rounded-xl ds-borda px-4 py-3">{aviso}</p>}
+      </Tela>
+    )
+  }
+
   const pago = p.status !== "aguardando_sinal"
   const etapa = ETAPAS.findIndex(([s]) => s === p.status)
   const oque = p.ml ? `para frasco de ${p.ml} ml` : p.produto ? `para ${p.produto}` : ""
@@ -291,13 +369,13 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
   )
 }
 
-function Tela({ children }: { children: React.ReactNode }) {
+function Tela({ children, rodape = "Enyla Embalagens · dúvidas, é só responder no WhatsApp" }: { children: React.ReactNode; rodape?: string }) {
   return (
     <div className="min-h-[100dvh] bg-[#f5f5f7]">
       <div className="max-w-md mx-auto px-4 py-6 space-y-4">
         <div className="flex justify-center"><Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1335} height={328} className="h-5 w-auto" priority /></div>
         {children}
-        <p className="text-center text-[11px] text-[#898892] pt-2">Enyla Embalagens · dúvidas, é só responder no WhatsApp</p>
+        <p className="text-center text-[11px] text-[#898892] pt-2">{rodape}</p>
       </div>
     </div>
   )

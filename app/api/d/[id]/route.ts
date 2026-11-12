@@ -8,8 +8,8 @@ import { mascararDocumento } from "@/app/lib/documento"
 
 // Página pública do pedido digital (/d/DIG-0001?t=…): só com o link assinado. Nunca devolve custo nem margem.
 // Link da arte (Leandro): nenhum valor de venda (total, sinal, restante, opções, cobrança), ele não pode saber por quanto foi vendido
-const publico = (p: PedidoComBriefing, regra?: RegraDigital, designer = false) => designer ? semValores(dadosPublicos(p, regra, true)) : dadosPublicos(p, regra, false)
-const semValores = <T extends Record<string, unknown>>(d: T) => ({ ...d, total: 0, sinal: 0, opcoes: [], restante: null, frete: null, cobranca: null, documento: null, asaas: false })
+const publico = (p: PedidoComBriefing, regra?: RegraDigital, designer = false) => designer ? semValores({ ...dadosPublicos(p, regra, true), folha: p.folhaReal ?? p.folha }) : dadosPublicos(p, regra, false)
+const semValores = <T extends Record<string, unknown>>(d: T) => ({ ...d, nome: null, total: 0, sinal: 0, opcoes: [], restante: null, frete: null, cobranca: null, documento: null, asaas: false, entrega: null })
 const dadosPublicos = (p: PedidoComBriefing, regra?: RegraDigital, designer = false) => ({
   id: p.id, nome: p.nome, ml: p.ml, produto: p.produto, medidas: p.medidas, padrao: p.padrao, folha: p.folha,
   quantidade: p.quantidade, total: p.total, sinal: p.sinal, status: p.status, sinalPagoEm: p.sinalPagoEm ?? null,
