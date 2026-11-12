@@ -4,11 +4,12 @@
 // (digital). Mediana e a faixa onde cai a metade dos casos; os mais recentes; quem ficou sem dado.
 
 import { useEffect, useState } from "react"
+import { Hourglass } from "lucide-react"
+import { Cartao, TituloCartao } from "./ds"
 import type { TempoAteFechar, Estatistica } from "../lib/tempoAteFechar"
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
 const dataBR = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
-const caixa = { background: "var(--bg-surface)", boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" }
 
 function Bloco({ titulo, e, sub }: { titulo: string; e: Estatistica; sub: string }) {
   return (
@@ -31,11 +32,9 @@ export function TempoAteFecharCard() {
   useEffect(() => { fetch("/api/tempo-fechar").then(r => r.ok ? r.json() : Promise.reject()).then(setT).catch(() => setErro(true)) }, [])
 
   return (
-    <div className="rounded-[18px] p-[22px]" style={caixa}>
-      <div className="flex items-baseline justify-between gap-3 mb-4 flex-wrap">
-        <p className="text-[15px] font-bold" style={{ color: "var(--text-main)" }}>Tempo até fechar</p>
-        <p className="text-[12px]" style={{ color: "var(--text-faint)" }}>do primeiro contato no WhatsApp ao primeiro pedido</p>
-      </div>
+    <Cartao className="ds-entrada">
+      <TituloCartao titulo="Tempo até fechar" icone={<Hourglass className="w-4 h-4" />}
+        sub="Do primeiro contato no WhatsApp até o primeiro pedido fechado (offset) ou o sinal pago (digital). Todas as vendas, não só as do período." />
       {!t ? <p className="text-[13px]" style={{ color: "var(--text-faint)" }}>{erro ? "Não deu para calcular agora." : "Calculando…"}</p> : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
           <Bloco titulo="Offset" e={t.offset} sub="até o primeiro pedido fechado · pedidos maiores costumam demorar mais" />
@@ -59,6 +58,6 @@ export function TempoAteFecharCard() {
           </div>
         </div>
       )}
-    </div>
+    </Cartao>
   )
 }

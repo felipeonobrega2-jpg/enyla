@@ -12,6 +12,7 @@ import {
 import { brl, num } from "../utils"
 import { CabecalhoPagina, Segmentado, Botao, Cartao, TituloCartao, ColunasDuplas, Colunas, ListaBarras, Vazio } from "./ds"
 import { gerarHtmlRelatorio } from "./DashboardView"
+import { TempoAteFecharCard } from "./TempoAteFecharCard"
 import { PrevisaoCartao } from "./PrevisaoCartao"
 import { SimuladorCartao } from "./SimuladorCartao"
 import { baseDoSimulador } from "../lib/simulador"
@@ -302,6 +303,8 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, 
             </div>
           </Cartao>
         )}
+
+        <TempoAteFecharCard />
 
         {baseSim.ticketNovo > 0 && <SimuladorCartao base={baseSim} />}
 
