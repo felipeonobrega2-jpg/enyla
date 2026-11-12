@@ -242,6 +242,15 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
         form: form(6, 13, 6), opcoes: [{ quantidade: 1500, preco: 2058, unitario: 1.372 }, { quantidade: 2000, preco: 2390, unitario: 1.195 }, { quantidade: 3000, preco: 3050, unitario: 1.017 }] },
     ] }))
   }
+  if (u.startsWith("/api/campanha-digital")) return new Response(JSON.stringify({
+    ligada: false, porDia: 10, hoje: 0, proximaEm: null, agenteLigado: true, naFila: 194, cotaveis: 106,
+    placar: { enviados: 0, responderam: 0, comOrcamento: 0, pagaram: 0, faturado: 0 },
+    fila: [
+      { jid: "1@lid", nome: "Ana Exemplo", motivo: "100 un · 50 ml: vai o orçamento pronto", cotavel: true, ultima: new Date(Date.now() - 6 * 86_400_000).toISOString() },
+      { jid: "2@lid", nome: "Perfumaria Modelo", motivo: "300 un · 30 ml: vai o orçamento pronto", cotavel: true, ultima: new Date(Date.now() - 12 * 86_400_000).toISOString() },
+      { jid: "3@lid", nome: "Essências Exemplo", motivo: "200 un, falta o tamanho", cotavel: false, ultima: new Date(Date.now() - 20 * 86_400_000).toISOString() },
+      { jid: "4@lid", nome: "Óleos Fictícia", motivo: "sem quantidade: pergunta", cotavel: false, ultima: new Date(Date.now() - 45 * 86_400_000).toISOString() },
+    ] }))
   if (u.startsWith("/api/tempo-fechar")) return new Response(JSON.stringify({
     offset: { n: 10, mediana: 32, media: 62, p25: 14, p75: 97 }, digital: { n: 1, mediana: 3, media: 3, p25: 3, p75: 3 },
     casos: [

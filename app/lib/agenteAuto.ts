@@ -8,6 +8,7 @@ import { cotarItens, montarPedidosDoGrupo, mudouOGrupo, pedidosDoGrupo, textoLin
 import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital, lembreteDigitalAgora, ADIOU } from "./digital"
 import { linkPedido } from "./digitalLink"
 import { faltaParaProposta } from "./propostaPronta"
+import { emCampanha, type EstadoCampanha } from "./campanhaDigital"
 import { prepararProposta, talvezPropostaDoMql } from "./propostaProntaServidor"
 import type { RegraDigital } from "./precoDigital"
 import { supabase } from "./supabase"
@@ -351,7 +352,9 @@ export async function responderSozinho(msgId: string) {
 
   // Filtro barato antes de chamar a IA: só contato novo (fornecedor e cliente antigo nunca)
   const primeira = await primeiraDa(jid)
-  const conversaNova = !!primeira && Date.now() - new Date(primeira.ts).getTime() < DIAS_CONVERSA_NOVA * 86_400_000
+  // Respondeu à campanha digital (conversa antiga): o agente atende como conversa nova
+  const conversaNova = (!!primeira && Date.now() - new Date(primeira.ts).getTime() < DIAS_CONVERSA_NOVA * 86_400_000)
+    || emCampanha((cfg as { campanhaDigital?: EstadoCampanha }).campanhaDigital, jid)
   const c = await lerConversa(jid)
   if (!c) return
   // Respondeu: sai do follow-up (vale também para lead que você está atendendo)
@@ -614,8 +617,11 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     .not("ultima_enviada_at", "is", null)
     .gte("ultima_enviada_at", new Date(Date.now() - DIAS_FOLLOW_UP * 86_400_000).toISOString())
   const falhas = new Set((cfg.agenteLog ?? []).filter(l => !l.enviou && /^não enviou/.test(l.motivo ?? "")).map(l => `${l.jid}|${l.em}`))
+  // Campanha digital é uma mensagem só: quem recebeu e não respondeu não ganha follow-up (contato frio = risco ao número)
+  const campanha = (cfg as { campanhaDigital?: EstadoCampanha }).campanhaDigital?.enviados ?? {}
   const candidatos = (data ?? []).filter(c =>
     !c.fechada_em && !["descartado", "perdido", "orcamento", "negociando", "pedido"].includes(c.status_lead ?? "")
+    && !(campanha[c.jid] && !(c.ultima_recebida_at && c.ultima_recebida_at > campanha[c.jid].em))
     && (!c.ultima_recebida_at || c.ultima_recebida_at < c.ultima_enviada_at))
     .map(c => ({ c: c as Conversa, enviada: c.ultima_enviada_at as string, passo: proximoFollowUp(c.etiquetas ?? [], (Date.now() - new Date(c.ultima_enviada_at).getTime()) / 3_600_000) }))
     // já tentou este passo depois da sua última mensagem (e segurou): não tenta de novo.

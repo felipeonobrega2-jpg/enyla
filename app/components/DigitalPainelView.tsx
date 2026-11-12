@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Printer, Clock, CheckCircle2, Truck, Wallet, MessageCircle, ExternalLink, ArrowRight, X, Eye, EyeOff, Copy, Check, Upload, Send, Palette, Users, Loader2 } from "lucide-react"
+import { CampanhaDigitalCard } from "./CampanhaDigitalCard"
 import { Pagina, CabecalhoPagina, Cartao, Kpi, GradeKpis, Selo, Botao, Segmentado, LinhaLista, Vazio, Gaveta, type Tom } from "./ds"
 import { ROTULO_STATUS, PROXIMO_STATUS, type StatusDigital } from "@/app/lib/digital"
 import { haQuanto } from "@/app/lib/hoje"
@@ -136,6 +137,8 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
         <Kpi rotulo="Andamento" valor={pedidos ? resumo.andamento : null} formato={n => String(n)} tom="info" icone={<Printer className="w-3.5 h-3.5" />} sub="arte e produção" />
         <Kpi rotulo="Margem" valor={pedidos ? resumo.margem : null} formato={brl} icone={<Wallet className="w-3.5 h-3.5" />} sub="pagos em 30 dias" />
       </GradeKpis>
+
+      <div className="mt-3"><CampanhaDigitalCard /></div>
 
       <Cartao className="mt-3">
         <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">

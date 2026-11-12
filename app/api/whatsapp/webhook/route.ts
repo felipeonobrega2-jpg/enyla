@@ -13,6 +13,7 @@ import { talvezConferirMeta } from "@/app/lib/metaSaldoServidor"
 import { talvezTesteAbertura } from "@/app/lib/aberturaABServidor"
 import { marcarOrigemPelaFrase, talvezMarcarOrigens } from "@/app/lib/origensWhatsappServidor"
 import { talvezAvisarGastos } from "@/app/lib/gastosServidor"
+import { talvezCampanhaDigital } from "@/app/lib/campanhaDigitalServidor"
 
 // Espera do modo automático (o lead termina de digitar) + resposta da IA + envio
 export const maxDuration = 60
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
       after(() => talvezAcertoSemanal().catch(e => console.error("[digital acerto]", e)))
       after(() => talvezCorrigirDigital().catch(e => console.error("[digital custo]", e)))
       after(() => talvezAjustePontual().catch(e => console.error("[digital ajuste]", e)))
+      after(() => talvezCampanhaDigital().catch(e => console.error("[campanha digital]", e)))
       after(() => talvezTesteAbertura().catch(e => console.error("[abertura A/B]", e)))
       // Leads do anúncio: conversas recentes sem origem são marcadas pela frase do anúncio (no máximo a cada 30 min)
       after(() => talvezMarcarOrigens().then(() => undefined).catch(e => console.error("[origens]", e)))
