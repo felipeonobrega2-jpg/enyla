@@ -14,7 +14,7 @@ function fmtDate(s: string) {
 }
 
 function hoje() {
-  return new Date().toISOString().split("T")[0]
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
 }
 
 type Props = {

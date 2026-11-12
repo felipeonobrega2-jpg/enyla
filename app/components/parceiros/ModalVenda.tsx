@@ -14,7 +14,7 @@ import { Botao } from "../ds"
 export const PRODUTOS = ["Frasco", "Essência", "Válvula", "Envase", "Adesivo / rótulo", "Sacola", "Outro"]
 const CATEGORIA_DO_PRODUTO: Record<string, string> = { Frasco: "Vidros", Essência: "Essências", Válvula: "Embalagens", Envase: "Outro", "Adesivo / rótulo": "Impressão", Sacola: "Embalagens", Outro: "Outro" }
 
-const hoje = () => new Date().toISOString().slice(0, 10)
+const hoje = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
 const num = (s: string) => { const n = parseFloat(s.replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : 0 }
 const campo = "w-full h-9 rounded-lg px-3 text-[12.5px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] ds-borda"
 

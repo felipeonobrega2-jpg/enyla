@@ -808,7 +808,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
     const { from, to } = periodBounds
     setLeadsLoading(true)
     const url = from
-      ? `/api/meta?since=${from.toISOString().split("T")[0]}&until=${to ? to.toISOString().split("T")[0] : new Date().toISOString().split("T")[0]}`
+      ? `/api/meta?since=${from.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })}&until=${to ? to.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) : new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })}`
       : `/api/meta?preset=maximum`
     fetch(url)
       .then(r => r.json())
@@ -1048,7 +1048,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
     const orcamentos = filteredCards.filter(c => !c.isTerceirizado).length
 
     const { from } = periodBounds
-    const periodoInicio = from ? from.toISOString().split("T")[0] : null
+    const periodoInicio = from ? from.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) : null
 
     // Clientes únicos que FECHARAM no período
     const sold = confirmedByCloseDate.filter(c => !c.isTerceirizado)
@@ -1137,9 +1137,9 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
 
   // ── Alertas ativos ───────────────────────────────────────────────────────────
   const alertas = useMemo(() => {
-    const hj = new Date().toISOString().split("T")[0]
+    const hj = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
     const amanha = (() => {
-      const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split("T")[0]
+      const d = new Date(); d.setDate(d.getDate() + 1); return d.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
     })()
 
     // Link PIX vencido e não pago deixa de ser receita pendente (o cliente não vai mais pagar aquele link específico)
@@ -1171,7 +1171,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
 
   // ── Relatório PDF ────────────────────────────────────────────────────────────
   function abrirRelatorio() {
-    const hj = new Date().toISOString().split("T")[0]
+    const hj = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
     const { from, to } = periodBounds
     const inPer = (l: LancamentoFinanceiro) => {
       const ref = l.dataPagamento || l.dataVencimento
@@ -1310,7 +1310,7 @@ export default function DashboardView({ historico, kanban, propostasCustom: _pro
               const total = alertas.vencidos.length + alertas.vencendoHoje.length + alertas.parados.length + alertas.semRegistro.length
               if (total === 0) return null
               const cor = alertas.vencidos.length > 0 ? "#d33a3c" : "#c57800"
-              const hj  = new Date().toISOString().split("T")[0]
+              const hj  = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
               return (
                 <div className="relative" ref={alertasRef}>
                   <button

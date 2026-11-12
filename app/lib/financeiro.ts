@@ -8,7 +8,7 @@
 import { LancamentoFinanceiro, KanbanCard, NegocioParceiro, COL_FECHADO, COL_PERDIDO, COL_HOT } from "../types"
 import { montarPedidos, pixExpirado } from "./negocio"
 
-export const hoje = () => new Date().toISOString().split("T")[0]
+export const hoje = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })   // dia em São Paulo (UTC virava amanhã depois das 21h)
 
 // Link PIX vencido e não pago: o link expirou, o cliente não vai mais pagar
 // aquele link específico — deixa de contar como receita pendente (só conta de

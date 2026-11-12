@@ -16,7 +16,7 @@ const CATEGORIAS = [
   "Impressão", "Design", "Logística", "Distribuição", "Outro",
 ]
 
-const hoje = () => new Date().toISOString().split("T")[0]
+const hoje = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
 
 const STATUS_LABEL: Record<StatusNegocio, string> = {
   pendente:  "Pendente",

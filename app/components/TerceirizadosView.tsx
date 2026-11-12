@@ -259,7 +259,7 @@ function TercCard({ card, onMove, onEdit, onDelete }: {
   const isLate = !!(
     card.dataEntregaPrevista &&
     card.coluna !== 9 &&
-    card.dataEntregaPrevista < new Date().toISOString().slice(0, 10)
+    card.dataEntregaPrevista < new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
   )
 
   const margin = card.custoTerceiro != null && card.custoTerceiro > 0
@@ -419,7 +419,7 @@ export function TerceirizadosView({ kanban, onMove, onEdit, onDelete, embutido }
     const vEntregue  = entregue.reduce((s, c) => s + c.preco, 0)
     const late       = tercs.filter(c =>
       c.dataEntregaPrevista && c.coluna !== 9 &&
-      c.dataEntregaPrevista < new Date().toISOString().slice(0, 10)
+      c.dataEntregaPrevista < new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
     ).length
     return { nAguardando: aguardando.length, nRecebido: recebido.length, nEntregue: entregue.length,
              vAberto, vEntregue, vTotal, late }

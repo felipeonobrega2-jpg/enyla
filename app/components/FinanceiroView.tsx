@@ -1134,8 +1134,8 @@ export function FinanceiroView({
 
   // Filtrar por período
   const { from, to } = periodoRange(periodo, mesOffset)
-  const fromStr = from?.toISOString().split("T")[0] ?? null
-  const toStr   = to?.toISOString().split("T")[0] ?? null
+  const fromStr = from?.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) ?? null
+  const toStr   = to?.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) ?? null
   const inPeriodo = (l: LancamentoFinanceiro) => {
     const ref = l.dataPagamento || l.dataVencimento
     if (fromStr && ref < fromStr) return false

@@ -9,7 +9,7 @@ import { ClienteCombobox, ClienteContactCard } from "./ClienteFields"
 function dataToInput(dataStr: string): string {
   // "19/05/2026, 10:15:47" → "2026-05-19"
   const m = dataStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
-  return m ? `${m[3]}-${m[2]}-${m[1]}` : new Date().toISOString().slice(0, 10)
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
 }
 
 export function ModalPropostaCustom({
@@ -48,7 +48,7 @@ export function ModalPropostaCustom({
   const [validadeDias, setValidadeDias]   = useState(initialData?.validadeDias ?? 7)
   const [obsCliente, setObsCliente]       = useState(initialData?.obsCliente ?? "")
   const [dataInput, setDataInput]         = useState(() =>
-    initialData?.data ? dataToInput(initialData.data) : new Date().toISOString().slice(0, 10)
+    initialData?.data ? dataToInput(initialData.data) : new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
   )
   const [linhas, setLinhas] = useState<LinhaPropostaCustom[]>(
     initialData?.linhas ?? [

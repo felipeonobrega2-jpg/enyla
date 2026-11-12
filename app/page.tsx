@@ -29,7 +29,7 @@ const COLUNA_PRAZOS: Record<number, (keyof PrazoEtapas)[]> = {
 function autoSetPrazos(card: KanbanCard, novaColuna: number): PrazoEtapas | null {
   const keys = COLUNA_PRAZOS[novaColuna]
   if (!keys) return null
-  const hoje = new Date().toISOString().slice(0, 10)
+  const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
   const prazosAtuais = card.prazos ?? {}
   const novos: Partial<PrazoEtapas> = {}
   keys.forEach(k => { if (!prazosAtuais[k]) novos[k] = hoje })
@@ -532,7 +532,7 @@ export default function Home() {
       blankAltura: result.dieline.altura,
       cavidades: rota.facaCavidades,
       custo: rota.itens.find(i => i.etapa === "faca")?.valor ?? form.valorFaca,
-      data: new Date().toISOString().slice(0, 10),
+      data: new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }),
     }
     salvarConfigTudo({ ...config, producao: { ...prod, ferramentais: [...prod.ferramentais, faca] } })
     showToast(`Faca de ${faca.cavidades} registrada para ${faca.cliente}`)
@@ -712,7 +712,7 @@ export default function Home() {
     loteId: string | undefined, loteNumero: string | undefined,
     valor: number, formaPagamento: string
   ) {
-    const hoje = new Date().toISOString().slice(0, 10)
+    const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
     const lancamento: LancamentoFinanceiro = {
       id: crypto.randomUUID(),
       tipo: "receita",
@@ -1294,7 +1294,7 @@ export default function Home() {
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement("a")
     a.href     = url
-    a.download = `enyla-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `enyla-backup-${new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })}.json`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -1387,7 +1387,7 @@ export default function Home() {
         fornecedor: t.fornecedor || undefined,
         custoTerceiro: t.custoTotal || undefined,
         isTerceirizado: true,
-        dataFechamento: new Date().toISOString().slice(0, 10),
+        dataFechamento: new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }),
       }
       setKanban(prev => [...prev, tCard])
       fetch("/api/kanban", {
@@ -2317,7 +2317,7 @@ export default function Home() {
               onMove={(id, coluna) => {
                 const card = kanban.find(c => c.id === id)
                 if (card) desfazerAoVoltar(card, coluna)
-                const hoje = new Date().toISOString().slice(0, 10)
+                const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
                 const dataFechamento = (coluna === COL_FECHADO && !card?.dataFechamento) ? hoje : undefined
                 setKanban(prev => prev.map(c => c.id === id ? { ...c, coluna, ...(dataFechamento ? { dataFechamento } : {}) } : c))
                 fetch(`/api/kanban/${id}`, {
@@ -2391,7 +2391,7 @@ export default function Home() {
               }}
               onFechamento={(id, opcao) => {
                 const card = kanban.find(c => c.id === id)
-                const hoje = new Date().toISOString().slice(0, 10)
+                const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
                 const dataFechamento = card?.dataFechamento ?? hoje
                 setKanban(prev => prev.map(c => c.id === id ? { ...c, coluna: COL_FECHADO, preco: opcao.preco, quantidade: opcao.quantidade, dataFechamento } : c))
                 fetch(`/api/kanban/${id}`, {
@@ -2967,7 +2967,7 @@ export default function Home() {
           onMoveEtapa={"card" in detalheModal && detalheModal.card ? (id, coluna) => {
             const card = kanban.find(c => c.id === id)
             if (card) desfazerAoVoltar(card, coluna)
-            const hoje = new Date().toISOString().slice(0, 10)
+            const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
             const dataFechamento = (coluna === COL_FECHADO && !card?.dataFechamento) ? hoje : undefined
             setKanban(prev => prev.map(c => c.id === id ? { ...c, coluna, ...(dataFechamento ? { dataFechamento } : {}) } : c))
             fetch(`/api/kanban/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ coluna }) }).catch(() => {})

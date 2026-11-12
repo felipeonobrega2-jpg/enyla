@@ -31,7 +31,7 @@ function PixEmitModal({ card, loteTotal, onClose, onAddLancamento }: {
   onClose: () => void
   onAddLancamento?: (l: LancamentoFinanceiro) => void
 }) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
   const [valor,   setValor]   = useState(loteTotal > 0 ? loteTotal.toFixed(2) : "")
   const [expDate, setExpDate] = useState(today)
   const [expTime, setExpTime] = useState("23:59")
@@ -421,7 +421,7 @@ export function KanbanView({
 
       {/* Entregas atrasadas */}
       {(() => {
-        const hj = new Date().toISOString().slice(0, 10)
+        const hj = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
         const atrasados = cards.filter(c =>
           c.dataEntregaPrevista && c.dataEntregaPrevista < hj &&
           c.coluna < COL_EXPEDICAO && c.coluna !== COL_PERDIDO   // na expedição já está pronto: não é atraso

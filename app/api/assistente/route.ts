@@ -8,7 +8,7 @@ import { COLUNAS_KANBAN, COL_FECHADO } from "@/app/types"
 type ChatMsg = { role: "user" | "assistant"; content: string }
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-const hoje = () => new Date().toISOString().slice(0, 10)
+const hoje = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
 
 const TOOLS: Anthropic.Beta.BetaTool[] = [
   {

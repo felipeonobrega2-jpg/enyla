@@ -5,7 +5,7 @@ import { KanbanCard, LancamentoFinanceiro } from "../types"
 import { brl } from "../utils"
 
 function hoje() {
-  return new Date().toISOString().slice(0, 10)
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
 }
 
 type Modo = "lote" | "pedido"
