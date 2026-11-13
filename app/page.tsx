@@ -2749,6 +2749,12 @@ export default function Home() {
           ) : view === "biblioteca" ? (
             <BibliotecaFacasView
               ferramentais={normalizarProducao(config.producao).ferramentais}
+              fornecedores={(() => {
+                const prod = normalizarProducao(config.producao)
+                const cv = prod.fornecedores.filter(f => f.ativo && f.servicos.corteVinco)
+                const padrao = prod.padroes.corteVinco
+                return [...cv].sort((a, b) => (b.id === padrao ? 1 : 0) - (a.id === padrao ? 1 : 0)).map(f => f.nome)
+              })()}
               usos={historico.filter(h => h.numero).map(h => ({ numero: h.numero!, cliente: h.form?.nomeCliente ?? "", desenhoId: h.form?.desenhoId ?? null }))}
               onUsar={(id, nome) => { void usarDesenho(id, nome) }}
               onRegistrarFaca={f => {

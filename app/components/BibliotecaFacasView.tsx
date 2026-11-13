@@ -53,15 +53,23 @@ function Previa({ id, nome }: { id: string; nome: string }) {
   )
 }
 
-function NovaFaca({ d, onSalvar, onCancelar }: { d: Desenho; onSalvar: (f: Ferramental & { desenhoId: string }) => void; onCancelar: () => void }) {
-  const [cav, setCav] = useState("4"), [forn, setForn] = useState(""), [cli, setCli] = useState(""), [custo, setCusto] = useState("")
+function NovaFaca({ d, fornecedores, onSalvar, onCancelar }: { d: Desenho; fornecedores: string[]; onSalvar: (f: Ferramental & { desenhoId: string }) => void; onCancelar: () => void }) {
+  // "Com quem está": os fornecedores de corte e vinco (o padrão primeiro); "Outro" abre o campo livre
+  const [cav, setCav] = useState("4"), [forn, setForn] = useState(fornecedores[0] ?? ""), [outro, setOutro] = useState(fornecedores.length === 0), [cli, setCli] = useState(""), [custo, setCusto] = useState("")
   const n = parseInt(cav) || 0
   return (
     <div className="mt-2 rounded-xl bg-[rgba(116,116,128,0.06)] p-3 space-y-2">
       <div className="grid grid-cols-2 gap-2">
         <label className="text-[11px] text-[#5e5c68]">Cavidades<input value={cav} onChange={e => setCav(e.target.value)} inputMode="numeric" className="mt-0.5 w-full h-8 rounded-lg bg-white px-2 text-[13px] ds-borda" /></label>
         <label className="text-[11px] text-[#5e5c68]">Custo (R$)<input value={custo} onChange={e => setCusto(e.target.value)} inputMode="decimal" className="mt-0.5 w-full h-8 rounded-lg bg-white px-2 text-[13px] ds-borda" /></label>
-        <label className="text-[11px] text-[#5e5c68]">Com quem está<input value={forn} onChange={e => setForn(e.target.value)} placeholder="fornecedor" className="mt-0.5 w-full h-8 rounded-lg bg-white px-2 text-[13px] ds-borda" /></label>
+        <label className="text-[11px] text-[#5e5c68]">Com quem está
+          {outro ? <input value={forn} onChange={e => setForn(e.target.value)} placeholder="fornecedor" autoFocus={fornecedores.length > 0} className="mt-0.5 w-full h-8 rounded-lg bg-white px-2 text-[13px] ds-borda" />
+            : <select value={forn} onChange={e => { if (e.target.value === "__outro") { setOutro(true); setForn("") } else setForn(e.target.value) }} className="mt-0.5 w-full h-8 rounded-lg bg-white px-1.5 text-[13px] ds-borda">
+                {fornecedores.map(n => <option key={n} value={n}>{n}</option>)}
+                <option value="">Não sei / em casa</option>
+                <option value="__outro">Outro…</option>
+              </select>}
+        </label>
         <label className="text-[11px] text-[#5e5c68]">Cliente<input value={cli} onChange={e => setCli(e.target.value)} placeholder="opcional" className="mt-0.5 w-full h-8 rounded-lg bg-white px-2 text-[13px] ds-borda" /></label>
       </div>
       <div className="flex gap-2">
@@ -75,8 +83,8 @@ function NovaFaca({ d, onSalvar, onCancelar }: { d: Desenho; onSalvar: (f: Ferra
   )
 }
 
-function CardDesenho({ d, facas, usos, onUsar, onRegistrar, onApagar }: {
-  d: Desenho; facas: Ferramental[]; usos: Uso[]
+function CardDesenho({ d, facas, usos, fornecedores, onUsar, onRegistrar, onApagar }: {
+  d: Desenho; facas: Ferramental[]; usos: Uso[]; fornecedores: string[]
   onUsar: () => void; onRegistrar: (f: Ferramental & { desenhoId: string }) => void; onApagar: () => void
 }) {
   const [nova, setNova] = useState(false)
@@ -100,7 +108,7 @@ function CardDesenho({ d, facas, usos, onUsar, onRegistrar, onApagar }: {
         {facas.map(f => (
           <p key={f.id} className="text-[12px] text-[#191625] mt-1"><b>{f.cavidades} cavidades</b>{f.fornecedor ? ` · com ${f.fornecedor}` : ""}{f.cliente ? ` · ${f.cliente}` : ""}{f.custo ? ` · R$ ${f.custo.toLocaleString("pt-BR")}` : ""}</p>
         ))}
-        {nova ? <NovaFaca d={d} onSalvar={f => { onRegistrar(f); setNova(false) }} onCancelar={() => setNova(false)} />
+        {nova ? <NovaFaca d={d} fornecedores={fornecedores} onSalvar={f => { onRegistrar(f); setNova(false) }} onCancelar={() => setNova(false)} />
           : <button onClick={() => setNova(true)} className="mt-1 text-[12px] font-semibold text-[#8456e8] flex items-center gap-1"><Plus className="w-3.5 h-3.5" />Registrar faca deste desenho</button>}
       </div>
 
@@ -119,8 +127,9 @@ function CardDesenho({ d, facas, usos, onUsar, onRegistrar, onApagar }: {
   )
 }
 
-export function BibliotecaFacasView({ ferramentais, usos, onUsar, onRegistrarFaca }: {
+export function BibliotecaFacasView({ ferramentais, fornecedores = [], usos, onUsar, onRegistrarFaca }: {
   ferramentais: Ferramental[]
+  fornecedores?: string[]          // quem faz corte e vinco (o padrão primeiro)
   usos: Uso[]
   onUsar: (id: string, nome: string) => void
   onRegistrarFaca: (f: Ferramental) => void
@@ -192,7 +201,7 @@ export function BibliotecaFacasView({ ferramentais, usos, onUsar, onRegistrarFac
         : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {visiveis.map(d => (
-              <CardDesenho key={d.id} d={d} facas={facasDoDesenho(d, ferramentais)} usos={usos.filter(u => u.desenhoId === d.id)}
+              <CardDesenho key={d.id} d={d} facas={facasDoDesenho(d, ferramentais)} usos={usos.filter(u => u.desenhoId === d.id)} fornecedores={fornecedores}
                 onUsar={() => onUsar(d.id, d.nome)} onRegistrar={onRegistrarFaca}
                 onApagar={() => { void fetch(`/api/biblioteca?id=${d.id}`, { method: "DELETE" }).then(carregar) }} />
             ))}

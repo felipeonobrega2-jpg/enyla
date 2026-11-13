@@ -471,7 +471,7 @@ function Telas() {
       <div style={{ flex: 1 }}>{pagina(<PedidosSiteView onVerChapas={() => {}} />)}</div>
     </div>
     case "digitalpainel": case "digitalpainel-m": case "digitalpainel-aberto": case "digitalpainel-qtd": case "digitalpainel-prod": case "digitalpainel-acerto": return pagina(<DigitalPainelView onAbrirConversa={() => {}} />)
-    case "biblioteca": case "biblioteca-m": return <BibliotecaFacasView onUsar={() => {}} onRegistrarFaca={() => {}}
+    case "biblioteca": case "biblioteca-m": case "biblioteca-faca": return <BibliotecaFacasView onUsar={() => {}} onRegistrarFaca={() => {}} fornecedores={["Corte Exemplo", "Acabamentos Modelo"]}
       usos={[{ numero: "ORC-2026-201", cliente: "Perfumaria Modelo", desenhoId: "a1b2c3d4e5f60001" }]}
       ferramentais={[
         { id: "f1", tipo: "faca", cliente: "Perfumaria Modelo", produto: "Fundo automático 52×32×85", blankLargura: 169.5, blankAltura: 149, cavidades: 6, fornecedor: "Fornecedor Exemplo", custo: 450, data: "2026-09-01" },
