@@ -144,12 +144,12 @@ export function BibliotecaFacasView({ ferramentais, fornecedores = [], usos, onU
   // Subir um ou vários DXF (os antigos do Pacdora)
   async function subir(files: FileList | null) {
     const arqs = Array.from(files ?? []).filter(f => /\.dxf$/i.test(f.name))
-    let ok = 0, falhou = 0
+    let ok = 0, falhou = 0, naoLeu = 0
     for (const [i, f] of arqs.entries()) {
       setSubindo(`${i + 1} de ${arqs.length}`)
       const texto = await f.text()
       const r = parseDXF(texto)
-      if (!r) { falhou++; continue }
+      if (!r) { naoLeu++; continue }
       const c = caixaDoDxf(f.name, r)
       const fd = new globalThis.FormData()
       fd.set("arquivo", new Blob([texto], { type: "application/dxf" }), f.name)
@@ -157,8 +157,9 @@ export function BibliotecaFacasView({ ferramentais, fornecedores = [], usos, onU
       const res = await fetch("/api/biblioteca", { method: "POST", body: fd }).catch(() => null)
       if (res?.ok) ok++; else falhou++
     }
-    setSubindo(falhou ? `${ok} guardados, ${falhou} não deram para ler` : null)
-    if (falhou) setTimeout(() => setSubindo(null), 5000)
+    const avisos = [naoLeu ? `${naoLeu} sem desenho legível` : "", falhou ? `${falhou} não subiram (tente de novo)` : ""].filter(Boolean)
+    setSubindo(avisos.length ? `${ok} guardados, ${avisos.join(", ")}` : null)
+    if (avisos.length) setTimeout(() => setSubindo(null), 8000)
     carregar()
   }
 
