@@ -47,6 +47,7 @@ import { TempoAteFecharCard } from "@/app/components/TempoAteFecharCard"
 import { NegociacoesDigitalCard } from "@/app/components/NegociacoesDigitalCard"
 import { termosDigital } from "@/app/lib/termosDigital"
 import { BibliotecaFacasView } from "@/app/components/BibliotecaFacasView"
+import { termosOffset, VERSAO_TERMOS_OFFSET } from "@/app/lib/termosOffset"
 import ChapasView from "@/app/cartuxo/components/ChapasView"
 import CustosView from "@/app/cartuxo/components/CustosView"
 import FacasView from "@/app/cartuxo/components/FacasView"
@@ -560,11 +561,12 @@ function Telas() {
       return pagina(r ? <RotasProducao calculo={r} form={form} producao={normalizarProducao(cfg.producao)} multiplicadorPadrao={cfg.multiplicadores.semFaca || 2}
         comFaca={form.comFaca} onOpcoes={o => setForm(f => ({ ...f, rota: o }))} onRegistrarFaca={() => {}} /> : <p>sem rota</p>)
     }
-    case "aprovar": return <AprovarClient numero="ORC-2026-001" token="x" proposta={{
+    case "aprovar": case "aprovar-termos": return <AprovarClient numero="ORC-2026-001" token="x" proposta={{
       nomeCliente: "Cliente Teste", sinalPct: cfg.sinalPct ?? 50, validaAte: "2099-12-31", vencida: false, jaAprovado: false,
       especificacoes: ["Caixa cartucho", "Dimensões: 15 × 20 × 8 cm (L × A × P)", "Material: Cartão 300g", "Verniz UV Total"],
       opcoes: [{ quantidade: 1000, preco: 3890, unitario: 3.89 }, { quantidade: 3000, preco: 6540, unitario: 2.18 }],
       caixa: { largura: 5.2, altura: 19, profundidade: 5.2, material: "Cartão 300g", verniz: true }, entregaSeAprovarHoje: "2026-11-24",
+      termos: termosOffset({ quantidade: null, sinalPct: 50, prazoDiasUteis: 12, validaAte: "2099-12-31" }), versaoTermos: VERSAO_TERMOS_OFFSET,
     }} />
     case "mobile": return <MobilePage />
     case "portal": {

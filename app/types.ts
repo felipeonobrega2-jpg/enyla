@@ -298,6 +298,7 @@ export type AprovacaoOnline = {
   loteId?: string
   loteNumero?: string
   lancamentoSinal?: string
+  termos?: { versao: string; em: string }   // termos da proposta aceitos na aprovação
 }
 
 export type Lote = {

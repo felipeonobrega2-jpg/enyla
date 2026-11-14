@@ -9,6 +9,7 @@ import { normalizarProducao } from "@/app/lib/producao"
 import { CONFIG_PADRAO } from "@/app/config"
 import type { VisitaProposta } from "@/app/types"
 import { gravarCampos } from "@/app/lib/configAtomica"
+import { termosOffset, VERSAO_TERMOS_OFFSET } from "@/app/lib/termosOffset"
 
 // Registra que o cliente abriu a proposta (não quando é a Enyla logada; no máximo uma vez a cada 30 min):
 // conta em config.visitasProposta (o Painel avisa) e deixa a marca no rastreio do pedido
@@ -44,6 +45,7 @@ export default async function AprovarPage({ params, searchParams }: {
   const sinalPct = config.sinalPct ?? SINAL_PCT_PADRAO
   // Se aprovar hoje, entrega até: prazo padrão em dias úteis
   definirFeriadosLocais((config.feriados ?? CONFIG_PADRAO.feriados) as never)
+  const prazoDias = normalizarProducao(config.producao as never).prazoEntregaPadraoDias
   const entregaSeAprovarHoje = p ? somarDiasUteis(new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }), normalizarProducao(config.producao as never).prazoEntregaPadraoDias) : null
   if (p && isAberto(p.card) && !(await auth())) await registrarVisita(numero).catch(() => {})
   return (
@@ -52,6 +54,8 @@ export default async function AprovarPage({ params, searchParams }: {
         nomeCliente: p.card.nomeCliente, opcoes: p.opcoes, especificacoes: p.especificacoes, observacao: p.observacao,
         validaAte: p.validaAte, vencida: p.vencida, jaAprovado: !isAberto(p.card), sinalPct,
         caixa: p.caixa, entregaSeAprovarHoje,
+        termos: termosOffset({ quantidade: p.opcoes.length === 1 ? p.opcoes[0].quantidade : null, sinalPct, prazoDiasUteis: prazoDias || null, validaAte: p.validaAte }),
+        versaoTermos: VERSAO_TERMOS_OFFSET,
       }} />
   )
 }

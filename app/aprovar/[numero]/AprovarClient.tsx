@@ -17,6 +17,8 @@ type Proposta = {
   sinalPct: number
   caixa?: { largura: number; altura: number; profundidade: number; material?: string; verniz?: boolean; laminacao?: string | null; arteUrl?: string | null } | null
   entregaSeAprovarHoje?: string | null
+  termos?: { titulo: string; itens: string[] }[]
+  versaoTermos?: string
 }
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -48,6 +50,7 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
   const [qtd, setQtd] = useState<number | null>(proposta?.opcoes.length === 1 ? proposta.opcoes[0].quantidade : null)
   const [nome, setNome] = useState("")
   const [aceite, setAceite] = useState(false)
+  const [verTermos, setVerTermos] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [feito, setFeito] = useState<{ sinal: number; pix: string; rastreio: string } | null>(null)
@@ -61,7 +64,7 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
     try {
       const r = await fetch(`/api/aprovar/${encodeURIComponent(numero)}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ t: token, quantidade: qtd, nome: nome.trim() }),
+        body: JSON.stringify({ t: token, quantidade: qtd, nome: nome.trim(), termos: proposta?.versaoTermos }),
       })
       const d = await r.json()
       if (!r.ok) setErro(d.erro ?? "Não foi possível aprovar agora. Tente de novo.")
@@ -167,8 +170,21 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
                 <input type="checkbox" checked={aceite} onChange={e => setAceite(e.target.checked)} className="mt-0.5 w-5 h-5 accent-[#8456e8] shrink-0" />
                 <span className="text-[13px] text-[#5e5c68] leading-relaxed">
                   Aprovo a proposta {numero}{escolhida ? <> de <strong className="text-[#191625]">{num(escolhida.quantidade)} unidades</strong> por <strong className="text-[#191625]">{brl(escolhida.preco)}</strong></> : ""}. A produção começa após o sinal de {proposta.sinalPct}%.
+                  {proposta.termos?.length ? <> Li e aceito os <button type="button" onClick={e => { e.preventDefault(); setVerTermos(v => !v) }} className="text-[#8456e8] font-semibold underline underline-offset-2">termos do pedido</button>.</> : null}
                 </span>
               </label>
+              {verTermos && proposta.termos && (
+                <div className="rounded-xl bg-[rgba(116,116,128,0.06)] px-3.5 py-3 space-y-3 max-h-[360px] overflow-y-auto">
+                  {proposta.termos.map(s => (
+                    <div key={s.titulo}>
+                      <p className="text-[12.5px] font-semibold text-[#191625]">{s.titulo}</p>
+                      <ul className="mt-1 space-y-1 list-disc pl-4">
+                        {s.itens.map(i => <li key={i} className="text-[12.5px] text-[#5e5c68] leading-snug">{i}</li>)}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
               {erro && <p className="text-[13px] text-[#d33a3c] flex items-start gap-2"><AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />{erro}</p>}
               <button onClick={aprovar} disabled={!pode}
                 className="h-12 w-full rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-all disabled:opacity-35 disabled:cursor-not-allowed">
