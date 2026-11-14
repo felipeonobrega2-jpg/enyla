@@ -1,6 +1,7 @@
 // Campanha digital (servidor): monta a fila, manda um de cada vez (pegando carona no webhook, como as outras rodadas)
 // e conta o resultado. Estado em AppConfig.campanhaDigital (campo do servidor).
 import { supabase } from "./supabase"
+import { lerRegistros } from "./registroAgente"
 import { mudarConfig } from "./configAtomica"
 import { enviar, aplicar, registrar, lerConversa, seuNumero, Conversa } from "./agenteAuto"
 import { dentroDoHorario, ETIQUETAS_AGENTE } from "./agenteLeads"
@@ -39,7 +40,7 @@ export async function fila(cfg?: Cfg): Promise<Candidato[]> {
   const meu = await seuNumero().catch(() => null)
   if (meu) fora.add(`${meu}@s.whatsapp.net`)
   const perfil = new Map<string, string>()
-  for (const l of [...(c.agenteLog ?? [])].reverse()) if (l.perfil && l.perfil !== "indefinido") perfil.set(l.jid, l.perfil)
+  for (const l of [...((await lerRegistros(1000)) ?? c.agenteLog ?? [])].reverse()) if (l.perfil && l.perfil !== "indefinido") perfil.set(l.jid, l.perfil)
   const out: Candidato[] = []
   for (let de = 0; de < 20000; de += 1000) {
     const { data } = await supabase.from("whatsapp_conversas").select("jid, nome, etiquetas, status_lead, ultima_at, proxima_acao").range(de, de + 999)

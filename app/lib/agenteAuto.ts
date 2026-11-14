@@ -15,6 +15,7 @@ import { supabase } from "./supabase"
 import { evo } from "./evolution"
 import { gravarLote, WaMessage, deveIgnorar } from "./whatsappDados"
 import { atender, lerConfigAtendente } from "./atendenteServidor"
+import { lerRegistros, gravarRegistro, lerIdsAgente, guardarIdAgente, reservarTratada, liberarTratada, temTabelas } from "./registroAgente"
 import { garantirTelefone } from "./contatosServidor"
 import { textoAvisoReativacao } from "./reativacao"
 import {
@@ -47,21 +48,31 @@ export type Registro = RegistroAgente & { ids?: string[] }
 export type CfgAgente = { pedidosDigitais?: PedidoDigital[]; digital?: RegraDigital; agenteAuto?: AgenteAuto; agenteLog?: Registro[]; agenteMarcos?: Marcos; filtroLeads?: string; etiquetasWhatsapp?: { nome: string; cor: string }[]; agenteFollowupEm?: string; agenteSemCreditoEm?: string; agenteRetomadaEm?: string; agenteRetomadas?: string[]; agenteIds?: string[]; agenteTratadas?: string[] }
 export type Conversa = { jid: string; nome: string | null; telefone: string | null; etiquetas: string[] | null; status_lead: string | null }
 
-export async function lerCfg() { return await lerConfigAtendente() as Awaited<ReturnType<typeof lerConfigAtendente>> & CfgAgente }
+// O registro do agente e os ids das mensagens dele vêm das tabelas próprias (quando existem); o resto, da configuração
+export async function lerCfg() {
+  const cfg = await lerConfigAtendente() as Awaited<ReturnType<typeof lerConfigAtendente>> & CfgAgente
+  const [log, ids] = await Promise.all([lerRegistros(), lerIdsAgente()])
+  if (log) cfg.agenteLog = log
+  if (ids) cfg.agenteIds = ids
+  return cfg
+}
 
 export async function gravarCfg(mudar: (d: Record<string, unknown> & CfgAgente) => Partial<CfgAgente>) {
   await mudarConfig(d => mudar(d as Record<string, unknown> & CfgAgente))
 }
 
 // Registro + garante que as etiquetas do agente existem (com cor) na lista de etiquetas do WhatsApp
-export const registrar = (r: Registro) => gravarCfg(d => {
-  const defs = [...(d.etiquetasWhatsapp ?? [])]
-  for (const [nome, cor] of Object.entries(COR_ETIQUETA_AGENTE)) if (!defs.some(e => e.nome === nome)) defs.push({ nome, cor })
-  return {
-    etiquetasWhatsapp: defs, agenteLog: [r, ...(d.agenteLog ?? [])].slice(0, MAX_REGISTROS),
-    agenteMarcos: marcar(d.agenteMarcos ?? marcosDoRegistro(d.agenteLog ?? []), r),
-  }
-})
+export const registrar = async (r: Registro) => {
+  const naTabela = await gravarRegistro(r)
+  return gravarCfg(d => {
+    const defs = [...(d.etiquetasWhatsapp ?? [])]
+    for (const [nome, cor] of Object.entries(COR_ETIQUETA_AGENTE)) if (!defs.some(e => e.nome === nome)) defs.push({ nome, cor })
+    return {
+      etiquetasWhatsapp: defs, ...(naTabela ? {} : { agenteLog: [r, ...(d.agenteLog ?? [])].slice(0, MAX_REGISTROS) }),
+      agenteMarcos: marcar(d.agenteMarcos ?? marcosDoRegistro(d.agenteLog ?? []), r),
+    }
+  })
+}
 
 export const lerConversa = async (jid: string) =>
   (await supabase.from("whatsapp_conversas").select("jid, nome, telefone, etiquetas, status_lead").eq("jid", jid).maybeSingle()).data as Conversa | null
@@ -185,7 +196,7 @@ export async function enviar(c: Conversa, texto: string, lida?: string, opcoes: 
     ids.push(env.corpo.key.id)
     await gravarLote([{ ...env.corpo, key: { ...env.corpo.key, remoteJid: c.jid, fromMe: true } }])
     // Guarda à parte tudo o que o agente mandou: é assim que ele distingue a mensagem dele da sua
-    await gravarCfg(d => ({ agenteIds: [env.corpo!.key.id, ...(d.agenteIds ?? [])].slice(0, MAX_IDS_AGENTE) })).catch(() => null)
+    if (!await guardarIdAgente(env.corpo.key.id)) await gravarCfg(d => ({ agenteIds: [env.corpo!.key.id, ...(d.agenteIds ?? [])].slice(0, MAX_IDS_AGENTE) })).catch(() => null)
   }
   return { ids }
 }
@@ -200,7 +211,7 @@ export async function enviarArquivo(c: Conversa, url: string, mime: string, lege
   const env = await evo<WaMessage>("/message/sendMedia/{i}", { method: "POST", body: JSON.stringify({ number, mediatype, mimetype: mime, media: url, caption: legenda || undefined, fileName: mediatype === "document" ? nome : undefined }) })
   if (!env.ok || !env.corpo?.key?.id) return { ids: [], erro: `não enviou (${env.status})` }
   await gravarLote([{ ...env.corpo, key: { ...env.corpo.key, remoteJid: c.jid, fromMe: true } }])
-  await gravarCfg(d => ({ agenteIds: [env.corpo!.key.id, ...(d.agenteIds ?? [])].slice(0, MAX_IDS_AGENTE) })).catch(() => null)
+  if (!await guardarIdAgente(env.corpo.key.id)) await gravarCfg(d => ({ agenteIds: [env.corpo!.key.id, ...(d.agenteIds ?? [])].slice(0, MAX_IDS_AGENTE) })).catch(() => null)
   return { ids: [env.corpo.key.id] }
 }
 
@@ -330,6 +341,8 @@ const emojiCtx = (ms: { from_me: boolean; corpo: string | null }[], cfg: { estil
 
 // Reserva atômica da mensagem: se outra execução já pegou esta mensagem, esta desiste
 async function reservarMensagem(msgId: string): Promise<boolean> {
+  const naTabela = await reservarTratada(msgId)
+  if (naTabela !== null) return naTabela
   let minha = false
   await mudarConfig((d: Record<string, unknown> & CfgAgente) => {
     if ((d.agenteTratadas ?? []).includes(msgId)) { minha = false; return null }
@@ -568,9 +581,10 @@ export async function talvezRetomarParados(origem: string) {
     if (disparadas > 0) await new Promise(r => setTimeout(r, 25_000 + Math.random() * 15_000))
     disparadas++
     // Tentativa nova de uma que não saiu: libera a mensagem para ser respondida de novo
+    const liberou = naoSaiu.has(c.jid) && await liberarTratada(u.id)
     await gravarCfg(d => ({
       agenteRetomadas: [u.id, ...(d.agenteRetomadas ?? []).filter(x => x !== u.id)].slice(0, 300),
-      ...(naoSaiu.has(c.jid) ? { agenteTratadas: (d.agenteTratadas ?? []).filter(x => x !== u.id) } : {}),
+      ...(naoSaiu.has(c.jid) && !liberou ? { agenteTratadas: (d.agenteTratadas ?? []).filter(x => x !== u.id) } : {}),
     }))
     await fetch(`${origem}/api/whatsapp/webhook/responder?token=${encodeURIComponent(process.env.WHATSAPP_WEBHOOK_SECRET ?? "")}`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ msgId: u.id }), signal: AbortSignal.timeout(8000),
@@ -746,4 +760,19 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     }
     return registrar({ ...dados, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? `F${nivel}: sem resposta${video}` })
   }
+}
+
+// Depois do SQL: o que ainda ficou na configuração (gravado entre a cópia e a troca) vai para as tabelas e as listas
+// antigas saem da configuração. Roda uma vez (quando acha as listas lá).
+let registroMovido = false
+export async function talvezMoverRegistroAntigo() {
+  if (registroMovido || !await temTabelas()) return
+  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const d = (data?.data ?? {}) as CfgAgente
+  if (!d.agenteLog && !d.agenteIds && !d.agenteTratadas) { registroMovido = true; return }
+  for (const r of d.agenteLog ?? []) await gravarRegistro(r)
+  for (const id of d.agenteIds ?? []) await guardarIdAgente(id)
+  for (const id of (d.agenteTratadas ?? []).slice(0, 200)) await reservarTratada(id)
+  // undefined some na gravação (o JSON não leva a chave)
+  await mudarConfig(() => ({ agenteLog: undefined, agenteIds: undefined, agenteTratadas: undefined }))
 }

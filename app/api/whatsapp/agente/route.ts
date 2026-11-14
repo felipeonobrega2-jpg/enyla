@@ -1,3 +1,4 @@
+import { lerRegistros } from "@/app/lib/registroAgente"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { atender, lerConfigAtendente } from "@/app/lib/atendenteServidor"
@@ -33,6 +34,8 @@ async function taxas(log: RegistroAgente[]): Promise<Taxa[]> {
 
 export async function GET() {
   const cfg = await lerConfigAtendente() as Cfg
+  const doRegistro = await lerRegistros()
+  if (doRegistro) cfg.agenteLog = doRegistro
   const log = cfg.agenteLog ?? []
   return NextResponse.json({ auto: cfg.agenteAuto ?? { ligado: false }, log: log.slice(0, 80), taxas: await taxas(log), conhecimento: cfg.conhecimentoAgente ?? [], aprendeuEm: cfg.agenteAprendeuEm ?? null })
 }
@@ -45,6 +48,8 @@ export async function POST(req: NextRequest) {
   if (typeof b.aprender === "number") {
     const r = await aprenderComConversas(new Date(Date.now() - Math.min(7, Math.max(1, b.aprender)) * 86_400_000).toISOString())
     const cfg = await lerConfigAtendente() as Cfg
+  const doRegistro = await lerRegistros()
+  if (doRegistro) cfg.agenteLog = doRegistro
     return NextResponse.json({ ...r, conhecimento: cfg.conhecimentoAgente ?? [] })
   }
   // Ensinar direto: uma regra sua entra na base que a IA lê em toda resposta

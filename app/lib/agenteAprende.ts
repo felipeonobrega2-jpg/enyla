@@ -3,6 +3,7 @@
 // prazos, como você contorna objeções, o que você recusa. Sem dados pessoais de cliente.
 // A lista fica em Configurações → Agente de leads (você apaga o que estiver errado) e entra no prompt do atendente.
 
+import { lerRegistros, lerIdsAgente } from "./registroAgente"
 import { supabase } from "./supabase"
 import { clienteClaude, MODELO } from "./claude"
 import { Conhecimento, TEMAS } from "./agenteLeads"
@@ -48,7 +49,8 @@ export async function aprenderComConversas(desde: string, ate?: string): Promise
   if (!cfg.apiKey) return { conversas: 0, novos: 0, erro: "Chave da IA não configurada." }
 
   // Conversas em que você mandou mensagem no período (as do agente não contam: ele não ensina a si mesmo)
-  const doAgente = new Set([...(cfg.agenteLog ?? []).flatMap(l => l.ids ?? []), ...(cfg.agenteIds ?? [])])
+  const [logT, idsT] = await Promise.all([lerRegistros(), lerIdsAgente()])
+  const doAgente = new Set([...(logT ?? cfg.agenteLog ?? []).flatMap(l => l.ids ?? []), ...(idsT ?? cfg.agenteIds ?? [])])
   // Seus áudios do período ainda sem texto: transcreve antes (é onde você mais ensina)
   const { data: semTexto } = await supabase.from("whatsapp_mensagens").select("id").eq("from_me", true).in("tipo", ["audio", "audioMessage"]).is("corpo", null).gte("ts", desde).limit(40)
   if (semTexto?.length) await transcreverPendentes({ ids: semTexto.map(m => m.id) }, 40).catch(() => null)
@@ -184,7 +186,7 @@ async function medirEstiloFelipe() {
   const cfgD = cfgRow?.data as { estiloFelipe?: EstiloFelipe; agenteIds?: string[] } | undefined
   const atual = cfgD?.estiloFelipe
   if (atual && Date.now() - new Date(atual.em).getTime() < 20 * 3_600_000) return
-  const doAgente = new Set(cfgD?.agenteIds ?? [])
+  const doAgente = new Set((await lerIdsAgente()) ?? cfgD?.agenteIds ?? [])
   const { data: convs } = await supabase.from("whatsapp_conversas").select("jid").ilike("campanha", "%anuncio%").gte("ultima_at", new Date(Date.now() - 30 * 86_400_000).toISOString()).limit(1000)
   const jids = (convs ?? []).map(c => c.jid)
   const textos: string[] = [], inicio: string[] = [], respostas: { texto: string; respondeu: boolean }[] = []
