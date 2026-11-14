@@ -265,7 +265,7 @@ const primeiraDa = async (jid: string) =>
   (await supabase.from("whatsapp_mensagens").select("ts").eq("jid", jid).order("ts", { ascending: true }).limit(1).maybeSingle()).data
 
 // Você mandou mensagem nesta conversa nas últimas `horas` (o que não foi o agente)
-async function voceAtende(jid: string, cfg: CfgAgente, horas = 24) {
+export async function voceAtende(jid: string, cfg: CfgAgente, horas = 24) {
   const ids = new Set([...(cfg.agenteLog ?? []).flatMap(l => l.ids ?? []), ...(cfg.agenteIds ?? [])])
   const desde = new Date(Date.now() - horas * 3_600_000).toISOString()
   const { data } = await supabase.from("whatsapp_mensagens").select("id, corpo, tipo").eq("jid", jid).eq("from_me", true).gte("ts", desde).limit(200)
@@ -362,7 +362,9 @@ export async function responderSozinho(msgId: string) {
   await aplicar(c, semFollowUp(c.etiquetas ?? []), null)
   await respondeuRetomada(cfg, c, msgId).catch(() => null)
   // MQL: daqui em diante é você (o agente não responde), mas com medida e quantidade a proposta já fica pronta para aprovar
-  if (conversaNova && c.status_lead === "mql") { await talvezPropostaDoMql(jid).catch(() => null); return }
+  // (vale também para o bom negócio antigo a quem o agente pediu a medida: a resposta dele vira proposta)
+  const pediuMedida = !!(cfg as { medidaPedida?: Record<string, string> }).medidaPedida?.[jid]
+  if ((conversaNova && c.status_lead === "mql") || pediuMedida) { await talvezPropostaDoMql(jid).catch(() => null); return }
   if (!conversaNova) return
   // Você escreveu nesta conversa nas últimas 24 h (celular ou tela do sistema): a conversa é sua, o agente não entra.
   // Lead do digital é a exceção: esse é todo do agente.
