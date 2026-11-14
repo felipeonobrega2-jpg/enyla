@@ -5,7 +5,7 @@
 // Tudo fica registrado (Configurações → Agente de leads) com o motivo de ter enviado ou segurado.
 
 import { cotarItens, montarPedidosDoGrupo, mudouOGrupo, pedidosDoGrupo, textoLinkGrupo, registrarNegociacao, totalPedido } from "./digital"
-import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital, lembreteDigitalAgora, ADIOU } from "./digital"
+import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital, lembreteDigitalAgora, ADIOU, prometeLinkSemLink, TEXTO_PEDE_MEDIDA } from "./digital"
 import { linkPedido } from "./digitalLink"
 import { faltaParaProposta } from "./propostaPronta"
 import { emCampanha, type EstadoCampanha } from "./campanhaDigital"
@@ -425,12 +425,14 @@ export async function responderSozinho(msgId: string) {
   // a medida, a resposta dela pede altura e largura
   const mandouArquivo = conversa.mensagens.slice(-12).some(m => !m.from_me && /image|document/i.test(m.tipo))
   let novoGrupo: PedidoDigital[] | null = null
+  let segurouPelaFoto = false   // cotava pela medida padrão, mas o cliente mandou foto/arquivo
   const grupo = digitalPequeno && !naoFazemos ? cotarItens(r.dados, cfg.digital) : null
   // A IA disse que é decisão sua (caixa cartonada/rígida, berço, kit, acabamento especial): nada de orçamento automático
   const decisaoSua = r.alerta === "decisao_sua"
   if (grupo && !decisaoSua) {
     if (!grupo.ok && !/falta/.test(grupo.motivo)) semTabela = grupo.motivo
     const anteriores = anterior ? pedidosDoGrupo(cfg.pedidosDigitais, anterior) : []
+    if (grupo.ok && mandouArquivo && grupo.itens.some(i => i.cot.padrao)) segurouPelaFoto = true
     if (grupo.ok && !(mandouArquivo && grupo.itens.some(i => i.cot.padrao)) && (!anteriores.length || mudouOGrupo(anteriores, grupo.itens))) {
       novoGrupo = montarPedidosDoGrupo(cfg.pedidosDigitais ?? [], jid, conversa.nome, grupo.itens)
       r.resposta = textoLinkGrupo(novoGrupo, novoGrupo.map(p => linkPedido(p.id)))
@@ -441,6 +443,7 @@ export async function responderSozinho(msgId: string) {
     if (!cot.ok && !cot.motivo.startsWith("falta")) semTabela = cot.motivo
     // Já tem grupo (mais de uma caixa) aberto: uma leitura com uma caixa só não desfaz o grupo
     const emGrupo = !!anterior && pedidosDoGrupo(cfg.pedidosDigitais, anterior).length > 1
+    if (cot.ok && !emGrupo && mandouArquivo && cot.padrao) segurouPelaFoto = true
     if (cot.ok && !emGrupo && !(mandouArquivo && cot.padrao) && (!anterior || mudouACotacao(anterior, cot))) {
       novoPedido = montarPedido(cfg.pedidosDigitais ?? [], jid, conversa.nome, r.dados, cot)
       r.resposta = textoLinkPedido(novoPedido, linkPedido(novoPedido.id))
@@ -471,6 +474,15 @@ export async function responderSozinho(msgId: string) {
     // Lead digital é todo do agente: conversa até o pagamento (mais mensagens por dia) e a IA hesitante não segura
     ctx.maxPorDia = Math.max(ctx.maxPorDia, MAX_POR_DIA_DIGITAL)
     if (!r.pode_enviar_sozinho && (r.alerta === "nenhum" || r.alerta === "preco")) r.pode_enviar_sozinho = true
+    // A IA falou do orçamento/link sem link na mensagem (13/11: "segue o orçamento" 3× e o cliente "não chegou link
+    // nenhum"): com pedido esperando o sinal, o link vai junto; se a foto segurou a cotação, pede a medida;
+    // senão fica com você (com aviso), em vez de o cliente procurar um link que não veio
+    if (!novoPedido && prometeLinkSemLink(r.resposta)) {
+      const pend = pedidoPendente(cfg.pedidosDigitais, jid)
+      if (pend) r.resposta = `${r.resposta.trim()}\n${linkPedido(pend.id)}`
+      else if (segurouPelaFoto) r.resposta = TEXTO_PEDE_MEDIDA
+      else { r.pode_enviar_sozinho = false; r.motivo_alerta = "falou do orçamento/link, mas nenhum orçamento saiu" }
+    }
   }
 
   const trava = travaDoEnvio({

@@ -6,6 +6,7 @@ const instancia = () => encodeURIComponent(process.env.EVOLUTION_INSTANCE ?? "")
 
 export async function evo<T = unknown>(caminho: string, init?: RequestInit): Promise<{ ok: boolean; status: number; corpo: T | null }> {
   if (!base() || !process.env.EVOLUTION_API_KEY) return { ok: false, status: 0, corpo: null }
+  init = semPreviaDeLink(caminho, init)
   try {
     const r = await fetch(`${base()}${caminho.replace("{i}", instancia())}`, {
       ...init, headers: { apikey: process.env.EVOLUTION_API_KEY, "Content-Type": "application/json", ...init?.headers },
@@ -14,6 +15,18 @@ export async function evo<T = unknown>(caminho: string, init?: RequestInit): Pro
     return { ok: r.ok, status: r.status, corpo: await r.json().catch(() => null) as T | null }
   } catch {
     return { ok: false, status: 0, corpo: null }
+  }
+}
+
+// Texto com link: o Evolution 2.4 monta a "prévia" como anúncio (externalAdReply, tipo vídeo, miniatura grande) e
+// o WhatsApp do cliente não mostra a mensagem ou some com o link. Sem prévia o link chega normal e clicável.
+export function semPreviaDeLink(caminho: string, init?: RequestInit): RequestInit | undefined {
+  if (!caminho.startsWith("/message/sendText") || typeof init?.body !== "string") return init
+  try {
+    const corpo = JSON.parse(init.body) as Record<string, unknown>
+    return "linkPreview" in corpo ? init : { ...init, body: JSON.stringify({ ...corpo, linkPreview: false }) }
+  } catch {
+    return init
   }
 }
 

@@ -211,6 +211,12 @@ export function textoLinkPedido(p: Pick<PedidoDigital, "quantidade" | "ml" | "me
 }
 
 
+// A IA escreveu como se o orçamento ou o link tivesse ido ("segue o orçamento", "pague pelo link"), mas a mensagem
+// não leva link nenhum: o cliente fica procurando um link que não chegou
+const PROMETE_LINK = /\b(segue|seguem|aqui est[aá]|te mand(o|ei)|mandei|enviei|te envio|j[aá] te passo)\b[^.!?\n]{0,40}\b(or[cç]amento|link|valor)|\b(pelo|no|o) link\b|\babr(e|ir) o link\b/i
+export const prometeLinkSemLink = (texto: string) => PROMETE_LINK.test(texto) && !/https?:\/\//i.test(texto)
+export const TEXTO_PEDE_MEDIDA = "Pra te passar o valor certinho, preciso da medida do frasco: me manda a altura e a largura (ou o diâmetro) em cm?"
+
 // ── Lembrete do pedido (follow-up de quem não pagou o sinal) ─────────────────
 // O follow-up do agente (3 h, 24 h, 72 h sem resposta) vira lembrete deste pedido: texto fixo, na voz do Felipe,
 // com o link. Nunca conta que viu o cliente abrir a página.
