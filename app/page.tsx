@@ -191,7 +191,15 @@ export default function Home() {
   const [result, setResult]   = useState<Calculo | null>(null)
   const [dxfNome, setDxfNome]       = useState<string | null>(null)
   const [dxfGeo, setDxfGeo]         = useState<DXFGeo | null>(null)
-  const dxfChave = useRef<string | null>(null)   // de que desenho/peça é o dxfGeo que está na tela
+  const dxfChave = useRef<string | null>(null)
+  // Vendas do digital (sinal pago): somam na meta do mês e nos marcos junto com o offset
+  const [vendasDigitais, setVendasDigitais] = useState<{ dia: string; total: number }[]>([])
+  useEffect(() => {
+    const ler = () => fetch("/api/digital/vendas").then(r => r.ok ? r.json() : null).then(d => { if (d?.vendas) setVendasDigitais(d.vendas) }).catch(() => null)
+    ler()
+    const t = setInterval(ler, 5 * 60_000)
+    return () => clearInterval(t)
+  }, [])   // de que desenho/peça é o dxfGeo que está na tela
   const [dxfPreview, setDxfPreview] = useState<{ result: DXFResult; nome: string; texto: string } | null>(null)
   const [novaQtd, setNovaQtd] = useState("")
   const [toast, setToast]     = useState("")
@@ -1676,6 +1684,7 @@ export default function Home() {
             metaMensal={config.metaMensal}
             baselineFaturamento={config.baselineFaturamento}
             marcos={normalizarMetas(config.metas).marcos}
+            digitalTotal={vendasDigitais.reduce((s, v) => s + v.total, 0)}
             onClick={() => navigate("painel")}
           />
         </div>
@@ -2327,6 +2336,7 @@ export default function Home() {
               onAbrirConversa={(jid, nome, dados) => setConversaHoje({ jid, nome: nome || jid.split("@")[0], dados: dados ?? null })}
               onOrcarConversa={orcamentoDaConversa}
               onPropostaPronta={propostaParaMesa}
+              vendasDigitais={vendasDigitais}
             />
           ) : view === "dashboard" ? (
             <RelatoriosView kanban={kanban} lancamentos={lancamentos} clientes={clientes} origensClientes={config.origensClientes} historico={historico}

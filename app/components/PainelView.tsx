@@ -62,7 +62,7 @@ type Detalhe = { titulo: string; sub?: string; linhas: React.ReactNode; destino?
 
 export function PainelView({
   kanban, lancamentos, historico, propostasCustom, clientes, config,
-  onAbrirCard, onAbrirCliente, onNavegar, onNovoOrcamento, onLancarCobranca, onSalvarMeta, onAprovacaoOnline, onAbrirConversa, onOrcarConversa, onPropostaPronta,
+  onAbrirCard, onAbrirCliente, onNavegar, onNovoOrcamento, onLancarCobranca, onSalvarMeta, onAprovacaoOnline, onAbrirConversa, onOrcarConversa, onPropostaPronta, vendasDigitais,
 }: {
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
@@ -80,6 +80,7 @@ export function PainelView({
   onAbrirConversa?: (jid: string, nome?: string, dados?: import("../lib/atendente").DadosPedido) => void
   onOrcarConversa?: (nome: string, jid: string, dados?: import("../lib/atendente").DadosPedido) => void
   onPropostaPronta?: (p: import("../lib/propostaPronta").PropostaPronta, enviar: boolean) => void
+  vendasDigitais?: { dia: string; total: number }[]   // digital (sinal pago) soma na meta e nos marcos
 }) {
   const [periodoId, setPeriodoId] = React.useState<PeriodoId>("mes")
   const [detalhe, setDetalhe] = React.useState<Detalhe | null>(null)
@@ -242,7 +243,10 @@ export function PainelView({
 
   // ── Meta do mês e marcos de faturamento ────────────────────────────────────
   const meta = config.metaMensal || 0
-  const vendidoMes = vendasDoPeriodo(pedidos, lancamentos, periodoDe("mes", hoje)).receita
+  const mesAtual = hoje.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 7)
+  const digitalMes = (vendasDigitais ?? []).filter(v => v.dia.startsWith(mesAtual)).reduce((s, v) => s + v.total, 0)
+  const digitalTotal = (vendasDigitais ?? []).reduce((s, v) => s + v.total, 0)
+  const vendidoMes = vendasDoPeriodo(pedidos, lancamentos, periodoDe("mes", hoje)).receita + digitalMes
   const diasMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate()
   const diasUteisRestantes = (() => {
     let n = 0
@@ -254,7 +258,7 @@ export function PainelView({
   const projecao = vendidoMes / hoje.getDate() * diasMes
   const faltaMeta = Math.max(0, meta - vendidoMes)
   const faturamentoTotal = (config.baselineFaturamento || 0) + pedidos.reduce((s, p) => s + p.valor, 0)
-    + vendasDoPeriodo(pedidos, lancamentos, { from: null, to: null }).sobras
+    + vendasDoPeriodo(pedidos, lancamentos, { from: null, to: null }).sobras + digitalTotal
   const metasCfg = normalizarMetas(config.metas)
   const proximoMarco = metasCfg.marcos.find(m => m.valor > faturamentoTotal) ?? null
   const marcoAnterior = [...metasCfg.marcos].reverse().find(m => m.valor <= faturamentoTotal)
@@ -349,7 +353,7 @@ export function PainelView({
         <div className="space-y-4">
         <Cartao className="ds-entrada">
           <TituloCartao titulo={`Meta de ${hoje.toLocaleDateString("pt-BR", { month: "long" })}`} icone={<Target className="w-4 h-4" />}
-            sub={meta > 0 ? `${brl(vendidoMes)} de ${brl(meta)}` : "Defina uma meta mensal de vendas"}
+            sub={meta > 0 ? `${brl(vendidoMes)} de ${brl(meta)}${digitalMes ? ` · ${brl(digitalMes)} do digital` : ""}` : "Defina uma meta mensal de vendas"}
             acao={onSalvarMeta && !editandoMeta ? (
               <Botao variante="fantasma" className="h-7 px-2 text-[11.5px]" onClick={() => { setRascunhoMeta(String(meta || "")); setEditandoMeta(true) }}>Ajustar meta</Botao>
             ) : undefined} />

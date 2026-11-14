@@ -286,7 +286,9 @@ export function SidebarGamificacao({
   baselineFaturamento,
   marcos,
   onClick,
+  digitalTotal = 0,
 }: {
+  digitalTotal?: number
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
   metaMensal: number
@@ -297,8 +299,8 @@ export function SidebarGamificacao({
   // Mesma conta do cartão de meta do Painel: pedidos (lib/negocio) + sobras + faturamento anterior
   const totalFaturado = useMemo(() => {
     const pedidos = montarPedidos(kanban, lancamentos)
-    return baselineFaturamento + pedidos.reduce((s, p) => s + p.valor, 0) + vendasDoPeriodo(pedidos, lancamentos, SEM_PERIODO).sobras
-  }, [kanban, baselineFaturamento, lancamentos])
+    return baselineFaturamento + pedidos.reduce((s, p) => s + p.valor, 0) + vendasDoPeriodo(pedidos, lancamentos, SEM_PERIODO).sobras + digitalTotal
+  }, [kanban, baselineFaturamento, lancamentos, digitalTotal])
 
   const proximoMarco = marcos.find(m => m.valor > totalFaturado) ?? null
   const pct = proximoMarco ? Math.min(totalFaturado / proximoMarco.valor, 1) : 1
