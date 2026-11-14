@@ -361,13 +361,6 @@ export async function responderSozinho(msgId: string) {
   // Respondeu: sai do follow-up (vale também para lead que você está atendendo)
   await aplicar(c, semFollowUp(c.etiquetas ?? []), null)
   await respondeuRetomada(cfg, c, msgId).catch(() => null)
-  // Orçamento digital esperando o sinal e o cliente mandou CPF/CNPJ: fecha na conversa (Pix copia e cola), sem IA
-  if (pedidoPendente(cfg.pedidosDigitais, jid)) {
-    const { data: m } = await supabase.from("whatsapp_mensagens").select("corpo").eq("id", msgId).maybeSingle()
-    const { fecharPeloWhatsapp } = await import("./digitalServidor")
-    if (m?.corpo && await fecharPeloWhatsapp(jid, m.corpo).catch(() => false))
-      return registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: "pequeno", enviou: true, texto: "Pix do sinal na conversa", motivo: "Digital: mandou CPF/CNPJ, Pix enviado na conversa", passo: "Pix na conversa" })
-  }
   // MQL: daqui em diante é você (o agente não responde), mas com medida e quantidade a proposta já fica pronta para aprovar
   if (conversaNova && c.status_lead === "mql") { await talvezPropostaDoMql(jid).catch(() => null); return }
   if (!conversaNova) return

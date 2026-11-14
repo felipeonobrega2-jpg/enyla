@@ -3,7 +3,6 @@
 // único (para reconhecer o Pix no extrato) e o texto que vai para o cliente.
 
 import type { DadosPedido } from "./atendente"
-import { documentoValido as docValido } from "./documento"
 import { custoVilla, facaAberta, folhaDaFaca, precoDigital, quantidadesDa, Folha, RegraDigital, REGRA_DIGITAL_PADRAO } from "./precoDigital"
 
 // Caixa padrão por ml (altura × largura × profundidade, cm), tirada das cotações com a Villa; o cliente confirma
@@ -48,8 +47,7 @@ export type PedidoDigital = {
   folhaReal?: Folha                // onde a caixa cabe de verdade (custo); "folha" é a tabela do preço de venda
   pedida?: number                  // quantidade que o cliente pediu (a cotação usa a faixa da tabela: 150 → 200)
   negociacao?: Negociacao          // cliente pediu desconto: espera a sua decisão no painel
-  termos?: { versao: string; em: string; via?: "whatsapp" }   // termos aceitos na página (antes do sinal) ou ao fechar pela conversa
-  pixPeloWhatsappEm?: string                                    // mandou CPF/CNPJ na conversa e recebeu o Pix lá
+  termos?: { versao: string; em: string }   // termos do pedido aceitos na página (antes do sinal)
   grupo?: string                   // mais de uma caixa na mesma conversa: todos os pedidos do grupo têm o id do 1º
   rotulo?: string                  // qual caixa é esta para o cliente ("30 ml", "difusor")
   custo: number; arte: number; margem: number; total: number
@@ -208,7 +206,6 @@ export function textoLinkPedido(p: Pick<PedidoDigital, "quantidade" | "ml" | "me
     faixa,
     `*${p.quantidade.toLocaleString("pt-BR")} caixinhas* ${oque} (${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm): *${brl(p.total)}*`,
     `Veja a caixa, escolha a quantidade e pague o sinal de 50% pelo Pix aqui: ${link}`,
-    FECHAR_POR_AQUI,
     p.padrao ? `Usei a medida padrão de caixa ${oque}. Se o seu frasco for diferente, me manda as medidas que eu ajusto.` : null,
   ].filter(x => x !== null).join("\n\n")
 }
@@ -243,17 +240,13 @@ export function lembreteDigitalAgora(p: Pick<PedidoDigital, "em" | "lembretes" |
 }
 
 const semente = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7)
-export function textoLembreteDigital(p: Pick<PedidoDigital, "nome" | "quantidade" | "total" | "em"> & { jid?: string; vistoEm?: string }, nivel: 1 | 2, link: string, opts: { adiou?: boolean } = {}): string {
+export function textoLembreteDigital(p: Pick<PedidoDigital, "nome" | "quantidade" | "total" | "em"> & { jid?: string }, nivel: 1 | 2, link: string, opts: { adiou?: boolean } = {}): string {
   const n = primeiroNome(p.nome)
   const ate = new Date(new Date(p.em).getTime() + DIAS_VALIDADE_DIGITAL * 86_400_000).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })
   const q = p.quantidade.toLocaleString("pt-BR")
   const oi = n ? `Oi, ${n}.` : "Oi, tudo bem?"
   const escolher = (xs: string[]) => xs[semente((p.jid ?? p.nome ?? "") + nivel) % xs.length]
   if (opts.adiou) return `${oi} Sem pressa, só pra você ter à mão: o orçamento das ${q} caixinhas fica valendo até ${ate}.\n${link}`
-  // Nunca abriu o link: o valor vai na própria mensagem, com o jeito de fechar pela conversa (sem depender do link)
-  if (!p.vistoEm) return nivel === 1
-    ? `${oi} Só pra você ter à mão: as ${q} caixinhas ficaram em *${brl(p.total)}*, com a arte inclusa. ${FECHAR_POR_AQUI}\n\nSe quiser ver a caixa e as outras quantidades: ${link}`
-    : `${oi} Consigo segurar as ${q} caixinhas por *${brl(p.total)}* até ${ate}. ${FECHAR_POR_AQUI}\n${link}`
   if (nivel === 1) return escolher([
     `${oi} Ficou alguma dúvida no orçamento das caixinhas? Se quiser mudar a quantidade ou a medida, me fala.\n${link}`,
     `${n ? `${n}, ` : ""}conseguiu dar uma olhada no orçamento? Qualquer dúvida sobre a arte ou o tamanho, é só me chamar.\n${link}`,
@@ -459,7 +452,6 @@ export function textoLinkGrupo(ps: Pick<PedidoDigital, "quantidade" | "ml" | "me
     `Montei os orçamentos em impressão digital, um para cada caixa, com a *arte inclusa* (a gente cria pra você):`,
     ...blocos,
     `Cada caixa tem o seu pedido: pode fechar as duas juntas ou uma de cada vez.`.replace("as duas", ps.length === 2 ? "as duas" : "todas"),
-    FECHAR_POR_AQUI,
     padrao.length ? `Usei a medida padrão de caixa para ${padrao.join(" e ")}. Se o seu frasco for diferente, me manda as medidas que eu ajusto.` : null,
   ].filter(x => x !== null).join("\n\n")
 }
@@ -513,29 +505,4 @@ export const textoNegociacaoAprovada = (p: Pick<PedidoDigital, "nome" | "quantid
 export const textoNegociacaoRecusada = (p: Pick<PedidoDigital, "nome" | "quantidade" | "total">, link: string) => {
   const n = primeiroNome(p.nome)
   return `${n ? `${n}, ` : ""}olhei aqui com carinho, mas nessa quantidade esse já é o melhor valor que consigo: *${brl(p.total)}* pelas ${p.quantidade.toLocaleString("pt-BR")} caixinhas, com a arte inclusa. Se fizer sentido pra você, é só seguir pelo link:\n${link}`
-}
-
-
-// ── Fechar pelo WhatsApp (sem precisar abrir o link) ────────────────────────
-// A maioria não abre o link: quem quiser fecha na conversa. Mandou CPF/CNPJ com orçamento esperando o sinal → o
-// sistema gera o Pix (Asaas, ou o Pix de sempre) e manda o copia e cola, com o resumo dos termos.
-export const FECHAR_POR_AQUI = "Se preferir fechar por aqui mesmo, é só me mandar o seu CPF ou CNPJ que eu te mando o Pix do sinal."
-
-// CPF/CNPJ válido dentro da mensagem ("meu cpf é 123.456.789-09")
-export function documentoNaMensagem(texto: string | null | undefined): string | null {
-  for (const m of (texto ?? "").match(/\d[\d.\-\/ ]{9,20}\d/g) ?? []) {
-    const d = m.replace(/\D/g, "")
-    if ((d.length === 11 || d.length === 14) && docValido(d)) return d
-  }
-  return null
-}
-
-export const TERMOS_RESUMO = "Pagando o sinal, você concorda com os termos do pedido: arte inclusa com até 2 rodadas de ajuste; se desistir antes de aprovar a arte, o sinal volta; produzimos a quantidade exata; o restante é pago antes do envio."
-
-export function textosPixNoWhatsapp(ps: Pick<PedidoDigital, "id" | "quantidade" | "sinal" | "rotulo">[], pix: string[], linkTermos: string): string[] {
-  const um = ps.length === 1
-  const cab = um
-    ? `Perfeito! O sinal de 50% das ${ps[0].quantidade.toLocaleString("pt-BR")} caixinhas é *${brl(ps[0].sinal)}*. O Pix copia e cola vai na próxima mensagem: é só copiar e colar no app do banco.`
-    : `Perfeito! São ${ps.length} pedidos, um Pix para cada (sinal de 50%):\n${ps.map((p, i) => `${i + 1}. ${rot(p.rotulo ?? `caixa ${i + 1}`)}: ${p.quantidade.toLocaleString("pt-BR")} caixinhas, *${brl(p.sinal)}*`).join("\n")}\n\nOs códigos vão nas próximas mensagens, na mesma ordem.`
-  return [cab, ...pix, `${TERMOS_RESUMO} Os termos completos estão aqui: ${linkTermos}\n\nAssim que o Pix cair, eu te aviso e o seu pedido entra na fila de design.`]
 }
