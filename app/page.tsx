@@ -87,6 +87,7 @@ import { TerceirizadosView } from "./components/TerceirizadosView"
 import MetaAdsView from "./components/MetaAdsView"
 import BuscaGlobal from "./components/BuscaGlobal"
 import { parseDXF, DXFResult, caixaDoDxf } from "./lib/dxf"
+import type { Desenho } from "./lib/biblioteca"
 import type { DXFGeo } from "./LayoutChapaVisual"
 
 function unpackTerceirizado(card: KanbanCard): KanbanCard {
@@ -190,6 +191,7 @@ export default function Home() {
   const [result, setResult]   = useState<Calculo | null>(null)
   const [dxfNome, setDxfNome]       = useState<string | null>(null)
   const [dxfGeo, setDxfGeo]         = useState<DXFGeo | null>(null)
+  const dxfChave = useRef<string | null>(null)   // de que desenho/peça é o dxfGeo que está na tela
   const [dxfPreview, setDxfPreview] = useState<{ result: DXFResult; nome: string; texto: string } | null>(null)
   const [novaQtd, setNovaQtd] = useState("")
   const [toast, setToast]     = useState("")
@@ -613,6 +615,7 @@ export default function Home() {
   function aplicarDesenho(nome: string, result: DXFResult, desenhoId?: string) {
     setDxfNome(nome)
     setDxfGeo({ bounds: result.bounds, paths: result.paths })
+    dxfChave.current = `${desenhoId ?? ""}|${result.largura}x${result.altura}`
     setForm(p => {
       const next = { ...p, blankOverride: { largura: result.largura, altura: result.altura }, caixaDxf: caixaDoDxf(nome, result), ...(desenhoId ? { desenhoId } : {}) }
       setResult(calcular(next, config))
@@ -636,6 +639,28 @@ export default function Home() {
     navigate("orcamento")
     showToast(`Desenho "${nome}" na mesa de orçamento`)
   }
+  // Orçamento reaberto (editar, replicar, proposta): o desenho volta da biblioteca. Pelo desenho ligado ao orçamento;
+  // nos de antes da biblioteca, pelo desenho com a mesma peça (±1 mm).
+  const blankL = form.blankOverride?.largura, blankA = form.blankOverride?.altura
+  useEffect(() => {
+    if (!blankL || !blankA) return
+    const chave = `${form.desenhoId ?? ""}|${blankL}x${blankA}`
+    if (dxfChave.current === chave) return
+    dxfChave.current = chave
+    setDxfGeo(null)
+    void (async () => {
+      const lista = await fetch("/api/biblioteca").then(r => r.json()).then(d => (d.desenhos ?? []) as Desenho[]).catch(() => [] as Desenho[])
+      const mesmaPeca = (d: Desenho) => (Math.abs(d.blank.largura - blankL) <= 1 && Math.abs(d.blank.altura - blankA) <= 1)
+      const d = (form.desenhoId && lista.find(x => x.id === form.desenhoId)) || lista.find(mesmaPeca)
+      if (!d) return
+      const texto = await fetch(`/api/biblioteca/${d.id}`).then(r => r.ok ? r.text() : null).catch(() => null)
+      const r = texto ? parseDXF(texto) : null
+      if (!r || dxfChave.current !== chave) return   // mudou de orçamento no meio
+      setDxfGeo({ bounds: r.bounds, paths: r.paths })
+      setDxfNome(d.nome)
+    })()
+  }, [form.desenhoId, blankL, blankA])   // eslint-disable-line react-hooks/exhaustive-deps
+
   const lerDxfRef = useRef(lerArquivoDxf)
   lerDxfRef.current = lerArquivoDxf
   // Soltou o .dxf em qualquer lugar da tela do orçamento: lê (e o navegador não abre o arquivo no lugar do sistema)
@@ -1754,7 +1779,7 @@ export default function Home() {
                   setDxfPreview(null)
                   showToast(`DXF importado: ${(largura / 10).toFixed(1)} × ${(altura / 10).toFixed(1)} cm · guardado na biblioteca de facas`)
                   // Guarda na biblioteca (o mesmo arquivo não duplica) e liga o orçamento ao desenho
-                  guardarNaBiblioteca(nome, dxfPreview.texto, result).then(id => { if (id) setForm(p => ({ ...p, desenhoId: id })) })
+                  guardarNaBiblioteca(nome, dxfPreview.texto, result).then(id => { if (id) { dxfChave.current = `${id}|${result.largura}x${result.altura}`; setForm(p => ({ ...p, desenhoId: id })) } })
                 }}
                   className="flex-1 py-2.5 rounded-xl bg-[#8456e8] text-white text-[13px] font-semibold hover:bg-[#7343d9] transition-colors">
                   Importar dieline
@@ -1884,7 +1909,7 @@ export default function Home() {
                   )}
                 </div>
                 <button type="button"
-                  onClick={() => { setForm(p => { const next = { ...p, blankOverride: null, caixaDxf: null }; setResult(calcular(next, config)); return next }); setDxfNome(null); setDxfGeo(null) }}
+                  onClick={() => { setForm(p => { const next = { ...p, blankOverride: null, caixaDxf: null, desenhoId: undefined }; setResult(calcular(next, config)); return next }); setDxfNome(null); setDxfGeo(null); dxfChave.current = null }}
                   className="text-[#8E8E93] hover:text-rose-500 text-sm transition-colors shrink-0 px-1">
                   ✕
                 </button>
