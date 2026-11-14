@@ -105,9 +105,13 @@ describe("lembrete do pedido e painel", async () => {
   const { textoLembreteDigital, pedidoPendente, mudarStatus } = await import("../app/lib/digital")
   const base = { nome: "MARIA silva", quantidade: 100, total: 619.95, em: "2026-11-06T18:00:00Z", vistoEm: undefined as string | undefined }
   it("lembrete varia entre leads e nunca diz que viu a página", () => {
-    const textos = new Set(["a@s", "b@s", "c@s", "d@s", "e@s", "f@s"].map(jid => textoLembreteDigital({ ...base, jid }, 1, "L")))
+    const textos = new Set(["a@s", "b@s", "c@s", "d@s", "e@s", "f@s"].map(jid => textoLembreteDigital({ ...base, jid, vistoEm: "2026-11-01" }, 1, "L")))
     expect(textos.size).toBeGreaterThan(1)
     for (const t of textos) { expect(t).not.toMatch(/vi que|abriu|viu|de novo/i); expect(t).toContain("Maria") }
+  })
+  it("quem nunca abriu o link recebe o valor na mensagem e o jeito de fechar pela conversa", () => {
+    const t = textoLembreteDigital({ ...base, jid: "a" }, 1, "L")
+    expect(t).toMatch(/R\$/); expect(t).toContain("CPF ou CNPJ"); expect(t).toContain("L")
   })
   it("2º lembrete dá a validade; quem adiou recebe um sem pressa", () => {
     expect(textoLembreteDigital({ ...base, jid: "a" }, 2, "L")).toContain("até 21/11")

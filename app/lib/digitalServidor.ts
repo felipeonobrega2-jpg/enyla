@@ -10,8 +10,10 @@ import { enviar, enviarArquivo, gravarCfg, seuNumero, Conversa, CfgAgente } from
 import {
   sinaisPagos, textoSinalPago, PedidoComBriefing, EntradaBanco, restantesPagos, textoRestantePago, arteAtual, novaArte, marcarArteEnviada,
   aprovarArte, pedirAjuste, textoArteParaAprovar, textoArteAprovada, textoParaVilla, textoParaDesigner, acertoDaSemana, textoAcerto, semanaDe,
-  aprovarNegociacao, textoNegociacaoAprovada,
+  aprovarNegociacao, textoNegociacaoAprovada, documentoNaMensagem, textosPixNoWhatsapp, pedidoPendente, pedidosDoGrupo,
 } from "./digital"
+import { gerarPixPayload } from "./pix"
+import { VERSAO_TERMOS } from "./termosDigital"
 import { sincronizar } from "./bancoServidor"
 import { pluggyConfigurada, atualizarItem } from "./pluggy"
 import { asaas, asaasConfigurado, PAGO, CobrancaAsaas } from "./asaas"
@@ -315,3 +317,33 @@ export async function conferirNoAsaas(id: string) {
 }
 
 export const conversaDoPedido = (jid: string) => conversa(jid)
+
+// Fechar pelo WhatsApp: o cliente mandou CPF/CNPJ com orçamento esperando o sinal → aceite dos termos (pela conversa),
+// cobrança no Asaas (ou o Pix de sempre) e o copia e cola na conversa. true = tratou (o agente não responde por cima).
+export async function fecharPeloWhatsapp(jid: string, texto: string): Promise<boolean> {
+  const doc = documentoNaMensagem(texto)
+  if (!doc) return false
+  const cfg = await lerDados()
+  const pend = pedidoPendente(cfg.pedidosDigitais, jid)
+  if (!pend) return false
+  const c = await conversa(jid)
+  if (!c) return false
+  const grupo = (pedidosDoGrupo(cfg.pedidosDigitais, pend) as PedidoComBriefing[]).filter(p => p.status === "aguardando_sinal")
+  const pedidos = grupo.length ? grupo : [pend as PedidoComBriefing]
+  const pix: string[] = []
+  for (const p of pedidos) {
+    await gravarPedido(p.id, x => ({ ...x, documento: doc, termos: x.termos ?? { versao: VERSAO_TERMOS, em: new Date().toISOString(), via: "whatsapp" } }))
+    const r = asaasConfigurado() ? await cobrarNoAsaas(p.id, "sinal", doc).catch(() => ({ erro: "falhou" } as { cobranca?: CobrancaPix; erro?: string })) : { erro: "sem asaas" }
+    pix.push(r.cobranca?.payload ?? gerarPixPayload({ chave: "financeiro@enyla.com.br", nome: "Enyla", cidade: "Natal", valor: p.sinal, txid: p.id.replace(/\W/g, ""), descricao: `Sinal ${p.id}` }))
+  }
+  const msgs = textosPixNoWhatsapp(pedidos, pix, linkPedido(pedidos[0].id))
+  for (const m of msgs) {
+    const env = await enviar(c, m, undefined, { essencial: true })
+    if (!env.ids.length) break
+    await new Promise(r => setTimeout(r, 1200))
+  }
+  await gravarPedido(pend.id, x => ({ ...x, pixPeloWhatsappEm: new Date().toISOString() }))
+  await notificar(`Digital: ${c.nome ?? "cliente"} vai pagar o sinal`, `${pedidos.map(p => p.id).join(", ")} · mandou o CPF/CNPJ e recebeu o Pix na conversa (${brl(pedidos.reduce((s, p) => s + p.sinal, 0))}).`,
+    { link: "https://app.enyla.com.br/?aba=digital", tags: ["moneybag"] }).catch(() => null)
+  return true
+}
