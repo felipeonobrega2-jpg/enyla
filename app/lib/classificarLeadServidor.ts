@@ -81,6 +81,7 @@ export type Resultado = { classificacao: Classificacao; mudou: boolean; virouMql
 // Classifica uma conversa. aplicar=false só devolve (o agente aplica do jeito dele); sempre marca a hora.
 export async function classificarConversa(jid: string, opts: { cfg?: Cfg; aplicar?: boolean; cache?: { cards?: { nomeCliente: string; coluna: number }[] } } = {}): Promise<Resultado> {
   const cfg = opts.cfg ?? await lerCfg()
+  let erro = ""
   const marcar = () => supabase.from("whatsapp_conversas").update({ ultima_classificacao_at: new Date().toISOString() }).eq("jid", jid)
   const { data: conv } = await supabase.from("whatsapp_conversas").select("jid, nome, telefone, etiquetas, status_lead, ultima_at, ultima_classificacao_at").eq("jid", jid).maybeSingle() as { data: Conv | null }
   if (!conv || NAO_MEXE.includes(conv.status_lead ?? "")) { await marcar(); return null }
@@ -93,8 +94,13 @@ export async function classificarConversa(jid: string, opts: { cfg?: Cfg; aplica
   const ms = [...todas.slice(0, -60).filter(m => !m.from_me && temSinalDeVolume([m.corpo])), ...todas.slice(-60)]
   const doCliente = ms.filter(m => !m.from_me).map(m => m.corpo ?? "")
   if (!doCliente.some(t => t.trim())) { await marcar(); return null }
-  const bruto = await perguntarIA(cfg, conv.nome, conversaParaIA(ms))
-  if (!bruto) return null
+  let bruto: Classificacao | null = null
+  try { bruto = await perguntarIA(cfg, conv.nome, conversaParaIA(ms)) } catch (e) { erro = String(e).slice(0, 300) }
+  if (!bruto) {
+    // Falhou: guarda o motivo (diagnóstico) e tenta de novo na próxima rodada
+    await mudarConfig(() => ({ classificarErro: { em: new Date().toISOString(), jid, erro: erro || "resposta sem JSON" } })).catch(() => null)
+    return null
+  }
   const c = validarClassificacao(bruto, doCliente)
   await marcar()
   if (opts.aplicar === false) return { classificacao: c, mudou: false, virouMql: false }
