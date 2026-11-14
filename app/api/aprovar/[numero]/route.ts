@@ -86,7 +86,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ num
   const lista = [aprovacao, ...((cfg.aprovacoesOnline as AprovacaoOnline[] | undefined) ?? [])].slice(0, 100)
   await gravarCampos({ aprovacoesOnline: lista })
 
-  await notificar("Proposta aprovada pelo cliente", `${opcao.quantidade.toLocaleString("pt-BR")} caixas · ${opcao.preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} · sinal ${sinal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`, { prioridade: "alta", tags: ["tada"], link: `${LINK_SISTEMA}/?aba=painel` }).catch(() => null)
+  // O pedido já está fechado no quadro: a conta do marco inclui esta venda
+  const rumo = await import("@/app/lib/animarServidor").then(m => m.linhaDeComemoracao(opcao.preco)).catch(() => "")
+  await notificar("Proposta aprovada pelo cliente", `${opcao.quantidade.toLocaleString("pt-BR")} caixas · ${opcao.preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} · sinal ${sinal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}${rumo ? `\n${rumo}` : ""}`, { prioridade: "alta", tags: ["tada"], link: `${LINK_SISTEMA}/?aba=painel` }).catch(() => null)
 
   const pix = `/pix/${encodeURIComponent(numero)}?v=${sinal.toFixed(2)}&c=${encodeURIComponent(p.card.nomeCliente)}`
   return NextResponse.json({ ok: true, sinal, pix, rastreio: `/track/${encodeURIComponent(numero)}` })

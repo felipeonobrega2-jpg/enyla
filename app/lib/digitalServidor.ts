@@ -87,7 +87,8 @@ export async function conferirSinais(opts: { forcar?: boolean } = {}): Promise<{
     pagos.push(id)
     const c = await conversa(p.jid)
     if (c) await enviar(c, textoSinalPago(p, linkPedido(p.id), !!(p.briefing?.marca || p.briefing?.arquivos?.length)), undefined, { essencial: true }).catch(() => null)
-    await notificar(`Venda digital: ${p.id}`, `Sinal pago ${brl(p.sinal)} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas · total ${brl(p.total)}`, { prioridade: "alta", tags: ["moneybag"] }).catch(() => null)
+    const rumo = await import("./animarServidor").then(m => m.linhaDeComemoracao(p.total)).catch(() => "")
+    await notificar(`Venda digital: ${p.id}`, `Sinal pago ${brl(p.sinal)} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas · total ${brl(p.total)}${rumo ? `\n${rumo}` : ""}`, { prioridade: "alta", tags: ["moneybag", "tada"] }).catch(() => null)
     const designer = await avisarDesigner(cfg, p)
     await avisarVoce(cfg, `💰 *Digital ${p.id}* · sinal pago ${brl(p.sinal)}\n${p.nome ?? ""} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas · total ${brl(p.total)}${designer ? "" : "\n\nSem o número do Leandro cadastrado (Digital → Contatos): mande para ele o link da arte (sem valores):\n" + linkDesigner(p.id)}`)
   }
@@ -253,7 +254,8 @@ export async function pagoPeloAsaas(id: string, parte: "sinal" | "restante", tx:
   const c = await conversa(p.jid)
   if (parte === "sinal") {
     if (c) await enviar(c, textoSinalPago(p, linkPedido(p.id), !!(p.briefing?.marca || p.briefing?.arquivos?.length)), undefined, { essencial: true }).catch(() => null)
-    await notificar(`Venda digital: ${p.id}`, `Sinal pago ${brl(tx.valor)} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas · total ${brl(p.total)}`, { prioridade: "alta", tags: ["moneybag"] }).catch(() => null)
+    const rumo = await import("./animarServidor").then(m => m.linhaDeComemoracao(p.total)).catch(() => "")
+    await notificar(`Venda digital: ${p.id}`, `Sinal pago ${brl(tx.valor)} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas · total ${brl(p.total)}${rumo ? `\n${rumo}` : ""}`, { prioridade: "alta", tags: ["moneybag", "tada"] }).catch(() => null)
     const designer = await avisarDesigner(cfg, p)
     await avisarVoce(cfg, `💰 *Digital ${p.id}* · sinal pago pelo Asaas ${brl(tx.valor)}\n${p.nome ?? ""} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas${designer ? "" : "\n\nSem o número do Leandro cadastrado (Digital → Contatos): mande para ele o link da arte (sem valores):\n" + linkDesigner(p.id)}`)
   } else {
