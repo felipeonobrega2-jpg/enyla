@@ -9,6 +9,7 @@ import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarFila, dentroDaJanela, ItemFila, AvisoPedido, ConversaFila, JANELA } from "../lib/filaMensagens"
 import type { Vinculos } from "../lib/vinculoWhatsapp"
 import { Selo, Botao, Vazio, Tom } from "./ds"
+import EnsinarIA, { enviarLicao } from "./EnsinarIA"
 
 type Midia = { id: string; tipo: "video" | "imagem"; ts: string }
 const ROTULO: Record<ItemFila["tipo"], { nome: string; tom: Tom }> = {
@@ -68,6 +69,7 @@ export function FilaMensagens({ conversas, kanban, lancamentos, vinculos, avisos
 
 function Editor({ item, onFeito, onAbrirConversa }: { item: ItemFila; onFeito: () => void; onAbrirConversa: (jid: string) => void }) {
   const [texto, setTexto] = useState(item.texto)
+  const [sugerido, setSugerido] = useState<string | null>(null)   // o que a IA escreveu (se você mudar antes de enviar, ela aprende)
   const [escrevendo, setEscrevendo] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -81,7 +83,7 @@ function Editor({ item, onFeito, onAbrirConversa }: { item: ItemFila; onFeito: (
     const r = await fetch("/api/whatsapp/sugerir", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jid: item.jid, cliente: item.cliente, motivo: `${ROTULO[item.tipo].nome}: ${item.motivo}`, texto }) }).catch(() => null)
     const d = r ? await r.json().catch(() => null) : null
-    if (r?.ok && d?.texto) setTexto(d.texto); else setErro(d?.erro ?? "A IA não respondeu.")
+    if (r?.ok && d?.texto) { setTexto(d.texto); setSugerido(d.texto) } else setErro(d?.erro ?? "A IA não respondeu.")
     setEscrevendo(false)
   }
 
@@ -105,6 +107,7 @@ function Editor({ item, onFeito, onAbrirConversa }: { item: ItemFila; onFeito: (
       if (!r?.ok) { ok = false; msg = (await r?.json().catch(() => null))?.erro ?? "Sem conexão." }
     }
     setEnviando(false)
+    if (ok && sugerido && sugerido.trim() !== texto.trim()) void enviarLicao("mensagens", { correcao: { ia: sugerido, voce: texto } })
     if (ok) onFeito(); else setErro(msg)
   }
 
@@ -143,6 +146,8 @@ function Editor({ item, onFeito, onAbrirConversa }: { item: ItemFila; onFeito: (
       {erro && <p className="text-[12.5px] text-[#d33a3c]">{erro}</p>}
       {!janela && <p className="text-[12px] flex items-center gap-1.5" style={{ color: "#b26b00" }}><Clock3 className="w-3.5 h-3.5" />Fora da janela de envio ({JANELA.inicio}h–{JANELA.fim}h). Melhor mandar amanhã cedo.</p>}
       {semDestino && <p className="text-[12px]" style={{ color: "#b26b00" }}>Sem conversa nem telefone deste cliente: ligue a conversa ao cliente na tela do WhatsApp.</p>}
+
+      <EnsinarIA area="mensagens" />
 
       <div className="flex items-center gap-2 flex-wrap">
         <Botao icone={<Sparkles className="w-4 h-4" />} onClick={escreverComIA} disabled={escrevendo}>{escrevendo ? "Escrevendo no seu tom…" : "Escrever com IA"}</Botao>

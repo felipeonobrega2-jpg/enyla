@@ -6,6 +6,7 @@ import { textoParaIA } from "./tempoAteFechar"
 import { supabase } from "./supabase"
 import { evo } from "./evolution"
 import { clienteClaude, FALLBACK, MODELO } from "./claude"
+import { licoesNoPrompt, LicoesIA } from "./licoesIA"
 import { clienteDaConversa, ligacaoForte, Vinculos } from "./vinculoWhatsapp"
 import { nomeChave } from "./negocio"
 import { COL_FECHADO, COL_ENTREGUE } from "../types"
@@ -24,7 +25,7 @@ const ORDEM_RESUMO = ["Retomada", "ICP", "Oportunidade", "Lead médio", "MQL"]
 
 type Cfg = {
   apiKey?: string; metaToken?: string; metaContaId?: string; filtroLeads?: string; vinculosWhatsapp?: Vinculos
-  marketingRelatorios?: Relatorio[]; marketingGerandoEm?: string; agenteAuto?: { avisoNumero?: string }
+  marketingRelatorios?: Relatorio[]; marketingGerandoEm?: string; agenteAuto?: { avisoNumero?: string }; licoesIA?: LicoesIA
 }
 
 async function lerCfg() {
@@ -125,7 +126,7 @@ Como ele qualifica os leads (resumo do filtro dele):
 ${filtro.slice(0, 2500)}
 </filtro>
 
-Escreva em português, direto, como um sócio que entende do negócio. Use só os números dados; não invente nada. "Sumiram" não responderam nem aos follow-ups (lead do anúncio que não leu); "ainda conversando" são os que falam mas não disseram o volume. Poucos dias e números pequenos variam muito: não tire conclusão forte de 1 ou 2 leads, e diga quando a amostra é pequena. Pedidos demoram para fechar (o ciclo real vem junto dos números, quando houver): não cobre pedido de lead de ontem nem condene campanha mais nova que o ciclo.`,
+Escreva em português, direto, como um sócio que entende do negócio. Use só os números dados; não invente nada. "Sumiram" não responderam nem aos follow-ups (lead do anúncio que não leu); "ainda conversando" são os que falam mas não disseram o volume. Poucos dias e números pequenos variam muito: não tire conclusão forte de 1 ou 2 leads, e diga quando a amostra é pequena. Pedidos demoram para fechar (o ciclo real vem junto dos números, quando houver): não cobre pedido de lead de ontem nem condene campanha mais nova que o ciclo.${licoesNoPrompt(cfg.licoesIA?.marketing)}`,
     messages: [{ role: "user", content: `${numerosParaIA(r)}${ciclo ? `\n\n${ciclo}` : ""}\n\nEscreva a leitura de marketing do dia.` }],
   })
   const texto = resp.content.flatMap(b => b.type === "text" ? [b.text] : []).join("")

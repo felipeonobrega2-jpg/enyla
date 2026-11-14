@@ -75,6 +75,10 @@ if (tela === "compositor-mic" && navigator.mediaDevices) navigator.mediaDevices.
 const orig = window.fetch
 window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
   const u = String(url)
+  if (u.startsWith("/api/ia/licoes")) return new Response(JSON.stringify({ licoes: [
+    { id: "1", texto: "Trato todo mundo pelo primeiro nome, nunca \"prezado\"", em: "2026-11-10T12:00:00Z", origem: "voce" },
+    { id: "2", texto: "A IA escreveu: «Olá! Segue o orçamento solicitado.» · você mandou: «Ana, te mandei o orçamento aqui!»", em: "2026-11-12T12:00:00Z", origem: "correcao" },
+  ] }))
   if (u.startsWith("/api/data")) return new Response(JSON.stringify({ ...dados, config, clientes: [], propostasCustom: [] }))
   if (u.startsWith("/api/aprovacao/link")) return new Response(JSON.stringify({ url: "https://exemplo/aprovar/X?t=abc" }))
   if (u.startsWith("/api/cliente/link")) return new Response(JSON.stringify({ url: "https://exemplo/c/abc" }))
@@ -492,7 +496,7 @@ function Telas() {
     case "hoje-conversa": case "hoje-conversa-m": return <>{pagina(<div className="max-w-[1200px]"><HojeCard onAbrirConversa={() => {}} onNavegar={() => {}} onOrcar={() => {}} /></div>)}
       <ConversaLateral jid="1@lid" nome="Perfumaria Modelo" responder onFechar={() => {}} onAbrir={() => {}} onOrcamento={() => {}}
         dados={{ produto: "caixinha", volume_ml: 50, caixa_cm: null, frasco_cm: null, quantidade: 3000, tem_arte: true, resumo: "3 mil caixinhas de 50 ml com hot stamping" }} /></>
-    case "marketing": case "marketing-m": return pagina(<div className="max-w-[1100px]"><MarketingRelatorio /></div>)
+    case "marketing": case "marketing-m": case "marketing-ensinar": return pagina(<div className="max-w-[1100px]"><MarketingRelatorio /></div>)
     case "reativacao": return pagina(<div className="max-w-[860px]"><ReativacaoCard /></div>)
     case "contatos": return pagina(<div className="max-w-[860px]"><ContatosProtegidosCard /></div>)
     case "agente": return pagina(<div className="max-w-[860px]"><AgenteLeadsCard onFiltro={() => {}} /></div>)
@@ -545,7 +549,7 @@ function Telas() {
       prefill={{ pedido: { loteId: "l1", numero: "ANA-001", cliente: "Ana Cosméticos" } }} /></div>
     case "compositor-mic": return <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#efeae2" }}><div style={{ flex: 1 }} /><Compositor jid="x" contato="Camilo" onOtimista={() => {}} onResultado={() => {}} /></div>
     case "aviso": case "aviso-escuro": return <div style={{ height: "100vh", background: "var(--bg-page)" }}><AvisoWhatsapp onAbrir={() => {}} /></div>
-    case "fila": case "fila-m": {
+    case "fila": case "fila-m": case "fila-ensinar": {
       const h = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString()
       const cv = (jid: string, nome: string, rec: number, env: number, extra = {}) => ({ jid, nome, ultima_recebida_at: h(rec), ultima_enviada_at: h(env), ...extra })
       const kanban = [...dados.kanban, { ...dados.kanban[0], id: "kx", numero: "ORC-2026-301", nomeCliente: "Maria Perfumes", coluna: 5, dataFechamento: h(5).slice(0, 10), dataEntregaReal: undefined },

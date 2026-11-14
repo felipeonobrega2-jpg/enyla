@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react"
 import { Sparkles, Loader2, RefreshCw, ArrowRight } from "lucide-react"
 import { Cartao, TituloCartao, Botao, Selo, Segmentado, Tom, COR } from "./ds"
+import EnsinarIA from "./EnsinarIA"
 import { Relatorio, LinhaCampanha, total, custoPor, variacao } from "../lib/marketing"
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: n < 100 ? 2 : 0 })
@@ -91,6 +92,7 @@ export default function MarketingRelatorio() {
               {r.leitura.acao && <p className="mt-2.5 text-[12.5px] font-semibold text-[#191625] flex gap-2"><ArrowRight className="w-4 h-4 text-[#8456e8] shrink-0 mt-px" />{r.leitura.acao}</p>}
             </div>
           ) : r.erroLeitura ? <p className="text-[11.5px] text-[#c57800] mb-3">Sem a leitura da IA desta vez ({r.erroLeitura}). Os números estão certos.</p> : null}
+          <EnsinarIA area="marketing" className="mb-4" />
 
           {/* Funil */}
           <div className="grid grid-cols-2 md:flex gap-2 mb-2">

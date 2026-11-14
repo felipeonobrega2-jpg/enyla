@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, Fragment } from "react"
+import EnsinarIA from "./EnsinarIA"
 
 type AcaoPendente = { resumo: string; confirmToken: string; resolvida?: "confirmada" | "cancelada" }
 type Msg = { role: "user" | "assistant"; content: string; acaoPendente?: AcaoPendente }
@@ -70,6 +71,7 @@ export default function FormaBubble({ apiKey }: { apiKey: string }) {
   const [msgs, setMsgs]       = useState<Msg[]>([])
   const [input, setInput]     = useState("")
   const [loading, setLoading] = useState(false)
+  const [ensinando, setEnsinando] = useState(false)
   const [erro, setErro]       = useState("")
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -134,6 +136,8 @@ export default function FormaBubble({ apiKey }: { apiKey: string }) {
         saveMsgs(final)
         return final
       })
+      // Guardou uma lição pela conversa: o bloco "Ensinar a IA" recarrega
+      if (data.ok && /^Guardar a lição/.test(acao.resumo)) window.dispatchEvent(new CustomEvent("licoes-ia", { detail: "assistente" }))
     } catch {
       setErro("Erro de conexão com a API.")
     }
@@ -170,6 +174,10 @@ export default function FormaBubble({ apiKey }: { apiKey: string }) {
               <p className="text-white text-[12.5px] font-semibold leading-tight">Forma</p>
               <p className="text-zinc-500 text-[10px] leading-tight">Pergunte qualquer coisa sobre o sistema</p>
             </div>
+            <button onClick={() => setEnsinando(v => !v)} title="Ensinar a Forma"
+              className={`text-[11px] font-medium px-1.5 transition-colors ${ensinando ? "text-white" : "text-zinc-500 hover:text-zinc-300"}`}>
+              Ensinar
+            </button>
             {msgs.length > 0 && (
               <button onClick={limpar} title="Limpar conversa"
                 className="text-zinc-500 hover:text-zinc-300 text-[11px] font-medium px-1.5 transition-colors">
@@ -183,6 +191,8 @@ export default function FormaBubble({ apiKey }: { apiKey: string }) {
               </svg>
             </button>
           </div>
+
+          {ensinando && <div className="shrink-0 p-2 bg-slate-50 border-b border-slate-200 max-h-[60%] overflow-y-auto"><EnsinarIA area="assistente" aberto /></div>}
 
           {/* Mensagens */}
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-slate-50">

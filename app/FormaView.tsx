@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
+import EnsinarIA from "./components/EnsinarIA"
 import { gerarDielineSVG } from "./dielineGen"
 
 type LayoutSugerido = {
@@ -385,6 +386,8 @@ export default function FormaView({
           Configure sua chave de API em <strong>Configurações → Chave da API</strong> para usar a Forma.
         </div>
       )}
+
+      <div className="shrink-0 px-6 pt-3"><EnsinarIA area="design" /></div>
 
       {/* Mensagens */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">

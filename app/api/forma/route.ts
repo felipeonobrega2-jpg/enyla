@@ -1,5 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk"
 import { clienteClaude, erroClaude, FALLBACK, MODELO, MSG_RECUSA } from "@/app/lib/claude"
+import { licoesNoPrompt } from "@/app/lib/licoesIA"
+import { lerLicoesIA } from "@/app/lib/licoesIAServidor"
 
 type MaterialInput = { id: string; nome: string }
 
@@ -21,7 +23,7 @@ export async function POST(request: Request) {
       ...FALLBACK,
       // Consultoria de design: raciocínio moderado basta e mantém a conversa ágil
       output_config: { effort: "medium" },
-      system: buildSystemPrompt(materiais),
+      system: buildSystemPrompt(materiais) + licoesNoPrompt(await lerLicoesIA("design").catch(() => [])),
       messages,
     })
     if (resposta.stop_reason === "refusal") {

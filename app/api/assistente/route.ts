@@ -4,6 +4,8 @@ import { clienteClaude, erroClaude, FALLBACK, MODELO, MSG_RECUSA } from "@/app/l
 import { calcularResumoFinanceiro } from "@/app/lib/financeiro"
 import type { KanbanCard, LancamentoFinanceiro, NegocioParceiro } from "@/app/types"
 import { COLUNAS_KANBAN, COL_FECHADO } from "@/app/types"
+import { licoesNoPrompt, adicionarLicao } from "@/app/lib/licoesIA"
+import { lerLicoesIA, mudarLicoesIA } from "@/app/lib/licoesIAServidor"
 
 type ChatMsg = { role: "user" | "assistant"; content: string }
 
@@ -42,6 +44,16 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
         coluna: { type: "number", description: "Índice da coluna de destino, de 0 a 10." },
       },
       required: ["numero", "coluna"],
+    },
+  },
+  {
+    name: "guardar_licao",
+    description:
+      "Propõe guardar uma lição que o usuário te ensinou, para você lembrar em todas as próximas conversas. NÃO grava direto — a interface mostra Confirmar/Cancelar. Use quando ele te corrigir (\"não é assim\", \"o certo é\"), explicar como algo funciona na empresa, ou disser como prefere a resposta. Escreva a lição em uma frase clara e geral, que sirva para outras perguntas, não só esta.",
+    input_schema: {
+      type: "object" as const,
+      properties: { texto: { type: "string", description: "A lição, em uma frase, em primeira pessoa do Felipe ou como regra (ex.: \"Faturamento do mês conta pela data de fechamento, não de entrega\")." } },
+      required: ["texto"],
     },
   },
 ]
@@ -98,7 +110,8 @@ type AcaoMoverPedido = {
   id: string; numero: string
   colunaAtual: number; novaColuna: number
 }
-type Acao = AcaoRegistrarPagamento | AcaoMoverPedido
+type AcaoGuardarLicao = { tool: "guardar_licao"; texto: string }
+type Acao = AcaoRegistrarPagamento | AcaoMoverPedido | AcaoGuardarLicao
 
 function gerarToken(acao: Acao): string {
   return Buffer.from(JSON.stringify(acao)).toString("base64")
@@ -152,6 +165,12 @@ async function proporMoverPedido(params: { numero: string; coluna: number }) {
   }
 }
 
+function proporGuardarLicao(params: { texto: string }) {
+  const texto = String(params.texto ?? "").trim().slice(0, 600)
+  if (texto.length < 5) return { erro: "Escreva a lição numa frase." }
+  return { status: "pendente_confirmacao", resumo: `Guardar a lição: "${texto}"`, confirmToken: gerarToken({ tool: "guardar_licao", texto }) }
+}
+
 async function executarAcao(token: string): Promise<{ ok: true; mensagem: string } | { erro: string }> {
   let acao: Acao
   try {
@@ -197,6 +216,11 @@ async function executarAcao(token: string): Promise<{ ok: true; mensagem: string
       await supabase.from("Tracking").update({ colunaAtual: acao.novaColuna, etapas }).eq("numero", acao.numero)
     }
     return { ok: true, mensagem: `Pedido ${acao.numero} movido para "${COLUNAS_KANBAN[acao.novaColuna]}".` }
+  }
+
+  if (acao.tool === "guardar_licao") {
+    await mudarLicoesIA("assistente", l => adicionarLicao(l, String(acao.texto ?? ""), "voce"))
+    return { ok: true, mensagem: "Guardei. Vou lembrar disso nas próximas conversas." }
   }
 
   return { erro: "Ação desconhecida." }
@@ -294,6 +318,10 @@ export async function POST(request: Request) {
 
   const convo: Anthropic.Beta.BetaMessageParam[] = messages.map(m => ({ role: m.role, content: m.content }))
   const claude = clienteClaude(apiKey)
+  const system = buildSystemPrompt() + licoesNoPrompt(await lerLicoesIA("assistente").catch(() => [])) + `
+
+## APRENDER
+Quando o Felipe te corrigir, explicar como algo funciona na empresa ou disser como prefere a resposta, use guardar_licao para propor guardar isso (uma frase geral). Não proponha para pedidos comuns de dados.`
   let acaoPendente: { resumo: string; confirmToken: string } | null = null
 
   for (let turno = 0; turno < 4; turno++) {
@@ -305,7 +333,7 @@ export async function POST(request: Request) {
         ...FALLBACK,
         // Perguntas do dia a dia e ações simples: raciocínio moderado
         output_config: { effort: "medium" },
-        system: buildSystemPrompt(),
+        system,
         messages: convo,
         tools: TOOLS,
       })
@@ -331,6 +359,7 @@ export async function POST(request: Request) {
         let resultado: unknown
         if (block.name === "consultar_dados") resultado = await consultarDados()
         else if (block.name === "registrar_pagamento") resultado = await proporRegistrarPagamento(block.input as { numero: string; valor: number; formaPagamento?: string })
+        else if (block.name === "guardar_licao") resultado = proporGuardarLicao(block.input as { texto: string })
         else if (block.name === "mover_pedido") resultado = await proporMoverPedido(block.input as { numero: string; coluna: number })
         else resultado = { erro: "ferramenta desconhecida" }
 
