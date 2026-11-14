@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { lerIndice, guardarDesenho, renomear, apagar } from "@/app/lib/bibliotecaServidor"
+import { lerIndice, guardarDesenho, editarDesenho, apagar } from "@/app/lib/bibliotecaServidor"
+import { lerTags } from "@/app/lib/biblioteca"
 
-// Biblioteca de facas (rota protegida pelo login): GET a lista · POST (form) guarda um DXF · PATCH { id, nome } · DELETE ?id=
+// Biblioteca de facas (rota protegida pelo login): GET a lista · POST (form) guarda um DXF · PATCH { id, apelido?, tags? } · DELETE ?id=
 export async function GET() {
   return NextResponse.json({ desenhos: await lerIndice() })
 }
@@ -21,9 +22,11 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as { id?: string; nome?: string }
-  if (!b.id || !b.nome) return NextResponse.json({ erro: "Faltou o nome." }, { status: 400 })
-  return (await renomear(b.id, b.nome)) ? NextResponse.json({ ok: true }) : NextResponse.json({ erro: "Não achei esse desenho." }, { status: 404 })
+  const b = await req.json().catch(() => ({})) as { id?: string; apelido?: string; tags?: string[] | string }
+  if (!b.id || (b.apelido === undefined && b.tags === undefined)) return NextResponse.json({ erro: "Faltou o nome ou as palavras-chave." }, { status: 400 })
+  const tags = b.tags === undefined ? undefined : lerTags(Array.isArray(b.tags) ? b.tags.join(",") : String(b.tags))
+  return (await editarDesenho(b.id, { apelido: b.apelido === undefined ? undefined : String(b.apelido), tags }))
+    ? NextResponse.json({ ok: true }) : NextResponse.json({ erro: "Não achei esse desenho." }, { status: 404 })
 }
 
 export async function DELETE(req: NextRequest) {

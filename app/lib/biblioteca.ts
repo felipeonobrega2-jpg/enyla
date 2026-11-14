@@ -13,6 +13,8 @@ export type Desenho = {
   caixa: { largura: number; altura: number; profundidade: number } | null   // caixa montada, mm
   blank: { largura: number; altura: number }                                // caixa aberta (a peça), mm
   criadoEm: string
+  apelido?: string               // o nome que você dá ("Perfume 20ml fundo automático"); o do arquivo fica guardado
+  tags?: string[]                // palavras-chave: "perfume", "20ml", "villa" (categoria é só uma palavra-chave)
 }
 
 const ESPACO_MM = 3   // entre peças na folha
@@ -64,4 +66,49 @@ export const descricaoCaixa = (d: Pick<Desenho, "caixa">) =>
 export function nomeBonito(nome: string) {
   const t = nome.replace(/\.dxf$/i, "").replace(/\s*\(\d+\)$/, "").replace(/^dieline_de_/i, "").replace(/_/g, " ").replace(/\s+/g, " ").trim()
   return t ? t[0].toUpperCase() + t.slice(1) : nome
+}
+
+
+// ── Nome e palavras-chave (para achar a faca no orçamento sem abrir a página de facas) ─────────
+export const nomeDoDesenho = (d: Pick<Desenho, "nome" | "apelido">) => d.apelido?.trim() || nomeBonito(d.nome)
+
+// Sem acento, minúsculo e "20 ml" = "20ml" (é assim que se busca e se guarda a palavra-chave)
+export const normalizarBusca = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  .replace(/(\d)\s+(ml|g|cm|mm|un)\b/g, "$1$2").replace(/[×*]/g, "x").replace(/\s+/g, " ").trim()
+
+// Palavras-chave digitadas ("perfume, 20 ml; Villa") → ["perfume", "20ml", "villa"], sem repetir
+export function lerTags(texto: string): string[] {
+  const out: string[] = []
+  for (const t of texto.split(/[,;\n#]+/).map(normalizarBusca).filter(Boolean)) if (!out.includes(t) && t.length <= 30) out.push(t)
+  return out.slice(0, 15)
+}
+
+// Tudo o que a busca enxerga de um desenho: seu nome, as palavras-chave, o modelo, o arquivo e as medidas
+function textoDeBusca(d: Desenho) {
+  const c = d.caixa ? [d.caixa.largura, d.caixa.altura, d.caixa.profundidade].map(n => (n / 10).toLocaleString("pt-BR", { maximumFractionDigits: 1 })) : []
+  return normalizarBusca([d.apelido ?? "", ...(d.tags ?? []), d.modelo ?? "", nomeBonito(d.nome), c.join("x")].join(" "))
+}
+
+// Busca: toda palavra digitada tem que aparecer (em qualquer campo). Palavra-chave idêntica e o seu nome vêm antes.
+export function buscarDesenhos(lista: Desenho[], termo: string): Desenho[] {
+  const palavras = normalizarBusca(termo).split(" ").filter(Boolean)
+  if (!palavras.length) return lista
+  return lista
+    .map(d => {
+      const tudo = textoDeBusca(d)
+      if (!palavras.every(p => tudo.includes(p))) return null
+      const tags = (d.tags ?? []).map(normalizarBusca), apelido = normalizarBusca(d.apelido ?? "")
+      const pontos = palavras.reduce((s, p) => s + (tags.includes(p) ? 3 : 0) + (apelido.includes(p) ? 2 : 0), 0)
+      return { d, pontos }
+    })
+    .filter((x): x is { d: Desenho; pontos: number } => !!x)
+    .sort((a, b) => b.pontos - a.pontos)
+    .map(x => x.d)
+}
+
+// Palavras-chave mais usadas (atalhos de filtro), da mais comum para a menos
+export function tagsMaisUsadas(lista: Desenho[], max = 12): string[] {
+  const n = new Map<string, number>()
+  for (const d of lista) for (const t of d.tags ?? []) n.set(t, (n.get(t) ?? 0) + 1)
+  return [...n.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, max).map(([t]) => t)
 }

@@ -89,10 +89,17 @@ export async function lerDxf(id: string): Promise<string | null> {
   return data ? await data.text() : null
 }
 
-export async function renomear(id: string, nome: string) {
+// Seu nome e as palavras-chave do desenho (o nome do arquivo do Pacdora não muda)
+export async function editarDesenho(id: string, mudar: { apelido?: string; tags?: string[] }) {
   const lista = await lerIndice()
   if (!lista.some(d => d.id === id)) return false
-  const novo = lista.map(d => d.id === id ? { ...d, nome: nome.trim().slice(0, 120) || d.nome } : d)
+  const novo = lista.map(d => {
+    if (d.id !== id) return d
+    const x = { ...d }
+    if (mudar.apelido !== undefined) { const a = mudar.apelido.trim().slice(0, 80); if (a) x.apelido = a; else delete x.apelido }
+    if (mudar.tags !== undefined) { if (mudar.tags.length) x.tags = mudar.tags; else delete x.tags }
+    return x
+  })
   await gravar(INDICE, JSON.stringify(novo), "application/json")
   const d = novo.find(x => x.id === id)
   if (d) await gravar(`meta/${id}.json`, JSON.stringify(d), "application/json").catch(() => null)

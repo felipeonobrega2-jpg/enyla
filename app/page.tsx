@@ -56,6 +56,7 @@ import { retornoPorCampanha } from "./lib/retornoCampanhas"
 import { normalizarMetas } from "./lib/metas"
 import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
 import { BibliotecaFacasView } from "./components/BibliotecaFacasView"
+import { BuscaFacaGuardada } from "./components/BuscaFacaGuardada"
 import FormaView from "./FormaView"
 import FormaBubble from "./components/FormaBubble"
 import { brl, num } from "./utils"
@@ -87,7 +88,7 @@ import { TerceirizadosView } from "./components/TerceirizadosView"
 import MetaAdsView from "./components/MetaAdsView"
 import BuscaGlobal from "./components/BuscaGlobal"
 import { parseDXF, DXFResult, caixaDoDxf } from "./lib/dxf"
-import type { Desenho } from "./lib/biblioteca"
+import { nomeDoDesenho, type Desenho } from "./lib/biblioteca"
 import type { DXFGeo } from "./LayoutChapaVisual"
 
 function unpackTerceirizado(card: KanbanCard): KanbanCard {
@@ -620,8 +621,8 @@ export default function Home() {
     reader.readAsText(file)
   }
   // Desenho (DXF) na mesa de orçamento: medidas da peça e da caixa montada
-  function aplicarDesenho(nome: string, result: DXFResult, desenhoId?: string) {
-    setDxfNome(nome)
+  function aplicarDesenho(nome: string, result: DXFResult, desenhoId?: string, mostrar?: string) {
+    setDxfNome(mostrar ?? nome)
     setDxfGeo({ bounds: result.bounds, paths: result.paths })
     dxfChave.current = `${desenhoId ?? ""}|${result.largura}x${result.altura}`
     setForm(p => {
@@ -639,13 +640,14 @@ export default function Home() {
     return r?.desenho?.id ?? null
   }
   // Biblioteca → "Usar no orçamento": abre a mesa com o desenho, sem o Pacdora
-  async function usarDesenho(id: string, nome: string) {
-    const texto = await fetch(`/api/biblioteca/${id}`).then(r => r.ok ? r.text() : null).catch(() => null)
+  // (o nome do arquivo lê o modelo e a caixa; na tela aparece o seu nome do desenho)
+  async function usarDesenho(d: Desenho, irParaOrcamento = true) {
+    const texto = await fetch(`/api/biblioteca/${d.id}`).then(r => r.ok ? r.text() : null).catch(() => null)
     const result = texto ? parseDXF(texto) : null
     if (!result) { showToast("Não consegui abrir esse desenho."); return }
-    aplicarDesenho(nome, result, id)
-    navigate("orcamento")
-    showToast(`Desenho "${nome}" na mesa de orçamento`)
+    aplicarDesenho(d.nome, result, d.id, nomeDoDesenho(d))
+    if (irParaOrcamento) navigate("orcamento")
+    showToast(`Faca "${nomeDoDesenho(d)}" na mesa de orçamento`)
   }
   // Orçamento reaberto (editar, replicar, proposta): o desenho volta da biblioteca. Pelo desenho ligado ao orçamento;
   // nos de antes da biblioteca, pelo desenho com a mesma peça (±1 mm).
@@ -665,7 +667,7 @@ export default function Home() {
       const r = texto ? parseDXF(texto) : null
       if (!r || dxfChave.current !== chave) return   // mudou de orçamento no meio
       setDxfGeo({ bounds: r.bounds, paths: r.paths })
-      setDxfNome(d.nome)
+      setDxfNome(nomeDoDesenho(d))
     })()
   }, [form.desenhoId, blankL, blankA])   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1924,6 +1926,8 @@ export default function Home() {
                 </button>
               </div>
             ) : (
+              <>
+              <BuscaFacaGuardada onEscolher={d => usarDesenho(d, false)} />
               <label
                 onDragOver={e => { e.preventDefault(); setDxfArrastando(true) }}
                 onDragLeave={() => setDxfArrastando(false)}
@@ -1938,6 +1942,7 @@ export default function Home() {
                   onChange={e => { const file = e.target.files?.[0]; if (file) lerArquivoDxf(file); e.target.value = "" }}
                 />
               </label>
+              </>
             )}
           </FormSection>
           )}
@@ -2779,7 +2784,7 @@ export default function Home() {
                 return [...cv].sort((a, b) => (b.id === padrao ? 1 : 0) - (a.id === padrao ? 1 : 0)).map(f => f.nome)
               })()}
               usos={historico.filter(h => h.numero).map(h => ({ numero: h.numero!, cliente: h.form?.nomeCliente ?? "", desenhoId: h.form?.desenhoId ?? null }))}
-              onUsar={(id, nome) => { void usarDesenho(id, nome) }}
+              onUsar={d => { void usarDesenho(d) }}
               onRegistrarFaca={f => {
                 const prod = normalizarProducao(config.producao)
                 salvarConfigTudo({ ...config, producao: { ...prod, ferramentais: [...prod.ferramentais, f] } })

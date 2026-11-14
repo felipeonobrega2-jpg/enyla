@@ -47,6 +47,8 @@ import { TempoAteFecharCard } from "@/app/components/TempoAteFecharCard"
 import { NegociacoesDigitalCard } from "@/app/components/NegociacoesDigitalCard"
 import { termosDigital } from "@/app/lib/termosDigital"
 import { BibliotecaFacasView } from "@/app/components/BibliotecaFacasView"
+import { BuscaFacaGuardada } from "@/app/components/BuscaFacaGuardada"
+import { Cartao } from "@/app/components/ds"
 import { termosOffset, VERSAO_TERMOS_OFFSET } from "@/app/lib/termosOffset"
 import ChapasView from "@/app/cartuxo/components/ChapasView"
 import CustosView from "@/app/cartuxo/components/CustosView"
@@ -264,10 +266,10 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     return new Response(`0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${ents}\n0\nENDSEC\n0\nEOF`)
   }
   if (u.startsWith("/api/biblioteca")) {
-    const d = (id: string, nome: string, modelo: string, c: [number, number, number], b: [number, number]) => ({ id, nome, modelo, caixa: { largura: c[0], altura: c[1], profundidade: c[2] }, blank: { largura: b[0], altura: b[1] }, criadoEm: new Date().toISOString() })
+    const d = (id: string, nome: string, modelo: string, c: [number, number, number], b: [number, number], extra = {}) => ({ id, nome, modelo, caixa: { largura: c[0], altura: c[1], profundidade: c[2] }, blank: { largura: b[0], altura: b[1] }, criadoEm: new Date().toISOString(), ...extra })
     return new Response(JSON.stringify({ desenhos: [
-      d("a1b2c3d4e5f60001", "dieline_de_caixa_com_fundo_automático_52×32×85_mm.dxf", "Caixa com fundo automático", [52, 85, 32], [169.5, 149]),
-      d("a1b2c3d4e5f60002", "dieline_de_caixa_com_fecho_inverso_40×40×120_mm.dxf", "Caixa com fecho inverso", [40, 120, 40], [161.5, 200]),
+      d("a1b2c3d4e5f60001", "dieline_de_caixa_com_fundo_automático_52×32×85_mm.dxf", "Caixa com fundo automático", [52, 85, 32], [169.5, 149], { apelido: "Perfume 50ml fundo automático", tags: ["perfume", "50ml", "villa"] }),
+      d("a1b2c3d4e5f60002", "dieline_de_caixa_com_fecho_inverso_40×40×120_mm.dxf", "Caixa com fecho inverso", [40, 120, 40], [161.5, 200], { apelido: "Perfume 20ml slim", tags: ["perfume", "20ml"] }),
       d("a1b2c3d4e5f60003", "dieline_de_caixa_tuck_end_60×60×130_mm.dxf", "Caixa tuck end", [60, 130, 60], [241.5, 252]),
     ] }))
   }
@@ -476,7 +478,9 @@ function Telas() {
       <div style={{ flex: 1 }}>{pagina(<PedidosSiteView onVerChapas={() => {}} />)}</div>
     </div>
     case "digitalpainel": case "digitalpainel-m": case "digitalpainel-aberto": case "digitalpainel-qtd": case "digitalpainel-prod": case "digitalpainel-acerto": return pagina(<DigitalPainelView onAbrirConversa={() => {}} />)
-    case "biblioteca": case "biblioteca-m": case "biblioteca-faca": return <BibliotecaFacasView onUsar={() => {}} onRegistrarFaca={() => {}} fornecedores={["Corte Exemplo", "Acabamentos Modelo"]}
+    case "buscafaca": case "buscafaca-filtro": return pagina(<div className="max-w-[460px]"><Cartao><p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-2">Dieline Pacdora</p><BuscaFacaGuardada onEscolher={() => {}} />
+      <div className="px-4 py-5 rounded-xl border-2 border-dashed border-[rgba(60,60,67,0.14)] text-center text-[12px] font-semibold text-[#8456e8]/80">Arraste ou clique: .dxf do Pacdora</div><div className="h-[300px]" /></Cartao></div>)
+    case "biblioteca": case "biblioteca-m": case "biblioteca-faca": case "biblioteca-nomear": return <BibliotecaFacasView onUsar={() => {}} onRegistrarFaca={() => {}} fornecedores={["Corte Exemplo", "Acabamentos Modelo"]}
       usos={[{ numero: "ORC-2026-201", cliente: "Perfumaria Modelo", desenhoId: "a1b2c3d4e5f60001" }]}
       ferramentais={[
         { id: "f1", tipo: "faca", cliente: "Perfumaria Modelo", produto: "Fundo automático 52×32×85", blankLargura: 169.5, blankAltura: 149, cavidades: 6, fornecedor: "Fornecedor Exemplo", custo: 450, data: "2026-09-01" },
