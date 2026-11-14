@@ -148,15 +148,16 @@ export async function talvezClassificarLeads() {
     const { data } = await supabase.from("whatsapp_conversas").select("jid, nome, telefone, etiquetas, status_lead, ultima_at, ultima_classificacao_at")
       .gte("ultima_at", desde).not("jid", "like", "%@g.us").order("ultima_at", { ascending: false }).limit(2000)
     const limite = Date.now() - MIN_DIGITANDO * 60_000
+    const marcado = (c: Conv) => c.ultima_classificacao_at ? new Date(c.ultima_classificacao_at).getTime() : 0
+    // Conversa viva: mensagem nos últimos 3 dias depois da última classificação (o lead que está esperando agora)
+    const viva = (c: Conv) => !!c.ultima_at && new Date(c.ultima_at).getTime() > marcado(c) && new Date(c.ultima_at).getTime() < limite && Date.now() - new Date(c.ultima_at).getTime() < 3 * 86_400_000
     const pendentes = ((data ?? []) as Conv[]).filter(c => {
       if (NAO_MEXE.includes(c.status_lead ?? "")) return false
-      const cl = c.ultima_classificacao_at ? new Date(c.ultima_classificacao_at).getTime() : 0
-      const novo = !!c.ultima_at && new Date(c.ultima_at).getTime() > cl && new Date(c.ultima_at).getTime() < limite
-      const naRevisao = cl < new Date(revisaoAte).getTime()
-      return novo || naRevisao
+      const novo = !!c.ultima_at && new Date(c.ultima_at).getTime() > marcado(c) && new Date(c.ultima_at).getTime() < limite
+      return novo || marcado(c) < new Date(revisaoAte).getTime()
     })
-    // MQL primeiro (os errados saem logo), depois os mais recentes
-    pendentes.sort((a, b) => Number(temEtiquetaDeMql(b.etiquetas)) - Number(temEtiquetaDeMql(a.etiquetas)) || (b.ultima_at ?? "").localeCompare(a.ultima_at ?? ""))
+    // Primeiro quem está vivo agora (mais recente primeiro); depois a revisão, MQL primeiro (os errados saem logo)
+    pendentes.sort((a, b) => Number(viva(b)) - Number(viva(a)) || (viva(a) ? 0 : Number(temEtiquetaDeMql(b.etiquetas)) - Number(temEtiquetaDeMql(a.etiquetas))) || (b.ultima_at ?? "").localeCompare(a.ultima_at ?? ""))
 
     const cache: { cards?: { nomeCliente: string; coluna: number }[] } = {}
     const paraIA: string[] = []
