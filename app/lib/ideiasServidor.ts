@@ -60,6 +60,10 @@ const LOTES: { v: number; ideias: string[] }[] = [
     "Gestão: assistente pessoal pelo WhatsApp: você manda a mensagem e o agente resolve (consulta, lança, avisa).",
     "Marketing: agente de posts que alimenta o Instagram da Enyla com os trabalhos.",
   ] },
+  { v: 6, ideias: [
+    // 14/11: pedido seu
+    "WhatsApp invertido: você manda mensagem (texto ou áudio) para o número da Enyla e o sistema executa. Ex.: \"pedido da Ana foi para impressão\" (move o pedido e avisa o cliente), \"recebi 500 do Bruno\" (lança o pagamento), \"orça 2.000 caixas 10x5x5 para a Perfumaria X\" (monta o orçamento), \"o WR é ICP\" (etiqueta), \"quanto falta receber essa semana?\" (responde). Só do seu número; o que mexe em dinheiro ou fala com cliente pede um \"ok\" antes; tudo fica no histórico. Base pronta: o assistente Forma já consulta, registra pagamento e move pedido com confirmação.",
+  ] },
 ]
 
 // Gastos fixos que o sistema põe uma vez (marca no servidor); apagou ou editou, não volta
