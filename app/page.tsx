@@ -82,7 +82,7 @@ import { ModalPropostaCustom, BoxPreview3D } from "./components/ModalPropostaCus
 import { ModalDetalhe, DetalheData } from "./components/ModalDetalhe"
 import { OrcamentoDigitalView } from "./components/OrcamentoDigitalView"
 import { ModalSobra } from "./components/ModalSobra"
-import { GamificacaoView, SidebarGamificacao } from "./components/GamificacaoView"
+import { SidebarGamificacao } from "./components/GamificacaoView"
 import { TerceirizadosView } from "./components/TerceirizadosView"
 import MetaAdsView from "./components/MetaAdsView"
 import BuscaGlobal from "./components/BuscaGlobal"
@@ -2768,18 +2768,6 @@ export default function Home() {
               onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }}
               onCriarCard={orcamentoDaConversa}
               abrirJid={whatsAbrir}
-            />
-          ) : view === "conquistas" ? (
-            <GamificacaoView
-              kanban={kanban}
-              lancamentos={lancamentos}
-              metaMensal={config.metaMensal}
-              baselineFaturamento={config.baselineFaturamento}
-              onSaveConfig={updates => {
-                const next = { ...config, ...updates }
-                setConfig(next)
-                fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) }).catch(() => {})
-              }}
             />
           ) : view === "biblioteca" ? (
             <BibliotecaFacasView

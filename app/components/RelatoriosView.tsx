@@ -11,7 +11,7 @@ import {
 } from "../lib/negocio"
 import { brl, num } from "../utils"
 import { CabecalhoPagina, Segmentado, Botao, Cartao, TituloCartao, ColunasDuplas, Colunas, ListaBarras, Vazio } from "./ds"
-import { gerarHtmlRelatorio } from "./DashboardView"
+import { gerarHtmlRelatorio } from "../lib/relatorioHtml"
 import { TempoAteFecharCard } from "./TempoAteFecharCard"
 import { PrevisaoCartao } from "./PrevisaoCartao"
 import { SimuladorCartao } from "./SimuladorCartao"
