@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
+import { mudarConfig } from "@/app/lib/configAtomica"
 
 export async function GET() {
   const { data, error } = await supabase
@@ -27,5 +28,11 @@ export async function PATCH(req: Request) {
     : { nao_lidas: 0 }
   const { error } = await supabase.from("whatsapp_conversas").update(campos).in("jid", alvo)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // Você decidiu a etapa ou as etiquetas: o classificador automático não rebaixa mais esta conversa
+  if (etapa !== undefined || etiquetas !== undefined) await mudarConfig((d: Record<string, unknown> & { leadManual?: Record<string, string> }) => {
+    const m = { ...(d.leadManual ?? {}) }
+    for (const j of alvo) m[j] = agora
+    return { leadManual: Object.fromEntries(Object.entries(m).sort((a, b) => a[1].localeCompare(b[1])).slice(-1500)) }
+  }).catch(() => null)
   return NextResponse.json({ ok: true })
 }

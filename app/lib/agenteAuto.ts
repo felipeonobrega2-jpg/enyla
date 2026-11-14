@@ -41,6 +41,7 @@ const MAX_POR_DIA_DIGITAL = 25
 const TRAVAS_COM_AVISO = ["precisa de você", "a IA pediu", "citou valor", "resposta longa", "já respondeu"]
 export { PRODUTO_RECUSADO } from "./metaMql"
 import { PRODUTO_RECUSADO } from "./metaMql"
+import { temSinalDeVolume } from "./classificarLead"
 const MIN_ENTRE_RODADAS = 6          // follow-ups: no máximo uma rodada a cada 6 min (2 por rodada ≈ 20/h, dentro do limite de envios ativos)
 const HORAS_REPOUSO_TENTATIVA = 3     // tentado (enviou ou pulou): sai da frente por 3 h, para a fila andar
 
@@ -131,6 +132,15 @@ export async function aplicar(c: Conversa, etiquetas: string[], etapa: string | 
   if (!mesmas) await sincronizarNoWhatsapp(c.telefone || c.jid, antes, etiquetas)
   c.etiquetas = etiquetas
   if (etapa) c.status_lead = etapa
+}
+
+// Como aplicar, mas status null tira da etapa (ex.: MQL sem prova volta para automática); undefined não mexe
+export async function aplicarStatus(c: Conversa, etiquetas: string[], status: string | null | undefined) {
+  await aplicar(c, etiquetas, status ?? null)
+  if (status === null && c.status_lead) {
+    await supabase.from("whatsapp_conversas").update({ status_lead: null }).eq("jid", c.jid)
+    c.status_lead = null
+  }
 }
 
 const organizar = (c: Conversa, perfil: PerfilLead) => {
@@ -235,7 +245,7 @@ export async function marcarNaoLida(c: Conversa, msgId: string) {
   }) }).catch(() => null)
 }
 
-async function avisarMql(cfg: CfgAgente, c: Conversa, r: { lead: { perfil: PerfilLead; quantidade_total: number | null; motivo: string }; dados?: { resumo?: string } }) {
+export async function avisarMql(cfg: CfgAgente, c: Conversa, r: { lead: { perfil: PerfilLead; quantidade_total: number | null; motivo: string }; dados?: { resumo?: string } }) {
   // No celular pelo ntfy (chega mesmo com o WhatsApp caído): só perfil e quantidade, sem nome nem telefone
   const rotulo = r.lead.perfil === "icp" ? "ICP" : r.lead.perfil === "oportunidade" ? "Oportunidade" : "MQL"
   await notificar(`Novo ${rotulo}`, `${r.lead.quantidade_total ? `${r.lead.quantidade_total.toLocaleString("pt-BR")} caixas` : "Bom negócio"}${r.dados?.resumo ? ` · ${r.dados.resumo.slice(0, 90)}` : ""}`, { prioridade: "alta", tags: ["star"] }).catch(() => null)
@@ -394,6 +404,13 @@ export async function responderSozinho(msgId: string) {
     return registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: "indefinido", enviou: false, texto: "", motivo: ehSemCredito(a.erro) ? "IA sem crédito na Anthropic" : `IA falhou: ${a.erro.slice(0, 120)}` })
   }
   const { r, conversa } = a
+  // Perfil do lead: o classificador é a fonte (prova do volume no que o cliente disse; menos de 1.000 nunca é MQL).
+  // Chamado quando o atendimento viu bom negócio ou pequeno, ou o lead acabou de falar de volume.
+  if (r.lead.perfil !== "nao_lead" && !conversa.clienteCadastrado && (ehQualificado(r.lead.perfil) || r.lead.perfil === "pequeno"
+    || temSinalDeVolume(conversa.mensagens.filter(m => !m.from_me).slice(-3).map(m => m.corpo)))) {
+    const cl = await import("./classificarLeadServidor").then(m => m.classificarConversa(jid, { aplicar: false })).catch(() => null)
+    if (cl) r.lead = { ...r.lead, perfil: cl.classificacao.perfil, quantidade_total: cl.classificacao.quantidade_total, motivo: cl.classificacao.motivo }
+  }
 
   // Braço digital: lead pequeno com quantidade e ml (ou medidas) recebe o orçamento da tabela da Villa e o link do
   // sinal, sem você. Mandou as medidas do frasco ou mudou a quantidade antes de pagar: recota.
