@@ -52,6 +52,8 @@ import { montarPedidos, nomeChave } from "./lib/negocio"
 import { origemDoCliente } from "./lib/coleta"
 import { EditorOrigem } from "./components/EditorOrigem"
 import { PrecoQueFecha } from "./components/PrecoQueFecha"
+import { MargemNegociacao } from "./components/MargemNegociacao"
+import { estatisticaSobras } from "./lib/sobras"
 import { linhasDeOrcamento } from "./lib/precoQueFecha"
 import { retornoPorCampanha } from "./lib/retornoCampanhas"
 import { normalizarMetas } from "./lib/metas"
@@ -517,6 +519,8 @@ export default function Home() {
   }, [kanban, historico, propostasCustom])
 
   const linhasOrcamento = useMemo(() => linhasDeOrcamento(kanban, historico), [kanban, historico])
+  // Sobras dos pedidos entregues → quanto dá para baixar o preço sem perder (Margem de negociação no orçamento)
+  const estatSobras = useMemo(() => estatisticaSobras(montarPedidos(kanban, lancamentos)), [kanban, lancamentos])
 
   // Retorno das campanhas pela camada canônica: venda (com sobras) e margem dos pedidos dos clientes que vieram delas
   const retornoCampanhas = useMemo(() => retornoPorCampanha(montarPedidos(kanban, lancamentos), clientes), [kanban, lancamentos, clientes])
@@ -3223,6 +3227,7 @@ export default function Home() {
 
               {/* ── Análise estratégica ── */}
               {r.tabela.length > 0 && <AnaliseEstrategica calculo={r} comFaca={form.comFaca} cliente={form.nomeCliente} />}
+              {r.tabela.length > 0 && <MargemNegociacao calculo={r} comFaca={form.comFaca} sobras={estatSobras} />}
               {r.tabela.length > 0 && <PrecoQueFecha linhas={linhasOrcamento} calculo={r} comFaca={form.comFaca} nomeCliente={form.nomeCliente} kanban={kanban} />}
 
             </div>

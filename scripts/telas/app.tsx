@@ -49,6 +49,7 @@ import { termosDigital } from "@/app/lib/termosDigital"
 import { BibliotecaFacasView } from "@/app/components/BibliotecaFacasView"
 import { BuscaFacaGuardada } from "@/app/components/BuscaFacaGuardada"
 import { LoteOrcamento } from "@/app/components/LoteOrcamento"
+import { MargemNegociacao } from "@/app/components/MargemNegociacao"
 import { registrarCorrecao } from "@/app/lib/aprendizado"
 import LayoutChapaVisual from "@/app/LayoutChapaVisual"
 import { SugestaoFacaPedido } from "@/app/components/SugestaoFacaPedido"
@@ -455,6 +456,7 @@ function Telas() {
     }
     case "pdfcliente": return <FolhasPdf />
     case "pdffrete": return <FolhasPdf frete />
+    case "margem": { const f = { ...dados.historico[0].form, quantidades: [1000, 3000, 5000] }; return pagina(<div className="max-w-[760px]"><MargemNegociacao calculo={calcular(f, config)!} comFaca={f.comFaca} sobras={{ pedidos: 31, comSobra: 11, pctEsperado: 0.042, pctQuandoTem: 0.109, unidadesQuandoTem: 0.155 }} /></div>) }
     case "pdflote": return <FolhasPdf lote />
     case "chapa": case "chapa-medir": {
       const r = calcular(dados.historico[0].form, config)!
