@@ -8,7 +8,7 @@ import { talvezAprender } from "@/app/lib/agenteAprende"
 import { talvezReativar } from "@/app/lib/reativacaoServidor"
 import { talvezRelatorio } from "@/app/lib/marketingServidor"
 import { conferirSinais, talvezAcertoSemanal, talvezCorrigirDigital, talvezAjustePontual } from "@/app/lib/digitalServidor"
-import { talvezAdicionarIdeias, talvezAdicionarGastosFixos } from "@/app/lib/ideiasServidor"
+import { talvezAdicionarIdeias, talvezCadastrarSubcategorias, talvezAdicionarGastosFixos } from "@/app/lib/ideiasServidor"
 import { talvezConferirMeta } from "@/app/lib/metaSaldoServidor"
 import { talvezTesteAbertura } from "@/app/lib/aberturaABServidor"
 import { marcarOrigemPelaFrase, talvezMarcarOrigens } from "@/app/lib/origensWhatsappServidor"
@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
       // Braço digital: confere no extrato os sinais esperando Pix (no máximo a cada 5 min; só se há pedido esperando)
       after(() => conferirSinais().then(() => undefined).catch(e => console.error("[digital]", e)))
       after(() => talvezAdicionarIdeias().catch(e => console.error("[ideias]", e)))
+      after(() => talvezCadastrarSubcategorias().catch(e => console.error("[subcategorias]", e)))
       after(() => talvezAdicionarGastosFixos().catch(e => console.error("[gastos fixos]", e)))
       // Crédito dos anúncios na Meta (no máximo 1 vez por hora): avisa no celular antes de parar
       after(() => talvezConferirMeta().catch(e => console.error("[meta saldo]", e)))

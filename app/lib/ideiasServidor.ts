@@ -107,3 +107,45 @@ export async function talvezAdicionarGastosFixos() {
     return { gastosFixos: [...(d.gastosFixos ?? []), ...novos], gastosFixosDoSistemaV: ultimo, gastosFixosDoSistemaEm: new Date().toISOString() }
   })
 }
+
+
+// Subcategorias que o sistema cadastra uma vez (16/11, a pedido seu, tiradas dos seus lançamentos): só acrescenta,
+// nunca tira o que você já tem. Depois disso você edita em Financeiro → Cadastros → Categorias.
+const SUBCATEGORIAS: { v: number; despesa: Record<string, string[]>; receita: Record<string, string[]> } = {
+  v: 1,
+  despesa: {
+    materiais: ["Papel", "Chapa", "Faca", "Clichê", "Kraft e fitas", "Cola", "Embalagem de envio"],
+    aluguel: ["Galpão (produção)", "Escritório (Brás)", "Condomínio", "IPTU"],
+    impostos: ["Simples Nacional (DAS)", "ISS", "ICMS", "IOF", "Outros tributos"],
+    servicos: ["Contabilidade", "Designer", "Faquista (desenho)", "Jurídico", "Manutenção", "Tarifas bancárias"],
+    outros: ["Refeição e lanche", "Mercado e mantimentos", "Ferramentas e equipamentos", "Diversos"],
+    "gastos-fixos": ["Internet", "Telefone", "Energia", "Água", "Sistemas e softwares"],
+    compras: ["Equipamentos", "Eletrônicos", "Móveis", "Material de escritório"],
+    "pagamento-fornecedor": ["Conta Jerograf", "Gráfica", "Papel", "Acabamento", "Outros fornecedores"],
+    "repassar-felipe": ["Alimentação", "Mercado", "Assinaturas", "Outros"],
+    assinaturas: ["IA (Anthropic)", "Hospedagem e domínio (Vercel)", "Servidor do WhatsApp (VPS)"],
+  },
+  receita: {
+    pedido: ["Offset", "Digital", "Revenda (frascos e essências)"],
+    sinal: ["Offset", "Digital"],
+    "saldo-final": ["Offset", "Digital"],
+    parcela: ["Offset", "Digital"],
+    outros: ["Rendimento", "Estorno", "Reembolso"],
+    "comisses-de-parcerias": ["Frascos", "Essências", "Indicação"],
+  },
+}
+type CatFin = { id: string; nome: string; subcategorias?: string[] }
+export async function talvezCadastrarSubcategorias() {
+  await mudarConfig((d: Record<string, unknown> & { categoriasDespesa?: CatFin[]; categoriasReceita?: CatFin[]; subcategoriasDoSistemaV?: number }) => {
+    if ((d.subcategoriasDoSistemaV ?? 0) >= SUBCATEGORIAS.v) return null
+    const juntar = (lista: CatFin[] | undefined, extra: Record<string, string[]>) => (lista ?? []).map(c => extra[c.id]
+      ? { ...c, subcategorias: [...new Set([...(c.subcategorias ?? []), ...extra[c.id].filter(n => !(c.subcategorias ?? []).some(x => x.toLowerCase() === n.toLowerCase()))])] }
+      : c)
+    if (!d.categoriasDespesa && !d.categoriasReceita) return null
+    return {
+      categoriasDespesa: juntar(d.categoriasDespesa, SUBCATEGORIAS.despesa),
+      categoriasReceita: juntar(d.categoriasReceita, SUBCATEGORIAS.receita),
+      subcategoriasDoSistemaV: SUBCATEGORIAS.v, subcategoriasDoSistemaEm: new Date().toISOString(),
+    }
+  })
+}
