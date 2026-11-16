@@ -115,9 +115,14 @@ describe("lembrete do pedido e painel", async () => {
     expect(um).toMatch(/\*Caixinha para 50 ml \(7,5 × 5,4 × 7,5 cm\)\* · 100 un: \*R\$\s419,95\*/)
     expect(um).toContain("https://x/d/DIG-1")
     const dois = itensDoLembrete([{ id: "A", quantidade: 100, medidas: { a: 7.5, l: 7.5, p: 5.4 }, total: 419.95, rotulo: "caixa 75x75x54 mm", ml: null }, { id: "B", quantidade: 100, medidas: { a: 4.2, l: 4.2, p: 10.7 }, total: 339.94, ml: null }], id => `L/${id}`)
-    expect(dois).toMatch(/Caixa 75x75x54 mm.*R\$\s419,95\*\nL\/A/)
+    expect(dois).toMatch(/^\*Caixa 75x75x54 mm\* · 100 un.*R\$\s419,95\*\nL\/A/)
     expect(dois).toMatch(/Caixa 2 .*R\$\s339,94\*\nL\/B/)
     for (const n of [1, 2] as const) expect(textoLembreteDigital({ ...base, jid: "a" }, n, um)).toMatch(/R\$\s419,95/)
+  })
+  it("texto de orçamento sai inteiro; resposta da IA no máximo 3 parágrafos", async () => {
+    const { partesDaResposta } = await import("../app/lib/agenteLeads")
+    expect(partesDaResposta("a\n\nb\n\nc\n\nd")).toHaveLength(3)
+    expect(partesDaResposta("a\n\nb https://x/d/DIG-0056?t=1\n\nc\n\nd\n\ne")).toHaveLength(5)
   })
   it("reenvio traz os valores e explica sem falar de sistema", async () => {
     const { textoReenvioDigital, itensDoLembrete } = await import("../app/lib/digital")

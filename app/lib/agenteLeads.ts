@@ -190,7 +190,12 @@ export const horarioDeFollowUp = (d = new Date()) => {
 }
 
 // Mensagens separadas por linha em branco viram envios separados (no máximo 3)
-export const partesDaResposta = (r: string) => r.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean).slice(0, 3)
+// Resposta da IA: no máximo 3 parágrafos. Texto de orçamento do sistema (tem o link do pedido digital) vai inteiro:
+// cortar ali sumia o aviso da medida padrão e o fim do lembrete com mais de uma caixa.
+export const partesDaResposta = (r: string) => {
+  const ps = r.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean)
+  return /\/d\/DIG-\d+/.test(r) ? ps : ps.slice(0, 3)
+}
 
 // Respostas automáticas do WhatsApp Business ("fora do horário") não contam como você na conversa. Nem as
 // mensagens com botões sem texto (interactive/template) que o app/Meta dispara sozinho em rajada para vários leads

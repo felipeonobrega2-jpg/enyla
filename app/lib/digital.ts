@@ -251,7 +251,8 @@ export function lembreteDigitalAgora(p: Pick<PedidoDigital, "em" | "lembretes" |
 export function itensDoLembrete(pedidos: Pick<PedidoDigital, "id" | "quantidade" | "medidas" | "total" | "rotulo" | "ml">[], link: (id: string) => string): string {
   return pedidos.map((p, i) => {
     const medida = `${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm`
-    const nome = pedidos.length > 1 ? `${(p.rotulo ?? `caixa ${i + 1}`).replace(/^./, x => x.toUpperCase())} (${medida})` : p.ml ? `Caixinha para ${p.ml} ml (${medida})` : `Caixinha ${medida}`
+    const rot = p.rotulo?.trim()
+    const nome = pedidos.length > 1 ? (rot ? rot.replace(/^./, x => x.toUpperCase()) : `Caixa ${i + 1} (${medida})`) : p.ml ? `Caixinha para ${p.ml} ml (${medida})` : `Caixinha ${medida}`
     return `*${nome}* · ${p.quantidade.toLocaleString("pt-BR")} un: *${brl(p.total)}*\n${link(p.id)}`
   }).join("\n\n")
 }
