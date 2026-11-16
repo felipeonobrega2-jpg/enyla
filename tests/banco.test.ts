@@ -82,3 +82,45 @@ describe("banco aprende subcategoria, conta e forma", async () => {
     expect((r as { lancamentos: { subcategoria?: string }[] }).lancamentos[0].subcategoria).toBeUndefined()
   })
 })
+
+describe("regra confiável lança sozinha", async () => {
+  const { regraConfiavel, aceitouSemMudar, zerarConfianca, REGRA_CONFIAVEL } = await import("@/app/lib/banco")
+  const t = tx({ contraparte_nome: "Papelaria Exemplo" })
+  const dec = { acao: "lancar" as const, categoria: "insumos", subcategoria: "Papel" }
+  it("3 aceitas seguidas sem mudar = lança sozinha; mudar zera; automático mantém", () => {
+    let r = aprender([], t, dec)                       // você lançou à mão
+    expect(r[0].seguidas).toBe(0)
+    for (let i = 0; i < REGRA_CONFIAVEL; i++) r = aprender(r, t, dec, "mais")
+    expect(regraConfiavel(r[0])).toBe(true)
+    r = aprender(r, t, dec, "mantem")
+    expect(r[0].seguidas).toBe(3)
+    r = aprender(r, t, { ...dec, subcategoria: "Tinta" })
+    expect(regraConfiavel(r[0])).toBe(false)
+    r = aprender(r, t, dec, "mais"); r = aprender(r, t, dec, "mais"); r = aprender(r, t, dec, "mais")
+    expect(regraConfiavel(zerarConfianca(r, t)[0])).toBe(false)
+    expect(regraConfiavel({ acao: "ignorar" })).toBe(true)
+  })
+  it("aceitou sem mudar compara categoria, subcategoria, fornecedor e conta", () => {
+    const sg = { acao: "criar" as const, origem: "regra" as const, motivo: "", lancamentos: [{ categoria: "insumos", subcategoria: "Papel", contaId: "itau", valor: 10 }] }
+    expect(aceitouSemMudar(sg, [{ categoria: "insumos", subcategoria: "Papel", contaId: "itau", valor: 10, descricao: "outra" }])).toBe(true)
+    expect(aceitouSemMudar(sg, [{ categoria: "insumos", subcategoria: "Tinta", contaId: "itau", valor: 10 }])).toBe(false)
+    expect(aceitouSemMudar(sg, [{ categoria: "insumos" }, { categoria: "insumos" }])).toBe(false)
+  })
+})
+
+describe("custo do fornecedor → pedido pelo previsto do motor", async () => {
+  const { pedidoDoCusto } = await import("@/app/lib/calibragem")
+  const cfgBase = { fornecedores: [{ id: "fv", nome: "Facas e Vincos Exemplo", categoria: "corte", ativo: true }], producao: undefined } as never
+  const ped = (numero: string, fechado: string, despesas: LancamentoFinanceiro[] = []) =>
+    ({ pedido: { numero, nomeCliente: "Cliente " + numero, tipo: "card", cards: [{ id: "c" + numero }], dataFechamento: fechado, despesas } as never, comp: { corteVinco: 480 }, porFornecedor: { fv: 480 } })
+  it("liga ao único pedido com o previsto perto do valor", () => {
+    const r = pedidoDoCusto({ valor: 470, data: "2026-11-10" }, { fornecedorId: "fv", descricao: "Corte e vinco" }, [ped("ORC-1", "2026-11-05"), { ...ped("ORC-2", "2026-11-05"), porFornecedor: { fv: 900 }, comp: { corteVinco: 900 } }], cfgBase)
+    expect(r?.pedido.numero).toBe("ORC-1")
+    expect(r?.previsto).toBe(480)
+  })
+  it("dois pedidos parecidos, fechado depois do pagamento ou custo já lançado: não liga", () => {
+    expect(pedidoDoCusto({ valor: 470, data: "2026-11-10" }, { fornecedorId: "fv" }, [ped("ORC-1", "2026-11-05"), ped("ORC-2", "2026-11-06")], cfgBase)).toBeNull()
+    expect(pedidoDoCusto({ valor: 470, data: "2026-11-01" }, { fornecedorId: "fv" }, [ped("ORC-1", "2026-11-05")], cfgBase)).toBeNull()
+    expect(pedidoDoCusto({ valor: 470, data: "2026-11-10" }, { fornecedorId: "fv" }, [ped("ORC-1", "2026-11-05", [lanc({ fornecedorId: "fv" })])], cfgBase)).toBeNull()
+  })
+})

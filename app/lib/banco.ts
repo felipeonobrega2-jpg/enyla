@@ -51,7 +51,15 @@ export type RegraBanco = {
   formaPagamento?: LancamentoFinanceiro["formaPagamento"]
   descricao?: string
   vezes: number
+  seguidas?: number            // aceitas em sequência sem você mudar nada (3 = lança sozinha)
 }
+
+// Regra em que dá para confiar: você aceitou 3 vezes seguidas sem mexer (lançar), ou mandou "sempre ignorar"
+export const REGRA_CONFIAVEL = 3
+export const regraConfiavel = (r: Pick<RegraBanco, "acao" | "seguidas"> | undefined) =>
+  !!r && (r.acao === "ignorar" || (r.seguidas ?? 0) >= REGRA_CONFIAVEL)
+export const regraDaTx = (regras: RegraBanco[], tx: Pick<TxBanco, "tipo" | "contraparte_doc" | "contraparte_nome" | "descricao">) =>
+  regras.find(r => r.chave === chaveContraparte(tx) && r.tipo === tx.tipo)
 
 // ── Transação da Pluggy → formato do sistema ─────────────────────────────────
 type Pessoa = { name?: string | null; documentNumber?: { value?: string | null } | null } | null | undefined
@@ -144,7 +152,7 @@ export function sugerir(args: {
   const regra = regras.find(r => r.chave === chave && r.tipo === tx.tipo)
   if (regra?.acao === "ignorar") return { acao: "ignorar", motivo: `você ensinou a ignorar (${tx.contraparte_nome ?? tx.descricao})` }
   if (regra?.acao === "lancar") return {
-    acao: "criar", origem: "regra", motivo: `regra aprendida (${regra.vezes}×): ${tx.contraparte_nome ?? tx.descricao}`,
+    acao: "criar", origem: "regra", motivo: `regra aprendida (${regra.vezes}×${regraConfiavel(regra) ? " · lança sozinha" : ` · ${regra.seguidas ?? 0} de ${REGRA_CONFIAVEL} para lançar sozinha`}): ${tx.contraparte_nome ?? tx.descricao}`,
     lancamentos: [{ tipo: tipoLanc, categoria: regra.categoria, ...(regra.subcategoria ? { subcategoria: regra.subcategoria } : {}), ...(regra.formaPagamento ? { formaPagamento: regra.formaPagamento } : {}), fornecedorId: regra.fornecedorId, descricao: regra.descricao ?? tx.contraparte_nome ?? tx.descricao, valor: tx.valor, status: "pago", dataVencimento: tx.data, dataPagamento: tx.data }],
   }
 
@@ -163,12 +171,14 @@ export function sugerir(args: {
 }
 
 // Correção vira regra: da próxima vez, o mesmo recebedor/pagador já vem certo
-export function aprender(regras: RegraBanco[], tx: TxBanco, decisao: { acao: "lancar" | "ignorar"; categoria?: string; subcategoria?: string; fornecedorId?: string; contaId?: string; formaPagamento?: LancamentoFinanceiro["formaPagamento"]; descricao?: string }): RegraBanco[] {
+export function aprender(regras: RegraBanco[], tx: TxBanco, decisao: { acao: "lancar" | "ignorar"; categoria?: string; subcategoria?: string; fornecedorId?: string; contaId?: string; formaPagamento?: LancamentoFinanceiro["formaPagamento"]; descricao?: string },
+  confianca: "mais" | "zera" | "mantem" = "zera"): RegraBanco[] {
   const chave = chaveContraparte(tx)
   if (!chave || chave.length < 3) return regras
   const atual = regras.find(r => r.chave === chave && r.tipo === tx.tipo)
   const nova: RegraBanco = { chave, tipo: tx.tipo, acao: decisao.acao, categoria: decisao.categoria, subcategoria: decisao.subcategoria || undefined, fornecedorId: decisao.fornecedorId,
-    contaId: decisao.contaId || undefined, formaPagamento: decisao.formaPagamento || undefined, descricao: decisao.descricao, vezes: (atual?.vezes ?? 0) + 1 }
+    contaId: decisao.contaId || undefined, formaPagamento: decisao.formaPagamento || undefined, descricao: decisao.descricao, vezes: (atual?.vezes ?? 0) + 1,
+    seguidas: confianca === "mais" ? (atual?.seguidas ?? 0) + 1 : confianca === "mantem" ? atual?.seguidas ?? 0 : 0 }
   return [...regras.filter(r => r !== atual), nova]
 }
 
@@ -207,3 +217,14 @@ export function completarSugestao(sg: SugestaoBanco, tx: TxBanco, regras: RegraB
     return { ...resto, ...(sub ? { subcategoria: sub } : {}), ...(l.contaId || !conta ? {} : { contaId: conta }) }
   }) }
 }
+
+// Você aceitou a sugestão sem mudar o que importa (categoria, subcategoria, fornecedor, conta)?
+export function aceitouSemMudar(sg: SugestaoBanco | null, criados: Partial<LancamentoFinanceiro>[]): boolean {
+  if (sg?.acao !== "criar" || sg.lancamentos.length !== 1 || criados.length !== 1) return false
+  const a = sg.lancamentos[0], b = criados[0]
+  const k = (x: Partial<LancamentoFinanceiro>) => [x.categoria ?? "", x.subcategoria ?? "", x.fornecedorId ?? "", x.contaId ?? ""].join("|")
+  return k(a) === k(b)
+}
+// Desfez um lançamento automático: a regra volta a pedir conferência
+export const zerarConfianca = (regras: RegraBanco[], tx: TxBanco) =>
+  regras.map(r => r.chave === chaveContraparte(tx) && r.tipo === tx.tipo ? { ...r, seguidas: 0 } : r)

@@ -240,3 +240,56 @@ export function desviosPorComponente(comps: Comparacao[]): DesvioComponente[] {
     return { componente: id, nome, pedidos: base.length, lancadoEm: lancados.length, previsto, real, previstoTodos, desvioPct, leitura }
   }).filter(d => d.previstoTodos > 0 || d.real > 0)
 }
+
+// ── Custo do fornecedor → pedido certo (aba Banco) ───────────────────────────
+// Previsto pelo motor de cada pedido em produção (ou entregue há pouco), por componente e por fornecedor do financeiro
+export type PrevistoPedido = { pedido: Pedido; comp: Partial<Record<Componente, number>>; porFornecedor: Record<string, number> }
+export function previstosEmAberto(pedidos: Pedido[], historico: HistItem[], cfg: Configuracoes, hojeIso: string, dias = 45): PrevistoPedido[] {
+  const prod = normalizarProducao(cfg.producao)
+  const corte = new Date(new Date(hojeIso + "T12:00:00").getTime() - dias * 86_400_000).toISOString().slice(0, 10)
+  const out: PrevistoPedido[] = []
+  for (const p of pedidos) {
+    if (!p.dataFechamento || (p.dataEntregaReal && p.dataEntregaReal.slice(0, 10) < corte)) continue
+    const comp: Partial<Record<Componente, number>> = {}, porFornecedor: Record<string, number> = {}
+    let algum = false
+    for (const card of p.cards.filter(c => !isTerceirizado(c))) {
+      const prev = previstoDoCard(card, historico.find(h => h.numero === card.numero), cfg)
+      if (!prev) continue
+      algum = true
+      for (const [k, v] of Object.entries(prev.comp)) comp[k as Componente] = (comp[k as Componente] ?? 0) + (v ?? 0)
+      for (const i of prev.itens) {
+        const fin = prod.fornecedores.find(f => f.id === i.fornecedorId)?.fornecedorId
+        if (fin && i.valor > 0) porFornecedor[fin] = (porFornecedor[fin] ?? 0) + i.valor
+      }
+    }
+    if (algum) out.push({ pedido: p, comp, porFornecedor })
+  }
+  return out
+}
+
+// Pagamento a fornecedor: o pedido cujo custo previsto (desse fornecedor ou dessa etapa) bate com o valor (até 12%),
+// que ainda não tem esse custo lançado e já estava fechado. Só devolve quando a escolha é clara.
+export function pedidoDoCusto(tx: { valor: number; data: string }, l: Partial<LancamentoFinanceiro>, previstos: PrevistoPedido[], cfg: Configuracoes):
+  { pedido: Pedido; previsto: number; etapa: string } | null {
+  const fornecedores = cfg.fornecedores ?? []
+  const comp = classificar({ id: "", tipo: "despesa", descricao: l.descricao ?? "", valor: tx.valor, dataVencimento: tx.data, status: "pago", criadoEm: "", ...l } as LancamentoFinanceiro, fornecedores, cfg)
+  const nomeEtapa = COMPONENTES.find(c => c.id === comp)?.nome ?? "custo"
+  const cands: { pedido: Pedido; previsto: number; dif: number; etapa: string }[] = []
+  for (const pp of previstos) {
+    // Pagamento antes do pedido fechar (com 2 dias de folga) não é dele
+    const limite = new Date(new Date(tx.data.slice(0, 10) + "T12:00:00").getTime() + 2 * 86_400_000).toISOString().slice(0, 10)
+    if ((pp.pedido.dataFechamento ?? "").slice(0, 10) > limite) continue
+    const doForn = l.fornecedorId ? pp.porFornecedor[l.fornecedorId] : undefined
+    const alvo = doForn ?? (comp !== "semCategoria" ? pp.comp[comp] : undefined)
+    if (!alvo || alvo <= 0) continue
+    // Já tem esse custo lançado no pedido: não liga de novo
+    const jaTem = pp.pedido.despesas.some(d => (l.fornecedorId && d.fornecedorId === l.fornecedorId) || (comp !== "semCategoria" && classificar(d, fornecedores, cfg) === comp))
+    if (jaTem) continue
+    const dif = Math.abs(alvo - tx.valor) / tx.valor
+    if (dif <= 0.12) cands.push({ pedido: pp.pedido, previsto: alvo, dif, etapa: doForn ? (fornecedores.find(f => f.id === l.fornecedorId)?.nome ?? nomeEtapa) : nomeEtapa })
+  }
+  cands.sort((a, b) => a.dif - b.dif)
+  if (!cands.length) return null
+  if (cands.length > 1 && cands[1].dif - cands[0].dif < 0.04) return null   // dois pedidos parecidos: você escolhe
+  return { pedido: cands[0].pedido, previsto: cands[0].previsto, etapa: cands[0].etapa }
+}

@@ -71,7 +71,7 @@ const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
 const escuro = tela.endsWith("-escuro")
 if (escuro) document.documentElement.classList.add("dark")
 // Abas do Financeiro: "financeiro-receber" abre a aba "receber"
-if (tela.startsWith("financeiro-")) sessionStorage.setItem("fin:tab", tela.slice(11).replace(/-conta$/, ""))
+if (tela.startsWith("financeiro-")) sessionStorage.setItem("fin:tab", tela.slice(11).replace(/-(conta|lista)$/, ""))
 
 // Microfones: simula um Mac com o iPhone por perto (Continuidade)
 if (tela === "compositor-mic" && navigator.mediaDevices) navigator.mediaDevices.enumerateDevices = async () => [
@@ -368,6 +368,8 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
         t("c", { valor: 1350, contraparte_nome: "PAPELARIA BRAS LTDA", sugestao: { acao: "criar", origem: "ia", motivo: "IA: papel cartão para o lote do Maurício (valor e fornecedor de papel)", lancamentos: [{ descricao: "Papel", categoria: "materiais", subcategoria: "Papel cartão", valor: 900, loteNumero: "MAU-007" }, { descricao: "Impressão", categoria: "fornecedor", valor: 450, loteNumero: "MAU-007" }] } }),
         t("d", { valor: 89.9, contraparte_nome: "IFOOD", descricao: "COMPRA CARTAO DEBITO", sugestao: { acao: "ignorar", motivo: "IA: gasto pessoal (alimentação)" } }),
         t("e", { valor: 37.5, descricao: "TARIFA PACOTE SERVICOS", sugestao: { acao: "revisar", motivo: "sem pista: confira" } }),
+        t("f", { valor: 470, contraparte_nome: "FACAS E VINCOS EXEMPLO", sugestao: { acao: "criar", origem: "regra", motivo: "regra aprendida (4× · 2 de 3 para lançar sozinha): FACAS E VINCOS EXEMPLO · pedido ORC-2026-201 (Perfumaria Modelo): Corte e vinco previsto R$ 480,00", lancamentos: [{ descricao: "Corte e vinco", categoria: "fornecedor", subcategoria: "Corte e Vinco", valor: 470, cardNumero: "ORC-2026-201" }] } }),
+        t("g", { valor: 310, data: "2026-11-05", contraparte_nome: "FACAS E VINCOS EXEMPLO", sugestao: { acao: "criar", origem: "regra", motivo: "regra aprendida (4× · 2 de 3 para lançar sozinha): FACAS E VINCOS EXEMPLO", lancamentos: [{ descricao: "Corte e vinco", categoria: "fornecedor", subcategoria: "Corte e Vinco", valor: 310 }] } }),
       ] }))
   }
   if (u.startsWith("/api/whatsapp/pendentes")) {

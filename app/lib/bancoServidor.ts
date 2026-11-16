@@ -4,8 +4,9 @@
 import { randomUUID } from "crypto"
 import { supabase } from "./supabase"
 import { contas as contasPluggy, item as itemPluggy, transacoes, pluggyConfigurada, ContaPluggy } from "./pluggy"
-import { daPluggy, sugerir, aprender, aprenderConta, completarSugestao as completar, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
-import { montarPedidos, pedidoEntregue } from "./negocio"
+import { daPluggy, sugerir, aprender, aprenderConta, completarSugestao as completar, regraConfiavel, regraDaTx, aceitouSemMudar, zerarConfianca, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
+import { montarPedidos, pedidoEntregue, type Pedido } from "./negocio"
+import { previstosEmAberto, pedidoDoCusto, type PrevistoPedido } from "./calibragem"
 import { MARCA } from "./conciliacao"
 import { clienteClaude, FALLBACK, MODELO } from "./claude"
 import type { LancamentoFinanceiro, KanbanCard } from "../types"
@@ -96,6 +97,28 @@ async function contexto() {
 const completarSugestao = (sg: SugestaoBanco, tx: TxBanco, cfg: Awaited<ReturnType<typeof lerConfig>>) =>
   completar(sg, tx, cfg.regrasBanco ?? [], cfg.contasDoBanco, [...(cfg.categoriasDespesa ?? []), ...(cfg.categoriasReceita ?? [])])
 
+// Pagamento a fornecedor sem pedido: liga ao pedido cujo custo previsto pelo motor bate com o valor (só se for claro).
+// O histórico dos orçamentos só é lido quando aparece o primeiro pagamento candidato.
+function ligadorDePedidos(cfg: Awaited<ReturnType<typeof lerConfig>>, pedidos: Pedido[]) {
+  let previstos: PrevistoPedido[] | null = null
+  const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+  return async (sg: SugestaoBanco, tx: TxBanco): Promise<SugestaoBanco> => {
+    if (sg.acao !== "criar" || tx.tipo !== "saida" || sg.lancamentos.length !== 1) return sg
+    const l = sg.lancamentos[0]
+    if (l.cardId || l.loteId || l.tipo !== "despesa" || l.formaPagamento === "conta") return sg
+    if (!previstos) {
+      const numeros = pedidos.filter(p => p.dataFechamento).flatMap(p => p.cards.map(c => c.numero)).filter(Boolean).slice(-300)
+      const { data } = numeros.length ? await supabase.from("HistoricoItem").select("numero, form").in("numero", numeros) : { data: [] }
+      previstos = previstosEmAberto(pedidos, (data ?? []) as { numero: string; form: import("../types").FormData }[], cfg, hojeSP())
+    }
+    const m = pedidoDoCusto(tx, l, previstos, cfg)
+    if (!m) return sg
+    const p = m.pedido
+    const vinculo = p.tipo === "lote" ? { loteId: p.cards[0].loteId, loteNumero: p.numero, nomeCliente: p.nomeCliente } : { cardId: p.cards[0].id, cardNumero: p.numero, nomeCliente: p.nomeCliente }
+    return { ...sg, lancamentos: [{ ...l, ...vinculo }], motivo: `${sg.motivo} · pedido ${p.numero} (${p.nomeCliente}): ${m.etapa} previsto ${brl(m.previsto)}` }
+  }
+}
+
 async function gravarSugestoes(lista: { id: string; sugestao: SugestaoBanco }[]) {
   for (let i = 0; i < lista.length; i += 25)
     await Promise.all(lista.slice(i, i + 25).map(x => supabase.from("banco_transacoes").update({ sugestao: x.sugestao, atualizado_em: agora() }).eq("id", x.id)))
@@ -112,17 +135,25 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
     documentosProprios: (cfg.pluggy?.documentosProprios ?? []).map(d => d.replace(/\D/g, "")).filter(Boolean),
   }
   // 1. Regras, vínculos e conciliação: rápido, tudo em memória
+  const ligar = ligadorDePedidos(cfg, pedidos)
   const porRegra: { id: string; sugestao: SugestaoBanco }[] = [], semPar: TxBanco[] = []
   for (const tx of lista) {
     const sg0 = sugerir({ ...comum, tx })
     if (!sg0) { semPar.push(tx); continue }
-    const sg = completarSugestao(sg0, tx, cfg)
+    const sg = await ligar(completarSugestao(sg0, tx, cfg), tx)
     if (sg.acao === "vincular" || sg.acao === "atualizar") jaVinculados.add(sg.lancamentoId)   // não serve para duas transações
     porRegra.push({ id: tx.id, sugestao: sg })
   }
   await gravarSugestoes(porRegra)
-  if (cfg.pluggy?.automatico)
-    for (const x of porRegra) { const sg = x.sugestao; if (sg.acao === "vincular" || sg.acao === "atualizar" || sg.acao === "ignorar" || (sg.acao === "criar" && sg.origem !== "ia")) await aplicar(x.id, { ...sg, automatico: true } as Decisao).catch(() => null) }
+  // Automático: tudo o que não tem dúvida (modo automático ligado) ou, sempre, o que vem de regra confiável
+  // (aceita 3 vezes seguidas sem você mudar nada, ou "sempre ignorar")
+  for (const x of porRegra) {
+    const sg = x.sugestao, tx = lista.find(t => t.id === x.id)!
+    const daRegra = (sg.acao === "criar" && sg.origem === "regra") || (sg.acao === "ignorar" && regraDaTx(cfg.regrasBanco ?? [], tx)?.acao === "ignorar")
+    const semDuvida = sg.acao === "vincular" || sg.acao === "atualizar" || sg.acao === "ignorar" || (sg.acao === "criar" && sg.origem !== "ia")
+    if ((cfg.pluggy?.automatico && semDuvida) || (daRegra && regraConfiavel(regraDaTx(cfg.regrasBanco ?? [], tx))))
+      await aplicar(x.id, { ...sg, automatico: true } as Decisao).catch(() => null)
+  }
 
   // 2. O resto: a IA em lotes de 30, três por vez, até o prazo
   let feitas = porRegra.length, iaFeitas = 0
@@ -134,6 +165,7 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
     const resultados = await Promise.all(grupo.map(lote => interpretarComIA(lote, cfg, pedidos).catch(() => null)))
     const gravar: { id: string; sugestao: SugestaoBanco }[] = []
     grupo.forEach((lote, k) => { for (const tx of lote) { const sg = resultados[k]?.get(tx.id); gravar.push({ id: tx.id, sugestao: sg ? completarSugestao(sg, tx, cfg) : { acao: "revisar", motivo: resultados[k] ? "a IA não soube dizer" : "a IA não respondeu; tente “Refazer sugestão”" } }) } })
+    for (const g of gravar) { const tx = lista.find(t => t.id === g.id)!; g.sugestao = await ligar(g.sugestao, tx) }
     await gravarSugestoes(gravar)
     iaFeitas += gravar.length
   }
@@ -155,7 +187,7 @@ export async function reinterpretar(txId: string, instrucao: string, lembrar: bo
   const r = await interpretarComIA([tx], cfg, pedidos, instrucao).catch(() => null)
   const sg0 = r?.get(tx.id)
   if (!sg0) return { ok: false, erro: "A IA não respondeu. Tente de novo." }
-  const sg = completarSugestao(sg0, tx, cfg)
+  const sg = await ligadorDePedidos(cfg, pedidos)(completarSugestao(sg0, tx, cfg), tx)
   await supabase.from("banco_transacoes").update({ sugestao: sg, atualizado_em: agora() }).eq("id", txId)
   return { ok: true, sugestao: sg }
 }
@@ -271,6 +303,8 @@ export async function aplicar(txId: string, d: Decisao): Promise<{ ok: boolean; 
     if (antes.criados?.length) await supabase.from("LancamentoFinanceiro").delete().in("id", antes.criados)
     if (antes.restaurar) await supabase.from("LancamentoFinanceiro").update(antes.restaurar.campos).eq("id", antes.restaurar.id)
     hist.push({ em: agora(), acao: "desfeito", detalhe: `por você (${ultimo?.acao ?? "?"})` })
+    // Desfez o que a regra lançou sozinha: ela volta a pedir a sua conferência
+    if (ultimo?.detalhe?.includes("regra automática")) { const c = await lerConfig(); await salvarCampos({ regrasBanco: zerarConfianca(c.regrasBanco ?? [], tx) }) }
     const { data: nova } = await supabase.from("banco_transacoes").update({ estado: "pendente", lancamento_ids: [], historico: hist, atualizado_em: agora() }).eq("id", txId).select("*").maybeSingle()
     return { ok: true, tx: nova as TxBanco, removidos: antes.criados ?? [], atualizados: antes.restaurar ? [antes.restaurar] : [] }
   }
@@ -308,9 +342,11 @@ export async function aplicar(txId: string, d: Decisao): Promise<{ ok: boolean; 
   if (error) return { ok: false, erro: `Não gravou o lançamento: ${error.message}` }
   if (d.ensinar !== false && criados[0]) {
     const l = criados[0]
+    const automatico = "automatico" in d && !!d.automatico
     const campos: Record<string, unknown> = {
       regrasBanco: aprender(cfg.regrasBanco ?? [], tx, { acao: "lancar", categoria: l.categoria, subcategoria: criados.length === 1 ? l.subcategoria : undefined, fornecedorId: l.fornecedorId,
-        contaId: l.contaId, formaPagamento: l.formaPagamento === "conta" ? undefined : l.formaPagamento, descricao: criados.length === 1 ? l.descricao : undefined }),
+        contaId: l.contaId, formaPagamento: l.formaPagamento === "conta" ? undefined : l.formaPagamento, descricao: criados.length === 1 ? l.descricao : undefined },
+        automatico ? "mantem" : aceitouSemMudar(tx.sugestao, criados) ? "mais" : "zera"),
     }
     if (l.contaId && l.formaPagamento !== "conta") campos.contasDoBanco = aprenderConta(cfg.contasDoBanco ?? {}, tx.conta_id, l.contaId)
     await salvarCampos(campos)

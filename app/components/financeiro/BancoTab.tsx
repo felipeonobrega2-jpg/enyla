@@ -5,10 +5,10 @@
 // Nada entra nos lançamentos sem o seu clique (enquanto o modo automático estiver desligado). Tudo dá para desfazer.
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { RefreshCw, Link2, Plus, EyeOff, Undo2, Settings2, Sparkles, Landmark, Check, X, Loader2, AlertCircle, ArrowDownLeft, ArrowUpRight } from "lucide-react"
+import { RefreshCw, Link2, Plus, EyeOff, Undo2, Settings2, Sparkles, Landmark, Check, X, Loader2, AlertCircle, ArrowDownLeft, ArrowUpRight, Layers, Keyboard, Zap } from "lucide-react"
 import type { KanbanCard, LancamentoFinanceiro } from "../../types"
 import type { Configuracoes } from "../../config"
-import type { TxBanco, SugestaoBanco } from "../../lib/banco"
+import { chaveContraparte, REGRA_CONFIAVEL, type TxBanco, type SugestaoBanco } from "../../lib/banco"
 import { ModalLancamento } from "../FinanceiroView"
 import { Botao, Selo, Segmentado, Vazio } from "../ds"
 
@@ -112,6 +112,52 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
     for (const t of exatos) await aceitar(t, t.sugestao!)
   }
 
+  // Lote: o que vem das suas regras sai de uma vez
+  const dasRegras = (dados?.transacoes ?? []).filter(t => t.sugestao?.acao === "criar" && t.sugestao.origem === "regra")
+  async function aceitarRegras() {
+    if (!confirm(`Lançar as ${dasRegras.length} transações como as suas regras sugerem?`)) return
+    for (const t of dasRegras) await aceitar(t, t.sugestao!)
+  }
+  // Mesma pessoa do outro lado: ficam juntas, e dá para lançar todas como a primeira
+  const grupoDe = (tx: TxBanco) => `${tx.tipo}|${chaveContraparte(tx)}`
+  const lista = estado === "pendente"
+    ? [...(dados?.transacoes ?? [])].sort((a, b) => grupoDe(a).localeCompare(grupoDe(b)) || a.data.localeCompare(b.data))
+    : dados?.transacoes ?? []
+  const tamanhoGrupo = (tx: TxBanco) => lista.filter(t => grupoDe(t) === grupoDe(tx)).length
+  async function lancarGrupoComo(modelo: TxBanco) {
+    const s = modelo.sugestao
+    if (s?.acao !== "criar" || s.lancamentos.length !== 1) return
+    const doGrupo = lista.filter(t => grupoDe(t) === grupoDe(modelo))
+    if (!confirm(`Lançar as ${doGrupo.length} de ${modelo.contraparte_nome ?? modelo.descricao} como esta (${nomeCat(s.lancamentos[0].categoria) ?? "sem categoria"}${s.lancamentos[0].subcategoria ? ` › ${s.lancamentos[0].subcategoria}` : ""})?`)) return
+    const m = s.lancamentos[0]
+    for (const t of doGrupo) {
+      const propria = t.sugestao?.acao === "criar" && t.sugestao.lancamentos.length === 1 ? t.sugestao.lancamentos[0] : null
+      const vinculo = propria ? { cardId: propria.cardId, cardNumero: propria.cardNumero, loteId: propria.loteId, loteNumero: propria.loteNumero, nomeCliente: propria.nomeCliente } : {}
+      await decidir(t, { acao: "criar", lancamentos: [{ tipo: m.tipo, categoria: m.categoria, subcategoria: m.subcategoria, fornecedorId: m.fornecedorId, contaId: m.contaId, formaPagamento: m.formaPagamento,
+        descricao: m.descricao, valor: t.valor, status: "pago", dataVencimento: t.data, dataPagamento: t.data, ...(t.id === modelo.id ? { cardId: m.cardId, cardNumero: m.cardNumero, loteId: m.loteId, loteNumero: m.loteNumero, nomeCliente: m.nomeCliente } : vinculo) }] })
+    }
+  }
+  // Teclado: ↑/↓ (ou K/J) anda, Enter aceita a sugestão, E corrige, I ignora
+  const [foco, setFoco] = useState(0)
+  const linhas = useRef<Record<string, HTMLDivElement | null>>({})
+  useEffect(() => {
+    if (estado !== "pendente") return
+    const tecla = (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement
+      if (corrigindo || ocupado || e.metaKey || e.ctrlKey || e.altKey || /input|textarea|select/i.test(alvo.tagName) || alvo.isContentEditable) return
+      if (!lista.length) return
+      const i = Math.min(foco, lista.length - 1), tx = lista[i]
+      const mover = (n: number) => { e.preventDefault(); const j = Math.max(0, Math.min(lista.length - 1, i + n)); setFoco(j); linhas.current[lista[j].id]?.scrollIntoView({ block: "nearest", behavior: "smooth" }) }
+      if (e.key === "ArrowDown" || e.key === "j") mover(1)
+      else if (e.key === "ArrowUp" || e.key === "k") mover(-1)
+      else if (e.key === "Enter" && tx.sugestao && tx.sugestao.acao !== "revisar" && tx.sugestao.acao !== "escolher") { e.preventDefault(); void aceitar(tx, tx.sugestao) }
+      else if (e.key === "e" || e.key === "E") { e.preventDefault(); abrirCorrecao(tx, tx.sugestao) }
+      else if (e.key === "i" || e.key === "I") { e.preventDefault(); void decidir(tx, { acao: "ignorar" }) }
+    }
+    window.addEventListener("keydown", tecla)
+    return () => window.removeEventListener("keydown", tecla)
+  })
+
   const salvarPluggy = (p: typeof pluggy) => onUpdateConfig({ ...config, pluggy: p })
 
   return (
@@ -174,6 +220,12 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
         {estado === "pendente" && exatos.length > 1 && (
           <Botao icone={<Link2 className="w-4 h-4" />} onClick={aceitarExatos}>Vincular os {exatos.length} que já estavam lançados</Botao>
         )}
+        {estado === "pendente" && dasRegras.length > 1 && (
+          <Botao icone={<Zap className="w-4 h-4" />} onClick={aceitarRegras}>Lançar as {dasRegras.length} das suas regras</Botao>
+        )}
+        {estado === "pendente" && lista.length > 0 && (
+          <span className="ml-auto text-[11px] text-[#898892] hidden md:inline-flex items-center gap-1.5"><Keyboard className="w-3.5 h-3.5" />↑ ↓ andar · Enter aceitar · E corrigir · I ignorar</span>
+        )}
       </div>
 
       {/* Transações */}
@@ -181,10 +233,15 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
         {!dados?.transacoes.length ? (
           <Vazio icone={<Landmark className="w-7 h-7" />} titulo={estado === "pendente" ? "Nada para conferir" : "Nenhuma transação aqui"}
             sub={estado === "pendente" ? "As transações novas aparecem aqui todo dia (ou ao sincronizar)." : undefined} />
-        ) : dados.transacoes.map((tx, k) => {
+        ) : lista.map((tx, k) => {
           const s = tx.sugestao, entrada = tx.tipo === "entrada"
+          const focada = estado === "pendente" && k === Math.min(foco, lista.length - 1)
+          const nGrupo = estado === "pendente" ? tamanhoGrupo(tx) : 1
+          const primeiroDoGrupo = k === 0 || grupoDe(lista[k - 1]) !== grupoDe(tx)
           return (
-            <div key={tx.id} className="px-4 py-3 flex gap-3" style={{ borderTop: k ? "1px solid rgba(60,60,67,0.08)" : undefined, opacity: ocupado === tx.id ? 0.5 : 1 }}>
+            <div key={tx.id} ref={el => { linhas.current[tx.id] = el }} onClick={() => estado === "pendente" && setFoco(k)}
+              className={`px-4 py-3 flex gap-3 transition-colors ${focada ? "bg-[#8456e8]/[0.04] shadow-[inset_3px_0_0_#8456e8]" : ""}`}
+              style={{ borderTop: k ? "1px solid rgba(60,60,67,0.08)" : undefined, opacity: ocupado === tx.id ? 0.5 : 1 }}>
               <span className="w-8 h-8 rounded-full grid place-items-center shrink-0" style={{ background: entrada ? "rgba(0,147,81,0.1)" : "rgba(211,58,60,0.08)" }}>
                 {entrada ? <ArrowDownLeft className="w-4 h-4 text-[#009351]" /> : <ArrowUpRight className="w-4 h-4 text-[#d33a3c]" />}
               </span>
@@ -209,6 +266,10 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
                           Vincular a: {lancPorId(id)?.descricao ?? id} ({lancPorId(id) ? dataBR((lancPorId(id)!.dataPagamento ?? lancPorId(id)!.dataVencimento).slice(0, 10)) : ""})
                         </button>
                       ))}
+                      {nGrupo > 1 && primeiroDoGrupo && s?.acao === "criar" && s.lancamentos.length === 1 && (
+                        <button onClick={() => lancarGrupoComo(tx)} title="Lança todas as transações desta pessoa com a mesma categoria, subcategoria, fornecedor e conta"
+                          className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold bg-[#8456e8]/10 text-[#8456e8] inline-flex items-center gap-1"><Layers className="w-3.5 h-3.5" />Lançar os {nGrupo} iguais</button>
+                      )}
                       <button onClick={() => abrirCorrecao(tx, s)} className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold bg-white ds-borda text-[#191625] inline-flex items-center gap-1"><Plus className="w-3.5 h-3.5" />{s?.acao === "criar" ? "Corrigir e lançar" : "Lançar"}</button>
                       {s?.acao !== "ignorar" && <button onClick={() => decidir(tx, { acao: "ignorar" })} className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold text-[#5e5c68] hover:bg-black/5 inline-flex items-center gap-1"><EyeOff className="w-3.5 h-3.5" />Ignorar</button>}
                       <button onClick={() => decidir(tx, { acao: "ignorar", sempre: true })} className="h-7 px-2.5 rounded-lg text-[11.5px] text-[#898892] hover:bg-black/5" title="Da próxima vez, quem está do outro lado já vem ignorado">Sempre ignorar este</button>
@@ -219,6 +280,7 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
                   <div className="mt-1.5 flex items-center gap-2 flex-wrap">
                     {tx.lancamento_ids.map(id => <Selo key={id} tom={estado === "criada" ? "sucesso" : "info"}>{lancPorId(id)?.descricao ?? "lançamento"}{lancPorId(id)?.categoria ? ` · ${nomeCat(lancPorId(id)!.categoria)}` : ""}</Selo>)}
                     <span className="text-[10.5px] text-[#898892]">{tx.historico?.[tx.historico.length - 1]?.acao}</span>
+                    {tx.historico?.[tx.historico.length - 1]?.detalhe?.includes("regra automática") && <Selo tom="info">automático</Selo>}
                     <button onClick={() => { if (confirm(estado === "criada" ? "Desfazer? O lançamento criado a partir do banco é apagado e a transação volta para conferir." : "Desfazer? A transação volta para conferir.")) decidir(tx, { acao: "desfazer" }) }}
                       className="ml-auto h-7 px-2.5 rounded-lg text-[11.5px] font-semibold text-[#5e5c68] hover:bg-black/5 inline-flex items-center gap-1"><Undo2 className="w-3.5 h-3.5" />Desfazer</button>
                   </div>
@@ -348,7 +410,7 @@ function EnsinarIA({ tx, onNova }: { tx: TxBanco; onNova: (s: SugestaoBanco) => 
 }
 
 type Aprendido = {
-  regras: { chave: string; tipo: string; acao: string; categoria?: string; subcategoria?: string; fornecedorId?: string; descricao?: string; vezes: number }[]
+  regras: { chave: string; tipo: string; acao: string; categoria?: string; subcategoria?: string; fornecedorId?: string; descricao?: string; vezes: number; seguidas?: number }[]
   licoes: { id: string; texto: string; em: string }[]
   exemplos: { contraparte: string; descricao: string; tipo: string; ia: string; voce: string; em: string }[]
 }
@@ -396,6 +458,9 @@ function PainelAprendizado({ nomeCat, nomeForn }: { nomeCat: (id?: string) => st
               <span className="text-[#898892]">{r.tipo === "entrada" ? "entrada" : "saída"} →</span>
               <span className="text-[#191625] font-semibold truncate">{r.acao === "ignorar" ? "ignorar" : [r.subcategoria ? `${nomeCat(r.categoria)} › ${r.subcategoria}` : nomeCat(r.categoria), nomeForn(r.fornecedorId), r.descricao].filter(Boolean).join(" · ") || "lançar"}</span>
               <span className="text-[10.5px] text-[#898892]">{r.vezes}×</span>
+              {r.acao === "lancar" && ((r.seguidas ?? 0) >= REGRA_CONFIAVEL
+                ? <Selo tom="sucesso">lança sozinha</Selo>
+                : <span className="text-[10.5px] text-[#898892]" title="Aceite sem mudar nada para ela passar a lançar sozinha">{r.seguidas ?? 0}/{REGRA_CONFIAVEL} para lançar sozinha</span>)}
               <button onClick={() => mudar({ tirarRegra: { chave: r.chave, tipo: r.tipo } })} className="ml-auto text-[#898892] hover:text-[#d33a3c]" aria-label="Apagar regra"><X className="w-3.5 h-3.5" /></button>
             </div>
           ))}
