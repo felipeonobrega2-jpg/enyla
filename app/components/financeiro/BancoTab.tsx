@@ -120,8 +120,11 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
   }
   // Mesma pessoa do outro lado: ficam juntas, e dá para lançar todas como a primeira
   const grupoDe = (tx: TxBanco) => `${tx.tipo}|${chaveContraparte(tx)}`
+  // Mais recente primeiro: cada grupo entra na posição da sua transação mais nova, e dentro dele da mais nova à mais antiga
+  const maisNova = new Map<string, string>()
+  for (const t of dados?.transacoes ?? []) { const g = grupoDe(t); if ((maisNova.get(g) ?? "") < t.data) maisNova.set(g, t.data) }
   const lista = estado === "pendente"
-    ? [...(dados?.transacoes ?? [])].sort((a, b) => grupoDe(a).localeCompare(grupoDe(b)) || a.data.localeCompare(b.data))
+    ? [...(dados?.transacoes ?? [])].sort((a, b) => maisNova.get(grupoDe(b))!.localeCompare(maisNova.get(grupoDe(a))!) || grupoDe(a).localeCompare(grupoDe(b)) || b.data.localeCompare(a.data))
     : dados?.transacoes ?? []
   const tamanhoGrupo = (tx: TxBanco) => lista.filter(t => grupoDe(t) === grupoDe(tx)).length
   async function lancarGrupoComo(modelo: TxBanco) {
