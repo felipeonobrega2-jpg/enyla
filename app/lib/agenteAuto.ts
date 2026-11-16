@@ -5,7 +5,7 @@
 // Tudo fica registrado (Configurações → Agente de leads) com o motivo de ter enviado ou segurado.
 
 import { cotarItens, montarPedidosDoGrupo, mudouOGrupo, pedidosDoGrupo, textoLinkGrupo, registrarNegociacao, totalPedido } from "./digital"
-import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital, lembreteDigitalAgora, ADIOU, prometeLinkSemLink, TEXTO_PEDE_MEDIDA } from "./digital"
+import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital, itensDoLembrete, lembreteDigitalAgora, ADIOU, prometeLinkSemLink, TEXTO_PEDE_MEDIDA } from "./digital"
 import { linkPedido } from "./digitalLink"
 import { faltaParaProposta } from "./propostaPronta"
 import { emCampanha, type EstadoCampanha } from "./campanhaDigital"
@@ -748,8 +748,8 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
       if (await voceNaConversa(c.jid, log, cfg)) return registrar({ ...base, perfil: "pequeno", enviou: false, texto: "", motivo: `F${nivel} segurado: você está nessa conversa agora`, passo: `F${nivel}` })
       // Grupo (mais de uma caixa): um lembrete só, com o link de cada caixa ainda esperando o sinal
       const doGrupo = pedidosDoGrupo(cfg.pedidosDigitais, pd).filter(p => p.status === "aguardando_sinal")
-      const links = doGrupo.length > 1 ? doGrupo.map((p, i) => `${(p.rotulo ?? `caixa ${i + 1}`).replace(/^./, x => x.toUpperCase())}: ${linkPedido(p.id)}`).join("\n") : linkPedido(pd.id)
-      const texto = textoLembreteDigital({ ...pd, jid: c.jid, quantidade: doGrupo.reduce((s, p) => s + p.quantidade, 0) || pd.quantidade }, adiou ? 2 : lemb, links, { adiou })
+      const itens = itensDoLembrete(doGrupo.length > 1 ? doGrupo : [pd], linkPedido)
+      const texto = textoLembreteDigital({ ...pd, jid: c.jid, quantidade: doGrupo.reduce((s, p) => s + p.quantidade, 0) || pd.quantidade }, adiou ? 2 : lemb, itens, { adiou })
       if (adiou) await marcarPd({ lembreteParado: true })   // depois deste, para
       const env = await enviar(c, texto, undefined, { proativo: true })
       if (env.ids.length) {

@@ -245,22 +245,34 @@ export function lembreteDigitalAgora(p: Pick<PedidoDigital, "em" | "lembretes" |
   return agora - desde >= HORAS_LEMBRETE[feitos] * 3_600_000 ? (feitos + 1) as 1 | 2 : null
 }
 
+// O orçamento dentro do lembrete: o que é, a quantidade e o valor de cada caixa, com o link logo abaixo. O cliente
+// vê o orçamento na própria mensagem (16/11: "não tô achando o seu orçamento", com só o link no lembrete).
+export function itensDoLembrete(pedidos: Pick<PedidoDigital, "id" | "quantidade" | "medidas" | "total" | "rotulo" | "ml">[], link: (id: string) => string): string {
+  return pedidos.map((p, i) => {
+    const medida = `${cm(p.medidas.a)} × ${cm(p.medidas.l)} × ${cm(p.medidas.p)} cm`
+    const nome = pedidos.length > 1 ? `${(p.rotulo ?? `caixa ${i + 1}`).replace(/^./, x => x.toUpperCase())} (${medida})` : p.ml ? `Caixinha para ${p.ml} ml (${medida})` : `Caixinha ${medida}`
+    return `*${nome}* · ${p.quantidade.toLocaleString("pt-BR")} un: *${brl(p.total)}*\n${link(p.id)}`
+  }).join("\n\n")
+}
+
 const semente = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7)
-export function textoLembreteDigital(p: Pick<PedidoDigital, "nome" | "quantidade" | "total" | "em"> & { jid?: string }, nivel: 1 | 2, link: string, opts: { adiou?: boolean } = {}): string {
+// "itens": o orçamento já escrito (itensDoLembrete), com valor e link de cada caixa
+export function textoLembreteDigital(p: Pick<PedidoDigital, "nome" | "quantidade" | "total" | "em"> & { jid?: string }, nivel: 1 | 2, itens: string, opts: { adiou?: boolean } = {}): string {
   const n = primeiroNome(p.nome)
   const ate = new Date(new Date(p.em).getTime() + DIAS_VALIDADE_DIGITAL * 86_400_000).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })
   const q = p.quantidade.toLocaleString("pt-BR")
   const oi = n ? `Oi, ${n}.` : "Oi, tudo bem?"
   const escolher = (xs: string[]) => xs[semente((p.jid ?? p.nome ?? "") + nivel) % xs.length]
-  if (opts.adiou) return `${oi} Sem pressa, só pra você ter à mão: o orçamento das ${q} caixinhas fica valendo até ${ate}.\n${link}`
+  const corpo = `\n\n${itens}\n\nArte inclusa (a gente cria pra você). No link você vê a caixa e paga o sinal de 50% pelo Pix.`
+  if (opts.adiou) return `${oi} Sem pressa, só pra você ter à mão o orçamento das caixinhas, que fica valendo até ${ate}:${corpo}`
   if (nivel === 1) return escolher([
-    `${oi} Ficou alguma dúvida no orçamento das caixinhas? Se quiser mudar a quantidade ou a medida, me fala.\n${link}`,
-    `${n ? `${n}, ` : ""}conseguiu dar uma olhada no orçamento? Qualquer dúvida sobre a arte ou o tamanho, é só me chamar.\n${link}`,
-    `${oi} Passando por causa das suas caixinhas. Se precisar de algum ajuste no orçamento, me avisa.\n${link}`,
+    `${oi} Deixo aqui o orçamento das suas caixinhas pra ficar à mão:${corpo}\n\nSe quiser mudar a quantidade ou a medida, me fala.`,
+    `${n ? `${n}, ` : ""}conseguiu ver o orçamento? Está aqui embaixo:${corpo}\n\nQualquer dúvida sobre a arte ou o tamanho, é só me chamar.`,
+    `${oi} Passando por causa das suas caixinhas. O orçamento está aqui:${corpo}\n\nSe precisar de algum ajuste, me avisa.`,
   ])
   return escolher([
-    `${oi} Consigo segurar o valor das ${q} caixinhas até ${ate}. Se ainda fizer sentido, é por aqui:\n${link}`,
-    `${oi} Último lembrete do seu orçamento: o valor fica garantido até ${ate}. Se mudou alguma coisa, me fala que eu ajusto.\n${link}`,
+    `${oi} Consigo segurar o valor das ${q} caixinhas até ${ate}:${corpo}`,
+    `${oi} Último lembrete do seu orçamento, com o valor garantido até ${ate}:${corpo}\n\nSe mudou alguma coisa, me fala que eu ajusto.`,
   ])
 }
 
