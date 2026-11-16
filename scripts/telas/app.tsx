@@ -49,6 +49,7 @@ import { termosDigital } from "@/app/lib/termosDigital"
 import { BibliotecaFacasView } from "@/app/components/BibliotecaFacasView"
 import { BuscaFacaGuardada } from "@/app/components/BuscaFacaGuardada"
 import { LoteOrcamento } from "@/app/components/LoteOrcamento"
+import LayoutChapaVisual from "@/app/LayoutChapaVisual"
 import { SugestaoFacaPedido } from "@/app/components/SugestaoFacaPedido"
 import { QuantidadesSugeridas } from "@/app/components/QuantidadesSugeridas"
 import { candidatas, sugerirQuantidades } from "@/app/lib/sugerirQuantidades"
@@ -448,6 +449,10 @@ function Telas() {
     }
     case "pdfcliente": return <FolhasPdf />
     case "pdflote": return <FolhasPdf lote />
+    case "chapa": case "chapa-medir": {
+      const r = calcular(dados.historico[0].form, config)!
+      return pagina(<div className="max-w-[900px] bg-white p-5 rounded-2xl"><LayoutChapaVisual layout={r.layoutChapa} dieline={r.dieline} formData={r.formData} customPecas={null} onCustomPecas={() => {}} /></div>)
+    }
     case "sugestaofaca": case "sugestaofaca-nada": {
       const dz = (id: string, apelido: string, c: [number, number, number]) => ({ d: { id, nome: `${id}.dxf`, apelido, caixa: { largura: c[0], altura: c[1], profundidade: c[2] }, blank: { largura: 200, altura: 150 }, criadoEm: "2026-11-01" }, motivo: `caixa ${c.map(n => (n / 10).toLocaleString("pt-BR")).join(" × ")} cm · 50 ml`, diferencaMm: 2 })
       return pagina(<div className="max-w-[288px] bg-white p-5 rounded-2xl"><p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-2">Dieline Pacdora</p>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { Ruler } from "lucide-react"
 import { LayoutChapa, TipoCaixa } from "./types"
 import { parseDXF } from "./lib/dxf"
 import type { DXFPaths, DXFResult } from "./lib/dxf"
@@ -105,6 +106,13 @@ export default function LayoutChapaVisual({
   const dragRef       = useRef<{ id: number; ox: number; oy: number; startX: number; startY: number } | null>(null)
   const svgRef        = useRef<SVGSVGElement>(null)
   const keyHandlerRef = useRef<((e: KeyboardEvent) => void) | null>(null)
+
+  // ── Réguas e guias (como no Canva): puxe da régua de cima (linha horizontal) ou da esquerda (vertical);
+  // a guia gruda na borda das peças e da chapa; entre guias aparece a distância. Solte fora da chapa para tirar.
+  type Guia = { id: number; eixo: "h" | "v"; mm: number }
+  const [guias, setGuias] = useState<Guia[]>([])
+  const guiaRef = useRef<{ id: number; eixo: "h" | "v" } | null>(null)
+  const guiaSeq = useRef(1)
 
   const { larguraChapa: cW, alturaChapa: cH } = layout
   const scale = Math.min((CANVAS_W - PAD * 2) / cW, (CANVAS_H - PAD * 2) / cH)
@@ -225,7 +233,41 @@ export default function LayoutChapaVisual({
     })
   }
 
+  // Pontos onde a guia gruda: bordas da chapa e de cada peça
+  function grudar(eixo: "h" | "v", mm: number) {
+    const alvos = eixo === "v"
+      ? [0, cW, ...pieces.flatMap(p => [p.x, p.x + pWmm(p)])]
+      : [0, cH, ...pieces.flatMap(p => [p.y, p.y + pHmm(p)])]
+    const limite = 6 / scale
+    let melhor = mm, dist = limite
+    for (const a of alvos) if (Math.abs(a - mm) < dist) { dist = Math.abs(a - mm); melhor = a }
+    return Math.round(melhor * 10) / 10
+  }
+  function puxarGuia(e: React.PointerEvent, eixo: "h" | "v", id?: number) {
+    e.stopPropagation()
+    svgRef.current?.setPointerCapture(e.pointerId)
+    const pt = toSheet(e)
+    const novoId = id ?? guiaSeq.current++
+    if (id == null) setGuias(g => [...g, { id: novoId, eixo, mm: grudar(eixo, eixo === "v" ? pt.x : pt.y) }])
+    guiaRef.current = { id: novoId, eixo }
+  }
+  function medirPecas() {
+    if (!pieces.length) return
+    const x0 = Math.min(...pieces.map(p => p.x)), x1 = Math.max(...pieces.map(p => p.x + pWmm(p)))
+    const y0 = Math.min(...pieces.map(p => p.y)), y1 = Math.max(...pieces.map(p => p.y + pHmm(p)))
+    const r = (v: number) => Math.round(v * 10) / 10
+    const base = guiaSeq.current; guiaSeq.current += 4
+    setGuias([{ id: base, eixo: "v", mm: r(x0) }, { id: base + 1, eixo: "v", mm: r(x1) }, { id: base + 2, eixo: "h", mm: r(y0) }, { id: base + 3, eixo: "h", mm: r(y1) }])
+  }
+
   function onSvgMove(e: React.PointerEvent) {
+    const g = guiaRef.current
+    if (g) {
+      const pt = toSheet(e)
+      const mm = g.eixo === "v" ? pt.x : pt.y
+      setGuias(gs => gs.map(x => x.id === g.id ? { ...x, mm: grudar(g.eixo, mm) } : x))
+      return
+    }
     const d = dragRef.current
     if (!d) return
     const pt  = toSheet(e)
@@ -243,7 +285,15 @@ export default function LayoutChapaVisual({
     }))
   }
 
-  function onSvgUp() { dragRef.current = null }
+  function onSvgUp() {
+    const g = guiaRef.current
+    if (g) {
+      guiaRef.current = null
+      // Solta fora da chapa (de volta na régua): a guia sai
+      setGuias(gs => gs.filter(x => x.id !== g.id || (x.mm > 0.5 && x.mm < (x.eixo === "v" ? cW : cH) - 0.5) || [0, x.eixo === "v" ? cW : cH].includes(x.mm)))
+    }
+    dragRef.current = null
+  }
 
   function rotatePiece(id: number) {
     setPieces(prev => prev.map(p => {
@@ -444,6 +494,11 @@ export default function LayoutChapaVisual({
             }`}>
             + Produto
           </button>
+          <button onClick={guias.length ? () => setGuias([]) : medirPecas}
+            title={guias.length ? "Tirar as guias" : "Põe guias em volta de todas as peças: mostra o tamanho da área impressa (ex.: folha para o verniz)"}
+            className={`text-[11.5px] px-2.5 py-1.5 rounded-lg border font-medium transition-colors ${guias.length ? "border-[#8456e8]/30 bg-[#8456e8]/5 text-[#8456e8]" : "border-slate-200 text-slate-500 hover:bg-violet-50 hover:text-[#8456e8] hover:border-violet-200"}`}>
+            {guias.length ? "Tirar guias" : <span className="inline-flex items-center gap-1"><Ruler className="w-3.5 h-3.5" />Medir peças</span>}
+          </button>
         </div>
 
         {/* Peças por chapa */}
@@ -616,10 +671,16 @@ export default function LayoutChapaVisual({
             )
           })}
 
+          {/* Réguas (cm) */}
+          <Reguas cW={cW} cH={cH} scale={scale} onPuxar={(e, eixo) => puxarGuia(e, eixo)} />
+
+          {/* Guias e as distâncias entre elas */}
+          <Guias guias={guias} cW={cW} cH={cH} scale={scale} onPegar={(e, g) => puxarGuia(e, g.eixo, g.id)} />
+
           {/* Footer */}
           <text x={PAD + (cW * scale) / 2} y={PAD + cH * scale + 20}
             textAnchor="middle" fontSize={11} fill="#475569" fontWeight={600}>
-            {`${(cW / 10).toFixed(0)} × ${(cH / 10).toFixed(0)} cm  ·  ${pieces.length} peça${pieces.length !== 1 ? "s" : ""}`}
+            {`${(cW / 10).toFixed(0)} × ${(cH / 10).toFixed(0)} cm  ·  ${pieces.length} peça${pieces.length !== 1 ? "s" : ""}${areaGuias(guias) ? `  ·  entre as guias: ${areaGuias(guias)}` : ""}`}
           </text>
         </svg>
       </div>
@@ -952,6 +1013,103 @@ function PieceSVG({
         </text>
       </g>
 
+    </g>
+  )
+}
+
+// ── Réguas e guias ─────────────────────────────────────────────────────────────
+
+const cmTxt = (mm: number) => `${(mm / 10).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}`
+
+// Área do retângulo formado pelas duas guias mais afastadas de cada eixo ("74,2 × 52 cm")
+function areaGuias(guias: { eixo: "h" | "v"; mm: number }[]) {
+  const v = guias.filter(g => g.eixo === "v").map(g => g.mm), h = guias.filter(g => g.eixo === "h").map(g => g.mm)
+  if (v.length < 2 || h.length < 2) return ""
+  return `${cmTxt(Math.max(...v) - Math.min(...v))} × ${cmTxt(Math.max(...h) - Math.min(...h))} cm`
+}
+
+const REGUA = 16
+
+function Reguas({ cW, cH, scale, onPuxar }: { cW: number; cH: number; scale: number; onPuxar: (e: React.PointerEvent, eixo: "h" | "v") => void }) {
+  // Marca a cada 1 cm; número a cada 5 ou 10 cm, conforme o espaço
+  const passoNum = 10 * scale >= 9 ? 50 : 100
+  const marcas = (total: number) => Array.from({ length: Math.floor(total / 10) + 1 }, (_, i) => i * 10)
+  return (
+    <g style={{ fontFamily: "system-ui, sans-serif" }}>
+      {/* Régua de cima: puxe para baixo e sai uma guia horizontal */}
+      <g onPointerDown={e => onPuxar(e, "h")} style={{ cursor: "row-resize" }}>
+        <title>Puxe para baixo: guia horizontal</title>
+        <rect x={PAD} y={PAD - REGUA - 4} width={cW * scale} height={REGUA} fill="#f8fafc" stroke="#e2e8f0" rx={2} />
+        {marcas(cW).map(mm => {
+          const x = PAD + mm * scale, grande = mm % passoNum === 0
+          return <g key={mm}>
+            <line x1={x} x2={x} y1={PAD - 4} y2={PAD - 4 - (grande ? 8 : mm % 50 === 0 ? 6 : 3)} stroke="#94a3b8" strokeWidth={0.8} />
+            {grande && mm > 0 && <text x={x + 2} y={PAD - REGUA + 5} fontSize={8} fill="#64748b">{mm / 10}</text>}
+          </g>
+        })}
+      </g>
+      {/* Régua da esquerda: puxe para a direita e sai uma guia vertical */}
+      <g onPointerDown={e => onPuxar(e, "v")} style={{ cursor: "col-resize" }}>
+        <title>Puxe para a direita: guia vertical</title>
+        <rect x={PAD - REGUA - 4} y={PAD} width={REGUA} height={cH * scale} fill="#f8fafc" stroke="#e2e8f0" rx={2} />
+        {marcas(cH).map(mm => {
+          const y = PAD + mm * scale, grande = mm % passoNum === 0
+          return <g key={mm}>
+            <line y1={y} y2={y} x1={PAD - 4} x2={PAD - 4 - (grande ? 8 : mm % 50 === 0 ? 6 : 3)} stroke="#94a3b8" strokeWidth={0.8} />
+            {grande && mm > 0 && <text x={PAD - REGUA - 1} y={y - 2} fontSize={8} fill="#64748b">{mm / 10}</text>}
+          </g>
+        })}
+      </g>
+      <text x={PAD - REGUA - 3} y={PAD - 7} fontSize={7.5} fill="#94a3b8">cm</text>
+    </g>
+  )
+}
+
+function Guias({ guias, cW, cH, scale, onPegar }: {
+  guias: { id: number; eixo: "h" | "v"; mm: number }[]; cW: number; cH: number; scale: number
+  onPegar: (e: React.PointerEvent, g: { id: number; eixo: "h" | "v"; mm: number }) => void
+}) {
+  const COR = "#e5007e"
+  // Distâncias: entre guias vizinhas e da guia até a borda
+  const cotas = (eixo: "h" | "v") => {
+    const total = eixo === "v" ? cW : cH
+    const pos = [...new Set([0, ...guias.filter(g => g.eixo === eixo).map(g => g.mm), total])].sort((a, b) => a - b)
+    return guias.some(g => g.eixo === eixo) ? pos.slice(1).map((b, i) => ({ a: pos[i], b })).filter(c => c.b - c.a >= 1) : []
+  }
+  return (
+    <g style={{ fontFamily: "system-ui, sans-serif" }}>
+      {guias.map(g => {
+        const v = g.eixo === "v"
+        const p = PAD + g.mm * scale
+        return (
+          <g key={g.id} onPointerDown={e => onPegar(e, g)} onClick={e => e.stopPropagation()} style={{ cursor: v ? "col-resize" : "row-resize" }}>
+            <line x1={v ? p : PAD} x2={v ? p : PAD + cW * scale} y1={v ? PAD : p} y2={v ? PAD + cH * scale : p} stroke="transparent" strokeWidth={10} />
+            <line x1={v ? p : PAD} x2={v ? p : PAD + cW * scale} y1={v ? PAD : p} y2={v ? PAD + cH * scale : p} stroke={COR} strokeWidth={1} />
+            {/* posição da guia, na régua */}
+            <g transform={v ? `translate(${p}, ${PAD - REGUA + 2})` : `translate(${PAD + cW * scale - 22}, ${p})`}>
+              <rect x={-20} y={-7} width={40} height={14} rx={4} fill={COR} />
+              <text x={0} y={3} textAnchor="middle" fontSize={8.5} fill="#fff" fontWeight={700}>{cmTxt(g.mm)} cm</text>
+            </g>
+          </g>
+        )
+      })}
+      {/* Cotas entre guias */}
+      {cotas("v").map(c => {
+        const x1 = PAD + c.a * scale, x2 = PAD + c.b * scale, y = PAD + 12
+        return <g key={`v${c.a}-${c.b}`} pointerEvents="none">
+          <line x1={x1 + 2} x2={x2 - 2} y1={y} y2={y} stroke={COR} strokeWidth={0.8} strokeDasharray="3 2" />
+          <rect x={(x1 + x2) / 2 - 24} y={y - 7} width={48} height={14} rx={7} fill="#fff" stroke={COR} strokeWidth={0.8} />
+          <text x={(x1 + x2) / 2} y={y + 3} textAnchor="middle" fontSize={9} fill={COR} fontWeight={700}>{cmTxt(c.b - c.a)} cm</text>
+        </g>
+      })}
+      {cotas("h").map(c => {
+        const y1 = PAD + c.a * scale, y2 = PAD + c.b * scale, x = PAD + 12
+        return <g key={`h${c.a}-${c.b}`} pointerEvents="none">
+          <line y1={y1 + 2} y2={y2 - 2} x1={x} x2={x} stroke={COR} strokeWidth={0.8} strokeDasharray="3 2" />
+          <rect x={x - 24} y={(y1 + y2) / 2 - 7} width={48} height={14} rx={7} fill="#fff" stroke={COR} strokeWidth={0.8} />
+          <text x={x} y={(y1 + y2) / 2 + 3} textAnchor="middle" fontSize={9} fill={COR} fontWeight={700}>{cmTxt(c.b - c.a)} cm</text>
+        </g>
+      })}
     </g>
   )
 }
