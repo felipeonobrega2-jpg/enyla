@@ -97,7 +97,7 @@ async function contexto() {
 }
 
 const completarSugestao = (sg: SugestaoBanco, tx: TxBanco, cfg: Awaited<ReturnType<typeof lerConfig>>) =>
-  completar(sg, tx, cfg.regrasBanco ?? [], cfg.contasDoBanco, [...(cfg.categoriasDespesa ?? []), ...(cfg.categoriasReceita ?? [])])
+  completar(sg, tx, cfg.regrasBanco ?? [], cfg.contasDoBanco, (tx.tipo === "entrada" ? cfg.categoriasReceita : cfg.categoriasDespesa) ?? [])
 
 // Pagamento a fornecedor sem pedido: liga ao pedido cujo custo previsto pelo motor bate com o valor (só se for claro).
 // O histórico dos orçamentos só é lido quando aparece o primeiro pagamento candidato.
@@ -132,11 +132,11 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
   let lista = (pend ?? []) as TxBanco[]
   // Sugestão da IA de antes da subcategoria (v < 2) numa categoria que tem subcategorias: refaz uma vez
   const cfg0 = await lerConfig()
-  const comSubs = new Set([...(cfg0.categoriasDespesa ?? []), ...(cfg0.categoriasReceita ?? [])].filter(c => c.subcategorias?.length).map(c => c.id))
+  const comSubs = (tipo: string) => new Set(((tipo === "entrada" ? cfg0.categoriasReceita : cfg0.categoriasDespesa) ?? []).filter(c => c.subcategorias?.length).map(c => c.id))
   const { data: antigas } = await supabase.from("banco_transacoes").select("*").eq("estado", "pendente").not("sugestao", "is", null).order("data", { ascending: false }).limit(3000)
   const refazer = ((antigas ?? []) as TxBanco[]).filter(t => {
     const sg = t.sugestao
-    return sg?.acao === "criar" && sg.origem === "ia" && (sg.v ?? 1) < 2 && sg.lancamentos.length === 1 && !sg.lancamentos[0].subcategoria && comSubs.has(sg.lancamentos[0].categoria ?? "")
+    return sg?.acao === "criar" && sg.origem === "ia" && (sg.v ?? 1) < 2 && sg.lancamentos.length === 1 && !sg.lancamentos[0].subcategoria && comSubs(t.tipo).has(sg.lancamentos[0].categoria ?? "")
   })
   lista = [...lista, ...refazer]
   if (!lista.length) return { feitas: 0, restantes: 0 }
