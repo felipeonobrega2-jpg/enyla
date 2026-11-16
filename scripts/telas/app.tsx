@@ -454,6 +454,7 @@ function Telas() {
       </div>
     }
     case "pdfcliente": return <FolhasPdf />
+    case "pdffrete": return <FolhasPdf frete />
     case "pdflote": return <FolhasPdf lote />
     case "chapa": case "chapa-medir": {
       const r = calcular(dados.historico[0].form, config)!
@@ -679,10 +680,10 @@ function Telas() {
 createRoot(document.getElementById("root")!).render(<Telas />)
 
 // PDF do cliente como arquivo: as folhas que vão no .pdf, lado a lado com o HTML da impressão
-function FolhasPdf({ lote = false }: { lote?: boolean }) {
+function FolhasPdf({ lote = false, frete = false }: { lote?: boolean; frete?: boolean }) {
   const [folhas, setFolhas] = React.useState<{ imagem: string; altura: number }[] | null>(null)
   const html = React.useMemo(() => {
-    const form = { ...dados.historico[0].form, nomeCliente: "Perfumaria Modelo", obsCliente: "Arte enviada pelo cliente." }
+    const form = { ...dados.historico[0].form, nomeCliente: "Perfumaria Modelo", obsCliente: "Arte enviada pelo cliente.", freteGratis: frete }
     if (lote) return gerarHtmlLoteCliente([[4, 9, 4], [5, 12, 5]].map(([fr, al, la], i) => {
       const f = { ...form, frente: fr, alturaBox: al, lateral: la }
       return { item: { form: f, calculo: calcular(f, config)!, data: "15/11/2026, 10:00:00", numero: `ORC-2026-99${i}` } }

@@ -42,6 +42,7 @@ function especificar(card: KanbanCard, form?: FormData): string[] {
     form.acompanhamentos?.length ? `Acompanha: ${form.acompanhamentos.join(", ").toLowerCase()}` : null,
     form.numArtes > 1 ? `${form.numArtes} artes` : null,
     form.comFaca ? "Faca de corte inclusa" : null,
+    form.freteGratis ? "Frete grátis para entregas em São Paulo" : null,
   ].filter(Boolean) as string[]
 }
 

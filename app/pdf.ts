@@ -454,7 +454,8 @@ function paginaVisualizacao3D(
 </div>`
 }
 
-function paginaCondicoesGerais(item: { dataRodape: string }): string {
+export const FRETE_GRATIS = "Frete grátis para entregas em São Paulo"
+function paginaCondicoesGerais(item: { dataRodape: string; freteGratis?: boolean }): string {
   const { dataRodape } = item
   return `
 <!-- ═══════════════════════════════════════════════════════ PÁGINA 3: CONDIÇÕES -->
@@ -503,7 +504,7 @@ function paginaCondicoesGerais(item: { dataRodape: string }): string {
 
   <div class="cond-item">
     <div class="cond-num-titulo">8. Frete e Logística</div>
-    <div class="cond-texto">Frete e logística a combinar no fechamento do pedido. A retirada/transporte é de responsabilidade do cliente, salvo condição específica acordada.</div>
+    <div class="cond-texto">${item.freteGratis ? `${FRETE_GRATIS}: a entrega é por nossa conta. Fora de São Paulo, frete e logística a combinar no fechamento do pedido.` : "Frete e logística a combinar no fechamento do pedido. A retirada/transporte é de responsabilidade do cliente, salvo condição específica acordada."}</div>
   </div>
 
   <div class="cond-item">
@@ -645,6 +646,7 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
     <div class="item">* Contamos com designer próprio — desenvolvimento de arte incluso sem custo adicional.</div>
     <div class="item">* A quantidade final do lote pode variar <strong>até 10%</strong> para mais ou para menos.</div>
     <div class="item">* Pedido mínimo: <strong>${num(sweetMin.quantidade)} unidades</strong>.</div>
+    ${form.freteGratis ? `<div class="item">* <strong>${FRETE_GRATIS}</strong>.</div>` : ""}
     <div class="item">* Os valores desta proposta são válidos <strong>até a data de vencimento</strong> indicada. Após esse prazo, os preços poderão ser reajustados sem aviso prévio.</div>
     <div class="item">* Recebeu uma proposta mais em conta? Apresente-nos — <strong>cobrimos qualquer oferta</strong> do mercado.</div>
     <div class="item">* Após o fechamento, você receberá um <strong>link de rastreamento exclusivo</strong> para acompanhar cada etapa da produção da sua embalagem em tempo real.</div>
@@ -659,7 +661,7 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
 </div>
 ${temDims3D ? paginaVisualizacao3D(form.frente, form.alturaBox, form.lateral, !!form.incluirVerniz, previewQrDataUrl, previewUrl, data)
   : form.caixaDxf ? paginaVisualizacao3D(form.caixaDxf.largura / 10, form.caixaDxf.altura / 10, form.caixaDxf.profundidade / 10, !!form.incluirVerniz, previewQrDataUrl, previewUrl, data) : ""}
-${semCondicoesGerais ? "" : paginaCondicoesGerais({ dataRodape: data })}
+${semCondicoesGerais ? "" : paginaCondicoesGerais({ dataRodape: data, freteGratis: !!form.freteGratis })}
 
 </body>
 </html>`
@@ -746,6 +748,7 @@ export function gerarHtmlLoteCliente(itens: { item: HistoricoItem; qr?: string; 
   <div class="obs-bar-list">
     <div class="item">* Nas próximas páginas está a proposta de cada item, com todas as quantidades e a caixa em 3D.</div>
     <div class="item">* Você pode fechar todos os itens ou só os que quiser; cada um tem a sua aprovação.</div>
+    ${itens.some(i => i.item.form.freteGratis) ? `<div class="item">* <strong>${FRETE_GRATIS}</strong>.</div>` : ""}
     <div class="item">* Prazo de produção: <strong>${PRAZO_ENTREGA_PADRAO}</strong> após aprovação da arte.</div>
     <div class="item">* Recebeu uma proposta mais em conta? Apresente-nos — <strong>cobrimos qualquer oferta</strong> do mercado.</div>
   </div>
@@ -756,7 +759,7 @@ export function gerarHtmlLoteCliente(itens: { item: HistoricoItem; qr?: string; 
   </div>
 </div>
 ${paginas.map(p => `<div class="page-break"></div>\n${p}`).join("\n")}
-${paginaCondicoesGerais({ dataRodape: data })}
+${paginaCondicoesGerais({ dataRodape: data, freteGratis: itens.some(i => i.item.form.freteGratis) })}
 
 </body>
 </html>`

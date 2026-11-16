@@ -39,6 +39,7 @@ export type FormData = {
   pecaPlana?: PecaPlana | null   // não é caixa: fita, tag, cinta… (sem dobra nem colagem)
   obsInterna: string
   obsCliente: string
+  freteGratis?: boolean        // frete grátis para entregas em São Paulo (aparece no PDF, na mensagem e na aprovação)
   validadeDias: number
   materialId: string
   materialNome: string

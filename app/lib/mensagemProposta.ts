@@ -30,6 +30,7 @@ export function especificacaoDaProposta(form: FormData): string[] {
     acomp.length ? `Acompanha: ${acomp.join(", ")}` : null,
     form.numSKUs > 1 ? `${form.numSKUs} modelos de arte` : null,
     form.comFaca ? "Faca de corte inclusa" : null,
+    form.freteGratis ? "Frete grátis para entregas em São Paulo" : null,
   ].filter(Boolean) as string[]
 }
 
@@ -60,7 +61,7 @@ export function mensagemLote(itens: { form: FormData; calculo: Calculo; numero: 
     const [cabeca, ...resto] = especificacaoDaProposta(it.form)
     return [
       `${i + 1}. ${cabeca ?? `Item ${i + 1}`}`,
-      ...resto.filter(l => !l.startsWith("Material") || i === 0 || it.form.materialNome !== itens[0].form.materialNome),
+      ...resto.filter(l => !l.startsWith("Frete grátis") && (!l.startsWith("Material") || i === 0 || it.form.materialNome !== itens[0].form.materialNome)),
       ideal ? `${num(ideal.quantidade)} unidades · ${brl(total)} à vista (${brl(unit)}/un)` : null,
       it.link ? `Ver em 3D e aprovar: ${it.link}` : null,
     ].filter(Boolean).join("\n")
@@ -69,6 +70,7 @@ export function mensagemLote(itens: { form: FormData; calculo: Calculo; numero: 
     `Oi${primeiro ? `, ${primeiro}` : ""}! Segue a proposta das ${itens.length} embalagens.`,
     ...blocos.map(b => `\n${b}`),
     itens.length > 1 ? `\nTotal dos ${itens.length} itens: ${brl(soma)} à vista` : null,
+    itens.some(it => it.form.freteGratis) ? "Frete grátis para entregas em São Paulo." : null,
     `\nNo PDF tem todas as quantidades de cada uma. Pode fechar todas ou só as que quiser.`,
     `Qualquer dúvida, é só me chamar.`,
   ].filter(Boolean).join("\n")

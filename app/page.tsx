@@ -1510,6 +1510,7 @@ export default function Home() {
       form.acompanhamentos?.length ? `• Acompanhamentos: ${form.acompanhamentos.join(", ")}` : null,
       form.outrosAcabamentos?.length ? `• Outros: ${form.outrosAcabamentos.join(", ")}` : null,
       form.comFaca ? `• Faca de corte inclusa` : null,
+      form.freteGratis ? `• Frete grátis para entregas em São Paulo` : null,
       ``,
       `💰 *Proposta recomendada*`,
       `• Quantidade: ${num(ideal.quantidade)} unidades`,
@@ -2403,6 +2404,17 @@ export default function Home() {
                 className="px-3 bg-[#8456e8] hover:bg-[#7445d4] text-white rounded-lg text-sm font-bold transition-colors">+</button>
             </div>
             <QuantidadesSugeridas sugestoes={sugestoesQtd} onAdicionar={adicionarSugestao} />
+          </FormSection>
+
+          {/* Seção: Entrega */}
+          <FormSection label="Entrega">
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <input type="checkbox" checked={!!form.freteGratis} onChange={e => set("freteGratis", e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#8456e8]" />
+              <span>
+                <span className="block text-[12.5px] font-semibold text-[#191625]">Frete grátis (São Paulo)</span>
+                <span className="block text-[11px] text-[#898892] leading-snug">Aparece na proposta, no PDF, na mensagem e na página de aprovação. Fora de SP segue a combinar.</span>
+              </span>
+            </label>
           </FormSection>
 
           {/* Seção: Observações */}

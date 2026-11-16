@@ -33,3 +33,23 @@ describe("orçamento em lote", () => {
     expect(gerarHtmlLoteCliente([])).toBe("")
   })
 })
+
+describe("frete grátis (São Paulo)", async () => {
+  const { gerarHtmlOrcamentoCliente } = await import("@/app/pdf")
+  const { mensagemProposta } = await import("@/app/lib/mensagemProposta")
+  const base = item(5, "ORC-2026-401")
+  it("aparece no PDF (condições e condições gerais) e na mensagem só quando marcado", () => {
+    const com = { ...base, form: { ...base.form, freteGratis: true } }
+    const html = gerarHtmlOrcamentoCliente(com)
+    expect(html).toContain("Frete grátis para entregas em São Paulo</strong>")
+    expect(html).toContain("a entrega é por nossa conta")
+    expect(mensagemProposta(com.form, com.calculo, "ORC-2026-401", null)).toContain("Frete grátis para entregas em São Paulo")
+    expect(gerarHtmlOrcamentoCliente(base)).not.toContain("Frete grátis")
+    expect(mensagemProposta(base.form, base.calculo, "ORC-2026-401", null)).not.toContain("Frete grátis")
+  })
+  it("lote: uma linha só no fim da mensagem", () => {
+    const itens = [item(5, "A"), item(7, "B")].map(x => ({ ...x, form: { ...x.form, freteGratis: true }, link: null }))
+    const m = mensagemLote(itens)
+    expect(m.match(/Frete grátis/g)).toHaveLength(1)
+  })
+})
