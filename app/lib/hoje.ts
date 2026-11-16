@@ -178,3 +178,23 @@ export function haQuanto(iso: string, agora = Date.now()) {
   const d = Math.round(h / 24)
   return `há ${d} ${d === 1 ? "dia" : "dias"}`
 }
+
+// Bom negócio com tudo para orçar esperando demais: ICP/Oportunidade passa de 2 h, os demais de 6 h. Avisa uma vez
+// por espera (a mesma mensagem dele / a mesma marcação sua não avisa de novo).
+export const HORAS_AVISO_ORCAR = { forte: 2, demais: 6 }
+export function orcamentosAtrasados(itens: ItemHoje[], avisados: Record<string, string>, agora = Date.now()) {
+  return itens.map(x => {
+    const horas = (agora - new Date(x.desde).getTime()) / 3_600_000
+    const limite = ["ICP", "Oportunidade"].includes(x.rotulo) ? HORAS_AVISO_ORCAR.forte : HORAS_AVISO_ORCAR.demais
+    return { ...x, horas, limite }
+  }).filter(x => x.horas >= x.limite && avisados[x.jid] !== x.desde)
+    .sort((a, b) => Number(["ICP", "Oportunidade"].includes(b.rotulo)) - Number(["ICP", "Oportunidade"].includes(a.rotulo)) || b.horas - a.horas)
+}
+
+// "2 h", "1 dia e 3 h"
+export function tempoDeEspera(horas: number) {
+  if (horas < 1) return `${Math.max(1, Math.round(horas * 60))} min`
+  if (horas < 24) return `${Math.round(horas)} h`
+  const d = Math.floor(horas / 24), h = Math.round(horas - d * 24)
+  return `${d} ${d === 1 ? "dia" : "dias"}${h ? ` e ${h} h` : ""}`
+}

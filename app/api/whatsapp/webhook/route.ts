@@ -18,6 +18,7 @@ import { talvezPedirMedida } from "@/app/lib/pedirMedidaServidor"
 import { talvezResumoDoDia } from "@/app/lib/animarServidor"
 import { talvezMoverRegistroAntigo } from "@/app/lib/agenteAuto"
 import { talvezClassificarLeads, talvezAvisarMqlEsperando } from "@/app/lib/classificarLeadServidor"
+import { talvezAvisarOrcamentoAtrasando } from "@/app/lib/hojeServidor"
 
 // Espera do modo automático (o lead termina de digitar) + resposta da IA + envio
 export const maxDuration = 60
@@ -63,6 +64,8 @@ export async function POST(req: NextRequest) {
       after(() => talvezMoverRegistroAntigo().catch(e => console.error("[registro do agente]", e)))
       after(() => talvezClassificarLeads().catch(e => console.error("[classificar leads]", e)))
       after(() => talvezAvisarMqlEsperando().catch(e => console.error("[mql esperando]", e)))
+      // Bom negócio com tudo para orçar esperando demais (no máximo a cada 15 min)
+      after(() => talvezAvisarOrcamentoAtrasando().catch(e => console.error("[orçamento atrasando]", e)))
       after(() => talvezTesteAbertura().catch(e => console.error("[abertura A/B]", e)))
       // Leads do anúncio: conversas recentes sem origem são marcadas pela frase do anúncio (no máximo a cada 30 min)
       after(() => talvezMarcarOrigens().then(() => undefined).catch(e => console.error("[origens]", e)))

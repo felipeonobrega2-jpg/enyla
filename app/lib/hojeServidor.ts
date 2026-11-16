@@ -8,10 +8,14 @@ import { POR_DIA_PADRAO } from "./reativacao"
 import { DIAS_PERDIDO } from "./funilWhatsapp"
 import { total, custoPor, Relatorio } from "./marketing"
 import { marcosDoRegistro } from "./agenteLeads"
-import { quemResponder, doAnuncio, doDigital, deveOrcamento, aguardaOrcamentoMarcado, etapaDaConversa, dadosDaConversa, ConvHoje, Hoje, ItemHoje, Passos } from "./hoje"
+import { quemResponder, doAnuncio, doDigital, deveOrcamento, orcamentosAtrasados, tempoDeEspera, aguardaOrcamentoMarcado, etapaDaConversa, dadosDaConversa, ConvHoje, Hoje, ItemHoje, Passos } from "./hoje"
 import { qualidadeDoLead } from "./marketing"
 import { nomeChave } from "./negocio"
 import { gastosAtuais } from "./gastosServidor"
+import { mudarConfig } from "./configAtomica"
+import { notificar, LINK_SISTEMA } from "./notificar"
+import { dentroDoHorario } from "./agenteLeads"
+import { evo } from "./evolution"
 import { estadoDoMql, resumirMeta, DIAS_META, MsgMeta, Momento } from "./metaMql"
 
 // O "momento" da última leitura da IA (de quem é a vez); conversa lida antes disso não tem
@@ -138,4 +142,34 @@ async function metaDoMql(convs: ConvHoje[], passos: Passos, vinculos: Record<str
   const ordem = { pronto: 0, padrao: 1, falta: 2, orcado: 3 }
   travados.sort((a, b) => ordem[a.estado] - ordem[b.estado] || a.desde.localeCompare(b.desde))
   return { resumo: resumirMeta(estados), travados }
+}
+
+// Orçamento atrasando: confere no máximo a cada 15 min, no seu horário, quem passou tudo e ainda não recebeu o orçamento.
+// Avisa no celular (ntfy) e no seu WhatsApp ("Você"), uma vez por espera.
+let rodadaOrcar = 0
+export async function talvezAvisarOrcamentoAtrasando() {
+  if (Date.now() - rodadaOrcar < 15 * 60_000) return
+  rodadaOrcar = Date.now()
+  const cfg = await lerCfg() as Awaited<ReturnType<typeof lerCfg>> & { proximosPassos?: Passos; orcarAvisado?: Record<string, string> }
+  if (!dentroDoHorario(cfg.agenteAuto?.horario)) return
+  const desde = new Date(Date.now() - 8 * 86_400_000).toISOString()
+  const { data } = await supabase.from("whatsapp_conversas")
+    .select("jid, nome, ultima_msg, ultima_recebida_at, ultima_enviada_at, fechada_em, status_lead, etiquetas, campanha, criado_em, proxima_acao")
+    .not("jid", "like", "%@g.us").gte("ultima_at", desde).order("ultima_at", { ascending: false }).limit(400)
+  const lista = await orcamentosParaFazer((data ?? []) as ConvHoje[], cfg.proximosPassos ?? {}, cfg.vinculosWhatsapp ?? {})
+  const atrasados = orcamentosAtrasados(lista, cfg.orcarAvisado ?? {})
+  if (!atrasados.length) return
+  // Grava antes de avisar: duas execuções ao mesmo tempo não mandam o aviso duas vezes
+  const naLista = new Set(lista.map(x => x.jid))
+  await mudarConfig((d: Record<string, unknown> & { orcarAvisado?: Record<string, string> }) => ({
+    orcarAvisado: { ...Object.fromEntries(Object.entries(d.orcarAvisado ?? {}).filter(([j]) => naLista.has(j))), ...Object.fromEntries(atrasados.map(x => [x.jid, x.desde])) },
+  }))
+  const linhas = atrasados.slice(0, 5).map(x => `${x.rotulo} · ${x.nome ?? x.cliente ?? "Lead"} · esperando há ${tempoDeEspera(x.horas)}${x.dados?.resumo ? ` · ${x.dados.resumo.slice(0, 80)}` : ""}`)
+  if (atrasados.length > 5) linhas.push(`e mais ${atrasados.length - 5}`)
+  const titulo = atrasados.length === 1 ? "Orçamento esperando você" : `${atrasados.length} orçamentos esperando você`
+  await notificar(titulo, linhas.join("\n"), { prioridade: "alta", tags: ["hourglass"], link: LINK_SISTEMA }).catch(() => null)
+  const { seuNumero } = await import("./agenteAuto")
+  const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero().catch(() => null)
+  if (destino) await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino,
+    text: [`⏳ *${titulo}*`, "O cliente já passou tudo e ainda não recebeu o orçamento:", ...linhas.map(l => `• ${l}`), `${LINK_SISTEMA}`].join("\n") }) }).catch(() => null)
 }

@@ -85,10 +85,14 @@ export function estadoDoMql(msgs: MsgMeta[], dados: DadosPedido | null, orcament
 
 // Placar da meta: conta só o que está (ou esteve) na sua mão. Quem ficou de mandar algo ou decidir (com o cliente)
 // e quem não tem pressa ficam de fora do total e do atraso, só aparecem contados.
-export type ResumoMeta = { total: number; orcados: number; noPrazo: number; atrasados: number; prontos: number; padrao: number; falta: number; comEle: number; semPressa: number }
+export type ResumoMeta = { total: number; orcados: number; noPrazo: number; atrasados: number; prontos: number; padrao: number; falta: number; comEle: number; semPressa: number
+  medianaHoras: number | null   // tempo típico do primeiro contato até o orçamento (dos orçados na janela)
+}
 
 export function resumirMeta(estados: { estado: EstadoMql; horas: number; momento?: Momento }[]): ResumoMeta {
-  const r: ResumoMeta = { total: 0, orcados: 0, noPrazo: 0, atrasados: 0, prontos: 0, padrao: 0, falta: 0, comEle: 0, semPressa: 0 }
+  const r: ResumoMeta = { total: 0, orcados: 0, noPrazo: 0, atrasados: 0, prontos: 0, padrao: 0, falta: 0, comEle: 0, semPressa: 0, medianaHoras: null }
+  const tempos = estados.filter(e => e.estado === "orcado").map(e => e.horas).sort((a, b) => a - b)
+  if (tempos.length) { const m = Math.floor(tempos.length / 2); r.medianaHoras = tempos.length % 2 ? tempos[m] : (tempos[m - 1] + tempos[m]) / 2 }
   for (const e of estados) {
     if (e.estado === "orcado") { r.total++; r.orcados++; if (e.horas <= META_HORAS) r.noPrazo++; continue }
     if (e.momento === "com_ele") { r.comEle++; continue }

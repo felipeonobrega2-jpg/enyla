@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react"
 import { Sun, Clock, MessageCircle, RotateCcw, Megaphone, ArrowRight, CheckCircle2, CalendarClock, FileText, Printer, AlertTriangle } from "lucide-react"
 import { Cartao, TituloCartao, LinhaLista, Selo, Botao, Tom } from "./ds"
-import { Hoje, ItemHoje, ItemMeta, haQuanto } from "../lib/hoje"
+import { Hoje, ItemHoje, ItemMeta, haQuanto, tempoDeEspera } from "../lib/hoje"
 import { comMedidaPadrao, textoDoTravado, META_HORAS } from "../lib/metaMql"
 import { ProximoPasso } from "./ProximoPasso"
 import { DadosPedido } from "../lib/atendente"
@@ -132,6 +132,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
                   <p className="text-[11.5px] text-[#5e5c68] leading-snug min-w-0">
                     <span className="font-semibold text-[#191625]">Meta: orçar todo MQL em {META_HORAS} h</span>
                     {` · 7 dias: ${m.orcados} de ${m.total} orçados, ${m.noPrazo} no prazo`}
+                    {m.medianaHoras != null && <>{" · "}<span className="font-semibold" style={{ color: m.medianaHoras <= META_HORAS ? "#009351" : "#c57800" }} title="Metade dos MQL da semana recebeu o orçamento em até esse tempo, contando da primeira mensagem">orçamento sai em {tempoDeEspera(m.medianaHoras)}</span>{" (mediana)"}</>}
                   </p>
                   <span className="text-[15px] font-semibold ds-num shrink-0" style={{ color: pct >= 80 ? "#009351" : pct >= 50 ? "#c57800" : "#d33a3c" }}>{pct}%</span>
                 </div>

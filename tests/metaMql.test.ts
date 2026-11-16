@@ -55,6 +55,6 @@ describe("meta: orçar todo MQL em 24 h", () => {
   it("placar: orçados, no prazo e atrasados", () => {
     expect(resumirMeta([{ estado: "orcado", horas: 10 }, { estado: "orcado", horas: 30 }, { estado: "falta", horas: 40 }, { estado: "padrao", horas: 5 },
       { estado: "falta", horas: 50, momento: "com_ele" }, { estado: "pronto", horas: 60, momento: "sem_pressa" }]))
-      .toEqual({ total: 4, orcados: 2, noPrazo: 1, atrasados: 1, prontos: 0, padrao: 1, falta: 1, comEle: 1, semPressa: 1 })
+      .toEqual({ total: 4, orcados: 2, noPrazo: 1, atrasados: 1, prontos: 0, padrao: 1, falta: 1, comEle: 1, semPressa: 1, medianaHoras: 20 })
   })
 })
