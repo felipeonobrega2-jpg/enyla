@@ -36,8 +36,16 @@ describe("banco → lançamentos sem bagunçar o manual", () => {
     const manual = lanc({ id: "aj", tipo: "receita", formaPagamento: "conta", fornecedorId: "jero", valor: 2000 })
     expect(sugerir({ ...base, tx: tx({ contraparte_nome: "Jerograf", valor: 2000 }), lancamentos: [manual] })).toMatchObject({ acao: "vincular", lancamentoId: "aj" })
   })
-  it("transferência entre as suas contas: ignora", () => {
-    expect(sugerir({ ...base, tx: tx({ contraparte_doc: "48970391851" }), lancamentos: [], documentosProprios: ["48970391851"] })).toMatchObject({ acao: "ignorar" })
+  it("Pix para você: distribuição de lucros (não some); a sua regra vale primeiro; rendimento e aplicação", () => {
+    const meu = ["48970391851"]
+    expect(sugerir({ ...base, tx: tx({ contraparte_doc: "48970391851", contraparte_nome: "Luiz Felipe" }), lancamentos: [], documentosProprios: meu }))
+      .toMatchObject({ acao: "criar", lancamentos: [{ tipo: "despesa", categoria: "salarios", subcategoria: "Distribuição de Lucros" }] })
+    const t = tx({ contraparte_doc: "48970391851" })
+    const regras = aprender([], t, { acao: "lancar", categoria: "salarios", subcategoria: "Folha Salarial" })
+    expect(sugerir({ ...base, regras, tx: t, lancamentos: [], documentosProprios: meu })).toMatchObject({ acao: "criar", origem: "regra", lancamentos: [{ subcategoria: "Folha Salarial" }] })
+    expect(sugerir({ ...base, tx: tx({ tipo: "entrada", valor: 0.08, descricao: "REMUNERACAO APLICACAO AUTOMATICA" }), lancamentos: [] }))
+      .toMatchObject({ acao: "criar", lancamentos: [{ tipo: "receita", categoria: "outros", subcategoria: "Rendimento" }] })
+    expect(sugerir({ ...base, tx: tx({ descricao: "APLICACAO AUTOMATICA" }), lancamentos: [] })).toMatchObject({ acao: "ignorar" })
   })
   it("correção vira regra e vale na próxima", () => {
     const t = tx({ contraparte_nome: "Papelaria Brás", contraparte_doc: "11222333000144", valor: 350 })

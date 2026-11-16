@@ -339,7 +339,7 @@ function Sugestao({ s, nomeCat, nomeForn, lancPorId }: { s: SugestaoBanco | null
   )
 }
 
-// Bancos conectados (Item ID do painel da Pluggy), data de corte e o que é seu (para não contar transferências entre contas)
+// Bancos conectados (Item ID do painel da Pluggy), data de corte e os seus CPF/CNPJ (Pix para você = distribuição de lucros)
 function ConfigBanco({ valor, onSalvar }: { valor: NonNullable<Configuracoes["pluggy"]>; onSalvar: (v: NonNullable<Configuracoes["pluggy"]>) => void }) {
   const [itens, setItens] = useState(valor.itens ?? [])
   const [corte, setCorte] = useState(valor.dataCorte ?? new Date().toLocaleDateString("sv-SE"))
@@ -369,7 +369,7 @@ function ConfigBanco({ valor, onSalvar }: { valor: NonNullable<Configuracoes["pl
           <span className="text-[10.5px] text-[#898892]">Antes dessa data nada é mexido: o que você lançou à mão fica como está.</span>
         </label>
         <label className="block">
-          <span className="text-[11.5px] font-semibold text-[#5e5c68]">Seus CPF/CNPJ (separados por vírgula)</span>
+          <span className="text-[11.5px] font-semibold text-[#5e5c68]">Seus CPF/CNPJ, separados por vírgula (Pix para você vira distribuição de lucros)</span>
           <input value={docs} onChange={e => setDocs(e.target.value)} placeholder="Para reconhecer transferências entre as suas contas" className={`${campo} w-full mt-1`} />
         </label>
       </div>

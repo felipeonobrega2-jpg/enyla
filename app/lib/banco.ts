@@ -117,9 +117,9 @@ export function sugerir(args: {
   const { tx, lancamentos, fornecedores, regras } = args
   const chave = chaveContraparte(tx)
 
-  // 0. Entre as suas contas
-  if (ehTransferenciaPropria(tx, args.documentosProprios ?? [], args.nomesProprios ?? []))
-    return { acao: "ignorar", motivo: "transferência entre as suas contas" }
+  // 0. Para você mesmo (seu CPF/CNPJ, "mesma titularidade", aplicação automática): não some mais da fila.
+  //    O seu salário sai assim; a regra que você ensinar vale primeiro (passo 3), senão o padrão abaixo (passo 3b).
+  const propria = ehTransferenciaPropria(tx, args.documentosProprios ?? [], args.nomesProprios ?? [])
 
   // 1. Lançamento que você já cadastrou (fora da conta de fornecedor, que não passa pelo banco)
   const tipoLanc = tx.tipo === "entrada" ? "receita" : "despesa"
@@ -154,6 +154,18 @@ export function sugerir(args: {
   if (regra?.acao === "lancar") return {
     acao: "criar", origem: "regra", motivo: `regra aprendida (${regra.vezes}×${regraConfiavel(regra) ? " · lança sozinha" : ` · ${regra.seguidas ?? 0} de ${REGRA_CONFIAVEL} para lançar sozinha`}): ${tx.contraparte_nome ?? tx.descricao}`,
     lancamentos: [{ tipo: tipoLanc, categoria: regra.categoria, ...(regra.subcategoria ? { subcategoria: regra.subcategoria } : {}), ...(regra.formaPagamento ? { formaPagamento: regra.formaPagamento } : {}), fornecedorId: regra.fornecedorId, descricao: regra.descricao ?? tx.contraparte_nome ?? tx.descricao, valor: tx.valor, status: "pago", dataVencimento: tx.data, dataPagamento: tx.data }],
+  }
+
+  // 3b. Para você, sem regra: saída = distribuição de lucros (o seu salário); rendimento da aplicação = receita;
+  //     ida e volta da aplicação automática não é receita nem despesa
+  if (propria) {
+    const base = { valor: tx.valor, status: "pago" as const, dataVencimento: tx.data, dataPagamento: tx.data }
+    if (/remunera[cç][aã]o|rendimento/i.test(tx.descricao) && tx.tipo === "entrada")
+      return { acao: "criar", origem: "regra", motivo: "rendimento da aplicação automática", lancamentos: [{ ...base, tipo: "receita", categoria: "outros", subcategoria: "Rendimento", descricao: "Rendimento da aplicação" }] }
+    if (/aplica[cç][aã]o autom|resgate autom/i.test(tx.descricao))
+      return { acao: "ignorar", motivo: "aplicação/resgate automático (o dinheiro continua seu, não é receita nem despesa)" }
+    if (tx.tipo === "saida")
+      return { acao: "criar", origem: "regra", motivo: "transferência para você: distribuição de lucros (o seu salário)", lancamentos: [{ ...base, tipo: "despesa", categoria: "salarios", subcategoria: "Distribuição de Lucros", descricao: `Distribuição de lucros${tx.contraparte_nome ? ` — ${tx.contraparte_nome}` : ""}` }] }
   }
 
   // 4. Recebimento de cliente: a conciliação do extrato (pagador × pedidos em aberto)

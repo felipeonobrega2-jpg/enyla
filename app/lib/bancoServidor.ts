@@ -136,6 +136,8 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
   const { data: antigas } = await supabase.from("banco_transacoes").select("*").eq("estado", "pendente").not("sugestao", "is", null).order("data", { ascending: false }).limit(3000)
   const refazer = ((antigas ?? []) as TxBanco[]).filter(t => {
     const sg = t.sugestao
+    // Transferência para você que antes era ignorada sem aparecer (agora é distribuição de lucros / rendimento)
+    if (sg?.acao === "ignorar" && sg.motivo === "transferência entre as suas contas") return true
     return sg?.acao === "criar" && sg.origem === "ia" && (sg.v ?? 1) < 2 && sg.lancamentos.length === 1 && !sg.lancamentos[0].subcategoria && comSubs(t.tipo).has(sg.lancamentos[0].categoria ?? "")
   })
   lista = [...lista, ...refazer]
