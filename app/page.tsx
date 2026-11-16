@@ -400,6 +400,7 @@ export default function Home() {
         if (d.contadorProp !== undefined) setContadorProp(d.contadorProp)
         if (d.kanban)                 setKanban(d.kanban.map(unpackTerceirizado))
         if (d.config)                 setConfig(c => ({ ...CONFIG_PADRAO, ...c, ...d.config }))
+        restaurarRascunho({ ...CONFIG_PADRAO, ...(d.config ?? {}) })
         const novasAprovacoes = (d.config?.aprovacoesOnline ?? []).filter((a: AprovacaoOnline) => !a.visto && !a.desfeita).length
         if (novasAprovacoes) showToast(novasAprovacoes === 1 ? "Um cliente aprovou o orçamento online. Veja no Painel." : `${novasAprovacoes} orçamentos aprovados online. Veja no Painel.`)
         if (d.parceiros)              setParceiros(d.parceiros)
@@ -421,8 +422,44 @@ export default function Home() {
           if (orfaos.length > 0) console.warn("Cards sem histórico correspondente:", orfaos.map(o => o.numero))
         }
       })
-      .catch(() => {})
+      .catch(() => restaurarRascunho(configAtual.current))
   }, [])
+
+  // ── Rascunho da mesa de orçamento: o que você está montando fica guardado neste navegador e volta depois do F5
+  // (medidas, faca/DXF, quantidades, custos editados, conversa ligada). Volta depois das Configurações carregarem,
+  // para o preço sair com os seus valores.
+  const RASCUNHO = "orcamento-rascunho-v1"
+  const rascunhoPronto = useRef(false)
+  function restaurarRascunho(cfg: Configuracoes) {
+    if (rascunhoPronto.current) return
+    rascunhoPronto.current = true
+    try {
+      const r = JSON.parse(localStorage.getItem(RASCUNHO) ?? "null") as null | {
+        form: FormData; customCustos?: typeof customCustos; customPacotesMap?: Record<number, number>; customAcabamentoCustos?: Record<string, Record<number, number>>
+        editandoHistorico?: string | null; conversaOrc?: typeof conversaOrc; dxfNome?: string | null
+      }
+      if (!r?.form) return
+      const f = { ...FORM_INICIAL, ...r.form }
+      setForm(f); setResult(calcular(f, cfg))
+      if (r.customCustos) setCustomCustos(r.customCustos)
+      if (r.customPacotesMap) setCustomPacotesMap(r.customPacotesMap)
+      if (r.customAcabamentoCustos) setCustomAcabamentoCustos(r.customAcabamentoCustos)
+      if (r.editandoHistorico) setEditandoHistorico(r.editandoHistorico)
+      if (r.conversaOrc) setConversaOrc(r.conversaOrc)
+      if (r.dxfNome) setDxfNome(r.dxfNome)
+      showToast(r.editandoHistorico ? `Você estava editando ${r.editandoHistorico}: continua de onde parou.` : `Orçamento em andamento${f.nomeCliente ? ` de ${f.nomeCliente}` : ""} recuperado.`)
+    } catch {}
+  }
+  useEffect(() => {
+    if (!rascunhoPronto.current) return
+    const t = setTimeout(() => {
+      try {
+        if (JSON.stringify(form) === JSON.stringify(FORM_INICIAL) && !editandoHistorico) { localStorage.removeItem(RASCUNHO); return }
+        localStorage.setItem(RASCUNHO, JSON.stringify({ form, customCustos, customPacotesMap, customAcabamentoCustos, editandoHistorico, conversaOrc, dxfNome }))
+      } catch {}
+    }, 400)
+    return () => clearTimeout(t)
+  }, [form, customCustos, customPacotesMap, customAcabamentoCustos, editandoHistorico, conversaOrc, dxfNome])
 
   // ── Auto-expire: move vencidos (col 0) para Perdido silenciosamente ──────────
   useEffect(() => {
