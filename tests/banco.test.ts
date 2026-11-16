@@ -135,15 +135,19 @@ describe("custo do fornecedor → pedido pelo previsto do motor", async () => {
 
 describe("aviso de duplicado ao lançar", async () => {
   const { possiveisDuplicados, duplicadosNoLote } = await import("@/app/lib/banco")
-  it("mesmo tipo e valor no mesmo dia (±1): avisa; criado desta transação ou na conta do fornecedor: não", () => {
-    const t = tx({ id: "tx9", valor: 300, data: "2026-11-11" })
-    expect(possiveisDuplicados(t, [lanc({ valor: 300, dataPagamento: "2026-11-12" })])).toHaveLength(1)
-    expect(possiveisDuplicados(t, [lanc({ valor: 300, dataPagamento: "2026-11-14" })])).toHaveLength(0)
-    expect(possiveisDuplicados(t, [lanc({ valor: 300, dataPagamento: "2026-11-11", obs: "conc:tx9" })])).toHaveLength(0)
-    expect(possiveisDuplicados(t, [lanc({ valor: 300, dataPagamento: "2026-11-11", tipo: "receita" })])).toHaveLength(0)
+  const t = tx({ id: "tx9", valor: 300, data: "2026-11-11", contraparte_nome: "Luiz Felipe Nobrega", descricao: "PIX ENVIADO Luiz Felipe" })
+  it("lançado à mão, mesmo valor e dia (±1) e parecido (categoria ou nome): avisa", () => {
+    expect(possiveisDuplicados(t, [lanc({ valor: 300, dataPagamento: "2026-11-12", descricao: "Retirada Felipe" })])).toHaveLength(1)
+    expect(possiveisDuplicados(t, [lanc({ valor: 300, dataPagamento: "2026-11-11", descricao: "Pró-labore", categoria: "salarios" })], "salarios")).toHaveLength(1)
   })
-  it("no lote: dois iguais no mesmo dia também avisam", () => {
-    const r = duplicadosNoLote([tx({ id: "a", valor: 100, data: "2026-11-11" }), tx({ id: "b", valor: 100, data: "2026-11-11" }), tx({ id: "c", valor: 500, data: "2026-11-12" })], [])
-    expect(r.map(x => x.tx.id)).toEqual(["a", "b"])
+  it("não avisa: outro gasto com o mesmo valor, longe da data, veio do banco, outro tipo", () => {
+    expect(possiveisDuplicados(t, [lanc({ valor: 300, dataPagamento: "2026-11-11", descricao: "Gasolina", categoria: "transporte" })], "salarios")).toHaveLength(0)
+    expect(possiveisDuplicados(t, [lanc({ valor: 300, dataPagamento: "2026-11-14", descricao: "Retirada Felipe" })])).toHaveLength(0)
+    expect(possiveisDuplicados(t, [lanc({ valor: 300, dataPagamento: "2026-11-11", descricao: "Retirada Felipe", obs: "conc:outra" })])).toHaveLength(0)
+    expect(possiveisDuplicados(t, [lanc({ valor: 300, dataPagamento: "2026-11-11", descricao: "Retirada Felipe", tipo: "receita" })])).toHaveLength(0)
+  })
+  it("no lote: dois Pix iguais no mesmo dia são duas transferências de verdade (não avisa)", () => {
+    const r = duplicadosNoLote([{ tx: { ...t, id: "a" } }, { tx: { ...t, id: "b" } }], [])
+    expect(r).toHaveLength(0)
   })
 })

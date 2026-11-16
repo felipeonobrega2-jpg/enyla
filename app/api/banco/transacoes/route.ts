@@ -5,7 +5,7 @@ import { pluggyConfigurada } from "@/app/lib/pluggy"
 // Extrato do banco para a aba Banco (sem o JSON bruto). ?estado=pendente|vinculada|criada|ignorada|todas
 export async function GET(req: NextRequest) {
   const estado = req.nextUrl.searchParams.get("estado") ?? "pendente"
-  let q = supabase.from("banco_transacoes").select("id, conta_id, conta_nome, data, valor, tipo, descricao, contraparte_nome, contraparte_doc, categoria_pluggy, estado, lancamento_ids, sugestao, historico")
+  let q = supabase.from("banco_transacoes").select("id, conta_id, conta_nome, data, valor, tipo, descricao, contraparte_nome, contraparte_doc, categoria_pluggy, estado, lancamento_ids, sugestao, historico, hora:bruto->>date")
   if (estado !== "todas") q = q.eq("estado", estado)
   // Para conferir: todas (a lista é o trabalho do dia); nas outras abas, as 400 mais recentes
   const { data, error } = await q.order("data", { ascending: false }).limit(estado === "pendente" ? 3000 : 400)

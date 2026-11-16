@@ -17,6 +17,10 @@ type Resposta = { configurada: boolean; tabela: boolean; erro: string | null; st
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 const dataBR = (d: string) => d.split("-").reverse().slice(0, 2).join("/")
+// Hora da transação no banco (horário de Brasília), quando o banco manda
+const horaBR = (iso?: string | null) => iso && iso.includes("T") ? new Date(iso).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }) : null
+// Quando o lançamento à mão foi digitado ("26/08/2026, 11:40:25" → "26/08 11:40")
+const digitadoEm = (s?: string) => { const m = (s ?? "").match(/^(\d{2})\/(\d{2})\/\d{4},?\s*(\d{2}):(\d{2})/); return m ? `${m[1]}/${m[2]} ${m[3]}:${m[4]}` : null }
 const campo = "h-8 rounded-lg px-2.5 text-[12px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] ds-borda"
 
 export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, onUpdate, onDelete }: {
@@ -120,6 +124,8 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
   // Lote: antes de lançar, confere duplicados (mesmo valor no mesmo dia já lançado, ou repetido no próprio lote)
   type Passo = { tx: TxBanco; decisao: Record<string, unknown> }
   const [revisaoLote, setRevisaoLote] = useState<{ titulo: string; plano: Passo[]; suspeitos: ReturnType<typeof duplicadosNoLote> } | null>(null)
+  // Em cada suspeita: "lancar" (não é duplicado) ou o id do lançamento que já é ela (vincula, não lança de novo)
+  const [escolhas, setEscolhas] = useState<Record<string, string>>({})
   const [lancandoLote, setLancandoLote] = useState<string | null>(null)
   async function rodarLote(plano: Passo[]) {
     setRevisaoLote(null)
@@ -128,8 +134,10 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
   }
   function lote(titulo: string, plano: Passo[]) {
     if (!plano.length) return
-    const suspeitos = duplicadosNoLote(plano.map(p => p.tx), lancamentos)
+    const categoriaDe = (d: Record<string, unknown>) => (d.lancamentos as { categoria?: string }[] | undefined)?.[0]?.categoria
+    const suspeitos = duplicadosNoLote(plano.map(p => ({ tx: p.tx, categoria: categoriaDe(p.decisao) })), lancamentos)
     if (!suspeitos.length) { if (confirm(`${titulo}?`)) void rodarLote(plano); return }
+    setEscolhas({})
     setRevisaoLote({ titulo, plano, suspeitos })
   }
   const decisaoDe = (s: SugestaoBanco): Record<string, unknown> | null =>
@@ -272,16 +280,25 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
                   <span className="text-[13px] font-semibold text-[#191625] truncate">{tx.contraparte_nome ?? tx.descricao}</span>
                   <span className="ml-auto text-[13.5px] font-bold ds-num shrink-0" style={{ color: entrada ? "#009351" : "#d33a3c" }}>{entrada ? "+" : "−"}{brl(tx.valor)}</span>
                 </div>
-                <p className="text-[11px] text-[#898892] truncate">{dataBR(tx.data)} · {tx.conta_nome ?? "conta"} · {tx.descricao}{tx.contraparte_doc ? ` · ${tx.contraparte_doc}` : ""}</p>
+                <p className="text-[11px] text-[#898892] truncate">{dataBR(tx.data)}{horaBR(tx.hora) ? ` ${horaBR(tx.hora)}` : ""} · {tx.conta_nome ?? "conta"} · {tx.descricao}{tx.contraparte_doc ? ` · ${tx.contraparte_doc}` : ""}</p>
 
                 {estado === "pendente" ? (
                   <div className="mt-2 rounded-lg px-3 py-2 bg-[rgba(132,86,232,0.05)] border border-[rgba(132,86,232,0.14)]">
                     <Sugestao s={s} nomeCat={nomeCat} nomeForn={nomeForn} lancPorId={lancPorId} />
                     {s?.acao === "criar" && (() => {
-                      const dup = possiveisDuplicados(tx, lancamentos)
+                      const dup = possiveisDuplicados(tx, lancamentos, s.lancamentos[0]?.categoria)
                       return dup.length > 0 && (
-                        <p className="mt-1.5 text-[11.5px] text-[#b26b00] flex items-start gap-1.5"><AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                          <span>Pode ser duplicado: já existe {dup.map(l => `“${l.descricao}” de ${brl(l.valor)} em ${dataBR((l.dataPagamento ?? l.dataVencimento).slice(0, 10))}`).join(", ")}. Confira se foi 2x mesmo.</span></p>
+                        <div className="mt-1.5 text-[11.5px] text-[#b26b00] flex items-start gap-1.5"><AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                          <div>
+                            <p>Pode ser duplicado. Você já lançou à mão:</p>
+                            {dup.map(l => (
+                              <p key={l.id} className="flex items-center gap-2 flex-wrap">
+                                <span>“{l.descricao}” de {brl(l.valor)} em {dataBR((l.dataPagamento ?? l.dataVencimento).slice(0, 10))}{digitadoEm(l.criadoEm) ? ` (digitado em ${digitadoEm(l.criadoEm)})` : ""}</span>
+                                <button onClick={() => decidir(tx, { acao: "vincular", lancamentoId: l.id })} className="font-semibold text-[#8456e8] hover:underline">É esta: vincular</button>
+                              </p>
+                            ))}
+                          </div>
+                        </div>
                       )
                     })()}
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap">
@@ -326,28 +343,39 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
         </div>
       )}
       {revisaoLote && (() => {
-        const ids = new Set(revisaoLote.suspeitos.map(x => x.tx.id))
-        const semSuspeitos = revisaoLote.plano.filter(p => !ids.has(p.tx.id))
+        const escolha = (id: string) => escolhas[id] ?? "lancar"
+        const planoFinal = revisaoLote.plano.map(p => escolha(p.tx.id) === "lancar" ? p : { tx: p.tx, decisao: { acao: "vincular", lancamentoId: escolha(p.tx.id) } })
+        const nVincular = planoFinal.filter(p => p.decisao.acao === "vincular" && revisaoLote.suspeitos.some(x => x.tx.id === p.tx.id)).length
         return (
           <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" style={{ background: "rgba(25,22,37,0.38)" }} onClick={e => { if (e.target === e.currentTarget) setRevisaoLote(null) }}>
-            <div className="w-full max-w-lg rounded-2xl bg-white p-5 space-y-3 shadow-2xl max-h-[85vh] flex flex-col">
+            <div className="w-full max-w-lg rounded-2xl bg-white p-5 space-y-3 shadow-2xl max-h-[88vh] flex flex-col">
               <div>
                 <p className="text-[15px] font-semibold text-[#191625] flex items-center gap-2"><AlertCircle className="w-4 h-4 text-[#b26b00]" />{revisaoLote.suspeitos.length} {revisaoLote.suspeitos.length === 1 ? "pode estar duplicada" : "podem estar duplicadas"}</p>
-                <p className="text-[12px] text-[#5e5c68] mt-0.5">{revisaoLote.titulo}. Nestes dias já existe lançamento com o mesmo valor, ou há dois iguais no lote. Confira se foi 2x mesmo.</p>
+                <p className="text-[12px] text-[#5e5c68] mt-0.5">{revisaoLote.titulo}. Nestes dias você já tinha lançado à mão algo parecido com o mesmo valor. Em cada uma, diga se é outra (lançar) ou se é a mesma (só vincula ao que já está lançado).</p>
               </div>
               <div className="overflow-y-auto divide-y divide-[rgba(60,60,67,0.08)] rounded-xl border border-[rgba(60,60,67,0.1)]">
-                {revisaoLote.suspeitos.map(x => (
-                  <div key={x.tx.id} className="px-3 py-2 text-[12px]">
-                    <p className="font-semibold text-[#191625]">{dataBR(x.tx.data)} · {brl(x.tx.valor)}</p>
-                    {x.existentes.map(l => <p key={l.id} className="text-[#5e5c68]">Já lançado: “{l.descricao}” em {dataBR((l.dataPagamento ?? l.dataVencimento).slice(0, 10))}</p>)}
-                    {x.irmas > 0 && <p className="text-[#5e5c68]">Mais {x.irmas} {x.irmas === 1 ? "transação igual" : "transações iguais"} neste dia, no lote</p>}
-                  </div>
-                ))}
+                {revisaoLote.suspeitos.map(x => {
+                  const h = horaBR((x.tx as TxBanco).hora)
+                  const opc = (v: string, rotulo: React.ReactNode) => (
+                    <label key={v} className={`flex items-start gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-[12px] ${escolha(x.tx.id) === v ? "bg-[#8456e8]/[0.07]" : "hover:bg-black/[0.03]"}`}>
+                      <input type="radio" className="mt-0.5 accent-[#8456e8]" checked={escolha(x.tx.id) === v} onChange={() => setEscolhas(e => ({ ...e, [x.tx.id]: v }))} />
+                      <span className="text-[#191625]">{rotulo}</span>
+                    </label>
+                  )
+                  return (
+                    <div key={x.tx.id} className="px-3 py-2.5">
+                      <p className="text-[12.5px] font-semibold text-[#191625] mb-1">No banco: {dataBR(x.tx.data)}{h ? ` às ${h}` : ""} · {brl(x.tx.valor)}</p>
+                      {opc("lancar", <>Lançar: é outra (não é duplicado)</>)}
+                      {x.existentes.map(l => opc(l.id, <>É esta, já lançada: <b>“{l.descricao}”</b> em {dataBR((l.dataPagamento ?? l.dataVencimento).slice(0, 10))}{digitadoEm(l.criadoEm) ? <span className="text-[#898892]"> (digitada em {digitadoEm(l.criadoEm)})</span> : null}</>))}
+                    </div>
+                  )
+                })}
               </div>
               <div className="flex flex-wrap gap-2 justify-end pt-1">
                 <Botao variante="fantasma" onClick={() => setRevisaoLote(null)}>Cancelar</Botao>
-                {semSuspeitos.length > 0 && <Botao onClick={() => void rodarLote(semSuspeitos)}>Pular as suspeitas e lançar {semSuspeitos.length}</Botao>}
-                <Botao variante="primario" onClick={() => void rodarLote(revisaoLote.plano)}>Lançar todas ({revisaoLote.plano.length})</Botao>
+                <Botao variante="primario" onClick={() => void rodarLote(planoFinal)}>
+                  {nVincular ? `Lançar ${planoFinal.length - nVincular} e vincular ${nVincular}` : `Lançar todas (${planoFinal.length})`}
+                </Botao>
               </div>
             </div>
           </div>

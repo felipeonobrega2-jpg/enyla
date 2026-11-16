@@ -10,7 +10,7 @@
 import type { LancamentoFinanceiro } from "../types"
 import type { Fornecedor } from "../config"
 import { Pedido, nomeChave } from "./negocio"
-import { conciliar, aplicarConciliacao, MemoriaConciliacao } from "./conciliacao"
+import { conciliar, aplicarConciliacao, MemoriaConciliacao, MARCA } from "./conciliacao"
 
 export type EstadoTx = "pendente" | "vinculada" | "criada" | "ignorada"
 
@@ -25,6 +25,7 @@ export type TxBanco = {
   contraparte_nome: string | null
   contraparte_doc: string | null
   categoria_pluggy: string | null
+  hora?: string | null         // data e hora da transação no banco (ISO), quando o banco manda
   estado: EstadoTx
   lancamento_ids: string[]
   sugestao: SugestaoBanco | null
@@ -241,19 +242,20 @@ export function aceitouSemMudar(sg: SugestaoBanco | null, criados: Partial<Lanca
 export const zerarConfianca = (regras: RegraBanco[], tx: TxBanco) =>
   regras.map(r => r.chave === chaveContraparte(tx) && r.tipo === tx.tipo ? { ...r, seguidas: 0 } : r)
 
-// Possível duplicado: lançamento que já existe com o mesmo tipo e valor na mesma data (um dia de folga), que não foi
-// criado a partir desta transação. Serve de aviso antes de lançar (em lote ou um a um): você confere se foi 2x mesmo.
-export function possiveisDuplicados(tx: Pick<TxBanco, "id" | "tipo" | "valor" | "data">, lancamentos: LancamentoFinanceiro[]): LancamentoFinanceiro[] {
+// Possível duplicado: lançamento feito À MÃO (o que veio de outra transação do banco é outra transferência de
+// verdade) com o mesmo tipo e valor na mesma data (um dia de folga) e parecido: a mesma categoria do que vai lançar,
+// ou o nome de quem recebeu/pagou na descrição. Você confere se foi 2x mesmo.
+const palavras = (s: string) => nomeChave(s).split(" ").filter(w => w.length > 3)
+export function possiveisDuplicados(tx: Pick<TxBanco, "id" | "tipo" | "valor" | "data" | "contraparte_nome" | "descricao">, lancamentos: LancamentoFinanceiro[], categoria?: string): LancamentoFinanceiro[] {
   const tipo = tx.tipo === "entrada" ? "receita" : "despesa"
+  const doOutroLado = new Set(palavras(`${tx.contraparte_nome ?? ""} ${tx.descricao}`).filter(w => !/^(pix|enviado|recebido|transf|debito|credito|visa|electron|brasil|ltda)$/.test(w)))
   return lancamentos.filter(l => l.tipo === tipo && l.formaPagamento !== "conta" && igual(l.valor, tx.valor)
-    && distancia(tx.data, (l.dataPagamento ?? l.dataVencimento).slice(0, 10)) <= 1 && !(l.obs ?? "").includes(tx.id))
+    && distancia(tx.data, (l.dataPagamento ?? l.dataVencimento).slice(0, 10)) <= 1
+    && !(l.obs ?? "").includes(MARCA)
+    && ((!!categoria && l.categoria === categoria) || palavras(l.descricao).some(w => doOutroLado.has(w))))
 }
 
-// No lote: além do que já existe, transações iguais (mesmo tipo, valor e dia) que entrariam juntas
-export function duplicadosNoLote(txs: Pick<TxBanco, "id" | "tipo" | "valor" | "data">[], lancamentos: LancamentoFinanceiro[]) {
-  return txs.map(t => ({
-    tx: t,
-    existentes: possiveisDuplicados(t, lancamentos),
-    irmas: txs.filter(o => o.id !== t.id && o.tipo === t.tipo && igual(o.valor, t.valor) && o.data === t.data).length,
-  })).filter(x => x.existentes.length > 0 || x.irmas > 0)
+// No lote: as que têm possível duplicado (com a categoria que cada uma vai receber)
+export function duplicadosNoLote(itens: { tx: Pick<TxBanco, "id" | "tipo" | "valor" | "data" | "contraparte_nome" | "descricao">; categoria?: string }[], lancamentos: LancamentoFinanceiro[]) {
+  return itens.map(i => ({ tx: i.tx, existentes: possiveisDuplicados(i.tx, lancamentos, i.categoria) })).filter(x => x.existentes.length > 0)
 }

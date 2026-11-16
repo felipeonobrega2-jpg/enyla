@@ -368,7 +368,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
         t("c", { valor: 1350, contraparte_nome: "PAPELARIA BRAS LTDA", sugestao: { acao: "criar", origem: "ia", motivo: "IA: papel cartão para o lote do Maurício (valor e fornecedor de papel)", lancamentos: [{ descricao: "Papel", categoria: "materiais", subcategoria: "Papel cartão", valor: 900, loteNumero: "MAU-007" }, { descricao: "Impressão", categoria: "fornecedor", valor: 450, loteNumero: "MAU-007" }] } }),
         t("d", { valor: 89.9, contraparte_nome: "IFOOD", descricao: "COMPRA CARTAO DEBITO", sugestao: { acao: "ignorar", motivo: "IA: gasto pessoal (alimentação)" } }),
         t("e", { valor: 37.5, descricao: "TARIFA PACOTE SERVICOS", sugestao: { acao: "revisar", motivo: "sem pista: confira" } }),
-        t("f", { valor: 470, contraparte_nome: "FACAS E VINCOS EXEMPLO", sugestao: { acao: "criar", origem: "regra", motivo: "regra aprendida (4× · 2 de 3 para lançar sozinha): FACAS E VINCOS EXEMPLO · pedido ORC-2026-201 (Perfumaria Modelo): Corte e vinco previsto R$ 480,00", lancamentos: [{ descricao: "Corte e vinco", categoria: "fornecedor", subcategoria: "Corte e Vinco", valor: 470, cardNumero: "ORC-2026-201" }] } }),
+        t("f", { valor: 470, hora: "2026-11-03T13:22:00Z", contraparte_nome: "FACAS E VINCOS EXEMPLO", sugestao: { acao: "criar", origem: "regra", motivo: "regra aprendida (4× · 2 de 3 para lançar sozinha): FACAS E VINCOS EXEMPLO · pedido ORC-2026-201 (Perfumaria Modelo): Corte e vinco previsto R$ 480,00", lancamentos: [{ descricao: "Corte e vinco", categoria: "fornecedor", subcategoria: "Corte e Vinco", valor: 470, cardNumero: "ORC-2026-201" }] } }),
         t("g", { valor: 310, data: "2026-11-05", contraparte_nome: "FACAS E VINCOS EXEMPLO", sugestao: { acao: "criar", origem: "regra", motivo: "regra aprendida (4× · 2 de 3 para lançar sozinha): FACAS E VINCOS EXEMPLO", lancamentos: [{ descricao: "Corte e vinco", categoria: "fornecedor", subcategoria: "Corte e Vinco", valor: 310 }] } }),
       ] }))
   }
@@ -430,7 +430,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
 function Telas() {
   const [cfg, setCfg] = React.useState(config)
   const [lancs, setLancs] = React.useState(tela === "financeiro-banco-dup"
-    ? [...dados.lancamentos, { id: "dup1", tipo: "despesa", descricao: "Corte e vinco (lançado à mão)", valor: 470, dataVencimento: "2026-11-03", dataPagamento: "2026-11-03", status: "pago", criadoEm: "" } as never]
+    ? [...dados.lancamentos, { id: "dup1", tipo: "despesa", descricao: "Corte e vinco (lançado à mão)", categoria: "fornecedor", valor: 470, dataVencimento: "2026-11-03", dataPagamento: "2026-11-03", status: "pago", criadoEm: "03/11/2026, 18:05:12" } as never]
     : dados.lancamentos)
   const [form, setForm] = React.useState(dados.historico[0].form)
   const pagina = (filho: React.ReactNode) => <div style={{ padding: 24, background: "#f5f5f7", minHeight: "100vh" }}><div className="max-w-[1320px] mx-auto">{filho}</div></div>
