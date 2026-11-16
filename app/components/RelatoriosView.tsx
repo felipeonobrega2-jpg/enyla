@@ -13,6 +13,7 @@ import { brl, num } from "../utils"
 import { CabecalhoPagina, Segmentado, Botao, Cartao, TituloCartao, ColunasDuplas, Colunas, ListaBarras, Vazio } from "./ds"
 import { gerarHtmlRelatorio } from "../lib/relatorioHtml"
 import { TempoAteFecharCard } from "./TempoAteFecharCard"
+import { SaudeEmpresaCard } from "./SaudeEmpresaCard"
 import { PrevisaoCartao } from "./PrevisaoCartao"
 import { SimuladorCartao } from "./SimuladorCartao"
 import { baseDoSimulador } from "../lib/simulador"
@@ -237,6 +238,8 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, 
         />
 
         <PrevisaoCartao p={prev} onAbrirCliente={onAbrirCliente} />
+
+        <SaudeEmpresaCard kanban={kanban} pedidos={pedidos} />
 
         <Cartao padding={false} className="ds-entrada">
           <div className="px-5 pt-5">
