@@ -64,6 +64,7 @@ export type PedidoDigital = {
   restante?: number; restantePagoEm?: string; pagamentoFinal?: { txId: string; valor: number; data: string; nome: string | null }
   acertadoEm?: string
   lembreteDepois?: string; lembreteParado?: boolean           // lead adiou (espera) · você assumiu a conversa (sem lembrete)
+  reenviadoEm?: string                                         // orçamento reenviado com os valores (varredura)
   documento?: string                                         // CPF/CNPJ (cobrança no Asaas e nota)
   teste?: boolean                                            // pedido de teste (você paga para você): fora de Villa, designer, acerto e margem
   asaas?: { cliente?: string; sinal?: CobrancaPix; restante?: CobrancaPix }
@@ -256,6 +257,12 @@ export function itensDoLembrete(pedidos: Pick<PedidoDigital, "id" | "quantidade"
 }
 
 const semente = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7)
+// Reenvio do orçamento com os valores (quem recebeu só o link, ou a mensagem não apareceu): uma vez por pedido
+export function textoReenvioDigital(nome: string | null, itens: string): string {
+  const n = primeiroNome(nome)
+  return `${n ? `Oi, ${n}!` : "Oi, tudo bem?"} A mensagem com o seu orçamento pode não ter aparecido direito aí no WhatsApp, então deixo aqui com os valores:\n\n${itens}\n\nArte inclusa (a gente cria pra você). No link você vê a caixa e paga o sinal de 50% pelo Pix. Qualquer dúvida, é só me chamar.`
+}
+
 // "itens": o orçamento já escrito (itensDoLembrete), com valor e link de cada caixa
 export function textoLembreteDigital(p: Pick<PedidoDigital, "nome" | "quantidade" | "total" | "em"> & { jid?: string }, nivel: 1 | 2, itens: string, opts: { adiou?: boolean } = {}): string {
   const n = primeiroNome(p.nome)

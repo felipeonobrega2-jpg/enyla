@@ -119,6 +119,14 @@ describe("lembrete do pedido e painel", async () => {
     expect(dois).toMatch(/Caixa 2 .*R\$\s339,94\*\nL\/B/)
     for (const n of [1, 2] as const) expect(textoLembreteDigital({ ...base, jid: "a" }, n, um)).toMatch(/R\$\s419,95/)
   })
+  it("reenvio traz os valores e explica sem falar de sistema", async () => {
+    const { textoReenvioDigital, itensDoLembrete } = await import("../app/lib/digital")
+    const { FALA_DE_SISTEMA } = await import("../app/lib/agenteLeads")
+    const t = textoReenvioDigital("THIAGO nagano", itensDoLembrete([{ id: "A", quantidade: 100, medidas: { a: 7.5, l: 7.5, p: 5.4 }, total: 719.95, ml: null }], id => `L/${id}`))
+    expect(t).toMatch(/^Oi, Thiago!/)
+    expect(t).toMatch(/R\$\s719,95\*\nL\/A/)
+    expect(FALA_DE_SISTEMA.test(t)).toBe(false)
+  })
   it("2º lembrete dá a validade; quem adiou recebe um sem pressa", () => {
     expect(textoLembreteDigital({ ...base, jid: "a" }, 2, "L")).toContain("até 21/11")
     expect(textoLembreteDigital(base, 1, "L", { adiou: true })).toContain("Sem pressa")
