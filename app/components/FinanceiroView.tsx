@@ -1,6 +1,7 @@
 "use client"
 
 import { etapasNoTexto, SUBCATEGORIA } from "../lib/calibragem"
+import { CampoCriavel } from "./CampoCriavel"
 import { CaixaView } from "./CaixaView"
 import { ConciliacaoView } from "./ConciliacaoView"
 import { previsaoDeCaixa } from "../lib/caixa"
@@ -239,8 +240,19 @@ export type ModalLancProps = {
 }
 
 export function ModalLancamento({ inicial, kanban, categoriasReceita, categoriasDespesa, contas, fornecedores, onSave, onClose }: ModalLancProps) {
-  const catsRec  = categoriasReceita ?? DEFAULT_CATS_REC
-  const catsDesp = categoriasDespesa ?? DEFAULT_CATS_DESP
+  // Categorias e subcategorias novas criadas aqui mesmo (digitando uma que não existe): valem na hora
+  const [catsLocal, setCatsLocal] = useState<{ despesa: CategoriaFinanceira[]; receita: CategoriaFinanceira[] } | null>(null)
+  const catsRec  = catsLocal?.receita ?? categoriasReceita ?? DEFAULT_CATS_REC
+  const catsDesp = catsLocal?.despesa ?? categoriasDespesa ?? DEFAULT_CATS_DESP
+  async function criarNaConfig(corpo: { nova?: string; categoriaId?: string; sub?: string }): Promise<string | null> {
+    const r = await fetch("/api/config/categorias", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo: tipo === "despesa" ? "despesa" : "receita", ...corpo }) })
+      .then(x => x.ok ? x.json() : null).catch(() => null) as { id: string; categoriasDespesa: CategoriaFinanceira[]; categoriasReceita: CategoriaFinanceira[] } | null
+    if (!r) { alert("Não consegui criar. Tente de novo."); return null }
+    setCatsLocal({ despesa: r.categoriasDespesa, receita: r.categoriasReceita })
+    // O resto do sistema (que tem a configuração carregada) fica sabendo, sem recarregar
+    window.dispatchEvent(new CustomEvent("categorias-atualizadas", { detail: { categoriasDespesa: r.categoriasDespesa, categoriasReceita: r.categoriasReceita } }))
+    return r.id
+  }
   const contasAtivas = (contas ?? []).filter(c => c.ativa)
   const fornecedoresAtivos = (fornecedores ?? []).filter(f => f.ativo)
   const fornecedoresConta = fornecedoresAtivos.filter(f => f.conta)
@@ -563,22 +575,18 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
           </Field>
 
           <Field label="Categoria">
-            <select value={categoria} onChange={e => { setCategoria(e.target.value); setSubcategoria("") }} className={inp()}>
-              <option value="">Selecione…</option>
-              {catsAtivas.map(c => (
-                <option key={c.id} value={c.id}>{c.nome}</option>
-              ))}
-            </select>
+            <CampoCriavel valor={categoria} opcoes={catsAtivas.map(c => ({ id: c.id, nome: c.nome }))} className={inp()}
+              placeholder="Digite: escolha ou crie uma categoria" rotuloCriar="Criar categoria"
+              onEscolher={id => { if (id !== categoria) { setCategoria(id); setSubcategoria("") } }}
+              onCriar={nome => criarNaConfig({ nova: nome })} />
           </Field>
 
-          {temSubs && (
+          {categoria && (
             <Field label="Subcategoria">
-              <select value={subcategoria} onChange={e => setSubcategoria(e.target.value)} className={inp()}>
-                <option value="">Selecione…</option>
-                {(catSel?.subcategorias ?? []).map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+              <CampoCriavel valor={subcategoria} opcoes={(catSel?.subcategorias ?? []).map(s => ({ id: s, nome: s }))} className={inp()}
+                placeholder={temSubs ? "Digite: escolha ou crie uma subcategoria" : "Nenhuma ainda: digite para criar"} rotuloCriar="Criar subcategoria"
+                onEscolher={setSubcategoria}
+                onCriar={async nome => (await criarNaConfig({ categoriaId: categoria, sub: nome })) ? nome : null} />
             </Field>
           )}
 

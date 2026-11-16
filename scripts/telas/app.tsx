@@ -437,6 +437,7 @@ function Telas() {
     case "config-agentes": case "config-sistema": case "abertura": try { sessionStorage.setItem("config:aba", tela === "abertura" ? "agentes" : tela.slice(7)) } catch {} // falls through
     case "config": return <ThemeProvider><div style={{ height: "100vh" }}><ConfigView config={cfg} onSave={setCfg} onExportar={() => {}} onImportar={() => {}} clientes={["Cliente Relacionamento", "Outro Cliente"]} /></div></ThemeProvider>
     case "lancamento": return <ModalLancamento inicial={{ tipo: "despesa", descricao: "Impressão + Papel", valor: 3100 }} kanban={dados.kanban} onSave={() => {}} onClose={() => {}} />
+    case "lancamento-criar": case "lancamento-sub": return <ModalLancamento inicial={{ tipo: "despesa", descricao: "Pix Papelaria", valor: 350, categoria: tela === "lancamento-sub" ? "materiais" : undefined }} kanban={dados.kanban} categoriasDespesa={[{ id: "materiais", nome: "Materiais", subcategorias: ["Papel", "Tinta"] }, { id: "transporte", nome: "Transporte", subcategorias: ["Lalamove"] }, { id: "marketing", nome: "Marketing" }]} onSave={() => {}} onClose={() => {}} />
     case "parceiros": case "parceiros-modal": {
       const parc = [{ id: "p1", nome: "Jeferson Vidros", categoria: "Vidros", comissaoDefault: 3, criadoEm: "" }, { id: "p2", nome: "Marcelino", categoria: "Impressão", comissaoDefault: 0, criadoEm: "" }, { id: "p3", nome: "Denis Essências", categoria: "Essências", comissaoDefault: 0, criadoEm: "" }]
       const negs = [

@@ -329,6 +329,16 @@ export default function Home() {
   const { isDark, setTheme, theme } = useTheme()
   const expirySweepDone = useRef(false)
 
+  // Categoria/subcategoria criada no lançamento: entra na configuração carregada (o servidor já gravou)
+  useEffect(() => {
+    const ouvir = (e: Event) => {
+      const d = (e as CustomEvent<{ categoriasDespesa: Configuracoes["categoriasDespesa"]; categoriasReceita: Configuracoes["categoriasReceita"] }>).detail
+      if (d) setConfig(c => ({ ...c, categoriasDespesa: d.categoriasDespesa, categoriasReceita: d.categoriasReceita }))
+    }
+    window.addEventListener("categorias-atualizadas", ouvir)
+    return () => window.removeEventListener("categorias-atualizadas", ouvir)
+  }, [])
+
   // Cmd+K global search shortcut
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
