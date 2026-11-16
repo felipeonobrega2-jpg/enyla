@@ -41,6 +41,7 @@ import { calcular, compactarCalculo } from "./calculos"
 import { Configuracoes, CONFIG_PADRAO } from "./config"
 import LayoutChapaVisual from "./LayoutChapaVisual"
 import { RotasProducao } from "./components/RotasProducao"
+import { registrarCorrecao, correcoesParecidas } from "./lib/aprendizado"
 import { FornecedoresView } from "./components/FornecedoresView"
 import { PainelView } from "./components/PainelView"
 import { ParceriasView } from "./components/ParceriasView"
@@ -3089,6 +3090,13 @@ export default function Home() {
                 comFaca={form.comFaca}
                 onOpcoes={o => mudarForm(p => ({ ...p, rota: o }))}
                 onRegistrarFaca={registrarFaca}
+                onCorrecao={c => {
+                  const novo = registrarCorrecao(config, c)
+                  salvarConfigTudo(novo)
+                  if (c.tipo === "excecao") { showToast("Anotado como exceção: o motor não muda por isso."); return }
+                  const n = correcoesParecidas(novo, c)
+                  showToast(n >= 3 ? "Anotado. Já há correções parecidas: veja a sugestão de calibragem em Fornecedores → Calibragem." : `Anotado (${n} de 3). Com 3 correções parecidas o motor sugere calibrar.`)
+                }}
               />
 
               {/* ── Layout da chapa ── */}

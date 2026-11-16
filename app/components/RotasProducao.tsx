@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowRight, Check, Printer, Scissors, Layers, Truck, Wre
 import { Calculo, FormData } from "../types"
 import { ConfigProducao, OpcoesRota, Rota, ItemCusto, ColagemModo, EtapaCusto, CustoExtra, chaveCavidades } from "../lib/producao"
 import { brl, num } from "../utils"
+import type { TipoCorrecao } from "../lib/aprendizado"
 import { Section } from "./ui"
 
 const border = { border: "1px solid rgba(60,60,67,0.08)" }
@@ -28,25 +29,48 @@ function Manual({ motor }: { motor: number }) {
   )
 }
 
-// Valor de um custo: clique para digitar; vale para esta tiragem ou para todas
+// Por que você trocou o valor do motor: o que não é exceção ensina a calibragem
+const TIPOS_CORRECAO: { v: TipoCorrecao; nome: string; dica: string }[] = [
+  { v: "preco", nome: "Preço do fornecedor mudou", dica: "Ensina o motor: o cadastro desse fornecedor está desatualizado" },
+  { v: "motor", nome: "O motor erra nisso", dica: "Ensina o motor: a conta não bate com a realidade nesse tipo de serviço" },
+  { v: "excecao", nome: "Só neste pedido", dica: "Não ensina: negociação, urgência ou caso especial" },
+]
+
+// Valor de um custo: clique para digitar; vale para esta tiragem ou para todas. Diga o porquê e o motor aprende.
 function ValorEditavel({ item, onSalvar, onRestaurar }: {
   item: ItemCusto
-  onSalvar: (v: number, todas: boolean) => void
+  onSalvar: (v: number, todas: boolean, porque: { tipo: TipoCorrecao; motivo: string }) => void
   onRestaurar: () => void
 }) {
   const [editando, setEditando] = React.useState(false)
   const [txt, setTxt] = React.useState("")
-  const abrir = () => { setTxt(item.valor.toFixed(2).replace(".", ",")); setEditando(true) }
-  const salvar = (todas: boolean) => { const v = lerNum(txt); if (v != null && v >= 0) onSalvar(v, todas); setEditando(false) }
+  const [tipo, setTipo] = React.useState<TipoCorrecao>("motor")
+  const [motivo, setMotivo] = React.useState("")
+  const abrir = () => { setTxt(item.valor.toFixed(2).replace(".", ",")); setTipo("motor"); setMotivo(""); setEditando(true) }
+  const salvar = (todas: boolean) => { const v = lerNum(txt); if (v != null && v >= 0) onSalvar(v, todas, { tipo, motivo: motivo.trim() }); setEditando(false) }
   if (editando) {
+    const tecla = (e: React.KeyboardEvent) => { if (e.key === "Enter") salvar(false); if (e.key === "Escape") setEditando(false) }
     return (
-      <div className="flex items-center gap-1.5 shrink-0">
-        <input autoFocus value={txt} onChange={e => setTxt(e.target.value)} inputMode="decimal"
-          onKeyDown={e => { if (e.key === "Enter") salvar(false); if (e.key === "Escape") setEditando(false) }}
-          className={`${inputCls} w-24 text-right`} style={inputStyle} />
-        <button onClick={() => salvar(false)} className="h-8 px-2 rounded-lg text-[11px] font-medium bg-[#0b0914] text-white">Esta tiragem</button>
-        <button onClick={() => salvar(true)} className="h-8 px-2 rounded-lg text-[11px] font-medium text-[#5e5c68] hover:bg-[rgba(116,116,128,0.08)]" style={border}>Todas</button>
-        <button onClick={() => setEditando(false)} aria-label="Cancelar" className="h-8 w-8 grid place-items-center rounded-lg text-[#898892] hover:bg-[rgba(116,116,128,0.08)]"><X className="w-3.5 h-3.5" /></button>
+      <div className="flex flex-col items-end gap-1.5 shrink-0 py-1">
+        <div className="flex items-center gap-1.5">
+          <input autoFocus value={txt} onChange={e => setTxt(e.target.value)} inputMode="decimal" onKeyDown={tecla}
+            className={`${inputCls} w-24 text-right`} style={inputStyle} aria-label="Novo valor" />
+          <button onClick={() => salvar(false)} className="h-8 px-2 rounded-lg text-[11px] font-medium bg-[#0b0914] text-white">Esta tiragem</button>
+          <button onClick={() => salvar(true)} className="h-8 px-2 rounded-lg text-[11px] font-medium text-[#5e5c68] hover:bg-[rgba(116,116,128,0.08)]" style={border}>Todas</button>
+          <button onClick={() => setEditando(false)} aria-label="Cancelar" className="h-8 w-8 grid place-items-center rounded-lg text-[#898892] hover:bg-[rgba(116,116,128,0.08)]"><X className="w-3.5 h-3.5" /></button>
+        </div>
+        <div className="w-[340px] max-w-[70vw] rounded-lg bg-[#8456e8]/[0.04] border border-[#8456e8]/15 p-2 space-y-1.5">
+          <p className="text-[10.5px] font-semibold text-[#8456e8]">Por que mudou? O motor aprende com isso</p>
+          <div className="flex flex-wrap gap-1">
+            {TIPOS_CORRECAO.map(t => (
+              <button key={t.v} type="button" title={t.dica} onClick={() => setTipo(t.v)}
+                className={`h-6 px-2 rounded-full text-[10.5px] font-semibold transition-colors ${tipo === t.v ? "bg-[#8456e8] text-white" : "bg-white text-[#5e5c68] border border-[rgba(60,60,67,0.12)] hover:border-[#8456e8]/40"}`}>{t.nome}</button>
+            ))}
+          </div>
+          <input value={motivo} onChange={e => setMotivo(e.target.value)} onKeyDown={tecla}
+            placeholder={tipo === "excecao" ? "Ex.: cliente negociou, urgência…" : "Ex.: o corte e vinco subiu para R$ 120 o milheiro"}
+            className="w-full h-7 rounded-md px-2 text-[11.5px] bg-white border border-[rgba(60,60,67,0.12)] focus:outline-none focus:border-[#8456e8]/50" />
+        </div>
       </div>
     )
   }
@@ -146,7 +170,9 @@ function Passadas({ rota, onCavidades }: { rota: Rota; onCavidades?: (lista: num
   )
 }
 
-export function RotasProducao({ calculo, form, producao, multiplicadorPadrao, comFaca, onOpcoes, onRegistrarFaca }: {
+export type CorrecaoDoOrcamento = { etapa: EtapaCusto; fornecedorId?: string; fornecedor?: string; materialId?: string; quantidade: number; motor: number; manual: number; todas: boolean; tipo: TipoCorrecao; motivo: string; cliente: string }
+
+export function RotasProducao({ calculo, form, producao, multiplicadorPadrao, comFaca, onOpcoes, onRegistrarFaca, onCorrecao }: {
   calculo: Calculo
   form: FormData
   producao: ConfigProducao
@@ -154,6 +180,7 @@ export function RotasProducao({ calculo, form, producao, multiplicadorPadrao, co
   comFaca: boolean
   onOpcoes: (o: OpcoesRota) => void
   onRegistrarFaca: (rota: Rota) => void
+  onCorrecao?: (c: CorrecaoDoOrcamento) => void
 }) {
   const rotas = calculo.rotas ?? []
   const [qtdSel, setQtdSel] = React.useState<number | null>(null)
@@ -285,7 +312,12 @@ export function RotasProducao({ calculo, form, producao, multiplicadorPadrao, co
                   {i.descricao}{i.fornecedor ? ` · ${i.fornecedor}` : ""}
                 </span>
                 {i.valorMotor != null ? <Manual motor={i.valorMotor} /> : i.estimado && <Estimado />}
-                <ValorEditavel item={i} onSalvar={(v, todas) => definirValor(i.etapa, v, todas)} onRestaurar={() => definirValor(i.etapa, null, false)} />
+                <ValorEditavel item={i} onSalvar={(v, todas, porque) => {
+                  definirValor(i.etapa, v, todas)
+                  const motor = i.valorMotor ?? i.valor
+                  if (Math.abs(v - motor) > 0.009) onCorrecao?.({ etapa: i.etapa, fornecedorId: i.fornecedorId, fornecedor: i.fornecedor, materialId: form.materialId, quantidade: atual.quantidade,
+                    motor, manual: v, todas, tipo: porque.tipo, motivo: porque.motivo, cliente: form.nomeCliente.trim() })
+                }} onRestaurar={() => definirValor(i.etapa, null, false)} />
               </div>
             ))}
 

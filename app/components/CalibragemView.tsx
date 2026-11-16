@@ -44,7 +44,11 @@ function CartaoSugestao({ s, onAplicar, onIgnorar }: { s: Sugestao; onAplicar?: 
             <p className="text-[13.5px] font-semibold text-[#191625]">{s.titulo}</p>
             {s.porFolha ? <Selo tom="info">valor aprendido</Selo> : s.inconsistente ? <Selo tom="alerta">revisar a regra</Selo> : <Selo tom="acento">ajuste sugerido</Selo>}
           </div>
-          {s.porFolha ? <p className="text-[12px] text-[#5e5c68] mt-1">Aprendido em {s.pedidos.length} pedidos: {s.pedidos.join(", ")}.</p> :
+          {s.origem === "correcoes" ? <p className="text-[12px] text-[#5e5c68] mt-1 leading-relaxed">
+            Em {s.pedidos.length} orçamentos de clientes diferentes você trocou o valor do motor: em média{" "}
+            <span className={`font-semibold ${acima ? "text-[#d33a3c]" : "text-[#c57800]"}`}>{num(Math.abs(s.desvioPct), 0)}% {acima ? "acima" : "abaixo"}</span>{" "}
+            do que ele calculou (<span className="ds-num">{brl(s.previsto)}</span> do motor, <span className="ds-num font-semibold text-[#191625]">{brl(s.real)}</span> seus).
+          </p> : s.porFolha ? <p className="text-[12px] text-[#5e5c68] mt-1">Aprendido em {s.pedidos.length} pedidos: {s.pedidos.join(", ")}.</p> :
           <p className="text-[12px] text-[#5e5c68] mt-1 leading-relaxed">
             Em {s.pedidos.length} pedidos{s.periodo.de ? ` (${dataBR(s.periodo.de)} a ${dataBR(s.periodo.ate)})` : ""}, o real ficou{" "}
             <span className={`font-semibold ${acima ? "text-[#d33a3c]" : "text-[#c57800]"}`}>{num(Math.abs(s.desvioPct), 0)}% {acima ? "acima" : "abaixo"}</span>{" "}
@@ -70,8 +74,14 @@ function CartaoSugestao({ s, onAplicar, onIgnorar }: { s: Sugestao; onAplicar?: 
                 </p>
               ))}
             </div>
+            {s.motivos && s.motivos.length > 0 && (
+              <div className="mt-2 space-y-0.5">
+                <p className="text-[11px] font-semibold text-[#5e5c68]">O que você disse:</p>
+                {s.motivos.map((m, i) => <p key={i} className="text-[11.5px] text-[#191625] leading-snug">“{m}”</p>)}
+              </div>
+            )}
             <p className="text-[11px] text-[#898892] mt-2">
-              Pedidos usados: {s.pedidos.join(", ")}.
+              {s.origem === "correcoes" ? "Correções usadas" : "Pedidos usados"}: {s.pedidos.join(", ")}.
               {s.foraDaCurva && <> Fora da conta por destoar dos demais: {s.foraDaCurva.map(f => `${f.numero} (real ${vezes(f.razao)} o previsto)`).join(", ")}; vale conferir os lançamentos.</>}
             </p>
           </>}
@@ -115,7 +125,7 @@ export function CalibragemView({ kanban, lancamentos, historico, config, onCateg
   // Só o ajuste mais recente de cada item pode ser desfeito (os anteriores já foram sobrescritos)
   const desfazivel = new Set(ajustes.filter((a, i) => ajustes.findIndex(b => b.chave === a.chave) === i).map(a => a.id))
 
-  if (comps.length === 0) return <Vazio icone={<Gauge className="w-9 h-9" />} titulo="Nenhum pedido com custo lançado ainda" sub="A calibragem compara o custo previsto no orçamento com os custos lançados em cada pedido." />
+  if (comps.length === 0 && sugestoes.length === 0) return <Vazio icone={<Gauge className="w-9 h-9" />} titulo="Nenhum pedido com custo lançado ainda" sub="A calibragem compara o custo previsto no orçamento com os custos lançados em cada pedido." />
 
   return (
     <div className="space-y-4">
@@ -137,7 +147,7 @@ export function CalibragemView({ kanban, lancamentos, historico, config, onCateg
       <Cartao padding={false} className="ds-entrada">
         <div className="px-5 pt-5">
           <TituloCartao titulo="O que o motor aprendeu" icone={<Sparkles className="w-4 h-4" />}
-            sub={`Comparando o previsto com o real (recalculado com quem fez cada etapa). Precisa de pelo menos ${AMOSTRA_MINIMA} pedidos concordando; nada muda sem você aplicar, e dá para desfazer.`} />
+            sub={`Comparando o previsto com o real (recalculado com quem fez cada etapa) e com as suas correções no orçamento. Precisa de pelo menos ${AMOSTRA_MINIMA} casos concordando; nada muda sem você aplicar, e dá para desfazer.`} />
         </div>
         {sugestoes.length === 0
           ? <div className="px-5 pb-5"><p className="text-[12.5px] text-[#5e5c68] flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-[#009351]" /> Nenhum ajuste a sugerir agora. Os preços cadastrados estão batendo com os custos lançados.</p></div>

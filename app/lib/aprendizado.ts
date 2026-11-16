@@ -31,6 +31,8 @@ export type Sugestao = {
   mudancas: { de: string; para: string }[]
   periodo: { de?: string; ate?: string }
   // Pedidos que discordam entre si: multiplicar o preço não resolve, a regra precisa de revisão
+  origem?: "correcoes"           // veio das suas correções no orçamento (não de pedidos fechados)
+  motivos?: string[]             // o porquê que você escreveu em cada correção
   inconsistente?: { motivo: string; porPedido: { numero: string; quantidade: number; razao: number; jogos?: number }[] }
   foraDaCurva?: { numero: string; razao: number }[]   // pedidos deixados de fora da conta
   porFolha?: { mediana: number; min: number; max: number }  // custo real por folha impressa (serviço sem tabela)
@@ -47,13 +49,57 @@ export type AjusteAplicado = {
   antes: unknown                 // regra(s) / preços / ferramental antes do ajuste
 }
 
+// Valor do motor trocado à mão no orçamento, com o porquê. "excecao" (só este pedido) não ensina o motor; os demais
+// entram na calibragem como segunda fonte, ao lado do real × previsto dos pedidos fechados.
+export type TipoCorrecao = "preco" | "motor" | "excecao"
+export type CorrecaoManual = {
+  id: string
+  data: string                   // ISO
+  cliente: string
+  quantidade: number
+  etapa: string                  // papel, impressao, corteVinco…
+  fornecedorId?: string
+  fornecedor?: string
+  materialId?: string
+  motor: number                  // o que o motor calculou
+  manual: number                 // o que você pôs
+  todas: boolean                 // valeu para todas as tiragens
+  tipo: TipoCorrecao
+  motivo: string
+}
+
 export type Aprendizado = {
   ajustes: AjusteAplicado[]
   ignorados: Record<string, string>   // chave → data em que foi ignorada (volta depois de 30 dias)
+  correcoes?: CorrecaoManual[]
 }
 
 export const aprendizadoDe = (p: ConfigProducao): Aprendizado =>
-  ({ ajustes: p.aprendizado?.ajustes ?? [], ignorados: p.aprendizado?.ignorados ?? {} })
+  ({ ajustes: p.aprendizado?.ajustes ?? [], ignorados: p.aprendizado?.ignorados ?? {}, correcoes: p.aprendizado?.correcoes ?? [] })
+
+export const DIAS_CORRECOES = 120
+const comp = (etapa: string) => COMP_SERVICOS_ETAPA.find(x => (x.servicos as string[]).includes(etapa))?.componente
+// Correções que ensinam o mesmo ponto do motor (mesmo serviço e fornecedor, mesmo papel, ou a faca)
+export function chaveDaCorrecao(c: Pick<CorrecaoManual, "etapa" | "fornecedorId" | "materialId">): string | null {
+  if (c.etapa === "faca") return "faca"
+  if (c.etapa === "papel") return c.materialId ? `papel|${c.materialId}` : null
+  const k = comp(c.etapa)
+  return k && c.fornecedorId ? `servico|${k}|${c.fornecedorId}` : null
+}
+export function registrarCorrecao(cfg: Configuracoes, c: Omit<CorrecaoManual, "id" | "data">, agora = new Date()): Configuracoes {
+  const prod = normalizarProducao(cfg.producao)
+  const apr = aprendizadoDe(prod)
+  const nova: CorrecaoManual = { ...c, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), data: agora.toISOString() }
+  return { ...cfg, producao: { ...prod, aprendizado: { ...apr, correcoes: [nova, ...(apr.correcoes ?? [])].slice(0, 300) } } }
+}
+// Quantas correções (que ensinam) já apontam para o mesmo ponto, nos últimos 120 dias
+export function correcoesParecidas(cfg: Configuracoes, c: Pick<CorrecaoManual, "etapa" | "fornecedorId" | "materialId">, agora = new Date()): number {
+  const k = chaveDaCorrecao(c)
+  if (!k) return 0
+  const corte = agora.getTime() - DIAS_CORRECOES * 86_400_000
+  return new Set((aprendizadoDe(normalizarProducao(cfg.producao)).correcoes ?? [])
+    .filter(x => x.tipo !== "excecao" && new Date(x.data).getTime() > corte && chaveDaCorrecao(x) === k).map(x => (x.cliente || x.id).toLowerCase())).size
+}
 
 const COMP_SERVICOS: { componente: "impressao" | "acabamento" | "hotStamping" | "corteVinco" | "colagem"; nome: string; servicos: Servico[] }[] = [
   { componente: "impressao", nome: "Impressão", servicos: ["impressao"] },
@@ -63,6 +109,7 @@ const COMP_SERVICOS: { componente: "impressao" | "acabamento" | "hotStamping" | 
   { componente: "colagem", nome: "Colagem", servicos: ["colagem"] },
 ]
 
+const COMP_SERVICOS_ETAPA = COMP_SERVICOS
 const r2 = (n: number) => Math.round(n * 100) / 100
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 
@@ -140,6 +187,29 @@ export function sugerirAjustes(comps: Comparacao[], cfg: Configuracoes, hoje = n
     // Faca: só onde o motor usou a tabela padrão (sem o valor do faquista)
     const facaReal = c.real.faca ?? 0, facaPrev = c.previsto?.faca ?? 0
     if (facaReal > 0 && facaPrev > 0 && c.facaPelaTabela) acumular(faca, "faca", facaPrev, facaReal, c)
+  }
+
+  // Suas correções no orçamento (menos as exceções), últimos 120 dias
+  const corrServico = new Map<string, Acumulado>(), corrPapel = new Map<string, Acumulado>(), corrFaca = new Map<string, Acumulado>()
+  const motivosPor = new Map<string, string[]>()
+  const corte = hoje.getTime() - DIAS_CORRECOES * 86_400_000
+  const vistos = new Set<string>()
+  for (const c of aprendizadoDe(prod).correcoes ?? []) {   // da mais nova para a mais antiga
+    if (c.tipo === "excecao" || !(c.motor > 0) || !(c.manual >= 0) || new Date(c.data).getTime() < corte) continue
+    const k = chaveDaCorrecao(c)
+    if (!k) continue
+    // Uma por cliente em cada ponto (a mais recente): várias tiragens do mesmo orçamento não contam como casos diferentes
+    const um = `${(c.cliente || c.id).toLowerCase()}|${k}`
+    if (vistos.has(um)) continue
+    vistos.add(um)
+    const mapa = k === "faca" ? corrFaca : k.startsWith("papel|") ? corrPapel : corrServico
+    const chaveMapa = k === "faca" ? "faca" : k.startsWith("papel|") ? k.slice(6) : k.slice(8)
+    const a = mapa.get(chaveMapa) ?? { prev: 0, real: 0, pedidos: [], razoes: [] }
+    const rotulo = `${c.cliente || "Orçamento"} · ${c.quantidade.toLocaleString("pt-BR")} un`
+    a.prev += c.motor; a.real += c.manual; a.pedidos.push(rotulo)
+    a.razoes.push({ numero: rotulo, quantidade: c.quantidade, razao: c.manual / c.motor, prev: c.motor, real: c.manual, data: c.data.slice(0, 10), jogos: 1 })
+    mapa.set(chaveMapa, a)
+    if (c.motivo.trim()) motivosPor.set(k, [...(motivosPor.get(k) ?? []), c.motivo.trim()])
   }
 
   const out: Sugestao[] = []
@@ -226,6 +296,33 @@ export function sugerirAjustes(comps: Comparacao[], cfg: Configuracoes, hoje = n
       },
     })
   }
+  // Sugestões pelas suas correções: mesmo ajuste (e o mesmo desfazer), com os seus motivos junto
+  const doCorr = (chaveBase: string, titulo: string, alvo: Alvo, a: Acumulado, mudancas: (f: number) => { de: string; para: string }[]) => {
+    const antes = out.length
+    montar(`${chaveBase}|correcoes`, `${titulo} (suas correções)`, alvo, a, mudancas)
+    for (const sg of out.slice(antes)) { sg.origem = "correcoes"; sg.motivos = [...new Set(motivosPor.get(chaveBase) ?? [])].slice(0, 6) }
+  }
+  for (const [k, a] of corrServico) {
+    const [componente, fornecedorId] = k.split("|")
+    const cs = COMP_SERVICOS.find(x => x.componente === componente)
+    const f = prod.fornecedores.find(x => x.id === fornecedorId)
+    if (!cs || !f) continue
+    const servicos = cs.servicos.filter(sv => f.servicos[sv])
+    doCorr(`servico|${componente}|${fornecedorId}`, `${cs.nome} · ${f.nome}`, { tipo: "servico", fornecedorId, servicos }, a, fator =>
+      servicos.map(sv => ({ de: descreverRegra(f.servicos[sv]), para: descreverRegra(escalarRegra(f.servicos[sv]!, fator)) })))
+  }
+  for (const [materialId, a] of corrPapel) {
+    const mat = cfg.materiais.find(m => m.id === materialId)
+    if (!mat) continue
+    doCorr(`papel|${materialId}`, `Papel · ${mat.nome}`, { tipo: "papel", materialId }, a, fator =>
+      FORMATOS_PAPEL.map(fmt => { const atual = mat.precos?.[fmt.id] ?? fmt.precoPor100; return { de: `${fmt.nome}: ${brl(atual)} / 100 fls`, para: `${brl(r2(atual * fator))} / 100 fls` } }))
+  }
+  for (const [, a] of corrFaca) {
+    const fp = prod.ferramentalPadrao
+    doCorr("faca", "Faca · tabela padrão", { tipo: "faca" }, a, fator => [
+      { de: `${brl(fp.facaBase)} + ${brl(fp.facaPorCavidade)} por cavidade`, para: `${brl(r2(fp.facaBase * fator))} + ${brl(r2(fp.facaPorCavidade * fator))} por cavidade` },
+    ])
+  }
   return out.sort((a, b) => Math.abs(b.real - b.previsto) - Math.abs(a.real - a.previsto))
 }
 
@@ -282,7 +379,7 @@ export function desfazerAjuste(cfg: Configuracoes, id: string): Configuracoes {
   } else if (a.chave.startsWith("papel|")) {
     const materialId = antes.materialId as string
     materiais = cfg.materiais.map(m => m.id === materialId ? { ...m, precos: (antes.precos as Record<string, number>) ?? {} } : m)
-  } else if (a.chave === "faca") {
+  } else if (a.chave.startsWith("faca")) {
     producao = { ...prod, ferramentalPadrao: antes.ferramentalPadrao as ConfigProducao["ferramentalPadrao"] }
   }
   return { ...cfg, materiais, producao: comAprendizado(producao, { ...apr, ajustes: apr.ajustes.filter(x => x.id !== id) }) }

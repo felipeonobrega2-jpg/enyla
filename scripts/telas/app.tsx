@@ -49,6 +49,7 @@ import { termosDigital } from "@/app/lib/termosDigital"
 import { BibliotecaFacasView } from "@/app/components/BibliotecaFacasView"
 import { BuscaFacaGuardada } from "@/app/components/BuscaFacaGuardada"
 import { LoteOrcamento } from "@/app/components/LoteOrcamento"
+import { registrarCorrecao } from "@/app/lib/aprendizado"
 import LayoutChapaVisual from "@/app/LayoutChapaVisual"
 import { SugestaoFacaPedido } from "@/app/components/SugestaoFacaPedido"
 import { QuantidadesSugeridas } from "@/app/components/QuantidadesSugeridas"
@@ -592,7 +593,15 @@ function Telas() {
     case "whatsview": case "whatsview-espiar": return <div style={{ height: "100vh" }}><WhatsAppView onCriarCard={() => {}} kanban={dados.kanban} lancamentos={lancs} /></div>
     case "enviar": return <div style={{ height: "100vh" }}><EnviarWhatsapp envio={{ cliente: "Raniere Péricles", texto: "Olá! Tudo bem? Passando para saber se conseguiu ver a proposta ORC-2026-233. Ficou alguma dúvida sobre quantidade ou acabamento? Posso te ajudar a escolher." }} linkWhatsapp="https://wa.me/" onFechar={() => {}} /></div>
     case "calibragem": return pagina(<CalibragemView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onAtualizarConfig={setCfg} onDividir={() => {}} />)
-    case "rotas": {
+    case "calibragem-correcoes": {
+      const forn = normalizarProducao(cfg.producao).fornecedores.find(f => f.ativo && f.servicos.corteVinco)!
+      const c = (cliente: string, motor: number, manual: number, motivo: string) => ({ cliente, quantidade: 1000, etapa: "corteVinco", fornecedorId: forn.id, fornecedor: forn.nome, motor, manual, todas: false, tipo: "preco" as const, motivo })
+      let cc = registrarCorrecao(cfg, c("Perfumaria Modelo", 180, 216, "O corte e vinco subiu para R$ 120 o milheiro"))
+      cc = registrarCorrecao(cc, c("Óleos Exemplo", 150, 182, ""))
+      cc = registrarCorrecao(cc, c("Aromas Teste", 210, 250, "Fornecedor avisou reajuste em novembro"))
+      return pagina(<CalibragemView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cc} onAtualizarConfig={setCfg} onDividir={() => {}} />)
+    }
+    case "rotas": case "rotas-corrigir": {
       const r = calcular(form, cfg)
       return pagina(r ? <RotasProducao calculo={r} form={form} producao={normalizarProducao(cfg.producao)} multiplicadorPadrao={cfg.multiplicadores.semFaca || 2}
         comFaca={form.comFaca} onOpcoes={o => setForm(f => ({ ...f, rota: o }))} onRegistrarFaca={() => {}} /> : <p>sem rota</p>)
