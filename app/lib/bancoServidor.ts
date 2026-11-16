@@ -4,7 +4,7 @@
 import { randomUUID } from "crypto"
 import { supabase } from "./supabase"
 import { contas as contasPluggy, item as itemPluggy, transacoes, pluggyConfigurada, ContaPluggy } from "./pluggy"
-import { daPluggy, sugerir, aprender, TxBanco, TxPluggy, RegraBanco, SugestaoBanco } from "./banco"
+import { daPluggy, sugerir, aprender, aprenderConta, completarSugestao as completar, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
 import { montarPedidos, pedidoEntregue } from "./negocio"
 import { MARCA } from "./conciliacao"
 import { clienteClaude, FALLBACK, MODELO } from "./claude"
@@ -20,7 +20,7 @@ const hojeSP = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America
 
 async function lerConfig() {
   const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
-  return (data?.data ?? {}) as Configuracoes & { pluggy?: ConfigPluggy; pluggyStatus?: StatusPluggy; regrasBanco?: RegraBanco[]; licoesBanco?: Aprendizado["licoes"]; exemplosBanco?: Aprendizado["exemplos"] }
+  return (data?.data ?? {}) as Configuracoes & { pluggy?: ConfigPluggy; pluggyStatus?: StatusPluggy; regrasBanco?: RegraBanco[]; licoesBanco?: Aprendizado["licoes"]; exemplosBanco?: Aprendizado["exemplos"]; contasDoBanco?: ContasDoBanco }
 }
 async function salvarCampos(campos: Record<string, unknown>) {
   await gravarCampos(campos)
@@ -93,6 +93,9 @@ async function contexto() {
   return { cfg, lancamentos, pedidos, jaVinculados }
 }
 
+const completarSugestao = (sg: SugestaoBanco, tx: TxBanco, cfg: Awaited<ReturnType<typeof lerConfig>>) =>
+  completar(sg, tx, cfg.regrasBanco ?? [], cfg.contasDoBanco, [...(cfg.categoriasDespesa ?? []), ...(cfg.categoriasReceita ?? [])])
+
 async function gravarSugestoes(lista: { id: string; sugestao: SugestaoBanco }[]) {
   for (let i = 0; i < lista.length; i += 25)
     await Promise.all(lista.slice(i, i + 25).map(x => supabase.from("banco_transacoes").update({ sugestao: x.sugestao, atualizado_em: agora() }).eq("id", x.id)))
@@ -111,8 +114,9 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
   // 1. Regras, vínculos e conciliação: rápido, tudo em memória
   const porRegra: { id: string; sugestao: SugestaoBanco }[] = [], semPar: TxBanco[] = []
   for (const tx of lista) {
-    const sg = sugerir({ ...comum, tx })
-    if (!sg) { semPar.push(tx); continue }
+    const sg0 = sugerir({ ...comum, tx })
+    if (!sg0) { semPar.push(tx); continue }
+    const sg = completarSugestao(sg0, tx, cfg)
     if (sg.acao === "vincular" || sg.acao === "atualizar") jaVinculados.add(sg.lancamentoId)   // não serve para duas transações
     porRegra.push({ id: tx.id, sugestao: sg })
   }
@@ -129,7 +133,7 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
     const grupo = lotes.slice(i, i + 3)
     const resultados = await Promise.all(grupo.map(lote => interpretarComIA(lote, cfg, pedidos).catch(() => null)))
     const gravar: { id: string; sugestao: SugestaoBanco }[] = []
-    grupo.forEach((lote, k) => { for (const tx of lote) gravar.push({ id: tx.id, sugestao: resultados[k]?.get(tx.id) ?? { acao: "revisar", motivo: resultados[k] ? "a IA não soube dizer" : "a IA não respondeu; tente “Refazer sugestão”" } }) })
+    grupo.forEach((lote, k) => { for (const tx of lote) { const sg = resultados[k]?.get(tx.id); gravar.push({ id: tx.id, sugestao: sg ? completarSugestao(sg, tx, cfg) : { acao: "revisar", motivo: resultados[k] ? "a IA não soube dizer" : "a IA não respondeu; tente “Refazer sugestão”" } }) } })
     await gravarSugestoes(gravar)
     iaFeitas += gravar.length
   }
@@ -149,8 +153,9 @@ export async function reinterpretar(txId: string, instrucao: string, lembrar: bo
     cfg.licoesBanco = licoes
   }
   const r = await interpretarComIA([tx], cfg, pedidos, instrucao).catch(() => null)
-  const sg = r?.get(tx.id)
-  if (!sg) return { ok: false, erro: "A IA não respondeu. Tente de novo." }
+  const sg0 = r?.get(tx.id)
+  if (!sg0) return { ok: false, erro: "A IA não respondeu. Tente de novo." }
+  const sg = completarSugestao(sg0, tx, cfg)
   await supabase.from("banco_transacoes").update({ sugestao: sg, atualizado_em: agora() }).eq("id", txId)
   return { ok: true, sugestao: sg }
 }
@@ -161,7 +166,8 @@ async function interpretarComIA(lote: TxBanco[], cfg: Awaited<ReturnType<typeof 
   const hoje = hojeSP()
   const abertos = pedidos.filter(p => p.dataFechamento && (!pedidoEntregue(p) || (p.dataEntregaReal ?? "") >= new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10)))
     .slice(-60).map((p, i) => ({ ref: `P${i + 1}`, p }))
-  const cats = [...(cfg.categoriasDespesa ?? []).map(c => `despesa:${c.id} = ${c.nome}${c.subcategorias?.length ? ` (${c.subcategorias.join(", ")})` : ""}`), ...(cfg.categoriasReceita ?? []).map(c => `receita:${c.id} = ${c.nome}`)]
+  const comSubs = (c: { id: string; nome: string; subcategorias?: string[] }) => `${c.id} = ${c.nome}${c.subcategorias?.length ? ` · subcategorias: ${c.subcategorias.join(" | ")}` : ""}`
+  const cats = [...(cfg.categoriasDespesa ?? []).map(c => `despesa:${comSubs(c)}`), ...(cfg.categoriasReceita ?? []).map(c => `receita:${comSubs(c)}`)]
   const forn = (cfg.fornecedores ?? []).filter(f => f.ativo).map(f => `${f.id} = ${f.nome} (${f.categoria}${f.conta ? ", conta corrente" : ""})`)
   const fixos = (cfg.gastosFixos ?? []).map(g => `${(g as { nome?: string }).nome ?? ""} R$ ${(g as { valor?: number }).valor ?? ""}`)
   const licoes = (cfg.licoesBanco ?? []).map(l => `- ${l.texto}`)
@@ -169,11 +175,11 @@ async function interpretarComIA(lote: TxBanco[], cfg: Awaited<ReturnType<typeof 
   const ESQUEMA = {
     type: "object", additionalProperties: false, required: ["itens"],
     properties: { itens: { type: "array", items: {
-      type: "object", additionalProperties: false, required: ["id", "acao", "categoria", "fornecedorId", "pedido", "descricao", "partes", "motivo"],
+      type: "object", additionalProperties: false, required: ["id", "acao", "categoria", "subcategoria", "fornecedorId", "pedido", "descricao", "partes", "motivo"],
       properties: {
         id: { type: "string" },
         acao: { type: "string", enum: ["lancar", "ignorar", "revisar"] },
-        categoria: { type: ["string", "null"] }, fornecedorId: { type: ["string", "null"] }, pedido: { type: ["string", "null"] },
+        categoria: { type: ["string", "null"] }, subcategoria: { type: ["string", "null"] }, fornecedorId: { type: ["string", "null"] }, pedido: { type: ["string", "null"] },
         descricao: { type: "string" },
         partes: { type: "array", items: { type: "object", additionalProperties: false, required: ["nome", "valor"], properties: { nome: { type: "string" }, valor: { type: "number" } } } },
         motivo: { type: "string" },
@@ -183,6 +189,7 @@ async function interpretarComIA(lote: TxBanco[], cfg: Awaited<ReturnType<typeof 
   const system = `Você classifica o extrato bancário de uma gráfica de embalagens (ENYLA / Jerograf) para virar lançamentos financeiros. O dono revisa tudo.
 Regras:
 - "lancar": é receita ou despesa do negócio. Escolha a categoria pelo id exato da lista (use despesa:… para saídas e receita:… para entradas, devolvendo só o id depois dos dois-pontos). Fornecedor e pedido só se tiver pista clara.
+- Subcategoria: se a categoria escolhida tem subcategorias, escolha sempre uma, com o nome exato da lista (o dono reclama quando fica vazia). Só deixe null se a categoria não tem subcategorias.
 - "ignorar": gasto pessoal claro (mercado, restaurante, streaming, farmácia), transferência para si mesmo, aplicação/resgate.
 - "revisar": quando não dá para saber. Na dúvida, revisar.
 - Pagamento a gráfica/fornecedor que cubra duas etapas (ex.: impressão + papel) pode vir dividido em "partes" (nome da etapa e valor, somando o total); senão deixe partes vazio.
@@ -204,7 +211,7 @@ ${instrucao ? `Explicação do dono para esta transação (siga): ${instrucao}\n
   })
   if (r.stop_reason === "refusal") return null
   const texto = r.content.flatMap(b => b.type === "text" ? [b.text] : []).join("")
-  const j = JSON.parse(texto) as { itens: { id: string; acao: "lancar" | "ignorar" | "revisar"; categoria: string | null; fornecedorId: string | null; pedido: string | null; descricao: string; partes: { nome: string; valor: number }[]; motivo: string }[] }
+  const j = JSON.parse(texto) as { itens: { id: string; acao: "lancar" | "ignorar" | "revisar"; categoria: string | null; subcategoria: string | null; fornecedorId: string | null; pedido: string | null; descricao: string; partes: { nome: string; valor: number }[]; motivo: string }[] }
   const out = new Map<string, SugestaoBanco>()
   for (const it of j.itens) {
     const tx = lote.find(t => t.id === it.id)
@@ -219,7 +226,7 @@ ${instrucao ? `Explicação do dono para esta transação (siga): ${instrucao}\n
     const partes = it.partes.length > 1 && Math.abs(somaPartes - tx.valor) < 0.05 ? it.partes : []
     out.set(tx.id, {
       acao: "criar", origem: "ia", motivo: `IA: ${it.motivo}`,
-      lancamentos: partes.length ? partes.map(p => ({ ...base, descricao: p.nome, subcategoria: p.nome, valor: p.valor })) : [{ ...base, descricao: it.descricao || tx.descricao, valor: tx.valor }],
+      lancamentos: partes.length ? partes.map(p => ({ ...base, descricao: p.nome, subcategoria: p.nome, valor: p.valor })) : [{ ...base, ...(it.subcategoria ? { subcategoria: it.subcategoria } : {}), descricao: it.descricao || tx.descricao, valor: tx.valor }],
     })
   }
   return out
@@ -230,7 +237,8 @@ function descrever(acao: string, l?: Partial<LancamentoFinanceiro>[], cfg?: Awai
   if (acao !== "criar" || !l?.length) return acao === "ignorar" ? "ignorar" : acao
   const cat = (id?: string) => [...(cfg?.categoriasDespesa ?? []), ...(cfg?.categoriasReceita ?? [])].find(c => c.id === id)?.nome ?? id ?? "sem categoria"
   const forn = (id?: string) => (cfg?.fornecedores ?? []).find(f => f.id === id)?.nome
-  return l.map(x => [x.tipo, cat(x.categoria), forn(x.fornecedorId), x.formaPagamento === "conta" ? "na conta do fornecedor" : null, x.loteNumero ?? x.cardNumero].filter(Boolean).join(" · ")).join(" + ")
+  const conta = (id?: string) => (cfg?.contas ?? []).find(c => c.id === id)?.nome
+  return l.map(x => [x.tipo, cat(x.categoria), x.subcategoria ? `subcategoria ${x.subcategoria}` : null, forn(x.fornecedorId), conta(x.contaId) ? `conta ${conta(x.contaId)}` : null, x.formaPagamento === "conta" ? "na conta do fornecedor" : null, x.loteNumero ?? x.cardNumero].filter(Boolean).join(" · ")).join(" + ")
 }
 async function guardarCorrecao(tx: TxBanco, voce: string, cfg: Awaited<ReturnType<typeof lerConfig>>) {
   const sg = tx.sugestao
@@ -300,7 +308,12 @@ export async function aplicar(txId: string, d: Decisao): Promise<{ ok: boolean; 
   if (error) return { ok: false, erro: `Não gravou o lançamento: ${error.message}` }
   if (d.ensinar !== false && criados[0]) {
     const l = criados[0]
-    await salvarCampos({ regrasBanco: aprender(cfg.regrasBanco ?? [], tx, { acao: "lancar", categoria: l.categoria, fornecedorId: l.fornecedorId, descricao: criados.length === 1 ? l.descricao : undefined }) })
+    const campos: Record<string, unknown> = {
+      regrasBanco: aprender(cfg.regrasBanco ?? [], tx, { acao: "lancar", categoria: l.categoria, subcategoria: criados.length === 1 ? l.subcategoria : undefined, fornecedorId: l.fornecedorId,
+        contaId: l.contaId, formaPagamento: l.formaPagamento === "conta" ? undefined : l.formaPagamento, descricao: criados.length === 1 ? l.descricao : undefined }),
+    }
+    if (l.contaId && l.formaPagamento !== "conta") campos.contasDoBanco = aprenderConta(cfg.contasDoBanco ?? {}, tx.conta_id, l.contaId)
+    await salvarCampos(campos)
   }
   if (!("automatico" in d && d.automatico)) await guardarCorrecao(tx, descrever("criar", criados, cfg), await lerConfig())
   hist.push({ em: agora(), acao: "criada", detalhe: JSON.stringify({ criados: criados.map(l => l.id), por: quem }) })

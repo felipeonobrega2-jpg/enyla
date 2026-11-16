@@ -45,7 +45,10 @@ export type RegraBanco = {
   tipo: "entrada" | "saida"
   acao: "lancar" | "ignorar"
   categoria?: string
+  subcategoria?: string
   fornecedorId?: string
+  contaId?: string             // conta/cartão em que você lança
+  formaPagamento?: LancamentoFinanceiro["formaPagamento"]
   descricao?: string
   vezes: number
 }
@@ -142,7 +145,7 @@ export function sugerir(args: {
   if (regra?.acao === "ignorar") return { acao: "ignorar", motivo: `você ensinou a ignorar (${tx.contraparte_nome ?? tx.descricao})` }
   if (regra?.acao === "lancar") return {
     acao: "criar", origem: "regra", motivo: `regra aprendida (${regra.vezes}×): ${tx.contraparte_nome ?? tx.descricao}`,
-    lancamentos: [{ tipo: tipoLanc, categoria: regra.categoria, fornecedorId: regra.fornecedorId, descricao: regra.descricao ?? tx.contraparte_nome ?? tx.descricao, valor: tx.valor, status: "pago", dataVencimento: tx.data, dataPagamento: tx.data }],
+    lancamentos: [{ tipo: tipoLanc, categoria: regra.categoria, ...(regra.subcategoria ? { subcategoria: regra.subcategoria } : {}), ...(regra.formaPagamento ? { formaPagamento: regra.formaPagamento } : {}), fornecedorId: regra.fornecedorId, descricao: regra.descricao ?? tx.contraparte_nome ?? tx.descricao, valor: tx.valor, status: "pago", dataVencimento: tx.data, dataPagamento: tx.data }],
   }
 
   // 4. Recebimento de cliente: a conciliação do extrato (pagador × pedidos em aberto)
@@ -160,10 +163,47 @@ export function sugerir(args: {
 }
 
 // Correção vira regra: da próxima vez, o mesmo recebedor/pagador já vem certo
-export function aprender(regras: RegraBanco[], tx: TxBanco, decisao: { acao: "lancar" | "ignorar"; categoria?: string; fornecedorId?: string; descricao?: string }): RegraBanco[] {
+export function aprender(regras: RegraBanco[], tx: TxBanco, decisao: { acao: "lancar" | "ignorar"; categoria?: string; subcategoria?: string; fornecedorId?: string; contaId?: string; formaPagamento?: LancamentoFinanceiro["formaPagamento"]; descricao?: string }): RegraBanco[] {
   const chave = chaveContraparte(tx)
   if (!chave || chave.length < 3) return regras
   const atual = regras.find(r => r.chave === chave && r.tipo === tx.tipo)
-  const nova: RegraBanco = { chave, tipo: tx.tipo, acao: decisao.acao, categoria: decisao.categoria, fornecedorId: decisao.fornecedorId, descricao: decisao.descricao, vezes: (atual?.vezes ?? 0) + 1 }
+  const nova: RegraBanco = { chave, tipo: tx.tipo, acao: decisao.acao, categoria: decisao.categoria, subcategoria: decisao.subcategoria || undefined, fornecedorId: decisao.fornecedorId,
+    contaId: decisao.contaId || undefined, formaPagamento: decisao.formaPagamento || undefined, descricao: decisao.descricao, vezes: (atual?.vezes ?? 0) + 1 }
   return [...regras.filter(r => r !== atual), nova]
+}
+
+// Conta/cartão do sistema em que entra o que vem de cada conta do banco: aprendido com os seus lançamentos
+// (a conta do banco e a do sistema são a mesma coisa; o que mais se repetiu vence)
+export type ContasDoBanco = Record<string, Record<string, number>>   // conta do banco → conta do sistema → vezes
+export function aprenderConta(m: ContasDoBanco, contaBanco: string, contaId: string | undefined): ContasDoBanco {
+  if (!contaBanco || !contaId) return m
+  const atual = m[contaBanco] ?? {}
+  return { ...m, [contaBanco]: { ...atual, [contaId]: (atual[contaId] ?? 0) + 1 } }
+}
+export function contaDoBanco(m: ContasDoBanco | undefined, contaBanco: string): string | undefined {
+  const x = m?.[contaBanco]
+  if (!x) return undefined
+  return Object.entries(x).sort((a, b) => b[1] - a[1])[0]?.[0]
+}
+
+// Subcategoria só vale se for uma das da categoria (nome exato, sem diferença de maiúscula/acento)
+export function subcategoriaValida(subs: string[] | undefined, sub: string | null | undefined): string | undefined {
+  if (!sub || !subs?.length) return undefined
+  const n = (x: string) => nomeChave(x)
+  return subs.find(s => n(s) === n(sub))
+}
+
+// Completa o lançamento sugerido com o que já se sabe: a conta/cartão (da regra ou da conta do banco de onde veio) e
+// a subcategoria da regra; subcategoria que não existe na categoria sai (para não gravar lixo)
+export function completarSugestao(sg: SugestaoBanco, tx: TxBanco, regras: RegraBanco[], contas: ContasDoBanco | undefined, cats: { id: string; subcategorias?: string[] }[]): SugestaoBanco {
+  if (sg.acao !== "criar" || sg.origem === "conta") return sg
+  const regra = regras.find(r => r.chave === chaveContraparte(tx) && r.tipo === tx.tipo && r.acao === "lancar")
+  const conta = regra?.contaId ?? contaDoBanco(contas, tx.conta_id)
+  return { ...sg, lancamentos: sg.lancamentos.map(l => {
+    const subs = cats.find(c => c.id === l.categoria)?.subcategorias
+    const sub = subcategoriaValida(subs, l.subcategoria) ?? (regra?.categoria === l.categoria ? subcategoriaValida(subs, regra?.subcategoria) : undefined)
+    const { subcategoria: _s, ...resto } = l
+    void _s
+    return { ...resto, ...(sub ? { subcategoria: sub } : {}), ...(l.contaId || !conta ? {} : { contaId: conta }) }
+  }) }
 }

@@ -261,7 +261,7 @@ function Sugestao({ s, nomeCat, nomeForn, lancPorId }: { s: SugestaoBanco | null
         <div className="mt-1 space-y-0.5 pl-5">
           {s.lancamentos.map((l, i) => (
             <p key={i} className="text-[11.5px] text-[#5e5c68]">
-              <b className="text-[#191625]">{l.descricao}</b>{l.categoria ? ` · ${nomeCat(l.categoria)}` : ""}{l.fornecedorId ? ` · ${nomeForn(l.fornecedorId) ?? "fornecedor"}` : ""}{l.loteNumero || l.cardNumero ? ` · ${l.loteNumero ?? l.cardNumero}` : ""} · <b className="ds-num">{brl(Number(l.valor))}</b>
+              <b className="text-[#191625]">{l.descricao}</b>{l.categoria ? ` · ${nomeCat(l.categoria)}` : ""}{l.subcategoria ? ` › ${l.subcategoria}` : ""}{l.fornecedorId ? ` · ${nomeForn(l.fornecedorId) ?? "fornecedor"}` : ""}{l.loteNumero || l.cardNumero ? ` · ${l.loteNumero ?? l.cardNumero}` : ""} · <b className="ds-num">{brl(Number(l.valor))}</b>
             </p>
           ))}
         </div>
@@ -348,7 +348,7 @@ function EnsinarIA({ tx, onNova }: { tx: TxBanco; onNova: (s: SugestaoBanco) => 
 }
 
 type Aprendido = {
-  regras: { chave: string; tipo: string; acao: string; categoria?: string; fornecedorId?: string; descricao?: string; vezes: number }[]
+  regras: { chave: string; tipo: string; acao: string; categoria?: string; subcategoria?: string; fornecedorId?: string; descricao?: string; vezes: number }[]
   licoes: { id: string; texto: string; em: string }[]
   exemplos: { contraparte: string; descricao: string; tipo: string; ia: string; voce: string; em: string }[]
 }
@@ -394,7 +394,7 @@ function PainelAprendizado({ nomeCat, nomeForn }: { nomeCat: (id?: string) => st
             <div key={r.chave + r.tipo} className="flex items-center gap-2 text-[12px]">
               <span className="font-mono text-[11px] text-[#5e5c68] truncate max-w-[220px]">{r.chave}</span>
               <span className="text-[#898892]">{r.tipo === "entrada" ? "entrada" : "saída"} →</span>
-              <span className="text-[#191625] font-semibold truncate">{r.acao === "ignorar" ? "ignorar" : [nomeCat(r.categoria), nomeForn(r.fornecedorId), r.descricao].filter(Boolean).join(" · ") || "lançar"}</span>
+              <span className="text-[#191625] font-semibold truncate">{r.acao === "ignorar" ? "ignorar" : [r.subcategoria ? `${nomeCat(r.categoria)} › ${r.subcategoria}` : nomeCat(r.categoria), nomeForn(r.fornecedorId), r.descricao].filter(Boolean).join(" · ") || "lançar"}</span>
               <span className="text-[10.5px] text-[#898892]">{r.vezes}×</span>
               <button onClick={() => mudar({ tirarRegra: { chave: r.chave, tipo: r.tipo } })} className="ml-auto text-[#898892] hover:text-[#d33a3c]" aria-label="Apagar regra"><X className="w-3.5 h-3.5" /></button>
             </div>

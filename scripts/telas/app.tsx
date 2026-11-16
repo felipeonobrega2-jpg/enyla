@@ -365,7 +365,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       transacoes: [
         t("a", { tipo: "entrada", valor: 650, contraparte_nome: "ANA COSMETICOS LTDA", descricao: "PIX RECEBIDO", sugestao: { acao: "atualizar", lancamentoId: "x", campos: { status: "pago" }, motivo: "" } }),
         t("b", { valor: 2000, contraparte_nome: "JEROGRAF GRAFICA E EDITORA", contraparte_doc: "03999896000152", sugestao: { acao: "criar", origem: "conta", motivo: "pagamento da conta Jerograf: abate o saldo devedor (não é custo novo)", lancamentos: [{ descricao: "Pagamento da conta — Jerograf", valor: 2000, tipo: "receita" }] } }),
-        t("c", { valor: 1350, contraparte_nome: "PAPELARIA BRAS LTDA", sugestao: { acao: "criar", origem: "ia", motivo: "IA: papel cartão para o lote do Maurício (valor e fornecedor de papel)", lancamentos: [{ descricao: "Papel", categoria: "materiais", valor: 900, loteNumero: "MAU-007" }, { descricao: "Impressão", categoria: "fornecedor", valor: 450, loteNumero: "MAU-007" }] } }),
+        t("c", { valor: 1350, contraparte_nome: "PAPELARIA BRAS LTDA", sugestao: { acao: "criar", origem: "ia", motivo: "IA: papel cartão para o lote do Maurício (valor e fornecedor de papel)", lancamentos: [{ descricao: "Papel", categoria: "materiais", subcategoria: "Papel cartão", valor: 900, loteNumero: "MAU-007" }, { descricao: "Impressão", categoria: "fornecedor", valor: 450, loteNumero: "MAU-007" }] } }),
         t("d", { valor: 89.9, contraparte_nome: "IFOOD", descricao: "COMPRA CARTAO DEBITO", sugestao: { acao: "ignorar", motivo: "IA: gasto pessoal (alimentação)" } }),
         t("e", { valor: 37.5, descricao: "TARIFA PACOTE SERVICOS", sugestao: { acao: "revisar", motivo: "sem pista: confira" } }),
       ] }))

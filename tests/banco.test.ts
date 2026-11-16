@@ -54,3 +54,31 @@ describe("banco → lançamentos sem bagunçar o manual", () => {
     expect(chaveContraparte({ contraparte_doc: null, contraparte_nome: "Gráfica X", descricao: "" })).toBe("grafica x")
   })
 })
+
+describe("banco aprende subcategoria, conta e forma", async () => {
+  const { aprenderConta, contaDoBanco, subcategoriaValida, completarSugestao } = await import("@/app/lib/banco")
+  const cats = [{ id: "insumos", subcategorias: ["Papel", "Tinta"] }, { id: "aluguel" }]
+  it("a regra guarda subcategoria, conta e forma, e sugere com elas", () => {
+    const t = tx({ contraparte_nome: "Papelaria Exemplo" })
+    const regras = aprender([], t, { acao: "lancar", categoria: "insumos", subcategoria: "Papel", contaId: "itau", formaPagamento: "pix" })
+    expect(regras[0]).toMatchObject({ subcategoria: "Papel", contaId: "itau", formaPagamento: "pix" })
+    const sg = sugerir({ ...base, tx: t, lancamentos: [], regras })
+    expect(sg).toMatchObject({ acao: "criar", origem: "regra", lancamentos: [{ categoria: "insumos", subcategoria: "Papel", formaPagamento: "pix" }] })
+    expect(completarSugestao(sg!, t, regras, undefined, cats)).toMatchObject({ lancamentos: [{ subcategoria: "Papel", contaId: "itau" }] })
+  })
+  it("conta do banco → conta do sistema pelo que mais se repete", () => {
+    let m = aprenderConta({}, "pluggy-1", "santander")
+    m = aprenderConta(m, "pluggy-1", "santander")
+    m = aprenderConta(m, "pluggy-1", "caixa")
+    expect(contaDoBanco(m, "pluggy-1")).toBe("santander")
+    expect(contaDoBanco(m, "outra")).toBeUndefined()
+  })
+  it("subcategoria da IA só vale se existe na categoria (sem diferença de acento/maiúscula)", () => {
+    expect(subcategoriaValida(["Papel", "Tinta"], "papel")).toBe("Papel")
+    expect(subcategoriaValida(["Papel"], "Cola")).toBeUndefined()
+    const sg = { acao: "criar" as const, origem: "ia" as const, motivo: "", lancamentos: [{ tipo: "despesa" as const, categoria: "insumos", subcategoria: "Inventada", valor: 10 }] }
+    const r = completarSugestao(sg, tx({ conta_id: "pluggy-1" }), [], { "pluggy-1": { santander: 3 } }, cats)
+    expect(r).toMatchObject({ lancamentos: [{ contaId: "santander" }] })
+    expect((r as { lancamentos: { subcategoria?: string }[] }).lancamentos[0].subcategoria).toBeUndefined()
+  })
+})
