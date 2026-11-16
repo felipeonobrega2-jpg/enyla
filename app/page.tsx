@@ -58,6 +58,9 @@ import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom,
 import { LoteOrcamento, ItemLote } from "./components/LoteOrcamento"
 import { BibliotecaFacasView } from "./components/BibliotecaFacasView"
 import { BuscaFacaGuardada } from "./components/BuscaFacaGuardada"
+import { SugestaoFacaPedido } from "./components/SugestaoFacaPedido"
+import { QuantidadesSugeridas } from "./components/QuantidadesSugeridas"
+import { candidatas, sugerirQuantidades, type SugestaoQtd } from "./lib/sugerirQuantidades"
 import FormaView from "./FormaView"
 import FormaBubble from "./components/FormaBubble"
 import { brl, num } from "./utils"
@@ -89,7 +92,7 @@ import { TerceirizadosView } from "./components/TerceirizadosView"
 import MetaAdsView from "./components/MetaAdsView"
 import BuscaGlobal from "./components/BuscaGlobal"
 import { parseDXF, DXFResult, caixaDoDxf } from "./lib/dxf"
-import { nomeDoDesenho, type Desenho } from "./lib/biblioteca"
+import { nomeDoDesenho, facasParaPedido, type FacaSugerida, type Desenho } from "./lib/biblioteca"
 import type { DXFGeo } from "./LayoutChapaVisual"
 
 function unpackTerceirizado(card: KanbanCard): KanbanCard {
@@ -349,8 +352,31 @@ export default function Home() {
   }, [])
 
   // Orçamento novo já com o cliente (e o que ele contou na conversa); a conversa fica ligada a ele
+  // Com a faca real (DXF) as medidas da conversa não vão para os campos: o sistema procura a faca guardada que
+  // combina (caixa ou ml) e, se só uma combina, já põe na mesa; senão mostra as opções. Medidas à mão só se você pedir.
+  const [sugestaoFaca, setSugestaoFaca] = useState<{ cliente: string; pedido: string; achadas: FacaSugerida[]; caixa: DadosPedido["caixa_cm"] } | null>(null)
+  const buscaFacaVez = useRef(0)
+  async function procurarFacaDoPedido(cliente: string, dados: DadosPedido) {
+    const vez = ++buscaFacaVez.current
+    const n = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
+    const c = dados.caixa_cm
+    const pedido = [c ? `caixa ${n(c.frente)} × ${n(c.altura)} × ${n(c.lateral)} cm` : "", dados.volume_ml ? `frasco de ${n(dados.volume_ml)} ml` : "", !c && dados.frasco_cm ? `frasco ${dados.frasco_cm}` : ""].filter(Boolean).join(" · ")
+    const lista = await fetch("/api/biblioteca").then(r => r.json()).then(d => (d.desenhos ?? []) as Desenho[]).catch(() => [] as Desenho[])
+    if (vez !== buscaFacaVez.current) return
+    const achadas = facasParaPedido(lista, dados)
+    const certeira = achadas.length === 1 || (achadas.length > 1 && achadas[0].diferencaMm <= 3 && achadas[1].diferencaMm > 8)
+    setSugestaoFaca({ cliente, pedido: pedido || "a embalagem", achadas: certeira ? [] : achadas.slice(0, 5), caixa: c })
+    if (certeira) {
+      await usarDesenho(achadas[0].d, false)
+      showToast(`Faca "${nomeDoDesenho(achadas[0].d)}" na mesa: combina com ${pedido}`)
+    }
+  }
   function orcamentoDaConversa(nome: string, jid: string, dados?: DadosPedido) {
-    setForm({ ...FORM_INICIAL, nomeCliente: nome, ...(dados ? formDoAtendimento(dados) : {}) }); setResult(null); setDxfNome(null)
+    const { frente: _f, lateral: _l, alturaBox: _a, ...doChat } = dados ? formDoAtendimento(dados) : {}
+    void _f; void _l; void _a
+    setForm({ ...FORM_INICIAL, nomeCliente: nome, ...doChat }); setResult(null); setDxfNome(null); setDxfGeo(null); dxfChave.current = null
+    setSugestaoFaca(null); buscaFacaVez.current++
+    if (dados && (dados.caixa_cm || dados.volume_ml || dados.frasco_cm)) void procurarFacaDoPedido(nome, dados)
     if (config.vinculosWhatsapp?.[jid] !== nome) salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [jid]: nome } })
     setConversaOrc({ jid, nome, dados: dados ?? null, cliente: nome }); setVerConversa(false)
     fetch(`/api/whatsapp/destino?jid=${encodeURIComponent(jid)}`).then(r => r.json())
@@ -631,7 +657,12 @@ export default function Home() {
     setDxfGeo({ bounds: result.bounds, paths: result.paths })
     dxfChave.current = `${desenhoId ?? ""}|${result.largura}x${result.altura}`
     setForm(p => {
-      const next = { ...p, blankOverride: { largura: result.largura, altura: result.altura }, caixaDxf: caixaDoDxf(nome, result), ...(desenhoId ? { desenhoId } : {}) }
+      // A caixa montada vem do desenho: as medidas digitadas (ou trazidas da conversa) dão lugar às do DXF,
+      // para o PDF, a mensagem e o quadro mostrarem a caixa real
+      const caixa = caixaDoDxf(nome, result)
+      const cmDe = (mm: number) => Math.round(mm) / 10
+      const next = { ...p, blankOverride: { largura: result.largura, altura: result.altura }, caixaDxf: caixa, ...(desenhoId ? { desenhoId } : {}),
+        frente: caixa ? cmDe(caixa.largura) : 0, alturaBox: caixa ? cmDe(caixa.altura) : 0, lateral: caixa ? cmDe(caixa.profundidade) : 0 }
       setResult(calcular(next, config))
       return next
     })
@@ -1650,6 +1681,27 @@ export default function Home() {
     setNovaQtd("")
   }
 
+  // Sugestões de quantidade: o motor calcula em volta das orçadas (fora do clique, para a mesa não travar)
+  const [sugestoesQtd, setSugestoesQtd] = useState<SugestaoQtd[]>([])
+  useEffect(() => {
+    if (!result || view !== "orcamento") { setSugestoesQtd([]); return }
+    const t = setTimeout(() => {
+      try {
+        const cand = candidatas(form.quantidades)
+        const extra = cand.length ? calcular({ ...form, quantidades: cand }, config) : null
+        const precoDe = (l: { quantidade: number; precoComFaca: number; precoSemFaca: number }) => ({ quantidade: l.quantidade, total: form.comFaca ? l.precoComFaca : l.precoSemFaca })
+        setSugestoesQtd(sugerirQuantidades(form.quantidades, [...result.tabela.map(precoDe), ...(extra?.tabela ?? []).map(precoDe)]))
+      } catch { setSugestoesQtd([]) }
+    }, 450)
+    return () => clearTimeout(t)
+  }, [result, view]) // eslint-disable-line react-hooks/exhaustive-deps
+  function adicionarSugestao(s: SugestaoQtd) {
+    if (form.quantidades.includes(s.quantidade)) return
+    mudarForm(p => ({ ...p, quantidades: [...p.quantidades, s.quantidade].sort((a, b) => a - b),
+      qualidades: { ...(p.qualidades ?? {}), [s.quantidade]: (p.qualidades ?? {})[s.base] ?? (s.base < 1000 ? "Digital" : "Offset") } }))
+    showToast(`${num(s.quantidade)} un no orçamento.`)
+  }
+
   const r = result
   const clienteAtual = clientes.find(c => c.nome.toLowerCase() === form.nomeCliente.trim().toLowerCase())
 
@@ -1999,6 +2051,13 @@ export default function Home() {
               </div>
             ) : (
               <>
+              {sugestaoFaca && sugestaoFaca.cliente === form.nomeCliente && (
+                <SugestaoFacaPedido pedido={sugestaoFaca.pedido} achadas={sugestaoFaca.achadas} onUsar={d => { void usarDesenho(d, false) }}
+                  onMedidas={sugestaoFaca.caixa && !(form.frente > 0) ? () => {
+                    const c = sugestaoFaca.caixa!
+                    setForm(p => { const next = { ...p, frente: c.frente, lateral: c.lateral, alturaBox: c.altura }; setResult(calcular(next, config)); return next })
+                  } : undefined} />
+              )}
               <BuscaFacaGuardada onEscolher={d => usarDesenho(d, false)} />
               <label
                 onDragOver={e => { e.preventDefault(); setDxfArrastando(true) }}
@@ -2295,6 +2354,7 @@ export default function Home() {
               <button onClick={addQtd}
                 className="px-3 bg-[#8456e8] hover:bg-[#7445d4] text-white rounded-lg text-sm font-bold transition-colors">+</button>
             </div>
+            <QuantidadesSugeridas sugestoes={sugestoesQtd} onAdicionar={adicionarSugestao} />
           </FormSection>
 
           {/* Seção: Observações */}

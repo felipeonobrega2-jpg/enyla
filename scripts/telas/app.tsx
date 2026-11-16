@@ -49,6 +49,9 @@ import { termosDigital } from "@/app/lib/termosDigital"
 import { BibliotecaFacasView } from "@/app/components/BibliotecaFacasView"
 import { BuscaFacaGuardada } from "@/app/components/BuscaFacaGuardada"
 import { LoteOrcamento } from "@/app/components/LoteOrcamento"
+import { SugestaoFacaPedido } from "@/app/components/SugestaoFacaPedido"
+import { QuantidadesSugeridas } from "@/app/components/QuantidadesSugeridas"
+import { candidatas, sugerirQuantidades } from "@/app/lib/sugerirQuantidades"
 import { Cartao } from "@/app/components/ds"
 import { termosOffset, VERSAO_TERMOS_OFFSET } from "@/app/lib/termosOffset"
 import ChapasView from "@/app/cartuxo/components/ChapasView"
@@ -445,6 +448,18 @@ function Telas() {
     }
     case "pdfcliente": return <FolhasPdf />
     case "pdflote": return <FolhasPdf lote />
+    case "sugestaofaca": case "sugestaofaca-nada": {
+      const dz = (id: string, apelido: string, c: [number, number, number]) => ({ d: { id, nome: `${id}.dxf`, apelido, caixa: { largura: c[0], altura: c[1], profundidade: c[2] }, blank: { largura: 200, altura: 150 }, criadoEm: "2026-11-01" }, motivo: `caixa ${c.map(n => (n / 10).toLocaleString("pt-BR")).join(" × ")} cm · 50 ml`, diferencaMm: 2 })
+      return pagina(<div className="max-w-[288px] bg-white p-5 rounded-2xl"><p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-2">Dieline Pacdora</p>
+        <SugestaoFacaPedido pedido="caixa 5,2 × 12 × 5,2 cm · frasco de 50 ml" achadas={tela === "sugestaofaca" ? [dz("a1", "Perfume 50ml fundo automático", [52, 120, 52]), dz("a2", "Cartucho 50 ml Villa", [50, 118, 55])] : []} onUsar={() => {}} onMedidas={() => {}} /></div>)
+    }
+    case "qtdsugeridas": {
+      const f = { ...dados.historico[0].form, quantidades: [1000] }
+      const precoDe = (l: { quantidade: number; precoComFaca: number; precoSemFaca: number }) => ({ quantidade: l.quantidade, total: f.comFaca ? l.precoComFaca : l.precoSemFaca })
+      const s = sugerirQuantidades([1000], [...calcular(f, config)!.tabela.map(precoDe), ...calcular({ ...f, quantidades: candidatas([1000]) }, config)!.tabela.map(precoDe)])
+      return pagina(<div className="max-w-[288px] bg-white p-5 rounded-2xl"><p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-2">Quantidades</p>
+        <span className="inline-flex text-[11.5px] bg-[rgba(116,116,128,0.08)] px-2 py-1 rounded-full">1.000</span><QuantidadesSugeridas sugestoes={s} onAdicionar={() => {}} /></div>)
+    }
     case "lote": case "lote-vazio": {
       const f = (fr: number, al: number, la: number) => ({ ...dados.historico[0].form, nomeCliente: "Perfumaria Modelo", frente: fr, alturaBox: al, lateral: la })
       const itens = tela === "lote" ? [f(4, 9, 4), f(5, 12, 5), f(6.5, 15, 6.5)].map((form, i) => ({ id: String(i), form, calculo: calcular(form, config)! })) : []

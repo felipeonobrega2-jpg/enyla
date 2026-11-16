@@ -112,3 +112,31 @@ export function tagsMaisUsadas(lista: Desenho[], max = 12): string[] {
   for (const d of lista) for (const t of d.tags ?? []) n.set(t, (n.get(t) ?? 0) + 1)
   return [...n.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, max).map(([t]) => t)
 }
+
+// Facas guardadas que combinam com o que o cliente pediu na conversa: a caixa (cm, ±5 mm em cada medida, largura e
+// profundidade em qualquer ordem) e o volume do frasco (palavra-chave/nome "50ml"). Da mais parecida para a menos.
+export type FacaSugerida = { d: Desenho; motivo: string; diferencaMm: number }
+export function facasParaPedido(lista: Desenho[], pedido: { caixa_cm?: { frente: number; lateral: number; altura: number } | null; volume_ml?: number | null }): FacaSugerida[] {
+  const out = new Map<string, FacaSugerida>()
+  const c = pedido.caixa_cm
+  if (c && c.frente > 0 && c.lateral > 0 && c.altura > 0) {
+    const [f, l, a] = [c.frente * 10, c.lateral * 10, c.altura * 10]
+    for (const d of lista) {
+      if (!d.caixa) continue
+      const { largura: L, profundidade: P, altura: A } = d.caixa
+      const difA = Math.abs(A - a)
+      const pares = [[Math.abs(L - f), Math.abs(P - l)], [Math.abs(L - l), Math.abs(P - f)]].filter(([x, y]) => x <= 5 && y <= 5)
+      if (difA <= 5 && pares.length) out.set(d.id, { d, motivo: `caixa ${descricaoCaixa(d)}`, diferencaMm: difA + Math.min(...pares.map(([x, y]) => x + y)) })
+    }
+  }
+  const ml = pedido.volume_ml
+  if (ml && ml > 0) {
+    const re = new RegExp(`(^|[^0-9])${Math.round(ml)}ml`)
+    for (const d of lista.filter(x => re.test(textoDeBusca(x)))) {
+      const ja = out.get(d.id)
+      if (ja) ja.motivo = `${ja.motivo} · ${Math.round(ml)} ml`
+      else out.set(d.id, { d, motivo: `${Math.round(ml)} ml`, diferencaMm: 50 })
+    }
+  }
+  return [...out.values()].sort((a, b) => a.diferencaMm - b.diferencaMm)
+}

@@ -246,7 +246,7 @@ export type EntradaRotas = {
   tipoCaixa: TipoCaixa
   cliente: string
   comFaca: boolean
-  valorFaca: number                    // valor informado pelo faquista (faca no tamanho cheio)
+  valorFaca: number                    // valor informado pelo faquista: o mesmo em todas as quantidades
   laminacaoTipo: string | null
   vernizTipo: string | null
   hotStamping: boolean
@@ -517,11 +517,12 @@ function fornecedorDaEtapa(
   return f ?? ativos.find(x => x.servicos[servico]) ?? null
 }
 
-function custoFaca(e: EntradaRotas, k: number, kCheio: number): { valor: number; estimado: boolean } {
+// Valor da faca digitado: é o preço da faca deste pedido e vale igual em todas as quantidades (uma faca só serve
+// a tiragem toda). Sem valor digitado, estima pela tabela (base + por cavidade).
+function custoFaca(e: EntradaRotas, k: number): { valor: number; estimado: boolean } {
+  if (e.valorFaca > 0) return { valor: e.valorFaca, estimado: false }
   const fp = e.producao.ferramentalPadrao
-  const tabela = (n: number) => fp.facaBase + fp.facaPorCavidade * n
-  if (e.valorFaca > 0) return { valor: e.valorFaca * tabela(k) / tabela(kCheio), estimado: k !== kCheio }
-  return { valor: tabela(k), estimado: true }
+  return { valor: fp.facaBase + fp.facaPorCavidade * k, estimado: true }
 }
 
 function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaExistente: Ferramental | null): Rota {
@@ -649,12 +650,11 @@ function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaEx
   }
 
   // Faca
-  const kCheio = Math.max(...base.passadas.map(ps => ps.cavidades))
   if (e.comFaca) {
     if (facaExistente) {
       itens.push({ etapa: "faca", descricao: `Faca de ${k} do cliente (já existe)`, valor: 0, estimado: false, ferramental: true })
     } else {
-      const f = custoFaca(e, k, kCheio)
+      const f = custoFaca(e, k)
       itens.push({ etapa: "faca", descricao: `Faca de ${k} cavidades`, valor: f.valor, estimado: f.estimado, ferramental: true })
     }
   }
