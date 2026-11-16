@@ -3,7 +3,7 @@
 
 import { randomUUID } from "crypto"
 import { supabase } from "./supabase"
-import { contas as contasPluggy, item as itemPluggy, transacoes, pluggyConfigurada, ContaPluggy } from "./pluggy"
+import { contas as contasPluggy, item as itemPluggy, transacoes, pluggyConfigurada, atualizarItem, ContaPluggy } from "./pluggy"
 import { daPluggy, sugerir, aprender, aprenderConta, completarSugestao as completar, regraConfiavel, regraDaTx, aceitouSemMudar, zerarConfianca, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
 import { montarPedidos, pedidoEntregue, type Pedido } from "./negocio"
 import { previstosEmAberto, pedidoDoCusto, type PrevistoPedido } from "./calibragem"
@@ -47,6 +47,8 @@ export async function sincronizar(): Promise<{ ok: boolean; novas: number; suger
   const itens = conf.itens ?? []
   if (!itens.length) return { ok: false, novas: 0, sugeridas: 0, erro: "Nenhum banco conectado: cole o Item ID de cada banco em Financeiro → Banco." }
 
+  // Pede à Pluggy para buscar no banco de novo (o que chegar depois entra na próxima sincronização, em poucos minutos)
+  await Promise.all(itens.map(it => atualizarItem(it.id).catch(() => false)))
   const status: StatusPluggy = { em: agora(), contas: [], novas: 0, erro: null }
   const linhas: Record<string, unknown>[] = []
   for (const it of itens) {

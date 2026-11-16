@@ -7,7 +7,8 @@ export async function GET(req: NextRequest) {
   const estado = req.nextUrl.searchParams.get("estado") ?? "pendente"
   let q = supabase.from("banco_transacoes").select("id, conta_id, conta_nome, data, valor, tipo, descricao, contraparte_nome, contraparte_doc, categoria_pluggy, estado, lancamento_ids, sugestao, historico")
   if (estado !== "todas") q = q.eq("estado", estado)
-  const { data, error } = await q.order("data", { ascending: false }).limit(400)
+  // Para conferir: todas (a lista é o trabalho do dia); nas outras abas, as 400 mais recentes
+  const { data, error } = await q.order("data", { ascending: false }).limit(estado === "pendente" ? 3000 : 400)
   const { count: pendentes } = await supabase.from("banco_transacoes").select("id", { count: "exact", head: true }).eq("estado", "pendente")
   const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
   return NextResponse.json({
