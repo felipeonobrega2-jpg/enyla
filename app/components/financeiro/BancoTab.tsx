@@ -60,6 +60,9 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
     rodando.current = false
   }, [carregar])
   const semSugestao = (dados?.transacoes ?? []).filter(t => !t.sugestao).length
+  // Ao abrir: o servidor também refaz sugestões antigas que precisam (ex.: sem subcategoria); se não houver nada, volta na hora
+  const abriu = useRef(false)
+  useEffect(() => { if (estado === "pendente" && dados && !abriu.current) { abriu.current = true; void prepararTudo() } }, [estado, dados, prepararTudo])
   useEffect(() => {
     if (estado !== "pendente" || semSugestao === 0) return
     const t = setTimeout(prepararTudo, 0)

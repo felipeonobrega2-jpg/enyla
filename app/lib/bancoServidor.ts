@@ -129,7 +129,16 @@ async function gravarSugestoes(lista: { id: string; sugestao: SugestaoBanco }[])
 export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: number; restantes: number }> {
   const inicio = Date.now()
   const { data: pend } = await supabase.from("banco_transacoes").select("*").eq("estado", "pendente").is("sugestao", null).order("data").limit(1000)
-  const lista = (pend ?? []) as TxBanco[]
+  let lista = (pend ?? []) as TxBanco[]
+  // Sugestão da IA de antes da subcategoria (v < 2) numa categoria que tem subcategorias: refaz uma vez
+  const cfg0 = await lerConfig()
+  const comSubs = new Set([...(cfg0.categoriasDespesa ?? []), ...(cfg0.categoriasReceita ?? [])].filter(c => c.subcategorias?.length).map(c => c.id))
+  const { data: antigas } = await supabase.from("banco_transacoes").select("*").eq("estado", "pendente").not("sugestao", "is", null).order("data", { ascending: false }).limit(3000)
+  const refazer = ((antigas ?? []) as TxBanco[]).filter(t => {
+    const sg = t.sugestao
+    return sg?.acao === "criar" && sg.origem === "ia" && (sg.v ?? 1) < 2 && sg.lancamentos.length === 1 && !sg.lancamentos[0].subcategoria && comSubs.has(sg.lancamentos[0].categoria ?? "")
+  })
+  lista = [...lista, ...refazer]
   if (!lista.length) return { feitas: 0, restantes: 0 }
   const { cfg, lancamentos, pedidos, jaVinculados } = await contexto()
   const comum = {
@@ -166,7 +175,12 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
     const grupo = lotes.slice(i, i + 3)
     const resultados = await Promise.all(grupo.map(lote => interpretarComIA(lote, cfg, pedidos).catch(() => null)))
     const gravar: { id: string; sugestao: SugestaoBanco }[] = []
-    grupo.forEach((lote, k) => { for (const tx of lote) { const sg = resultados[k]?.get(tx.id); gravar.push({ id: tx.id, sugestao: sg ? completarSugestao(sg, tx, cfg) : { acao: "revisar", motivo: resultados[k] ? "a IA não soube dizer" : "a IA não respondeu; tente “Refazer sugestão”" } }) } })
+    grupo.forEach((lote, k) => { for (const tx of lote) {
+      const sg = resultados[k]?.get(tx.id)
+      // Refazendo uma antiga: se a IA não trouxer nada melhor, fica a de antes (marcada para não tentar de novo)
+      const antiga = tx.sugestao?.acao === "criar" ? { ...tx.sugestao, v: 2 } : null
+      gravar.push({ id: tx.id, sugestao: sg ? completarSugestao(sg, tx, cfg) : antiga ?? { acao: "revisar", motivo: resultados[k] ? "a IA não soube dizer" : "a IA não respondeu; tente “Refazer sugestão”" } })
+    } })
     for (const g of gravar) { const tx = lista.find(t => t.id === g.id)!; g.sugestao = await ligar(g.sugestao, tx) }
     await gravarSugestoes(gravar)
     iaFeitas += gravar.length
@@ -259,7 +273,7 @@ ${instrucao ? `Explicação do dono para esta transação (siga): ${instrucao}\n
     const somaPartes = it.partes.reduce((s, p) => s + p.valor, 0)
     const partes = it.partes.length > 1 && Math.abs(somaPartes - tx.valor) < 0.05 ? it.partes : []
     out.set(tx.id, {
-      acao: "criar", origem: "ia", motivo: `IA: ${it.motivo}`,
+      acao: "criar", origem: "ia", v: 2, motivo: `IA: ${it.motivo}`,
       lancamentos: partes.length ? partes.map(p => ({ ...base, descricao: p.nome, subcategoria: p.nome, valor: p.valor })) : [{ ...base, ...(it.subcategoria ? { subcategoria: it.subcategoria } : {}), descricao: it.descricao || tx.descricao, valor: tx.valor }],
     })
   }

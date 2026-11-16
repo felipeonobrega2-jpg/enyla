@@ -35,7 +35,7 @@ export type SugestaoBanco =
   | { acao: "vincular"; lancamentoId: string; motivo: string }
   | { acao: "escolher"; candidatos: string[]; motivo: string }
   | { acao: "atualizar"; lancamentoId: string; campos: Partial<LancamentoFinanceiro>; motivo: string }
-  | { acao: "criar"; lancamentos: Partial<LancamentoFinanceiro>[]; motivo: string; origem: "regra" | "conciliacao" | "conta" | "ia" }
+  | { acao: "criar"; lancamentos: Partial<LancamentoFinanceiro>[]; motivo: string; origem: "regra" | "conciliacao" | "conta" | "ia"; v?: number }   // v 2: IA já com subcategoria
   | { acao: "ignorar"; motivo: string }
   | { acao: "revisar"; motivo: string }   // ninguém soube dizer: você decide
 
