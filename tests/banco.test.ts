@@ -132,3 +132,18 @@ describe("custo do fornecedor → pedido pelo previsto do motor", async () => {
     expect(pedidoDoCusto({ valor: 470, data: "2026-11-10" }, { fornecedorId: "fv" }, [ped("ORC-1", "2026-11-05", [lanc({ fornecedorId: "fv" })])], cfgBase)).toBeNull()
   })
 })
+
+describe("aviso de duplicado ao lançar", async () => {
+  const { possiveisDuplicados, duplicadosNoLote } = await import("@/app/lib/banco")
+  it("mesmo tipo e valor no mesmo dia (±1): avisa; criado desta transação ou na conta do fornecedor: não", () => {
+    const t = tx({ id: "tx9", valor: 300, data: "2026-11-11" })
+    expect(possiveisDuplicados(t, [lanc({ valor: 300, dataPagamento: "2026-11-12" })])).toHaveLength(1)
+    expect(possiveisDuplicados(t, [lanc({ valor: 300, dataPagamento: "2026-11-14" })])).toHaveLength(0)
+    expect(possiveisDuplicados(t, [lanc({ valor: 300, dataPagamento: "2026-11-11", obs: "conc:tx9" })])).toHaveLength(0)
+    expect(possiveisDuplicados(t, [lanc({ valor: 300, dataPagamento: "2026-11-11", tipo: "receita" })])).toHaveLength(0)
+  })
+  it("no lote: dois iguais no mesmo dia também avisam", () => {
+    const r = duplicadosNoLote([tx({ id: "a", valor: 100, data: "2026-11-11" }), tx({ id: "b", valor: 100, data: "2026-11-11" }), tx({ id: "c", valor: 500, data: "2026-11-12" })], [])
+    expect(r.map(x => x.tx.id)).toEqual(["a", "b"])
+  })
+})

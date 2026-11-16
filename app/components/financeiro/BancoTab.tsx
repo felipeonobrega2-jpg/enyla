@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { RefreshCw, Link2, Plus, EyeOff, Undo2, Settings2, Sparkles, Landmark, Check, X, Loader2, AlertCircle, ArrowDownLeft, ArrowUpRight, Layers, Keyboard, Zap } from "lucide-react"
 import type { KanbanCard, LancamentoFinanceiro } from "../../types"
 import type { Configuracoes } from "../../config"
-import { chaveContraparte, REGRA_CONFIAVEL, type TxBanco, type SugestaoBanco } from "../../lib/banco"
+import { chaveContraparte, REGRA_CONFIAVEL, possiveisDuplicados, duplicadosNoLote, type TxBanco, type SugestaoBanco } from "../../lib/banco"
 import { ModalLancamento } from "../FinanceiroView"
 import { Botao, Selo, Segmentado, Vazio } from "../ds"
 
@@ -117,9 +117,26 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
 
   // Lote: o que vem das suas regras sai de uma vez
   const dasRegras = (dados?.transacoes ?? []).filter(t => t.sugestao?.acao === "criar" && t.sugestao.origem === "regra")
-  async function aceitarRegras() {
-    if (!confirm(`Lançar as ${dasRegras.length} transações como as suas regras sugerem?`)) return
-    for (const t of dasRegras) await aceitar(t, t.sugestao!)
+  // Lote: antes de lançar, confere duplicados (mesmo valor no mesmo dia já lançado, ou repetido no próprio lote)
+  type Passo = { tx: TxBanco; decisao: Record<string, unknown> }
+  const [revisaoLote, setRevisaoLote] = useState<{ titulo: string; plano: Passo[]; suspeitos: ReturnType<typeof duplicadosNoLote> } | null>(null)
+  const [lancandoLote, setLancandoLote] = useState<string | null>(null)
+  async function rodarLote(plano: Passo[]) {
+    setRevisaoLote(null)
+    for (let i = 0; i < plano.length; i++) { setLancandoLote(`${i + 1} de ${plano.length}`); await decidir(plano[i].tx, plano[i].decisao) }
+    setLancandoLote(null)
+  }
+  function lote(titulo: string, plano: Passo[]) {
+    if (!plano.length) return
+    const suspeitos = duplicadosNoLote(plano.map(p => p.tx), lancamentos)
+    if (!suspeitos.length) { if (confirm(`${titulo}?`)) void rodarLote(plano); return }
+    setRevisaoLote({ titulo, plano, suspeitos })
+  }
+  const decisaoDe = (s: SugestaoBanco): Record<string, unknown> | null =>
+    s.acao === "vincular" ? { acao: "vincular", lancamentoId: s.lancamentoId } : s.acao === "atualizar" ? { acao: "atualizar", lancamentoId: s.lancamentoId, campos: s.campos }
+      : s.acao === "criar" ? { acao: "criar", lancamentos: s.lancamentos } : s.acao === "ignorar" ? { acao: "ignorar" } : null
+  function aceitarRegras() {
+    lote(`Lançar as ${dasRegras.length} transações como as suas regras sugerem`, dasRegras.map(t => ({ tx: t, decisao: decisaoDe(t.sugestao!)! })))
   }
   // Mesma pessoa do outro lado: ficam juntas, e dá para lançar todas como a primeira
   const grupoDe = (tx: TxBanco) => `${tx.tipo}|${chaveContraparte(tx)}`
@@ -134,14 +151,13 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
     const s = modelo.sugestao
     if (s?.acao !== "criar" || s.lancamentos.length !== 1) return
     const doGrupo = lista.filter(t => grupoDe(t) === grupoDe(modelo))
-    if (!confirm(`Lançar as ${doGrupo.length} de ${modelo.contraparte_nome ?? modelo.descricao} como esta (${nomeCat(s.lancamentos[0].categoria) ?? "sem categoria"}${s.lancamentos[0].subcategoria ? ` › ${s.lancamentos[0].subcategoria}` : ""})?`)) return
     const m = s.lancamentos[0]
-    for (const t of doGrupo) {
+    lote(`Lançar as ${doGrupo.length} de ${modelo.contraparte_nome ?? modelo.descricao} como esta (${nomeCat(m.categoria) ?? "sem categoria"}${m.subcategoria ? ` › ${m.subcategoria}` : ""})`, doGrupo.map(t => {
       const propria = t.sugestao?.acao === "criar" && t.sugestao.lancamentos.length === 1 ? t.sugestao.lancamentos[0] : null
       const vinculo = propria ? { cardId: propria.cardId, cardNumero: propria.cardNumero, loteId: propria.loteId, loteNumero: propria.loteNumero, nomeCliente: propria.nomeCliente } : {}
-      await decidir(t, { acao: "criar", lancamentos: [{ tipo: m.tipo, categoria: m.categoria, subcategoria: m.subcategoria, fornecedorId: m.fornecedorId, contaId: m.contaId, formaPagamento: m.formaPagamento,
-        descricao: m.descricao, valor: t.valor, status: "pago", dataVencimento: t.data, dataPagamento: t.data, ...(t.id === modelo.id ? { cardId: m.cardId, cardNumero: m.cardNumero, loteId: m.loteId, loteNumero: m.loteNumero, nomeCliente: m.nomeCliente } : vinculo) }] })
-    }
+      return { tx: t, decisao: { acao: "criar", lancamentos: [{ tipo: m.tipo, categoria: m.categoria, subcategoria: m.subcategoria, fornecedorId: m.fornecedorId, contaId: m.contaId, formaPagamento: m.formaPagamento,
+        descricao: m.descricao, valor: t.valor, status: "pago", dataVencimento: t.data, dataPagamento: t.data, ...(t.id === modelo.id ? { cardId: m.cardId, cardNumero: m.cardNumero, loteId: m.loteId, loteNumero: m.loteNumero, nomeCliente: m.nomeCliente } : vinculo) }] } }
+    }))
   }
   // Teclado: ↑/↓ (ou K/J) anda, Enter aceita a sugestão, E corrige, I ignora
   const [foco, setFoco] = useState(0)
@@ -261,6 +277,13 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
                 {estado === "pendente" ? (
                   <div className="mt-2 rounded-lg px-3 py-2 bg-[rgba(132,86,232,0.05)] border border-[rgba(132,86,232,0.14)]">
                     <Sugestao s={s} nomeCat={nomeCat} nomeForn={nomeForn} lancPorId={lancPorId} />
+                    {s?.acao === "criar" && (() => {
+                      const dup = possiveisDuplicados(tx, lancamentos)
+                      return dup.length > 0 && (
+                        <p className="mt-1.5 text-[11.5px] text-[#b26b00] flex items-start gap-1.5"><AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                          <span>Pode ser duplicado: já existe {dup.map(l => `“${l.descricao}” de ${brl(l.valor)} em ${dataBR((l.dataPagamento ?? l.dataVencimento).slice(0, 10))}`).join(", ")}. Confira se foi 2x mesmo.</span></p>
+                      )
+                    })()}
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                       {s && s.acao !== "revisar" && s.acao !== "escolher" && (
                         <button onClick={() => aceitar(tx, s)} className="h-7 px-3 rounded-lg text-[11.5px] font-semibold text-white bg-[#8456e8] inline-flex items-center gap-1">
@@ -296,6 +319,40 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
           )
         })}
       </div>
+
+      {lancandoLote && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[70] rounded-full px-4 py-2 bg-[#191625] text-white text-[12.5px] flex items-center gap-2 shadow-lg">
+          <Loader2 className="w-4 h-4 animate-spin" />Lançando {lancandoLote}…
+        </div>
+      )}
+      {revisaoLote && (() => {
+        const ids = new Set(revisaoLote.suspeitos.map(x => x.tx.id))
+        const semSuspeitos = revisaoLote.plano.filter(p => !ids.has(p.tx.id))
+        return (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" style={{ background: "rgba(25,22,37,0.38)" }} onClick={e => { if (e.target === e.currentTarget) setRevisaoLote(null) }}>
+            <div className="w-full max-w-lg rounded-2xl bg-white p-5 space-y-3 shadow-2xl max-h-[85vh] flex flex-col">
+              <div>
+                <p className="text-[15px] font-semibold text-[#191625] flex items-center gap-2"><AlertCircle className="w-4 h-4 text-[#b26b00]" />{revisaoLote.suspeitos.length} {revisaoLote.suspeitos.length === 1 ? "pode estar duplicada" : "podem estar duplicadas"}</p>
+                <p className="text-[12px] text-[#5e5c68] mt-0.5">{revisaoLote.titulo}. Nestes dias já existe lançamento com o mesmo valor, ou há dois iguais no lote. Confira se foi 2x mesmo.</p>
+              </div>
+              <div className="overflow-y-auto divide-y divide-[rgba(60,60,67,0.08)] rounded-xl border border-[rgba(60,60,67,0.1)]">
+                {revisaoLote.suspeitos.map(x => (
+                  <div key={x.tx.id} className="px-3 py-2 text-[12px]">
+                    <p className="font-semibold text-[#191625]">{dataBR(x.tx.data)} · {brl(x.tx.valor)}</p>
+                    {x.existentes.map(l => <p key={l.id} className="text-[#5e5c68]">Já lançado: “{l.descricao}” em {dataBR((l.dataPagamento ?? l.dataVencimento).slice(0, 10))}</p>)}
+                    {x.irmas > 0 && <p className="text-[#5e5c68]">Mais {x.irmas} {x.irmas === 1 ? "transação igual" : "transações iguais"} neste dia, no lote</p>}
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2 justify-end pt-1">
+                <Botao variante="fantasma" onClick={() => setRevisaoLote(null)}>Cancelar</Botao>
+                {semSuspeitos.length > 0 && <Botao onClick={() => void rodarLote(semSuspeitos)}>Pular as suspeitas e lançar {semSuspeitos.length}</Botao>}
+                <Botao variante="primario" onClick={() => void rodarLote(revisaoLote.plano)}>Lançar todas ({revisaoLote.plano.length})</Botao>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {corrigindo && (
         <ModalLancamento inicial={corrigindo.inicial} kanban={kanban}

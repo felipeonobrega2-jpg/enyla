@@ -71,7 +71,7 @@ const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
 const escuro = tela.endsWith("-escuro")
 if (escuro) document.documentElement.classList.add("dark")
 // Abas do Financeiro: "financeiro-receber" abre a aba "receber"
-if (tela.startsWith("financeiro-")) sessionStorage.setItem("fin:tab", tela.slice(11).replace(/-(conta|lista)$/, ""))
+if (tela.startsWith("financeiro-")) sessionStorage.setItem("fin:tab", tela.slice(11).replace(/-(conta|lista|dup)$/, ""))
 
 // Microfones: simula um Mac com o iPhone por perto (Continuidade)
 if (tela === "compositor-mic" && navigator.mediaDevices) navigator.mediaDevices.enumerateDevices = async () => [
@@ -429,7 +429,9 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
 
 function Telas() {
   const [cfg, setCfg] = React.useState(config)
-  const [lancs, setLancs] = React.useState(dados.lancamentos)
+  const [lancs, setLancs] = React.useState(tela === "financeiro-banco-dup"
+    ? [...dados.lancamentos, { id: "dup1", tipo: "despesa", descricao: "Corte e vinco (lançado à mão)", valor: 470, dataVencimento: "2026-11-03", dataPagamento: "2026-11-03", status: "pago", criadoEm: "" } as never]
+    : dados.lancamentos)
   const [form, setForm] = React.useState(dados.historico[0].form)
   const pagina = (filho: React.ReactNode) => <div style={{ padding: 24, background: "#f5f5f7", minHeight: "100vh" }}><div className="max-w-[1320px] mx-auto">{filho}</div></div>
   switch (tela) {
