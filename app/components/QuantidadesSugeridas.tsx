@@ -6,8 +6,8 @@ import { Lightbulb, Plus } from "lucide-react"
 import type { SugestaoQtd } from "../lib/sugerirQuantidades"
 import { brl, num } from "../utils"
 
-const ROTULO: Record<SugestaoQtd["tipo"], string> = { rende: "Rende mais", abaixo: "Mais em conta", volume: "Volume" }
-const COR: Record<SugestaoQtd["tipo"], string> = { rende: "#009351", abaixo: "#c57800", volume: "#8456e8" }
+const ROTULO: Record<SugestaoQtd["tipo"], string> = { minimo: "Mínimo do offset", rende: "Rende mais", abaixo: "Mais em conta", volume: "Volume" }
+const COR: Record<SugestaoQtd["tipo"], string> = { minimo: "#d33a3c", rende: "#009351", abaixo: "#c57800", volume: "#8456e8" }
 
 export function QuantidadesSugeridas({ sugestoes, onAdicionar }: { sugestoes: SugestaoQtd[]; onAdicionar: (s: SugestaoQtd) => void }) {
   if (!sugestoes.length) return null

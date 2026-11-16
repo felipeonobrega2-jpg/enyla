@@ -5,7 +5,7 @@
 export type PrecoQtd = { quantidade: number; total: number }
 export type SugestaoQtd = {
   quantidade: number
-  tipo: "rende" | "abaixo" | "volume"
+  tipo: "minimo" | "rende" | "abaixo" | "volume"
   base: number                 // quantidade orçada que gerou a sugestão
   total: number
   unitario: number
@@ -25,6 +25,7 @@ export function candidatas(orcadas: number[]): number[] {
     for (let c = Math.max(p, Math.floor(q * 0.8 / p) * p); c <= q * 1.6; c += p) set.add(c)
     for (const m of [2, 3]) set.add(redondo(q * m))
   }
+  if (orcadas.some(q => q >= 300 && q < 1000)) set.add(1000)
   for (const q of orcadas) set.delete(q)
   return [...set].filter(q => q >= 50).sort((a, b) => a - b)
 }
@@ -55,6 +56,16 @@ export function sugerirQuantidades(orcadas: number[], precos: PrecoQtd[], max = 
       texto: `${brl(t - abaixo.total)} mais barato no total (−${pct(1 - abaixo.total / t)}) com ${num(q - abaixo.quantidade)} caixas a menos. Bom para cliente que olha o valor final.` })
   }
 
+  // 300 a 999 de um tamanho: o offset precisa rodar pelo menos 1.000 folhas, então fica caro aqui e na digital.
+  // Sugere subir para 1.000 (ou descer e cotar na digital). Regra do Felipe, 16/11.
+  const ruim = orcadas.filter(q => q >= 300 && q < 1000 && preco.has(q)).sort((a, b) => a - b)[0]
+  const t1000 = preco.get(1000)
+  if (ruim && t1000) {
+    const uR = preco.get(ruim)! / ruim, u1 = t1000 / 1000
+    add({ quantidade: 1000, tipo: "minimo", base: ruim, total: t1000,
+      texto: `${num(ruim)} un é quantidade ruim: o offset precisa rodar pelo menos 1.000 folhas e fica caro aqui e na digital. Com 1.000 o unitário cai ${pct(1 - u1 / uR)} (${brl(uR)} → ${brl(u1)}). Ou diminua e cote na digital.` })
+  }
+
   // Volume: 2x ou 3x a menor orçada, quando o unitário cai pelo menos 15%
   const menor = Math.min(...orcadas.filter(q => preco.has(q)))
   if (Number.isFinite(menor)) {
@@ -66,6 +77,6 @@ export function sugerirQuantidades(orcadas: number[], precos: PrecoQtd[], max = 
       if (queda >= 0.15) { add({ quantidade: v, tipo: "volume", base: menor, total: tv, texto: `Unitário cai ${pct(queda)} (${brl(uBase)} → ${brl(tv / v)}). Bom para quem compra todo mês.` }); break }
     }
   }
-  const ordem = { rende: 0, abaixo: 1, volume: 2 }
+  const ordem = { minimo: 0, rende: 1, abaixo: 2, volume: 3 }
   return out.sort((a, b) => ordem[a.tipo] - ordem[b.tipo] || a.quantidade - b.quantidade).slice(0, max)
 }

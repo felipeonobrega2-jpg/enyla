@@ -22,6 +22,14 @@ describe("sugestão de quantidades", () => {
     expect(v.quantidade).toBe(2000)
     expect(v.texto).toMatch(/Unitário cai 29%/)
   })
+  it("500 de um tamanho: sugere 1.000 (mínimo do offset) antes de tudo", () => {
+    const s = sugerirQuantidades([500], [{ quantidade: 500, total: 2600 }, { quantidade: 1000, total: 3400 }, { quantidade: 550, total: 2640 }])
+    expect(s[0].tipo).toBe("minimo")
+    expect(s[0].quantidade).toBe(1000)
+    expect(s[0].texto).toMatch(/1\.000 folhas/)
+    expect(candidatas([500])).toContain(1000)
+    expect(sugerirQuantidades([200], [{ quantidade: 200, total: 1200 }, { quantidade: 1000, total: 3400 }]).some(x => x.tipo === "minimo")).toBe(false)
+  })
   it("não sugere quantidade que já está no orçamento", () => {
     expect(sugerirQuantidades([1000, 1200, 2000], precos).map(x => x.quantidade)).not.toContain(1200)
   })

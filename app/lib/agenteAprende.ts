@@ -224,6 +224,9 @@ async function medirEstiloFelipe() {
 
 // O que você ensinou direto (pediu ao Claude): entra uma vez, pela versão
 const ENSINADO: { v: number; item: Conhecimento }[] = [
+  // v8 (16/11, regra sua: 500 de cada tamanho é a pior quantidade)
+  { v: 8, item: { id: "felipe-500-de-cada", tema: "preco", em: "2026-11-16T00:00:00.000Z",
+    texto: "500 unidades de cada tamanho é uma quantidade ruim: fica cara tanto na impressão digital quanto no offset, porque o offset precisa rodar pelo menos 1.000 folhas para valer a pena. Quando o cliente pedir por volta de 500 de cada tamanho (ou de cada modelo de caixa), ofereço as duas saídas: diminuir a quantidade e fazer na impressão digital, ou subir para pelo menos 1.000 de cada tamanho no offset, onde o unitário cai bastante. Não cotar 500 de cada sem apresentar essas duas opções." } },
   // v7 (12/11, conversa com o Carlos Júnior)
   { v: 7, item: { id: "felipe-cartonada", tema: "produto", em: "2026-11-12T00:00:00.000Z",
     texto: "Caixa cartonada é outra coisa: papelão revestido, rígida, com aspecto de caixa de iPhone; bem mais cara que o cartucho de triplex. Berço interno, divisória, kit com mais de um frasco ou ampola, verniz localizado e hot stamping também fogem do digital padrão (um frasco por caixa, triplex 300 g). Quando o cliente pede ou manda foto disso, quem orça sou eu: não prometo que faço nem passo preço do digital, digo que vou ver o melhor formato e já falo." } },
