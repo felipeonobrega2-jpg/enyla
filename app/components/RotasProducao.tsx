@@ -173,9 +173,9 @@ export function RotasProducao({ calculo, form, producao, multiplicadorPadrao, co
     custos: rotas.map(q => q.alternativas.filter(a => a.impressorId === imp.id).reduce<Rota | null>((b, a) => !b || a.custoTotal < b.custoTotal ? a : b, null)),
   }))
 
-  const facasDisponiveis = Array.from(new Set(atual.alternativas
-    .filter(a => a.impressorId === melhor.impressorId && a.formatoId === melhor.formatoId && a.divisao === melhor.divisao)
-    .map(a => a.facaCavidades))).sort((a, b) => b - a)
+  // Faca: qualquer número de cavidades, do máximo que cabe na folha até 1 (o motor refaz as batidas com a escolhida)
+  const kCheio = Math.max(1, ...melhor.passadas.map(ps => ps.cavidades))
+  const facasDisponiveis = Array.from({ length: kCheio }, (_, i) => kCheio - i)
 
   const etapasFornecedor: { etapa: "acabamento" | "corteVinco" | "colagem" | "hotStamping"; nome: string; servico: "laminacao" | "corteVinco" | "colagem" | "hotStamping"; mostrar: boolean }[] = [
     { etapa: "acabamento",  nome: "Laminação / verniz", servico: "laminacao",  mostrar: form.laminacao || form.incluirVerniz },
@@ -383,7 +383,7 @@ export function RotasProducao({ calculo, form, producao, multiplicadorPadrao, co
                 opcoes={[{ v: 0, nome: "Automático" }, { v: 1, nome: "Folha inteira" }, { v: 2, nome: "Meia folha" }, { v: 4, nome: "Quarto de folha" }]}
                 onChange={v => set({ divisao: (v || null) as 1 | 2 | 4 | null })} />
               <Seletor label="Faca" valor={opcoes.facaCavidades ?? 0}
-                opcoes={[{ v: 0, nome: "Automático" }, ...facasDisponiveis.map(k => ({ v: k, nome: `${k} cavidades` }))]}
+                opcoes={[{ v: 0, nome: "Automático" }, ...facasDisponiveis.map(k => ({ v: k, nome: `${k} ${k === 1 ? "cavidade" : "cavidades"}${k === kCheio ? " (cheia)" : ""}` }))]}
                 onChange={v => set({ facaCavidades: v || null })} />
               <Seletor<ColagemModo> label="Colagem" valor={opcoes.colagemModo ?? (form.pecaPlana || form.tipoCaixa === "aviao" ? "nenhuma" : "fornecedor")}
                 opcoes={[{ v: "fornecedor", nome: "No fornecedor" }, { v: "manual", nome: "Manual (por unidade)" }, { v: "nenhuma", nome: "Sem colagem" }]}
