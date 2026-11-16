@@ -525,7 +525,7 @@ function paginaCondicoesGerais(item: { dataRodape: string }): string {
 </div>`
 }
 
-export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?: string, previewQrDataUrl?: string, previewUrl?: string): string {
+export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?: string, previewQrDataUrl?: string, previewUrl?: string, semCondicoesGerais = false): string {
   const { form, calculo, data, numero } = item
   const validadeDias = form.validadeDias ?? 7
   const dataVencimento = (() => {
@@ -659,6 +659,103 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
 </div>
 ${temDims3D ? paginaVisualizacao3D(form.frente, form.alturaBox, form.lateral, !!form.incluirVerniz, previewQrDataUrl, previewUrl, data)
   : form.caixaDxf ? paginaVisualizacao3D(form.caixaDxf.largura / 10, form.caixaDxf.altura / 10, form.caixaDxf.profundidade / 10, !!form.incluirVerniz, previewQrDataUrl, previewUrl, data) : ""}
+${semCondicoesGerais ? "" : paginaCondicoesGerais({ dataRodape: data })}
+
+</body>
+</html>`
+}
+
+// Medidas da caixa para o resumo do lote ("5 × 5 × 12 cm")
+function medidasDoItem(form: FormData, calculo: Calculo): string {
+  const n = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
+  if (form.pecaPlana) return `${n(form.pecaPlana.largura)} × ${n(form.pecaPlana.comprimento)} cm`
+  if (form.frente > 0 && form.alturaBox > 0 && form.lateral > 0) return `${n(form.frente)} × ${n(form.alturaBox)} × ${n(form.lateral)} cm`
+  if (form.caixaDxf) return `${[form.caixaDxf.largura, form.caixaDxf.altura, form.caixaDxf.profundidade].map(v => n(v / 10)).join(" × ")} cm`
+  return `blank ${n(calculo.dieline.largura / 10)} × ${n(calculo.dieline.altura / 10)} cm`
+}
+
+// Lote (tamanhos diferentes do mesmo cliente): uma página de resumo no mesmo visual e, depois, a proposta de cada
+// item como sempre (valores e caixa 3D); as condições gerais saem uma vez só, no fim.
+export function gerarHtmlLoteCliente(itens: { item: HistoricoItem; qr?: string; previewUrl?: string }[], telefoneCliente?: string): string {
+  const primeiro = itens[0]?.item
+  if (!primeiro) return ""
+  const { form: f0, data } = primeiro
+  const linhas = itens.map(({ item }, i) => {
+    const { form, calculo } = item
+    const ideal = calculo.tabela.find(l => l.quantidade === calculo.sweetSpotIdealQtd) ?? calculo.tabela[calculo.tabela.length - 1]
+    const total = ideal ? (form.comFaca ? ideal.precoComFaca : ideal.precoSemFaca) : 0
+    const unit = ideal ? (form.comFaca ? ideal.unitarioComFaca : ideal.unitarioSemFaca) : 0
+    const produto = form.pecaPlana?.nome || (form.caixaDxf?.modelo ?? (form.blankOverride ? "Embalagem Personalizada" : TIPO_CAIXA_PDF[form.tipoCaixa] ?? "Embalagem Personalizada"))
+    return { i, numero: item.numero ?? "", produto, medidas: medidasDoItem(form, calculo), material: form.materialNome || "—", qtd: ideal?.quantidade ?? 0, unit, total }
+  })
+  const soma = linhas.reduce((s, l) => s + l.total, 0)
+  const corpo = (html: string) => html.slice(html.indexOf("<body>") + 6, html.lastIndexOf("</body>"))
+  const paginas = itens.map(({ item, qr, previewUrl }) => corpo(gerarHtmlOrcamentoCliente(item, telefoneCliente, qr, previewUrl, true)))
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Proposta — ${f0.nomeCliente || "Cliente"} — ${itens.length} itens</title>
+  <style>${estiloPropostaCliente()}</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="doc-header">
+    <img src="${LOGO_DARK_B64}" alt="Enyla" style="height:26px;display:block" />
+    <div class="titulo">Proposta Comercial <span>${itens.length} itens</span></div>
+  </div>
+
+  <div class="client-row">
+    <div class="bloco">
+      <div><span class="lbl">Para: </span><span class="val">${f0.nomeCliente || "Cliente"}</span></div>
+      ${telefoneCliente ? `<div><span class="lbl">Telefone: </span><span class="val">${telefoneCliente}</span></div>` : ""}
+    </div>
+    <div class="bloco">
+      <div><span class="lbl">Data: </span><span class="val">${data}</span></div>
+      <div><span class="lbl">Validade: </span><span class="val">${f0.validadeDias ?? 7} dias</span></div>
+    </div>
+  </div>
+
+  <div class="section-bar">Resumo da proposta</div>
+  <table class="valores-table">
+    <thead><tr><th>Item</th><th>Medidas (L × A × P)</th><th>Quantidade</th><th>Unitário</th><th>À Vista</th></tr></thead>
+    <tbody>${linhas.map(l => `
+      <tr>
+        <td><div style="font-weight:800">${l.i + 1}. ${l.produto}</div><div class="v-parc">${l.material}${l.numero ? ` · ${l.numero}` : ""}</div></td>
+        <td>${l.medidas}</td>
+        <td><span style="font-weight:700">${num(l.qtd)} un</span></td>
+        <td class="v-unit">${brl(l.unit)}</td>
+        <td class="v-total">${brl(l.total)}</td>
+      </tr>`).join("")}
+      <tr>
+        <td colspan="4" style="font-weight:800;border-bottom:0">Total do pedido</td>
+        <td class="v-total" style="font-size:13px;border-bottom:0">${brl(soma)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-bar">Pagamento</div>
+  <div class="kv-grid">
+    <div class="kv" style="grid-column:1/-1"><span class="lbl">Condições:</span><span class="val">50% de sinal no fechamento do pedido + 50% na entrega</span></div>
+  </div>
+
+  <div class="section-bar">Condições e Observações</div>
+  <div class="obs-bar-list">
+    <div class="item">* Nas próximas páginas está a proposta de cada item, com todas as quantidades e a caixa em 3D.</div>
+    <div class="item">* Você pode fechar todos os itens ou só os que quiser; cada um tem a sua aprovação.</div>
+    <div class="item">* Prazo de produção: <strong>${PRAZO_ENTREGA_PADRAO}</strong> após aprovação da arte.</div>
+    <div class="item">* Recebeu uma proposta mais em conta? Apresente-nos — <strong>cobrimos qualquer oferta</strong> do mercado.</div>
+  </div>
+
+  <div class="doc-footer">
+    Enyla · Jerograf Embalagens Personalizadas · CNPJ 03.999.896/0001-52<br>
+    Estrada Velha de Itapevi, 3614 · Barueri – SP · ${data}
+  </div>
+</div>
+${paginas.map(p => `<div class="page-break"></div>\n${p}`).join("\n")}
 ${paginaCondicoesGerais({ dataRodape: data })}
 
 </body>

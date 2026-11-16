@@ -54,13 +54,14 @@ import { PrecoQueFecha } from "./components/PrecoQueFecha"
 import { linhasDeOrcamento } from "./lib/precoQueFecha"
 import { retornoPorCampanha } from "./lib/retornoCampanhas"
 import { normalizarMetas } from "./lib/metas"
-import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS } from "./pdf"
+import { gerarHtmlOrcamento, gerarHtmlOrcamentoCliente, gerarHtmlPropostaCustom, gerarHtmlOS, gerarHtmlLoteCliente } from "./pdf"
+import { LoteOrcamento, ItemLote } from "./components/LoteOrcamento"
 import { BibliotecaFacasView } from "./components/BibliotecaFacasView"
 import { BuscaFacaGuardada } from "./components/BuscaFacaGuardada"
 import FormaView from "./FormaView"
 import FormaBubble from "./components/FormaBubble"
 import { brl, num } from "./utils"
-import { mensagemProposta } from "./lib/mensagemProposta"
+import { mensagemProposta, mensagemLote } from "./lib/mensagemProposta"
 import { FormSection, Label, NumberInput, Section, TH, TabelaRow, AnaliseEstrategica, EmptyState } from "./components/ui"
 import { CabecalhoPagina, Kpi, Segmentado } from "./components/ds"
 import { HistoricoView } from "./components/HistoricoView"
@@ -215,6 +216,10 @@ export default function Home() {
   definirFeriadosLocais(config.feriados)
   const configAtual = useRef<Configuracoes>(CONFIG_PADRAO)
   useEffect(() => { configAtual.current = config }, [config])
+  // Lote: o mesmo cliente com tamanhos diferentes, numa proposta só (fica guardado neste navegador até salvar)
+  const [loteOrc, setLoteOrc] = useState<ItemLote[]>([])
+  const [salvandoLote, setSalvandoLote] = useState(false)
+  const [envioLote, setEnvioLote] = useState<{ cliente: string; itens: { form: FormData; calculo: Calculo; numero: string; data: string; link: string | null }[] } | null>(null)
   const [envioProposta, setEnvioProposta] = useState<{ form: FormData; calculo: Calculo; numero: string; data: string; jid?: string } | null>(null)
   const [modalSalvar, setModalSalvar] = useState<{ form: FormData; calculo: Calculo; numero: string; data: string; cardId: string } | null>(null)
   const [clientes, setClientes] = useState<Cliente[]>([])
@@ -983,11 +988,11 @@ export default function Home() {
   const salvandoRef = useRef(false)
   const formMesa = form, resultMesa = result, custosMesa = customCustos
   // opts.f/opts.r: salvar um orçamento que não está na mesa (proposta pronta do agente); opts.enviar: abre o envio com o PDF
-  async function salvar(opts: { f?: FormData; r?: Calculo | null; enviar?: boolean; jid?: string } = {}) {
+  async function salvar(opts: { f?: FormData; r?: Calculo | null; enviar?: boolean; jid?: string; silencioso?: boolean; custos?: typeof customCustos } = {}): Promise<{ numero: string; data: string } | null> {
     const form = opts.f ?? formMesa
     const result = opts.r !== undefined ? opts.r : resultMesa
-    const customCustos: typeof custosMesa = opts.f ? {} : custosMesa
-    if (!result || salvandoRef.current) return
+    const customCustos: typeof custosMesa = opts.custos ?? (opts.f ? {} : custosMesa)
+    if (!result || salvandoRef.current) return null
     salvandoRef.current = true
     // Número reservado no servidor (o agente também cria orçamentos): sem isso, dois iguais se sobrescrevem
     let numero: string, novoContador: number, doServidor = false
@@ -1094,8 +1099,75 @@ export default function Home() {
         body: JSON.stringify({ acao: "salva", id: pp.id, numero, preco, multiplicador: custo > 0 ? preco / custo : undefined }) }).catch(() => {})
       propostaNaMesa.current = null
     }
+    if (opts.silencioso) return { numero, data }
     if (opts.enviar) setEnvioProposta({ form: { ...form }, calculo: result, numero, data, jid: opts.jid })
     else setModalSalvar({ form: { ...form }, calculo: result, numero, data, cardId: card.id })
+    return { numero, data }
+  }
+
+  // ── Lote ──
+  const LOTE_CHAVE = "orcamento-lote-v1"
+  useEffect(() => {
+    try {
+      const salvos = JSON.parse(localStorage.getItem(LOTE_CHAVE) ?? "[]") as { id: string; form: FormData }[]
+      const itens = salvos.map(x => ({ id: x.id, form: x.form, calculo: calcular(x.form, config) })).filter((x): x is ItemLote => !!x.calculo)
+      if (itens.length) setLoteOrc(itens)
+    } catch {}
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  function guardarLote(itens: ItemLote[]) {
+    setLoteOrc(itens)
+    try { if (itens.length) localStorage.setItem(LOTE_CHAVE, JSON.stringify(itens.map(i => ({ id: i.id, form: i.form })))); else localStorage.removeItem(LOTE_CHAVE) } catch {}
+  }
+  const mesaNoLote = !!result && loteOrc.some(i => JSON.stringify(i.form) === JSON.stringify(form))
+  function adicionarAoLote() {
+    if (!result) return
+    const doLote = loteOrc[0]?.form.nomeCliente.trim()
+    const daMesa = form.nomeCliente.trim()
+    if (doLote && daMesa && doLote.toLowerCase() !== daMesa.toLowerCase()) { showToast(`O lote é de ${doLote}. Salve ou limpe o lote antes de orçar outro cliente.`); return }
+    const f = { ...form, nomeCliente: daMesa || doLote || "" }
+    if (!f.nomeCliente) { showToast("Coloque o nome do cliente antes de montar o lote."); return }
+    guardarLote([...loteOrc, { id: Date.now().toString(36), form: f, calculo: result }])
+    if (f.nomeCliente !== form.nomeCliente) setForm(f)
+    showToast(`Item ${loteOrc.length + 1} no lote. Mude a medida e adicione o próximo.`)
+  }
+  function abrirDoLote(id: string) {
+    const it = loteOrc.find(i => i.id === id)
+    if (!it) return
+    setForm(it.form); setResult(calcular(it.form, config)); setDxfNome(null)
+    guardarLote(loteOrc.filter(i => i.id !== id))
+    showToast("Item na mesa: ajuste e adicione de novo ao lote.")
+  }
+  async function salvarLote() {
+    if (loteOrc.length < 2 || salvandoLote) return
+    setSalvandoLote(true)
+    const salvos: { form: FormData; calculo: Calculo; numero: string; data: string; link: string | null }[] = []
+    for (const it of loteOrc) {
+      const s = await salvar({ f: it.form, r: it.calculo, silencioso: true })
+      if (!s) { showToast("Não consegui salvar todos os itens. Os que faltam continuam no lote."); break }
+      salvos.push({ form: it.form, calculo: it.calculo, numero: s.numero, data: s.data, link: null })
+    }
+    const restantes = loteOrc.slice(salvos.length)
+    guardarLote(restantes)
+    if (salvos.length) {
+      const links = await Promise.all(salvos.map(x => linkAprovacao(x.numero)))
+      salvos.forEach((x, i) => { x.link = links[i] })
+      setEnvioLote({ cliente: salvos[0].form.nomeCliente.trim(), itens: salvos })
+      showToast(`${salvos.length} orçamentos salvos: ${salvos.map(x => x.numero).join(", ")}.`)
+    }
+    setSalvandoLote(false)
+  }
+  async function htmlPdfLote(itens: { form: FormData; calculo: Calculo; numero: string; data: string }[]) {
+    const telefone = clientes.find(c => c.nome.toLowerCase() === itens[0].form.nomeCliente.trim().toLowerCase())?.telefone
+    const QRCode = (await import("qrcode").catch(() => null))?.default
+    const comQr = await Promise.all(itens.map(async it => {
+      const f = it.form
+      const [l, a, p] = f.frente > 0 ? [f.frente, f.alturaBox, f.lateral] : f.caixaDxf ? [f.caixaDxf.largura / 10, f.caixaDxf.altura / 10, f.caixaDxf.profundidade / 10] : [0, 0, 0]
+      const previewUrl = l ? `${window.location.origin}/box-preview?l=${l}&a=${a}&p=${p}&v=${f.incluirVerniz ? 1 : 0}` : undefined
+      let qr: string | undefined
+      try { if (previewUrl && QRCode) qr = await QRCode.toDataURL(previewUrl, { width: 180, margin: 1, color: { dark: "#5009c4", light: "#ffffff" } }) } catch {}
+      return { item: { form: it.form, calculo: it.calculo, data: it.data, numero: it.numero }, qr, previewUrl }
+    }))
+    return gerarHtmlLoteCliente(comQr, telefone)
   }
 
   // Proposta pronta do agente → mesa de orçamento (Ajustar) ou direto para o envio com o PDF (Aprovar)
@@ -2284,6 +2356,11 @@ export default function Home() {
                 </button>
               </div>
             )}
+            {!editandoHistorico && (
+              <LoteOrcamento itens={loteOrc} podeAdicionar={!!r} mesaNoLote={mesaNoLote} salvando={salvandoLote}
+                onAdicionar={adicionarAoLote} onAbrir={abrirDoLote} onRemover={id => guardarLote(loteOrc.filter(i => i.id !== id))}
+                onSalvarEnviar={() => { void salvarLote() }} />
+            )}
             <button onClick={editandoHistorico ? salvarEdicaoHistorico : () => { void salvar() }} disabled={!r}
               className="w-full h-11 bg-[#8456e8] hover:bg-[#7445d4] active:bg-[#6234bc] active:scale-[0.99] disabled:opacity-30 disabled:cursor-not-allowed text-white text-[13px] font-bold rounded-xl transition-all duration-150 shadow-sm shadow-[#8456e8]/15 disabled:shadow-none">
               {editandoHistorico ? "Salvar alterações" : "Salvar orçamento"}
@@ -3034,6 +3111,12 @@ export default function Home() {
           gerarHtml={() => htmlPdfCliente(envioProposta)}
           mensagem={link => mensagemProposta(envioProposta.form, envioProposta.calculo, envioProposta.numero, link)}
           onFechar={() => setEnvioProposta(null)} />
+      )}
+      {envioLote && (
+        <EnviarProposta cliente={envioLote.cliente || "cliente"}
+          gerarHtml={() => htmlPdfLote(envioLote.itens)}
+          mensagem={() => mensagemLote(envioLote.itens)}
+          onFechar={() => setEnvioLote(null)} />
       )}
       {modalSalvar && (
         <ModalPersonalizarProposta

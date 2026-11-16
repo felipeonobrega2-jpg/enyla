@@ -32,7 +32,7 @@ import AgenteLeadsCard from "@/app/components/AgenteLeadsCard"
 import ContatosProtegidosCard from "@/app/components/ContatosProtegidosCard"
 import ReativacaoCard from "@/app/components/ReativacaoCard"
 import { HojeCard } from "@/app/components/HojeCard"
-import { gerarHtmlOrcamentoCliente } from "@/app/pdf"
+import { gerarHtmlLoteCliente, gerarHtmlOrcamentoCliente } from "@/app/pdf"
 import { folhasDoHtml, htmlParaPdf } from "@/app/lib/pdfArquivo"
 import { EnviarProposta } from "@/app/components/EnviarProposta"
 import MarketingRelatorio from "@/app/components/MarketingRelatorio"
@@ -48,6 +48,7 @@ import { NegociacoesDigitalCard } from "@/app/components/NegociacoesDigitalCard"
 import { termosDigital } from "@/app/lib/termosDigital"
 import { BibliotecaFacasView } from "@/app/components/BibliotecaFacasView"
 import { BuscaFacaGuardada } from "@/app/components/BuscaFacaGuardada"
+import { LoteOrcamento } from "@/app/components/LoteOrcamento"
 import { Cartao } from "@/app/components/ds"
 import { termosOffset, VERSAO_TERMOS_OFFSET } from "@/app/lib/termosOffset"
 import ChapasView from "@/app/cartuxo/components/ChapasView"
@@ -443,6 +444,13 @@ function Telas() {
       </div>
     }
     case "pdfcliente": return <FolhasPdf />
+    case "pdflote": return <FolhasPdf lote />
+    case "lote": case "lote-vazio": {
+      const f = (fr: number, al: number, la: number) => ({ ...dados.historico[0].form, nomeCliente: "Perfumaria Modelo", frente: fr, alturaBox: al, lateral: la })
+      const itens = tela === "lote" ? [f(4, 9, 4), f(5, 12, 5), f(6.5, 15, 6.5)].map((form, i) => ({ id: String(i), form, calculo: calcular(form, config)! })) : []
+      return pagina(<div className="max-w-[340px] bg-white p-5 rounded-2xl space-y-2"><LoteOrcamento itens={itens} podeAdicionar mesaNoLote={false} salvando={false} onAdicionar={() => {}} onAbrir={() => {}} onRemover={() => {}} onSalvarEnviar={() => {}} />
+        <div className="w-full h-11 bg-[#8456e8] text-white text-[13px] font-bold rounded-xl grid place-items-center">Salvar orçamento</div></div>)
+    }
     case "enviarproposta": case "enviarproposta-sem": {
       const form = { ...dados.historico[0].form, nomeCliente: tela === "enviarproposta" ? "Perfumaria Modelo" : "Sem Conversa" }
       const calculo = calcular(form, config)!
@@ -637,10 +645,14 @@ function Telas() {
 createRoot(document.getElementById("root")!).render(<Telas />)
 
 // PDF do cliente como arquivo: as folhas que vão no .pdf, lado a lado com o HTML da impressão
-function FolhasPdf() {
+function FolhasPdf({ lote = false }: { lote?: boolean }) {
   const [folhas, setFolhas] = React.useState<{ imagem: string; altura: number }[] | null>(null)
   const html = React.useMemo(() => {
     const form = { ...dados.historico[0].form, nomeCliente: "Perfumaria Modelo", obsCliente: "Arte enviada pelo cliente." }
+    if (lote) return gerarHtmlLoteCliente([[4, 9, 4], [5, 12, 5]].map(([fr, al, la], i) => {
+      const f = { ...form, frente: fr, alturaBox: al, lateral: la }
+      return { item: { form: f, calculo: calcular(f, config)!, data: "15/11/2026, 10:00:00", numero: `ORC-2026-99${i}` } }
+    }))
     return gerarHtmlOrcamentoCliente({ form, calculo: calcular(form, config)!, data: "05/11/2026, 10:00:00", numero: "ORC-2026-999" })
   }, [])
   React.useEffect(() => {

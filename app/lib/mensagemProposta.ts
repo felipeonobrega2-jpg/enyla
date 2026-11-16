@@ -47,3 +47,29 @@ export function mensagemProposta(form: FormData, calculo: Calculo, numero: strin
     `\nQualquer dúvida, é só me chamar.`,
   ].filter(Boolean).join("\n")
 }
+
+// Lote: tamanhos diferentes do mesmo cliente numa mensagem só, cada item com o seu preço e o seu link de aprovação
+export function mensagemLote(itens: { form: FormData; calculo: Calculo; numero: string; link: string | null }[]) {
+  const primeiro = (itens[0]?.form.nomeCliente ?? "").trim().split(/\s+/)[0]
+  let soma = 0
+  const blocos = itens.map((it, i) => {
+    const ideal = it.calculo.tabela.find(l => l.quantidade === it.calculo.sweetSpotIdealQtd) ?? it.calculo.tabela[it.calculo.tabela.length - 1]
+    const total = ideal ? (it.form.comFaca ? ideal.precoComFaca : ideal.precoSemFaca) : 0
+    const unit = ideal ? (it.form.comFaca ? ideal.unitarioComFaca : ideal.unitarioSemFaca) : 0
+    soma += total
+    const [cabeca, ...resto] = especificacaoDaProposta(it.form)
+    return [
+      `${i + 1}. ${cabeca ?? `Item ${i + 1}`}`,
+      ...resto.filter(l => !l.startsWith("Material") || i === 0 || it.form.materialNome !== itens[0].form.materialNome),
+      ideal ? `${num(ideal.quantidade)} unidades · ${brl(total)} à vista (${brl(unit)}/un)` : null,
+      it.link ? `Ver em 3D e aprovar: ${it.link}` : null,
+    ].filter(Boolean).join("\n")
+  })
+  return [
+    `Oi${primeiro ? `, ${primeiro}` : ""}! Segue a proposta das ${itens.length} embalagens.`,
+    ...blocos.map(b => `\n${b}`),
+    itens.length > 1 ? `\nTotal dos ${itens.length} itens: ${brl(soma)} à vista` : null,
+    `\nNo PDF tem todas as quantidades de cada uma. Pode fechar todas ou só as que quiser.`,
+    `Qualquer dúvida, é só me chamar.`,
+  ].filter(Boolean).join("\n")
+}
