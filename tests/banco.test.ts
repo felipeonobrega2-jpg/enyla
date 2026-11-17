@@ -20,6 +20,14 @@ describe("banco → lançamentos sem bagunçar o manual", () => {
     const r = sugerir({ ...base, tx: tx({ tipo: "entrada", data: "2026-11-11" }), lancamentos: [lanc({ id: "a", tipo: "receita", dataPagamento: "2026-11-09" }), lanc({ id: "b", tipo: "receita", dataPagamento: "2026-11-11" })] })
     expect(r).toMatchObject({ acao: "vincular", lancamentoId: "b" })
   })
+  it("pagador conhecido: mesmo valor até 10 dias; senão, parte de um maior no mesmo dia", () => {
+    const memoria = { pagadores: { "bianca maria": "Maurício" } }
+    const t = tx({ tipo: "entrada", valor: 1000, data: "2026-09-26", contraparte_nome: "Bianca Maria" })
+    const l = (p: Partial<LancamentoFinanceiro>) => lanc({ tipo: "receita", nomeCliente: "Maurício", ...p })
+    expect(sugerir({ ...base, memoria, tx: t, lancamentos: [l({ id: "x", valor: 1000, dataPagamento: "2026-09-21" })] })).toMatchObject({ acao: "vincular", lancamentoId: "x" })
+    expect(sugerir({ ...base, memoria, tx: { ...t, valor: 280, data: "2026-09-11" }, lancamentos: [l({ id: "y", valor: 1280, dataPagamento: "2026-09-11" })] })).toMatchObject({ acao: "escolher", candidatos: ["y"] })
+    expect(sugerir({ ...base, tx: t, lancamentos: [l({ id: "x", valor: 1000, dataPagamento: "2026-09-21" })] })?.acao).not.toBe("vincular")
+  })
   it("dois iguais: pergunta qual; já vinculado a outra transação não conta", () => {
     expect(sugerir({ ...base, tx: tx({}), lancamentos: [lanc({}), lanc({ id: "l2" })] })).toMatchObject({ acao: "escolher" })
     expect(sugerir({ ...base, tx: tx({}), lancamentos: [lanc({}), lanc({ id: "l2" })], jaVinculados: new Set(["l2"]) })).toMatchObject({ acao: "vincular", lancamentoId: "l1" })

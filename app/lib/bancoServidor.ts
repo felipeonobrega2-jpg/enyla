@@ -146,9 +146,11 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
   const docsProprios = (cfg.pluggy?.documentosProprios ?? []).map(d => d.replace(/\D/g, "")).filter(Boolean)
   const voltar: { id: string; sugestao: SugestaoBanco }[] = []
   for (const t of (antigas ?? []) as TxBanco[]) {
-    if (t.sugestao?.acao !== "criar" || t.sugestao.origem !== "ia") continue
+    // Refaz com as regras de hoje: "lançar" da IA, "escolher" e "sem pista" (o que você ensinou depois pode resolver)
+    const sg0 = t.sugestao
+    if (!sg0 || !((sg0.acao === "criar" && sg0.origem === "ia") || sg0.acao === "escolher" || sg0.acao === "revisar")) continue
     const d = sugerir({ tx: t, lancamentos, pedidos, fornecedores: cfg.fornecedores ?? [], regras: cfg.regrasBanco ?? [], memoria: cfg.conciliacao, jaVinculados, documentosProprios: docsProprios })
-    if (d && (d.acao === "vincular" || d.acao === "atualizar" || d.acao === "escolher")) {
+    if (d && (d.acao === "vincular" || d.acao === "atualizar" || d.acao === "escolher") && JSON.stringify(d) !== JSON.stringify(sg0)) {
       if (d.acao !== "escolher") jaVinculados.add(d.lancamentoId)
       voltar.push({ id: t.id, sugestao: d }); lista = lista.filter(x => x.id !== t.id)
     }

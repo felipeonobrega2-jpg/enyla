@@ -405,7 +405,7 @@ function Sugestao({ s, nomeCat, nomeForn, lancPorId }: { s: SugestaoBanco | null
       <p className="flex items-start gap-1.5">{icone}<span>
         {s.acao === "vincular" && <>Já está lançado: <b>{lancPorId(s.lancamentoId)?.descricao ?? "lançamento"}</b>. Só vincula, não cria nada.</>}
         {s.acao === "atualizar" && <>Dá baixa em <b>{lancPorId(s.lancamentoId)?.descricao ?? "lançamento"}</b> (estava pendente).</>}
-        {s.acao === "escolher" && <>Há mais de um lançamento com esse valor e data. Qual é?</>}
+        {s.acao === "escolher" && <>{/Qual/.test(s.motivo) ? s.motivo : "Há mais de um lançamento com esse valor e data. Qual é?"}</>}
         {s.acao === "ignorar" && <>Ignorar: {s.motivo}.</>}
         {s.acao === "revisar" && <>Sem pista para sugerir. Lance ou ignore.</>}
         {s.acao === "criar" && <>{s.origem === "conta" ? "Pagamento da conta do fornecedor: abate o saldo devedor (não é custo novo)." : s.origem === "conciliacao" ? "Recebimento de cliente:" : s.origem === "regra" ? "Pela sua regra:" : "Sugestão da IA:"}</>}

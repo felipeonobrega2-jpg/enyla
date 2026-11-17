@@ -132,6 +132,19 @@ export function sugerir(args: {
       ? { acao: "vincular", lancamentoId: l.id, motivo: `já lançado: ${l.descricao}` }
       : { acao: "atualizar", lancamentoId: l.id, campos: { status: "pago", dataPagamento: tx.data }, motivo: `dá baixa em: ${l.descricao}` }
   }
+  // 1b. Pagador que você já ligou a um cliente (ex.: "Bianca paga pelo Maurício"): o mesmo valor até 10 dias, e se não
+  //     houver, um lançamento maior dele no mesmo dia (pagamento dividido em dois Pix)
+  const clienteDoPagador = tx.tipo === "entrada" && tx.contraparte_nome ? args.memoria?.pagadores?.[nomeChave(tx.contraparte_nome)] : undefined
+  if (!candidatos.length && clienteDoPagador) {
+    const doCliente = lancamentos.filter(l => l.tipo === "receita" && !args.jaVinculados.has(l.id) && l.formaPagamento !== "conta" && l.categoria !== "sobra"
+      && nomeChave(l.nomeCliente) === nomeChave(clienteDoPagador))
+    const dias = (l: LancamentoFinanceiro) => distancia(tx.data, (l.dataPagamento ?? l.dataVencimento).slice(0, 10))
+    const mesmoValor = doCliente.filter(l => igual(l.valor, tx.valor) && dias(l) <= 10).sort((a, b) => dias(a) - dias(b))
+    if (mesmoValor.length === 1) return { acao: "vincular", lancamentoId: mesmoValor[0].id, motivo: `${clienteDoPagador} (pagador conhecido), ${Math.round(dias(mesmoValor[0]))} dia(s) de diferença: ${mesmoValor[0].descricao}` }
+    if (mesmoValor.length > 1) return { acao: "escolher", candidatos: mesmoValor.map(l => l.id), motivo: `${clienteDoPagador}: mais de um lançamento com esse valor perto dessa data. Qual é?` }
+    const maior = doCliente.filter(l => l.valor > tx.valor + 0.01 && dias(l) <= 1).sort((a, b) => dias(a) - dias(b))
+    if (maior.length) return { acao: "escolher", candidatos: maior.map(l => l.id), motivo: `${clienteDoPagador}: pode ser parte de um pagamento maior (pagou em mais de um Pix). É parte de qual?` }
+  }
   if (candidatos.length > 1) {
     // Um só no mesmo dia: é ele. Senão pergunta, do mais perto para o mais longe da data do banco
     const dias = (l: LancamentoFinanceiro) => distancia(tx.data, (l.dataPagamento ?? l.dataVencimento).slice(0, 10))
