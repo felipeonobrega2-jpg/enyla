@@ -207,3 +207,27 @@ describe("regras do histórico (o que você já vinculou ou lançou)", () => {
     expect(regrasDoHistorico([t("ENSINADA", "a"), t("ENSINADA", "a")], ls, [{ chave: chaveContraparte(t("ENSINADA", "a")), tipo: "saida", acao: "ignorar", vezes: 1 }])).toEqual([])
   })
 })
+
+describe("devoluções (PIX DEVOLVIDO / estorno)", () => {
+  it("Pix que foi e voltou inteiro: as duas pontas são ignoradas; cada compra serve a uma devolução", async () => {
+    const { paresDeDevolucao } = await import("@/app/lib/banco")
+    const c1 = tx({ id: "c1", valor: 70.26, contraparte_doc: "111", descricao: "PIX ENVIADO", data: "2026-09-25" })
+    const c2 = tx({ id: "c2", valor: 70.26, contraparte_doc: "111", descricao: "PIX ENVIADO", data: "2026-09-25" })
+    const d1 = tx({ id: "d1", tipo: "entrada", valor: 70.26, contraparte_doc: "111", descricao: "PIX DEVOLVIDO", data: "2026-09-25" })
+    const pares = paresDeDevolucao([c1, c2, d1])
+    expect(pares.size).toBe(2)   // uma compra fica sem par (não foi devolvida)
+    const base = { lancamentos: [], pedidos: [], fornecedores: [], regras: [], jaVinculados: new Set<string>(), pares }
+    expect(sugerir({ ...base, tx: d1 })).toMatchObject({ acao: "ignorar", motivo: expect.stringMatching(/^foi e voltou/) })
+    const compra = pares.get("d1")!.outra.id
+    expect(sugerir({ ...base, tx: compra === "c1" ? c1 : c2 })).toMatchObject({ acao: "ignorar" })
+    expect(sugerir({ ...base, tx: compra === "c1" ? c2 : c1 })).toBeNull()
+  })
+  it("devolução parcial de compra já lançada vira estorno (Outros / Estorno)", async () => {
+    const { paresDeDevolucao } = await import("@/app/lib/banco")
+    const c = tx({ id: "c", valor: 279.18, contraparte_doc: "222", data: "2026-10-22", estado: "vinculada", lancamento_ids: ["l9"] })
+    const d = tx({ id: "d", tipo: "entrada", valor: 274.07, contraparte_doc: "222", descricao: "PIX DEVOLVIDO Pix Marketplace", data: "2026-10-22" })
+    const pares = paresDeDevolucao([c, d])
+    const sg = sugerir({ tx: d, lancamentos: [lanc({ id: "l9", descricao: "Compra Mercado Livre" })], pedidos: [], fornecedores: [], regras: [], jaVinculados: new Set(["l9"]), pares })
+    expect(sg).toMatchObject({ acao: "criar", origem: "devolucao", lancamentos: [{ tipo: "receita", categoria: "outros", subcategoria: "Estorno", descricao: "Estorno — Compra Mercado Livre", valor: 274.07 }] })
+  })
+})

@@ -441,8 +441,8 @@ function Sugestao({ s, nomeCat, nomeForn, lancPorId }: { s: SugestaoBanco | null
         {s.acao === "atualizar" && <>Dá baixa em <b>{lancPorId(s.lancamentoId)?.descricao ?? "lançamento"}</b> (estava pendente).</>}
         {s.acao === "escolher" && <>{/Qual/.test(s.motivo) ? s.motivo : "Há mais de um lançamento com esse valor e data. Qual é?"}</>}
         {s.acao === "ignorar" && <>Ignorar: {s.motivo}.</>}
-        {s.acao === "revisar" && <>Sem pista para sugerir. Lance ou ignore.</>}
-        {s.acao === "criar" && <>{s.origem === "conta" ? "Pagamento da conta do fornecedor: abate o saldo devedor (não é custo novo)." : s.origem === "conciliacao" ? "Recebimento de cliente:" : s.origem === "regra" ? "Pela sua regra:" : "Sugestão da IA:"}</>}
+        {s.acao === "revisar" && <>{/^devolu/.test(s.motivo) ? "Devolução de uma compra que ainda está na fila." : "Sem pista para sugerir. Lance ou ignore."}</>}
+        {s.acao === "criar" && <>{s.origem === "conta" ? "Pagamento da conta do fornecedor: abate o saldo devedor (não é custo novo)." : s.origem === "conciliacao" ? "Recebimento de cliente:" : s.origem === "devolucao" ? "Estorno de uma compra já lançada (volta para o caixa):" : s.origem === "regra" ? "Pela sua regra:" : "Sugestão da IA:"}</>}
       </span></p>
       {s.acao === "criar" && (
         <div className="mt-1 space-y-0.5 pl-5">

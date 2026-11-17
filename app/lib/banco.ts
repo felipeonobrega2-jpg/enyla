@@ -37,7 +37,7 @@ export type SugestaoBanco =
   | { acao: "vincularVarios"; lancamentoIds: string[]; motivo: string }          // uma transação pagou vários lançamentos (rateio entre lotes)
   | { acao: "escolher"; candidatos: string[]; motivo: string }
   | { acao: "atualizar"; lancamentoId: string; campos: Partial<LancamentoFinanceiro>; motivo: string }
-  | { acao: "criar"; lancamentos: Partial<LancamentoFinanceiro>[]; motivo: string; origem: "regra" | "conciliacao" | "conta" | "ia"; v?: number }   // v 2: IA já com subcategoria
+  | { acao: "criar"; lancamentos: Partial<LancamentoFinanceiro>[]; motivo: string; origem: "regra" | "conciliacao" | "conta" | "ia" | "devolucao"; v?: number }   // v 2: IA já com subcategoria
   | { acao: "ignorar"; motivo: string }
   | { acao: "revisar"; motivo: string }   // ninguém soube dizer: você decide
 
@@ -105,6 +105,31 @@ const pareceFornecedor = (nome: string | null, f: Fornecedor) => {
   return a.includes(b) || b.includes(a) || a.split(" ").filter(w => w.length > 3).some(w => b.split(" ").includes(w))
 }
 
+// Devolução (PIX DEVOLVIDO / estorno) ↔ a compra de onde veio: mesma empresa, até 20 dias antes, valor ≥ o devolvido.
+// Cada compra serve a uma devolução só (a de valor exato e mais perto primeiro).
+export type ParDevolucao = { outra: Pick<TxBanco, "id" | "data" | "valor" | "estado" | "lancamento_ids">; total: boolean; papel: "compra" | "devolucao" }
+type TxPar = Pick<TxBanco, "id" | "data" | "valor" | "tipo" | "estado" | "descricao" | "contraparte_doc" | "contraparte_nome" | "lancamento_ids">
+export const ehDevolucao = (t: Pick<TxBanco, "tipo" | "descricao">) => t.tipo === "entrada" && /devolvid|estorn|reembols/i.test(t.descricao)
+export function paresDeDevolucao(txs: TxPar[]): Map<string, ParDevolucao> {
+  const pares = new Map<string, ParDevolucao>()
+  const porChave = new Map<string, TxPar[]>()
+  for (const t of txs) if (t.tipo === "saida") { const k = chaveContraparte(t); if (k) porChave.set(k, [...(porChave.get(k) ?? []), t]) }
+  const usadas = new Set<string>()
+  for (const d of txs.filter(ehDevolucao).sort((a, b) => a.data.localeCompare(b.data))) {
+    const cands = (porChave.get(chaveContraparte(d)) ?? []).filter(s => !usadas.has(s.id) && s.data <= d.data && distancia(d.data, s.data) <= 20 && s.valor >= d.valor - 0.005)
+    const s = [...cands].sort((a, b) => Number(!igual(a.valor, d.valor)) - Number(!igual(b.valor, d.valor)) || b.data.localeCompare(a.data))[0]
+    if (!s) continue
+    const total = igual(s.valor, d.valor)
+    usadas.add(s.id)
+    pares.set(d.id, { outra: s, total, papel: "devolucao" })
+    if (total) pares.set(s.id, { outra: d, total, papel: "compra" })
+  }
+  return pares
+}
+export const FOI_E_VOLTOU = "foi e voltou"
+const diaMes = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`
+const reais = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+
 export function sugerir(args: {
   tx: TxBanco
   lancamentos: LancamentoFinanceiro[]
@@ -115,6 +140,7 @@ export function sugerir(args: {
   jaVinculados: Set<string>          // lançamentos ligados a outra transação
   documentosProprios?: string[]
   nomesProprios?: string[]
+  pares?: Map<string, ParDevolucao>  // devolução ↔ compra (paresDeDevolucao)
 }): SugestaoBanco | null {
   const { tx, lancamentos, fornecedores, regras } = args
   const chave = chaveContraparte(tx)
@@ -122,6 +148,23 @@ export function sugerir(args: {
   // 0. Para você mesmo (seu CPF/CNPJ, "mesma titularidade", aplicação automática): não some mais da fila.
   //    O seu salário sai assim; a regra que você ensinar vale primeiro (passo 3), senão o padrão abaixo (passo 3b).
   const propria = ehTransferenciaPropria(tx, args.documentosProprios ?? [], args.nomesProprios ?? [])
+
+  // 0b. Devolução: o Pix que foi e voltou inteiro não é nada (as duas pontas saem da fila); a devolução de uma compra
+  //     já lançada vira estorno (Outros / Estorno), total ou parcial
+  const par = args.pares?.get(tx.id)
+  if (par?.papel === "compra" && (par.outra.estado === "pendente" || par.outra.estado === "ignorada"))
+    return { acao: "ignorar", motivo: `${FOI_E_VOLTOU}: devolvido inteiro em ${diaMes(par.outra.data)}` }
+  if (par?.papel === "devolucao") {
+    const c = par.outra
+    if (par.total && (c.estado === "pendente" || c.estado === "ignorada"))
+      return { acao: "ignorar", motivo: `${FOI_E_VOLTOU}: devolução do Pix de ${reais(c.valor)} de ${diaMes(c.data)}` }
+    const lc = lancamentos.find(l => (c.lancamento_ids ?? []).includes(l.id))
+    if (c.estado === "criada" || c.estado === "vinculada") return {
+      acao: "criar", origem: "devolucao", motivo: `${par.total ? "devolução" : "devolução parcial"} da compra de ${reais(c.valor)} de ${diaMes(c.data)}${lc ? ` (${lc.descricao})` : ""}`,
+      lancamentos: [{ tipo: "receita", categoria: "outros", subcategoria: "Estorno", descricao: `Estorno — ${lc?.descricao ?? tx.contraparte_nome ?? tx.descricao}`, valor: tx.valor, status: "pago", dataVencimento: tx.data, dataPagamento: tx.data }],
+    }
+    if (c.estado === "pendente") return { acao: "revisar", motivo: `devolução parcial do Pix de ${reais(c.valor)} de ${diaMes(c.data)}, que ainda está na fila: resolva a compra primeiro; esta vira estorno` }
+  }
 
   // 1. Lançamento que você já cadastrou (fora da conta de fornecedor, que não passa pelo banco)
   const tipoLanc = tx.tipo === "entrada" ? "receita" : "despesa"
