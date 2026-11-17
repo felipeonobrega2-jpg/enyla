@@ -33,7 +33,8 @@ export type TxBanco = {
 }
 
 export type SugestaoBanco =
-  | { acao: "vincular"; lancamentoId: string; motivo: string }
+  | { acao: "vincular"; lancamentoId: string; motivo: string; junto?: string[] }   // junto: outras transações que, somadas, pagaram o mesmo lançamento
+  | { acao: "vincularVarios"; lancamentoIds: string[]; motivo: string }          // uma transação pagou vários lançamentos (rateio entre lotes)
   | { acao: "escolher"; candidatos: string[]; motivo: string }
   | { acao: "atualizar"; lancamentoId: string; campos: Partial<LancamentoFinanceiro>; motivo: string }
   | { acao: "criar"; lancamentos: Partial<LancamentoFinanceiro>[]; motivo: string; origem: "regra" | "conciliacao" | "conta" | "ia"; v?: number }   // v 2: IA já com subcategoria
@@ -282,4 +283,74 @@ export function possiveisDuplicados(tx: Pick<TxBanco, "id" | "tipo" | "valor" | 
 // No lote: as que têm possível duplicado (com a categoria que cada uma vai receber)
 export function duplicadosNoLote(itens: { tx: Pick<TxBanco, "id" | "tipo" | "valor" | "data" | "contraparte_nome" | "descricao">; categoria?: string }[], lancamentos: LancamentoFinanceiro[]) {
   return itens.map(i => ({ tx: i.tx, existentes: possiveisDuplicados(i.tx, lancamentos, i.categoria) })).filter(x => x.existentes.length > 0)
+}
+
+
+// ── Vínculos por soma (o que o 1 para 1 não acha) ────────────────────────────
+//   rateio: uma transação = vários lançamentos seus no mesmo dia (ex.: 5 × "Colagem R$ 194" num Pix de R$ 970)
+//   junto:  várias transações = um lançamento seu (ex.: "Lote MAU-003 R$ 1.280" = Pix de R$ 1.000 + R$ 280)
+//   quase:  um lançamento do mesmo dia com valor até 5% diferente (taxa, arredondamento): você confirma
+// Só quando a combinação é única (com várias possíveis, ninguém garante qual é qual).
+const centavos = (v: number) => Math.round(v * 100)
+function combinacoes<T>(itens: T[], valor: (x: T) => number, alvo: number, max = 3): T[][] {
+  const out: T[][] = [], n = Math.min(itens.length, 30), a = centavos(alvo)
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+    const s2 = centavos(valor(itens[i])) + centavos(valor(itens[j]))
+    if (s2 === a) out.push([itens[i], itens[j]])
+    if (max >= 3) for (let k = j + 1; k < n; k++) if (s2 + centavos(valor(itens[k])) === a) out.push([itens[i], itens[j], itens[k]])
+    if (out.length > 1) return out
+  }
+  return out
+}
+export function vinculosPorSoma(pendentes: TxBanco[], livres: LancamentoFinanceiro[]): { porTx: Map<string, SugestaoBanco>; rateioAutomatico: Set<string> } {
+  const porTx = new Map<string, SugestaoBanco>(), rateioAutomatico = new Set<string>()
+  const usados = new Set<string>(), txUsadas = new Set<string>()
+  const tipoL = (t: TxBanco) => t.tipo === "entrada" ? "receita" : "despesa"
+  const dataL = (l: LancamentoFinanceiro) => (l.dataPagamento ?? l.dataVencimento).slice(0, 10)
+  const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+
+  // 1. Rateio: lançamentos iguais (mesma descrição e valor) somam a transação; senão 2 ou 3 diferentes
+  for (const t of pendentes) {
+    const perto = livres.filter(l => !usados.has(l.id) && l.tipo === tipoL(t) && l.valor < t.valor - 0.009 && distancia(t.data, dataL(l)) <= 2)
+    if (perto.length < 2) continue
+    const grupos = new Map<string, LancamentoFinanceiro[]>()
+    for (const l of perto) { const k = `${nomeChave(l.descricao)}|${centavos(l.valor)}`; grupos.set(k, [...(grupos.get(k) ?? []), l]) }
+    let achou: LancamentoFinanceiro[] | null = null, iguais = false
+    for (const g of grupos.values()) {
+      const m = centavos(t.valor) / centavos(g[0].valor)
+      if (Number.isInteger(m) && m >= 2 && m <= g.length) { achou = g.slice(0, m); iguais = true; break }
+    }
+    if (!achou) { const c = combinacoes(perto, l => l.valor, t.valor); if (c.length === 1) achou = c[0] }
+    if (!achou) continue
+    for (const l of achou) usados.add(l.id)
+    txUsadas.add(t.id)
+    porTx.set(t.id, { acao: "vincularVarios", lancamentoIds: achou.map(l => l.id), motivo: `paga ${achou.length} lançamentos seus que somam ${brl(t.valor)}${iguais ? ` (${achou.length} × “${achou[0].descricao}”)` : ""}` })
+    if (iguais) rateioAutomatico.add(t.id)
+  }
+
+  // 2. Junto: 2 ou 3 transações somam um lançamento
+  for (const l of livres) {
+    if (usados.has(l.id)) continue
+    const tipo = l.tipo === "receita" ? "entrada" : "saida"
+    const perto = pendentes.filter(t => !txUsadas.has(t.id) && t.tipo === tipo && t.valor < l.valor - 0.009 && distancia(t.data, dataL(l)) <= 3)
+    if (perto.length < 2) continue
+    const c = combinacoes(perto, t => t.valor, l.valor)
+    if (c.length !== 1) continue
+    usados.add(l.id)
+    for (const t of c[0]) {
+      txUsadas.add(t.id)
+      porTx.set(t.id, { acao: "vincular", lancamentoId: l.id, junto: c[0].filter(x => x.id !== t.id).map(x => x.id),
+        motivo: `junto com ${c[0].length - 1} outra(s) transação(ões) (${c[0].map(x => brl(x.valor)).join(" + ")}) soma “${l.descricao}” de ${brl(l.valor)}` })
+    }
+  }
+
+  // 3. Quase igual: um só lançamento do mesmo dia (±1) com valor até 5% diferente
+  for (const t of pendentes) {
+    if (txUsadas.has(t.id)) continue
+    const c = livres.filter(l => !usados.has(l.id) && l.tipo === tipoL(t) && distancia(t.data, dataL(l)) <= 1
+      && Math.abs(l.valor - t.valor) >= 0.01 && Math.abs(l.valor - t.valor) / t.valor <= 0.05)
+    if (c.length !== 1) continue
+    porTx.set(t.id, { acao: "escolher", candidatos: [c[0].id], motivo: `Valor quase igual: lançado ${brl(c[0].valor)}, no banco ${brl(t.valor)} (taxa ou arredondamento?). É este?` })
+  }
+  return { porTx, rateioAutomatico }
 }

@@ -103,6 +103,7 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
 
   const aceitar = (tx: TxBanco, s: SugestaoBanco) => {
     if (s.acao === "vincular") return decidir(tx, { acao: "vincular", lancamentoId: s.lancamentoId })
+    if (s.acao === "vincularVarios") return decidir(tx, { acao: "vincularVarios", lancamentoIds: s.lancamentoIds })
     if (s.acao === "atualizar") return decidir(tx, { acao: "atualizar", lancamentoId: s.lancamentoId, campos: s.campos })
     if (s.acao === "criar") return decidir(tx, { acao: "criar", lancamentos: s.lancamentos })
     if (s.acao === "ignorar") return decidir(tx, { acao: "ignorar" })
@@ -113,7 +114,7 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
     setCorrigindo({ tx, inicial: { tipo: tx.tipo === "entrada" ? "receita" : "despesa", descricao: tx.contraparte_nome ?? tx.descricao, valor: tx.valor, dataVencimento: tx.data, dataPagamento: tx.data, status: "pago", ...base } })
   }
 
-  const exatos = (dados?.transacoes ?? []).filter(t => t.sugestao?.acao === "vincular" || t.sugestao?.acao === "atualizar")
+  const exatos = (dados?.transacoes ?? []).filter(t => t.sugestao?.acao === "vincular" || t.sugestao?.acao === "atualizar" || t.sugestao?.acao === "vincularVarios")
   async function aceitarExatos() {
     if (!confirm(`Vincular ${exatos.length} transações aos lançamentos que você já tinha feito?`)) return
     for (const t of exatos) await aceitar(t, t.sugestao!)
@@ -141,7 +142,7 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
     setRevisaoLote({ titulo, plano, suspeitos })
   }
   const decisaoDe = (s: SugestaoBanco): Record<string, unknown> | null =>
-    s.acao === "vincular" ? { acao: "vincular", lancamentoId: s.lancamentoId } : s.acao === "atualizar" ? { acao: "atualizar", lancamentoId: s.lancamentoId, campos: s.campos }
+    s.acao === "vincular" ? { acao: "vincular", lancamentoId: s.lancamentoId } : s.acao === "vincularVarios" ? { acao: "vincularVarios", lancamentoIds: s.lancamentoIds } : s.acao === "atualizar" ? { acao: "atualizar", lancamentoId: s.lancamentoId, campos: s.campos }
       : s.acao === "criar" ? { acao: "criar", lancamentos: s.lancamentos } : s.acao === "ignorar" ? { acao: "ignorar" } : null
   function aceitarRegras() {
     lote(`Lançar as ${dasRegras.length} transações como as suas regras sugerem`, dasRegras.map(t => ({ tx: t, decisao: decisaoDe(t.sugestao!)! })))
@@ -152,10 +153,11 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
   const maisNova = new Map<string, string>()
   for (const t of dados?.transacoes ?? []) { const g = grupoDe(t); if ((maisNova.get(g) ?? "") < t.data) maisNova.set(g, t.data) }
   // Filtro por tipo de sugestão: trabalha um bloco de cada vez
-  type Tipo = "todas" | "regra" | "ia" | "escolher" | "revisar" | "ignorar" | "outros"
+  type Tipo = "todas" | "vincular" | "regra" | "ia" | "escolher" | "revisar" | "ignorar" | "outros"
   const tipoDe = (t: TxBanco): Exclude<Tipo, "todas"> => {
     const s = t.sugestao
     if (!s) return "outros"
+    if (s.acao === "vincular" || s.acao === "atualizar" || s.acao === "vincularVarios") return "vincular"
     if (s.acao === "criar") return s.origem === "regra" ? "regra" : s.origem === "ia" ? "ia" : "outros"
     return s.acao === "escolher" || s.acao === "revisar" || s.acao === "ignorar" ? s.acao : "outros"
   }
@@ -278,7 +280,7 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
       </div>
       {estado === "pendente" && (dados?.transacoes ?? []).length > 0 && (
         <div className="flex gap-1.5 flex-wrap -mt-1">
-          {([["todas", "Todas"], ["regra", "Pelas suas regras"], ["ia", "IA sugere lançar"], ["escolher", "Escolher o lançamento"], ["revisar", "Sem pista"], ["ignorar", "IA sugere ignorar"], ["outros", "Outras"]] as [Tipo, string][])
+          {([["todas", "Todas"], ["vincular", "Já lançado (vincular)"], ["regra", "Pelas suas regras"], ["ia", "IA sugere lançar"], ["escolher", "Escolher o lançamento"], ["revisar", "Sem pista"], ["ignorar", "IA sugere ignorar"], ["outros", "Outras"]] as [Tipo, string][])
             .filter(([k]) => k === "todas" || (contagem[k] ?? 0) > 0)
             .map(([k, nome]) => (
               <button key={k} onClick={() => { setFiltro(k); setFoco(0) }}
@@ -335,7 +337,7 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                       {s && s.acao !== "revisar" && s.acao !== "escolher" && (
                         <button onClick={() => aceitar(tx, s)} className="h-7 px-3 rounded-lg text-[11.5px] font-semibold text-white bg-[#8456e8] inline-flex items-center gap-1">
-                          <Check className="w-3.5 h-3.5" />{s.acao === "vincular" ? "Vincular" : s.acao === "atualizar" ? "Dar baixa" : s.acao === "ignorar" ? "Ignorar" : "Lançar"}
+                          <Check className="w-3.5 h-3.5" />{s.acao === "vincular" || s.acao === "vincularVarios" ? "Vincular" : s.acao === "atualizar" ? "Dar baixa" : s.acao === "ignorar" ? "Ignorar" : "Lançar"}
                         </button>
                       )}
                       {s?.acao === "escolher" && s.candidatos.map(id => (
@@ -434,7 +436,8 @@ function Sugestao({ s, nomeCat, nomeForn, lancPorId }: { s: SugestaoBanco | null
   return (
     <div className="text-[12px] text-[#191625]">
       <p className="flex items-start gap-1.5">{icone}<span>
-        {s.acao === "vincular" && <>Já está lançado: <b>{lancPorId(s.lancamentoId)?.descricao ?? "lançamento"}</b>. Só vincula, não cria nada.</>}
+        {s.acao === "vincular" && (s.junto?.length ? <>Faz parte de <b>{lancPorId(s.lancamentoId)?.descricao ?? "lançamento"}</b>: {s.motivo}. Só vincula.</> : <>Já está lançado: <b>{lancPorId(s.lancamentoId)?.descricao ?? "lançamento"}</b>. Só vincula, não cria nada.</>)}
+        {s.acao === "vincularVarios" && <>Esta transação {s.motivo}: {s.lancamentoIds.map(id => lancPorId(id)?.descricao ?? "lançamento").join(", ")}. Só vincula.</>}
         {s.acao === "atualizar" && <>Dá baixa em <b>{lancPorId(s.lancamentoId)?.descricao ?? "lançamento"}</b> (estava pendente).</>}
         {s.acao === "escolher" && <>{/Qual/.test(s.motivo) ? s.motivo : "Há mais de um lançamento com esse valor e data. Qual é?"}</>}
         {s.acao === "ignorar" && <>Ignorar: {s.motivo}.</>}
@@ -450,7 +453,7 @@ function Sugestao({ s, nomeCat, nomeForn, lancPorId }: { s: SugestaoBanco | null
           ))}
         </div>
       )}
-      {s.acao !== "vincular" && s.acao !== "atualizar" && s.acao !== "escolher" && <p className="text-[10.5px] text-[#898892] pl-5 mt-0.5">{s.motivo}</p>}
+      {s.acao !== "vincular" && s.acao !== "atualizar" && s.acao !== "escolher" && s.acao !== "vincularVarios" && <p className="text-[10.5px] text-[#898892] pl-5 mt-0.5">{s.motivo}</p>}
     </div>
   )
 }

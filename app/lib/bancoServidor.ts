@@ -4,7 +4,7 @@
 import { randomUUID } from "crypto"
 import { supabase } from "./supabase"
 import { contas as contasPluggy, item as itemPluggy, transacoes, pluggyConfigurada, atualizarItem, ContaPluggy } from "./pluggy"
-import { daPluggy, sugerir, aprender, aprenderConta, completarSugestao as completar, regraConfiavel, regraDaTx, aceitouSemMudar, zerarConfianca, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
+import { daPluggy, sugerir, aprender, aprenderConta, completarSugestao as completar, regraConfiavel, regraDaTx, aceitouSemMudar, zerarConfianca, vinculosPorSoma, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
 import { montarPedidos, pedidoEntregue, nomeChave, type Pedido } from "./negocio"
 import { previstosEmAberto, pedidoDoCusto, type PrevistoPedido } from "./calibragem"
 import { MARCA } from "./conciliacao"
@@ -156,11 +156,25 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
     }
   }
   if (voltar.length) await gravarSugestoes(voltar)
+  // Por soma (rateio entre lotes, vários Pix para um lançamento, valor quase igual), no que ainda não se resolveu
+  const soma = vinculosPorSoma(((antigas ?? []) as TxBanco[]).filter(t => { const a = (voltar.find(v => v.id === t.id)?.sugestao ?? t.sugestao)?.acao; return a !== "vincular" && a !== "atualizar" && a !== "vincularVarios" }),
+    lancamentos.filter(l => !jaVinculados.has(l.id) && l.formaPagamento !== "conta" && l.status === "pago" && l.categoria !== "sobra" && !(l.obs ?? "").includes(MARCA)))
+  const porSoma = [...soma.porTx].map(([id, sugestao]) => ({ id, sugestao }))
+  if (porSoma.length) await gravarSugestoes(porSoma)
+  for (const x of porSoma) { lista = lista.filter(t => t.id !== x.id); const i = voltar.findIndex(v => v.id === x.id); if (i >= 0) voltar.splice(i, 1) }
   // Já existe o lançamento (vincular / dar baixa): liga sozinho, sem perguntar. Não cria nada e dá para desfazer.
   // Vale para as que já estavam na fila e para as refeitas agora; um lançamento serve a uma transação só.
   const usados = new Set<string>()
-  const prontas = [...((antigas ?? []) as TxBanco[]).filter(t => !voltar.some(v => v.id === t.id)).map(t => ({ id: t.id, sugestao: t.sugestao! })), ...voltar]
   let ligadas = 0
+  const prontas = [...((antigas ?? []) as TxBanco[]).filter(t => !voltar.some(v => v.id === t.id) && !soma.porTx.has(t.id)).map(t => ({ id: t.id, sugestao: t.sugestao! })), ...voltar]
+  // Rateio de lançamentos iguais (5 × "Colagem R$ 194" num Pix) e soma de transações do mesmo dia: também sozinhos
+  const txPorId = new Map(((antigas ?? []) as TxBanco[]).map(t => [t.id, t]))
+  for (const x of porSoma) {
+    if (Date.now() - inicio > prazoMs - 20_000) break
+    const sg = x.sugestao, t = txPorId.get(x.id)
+    const mesmoDia = sg.acao === "vincular" && !!sg.junto && !!t && [t, ...sg.junto.map(j => txPorId.get(j)!)].every(o => o && lancamentos.some(l => l.id === sg.lancamentoId && Math.abs(new Date(o.data).getTime() - new Date((l.dataPagamento ?? l.dataVencimento).slice(0, 10)).getTime()) <= 86_400_000))
+    if (soma.rateioAutomatico.has(x.id) || mesmoDia) { const r = await aplicar(x.id, { ...sg, automatico: true } as Decisao).catch(() => null); if (r?.ok) ligadas++ }
+  }
   for (const x of prontas) {
     if (Date.now() - inicio > prazoMs - 20_000) break
     const sg = x.sugestao
@@ -349,6 +363,7 @@ async function aprenderPagador(tx: TxBanco, cliente: string | null | undefined) 
 // ── Aplicar a sua decisão (ou a regra automática) ───────────────────────────
 export type Decisao =
   | { acao: "vincular"; lancamentoId: string; automatico?: boolean }
+  | { acao: "vincularVarios"; lancamentoIds: string[]; automatico?: boolean }
   | { acao: "atualizar"; lancamentoId: string; campos: Partial<LancamentoFinanceiro>; automatico?: boolean }
   | { acao: "criar"; lancamentos: Partial<LancamentoFinanceiro>[]; ensinar?: boolean; automatico?: boolean }
   | { acao: "ignorar"; sempre?: boolean; automatico?: boolean }
@@ -364,16 +379,28 @@ export async function aplicar(txId: string, d: Decisao): Promise<{ ok: boolean; 
 
   if (d.acao === "desfazer") {
     const ultimo = [...hist].reverse().find(h => h.acao !== "desfeito")
-    const antes = ultimo?.detalhe ? JSON.parse(ultimo.detalhe) as { criados?: string[]; restaurar?: { id: string; campos: Partial<LancamentoFinanceiro> } } : {}
+    const antes = ultimo?.detalhe ? JSON.parse(ultimo.detalhe) as { criados?: string[]; restaurar?: { id: string; campos: Partial<LancamentoFinanceiro> }; restaurarVarios?: { id: string; campos: Partial<LancamentoFinanceiro> }[] } : {}
+    for (const r of antes.restaurarVarios ?? []) await supabase.from("LancamentoFinanceiro").update(r.campos).eq("id", r.id)
     if (antes.criados?.length) await supabase.from("LancamentoFinanceiro").delete().in("id", antes.criados)
     if (antes.restaurar) await supabase.from("LancamentoFinanceiro").update(antes.restaurar.campos).eq("id", antes.restaurar.id)
     hist.push({ em: agora(), acao: "desfeito", detalhe: `por você (${ultimo?.acao ?? "?"})` })
     // Desfez o que a regra lançou sozinha: ela volta a pedir a sua conferência
     if (ultimo?.detalhe?.includes("regra automática")) { const c = await lerConfig(); await salvarCampos({ regrasBanco: zerarConfianca(c.regrasBanco ?? [], tx) }) }
     const { data: nova } = await supabase.from("banco_transacoes").update({ estado: "pendente", lancamento_ids: [], historico: hist, atualizado_em: agora() }).eq("id", txId).select("*").maybeSingle()
-    return { ok: true, tx: nova as TxBanco, removidos: antes.criados ?? [], atualizados: antes.restaurar ? [antes.restaurar] : [] }
+    return { ok: true, tx: nova as TxBanco, removidos: antes.criados ?? [], atualizados: [...(antes.restaurar ? [antes.restaurar] : []), ...(antes.restaurarVarios ?? [])] }
   }
   if (tx.estado !== "pendente") return { ok: false, erro: "Essa transação já foi resolvida. Desfaça antes para mudar." }
+
+  if (d.acao === "vincularVarios") {
+    const { data: ls } = await supabase.from("LancamentoFinanceiro").select("*").in("id", d.lancamentoIds)
+    if (!ls?.length || ls.length !== d.lancamentoIds.length) return { ok: false, erro: "Algum lançamento não foi encontrado." }
+    const restaurarVarios = ls.map(l => ({ id: l.id, campos: { obs: l.obs ?? null } as Partial<LancamentoFinanceiro> }))
+    const atualizados = ls.map(l => ({ id: l.id as string, campos: { obs: [l.obs, marca].filter(Boolean).join(" ") } as Partial<LancamentoFinanceiro> }))
+    for (const u of atualizados) await supabase.from("LancamentoFinanceiro").update(u.campos).eq("id", u.id)
+    hist.push({ em: agora(), acao: `vinculada a ${ls.length} lançamentos`, detalhe: JSON.stringify({ restaurarVarios, por: quem }) })
+    const { data: nova } = await supabase.from("banco_transacoes").update({ estado: "vinculada", lancamento_ids: ls.map(l => l.id), historico: hist, atualizado_em: agora() }).eq("id", txId).select("*").maybeSingle()
+    return { ok: true, tx: nova as TxBanco, atualizados }
+  }
 
   if (d.acao === "vincular" || d.acao === "atualizar") {
     const { data: l } = await supabase.from("LancamentoFinanceiro").select("*").eq("id", d.lancamentoId).maybeSingle()

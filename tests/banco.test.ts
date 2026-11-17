@@ -163,3 +163,26 @@ describe("aviso de duplicado ao lançar", async () => {
     expect(r).toHaveLength(0)
   })
 })
+
+describe("vínculos por soma", async () => {
+  const { vinculosPorSoma } = await import("@/app/lib/banco")
+  it("rateio: um Pix paga 5 lançamentos iguais do mesmo dia (sozinho)", () => {
+    const ls = Array.from({ length: 5 }, (_, i) => lanc({ id: `c${i}`, descricao: "Colagem", valor: 194, dataPagamento: "2026-09-18" }))
+    const r = vinculosPorSoma([tx({ id: "p", valor: 970, data: "2026-09-18" })], ls)
+    expect(r.porTx.get("p")).toMatchObject({ acao: "vincularVarios" })
+    expect((r.porTx.get("p") as { lancamentoIds: string[] }).lancamentoIds).toHaveLength(5)
+    expect(r.rateioAutomatico.has("p")).toBe(true)
+  })
+  it("junto: dois Pix somam um lançamento", () => {
+    const r = vinculosPorSoma([tx({ id: "a", tipo: "entrada", valor: 1000, data: "2026-09-11" }), tx({ id: "b", tipo: "entrada", valor: 280, data: "2026-09-11" })],
+      [lanc({ id: "m", tipo: "receita", descricao: "Lote MAU-003", valor: 1280, dataPagamento: "2026-09-11" })])
+    expect(r.porTx.get("a")).toMatchObject({ acao: "vincular", lancamentoId: "m", junto: ["b"] })
+    expect(r.porTx.get("b")).toMatchObject({ acao: "vincular", lancamentoId: "m", junto: ["a"] })
+  })
+  it("quase igual (até 5%) no mesmo dia: pergunta; combinação ambígua: não sugere", () => {
+    const q = vinculosPorSoma([tx({ id: "l", valor: 106.34, data: "2026-10-08" })], [lanc({ id: "x", valor: 105.15, dataPagamento: "2026-10-08" })])
+    expect(q.porTx.get("l")).toMatchObject({ acao: "escolher", candidatos: ["x"] })
+    const amb = vinculosPorSoma(Array.from({ length: 5 }, (_, i) => tx({ id: `g${i}`, valor: 50, data: "2026-10-28" })), [lanc({ id: "gas", descricao: "Gasolina", valor: 100, dataPagamento: "2026-10-28" })])
+    expect(amb.porTx.size).toBe(0)
+  })
+})
