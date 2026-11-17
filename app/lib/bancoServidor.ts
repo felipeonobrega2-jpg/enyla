@@ -146,6 +146,15 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
   })
   lista = [...lista, ...refazer]
   const { cfg, lancamentos, pedidos, jaVinculados, regras, pares } = await contexto()
+  // Sugestão de vincular que aponta para lançamento que agora é de outra transação: some e é refeita do zero
+  const idsDa = (sg: SugestaoBanco | null) => !sg ? [] : sg.acao === "vincularVarios" ? sg.lancamentoIds : sg.acao === "vincular" || sg.acao === "atualizar" ? [sg.lancamentoId] : sg.acao === "escolher" ? sg.candidatos : []
+  const vencidas = ((antigas ?? []) as TxBanco[]).filter(t => { const ids = idsDa(t.sugestao); return ids.length > 0 && (t.sugestao!.acao === "escolher" ? ids.every(i => jaVinculados.has(i)) : ids.some(i => jaVinculados.has(i))) })
+  if (vencidas.length) {
+    await supabase.from("banco_transacoes").update({ sugestao: null, atualizado_em: agora() }).in("id", vencidas.map(t => t.id))
+    const fora = new Set(vencidas.map(t => t.id))
+    antigas!.splice(0, antigas!.length, ...((antigas ?? []) as TxBanco[]).filter(t => !fora.has(t.id)))
+    lista = [...lista.filter(t => !fora.has(t.id)), ...vencidas.map(t => ({ ...t, sugestao: null }))]
+  }
   // Sugestão da IA de "lançar" para algo que já está lançado (ex.: refeita com a sua explicação): volta para vincular
   const docsProprios = (cfg.pluggy?.documentosProprios ?? []).map(d => d.replace(/\D/g, "")).filter(Boolean)
   const voltar: { id: string; sugestao: SugestaoBanco }[] = []
@@ -404,6 +413,13 @@ export async function aplicar(txId: string, d: Decisao): Promise<{ ok: boolean; 
     return { ok: true, tx: nova as TxBanco, removidos: antes.criados ?? [], atualizados: [...(antes.restaurar ? [antes.restaurar] : []), ...(antes.restaurarVarios ?? [])] }
   }
   if (tx.estado !== "pendente") return { ok: false, erro: "Essa transação já foi resolvida. Desfaça antes para mudar." }
+  // Um lançamento serve a uma transação só: não liga ao que já está ligado a outra
+  const paraLigar = d.acao === "vincularVarios" ? d.lancamentoIds : d.acao === "vincular" || d.acao === "atualizar" ? [d.lancamentoId] : []
+  if (paraLigar.length) {
+    const { data: outras } = await supabase.from("banco_transacoes").select("id, data, valor").neq("id", txId).neq("estado", "pendente").overlaps("lancamento_ids", paraLigar).limit(1)
+    const o = (outras ?? [])[0] as { data: string; valor: number } | undefined
+    if (o) return { ok: false, erro: `Esse lançamento já está ligado a outra transação do banco (${o.data.split("-").reverse().join("/")}, R$ ${o.valor.toFixed(2).replace(".", ",")}). Atualize a página: a sugestão desta foi refeita.` }
+  }
 
   if (d.acao === "vincularVarios") {
     const { data: ls } = await supabase.from("LancamentoFinanceiro").select("*").in("id", d.lancamentoIds)
