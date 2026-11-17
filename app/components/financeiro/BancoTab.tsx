@@ -151,9 +151,25 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
   // Mais recente primeiro: cada grupo entra na posição da sua transação mais nova, e dentro dele da mais nova à mais antiga
   const maisNova = new Map<string, string>()
   for (const t of dados?.transacoes ?? []) { const g = grupoDe(t); if ((maisNova.get(g) ?? "") < t.data) maisNova.set(g, t.data) }
+  // Filtro por tipo de sugestão: trabalha um bloco de cada vez
+  type Tipo = "todas" | "regra" | "ia" | "escolher" | "revisar" | "ignorar" | "outros"
+  const tipoDe = (t: TxBanco): Exclude<Tipo, "todas"> => {
+    const s = t.sugestao
+    if (!s) return "outros"
+    if (s.acao === "criar") return s.origem === "regra" ? "regra" : s.origem === "ia" ? "ia" : "outros"
+    return s.acao === "escolher" || s.acao === "revisar" || s.acao === "ignorar" ? s.acao : "outros"
+  }
+  const [filtro, setFiltro] = useState<Tipo>("todas")
+  const contagem = (dados?.transacoes ?? []).reduce<Record<string, number>>((m, t) => { const k = tipoDe(t); m[k] = (m[k] ?? 0) + 1; return m }, {})
   const lista = estado === "pendente"
-    ? [...(dados?.transacoes ?? [])].sort((a, b) => maisNova.get(grupoDe(b))!.localeCompare(maisNova.get(grupoDe(a))!) || grupoDe(a).localeCompare(grupoDe(b)) || b.data.localeCompare(a.data))
+    ? [...(dados?.transacoes ?? [])].filter(t => filtro === "todas" || tipoDe(t) === filtro)
+      .sort((a, b) => maisNova.get(grupoDe(b))!.localeCompare(maisNova.get(grupoDe(a))!) || grupoDe(a).localeCompare(grupoDe(b)) || b.data.localeCompare(a.data))
     : dados?.transacoes ?? []
+  const paraIgnorar = (dados?.transacoes ?? []).filter(t => t.sugestao?.acao === "ignorar")
+  function ignorarSugeridas() {
+    if (!confirm(`Ignorar as ${paraIgnorar.length} que a IA marcou como pessoais ou sem efeito no caixa? Elas ficam em "Ignoradas" e dá para desfazer uma a uma.`)) return
+    void rodarLote(paraIgnorar.map(t => ({ tx: t, decisao: { acao: "ignorar" } })))
+  }
   const tamanhoGrupo = (tx: TxBanco) => lista.filter(t => grupoDe(t) === grupoDe(tx)).length
   async function lancarGrupoComo(modelo: TxBanco) {
     const s = modelo.sugestao
@@ -253,10 +269,25 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
         {estado === "pendente" && dasRegras.length > 1 && (
           <Botao icone={<Zap className="w-4 h-4" />} onClick={aceitarRegras}>Lançar as {dasRegras.length} das suas regras</Botao>
         )}
+        {estado === "pendente" && paraIgnorar.length > 1 && (
+          <Botao icone={<EyeOff className="w-4 h-4" />} onClick={ignorarSugeridas}>Ignorar as {paraIgnorar.length} pessoais</Botao>
+        )}
         {estado === "pendente" && lista.length > 0 && (
           <span className="ml-auto text-[11px] text-[#898892] hidden md:inline-flex items-center gap-1.5"><Keyboard className="w-3.5 h-3.5" />↑ ↓ andar · Enter aceitar · E corrigir · I ignorar</span>
         )}
       </div>
+      {estado === "pendente" && (dados?.transacoes ?? []).length > 0 && (
+        <div className="flex gap-1.5 flex-wrap -mt-1">
+          {([["todas", "Todas"], ["regra", "Pelas suas regras"], ["ia", "IA sugere lançar"], ["escolher", "Escolher o lançamento"], ["revisar", "Sem pista"], ["ignorar", "IA sugere ignorar"], ["outros", "Outras"]] as [Tipo, string][])
+            .filter(([k]) => k === "todas" || (contagem[k] ?? 0) > 0)
+            .map(([k, nome]) => (
+              <button key={k} onClick={() => { setFiltro(k); setFoco(0) }}
+                className={`h-7 px-3 rounded-full text-[11.5px] font-semibold transition-colors ${filtro === k ? "bg-[#8456e8] text-white" : "bg-white ds-borda text-[#5e5c68] hover:border-[#8456e8]/40"}`}>
+                {nome} · {k === "todas" ? (dados?.transacoes ?? []).length : contagem[k]}
+              </button>
+            ))}
+        </div>
+      )}
 
       {/* Transações */}
       <div className="rounded-xl bg-white ds-cartao overflow-hidden">

@@ -156,7 +156,21 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
     }
   }
   if (voltar.length) await gravarSugestoes(voltar)
-  if (!lista.length) return { feitas: voltar.length, restantes: 0 }
+  // Já existe o lançamento (vincular / dar baixa): liga sozinho, sem perguntar. Não cria nada e dá para desfazer.
+  // Vale para as que já estavam na fila e para as refeitas agora; um lançamento serve a uma transação só.
+  const usados = new Set<string>()
+  const prontas = [...((antigas ?? []) as TxBanco[]).filter(t => !voltar.some(v => v.id === t.id)).map(t => ({ id: t.id, sugestao: t.sugestao! })), ...voltar]
+  let ligadas = 0
+  for (const x of prontas) {
+    if (Date.now() - inicio > prazoMs - 20_000) break
+    const sg = x.sugestao
+    if (sg.acao !== "vincular" && sg.acao !== "atualizar") continue
+    if (usados.has(sg.lancamentoId)) continue
+    usados.add(sg.lancamentoId)
+    const r = await aplicar(x.id, { ...sg, automatico: true } as Decisao).catch(() => null)
+    if (r?.ok) ligadas++
+  }
+  if (!lista.length) return { feitas: voltar.length + ligadas, restantes: 0 }
   const comum = {
     lancamentos, pedidos, fornecedores: cfg.fornecedores ?? [], regras: cfg.regrasBanco ?? [], memoria: cfg.conciliacao, jaVinculados,
     documentosProprios: (cfg.pluggy?.documentosProprios ?? []).map(d => d.replace(/\D/g, "")).filter(Boolean),
@@ -178,7 +192,8 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
     const sg = x.sugestao, tx = lista.find(t => t.id === x.id)!
     const daRegra = (sg.acao === "criar" && sg.origem === "regra") || (sg.acao === "ignorar" && regraDaTx(cfg.regrasBanco ?? [], tx)?.acao === "ignorar")
     const semDuvida = sg.acao === "vincular" || sg.acao === "atualizar" || sg.acao === "ignorar" || (sg.acao === "criar" && sg.origem !== "ia")
-    if ((cfg.pluggy?.automatico && semDuvida) || (daRegra && regraConfiavel(regraDaTx(cfg.regrasBanco ?? [], tx))))
+    const jaLancado = sg.acao === "vincular" || sg.acao === "atualizar"   // sempre: só liga ao que você já lançou
+    if (jaLancado || (cfg.pluggy?.automatico && semDuvida) || (daRegra && regraConfiavel(regraDaTx(cfg.regrasBanco ?? [], tx))))
       await aplicar(x.id, { ...sg, automatico: true } as Decisao).catch(() => null)
   }
 
