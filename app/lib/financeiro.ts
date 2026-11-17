@@ -182,6 +182,19 @@ export function calcularResumoFinanceiro(kanban: KanbanCard[], lancamentos: Lanc
   }
 }
 
+// Ganho de parceria que você também lançou como receita (ex.: comissão da Jupter que entrou no banco e foi lançada):
+// conta uma vez só, pelo lançamento. Par = receita paga, sem pedido, mesmo valor, até 15 dias de distância.
+export function parceriasSemLancamento<N extends { comissaoValor: number; dataOrcamento: string }>(negocios: N[], lancamentos: LancamentoFinanceiro[]): N[] {
+  const usados = new Set<string>()
+  const dia = (d: string) => new Date(d.slice(0, 10) + "T12:00:00").getTime() / 86_400_000
+  return negocios.filter(n => {
+    const par = lancamentos.find(l => !usados.has(l.id) && l.tipo === "receita" && l.status === "pago" && l.formaPagamento !== "conta" && !l.cardId && !l.loteId
+      && Math.abs(l.valor - n.comissaoValor) < 0.01 && Math.abs(dia(l.dataPagamento ?? l.dataVencimento) - dia(n.dataOrcamento)) <= 15)
+    if (par) usados.add(par.id)
+    return !par
+  })
+}
+
 // ── DRE (regime de caixa) ──────────────────────────────────────────────────────
 // Mesma base do "resultado" do Financeiro: o que foi pago no período, sem os
 // lançamentos da conta corrente de fornecedor (débitos e abatimentos não são caixa).

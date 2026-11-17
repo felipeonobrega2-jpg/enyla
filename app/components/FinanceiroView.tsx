@@ -22,7 +22,7 @@ import { FixasTab } from "./financeiro/FixasTab"
 import { FornecedoresTab } from "./financeiro/FornecedoresTab"
 import {
   hoje, isReceitaPendenteValida, pedidosElegiveis as calcPedidosElegiveis,
-  calcularPedidosFechados, pedidosAbertos, contarNaoRegistrados, calcularVencidos, dreDoPeriodo,
+  calcularPedidosFechados, pedidosAbertos, contarNaoRegistrados, calcularVencidos, dreDoPeriodo, parceriasSemLancamento,
 } from "../lib/financeiro"
 
 
@@ -1189,7 +1189,8 @@ export function FinanceiroView({
   }
 
   // Negócios pagos no período selecionado (para KPIs e DRE)
-  const negociosPagos     = negocios.filter(n => n.status === "pago" && negociosInPeriodo(n))
+  // Sem os que você também lançou como receita (não conta duas vezes)
+  const negociosPagos     = parceriasSemLancamento(negocios.filter(n => n.status === "pago" && negociosInPeriodo(n)), lancamentos)
   // Todos os pagos (sem filtro de período — para mostrar no painel de parcerias)
   const negociosPagosTodos = negocios.filter(n => n.status === "pago")
   // Pendentes (qualquer tipo → a receber)

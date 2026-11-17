@@ -151,6 +151,7 @@ export function sugerir(args: {
   documentosProprios?: string[]
   nomesProprios?: string[]
   pares?: Map<string, ParDevolucao>  // devolução ↔ compra (paresDeDevolucao)
+  negocios?: { descricao: string; parceiroNome: string; tipo: string; valorVenda: number; valorCusto?: number | null; dataOrcamento: string; status: string }[]   // Parcerias
 }): SugestaoBanco | null {
   const { tx, lancamentos, fornecedores, regras } = args
   const chave = chaveContraparte(tx)
@@ -175,6 +176,12 @@ export function sugerir(args: {
     }
     if (c.estado === "pendente") return { acao: "revisar", motivo: `devolução parcial do Pix de ${reais(c.valor)} de ${diaMes(c.data)}, que ainda está na fila: resolva a compra primeiro; esta vira estorno` }
   }
+
+  // 0c. Revenda de parceria ("ganho em cima"): o cliente paga a venda e você paga o custo ao parceiro. O ganho já está
+  //     em Parcerias, então as duas pontas no banco são só dinheiro passando
+  const negocio = (args.negocios ?? []).find(n => n.tipo === "ganho" && n.status !== "perdido" && distancia(tx.data, n.dataOrcamento.slice(0, 10)) <= 10
+    && (tx.tipo === "entrada" ? igual(n.valorVenda, tx.valor) : n.valorCusto != null && igual(n.valorCusto, tx.valor)))
+  if (negocio) return { acao: "ignorar", motivo: `${tx.tipo === "entrada" ? "venda" : "custo"} de “${negocio.descricao}” (${negocio.parceiroNome}), já em Parcerias: o ganho conta lá` }
 
   // 1. Lançamento que você já cadastrou (fora da conta de fornecedor, que não passa pelo banco)
   const tipoLanc = tx.tipo === "entrada" ? "receita" : "despesa"

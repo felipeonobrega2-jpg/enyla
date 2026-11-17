@@ -251,3 +251,18 @@ it("soma de lançamentos diferentes não mistura fornecedores", async () => {
   const ls = [lanc({ id: "a", descricao: "Colagem", valor: 975, fornecedorId: "fab", loteNumero: "L1", ...d }), lanc({ id: "b", descricao: "Colagem", valor: 975, fornecedorId: "fab", loteNumero: "L2", ...d }), lanc({ id: "c", descricao: "Corte", valor: 400, fornecedorId: "jac", ...d })]
   expect(vinculosPorSoma([tx({ id: "p", valor: 2350, data: "2026-10-27" })], ls).porTx.size).toBe(0)
 })
+
+it("parceria que também foi lançada como receita conta uma vez só", async () => {
+  const { parceriasSemLancamento } = await import("@/app/lib/financeiro")
+  const ns = [{ comissaoValor: 316.8, dataOrcamento: "2026-11-04" }, { comissaoValor: 222.58, dataOrcamento: "2026-11-04" }]
+  const ls = [lanc({ id: "j", tipo: "receita", valor: 316.8, dataPagamento: "2026-11-04", dataVencimento: "2026-11-04", categoria: "comisses-de-parcerias" })]
+  expect(parceriasSemLancamento(ns, ls)).toEqual([ns[1]])
+})
+
+it("revenda de parceria: venda e custo no banco são só dinheiro passando", () => {
+  const negocios = [{ descricao: "Valvula lyon", parceiroNome: "Lyon", tipo: "ganho", valorVenda: 3150, valorCusto: 2927.42, dataOrcamento: "2026-11-04", status: "pago" }]
+  const base = { lancamentos: [], pedidos: [], fornecedores: [], regras: [], jaVinculados: new Set<string>(), negocios }
+  expect(sugerir({ ...base, tx: tx({ tipo: "entrada", valor: 3150, data: "2026-11-04" }) })).toMatchObject({ acao: "ignorar", motivo: expect.stringContaining("Parcerias") })
+  expect(sugerir({ ...base, tx: tx({ valor: 2927.42, data: "2026-11-04", contraparte_nome: "PAGAR.ME" }) })).toMatchObject({ acao: "ignorar" })
+  expect(sugerir({ ...base, tx: tx({ valor: 2927.42, data: "2026-12-20" }) })).toBeNull()
+})

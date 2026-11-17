@@ -91,13 +91,15 @@ async function contexto() {
     todos<KanbanCard>("KanbanCard"),
     todos<TxBanco>("banco_transacoes", "id, data, valor, tipo, estado, descricao, contraparte_doc, contraparte_nome, lancamento_ids"),
   ])
+  const { data: neg } = await supabase.from("NegocioParceiro").select("descricao, parceiroNome, tipo, valorVenda, valorCusto, dataOrcamento, status").eq("tipo", "ganho")
+  const negocios = (neg ?? []) as { descricao: string; parceiroNome: string; tipo: string; valorVenda: number; valorCusto: number | null; dataOrcamento: string; status: string }[]
   const pedidos = montarPedidos(kanban.map(c => ({ ...c, isTerceirizado: c.isTerceirizado || c.materialNome === "Terceirizado" })), lancamentos)
   const resolvidas = transacoes.filter(t => t.estado !== "pendente")
   const pares = paresDeDevolucao(transacoes)
   const jaVinculados = new Set(resolvidas.flatMap(r => r.lancamento_ids ?? []))
   // Suas regras + as que saem do que você já resolveu (só sugerem; não lançam sozinhas)
   const regras = [...(cfg.regrasBanco ?? []), ...regrasDoHistorico(resolvidas, lancamentos, cfg.regrasBanco ?? [], [...(cfg.categoriasReceita ?? []), ...(cfg.categoriasDespesa ?? [])])]
-  return { cfg, lancamentos, pedidos, jaVinculados, regras, pares }
+  return { cfg, lancamentos, pedidos, jaVinculados, regras, pares, negocios }
 }
 
 const completarSugestao = (sg: SugestaoBanco, tx: TxBanco, cfg: Awaited<ReturnType<typeof lerConfig>>, regras = cfg.regrasBanco ?? []) =>
@@ -145,7 +147,7 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
     return sg?.acao === "criar" && sg.origem === "ia" && (sg.v ?? 1) < 2 && sg.lancamentos.length === 1 && !sg.lancamentos[0].subcategoria && comSubs(t.tipo).has(sg.lancamentos[0].categoria ?? "")
   })
   lista = [...lista, ...refazer]
-  const { cfg, lancamentos, pedidos, jaVinculados, regras, pares } = await contexto()
+  const { cfg, lancamentos, pedidos, jaVinculados, regras, pares, negocios } = await contexto()
   // Sugestão de vincular que aponta para lançamento que agora é de outra transação: some e é refeita do zero
   const idsDa = (sg: SugestaoBanco | null) => !sg ? [] : sg.acao === "vincularVarios" ? sg.lancamentoIds : sg.acao === "vincular" || sg.acao === "atualizar" ? [sg.lancamentoId] : sg.acao === "escolher" ? sg.candidatos : []
   const vencidas = ((antigas ?? []) as TxBanco[]).filter(t => { const ids = idsDa(t.sugestao); return ids.length > 0 && (t.sugestao!.acao === "escolher" ? ids.every(i => jaVinculados.has(i)) : ids.some(i => jaVinculados.has(i))) })
@@ -163,10 +165,10 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
     const sg0 = t.sugestao
     if (!sg0) continue
     const refazivel = (sg0.acao === "criar" && sg0.origem === "ia") || sg0.acao === "escolher" || sg0.acao === "revisar"
-    if (!refazivel && !pares.has(t.id)) continue
-    const d0 = sugerir({ tx: t, lancamentos, pedidos, fornecedores: cfg.fornecedores ?? [], regras, memoria: cfg.conciliacao, jaVinculados, documentosProprios: docsProprios, pares })
+    if (!refazivel && !pares.has(t.id) && sg0.acao !== "ignorar") continue
+    const d0 = sugerir({ tx: t, lancamentos, pedidos, fornecedores: cfg.fornecedores ?? [], regras, memoria: cfg.conciliacao, jaVinculados, documentosProprios: docsProprios, pares, negocios })
     // Devolução (foi e voltou / estorno) vale por cima de qualquer sugestão antiga; o resto só refaz o que era refazível
-    const deDevolucao = !!d0 && ((d0.acao === "ignorar" && d0.motivo.startsWith(FOI_E_VOLTOU)) || (d0.acao === "criar" && d0.origem === "devolucao") || (d0.acao === "revisar" && pares.has(t.id)))
+    const deDevolucao = !!d0 && ((d0.acao === "ignorar" && (d0.motivo.startsWith(FOI_E_VOLTOU) || d0.motivo.includes("já em Parcerias"))) || (d0.acao === "criar" && d0.origem === "devolucao") || (d0.acao === "revisar" && pares.has(t.id)))
     if (!refazivel && !deDevolucao) continue
     // Regra nova (sua ou do histórico) para o que estava "sem pista" ou com a IA: passa a valer
     const daRegraNova = d0?.acao === "criar" && d0.origem === "regra" && (sg0.acao === "revisar" || (sg0.acao === "criar" && sg0.origem === "ia"))
@@ -209,7 +211,7 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
   }
   if (!lista.length) return { feitas: voltar.length + ligadas, restantes: 0 }
   const comum = {
-    lancamentos, pedidos, fornecedores: cfg.fornecedores ?? [], regras, memoria: cfg.conciliacao, jaVinculados, pares,
+    lancamentos, pedidos, fornecedores: cfg.fornecedores ?? [], regras, memoria: cfg.conciliacao, jaVinculados, pares, negocios,
     documentosProprios: (cfg.pluggy?.documentosProprios ?? []).map(d => d.replace(/\D/g, "")).filter(Boolean),
   }
   // 1. Regras, vínculos e conciliação: rápido, tudo em memória
