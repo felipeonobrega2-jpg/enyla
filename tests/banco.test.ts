@@ -186,3 +186,24 @@ describe("vínculos por soma", async () => {
     expect(amb.porTx.size).toBe(0)
   })
 })
+
+describe("regras do histórico (o que você já vinculou ou lançou)", () => {
+  it("quem caiu 2+ vezes na mesma categoria vira regra, com a subcategoria tirada do nome", async () => {
+    const { regrasDoHistorico } = await import("@/app/lib/banco")
+    const ls = [lanc({ id: "a", tipo: "receita", descricao: "Comissão Venda Frascos", categoria: "comissoes" }), lanc({ id: "b", tipo: "receita", descricao: "Comissão Frascos Ana", categoria: "comissoes" }), lanc({ id: "c", tipo: "receita", descricao: "Comissão Bia", categoria: "comissoes" })]
+    const res = [tx({ tipo: "entrada", contraparte_nome: "ACME EMBALAGENS", lancamento_ids: ["a"] }), tx({ tipo: "entrada", contraparte_nome: "ACME EMBALAGENS", lancamento_ids: ["b"] }), tx({ tipo: "entrada", contraparte_nome: "ACME EMBALAGENS", lancamento_ids: ["c"] })]
+    const [r] = regrasDoHistorico(res, ls, [], [{ id: "comissoes", subcategorias: ["Frascos", "Indicação"] }])
+    expect(r).toMatchObject({ acao: "lancar", categoria: "comissoes", subcategoria: "Frascos", seguidas: 0, vezes: 3 })
+    const sg = sugerir({ tx: tx({ tipo: "entrada", valor: 316.8, contraparte_nome: "ACME EMBALAGENS" }), lancamentos: [], pedidos: [], fornecedores: [], regras: [r], jaVinculados: new Set() })
+    expect(sg).toMatchObject({ acao: "criar", origem: "regra", lancamentos: [{ tipo: "receita", categoria: "comissoes", subcategoria: "Frascos" }] })
+  })
+  it("não vira regra: uma vez só, categorias diferentes, pedido de cliente ou regra que você já ensinou", async () => {
+    const { regrasDoHistorico } = await import("@/app/lib/banco")
+    const ls = [lanc({ id: "a", categoria: "x" }), lanc({ id: "b", categoria: "y" }), lanc({ id: "c", categoria: "x", loteNumero: "L-1" }), lanc({ id: "d", categoria: "x", loteNumero: "L-2" })]
+    const t = (nome: string, id: string) => tx({ contraparte_nome: nome, lancamento_ids: [id] })
+    expect(regrasDoHistorico([t("UMA VEZ", "a")], ls, [])).toEqual([])
+    expect(regrasDoHistorico([t("MISTURA", "a"), t("MISTURA", "b")], ls, [])).toEqual([])
+    expect(regrasDoHistorico([t("CLIENTE", "c"), t("CLIENTE", "d")], ls, [])).toEqual([])
+    expect(regrasDoHistorico([t("ENSINADA", "a"), t("ENSINADA", "a")], ls, [{ chave: chaveContraparte(t("ENSINADA", "a")), tipo: "saida", acao: "ignorar", vezes: 1 }])).toEqual([])
+  })
+})

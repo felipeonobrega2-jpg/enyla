@@ -220,6 +220,42 @@ export function aprender(regras: RegraBanco[], tx: TxBanco, decisao: { acao: "la
   return [...regras.filter(r => r !== atual), nova]
 }
 
+// Regras tiradas do que você já resolveu (lançou ou vinculou): quem pagou/recebeu 2+ vezes e caiu sempre na mesma
+// categoria vira regra (ex.: Jupter → Comissões de Parcerias). Não entra pedido de cliente (isso é da conciliação),
+// não passa por cima de regra que você ensinou e nunca lança sozinha (começa em 0 de 3).
+export function regrasDoHistorico(resolvidas: Pick<TxBanco, "tipo" | "contraparte_doc" | "contraparte_nome" | "descricao" | "lancamento_ids">[],
+  lancamentos: LancamentoFinanceiro[], regras: RegraBanco[], cats: { id: string; subcategorias?: string[] }[] = []): RegraBanco[] {
+  const porId = new Map(lancamentos.map(l => [l.id, l]))
+  const grupos = new Map<string, { tipo: TxBanco["tipo"]; ls: LancamentoFinanceiro[]; vezes: number }>()
+  for (const t of resolvidas) {
+    const ls = (t.lancamento_ids ?? []).map(id => porId.get(id)).filter((l): l is LancamentoFinanceiro => !!l)
+    if (!ls.length) continue
+    const chave = chaveContraparte(t)
+    if (!chave || chave.length < 3) continue
+    const k = `${t.tipo}|${chave}`
+    const g = grupos.get(k) ?? { tipo: t.tipo, ls: [], vezes: 0 }
+    g.ls.push(...ls); g.vezes++
+    grupos.set(k, g)
+  }
+  const novas: RegraBanco[] = []
+  for (const [k, g] of grupos) {
+    const chave = k.slice(k.indexOf("|") + 1)
+    if (g.vezes < 2 || regras.some(r => r.chave === chave && r.tipo === g.tipo)) continue
+    if (g.ls.some(l => l.loteNumero || l.cardId || l.loteId || l.formaPagamento === "conta" || !l.categoria)) continue
+    const categoria = g.ls[0].categoria!
+    if (g.ls.some(l => l.categoria !== categoria)) continue
+    // Subcategoria: a que você usou mais; se nunca usou, a que aparece no nome da maioria dos lançamentos ("Comissão Frascos")
+    const conta = (xs: string[]) => Object.entries(xs.reduce<Record<string, number>>((m, x) => ({ ...m, [x]: (m[x] ?? 0) + 1 }), {})).sort((a, b) => b[1] - a[1])[0]
+    const usada = conta(g.ls.map(l => l.subcategoria).filter((s): s is string => !!s))
+    const subs = cats.find(c => c.id === categoria)?.subcategorias ?? []
+    const noNome = conta(g.ls.flatMap(l => subs.filter(s => nomeChave(l.descricao ?? "").includes(nomeChave(s)))))
+    const subcategoria = usada?.[0] ?? (noNome && noNome[1] * 2 > g.ls.length ? noNome[0] : undefined)
+    const fornecedores = [...new Set(g.ls.map(l => l.fornecedorId).filter(Boolean))]
+    novas.push({ chave, tipo: g.tipo, acao: "lancar", categoria, ...(subcategoria ? { subcategoria } : {}), ...(fornecedores.length === 1 ? { fornecedorId: fornecedores[0] } : {}), vezes: g.vezes, seguidas: 0 })
+  }
+  return novas
+}
+
 // Conta/cartão do sistema em que entra o que vem de cada conta do banco: aprendido com os seus lançamentos
 // (a conta do banco e a do sistema são a mesma coisa; o que mais se repetiu vence)
 export type ContasDoBanco = Record<string, Record<string, number>>   // conta do banco → conta do sistema → vezes

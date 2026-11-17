@@ -4,7 +4,7 @@
 import { randomUUID } from "crypto"
 import { supabase } from "./supabase"
 import { contas as contasPluggy, item as itemPluggy, transacoes, pluggyConfigurada, atualizarItem, ContaPluggy } from "./pluggy"
-import { daPluggy, sugerir, aprender, aprenderConta, completarSugestao as completar, regraConfiavel, regraDaTx, aceitouSemMudar, zerarConfianca, vinculosPorSoma, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
+import { daPluggy, sugerir, aprender, aprenderConta, completarSugestao as completar, regrasDoHistorico, regraConfiavel, regraDaTx, aceitouSemMudar, zerarConfianca, vinculosPorSoma, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
 import { montarPedidos, pedidoEntregue, nomeChave, type Pedido } from "./negocio"
 import { previstosEmAberto, pedidoDoCusto, type PrevistoPedido } from "./calibragem"
 import { MARCA } from "./conciliacao"
@@ -89,15 +89,18 @@ async function contexto() {
   const [lancamentos, kanban, vinculadas] = await Promise.all([
     todos<LancamentoFinanceiro>("LancamentoFinanceiro"),
     todos<KanbanCard>("KanbanCard"),
-    supabase.from("banco_transacoes").select("lancamento_ids").neq("estado", "pendente"),
+    supabase.from("banco_transacoes").select("lancamento_ids, tipo, contraparte_doc, contraparte_nome, descricao").neq("estado", "pendente"),
   ])
   const pedidos = montarPedidos(kanban.map(c => ({ ...c, isTerceirizado: c.isTerceirizado || c.materialNome === "Terceirizado" })), lancamentos)
-  const jaVinculados = new Set(((vinculadas.data ?? []) as { lancamento_ids: string[] }[]).flatMap(r => r.lancamento_ids ?? []))
-  return { cfg, lancamentos, pedidos, jaVinculados }
+  const resolvidas = (vinculadas.data ?? []) as Pick<TxBanco, "lancamento_ids" | "tipo" | "contraparte_doc" | "contraparte_nome" | "descricao">[]
+  const jaVinculados = new Set(resolvidas.flatMap(r => r.lancamento_ids ?? []))
+  // Suas regras + as que saem do que você já resolveu (só sugerem; não lançam sozinhas)
+  const regras = [...(cfg.regrasBanco ?? []), ...regrasDoHistorico(resolvidas, lancamentos, cfg.regrasBanco ?? [], [...(cfg.categoriasReceita ?? []), ...(cfg.categoriasDespesa ?? [])])]
+  return { cfg, lancamentos, pedidos, jaVinculados, regras }
 }
 
-const completarSugestao = (sg: SugestaoBanco, tx: TxBanco, cfg: Awaited<ReturnType<typeof lerConfig>>) =>
-  completar(sg, tx, cfg.regrasBanco ?? [], cfg.contasDoBanco, (tx.tipo === "entrada" ? cfg.categoriasReceita : cfg.categoriasDespesa) ?? [])
+const completarSugestao = (sg: SugestaoBanco, tx: TxBanco, cfg: Awaited<ReturnType<typeof lerConfig>>, regras = cfg.regrasBanco ?? []) =>
+  completar(sg, tx, regras, cfg.contasDoBanco, (tx.tipo === "entrada" ? cfg.categoriasReceita : cfg.categoriasDespesa) ?? [])
 
 // Pagamento a fornecedor sem pedido: liga ao pedido cujo custo previsto pelo motor bate com o valor (só se for claro).
 // O histórico dos orçamentos só é lido quando aparece o primeiro pagamento candidato.
@@ -141,7 +144,7 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
     return sg?.acao === "criar" && sg.origem === "ia" && (sg.v ?? 1) < 2 && sg.lancamentos.length === 1 && !sg.lancamentos[0].subcategoria && comSubs(t.tipo).has(sg.lancamentos[0].categoria ?? "")
   })
   lista = [...lista, ...refazer]
-  const { cfg, lancamentos, pedidos, jaVinculados } = await contexto()
+  const { cfg, lancamentos, pedidos, jaVinculados, regras } = await contexto()
   // Sugestão da IA de "lançar" para algo que já está lançado (ex.: refeita com a sua explicação): volta para vincular
   const docsProprios = (cfg.pluggy?.documentosProprios ?? []).map(d => d.replace(/\D/g, "")).filter(Boolean)
   const voltar: { id: string; sugestao: SugestaoBanco }[] = []
@@ -149,9 +152,12 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
     // Refaz com as regras de hoje: "lançar" da IA, "escolher" e "sem pista" (o que você ensinou depois pode resolver)
     const sg0 = t.sugestao
     if (!sg0 || !((sg0.acao === "criar" && sg0.origem === "ia") || sg0.acao === "escolher" || sg0.acao === "revisar")) continue
-    const d = sugerir({ tx: t, lancamentos, pedidos, fornecedores: cfg.fornecedores ?? [], regras: cfg.regrasBanco ?? [], memoria: cfg.conciliacao, jaVinculados, documentosProprios: docsProprios })
-    if (d && (d.acao === "vincular" || d.acao === "atualizar" || d.acao === "escolher") && JSON.stringify(d) !== JSON.stringify(sg0)) {
-      if (d.acao !== "escolher") jaVinculados.add(d.lancamentoId)
+    const d0 = sugerir({ tx: t, lancamentos, pedidos, fornecedores: cfg.fornecedores ?? [], regras, memoria: cfg.conciliacao, jaVinculados, documentosProprios: docsProprios })
+    // Regra nova (sua ou do histórico) para o que estava "sem pista" ou com a IA: passa a valer
+    const daRegraNova = d0?.acao === "criar" && d0.origem === "regra" && (sg0.acao === "revisar" || (sg0.acao === "criar" && sg0.origem === "ia"))
+    const d = d0 && daRegraNova ? completarSugestao(d0, t, cfg, regras) : d0
+    if (d && (d.acao === "vincular" || d.acao === "atualizar" || d.acao === "escolher" || daRegraNova) && JSON.stringify(d) !== JSON.stringify(sg0)) {
+      if (d.acao === "vincular" || d.acao === "atualizar") jaVinculados.add(d.lancamentoId)
       voltar.push({ id: t.id, sugestao: d }); lista = lista.filter(x => x.id !== t.id)
     }
   }
@@ -186,7 +192,7 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
   }
   if (!lista.length) return { feitas: voltar.length + ligadas, restantes: 0 }
   const comum = {
-    lancamentos, pedidos, fornecedores: cfg.fornecedores ?? [], regras: cfg.regrasBanco ?? [], memoria: cfg.conciliacao, jaVinculados,
+    lancamentos, pedidos, fornecedores: cfg.fornecedores ?? [], regras, memoria: cfg.conciliacao, jaVinculados,
     documentosProprios: (cfg.pluggy?.documentosProprios ?? []).map(d => d.replace(/\D/g, "")).filter(Boolean),
   }
   // 1. Regras, vínculos e conciliação: rápido, tudo em memória
@@ -195,7 +201,7 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
   for (const tx of lista) {
     const sg0 = sugerir({ ...comum, tx })
     if (!sg0) { semPar.push(tx); continue }
-    const sg = await ligar(completarSugestao(sg0, tx, cfg), tx)
+    const sg = await ligar(completarSugestao(sg0, tx, cfg, regras), tx)
     if (sg.acao === "vincular" || sg.acao === "atualizar") jaVinculados.add(sg.lancamentoId)   // não serve para duas transações
     porRegra.push({ id: tx.id, sugestao: sg })
   }
