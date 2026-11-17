@@ -5,13 +5,13 @@ import { randomUUID } from "crypto"
 import { supabase } from "./supabase"
 import { contas as contasPluggy, item as itemPluggy, transacoes, pluggyConfigurada, atualizarItem, ContaPluggy } from "./pluggy"
 import { daPluggy, sugerir, aprender, aprenderConta, completarSugestao as completar, regraConfiavel, regraDaTx, aceitouSemMudar, zerarConfianca, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
-import { montarPedidos, pedidoEntregue, type Pedido } from "./negocio"
+import { montarPedidos, pedidoEntregue, nomeChave, type Pedido } from "./negocio"
 import { previstosEmAberto, pedidoDoCusto, type PrevistoPedido } from "./calibragem"
 import { MARCA } from "./conciliacao"
 import { clienteClaude, FALLBACK, MODELO } from "./claude"
 import type { LancamentoFinanceiro, KanbanCard } from "../types"
 import type { Configuracoes } from "../config"
-import { gravarCampos } from "./configAtomica"
+import { gravarCampos, mudarConfig } from "./configAtomica"
 
 export type ConfigPluggy = { itens?: { id: string; nome?: string }[]; dataCorte?: string; automatico?: boolean; documentosProprios?: string[] }
 export type StatusPluggy = { em: string; contas: { id: string; nome: string; banco: string; saldo: number | null }[]; novas: number; erro?: string | null }
@@ -141,8 +141,20 @@ export async function sugerirPendentes(prazoMs = 45_000): Promise<{ feitas: numb
     return sg?.acao === "criar" && sg.origem === "ia" && (sg.v ?? 1) < 2 && sg.lancamentos.length === 1 && !sg.lancamentos[0].subcategoria && comSubs(t.tipo).has(sg.lancamentos[0].categoria ?? "")
   })
   lista = [...lista, ...refazer]
-  if (!lista.length) return { feitas: 0, restantes: 0 }
   const { cfg, lancamentos, pedidos, jaVinculados } = await contexto()
+  // Sugestão da IA de "lançar" para algo que já está lançado (ex.: refeita com a sua explicação): volta para vincular
+  const docsProprios = (cfg.pluggy?.documentosProprios ?? []).map(d => d.replace(/\D/g, "")).filter(Boolean)
+  const voltar: { id: string; sugestao: SugestaoBanco }[] = []
+  for (const t of (antigas ?? []) as TxBanco[]) {
+    if (t.sugestao?.acao !== "criar" || t.sugestao.origem !== "ia") continue
+    const d = sugerir({ tx: t, lancamentos, pedidos, fornecedores: cfg.fornecedores ?? [], regras: cfg.regrasBanco ?? [], memoria: cfg.conciliacao, jaVinculados, documentosProprios: docsProprios })
+    if (d && (d.acao === "vincular" || d.acao === "atualizar" || d.acao === "escolher")) {
+      if (d.acao !== "escolher") jaVinculados.add(d.lancamentoId)
+      voltar.push({ id: t.id, sugestao: d }); lista = lista.filter(x => x.id !== t.id)
+    }
+  }
+  if (voltar.length) await gravarSugestoes(voltar)
+  if (!lista.length) return { feitas: voltar.length, restantes: 0 }
   const comum = {
     lancamentos, pedidos, fornecedores: cfg.fornecedores ?? [], regras: cfg.regrasBanco ?? [], memoria: cfg.conciliacao, jaVinculados,
     documentosProprios: (cfg.pluggy?.documentosProprios ?? []).map(d => d.replace(/\D/g, "")).filter(Boolean),
@@ -201,6 +213,15 @@ export async function reinterpretar(txId: string, instrucao: string, lembrar: bo
     const licoes = [...(cfg.licoesBanco ?? []), { id: randomUUID(), texto: `${instrucao.trim()} (ex.: ${tx.contraparte_nome ?? tx.descricao}, ${tx.tipo === "entrada" ? "entrada" : "saída"} de R$ ${tx.valor.toFixed(2)})`, em: agora() }].slice(-80)
     await salvarCampos({ licoesBanco: licoes })
     cfg.licoesBanco = licoes
+  }
+  // Já existe lançamento para esta transação (vincular / dar baixa / escolher): fica isso, só com a lição guardada.
+  // A IA só cria lançamento novo, e aqui isso duplicaria.
+  const { lancamentos, jaVinculados } = await contexto()
+  const direto = sugerir({ tx, lancamentos, pedidos, fornecedores: cfg.fornecedores ?? [], regras: cfg.regrasBanco ?? [], memoria: cfg.conciliacao, jaVinculados,
+    documentosProprios: (cfg.pluggy?.documentosProprios ?? []).map(d => d.replace(/\D/g, "")).filter(Boolean) })
+  if (direto && (direto.acao === "vincular" || direto.acao === "atualizar" || direto.acao === "escolher")) {
+    await supabase.from("banco_transacoes").update({ sugestao: direto, atualizado_em: agora() }).eq("id", txId)
+    return { ok: true, sugestao: direto }
   }
   const r = await interpretarComIA([tx], cfg, pedidos, instrucao).catch(() => null)
   const sg0 = r?.get(tx.id)
@@ -299,6 +320,15 @@ async function guardarCorrecao(tx: TxBanco, voce: string, cfg: Awaited<ReturnTyp
   await salvarCampos({ exemplosBanco: exemplos })
 }
 
+// Recebimento ligado a um cliente: quem pagou passa a apontar para ele (a conciliação usa nas próximas entradas)
+async function aprenderPagador(tx: TxBanco, cliente: string | null | undefined) {
+  if (tx.tipo !== "entrada" || !cliente || !tx.contraparte_nome) return
+  const chave = nomeChave(tx.contraparte_nome)
+  if (!chave) return
+  await mudarConfig((d: Record<string, unknown> & { conciliacao?: { pagadores?: Record<string, string>; ignorados?: string[] } }) =>
+    d.conciliacao?.pagadores?.[chave] === cliente ? null : { conciliacao: { ...(d.conciliacao ?? {}), pagadores: { ...(d.conciliacao?.pagadores ?? {}), [chave]: cliente } } })
+}
+
 // ── Aplicar a sua decisão (ou a regra automática) ───────────────────────────
 export type Decisao =
   | { acao: "vincular"; lancamentoId: string; automatico?: boolean }
@@ -335,6 +365,7 @@ export async function aplicar(txId: string, d: Decisao): Promise<{ ok: boolean; 
     const campos = d.acao === "atualizar" ? { ...d.campos, obs } : { obs }
     const restaurar = { id: l.id, campos: Object.fromEntries(Object.keys(campos).map(k => [k, l[k] ?? null])) as Partial<LancamentoFinanceiro> }
     await supabase.from("LancamentoFinanceiro").update(campos).eq("id", l.id)
+    await aprenderPagador(tx, l.nomeCliente)
     hist.push({ em: agora(), acao: d.acao === "atualizar" ? "baixa no lançamento" : "vinculada", detalhe: JSON.stringify({ restaurar, por: quem }) })
     const { data: nova } = await supabase.from("banco_transacoes").update({ estado: "vinculada", lancamento_ids: [l.id], historico: hist, atualizado_em: agora() }).eq("id", txId).select("*").maybeSingle()
     return { ok: true, tx: nova as TxBanco, atualizados: [{ id: l.id, campos }] }
@@ -370,6 +401,7 @@ export async function aplicar(txId: string, d: Decisao): Promise<{ ok: boolean; 
     await salvarCampos(campos)
   }
   if (!("automatico" in d && d.automatico)) await guardarCorrecao(tx, descrever("criar", criados, cfg), await lerConfig())
+  await aprenderPagador(tx, criados.find(l => l.tipo === "receita" && l.nomeCliente)?.nomeCliente)
   hist.push({ em: agora(), acao: "criada", detalhe: JSON.stringify({ criados: criados.map(l => l.id), por: quem }) })
   const { data: nova } = await supabase.from("banco_transacoes").update({ estado: "criada", lancamento_ids: criados.map(l => l.id), historico: hist, atualizado_em: agora() }).eq("id", txId).select("*").maybeSingle()
   return { ok: true, tx: nova as TxBanco, criados }

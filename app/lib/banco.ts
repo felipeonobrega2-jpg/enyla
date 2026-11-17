@@ -132,7 +132,18 @@ export function sugerir(args: {
       ? { acao: "vincular", lancamentoId: l.id, motivo: `já lançado: ${l.descricao}` }
       : { acao: "atualizar", lancamentoId: l.id, campos: { status: "pago", dataPagamento: tx.data }, motivo: `dá baixa em: ${l.descricao}` }
   }
-  if (candidatos.length > 1) return { acao: "escolher", candidatos: candidatos.map(l => l.id), motivo: `${candidatos.length} lançamentos com o mesmo valor e data` }
+  if (candidatos.length > 1) {
+    // Um só no mesmo dia: é ele. Senão pergunta, do mais perto para o mais longe da data do banco
+    const dias = (l: LancamentoFinanceiro) => distancia(tx.data, (l.dataPagamento ?? l.dataVencimento).slice(0, 10))
+    const mesmoDia = candidatos.filter(l => dias(l) === 0)
+    if (mesmoDia.length === 1) {
+      const l = mesmoDia[0]
+      return l.status === "pago"
+        ? { acao: "vincular", lancamentoId: l.id, motivo: `já lançado no mesmo dia: ${l.descricao}` }
+        : { acao: "atualizar", lancamentoId: l.id, campos: { status: "pago", dataPagamento: tx.data }, motivo: `dá baixa em (mesmo dia): ${l.descricao}` }
+    }
+    return { acao: "escolher", candidatos: [...candidatos].sort((a, b) => dias(a) - dias(b)).map(l => l.id), motivo: `${candidatos.length} lançamentos com o mesmo valor e data` }
+  }
 
   // 2. Pagamento a fornecedor com conta corrente: abate a conta (o custo já está lançado na conta)
   if (tx.tipo === "saida") {

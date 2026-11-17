@@ -43,6 +43,11 @@ export async function POST(req: NextRequest) {
           proximo[k] = recente("categoriasMudadasEm") ? [...juntas, ...banco.filter(b => !tela.some(c => c.id === b.id))] : juntas
         }
       }
+      // Quem paga por qual cliente também é aprendido no servidor (aba Banco): soma, a tela vence em cada pagador
+      if (salvo.conciliacao || body.conciliacao) {
+        const sv = (salvo.conciliacao ?? {}) as { pagadores?: Record<string, string> }, bd = (body.conciliacao ?? {}) as { pagadores?: Record<string, string> }
+        proximo.conciliacao = { ...sv, ...bd, pagadores: { ...(sv.pagadores ?? {}), ...(bd.pagadores ?? {}) } }
+      }
       // Vínculos conversa → cliente também nascem no servidor (telefone, conversas juntadas): soma, nunca perde.
       // A tela não apaga vínculo, só marca "" (não é cliente), então a versão dela vence em cada conversa.
       proximo.vinculosWhatsapp = { ...(salvo.vinculosWhatsapp as Record<string, string> ?? {}), ...(body.vinculosWhatsapp as Record<string, string> ?? {}) }

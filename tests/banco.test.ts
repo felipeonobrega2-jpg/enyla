@@ -16,6 +16,10 @@ describe("banco → lançamentos sem bagunçar o manual", () => {
     expect(sugerir({ ...base, tx: tx({}), lancamentos: [lanc({ status: "pendente", dataPagamento: undefined })] }))
       .toMatchObject({ acao: "atualizar", campos: { status: "pago", dataPagamento: "2026-11-03" } })
   })
+  it("dois iguais, um no mesmo dia do banco: é ele (vincula sem perguntar)", () => {
+    const r = sugerir({ ...base, tx: tx({ tipo: "entrada", data: "2026-11-11" }), lancamentos: [lanc({ id: "a", tipo: "receita", dataPagamento: "2026-11-09" }), lanc({ id: "b", tipo: "receita", dataPagamento: "2026-11-11" })] })
+    expect(r).toMatchObject({ acao: "vincular", lancamentoId: "b" })
+  })
   it("dois iguais: pergunta qual; já vinculado a outra transação não conta", () => {
     expect(sugerir({ ...base, tx: tx({}), lancamentos: [lanc({}), lanc({ id: "l2" })] })).toMatchObject({ acao: "escolher" })
     expect(sugerir({ ...base, tx: tx({}), lancamentos: [lanc({}), lanc({ id: "l2" })], jaVinculados: new Set(["l2"]) })).toMatchObject({ acao: "vincular", lancamentoId: "l1" })
