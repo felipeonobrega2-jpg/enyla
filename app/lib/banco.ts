@@ -130,6 +130,16 @@ export const FOI_E_VOLTOU = "foi e voltou"
 const diaMes = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`
 const reais = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 
+// Pagamento da conta corrente de um fornecedor: dois lançamentos. A saída de caixa (Pagamento a fornecedor › Conta X),
+// que o DRE (regime de caixa) conta como custo, e o abatimento na conta (fora do caixa), que baixa o saldo devedor.
+export function pagamentoDaConta(f: Pick<Fornecedor, "id" | "nome">, tx: Pick<TxBanco, "valor" | "data">, obs?: string): Partial<LancamentoFinanceiro>[] {
+  const base = { valor: tx.valor, status: "pago" as const, dataVencimento: tx.data, dataPagamento: tx.data, fornecedorId: f.id, ...(obs ? { obs } : {}) }
+  return [
+    { ...base, tipo: "despesa", categoria: "pagamento-fornecedor", subcategoria: `Conta ${f.nome}`, formaPagamento: "pix", descricao: `Pagamento da conta — ${f.nome}` },
+    { ...base, tipo: "receita", formaPagamento: "conta", descricao: `Abatimento na conta — ${f.nome}` },
+  ]
+}
+
 export function sugerir(args: {
   tx: TxBanco
   lancamentos: LancamentoFinanceiro[]
@@ -210,10 +220,7 @@ export function sugerir(args: {
       const jaTem = lancamentos.find(l => l.tipo === "receita" && l.formaPagamento === "conta" && l.fornecedorId === fConta.id && !args.jaVinculados.has(l.id)
         && igual(l.valor, tx.valor) && distancia(tx.data, (l.dataPagamento ?? l.dataVencimento).slice(0, 10)) <= 3)
       if (jaTem) return { acao: "vincular", lancamentoId: jaTem.id, motivo: `pagamento da conta ${fConta.nome} já lançado` }
-      return {
-        acao: "criar", origem: "conta", motivo: `pagamento da conta ${fConta.nome}: abate o saldo devedor (não é custo novo)`,
-        lancamentos: [{ tipo: "receita", formaPagamento: "conta", fornecedorId: fConta.id, descricao: `Pagamento da conta — ${fConta.nome}`, valor: tx.valor, status: "pago", dataVencimento: tx.data, dataPagamento: tx.data }],
-      }
+      return { acao: "criar", origem: "conta", motivo: `pagamento da conta ${fConta.nome}: sai do caixa e abate o saldo devedor`, lancamentos: pagamentoDaConta(fConta, tx) }
     }
   }
 

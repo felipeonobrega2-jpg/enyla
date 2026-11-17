@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { RefreshCw, Link2, Plus, EyeOff, Undo2, Settings2, Sparkles, Landmark, Check, X, Loader2, AlertCircle, ArrowDownLeft, ArrowUpRight, Layers, Keyboard, Zap, Wallet } from "lucide-react"
 import type { KanbanCard, LancamentoFinanceiro } from "../../types"
 import type { Configuracoes } from "../../config"
-import { chaveContraparte, REGRA_CONFIAVEL, possiveisDuplicados, duplicadosNoLote, type TxBanco, type SugestaoBanco } from "../../lib/banco"
+import { chaveContraparte, REGRA_CONFIAVEL, pagamentoDaConta, possiveisDuplicados, duplicadosNoLote, type TxBanco, type SugestaoBanco } from "../../lib/banco"
 import { ModalLancamento } from "../FinanceiroView"
 import { Botao, Selo, Segmentado, Vazio } from "../ds"
 
@@ -352,8 +352,8 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
                       <button onClick={() => abrirCorrecao(tx, s)} className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold bg-white ds-borda text-[#191625] inline-flex items-center gap-1"><Plus className="w-3.5 h-3.5" />{s?.acao === "criar" ? "Corrigir e lançar" : "Lançar"}</button>
                       {s?.acao !== "ignorar" && <button onClick={() => decidir(tx, { acao: "ignorar" })} className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold text-[#5e5c68] hover:bg-black/5 inline-flex items-center gap-1"><EyeOff className="w-3.5 h-3.5" />Ignorar</button>}
                       {tx.tipo === "saida" && !(s?.acao === "criar" && s.origem === "conta") && (config.fornecedores ?? []).filter(f => f.ativo && f.conta).map(f => (
-                        <button key={f.id} onClick={() => decidir(tx, { acao: "criar", lancamentos: [{ tipo: "receita", formaPagamento: "conta", fornecedorId: f.id, descricao: `Pagamento da conta — ${f.nome}`, valor: tx.valor, status: "pago", dataVencimento: tx.data, dataPagamento: tx.data }] })}
-                          title={`Este pagamento abate o que você deve para ${f.nome} (não é custo novo). Da próxima vez, quem recebeu já vem como pagamento dessa conta.`}
+                        <button key={f.id} onClick={() => decidir(tx, { acao: "criar", lancamentos: pagamentoDaConta(f, tx) })}
+                          title={`Sai do caixa e abate o que você deve para ${f.nome}. Da próxima vez, quem recebeu já vem como pagamento dessa conta.`}
                           className="h-7 px-2.5 rounded-lg text-[11.5px] font-semibold text-[#5e5c68] hover:bg-black/5 inline-flex items-center gap-1"><Wallet className="w-3.5 h-3.5" />Abater na conta {f.nome}</button>
                       ))}
                       <button onClick={() => decidir(tx, { acao: "ignorar", sempre: true })} className="h-7 px-2.5 rounded-lg text-[11.5px] text-[#898892] hover:bg-black/5" title="Da próxima vez, quem está do outro lado já vem ignorado">Sempre ignorar este</button>
@@ -447,7 +447,7 @@ function Sugestao({ s, nomeCat, nomeForn, lancPorId }: { s: SugestaoBanco | null
         {s.acao === "escolher" && <>{/Qual/.test(s.motivo) ? s.motivo : "Há mais de um lançamento com esse valor e data. Qual é?"}</>}
         {s.acao === "ignorar" && <>Ignorar: {s.motivo}.</>}
         {s.acao === "revisar" && <>{/^devolu/.test(s.motivo) ? "Devolução de uma compra que ainda está na fila." : "Sem pista para sugerir. Lance ou ignore."}</>}
-        {s.acao === "criar" && <>{s.origem === "conta" ? "Pagamento da conta do fornecedor: abate o saldo devedor (não é custo novo)." : s.origem === "conciliacao" ? "Recebimento de cliente:" : s.origem === "devolucao" ? "Estorno de uma compra já lançada (volta para o caixa):" : s.origem === "regra" ? "Pela sua regra:" : "Sugestão da IA:"}</>}
+        {s.acao === "criar" && <>{s.origem === "conta" ? "Pagamento da conta do fornecedor: sai do caixa e abate o saldo devedor." : s.origem === "conciliacao" ? "Recebimento de cliente:" : s.origem === "devolucao" ? "Estorno de uma compra já lançada (volta para o caixa):" : s.origem === "regra" ? "Pela sua regra:" : "Sugestão da IA:"}</>}
       </span></p>
       {s.acao === "criar" && (
         <div className="mt-1 space-y-0.5 pl-5">

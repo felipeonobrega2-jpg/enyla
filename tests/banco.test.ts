@@ -39,10 +39,12 @@ describe("banco → lançamentos sem bagunçar o manual", () => {
   it("custo na conta do fornecedor nunca casa com saída do banco (não passou pelo banco)", () => {
     expect(sugerir({ ...base, tx: tx({}), lancamentos: [lanc({ formaPagamento: "conta" })] })?.acao).not.toBe("vincular")
   })
-  it("Pix para a Jerograf: abate a conta (receita na conta), não vira custo", () => {
+  it("Pix para a Jerograf: sai do caixa (custo no DRE) e abate a conta (receita na conta)", () => {
     const s = sugerir({ ...base, tx: tx({ contraparte_nome: "JEROGRAF GRAFICA LTDA", valor: 2000 }), lancamentos: [] })
     expect(s).toMatchObject({ acao: "criar", origem: "conta" })
-    expect(s && s.acao === "criar" && s.lancamentos[0]).toMatchObject({ tipo: "receita", formaPagamento: "conta", fornecedorId: "jero", valor: 2000 })
+    const ls = s && s.acao === "criar" ? s.lancamentos : []
+    expect(ls[0]).toMatchObject({ tipo: "despesa", categoria: "pagamento-fornecedor", formaPagamento: "pix", fornecedorId: "jero", valor: 2000 })
+    expect(ls[1]).toMatchObject({ tipo: "receita", formaPagamento: "conta", fornecedorId: "jero", valor: 2000 })
   })
   it("pagamento da conta já lançado à mão: vincula", () => {
     const manual = lanc({ id: "aj", tipo: "receita", formaPagamento: "conta", fornecedorId: "jero", valor: 2000 })
