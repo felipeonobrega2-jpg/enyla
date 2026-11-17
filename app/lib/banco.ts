@@ -381,6 +381,27 @@ function combinacoes<T>(itens: T[], valor: (x: T) => number, alvo: number, max =
   }
   return out
 }
+const umFornecedor = (ls: LancamentoFinanceiro[]) => new Set(ls.map(l => l.fornecedorId).filter(Boolean)).size <= 1
+// Lançamentos de um mesmo fornecedor (até 10) cujo subconjunto de 4+ soma o valor: só se for um subconjunto único
+function somaDoFornecedor(ls: LancamentoFinanceiro[], alvo: number): LancamentoFinanceiro[] | null {
+  const porF = new Map<string, LancamentoFinanceiro[]>()
+  for (const l of ls) if (l.fornecedorId) porF.set(l.fornecedorId, [...(porF.get(l.fornecedorId) ?? []), l])
+  const a = centavos(alvo)
+  let achado: LancamentoFinanceiro[] | null = null, achados = 0
+  for (const g of porF.values()) {
+    if (g.length < 4 || g.length > 10) continue
+    const vistos = new Set<string>()
+    for (let m = 1; m < 1 << g.length; m++) {
+      const sub = g.filter((_, i) => m & (1 << i))
+      if (sub.length < 4 || sub.reduce((s, l) => s + centavos(l.valor), 0) !== a) continue
+      // Iguais trocados (duas "Colagem 975") contam como a mesma resposta
+      const assinatura = sub.map(l => `${nomeChave(l.descricao)}|${centavos(l.valor)}|${l.loteNumero ?? ""}`).sort().join(";")
+      if (vistos.has(assinatura)) continue
+      vistos.add(assinatura); achado = sub; achados++
+    }
+  }
+  return achados === 1 ? achado : null
+}
 export function vinculosPorSoma(pendentes: TxBanco[], livres: LancamentoFinanceiro[]): { porTx: Map<string, SugestaoBanco>; rateioAutomatico: Set<string> } {
   const porTx = new Map<string, SugestaoBanco>(), rateioAutomatico = new Set<string>()
   const usados = new Set<string>(), txUsadas = new Set<string>()
@@ -399,7 +420,10 @@ export function vinculosPorSoma(pendentes: TxBanco[], livres: LancamentoFinancei
       const m = centavos(t.valor) / centavos(g[0].valor)
       if (Number.isInteger(m) && m >= 2 && m <= g.length) { achou = g.slice(0, m); iguais = true; break }
     }
-    if (!achou) { const c = combinacoes(perto, l => l.valor, t.valor); if (c.length === 1) achou = c[0] }
+    // Lançamentos diferentes: um Pix paga uma pessoa só, então nunca mistura fornecedores (ex.: Fabiano + Jacuna)
+    if (!achou) { const c = combinacoes(perto, l => l.valor, t.valor).filter(umFornecedor); if (c.length === 1) achou = c[0] }
+    // Um Pix para o fornecedor pagando 4+ lançamentos dele do mesmo dia (ex.: 2 colagens + 2 cortes de dois lotes)
+    if (!achou) achou = somaDoFornecedor(perto.filter(l => distancia(t.data, dataL(l)) <= 1), t.valor)
     if (!achou) continue
     for (const l of achou) usados.add(l.id)
     txUsadas.add(t.id)

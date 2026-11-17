@@ -231,3 +231,21 @@ describe("devoluções (PIX DEVOLVIDO / estorno)", () => {
     expect(sg).toMatchObject({ acao: "criar", origem: "devolucao", lancamentos: [{ tipo: "receita", categoria: "outros", subcategoria: "Estorno", descricao: "Estorno — Compra Mercado Livre", valor: 274.07 }] })
   })
 })
+
+describe("um Pix para o fornecedor que paga 4+ lançamentos dele no mesmo dia", () => {
+  it("2 colagens + 2 cortes de dois lotes = o Pix", async () => {
+    const { vinculosPorSoma } = await import("@/app/lib/banco")
+    const d = { dataVencimento: "2026-10-27", dataPagamento: "2026-10-27", fornecedorId: "fab" }
+    const ls = [lanc({ id: "a", descricao: "Colagem", valor: 975, loteNumero: "L1", ...d }), lanc({ id: "b", descricao: "Colagem", valor: 975, loteNumero: "L2", ...d }),
+      lanc({ id: "c", descricao: "Corte e Vinco", valor: 318.5, loteNumero: "L1", ...d }), lanc({ id: "e", descricao: "Corte e Vinco", valor: 318.5, loteNumero: "L2", ...d })]
+    const r = vinculosPorSoma([tx({ id: "p", valor: 2587, data: "2026-10-27" })], ls)
+    expect(r.porTx.get("p")).toMatchObject({ acao: "vincularVarios", lancamentoIds: expect.arrayContaining(["a", "b", "c", "e"]) })
+  })
+})
+
+it("soma de lançamentos diferentes não mistura fornecedores", async () => {
+  const { vinculosPorSoma } = await import("@/app/lib/banco")
+  const d = { dataVencimento: "2026-10-27", dataPagamento: "2026-10-27" }
+  const ls = [lanc({ id: "a", descricao: "Colagem", valor: 975, fornecedorId: "fab", loteNumero: "L1", ...d }), lanc({ id: "b", descricao: "Colagem", valor: 975, fornecedorId: "fab", loteNumero: "L2", ...d }), lanc({ id: "c", descricao: "Corte", valor: 400, fornecedorId: "jac", ...d })]
+  expect(vinculosPorSoma([tx({ id: "p", valor: 2350, data: "2026-10-27" })], ls).porTx.size).toBe(0)
+})
