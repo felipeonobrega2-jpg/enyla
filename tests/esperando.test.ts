@@ -22,3 +22,16 @@ describe("ninguém sem resposta", () => {
     expect(r.map(x => x.nome)).toEqual(["Mateus", "Bom"])
   })
 })
+
+describe("a IA fecha só o óbvio", () => {
+  it("fecha quem encerrou depois da nossa resposta; não fecha pergunta nossa, orçamento aberto nem quem disse que volta", async () => {
+    const { podeFecharSozinha } = await import("@/app/lib/esperando")
+    const base = { jid: "1@s.whatsapp.net", nome: "Ana", etiquetas: [], status_lead: null, ultima_msg: "Ok, obrigado!", ultima_recebida_at: min(40), ultima_enviada_at: min(50) }
+    expect(podeFecharSozinha({ ...base, penultimaNossa: "Fechado, te mando o rastreio amanhã." }, agora)).toBe("o cliente encerrou a conversa")
+    expect(podeFecharSozinha({ ...base, penultimaNossa: "Quer que eu já separe as 1.000?" }, agora)).toBeNull()
+    expect(podeFecharSozinha({ ...base, kanban_card_id: "k1", penultimaNossa: "Fechado." }, agora)).toBeNull()
+    expect(podeFecharSozinha({ ...base, ultima_msg: "Vou ver com meu sócio e te falo", penultimaNossa: "Fechado." }, agora)).toBeNull()
+    expect(podeFecharSozinha({ ...base, ultima_recebida_at: min(10), penultimaNossa: "Fechado." }, agora)).toBeNull()
+    expect(podeFecharSozinha({ ...base, etiquetas: ["Descartado"], ultima_msg: "Quanto custa?", ultima_recebida_at: min(90), ultima_enviada_at: min(80) }, agora)).toBe("não é lead e já foi respondido")
+  })
+})

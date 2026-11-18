@@ -37,6 +37,7 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
 
   // 1b. Ninguém sem resposta: quem escreveu por último há 20+ min. O agente tenta uma vez por mensagem (se a conversa
   //     não for sua, as travas dele seguram); o que sobra vira aviso no seu WhatsApp (cada conversa no máximo a cada 3 h)
+  out.fechadas = await fecharOObvio(agora).catch(e => String(e))
   out.esperando = await cuidarDeQuemEspera(cfg, agora).catch(e => String(e))
 
   // 2. Rotina (dias de trabalho do agente): 13h checagem, 18h fechamento
@@ -64,6 +65,31 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
     out.whatsapp = "avisado"
   }
   return out
+}
+
+// A IA fecha o que acabou (ver podeFecharSozinha); fica anotado em config.fechadasPelaIA para você ver e reabrir
+async function fecharOObvio(agora: Date) {
+  const { podeFecharSozinha } = await import("./esperando")
+  const { data } = await supabase.from("whatsapp_conversas").select("jid, nome, etiquetas, status_lead, ultima_msg, ultima_recebida_at, ultima_enviada_at, proxima_acao, fechada_em, kanban_card_id")
+    .not("jid", "like", "%@g.us").gte("ultima_at", new Date(agora.getTime() - 7 * 86_400_000).toISOString()).limit(800)
+  const fechar: { jid: string; motivo: string }[] = []
+  for (const c of (data ?? []) as never as import("./esperando").ConvFechar[]) {
+    // Só lê a nossa última mensagem para quem pode ser fim de conversa
+    const rapido = podeFecharSozinha({ ...c, penultimaNossa: "" }, agora.getTime())
+    if (!rapido) continue
+    let motivo: string | null = rapido
+    if (rapido === "o cliente encerrou a conversa") {
+      const { data: nossa } = await supabase.from("whatsapp_mensagens").select("corpo").eq("jid", c.jid).eq("from_me", true).order("criado_em", { ascending: false }).limit(1).maybeSingle()
+      motivo = podeFecharSozinha({ ...c, penultimaNossa: nossa?.corpo ?? "" }, agora.getTime())
+    }
+    if (motivo) fechar.push({ jid: c.jid, motivo })
+    if (fechar.length >= 40) break
+  }
+  if (!fechar.length) return 0
+  const em = agora.toISOString()
+  await supabase.from("whatsapp_conversas").update({ fechada_em: em }).in("jid", fechar.map(f => f.jid))
+  await mudarConfig((d: Cfg & { fechadasPelaIA?: { jid: string; motivo: string; em: string }[] }) => ({ fechadasPelaIA: [...fechar.map(f => ({ ...f, em })), ...(d.fechadasPelaIA ?? [])].slice(0, 300) }))
+  return fechar.length
 }
 
 async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvisada?: Record<string, string>; esperaAvisoEm?: string; agenteAuto?: { horario?: { dias?: number[]; inicio?: string; fim?: string }; avisoNumero?: string } }, agora: Date) {

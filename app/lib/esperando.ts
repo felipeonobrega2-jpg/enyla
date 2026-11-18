@@ -39,3 +39,21 @@ export function quemEspera(convs: ConvEspera[], agora = Date.now(), minimoMin = 
 }
 
 export const tempoEspera = (min: number) => min < 60 ? `${min} min` : min < 1440 ? `${Math.floor(min / 60)} h` : `${Math.floor(min / 1440)} ${Math.floor(min / 1440) === 1 ? "dia" : "dias"}`
+
+// A IA fecha sozinha só o óbvio: o cliente encerrou ("ok", "obrigado", 👍) depois de uma resposta nossa que não era
+// pergunta, há 30+ min; ou não é lead (Descartado) e já respondemos. Fornecedor nunca. Quem disse que volta NÃO fecha
+// (o follow-up depende disso), nem quem tem orçamento aberto (kanban_card_id). Reabre sozinha se o cliente escrever.
+export type ConvFechar = ConvEspera & { kanban_card_id?: string | null; penultimaNossa?: string | null }
+export function podeFecharSozinha(c: ConvFechar, agora = Date.now()): string | null {
+  if (c.jid.includes("@g.us") || c.kanban_card_id) return null
+  if (c.fechada_em && c.ultima_recebida_at && c.fechada_em >= c.ultima_recebida_at) return null
+  const et = c.etiquetas ?? []
+  const respondemos = !!c.ultima_enviada_at
+  if (et.includes("Fornecedora")) return null   // fornecedor é conversa de trabalho: fica como você deixou
+  if (respondemos && et.includes("Descartado") && c.ultima_enviada_at! >= (c.ultima_recebida_at ?? "")) return "não é lead e já foi respondido"
+  if (!c.ultima_recebida_at || (c.ultima_enviada_at && c.ultima_enviada_at > c.ultima_recebida_at)) return null
+  if (agora - new Date(c.ultima_recebida_at).getTime() < 30 * 60_000) return null
+  if (!FECHO.test((c.ultima_msg ?? "").trim())) return null
+  if (!respondemos || /\?\s*$/.test((c.penultimaNossa ?? "").trim())) return null
+  return "o cliente encerrou a conversa"
+}
