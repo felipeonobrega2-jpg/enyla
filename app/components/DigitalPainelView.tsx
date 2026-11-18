@@ -213,6 +213,10 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
               <Info rotulo="Termos" valor={sel.termosAceitosEm ? `aceitos em ${new Date(sel.termosAceitosEm).toLocaleDateString("pt-BR")}` : sel.status === "aguardando_sinal" ? "ainda não aceitos" : "de antes dos termos"} />
             </div>
 
+            {["aguardando_sinal", "sinal_pago", "arte"].includes(sel.status) && !sel.arteAprovadaEm && (
+              <MudarMedidas key={sel.id} pedido={sel} onFeito={async () => aplicar(await buscar())} />
+            )}
+
             {sel.status === "aguardando_sinal" && (sel.opcoes?.length ?? 0) > 1 && (
               <div className="rounded-xl ds-borda px-3.5 py-3 space-y-2">
                 <p className="text-[12px] font-semibold text-[#191625]">Mudar a quantidade</p>
@@ -316,6 +320,84 @@ function Info({ rotulo, valor }: { rotulo: string; valor: string }) {
     <div className="rounded-xl bg-[rgba(116,116,128,0.06)] px-3 py-2.5 min-w-0">
       <p className="text-[10.5px] text-[#898892] truncate">{rotulo}</p>
       <p className="text-[13px] font-semibold text-[#191625] ds-num truncate mt-0.5">{valor}</p>
+    </div>
+  )
+}
+
+// Cliente fechou e mudou o frasco: medidas novas, o preço da tabela na hora e o aviso ao Leandro (e ao cliente, se quiser)
+function MudarMedidas({ pedido, onFeito }: { pedido: Pedido; onFeito: () => Promise<void> }) {
+  const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+  const fmt = (n: number) => String(n).replace(".", ",")
+  const [aberto, setAberto] = useState(false)
+  const [m, setM] = useState({ a: fmt(pedido.medidas.a), l: fmt(pedido.medidas.l), p: fmt(pedido.medidas.p) })
+  const [previa, setPrevia] = useState<{ total: number; antes: number; folha: string; restante: number; sinalPago: boolean } | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+  const [avisarCliente, setAvisarCliente] = useState(false)
+  const [salvando, setSalvando] = useState(false)
+  const n = (x: string) => Number(x.replace(",", "."))
+  const corpo = (salvar: boolean) => ({ id: pedido.id, acao: "medidas", a: n(m.a), l: n(m.l), p: n(m.p), salvar, avisarCliente })
+  useEffect(() => {
+    if (!aberto) return
+    if (!(n(m.a) > 0 && n(m.l) > 0 && n(m.p) > 0)) { setPrevia(null); return }
+    const t = setTimeout(async () => {
+      const r = await fetch("/api/digital", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo(false)) }).catch(() => null)
+      const d = r ? await r.json().catch(() => ({})) : {}
+      if (r?.ok && d.previa) { setPrevia(d.previa); setErro(null) } else { setPrevia(null); setErro(d.erro ?? "Não consegui calcular.") }
+    }, 350)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberto, m.a, m.l, m.p])
+  const mesmas = n(m.a) === pedido.medidas.a && n(m.l) === pedido.medidas.l && n(m.p) === pedido.medidas.p
+  const salvar = async () => {
+    setSalvando(true)
+    const r = await fetch("/api/digital", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo(true)) }).catch(() => null)
+    const d = r ? await r.json().catch(() => ({})) : {}
+    setSalvando(false)
+    if (!r?.ok) { setErro(d.erro ?? "Não salvou."); return }
+    const partes = [pedido.status === "aguardando_sinal" ? "" : d.leandro ? "o Leandro recebeu as medidas novas" : "o Leandro NÃO foi avisado (cadastre o número em Contatos)", avisarCliente ? (d.cliente ? "o cliente foi avisado" : "a mensagem ao cliente não saiu") : ""].filter(Boolean)
+    alert(`Medidas atualizadas${partes.length ? `: ${partes.join("; ")}` : ""}.`)
+    setAberto(false); await onFeito()
+  }
+  const campo = (k: "a" | "l" | "p", rotulo: string) => (
+    <label className="block min-w-0">
+      <span className="text-[11px] font-medium text-[#5e5c68]">{rotulo}</span>
+      <input value={m[k]} onChange={e => setM({ ...m, [k]: e.target.value })} inputMode="decimal"
+        className="mt-1 w-full h-10 rounded-lg px-3 text-[14px] text-[#191625] bg-white ds-borda outline-none focus:ring-2 focus:ring-[#8456e8]/20" />
+    </label>
+  )
+  if (!aberto) return (
+    <button onClick={() => setAberto(true)} className="ds-toque w-full rounded-xl ds-borda px-3.5 py-3 text-left flex items-center gap-2 hover:bg-[rgba(116,116,128,0.04)]">
+      <span className="flex-1"><span className="block text-[12.5px] font-semibold text-[#191625]">Mudar medidas</span>
+        <span className="block text-[11.5px] text-[#898892]">Cliente mudou o frasco? Recalcula o preço e avisa o Leandro.</span></span>
+      <ArrowRight className="w-4 h-4 text-[#898892]" />
+    </button>
+  )
+  const mudou = previa && Math.round(previa.total * 100) !== Math.round(previa.antes * 100)
+  return (
+    <div className="rounded-xl ds-borda px-3.5 py-3 space-y-3">
+      <p className="text-[12.5px] font-semibold text-[#191625]">Medidas da caixa (cm)</p>
+      <div className="grid grid-cols-3 gap-2">{campo("a", "Altura")}{campo("l", "Largura")}{campo("p", "Profundidade")}</div>
+      {erro && <p className="text-[12px] text-[#d33a3c]">{erro}</p>}
+      {previa && !mesmas && (
+        <p className={`text-[12.5px] rounded-lg px-3 py-2 ${mudou ? "bg-[#c57800]/[0.08] text-[#9a5e00]" : "bg-[#009351]/[0.07] text-[#0b7a45]"}`}>
+          {mudou
+            ? <>Folha {previa.folha}: o total passa de {brl(previa.antes)} para <strong>{brl(previa.total)}</strong>{previa.sinalPago ? <> (o sinal pago fica; o restante vira {brl(previa.restante)})</> : null}.</>
+            : <>Mesma folha {previa.folha}: o preço não muda ({brl(previa.total)}).</>}
+        </p>
+      )}
+      {previa && !mesmas && (
+        <label className="flex items-center gap-2 text-[12.5px] text-[#191625] cursor-pointer">
+          <input type="checkbox" checked={avisarCliente} onChange={e => setAvisarCliente(e.target.checked)} className="w-4 h-4 accent-[#8456e8]" />
+          Avisar o cliente {mudou ? "das medidas e do valor novo" : "das medidas novas"}
+        </label>
+      )}
+      <div className="flex gap-2 justify-end">
+        <Botao variante="fantasma" onClick={() => { setAberto(false); setM({ a: fmt(pedido.medidas.a), l: fmt(pedido.medidas.l), p: fmt(pedido.medidas.p) }) }}>Cancelar</Botao>
+        <Botao variante="primario" disabled={!previa || mesmas || salvando} onClick={() => void salvar()}>
+          {salvando ? "Salvando…" : pedido.status === "aguardando_sinal" ? "Salvar medidas" : "Salvar e avisar o Leandro"}
+        </Botao>
+      </div>
+      {pedido.versoes > 0 && <p className="text-[11px] text-[#898892]">A arte já feita volta para ajuste, com a anotação das medidas novas na página do Leandro.</p>}
     </div>
   )
 }

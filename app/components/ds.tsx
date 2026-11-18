@@ -104,8 +104,8 @@ export function TituloCartao({ titulo, sub, acao, icone }: {
   titulo: string; sub?: React.ReactNode; acao?: React.ReactNode; icone?: React.ReactNode
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 mb-4">
-      <div className="min-w-0">
+    <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 mb-4">
+      <div className="min-w-0 flex-1 basis-[220px]">
         <p className="text-[13.5px] font-semibold text-[#191625] flex items-center gap-2">
           {icone && <span className="text-[#8456e8] shrink-0">{icone}</span>}{titulo}
         </p>

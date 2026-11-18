@@ -173,3 +173,19 @@ describe("quantidade entre faixas", async () => {
   it("pediu 150: explica que pelo mesmo valor sai 200", () => expect(textoLinkPedido({ ...base, pedida: 150 }, "L")).toMatch(/Você pediu 150: .*200 caixinhas/))
   it("pediu exatamente a faixa: não fala de faixa", () => expect(textoLinkPedido({ ...base, pedida: undefined }, "L")).not.toMatch(/Você pediu/))
 })
+
+describe("mudar medidas depois de fechar", () => {
+  it("recalcula pela tabela, guarda as antigas e manda a arte feita para ajuste; depois da arte aprovada não muda", async () => {
+    const { trocarMedidas, pedidoDeTeste } = await import("@/app/lib/digital")
+    const base = { ...pedidoDeTeste([], "x@s.whatsapp.net", new Date("2026-11-18T12:00:00Z")), teste: false, status: "arte" as const, quantidade: 100, faixa: 100, sinal: 300, total: 620, artes: [{ url: "u", nome: "a.png", em: "2026-11-18" }], arteEnviadaEm: "2026-11-18" }
+    const r = trocarMedidas([], base as never, { a: 12, l: 5, p: 5 })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.pedido.medidas).toEqual({ a: 12, l: 5, p: 5 })
+    expect(r.pedido.medidasAntes?.[0].medidas).toEqual(base.medidas)
+    expect(r.pedido.sinal).toBe(300)               // sinal pago fica
+    expect(r.pedido.arteEnviadaEm).toBeUndefined() // arte volta para ajuste
+    expect(r.pedido.ajustes?.at(-1)?.texto).toMatch(/Medidas mudaram/)
+    expect(trocarMedidas([], { ...base, arteAprovadaEm: "2026-11-18" } as never, { a: 12, l: 5, p: 5 }).ok).toBe(false)
+  })
+})

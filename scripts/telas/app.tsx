@@ -214,6 +214,9 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     r.chapas[1].ocupacao[0].arteAprovadaEm = d(3)
     return new Response(JSON.stringify({ chapas: r.chapas, semDados: 0 }))
   }
+  if (u.startsWith("/api/digital") && o?.method === "POST" && String(o.body ?? "").includes('"acao":"medidas"')) {
+    return new Response(JSON.stringify({ ok: true, previa: { medidas: { a: 12, l: 4, p: 4 }, folha: "A3", total: 742.5, antes: 619.95, restante: 432.52, sinalPago: true } }))
+  }
   if (u.startsWith("/api/digital")) {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
     const extra = { linkDesigner: "https://app.enyla.com.br/d/DIG-0001?t=x&dz=y", arteAtual: null, versoes: 0, arteEnviadaEm: null, arteAprovadaEm: null, ajustes: [], designerAvisadoEm: null, villaEnviadoEm: null, frete: null, restante: null, restantePagoEm: null, entrega: null, acertadoEm: null }
@@ -536,7 +539,7 @@ function Telas() {
       </aside>
       <div style={{ flex: 1 }}>{pagina(<PedidosSiteView onVerChapas={() => {}} />)}</div>
     </div>
-    case "digitalpainel": case "digitalpainel-m": case "digitalpainel-aberto": case "digitalpainel-qtd": case "digitalpainel-prod": case "digitalpainel-acerto": return pagina(<DigitalPainelView onAbrirConversa={() => {}} />)
+    case "digitalpainel": case "digitalpainel-m": case "digitalpainel-aberto": case "digitalpainel-qtd": case "digitalpainel-prod": case "digitalpainel-acerto": case "digitalpainel-medidas": return pagina(<DigitalPainelView onAbrirConversa={() => {}} />)
     case "buscafaca": case "buscafaca-filtro": return pagina(<div className="max-w-[460px]"><Cartao><p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-2">Dieline Pacdora</p><BuscaFacaGuardada onEscolher={() => {}} />
       <div className="px-4 py-5 rounded-xl border-2 border-dashed border-[rgba(60,60,67,0.14)] text-center text-[12px] font-semibold text-[#8456e8]/80">Arraste ou clique: .dxf do Pacdora</div><div className="h-[300px]" /></Cartao></div>)
     case "biblioteca": case "biblioteca-m": case "biblioteca-faca": case "biblioteca-nomear": return <BibliotecaFacasView onUsar={() => {}} onRegistrarFaca={() => {}} fornecedores={["Corte Exemplo", "Acabamentos Modelo"]}

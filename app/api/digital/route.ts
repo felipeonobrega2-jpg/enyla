@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { lerPedido, gravarPedido, linkPedido, linkDesigner, mandarArte, mandarParaVilla, avisarDesigner, conversaDoPedido, ContatosDigital } from "@/app/lib/digitalServidor"
+import { lerPedido, gravarPedido, linkPedido, linkDesigner, mandarArte, mandarParaVilla, avisarDesigner, avisarDesignerMedidas, conversaDoPedido, ContatosDigital } from "@/app/lib/digitalServidor"
 import { seuNumero, enviar } from "@/app/lib/agenteAuto"
-import { pedidoDeTeste, textoLinkPedido, opcoesDoPedido, trocarQuantidade, aprovarNegociacao, recusarNegociacao, textoNegociacaoAprovada, textoNegociacaoRecusada } from "@/app/lib/digital"
+import { pedidoDeTeste, textoLinkPedido, opcoesDoPedido, trocarQuantidade, trocarMedidas, fmtMedidas, aprovarNegociacao, recusarNegociacao, textoNegociacaoAprovada, textoNegociacaoRecusada } from "@/app/lib/digital"
 import { supabase } from "@/app/lib/supabase"
 import { mudarStatus, trocarFrete, restanteUnico, arteAtual, acertoDaSemana, PedidoComBriefing, StatusDigital, DIAS_VALIDADE_DIGITAL } from "@/app/lib/digital"
 import { mudarConfig } from "@/app/lib/configAtomica"
@@ -35,7 +35,7 @@ export async function GET() {
 
 // POST { id, status } avança ou cancela · { id, acao } frete, arte, Villa, designer · { acertar: ids } · { contatos }
 export async function POST(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as { teste?: boolean; id?: string; status?: StatusDigital; acao?: string; frete?: number; quantidade?: number; enviar?: boolean; acertar?: string[]; contatos?: ContatosDigital; decisao?: "aprovar" | "recusar" | "eu"; total?: number }
+  const b = await req.json().catch(() => ({})) as { teste?: boolean; id?: string; status?: StatusDigital; acao?: string; frete?: number; quantidade?: number; enviar?: boolean; acertar?: string[]; contatos?: ContatosDigital; decisao?: "aprovar" | "recusar" | "eu"; total?: number; a?: number; l?: number; p?: number; salvar?: boolean; avisarCliente?: boolean }
 
   // Pedido de teste: na sua conversa com você mesmo, com o link do pedido
   if (b.teste) {
@@ -98,6 +98,31 @@ export async function POST(req: NextRequest) {
       if (!env.ids.length) return NextResponse.json({ erro: `A mensagem não saiu (${env.erro ?? "erro"}). Responda à mão.` }, { status: 502 })
     }
     return NextResponse.json({ ok: true })
+  }
+  // Medidas novas: "previa" só calcula; "salvar" grava, avisa o Leandro (se já passou do sinal) e, se pedir, o cliente
+  if (b.acao === "medidas") {
+    const m = { a: Number(b.a), l: Number(b.l), p: Number(b.p) }
+    const todos = (cfg.pedidosDigitais ?? []) as PedidoComBriefing[]
+    const t = trocarMedidas(todos, pedido, m, cfg.digital)
+    if (!t.ok) return NextResponse.json({ erro: t.motivo }, { status: 400 })
+    if (!b.salvar) return NextResponse.json({ ok: true, previa: { medidas: t.pedido.medidas, folha: t.pedido.folha, total: t.pedido.total, antes: t.antes.total, restante: t.pedido.total - (pedido.status === "aguardando_sinal" ? t.pedido.sinal : pedido.sinal), sinalPago: pedido.status !== "aguardando_sinal" } })
+    const novo = await gravarPedido(b.id, (p, ts) => { const r = trocarMedidas(ts, p, m, cfg.digital); return r.ok ? r.pedido as PedidoComBriefing : null })
+    if (!novo) return NextResponse.json({ erro: "Não deu para mudar as medidas agora." }, { status: 400 })
+    const leandro = novo.status === "aguardando_sinal" ? null : await avisarDesignerMedidas(cfg, novo, t.antes.medidas).catch(() => false)
+    let cliente: boolean | null = null
+    if (b.avisarCliente) {
+      const c = await conversaDoPedido(novo.jid)
+      const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+      const mudouValor = Math.round(novo.total * 100) !== Math.round(t.antes.total * 100)
+      const texto = novo.status === "aguardando_sinal"
+        ? textoLinkPedido(novo, linkPedido(novo.id))
+        : `Atualizei as medidas da sua caixa para *${fmtMedidas(novo.medidas)} cm* (altura × largura × profundidade).${mudouValor ? ` Com essa medida o pedido fica em *${brl(novo.total)}*: o sinal que você já pagou continua valendo e muda só o restante, que fica ${brl(novo.total - novo.sinal)}.` : " O valor não muda."}
+
+O pedido está aqui: ${linkPedido(novo.id)}`
+      const env = c ? await enviar(c, texto, undefined, { essencial: true }) : { ids: [] }
+      cliente = env.ids.length > 0
+    }
+    return NextResponse.json({ ok: true, leandro, cliente })
   }
   if (b.acao === "mandarArte") {
     const r = await mandarArte(b.id)

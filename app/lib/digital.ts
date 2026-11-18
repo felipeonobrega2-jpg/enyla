@@ -61,6 +61,7 @@ export type PedidoDigital = {
   statusEm?: string                                          // última mudança de status
   // Fases 4–6: arte, produção na Villa, restante (com frete) e acerto semanal
   artes?: Arte[]; arteEnviadaEm?: string; arteAprovadaEm?: string; ajustes?: Ajuste[]
+  medidasAntes?: { medidas: { a: number; l: number; p: number }; total: number; em: string }[]   // mudanças de medida (a mais recente por último)
   designerAvisadoEm?: string; villaEnviadoEm?: string
   frete?: number; entrega?: Entrega
   restante?: number; restantePagoEm?: string; pagamentoFinal?: { txId: string; valor: number; data: string; nome: string | null }
@@ -172,6 +173,29 @@ export function trocarQuantidade(pedidos: PedidoDigital[], p: PedidoDigital, q: 
   if (!x || x.faixa !== q) return null
   const abertos = pedidos.filter(o => o.id !== p.id && o.status === "aguardando_sinal").map(o => o.sinal)
   return { ...p, quantidade: q, faixa: q, custo: x.custo, arte: x.arte, margem: x.margem, total: x.total, sinal: sinalUnico(x.total, abertos) }
+}
+
+// Medidas novas (cliente fechou e mudou o frasco): recalcula pela tabela com a mesma quantidade. Vale até a arte ser
+// aprovada (depois vai para a produção). Sinal já pago fica; o valor novo muda o restante. Arte já feita volta para
+// ajuste com a anotação das medidas novas (o Leandro vê na página dele).
+export const fmtMedidas = (m: { a: number; l: number; p: number }) => [m.a, m.l, m.p].map(n => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })).join(" × ")
+export function trocarMedidas(pedidos: PedidoDigital[], p: PedidoDigital, m: { a: number; l: number; p: number }, regra: RegraDigital = REGRA_DIGITAL_PADRAO, agora = new Date()):
+  { ok: true; pedido: PedidoDigital; antes: { medidas: PedidoDigital["medidas"]; total: number } } | { ok: false; motivo: string } {
+  if (!["aguardando_sinal", "sinal_pago", "arte"].includes(p.status) || p.arteAprovadaEm) return { ok: false, motivo: "Depois da arte aprovada a caixa já foi para a produção: combine com a Villa." }
+  if (!(m.a > 0 && m.l > 0 && m.p > 0)) return { ok: false, motivo: "Informe altura, largura e profundidade." }
+  const cot = cotarDigital({ itens: [], produto: p.produto ?? "", volume_ml: null, caixa_cm: { altura: m.a, frente: m.l, lateral: m.p }, frasco_cm: null, quantidade: p.faixa ?? p.quantidade, tem_arte: null, resumo: "" }, regra)
+  if (!cot.ok) return { ok: false, motivo: cot.motivo }
+  const antes = { medidas: p.medidas, total: p.total }
+  const abertos = pedidos.filter(o => o.id !== p.id && o.status === "aguardando_sinal").map(o => o.sinal)
+  const nota = `Medidas mudaram: de ${fmtMedidas(p.medidas)} para ${fmtMedidas(cot.medidas)} cm (A × L × P)`
+  const temArte = (p.artes?.length ?? 0) > 0
+  return { ok: true, antes, pedido: {
+    ...p, medidas: cot.medidas, padrao: false, folha: cot.folha, folhaReal: cot.folhaReal,
+    custo: cot.custo, arte: cot.arte, margem: cot.margem, total: cot.total,
+    ...(p.status === "aguardando_sinal" ? { sinal: sinalUnico(cot.total, abertos) } : {}),
+    medidasAntes: [...(p.medidasAntes ?? []), { ...antes, em: agora.toISOString() }].slice(-10),
+    ...(temArte ? { ajustes: [...(p.ajustes ?? []), { texto: nota, em: agora.toISOString() }].slice(-20), arteEnviadaEm: undefined } : {}),
+  } }
 }
 
 // ── Sinal no extrato ─────────────────────────────────────────────────────────

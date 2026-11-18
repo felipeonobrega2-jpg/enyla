@@ -129,6 +129,20 @@ export async function avisarDesigner(cfg: CfgDigital, p: PedidoComBriefing) {
   return ok
 }
 
+// Medidas mudaram depois de fechar: o Leandro recebe as antigas e as novas (sem valores) e o link do pedido
+export async function avisarDesignerMedidas(cfg: CfgDigital, p: PedidoComBriefing, antes: { a: number; l: number; p: number }) {
+  if (p.teste) return true
+  const num = soDigitos(cfg.digitalContatos?.designer) || soDigitos(cfg.digitalContatos?.villa)
+  if (!num) return false
+  const { fmtMedidas } = await import("./digital")
+  const temArte = (p.artes?.length ?? 0) > 0
+  return paraNumero(num, `📐 *${p.id}* · as medidas da caixa mudaram
+Antes: ${fmtMedidas(antes)} cm
+Agora: *${fmtMedidas(p.medidas)} cm* (A × L × P)
+${temArte ? "Ajuste a faca e a arte e suba a versão nova pelo link:" : "Use estas medidas na faca e na arte:"}
+${linkDesigner(p.id)}`)
+}
+
 // Arte nova (designer pela página, ou você pelo painel): só guarda; mandar ao cliente é outro passo
 export async function guardarArte(id: string, file: File) {
   const path = `digital/${id}/arte-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-60)}`
