@@ -141,7 +141,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       opcoes: [{ quantidade: 20, total: 339.94, unit: 17 }, { quantidade: 50, total: 419.95, unit: 8.4 }, { quantidade: 100, total: 619.95, unit: 6.2 }],
       termos: termosDigital({ quantidade: 100, medidas: { a: 10, l: 5, p: 5 }, validadeDias: 15 }), termosVersao: "2026-11-12", termosAceitosEm: pago ? new Date().toISOString() : null, cartao: true }))
   }
-  if (u.startsWith("/api/whatsapp/agente")) return new Response(JSON.stringify({ auto: { ligado: true, pequenoParceiro: false, horario: { dias: [1, 2, 3, 4, 5], inicio: "08:00", fim: "20:00" } }, log: [
+  if (u.startsWith("/api/whatsapp/agente")) return new Response(JSON.stringify({ estilo: { n: 507, mediaChars: 46, pctEmoji: 2, emojis: ["😂", "🙏", "🫡"], aberturas: ["bom", "boa", "show", "fala", "beleza"], vocativos: [{ texto: "cara", pct: 3.5 }, { texto: "meu amigo", pct: 3 }, { texto: "mano", pct: 1.8 }, { texto: "irmão", pct: 1.5 }] }, auto: { ligado: true, pequenoParceiro: false, horario: { dias: [1, 2, 3, 4, 5], inicio: "08:00", fim: "20:00" } }, log: [
     { em: new Date().toISOString(), jid: "1@lid", nome: "Camilo", perfil: "pequeno", enviou: true, texto: "Pô, essa quantidade a gente não roda porque é offset…", motivo: "100 unidades no total" },
     { em: new Date().toISOString(), jid: "2@lid", nome: "Marcio", perfil: "icp", enviou: false, texto: "Show! Vou preparar o seu orçamento.", motivo: "precisa de você (decisao_sua)" },
     { em: new Date().toISOString(), jid: "3@lid", nome: "Bia", perfil: "indefinido", enviou: true, passo: "F1", texto: "Oi! Conseguiu ver a quantidade?", motivo: "F1: sem resposta" },

@@ -37,7 +37,8 @@ export async function GET() {
   const doRegistro = await lerRegistros()
   if (doRegistro) cfg.agenteLog = doRegistro
   const log = cfg.agenteLog ?? []
-  return NextResponse.json({ auto: cfg.agenteAuto ?? { ligado: false }, log: log.slice(0, 80), taxas: await taxas(log), conhecimento: cfg.conhecimentoAgente ?? [], aprendeuEm: cfg.agenteAprendeuEm ?? null })
+  return NextResponse.json({ auto: cfg.agenteAuto ?? { ligado: false }, log: log.slice(0, 80), taxas: await taxas(log), conhecimento: cfg.conhecimentoAgente ?? [], aprendeuEm: cfg.agenteAprendeuEm ?? null,
+    estilo: (() => { const e = (cfg as { estiloFelipe?: import("@/app/lib/estilo").EstiloFelipe }).estiloFelipe; return e ? { n: e.n, em: e.em, mediaChars: e.mediaChars, pctEmoji: e.pctEmoji, emojis: e.emojis, aberturas: e.aberturas, vocativos: e.vocativos ?? [] } : null })() })
 }
 
 export type Simulacao = { jid: string; nome: string | null; ultima: string; perfil: PerfilLead; quantidade: number | null; motivo: string; resposta: string; enviaria: boolean; trava: string | null }

@@ -25,3 +25,13 @@ it("mensagem rápida sem nome de pessoa não sobra vírgula", async () => {
   expect(await preencher("{{nome}}, conseguiu ver?", { contato: "Comercial", links: {} })).toBe("conseguiu ver?")
   expect(await preencher("Oi, {{nome}}! Tudo bem?", { contato: "Ana Paula", links: {} })).toBe("Oi, Ana! Tudo bem?")
 })
+
+it("mede como você chama a pessoa (meu amigo, irmão…) e põe no estilo da IA", async () => {
+  const { medirVocativos, textoEstilo } = await import("@/app/lib/estilo")
+  const ms = ["Perfeito, meu amigo", "Fala, irmão, tudo bem?", "Show", "Claro, meu amigo", "Quantas unidades?", "Bom dia", "Beleza", "Pode mandar", "Tá certo", "Fechado"]
+  const v = medirVocativos(ms)
+  expect(v[0]).toEqual({ texto: "meu amigo", pct: 20 })
+  expect(v.some(x => x.texto === "irmão")).toBe(true)
+  const t = textoEstilo({ em: "", n: 10, mediaChars: 12, pctEmoji: 0, pctExclamacao: 0, emojis: [], aberturas: ["show"], exemplos: [], vocativos: v })
+  expect(t).toMatch(/Como eu chamo a pessoa: "meu amigo" \(20% das mensagens\)/)
+})

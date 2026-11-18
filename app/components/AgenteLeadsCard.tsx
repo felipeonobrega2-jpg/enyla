@@ -23,13 +23,14 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
   const [vitrine, setVitrine] = useState<string | null>(null)
   const [vitrineSalva, setVitrineSalva] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [estilo, setEstilo] = useState<{ n: number; mediaChars: number; pctEmoji: number; emojis: string[]; aberturas: string[]; vocativos: { texto: string; pct: number }[] } | null>(null)
   const [conhecimento, setConhecimento] = useState<{ id: string; tema: string; texto: string; em: string }[]>([])
   const [aprendeuEm, setAprendeuEm] = useState<string | null>(null)
   const [aprendendo, setAprendendo] = useState<string | null>(null)
   const [wa, setWa] = useState<{ rodando: boolean; feitas: number; total: number; msg?: string } | null>(null)
 
   useEffect(() => {
-    fetch("/api/whatsapp/agente").then(r => r.json()).then(d => { setAuto(d.auto); setLog(d.log ?? []); setTaxas(d.taxas ?? []); setConhecimento(d.conhecimento ?? []); setAprendeuEm(d.aprendeuEm ?? null) }).catch(() => {})
+    fetch("/api/whatsapp/agente").then(r => r.json()).then(d => { setAuto(d.auto); setLog(d.log ?? []); setTaxas(d.taxas ?? []); setConhecimento(d.conhecimento ?? []); setAprendeuEm(d.aprendeuEm ?? null); setEstilo(d.estilo ?? null) }).catch(() => {})
   }, [])
 
   async function alternar() {
@@ -212,6 +213,14 @@ export default function AgenteLeadsCard({ filtro, onFiltro }: { filtro?: string;
             className="flex-1 h-9 rounded-lg px-3 text-[12.5px] text-[#191625] bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20 focus:border-[#8456e8] ds-borda" />
           <Botao disabled={!ensinar.trim()} onClick={() => void ensinarAgora()}>Ensinar</Botao>
         </div>
+        {estilo && (
+          <div className="mb-2.5 rounded-xl bg-[rgba(116,116,128,0.05)] px-3 py-2.5 text-[12px] text-[#191625] space-y-1">
+            <p className="text-[10.5px] font-bold uppercase tracking-wider text-[#898892]">Seu jeito de escrever (medido em {estilo.n} mensagens suas)</p>
+            {estilo.vocativos.length > 0 && <p><span className="text-[#5e5c68]">Como chama a pessoa:</span> {estilo.vocativos.map(v => `"${v.texto}" ${String(v.pct).replace(".", ",")}%`).join(" · ")}</p>}
+            {estilo.aberturas.length > 0 && <p><span className="text-[#5e5c68]">Começa com:</span> {estilo.aberturas.slice(0, 6).map(a => `"${a}"`).join(", ")}</p>}
+            <p><span className="text-[#5e5c68]">Mensagem média:</span> {estilo.mediaChars} letras · emoji em {estilo.pctEmoji}%{estilo.emojis.length ? ` (${estilo.emojis.slice(0, 4).join(" ")})` : ""}</p>
+          </div>
+        )}
         <div className="space-y-1 max-h-[280px] overflow-y-auto">
           {[...conhecimento].reverse().map(i => (
             <div key={i.id} className="flex items-start gap-2 text-[12px] group">

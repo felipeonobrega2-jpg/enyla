@@ -5,6 +5,7 @@ export type EstiloFelipe = {
   em: string; n: number
   mediaChars: number; pctEmoji: number; pctExclamacao: number
   emojis: string[]; aberturas: string[]; exemplos: string[]
+  vocativos?: { texto: string; pct: number }[]   // como você chama a pessoa ("meu amigo", "irmão"…), em % das mensagens
   // O que o agente já mandou e o lead respondeu (a IA aprimora em cima do que funciona)
   taxaAgente?: number; nAgente?: number; funcionou?: string[]
 }
@@ -23,6 +24,19 @@ const NAO_ABERTURA = new Set(["o", "a", "os", "as", "e", "de", "da", "do", "que"
 const ROBO = /como posso (te |lhe )?ajudar|fico (à|a) disposi|estou (aqui )?(à|a) disposi|qualquer d[uú]vida,? estou|agradecemos o (seu )?contato|seja bem[- ]vind|prezad[oa]|atenciosamente|sistema|autom[aá]tic|\bIA\b|rob[oô]/i
 const limpoParaExemplo = (t: string) => t.length >= 12 && t.length <= 160 && !ruim.test(t) && !ROBO.test(t) && !MODELO.test(t)
 
+// Como você chama a pessoa: o seu jeito (a IA usa na mesma frequência, alternando com o nome)
+const VOCATIVOS: [string, RegExp][] = [
+  ["meu amigo", /\bmeu amigo\b/i], ["minha amiga", /\bminha amiga\b/i], ["meu irmão", /\bmeu irm[aã]o\b/i], ["irmão", /(?<!meu )\birm[aã]o\b/i],
+  ["meu querido", /\bmeu querido\b/i], ["minha querida", /\bminha querida\b/i], ["mano", /\bmano\b/i], ["cara", /,\s*cara\b|\bcara,/i],
+  ["meu nobre", /\bmeu nobre\b/i], ["chefe", /\b(meu )?chefe\b/i], ["amigão", /\bamig[aã]o\b/i], ["campeão", /\bcampe[aã]o\b/i], ["primo", /\bprimo\b/i],
+]
+export function medirVocativos(textos: string[]): { texto: string; pct: number }[] {
+  const n = textos.length
+  if (!n) return []
+  return VOCATIVOS.map(([texto, re]) => ({ texto, pct: Math.round(textos.filter(t => re.test(t)).length / n * 1000) / 10 }))
+    .filter(v => v.pct >= 0.5).sort((a, b) => b.pct - a.pct).slice(0, 6)
+}
+
 export function medirEstilo(textos: string[], agora = new Date(), paraExemplos?: string[], doAgente: { texto: string; respondeu: boolean }[] = []): EstiloFelipe | null {
   const ms = textos.map(t => (t ?? "").trim()).filter(t => t && !MODELO.test(t))
   if (ms.length < 30) return null
@@ -38,13 +52,16 @@ export function medirEstilo(textos: string[], agora = new Date(), paraExemplos?:
     if (/^[a-zà-ÿ]{2,}$/.test(ab) && !NAO_ABERTURA.has(ab)) contAb[ab] = (contAb[ab] ?? 0) + 1
   }
   const fonte = (paraExemplos ?? ms).map(t => (t ?? "").trim()).filter(t => t && !MODELO.test(t))
-  const exemplos = [...new Set(fonte.filter(t => t.length >= 12 && t.length <= 140 && !ruim.test(t)))].slice(-14)
+  // Exemplos: alguns com o seu jeito de chamar a pessoa ("Perfeito, meu amigo"), senão a IA não vê isso nos exemplos
+  const bons = [...new Set(fonte.filter(t => t.length >= 12 && t.length <= 140 && !ruim.test(t)))]
+  const comVocativo = bons.filter(t => VOCATIVOS.some(([, re]) => re.test(t))).slice(-4)
+  const exemplos = [...comVocativo, ...bons.filter(t => !comVocativo.includes(t)).slice(-(14 - comVocativo.length))]
   return {
     em: agora.toISOString(), n: ms.length,
     mediaChars: Math.round(chars / ms.length), pctEmoji: pct(comEmo, ms.length), pctExclamacao: pct(comExcl, ms.length),
     emojis: Object.entries(contEmo).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k]) => k),
     aberturas: Object.entries(contAb).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k]) => k),
-    exemplos,
+    exemplos, vocativos: medirVocativos(ms),
     ...(doAgente.length >= 20 ? {
       nAgente: doAgente.length,
       taxaAgente: pct(doAgente.filter(x => x.respondeu).length, doAgente.length),
@@ -58,7 +75,8 @@ export function textoEstilo(e: EstiloFelipe): string {
 - Tamanho médio: ${e.mediaChars} caracteres por mensagem. Curto e direto.
 - Ponto de exclamação em só ${e.pctExclamacao}% das mensagens. Não abra com "Perfeito!", "Show!", "Fechou!": escreva sem exclamação ("Show", "Fechou", "Blz").
 - Emoji em ${e.pctEmoji}% das mensagens (fora a saudação pronta)${e.emojis.length ? `; os que eu uso: ${e.emojis.slice(0, 4).join(" ")}` : ""}. Não use 🙌, ✨ nem emoji de efeito.
-- Costumo começar com: ${e.aberturas.map(a => `"${a}"`).join(", ")}.
+- Costumo começar com: ${e.aberturas.map(a => `"${a}"`).join(", ")}.${e.vocativos?.length ? `
+- Como eu chamo a pessoa: ${e.vocativos.map(v => `"${v.texto}" (${String(v.pct).replace(".", ",")}% das mensagens)`).join(", ")}. É o meu jeito: use na mesma frequência, alternando com o nome dela (nunca os dois em toda mensagem).` : ""}
 - Exemplos reais meus (o tom, não o conteúdo):
 ${e.exemplos.map(x => `  · ${x.replace(/\n/g, " / ")}`).join("\n")}${e.funcionou?.length ? `
 - Mensagens que você (agente) já mandou e o lead RESPONDEU (${e.taxaAgente}% das ${e.nAgente} últimas tiveram resposta). Pode seguir esse caminho e melhorar em cima, variando as palavras:
