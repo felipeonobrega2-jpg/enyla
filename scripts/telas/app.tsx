@@ -710,7 +710,7 @@ function Telas() {
         itens={[]} propostas={[]} kanban={dados.kanban} lancamentos={lancs} onClose={() => {}} onReplicar={() => {}} onWhatsApp={() => {}} onSave={() => {}}
         origem={origemDoCliente("Ana Cosméticos", cfg.origensClientes, [])}
         onSalvarOrigem={o => setCfg({ ...cfg, origensClientes: o ? { "ana cosmeticos": o } : {} })} />
-    case "escritorio": case "escritorio-m": case "escritorio-sel": return <EscritorioView />
+    case "escritorio": case "escritorio-m": case "escritorio-sel": return <div style={{ height: "100vh" }}><EscritorioView /></div>
     case "ideias": return <div style={{ height: "100vh" }}><IdeiasView config={cfg} onSalvar={setCfg} /></div>
     case "precofecha": {
       const calc = calcular(dados.historico[3].form, cfg)!
