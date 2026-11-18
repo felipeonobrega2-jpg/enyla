@@ -52,7 +52,11 @@ const NOMES = new Set([
   "veronica vicente victor vilma vinicius violeta virginia vitor vitoria vivian viviane wagner waldir walter",
   "wanda wanderson washington wellington wesley will william willian wilson xavier yara yasmin yuri zelia zilda",
   "zuleica",
-].join(" ").split(" "))
+  // Apelidos: chamar assim dá mais proximidade
+  "cadu dudu duda juju gabi bia nanda rafa fer fe lu malu mari carol rê re pati paty tati thati dani lele lili tete",
+  "zeca zé ze chico tonho toninho tião juca guto beto betinho caco kiko nando nandinho fefe dedé dede bel belinha",
+  "manu nina nana lulu jeh je cris kaká kaka vivi xande alê ale tuca tuti pedrinho joãozinho joaozinho ju jú",
+].join(" ").split(" ").map(n => n.normalize("NFD").replace(/[\u0300-\u036f]/g, "")))
 
 const EMPRESA = /\b(ltda|eireli|mei|s\/?a|comercial|com[eé]rcio|loja|store|shop|oficial|official|embalage?ns?|cosm[eé]ticos?|perfumaria|perfumes?|ess[eê]ncias?|fragr[aâ]ncias?|aromas?|distribuidora|atacado|varejo|vendas|gr[aá]fica|digital|studio|est[uú]dio|sal[aã]o|gest[aã]o|alimentos|nutri|nutre|[aá]udio|musical|sacolas|marketing|empresa|ind[uú]stria|f[aá]brica|import|export|brasil|grupo|servi[cç]os|solu[cç][oõ]es|consultoria|ateli[eê]|boutique|modas?|beauty|cosmetics|presentes|doces|chocolates?|caf[eé]|restaurante|delivery|express|center|clube?|agro|farma|cl[ií]nica)\b/i
 
@@ -62,7 +66,8 @@ export function nomeParaChamar(nome: string | null | undefined): string {
   const bruto = String(nome ?? "").trim()
   if (!bruto || /[@&\d]|https?:|www\./i.test(bruto) || EMPRESA.test(semAcento(bruto))) return ""
   // Tira emoji e símbolo: "Jimmy ✌🏻", "Ana 🌸" viram "Jimmy", "Ana"
-  const limpo = bruto.replace(/[^\p{L}\s'-]/gu, " ").replace(/\s+/g, " ").trim()
+  // "EdsonLima" (nome colado) vira "Edson Lima"
+  const limpo = bruto.replace(/[^\p{L}\s'-]/gu, " ").replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2").replace(/\s+/g, " ").trim()
   const palavras = limpo.split(" ").filter(Boolean)
   if (!palavras.length || palavras.length > 5) return ""
   const primeiro = palavras[0]

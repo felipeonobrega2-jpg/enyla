@@ -5,7 +5,9 @@ describe("chamar pelo nome só quando é nome de gente", () => {
   it("nomes de pessoa", () => {
     expect(nomeParaChamar("Nubia Lima")).toBe("Nubia")
     expect(nomeParaChamar("Jimmy ✌🏻")).toBe("Jimmy")
-    expect(nomeParaChamar("~ Cadu")).toBe("")   // apelido fora da lista: sem nome é o seguro
+    expect(nomeParaChamar("~ Cadu")).toBe("Cadu")   // apelido: mais proximidade
+    expect(nomeParaChamar("EdsonLima")).toBe("Edson")   // nome colado
+    expect(nomeParaChamar("Dudu Santos")).toBe("Dudu")
     expect(nomeParaChamar("MARIA")).toBe("Maria")
     expect(nomeParaChamar("joão pedro")).toBe("João")
     expect(nomeParaChamar("Eraldo Junior")).toBe("Eraldo")
