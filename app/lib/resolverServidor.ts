@@ -7,7 +7,7 @@ import type { AprovacaoOnline } from "./aprovacao"
 import type { Passos } from "./hoje"
 
 export type ItemResolver = {
-  tipo: "proposta" | "pagamento" | "atrasado" | "sistema"
+  tipo: "proposta" | "pagamento" | "atrasado" | "sistema" | "digital"
   titulo: string            // "Márcio Santana · ORC-2026-283"
   detalhe: string           // "abriu a proposta 3× · sem retomada há 2 dias"
   valor: number | null
@@ -46,7 +46,30 @@ export async function ligarConversasAosOrcamentos(diasAtras = 45): Promise<numbe
   return ligadas
 }
 
-export async function paraResolver(cfg: { visitasProposta?: Record<string, { vezes: number; ultima: string }>; aprovacoesOnline?: AprovacaoOnline[]; proximosPassos?: Passos; agenteSemCreditoEm?: string; whatsappConexao?: { estado?: string; em?: string } }, agora = Date.now()): Promise<ItemResolver[]> {
+// Digital parado além do prazo de cada etapa (dono entre parênteses no texto)
+export const PRAZO_DIGITAL = { arteFazer: 2, arteCliente: 2, producao: 7 }   // dias
+type PedDig = { id: string; nome?: string | null; jid: string; total: number; status: string; statusEm?: string; sinalPagoEm?: string; arteEnviadaEm?: string; arteAprovadaEm?: string; artes?: unknown[]; teste?: boolean; restante?: number | null; restantePagoEm?: string }
+export function digitalParado(pedidos: PedDig[], agora = Date.now()): ItemResolver[] {
+  const out: ItemResolver[] = []
+  for (const p of pedidos) {
+    if (p.teste) continue
+    const base = { valor: p.total, jid: p.jid, numero: p.id, titulo: `${p.nome || "Cliente"} · ${p.id}` }
+    const desde = (iso?: string) => iso ? dias(iso, agora) : 0
+    if (p.status === "sinal_pago" || (p.status === "arte" && !p.arteEnviadaEm)) {
+      const d = desde(p.statusEm ?? p.sinalPagoEm)
+      if (d >= PRAZO_DIGITAL.arteFazer) out.push({ ...base, tipo: "digital", detalhe: `sinal pago há ${d} dias e a arte ainda não foi para o cliente (Leandro)`, desde: p.statusEm ?? p.sinalPagoEm ?? null, nivel: d >= 4 ? "perigo" : "alerta" })
+    } else if (p.status === "arte" && p.arteEnviadaEm && !p.arteAprovadaEm) {
+      const d = desde(p.arteEnviadaEm)
+      if (d >= PRAZO_DIGITAL.arteCliente) out.push({ ...base, tipo: "digital", detalhe: `arte com o cliente há ${d} dias sem aprovar: dê um toque`, desde: p.arteEnviadaEm, nivel: "info" })
+    } else if (p.status === "producao") {
+      const d = desde(p.arteAprovadaEm ?? p.statusEm)
+      if (d >= PRAZO_DIGITAL.producao) out.push({ ...base, tipo: "digital", detalhe: `em produção há ${d} dias (Villa): confira quando sai`, desde: p.arteAprovadaEm ?? p.statusEm ?? null, nivel: "alerta" })
+    }
+  }
+  return out
+}
+
+export async function paraResolver(cfg: { pedidosDigitais?: PedDig[]; visitasProposta?: Record<string, { vezes: number; ultima: string }>; aprovacoesOnline?: AprovacaoOnline[]; proximosPassos?: Passos; agenteSemCreditoEm?: string; whatsappConexao?: { estado?: string; em?: string } }, agora = Date.now()): Promise<ItemResolver[]> {
   const itens: ItemResolver[] = []
   const hoje = new Date(agora - 3 * 3600_000).toISOString().slice(0, 10)
 
@@ -103,6 +126,7 @@ export async function paraResolver(cfg: { visitasProposta?: Record<string, { vez
     itens.push({ tipo: "atrasado", titulo: `${k.nomeCliente} · ${k.numero}`, detalhe: `entrega era ${String(k.dataEntregaPrevista).split("-").reverse().slice(0, 2).join("/")} (${d} ${d === 1 ? "dia" : "dias"} de atraso): avise o cliente e ajuste a data`, valor: Number(k.preco) || null, jid: cvAt?.find(c => c.kanban_card_id === k.id)?.jid ?? null, numero: k.numero, desde: k.dataEntregaPrevista, nivel: d >= 3 ? "perigo" : "alerta" })
   }
 
-  const ordem = { sistema: 0, pagamento: 1, atrasado: 2, proposta: 3 }
+  itens.push(...digitalParado(cfg.pedidosDigitais ?? [], agora))
+  const ordem = { sistema: 0, pagamento: 1, atrasado: 2, digital: 3, proposta: 4 }
   return itens.sort((a, b) => ordem[a.tipo] - ordem[b.tipo] || (b.valor ?? 0) - (a.valor ?? 0))
 }
