@@ -11,6 +11,8 @@ export const maxDuration = 60
 // Varredura do digital (rota do sistema, com login ou com o segredo do webhook):
 //   { acao: "orcar", jid }       → monta o orçamento digital com o que a conversa já tem e manda (como o agente faria)
 //   { acao: "reenviar", jid }    → manda de novo, com os valores na mensagem, o orçamento esperando o sinal
+//   { acao: "responder", jid }   → o agente responde agora a última mensagem do lead que ficou sem resposta (com
+//                                  "desculpa a demora"), com as travas de sempre
 // Sai pelo agente: a mensagem conta como dele e ele segue atendendo a conversa.
 async function autorizado(req: NextRequest) {
   const segredo = process.env.WHATSAPP_WEBHOOK_SECRET
@@ -21,7 +23,15 @@ async function autorizado(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!await autorizado(req)) return NextResponse.json({ erro: "não autorizado" }, { status: 401 })
   const { acao, jid } = await req.json().catch(() => ({})) as { acao?: string; jid?: string }
-  if (!jid || !["orcar", "reenviar"].includes(acao ?? "")) return NextResponse.json({ erro: "acao (orcar|reenviar) e jid" }, { status: 400 })
+  if (!jid || !["orcar", "reenviar", "responder"].includes(acao ?? "")) return NextResponse.json({ erro: "acao (orcar|reenviar|responder) e jid" }, { status: 400 })
+  if (acao === "responder") {
+    const { data: ult } = await supabase.from("whatsapp_mensagens").select("id, from_me").eq("jid", jid).order("criado_em", { ascending: false }).limit(1).maybeSingle()
+    if (!ult || ult.from_me) return NextResponse.json({ ok: true, enviou: false, motivo: "a última mensagem já é nossa" })
+    const { responderSozinho } = await import("@/app/lib/agenteAuto")
+    await responderSozinho(ult.id, { atrasada: true })
+    const { data: depois } = await supabase.from("whatsapp_mensagens").select("from_me, corpo").eq("jid", jid).order("criado_em", { ascending: false }).limit(1).maybeSingle()
+    return NextResponse.json({ ok: true, enviou: !!depois?.from_me, texto: depois?.from_me ? String(depois.corpo ?? "").slice(0, 160) : null })
+  }
   const { data: conv } = await supabase.from("whatsapp_conversas").select("jid, nome, telefone, etiquetas, status_lead, proxima_acao").eq("jid", jid).maybeSingle()
   if (!conv) return NextResponse.json({ erro: "conversa não encontrada" }, { status: 404 })
   const c: Conversa = { jid: conv.jid, nome: conv.nome, telefone: conv.telefone, etiquetas: conv.etiquetas, status_lead: conv.status_lead }

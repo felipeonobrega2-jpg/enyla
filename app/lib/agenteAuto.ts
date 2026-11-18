@@ -363,16 +363,29 @@ async function reservarMensagem(msgId: string): Promise<boolean> {
 }
 
 // 2ª etapa: mais um tempo (como quem viu e vai responder), pensa, lê e digita
-export async function responderSozinho(msgId: string) {
+// "Desculpa a demora" antes da primeira frase (sem repetir se a IA já pediu desculpa)
+export function comDesculpa(texto: string): string {
+  const t = texto.trim()
+  if (/desculp|perd[aã]o pela demora/i.test(t.slice(0, 80))) return t
+  const sem = t.replace(/^(oi|ol[aá]|opa|bom dia|boa tarde|boa noite)[^\n.!?]*[,.!?]?\s*/i, "")
+  const saudacao = t.length - sem.length > 0 ? t.slice(0, t.length - sem.length).trim().replace(/[,.]$/, "!") + " " : ""
+  const resto = sem ? sem[0].toUpperCase() + sem.slice(1) : ""
+  return `${saudacao}Desculpa a demora pra te responder! ${resto}`.trim()
+}
+
+// atrasada: resposta que não saiu na hora (ex.: IA sem crédito). Sai já, sem a espera, mesmo que a mensagem já
+// tenha sido "reservada" pela tentativa que falhou, e começa pedindo desculpa pela demora. As travas são as de sempre
+// (cliente antigo, conversa sua, MQL, limites): só muda o tempo e a primeira frase.
+export async function responderSozinho(msgId: string, opts: { atrasada?: boolean } = {}) {
   const cfg = await lerCfg()
   const auto = cfg.agenteAuto
   if (!auto?.ligado || !dentroDoHorario(auto.horario)) return
   const inicio = Date.now()
-  await espera(10, 25)
+  if (!opts.atrasada) await espera(10, 25)
   const jid = await aindaEhAUltima(msgId)
   if (!jid) return
   // Cada mensagem do lead é respondida uma vez só (dois disparos ao mesmo tempo: só um passa)
-  if (!await reservarMensagem(msgId)) return
+  if (!await reservarMensagem(msgId) && !opts.atrasada) return
 
   // Filtro barato antes de chamar a IA: só contato novo (fornecedor e cliente antigo nunca)
   const primeira = await primeiraDa(jid)
@@ -468,6 +481,7 @@ export async function responderSozinho(msgId: string) {
   }
   // Emoji só do jeito que você usa (👋 na primeira mensagem, risada quando o lead ri)
   if (!novoPedido) r.resposta = limparEmojis(r.resposta, emojiCtx(conversa.mensagens, cfg))
+  if (opts.atrasada && r.resposta.trim()) r.resposta = comDesculpa(r.resposta)
   const ctx = contexto(cfg, log, jid)
   for (const p of novoGrupo ?? (novoPedido ? [novoPedido] : [])) ctx.precosDoFiltro.push(...valoresDoPedido(p))
   if (digitalPequeno) {
