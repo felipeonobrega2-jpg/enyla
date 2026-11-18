@@ -363,6 +363,19 @@ async function reservarMensagem(msgId: string): Promise<boolean> {
 }
 
 // 2ª etapa: mais um tempo (como quem viu e vai responder), pensa, lê e digita
+// IA fora: "já te respondo" uma vez (se nada nosso saiu nos últimos 10 min) e a mensagem na fila respostasPendentes
+export const TEXTO_SEM_IA = "Oi, tudo bem? Recebi sua mensagem! Já te respondo com os detalhes."
+async function segurarSemIA(c: Conversa, msgId: string) {
+  const { data: nossas } = await supabase.from("whatsapp_mensagens").select("id").eq("jid", c.jid).eq("from_me", true).gte("criado_em", new Date(Date.now() - 10 * 60_000).toISOString()).limit(1)
+  let ja = false
+  await mudarConfig((d: Record<string, unknown> & { respostasPendentes?: { msgId: string; jid: string; em: string; segurou?: boolean }[] }) => {
+    const fila = d.respostasPendentes ?? []
+    ja = fila.some(f => f.jid === c.jid && f.segurou)
+    return { respostasPendentes: [...fila.filter(f => f.jid !== c.jid), { msgId, jid: c.jid, em: new Date().toISOString(), segurou: ja || !nossas?.length }].slice(-150) }
+  })
+  if (!ja && !nossas?.length) await enviar(c, TEXTO_SEM_IA).catch(() => null)
+}
+
 // "Desculpa a demora" antes da primeira frase (sem repetir se a IA já pediu desculpa)
 export function comDesculpa(texto: string): string {
   const t = texto.trim()
@@ -413,7 +426,12 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
 
   const a = await atender(jid, { cfg, automatico: true }).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
   if (!a.ok) {
-    if (ehSemCredito(a.erro)) await avisarSemCredito(cfg)
+    if (ehSemCredito(a.erro)) {
+      await avisarSemCredito(cfg)
+      // O lead não fica no vácuo: um "já te respondo" (sem IA), e a mensagem entra na fila para o vigia responder
+      // de verdade assim que a IA voltar
+      if (!opts.atrasada) await segurarSemIA(c, msgId).catch(() => null)
+    }
     return registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: "indefinido", enviou: false, texto: "", motivo: ehSemCredito(a.erro) ? "IA sem crédito na Anthropic" : `IA falhou: ${a.erro.slice(0, 120)}` })
   }
   const { r, conversa } = a
