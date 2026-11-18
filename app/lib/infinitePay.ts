@@ -1,6 +1,6 @@
 // InfinitePay (Checkout Integrado): cartão em até 12x e Pix, com o recebimento da sua conta InfinitePay.
-// Na Vercel: INFINITEPAY_HANDLE (sem o "$") e, opcional, INFINITEPAY_API_KEY (inchk_…, só no servidor), que liga
-// o link de pagamento único (não deixa pagar duas vezes) com validade de 24 h.
+// Na Vercel: INFINITEPAY_HANDLE (sem o "$") e INFINITEPAY_API_KEY (inchk_…, só no servidor), que liga as opções:
+// link de pagamento único (não deixa pagar duas vezes), validade de 24 h, só cartão e sem pedir endereço.
 // O checkout é a página da InfinitePay (não pode ser embutida): o cliente vai, paga e volta para a aprovação.
 // Nem o webhook nem a volta são assinados: o pagamento só vale depois de confirmado no payment_check.
 import { LINK_SISTEMA } from "./notificar"
@@ -23,7 +23,8 @@ export async function criarLinkInfinitePay(a: { numero: string; nsu: string; val
       items: [{ description: a.descricao.slice(0, 120), price: Math.round(a.valor * 100), quantity: 1 }],
       redirect_url: a.voltarPara, webhook_url: `${LINK_SISTEMA}/api/infinitepay/webhook`,
       ...(a.cliente && Object.values(a.cliente).some(Boolean) ? { customer: a.cliente } : {}),
-      ...(chave ? { options: { single_payment: true, valid_until: new Date(Date.now() + 24 * 3600_000).toISOString() } } : {}),
+      // Só cartão (o Pix é o nosso, na página de aprovação) e sem pedir endereço de entrega (a entrega é combinada com a Enyla)
+      ...(chave ? { options: { single_payment: true, valid_until: new Date(Date.now() + 24 * 3600_000).toISOString(), payment_methods_enabled: ["credit_card"], require_delivery_address: false } } : {}),
     }),
   }).catch(() => null)
   const corpo = r ? await r.json().catch(() => null) as Record<string, unknown> | null : null

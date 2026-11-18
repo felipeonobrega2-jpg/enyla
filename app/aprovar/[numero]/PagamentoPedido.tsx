@@ -91,8 +91,8 @@ export function PosAprovacao({ numero, token, primeiroNome, quantidade, total, s
               {abrindo ? <><Loader2 className="w-5 h-5 animate-spin" /> Abrindo…</> : <>Continuar para o cartão <ChevronRight className="w-5 h-5" /></>}
             </button>
           )}
-          <p className="text-[11.5px] text-[#8E8E93] text-center flex items-center justify-center gap-1.5">
-            <Lock className="w-3 h-3" />{modo === "cartao" ? "Ambiente seguro da InfinitePay. Você volta para cá depois de pagar." : `Sinal de ${sinalPct}% · a produção começa assim que o pagamento é confirmado.`}
+          <p className="text-[11.5px] text-[#8E8E93] text-center leading-snug px-2">
+            <Lock className="w-3 h-3 inline -mt-0.5 mr-1" />{modo === "cartao" ? "Ambiente seguro da InfinitePay. Você volta para cá depois de pagar." : `Sinal de ${sinalPct}% · a produção começa assim que o pagamento é confirmado.`}
           </p>
         </div>
       )}

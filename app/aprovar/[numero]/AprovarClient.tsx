@@ -108,7 +108,7 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
 
             {proposta.caixa && (
               <div className="bg-white rounded-2xl pt-4 pb-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-                <Caixa3D {...proposta.caixa} tamanho={150} />
+                <Caixa3D {...proposta.caixa} tamanho={125} />
                 <p className="text-center text-[11px] text-[#8E8E93] -mt-2">
                   {[proposta.caixa.largura, proposta.caixa.altura, proposta.caixa.profundidade].map(n => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })).join(" × ")} cm · arraste para girar
                   {!proposta.caixa.arteUrl && " · a arte entra depois da aprovação"}
@@ -183,7 +183,7 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
                 {enviando ? "Aprovando…" : <><Check className="w-5 h-5" /> Aprovar pedido</>}
               </button>
               {proposta.entregaSeAprovarHoje && (
-                <p className="text-[12.5px] text-[#191625] text-center flex items-center justify-center gap-1.5"><CalendarCheck className="w-4 h-4 text-[#8456e8]" />Aprovando hoje, entrega prevista até <strong>{dataBR(proposta.entregaSeAprovarHoje)}</strong></p>
+                <p className="text-[12.5px] text-[#191625] text-center leading-snug"><CalendarCheck className="w-4 h-4 text-[#8456e8] inline -mt-0.5 mr-1" />Aprovando hoje, entrega prevista até <strong>{dataBR(proposta.entregaSeAprovarHoje)}</strong></p>
               )}
               {proposta.validaAte && <p className="text-[12px] text-[#8E8E93] text-center">Proposta válida até {dataBR(proposta.validaAte)}</p>}
             </div>
