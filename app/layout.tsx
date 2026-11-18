@@ -32,7 +32,7 @@ export default function RootLayout({
     >
       <head>
         {/* Anti-flash: apply dark class before first paint. Páginas do cliente (links enviados) ficam sempre claras. */}
-        <script dangerouslySetInnerHTML={{ __html: `(function(){if(/^\\/(aprovar|d|c|pix|track|pedido|box-preview)(\\/|$)/.test(location.pathname))return;var t=localStorage.getItem('theme')||'system';if(t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}})();` }} />
+        <script dangerouslySetInnerHTML={{ __html: `(function(){if(/^\\/(aprovar|d|c|pix|track|pedido|box-preview|parceiros)(\\/|$)/.test(location.pathname))return;var t=localStorage.getItem('theme')||'system';if(t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}})();` }} />
       </head>
       <body suppressHydrationWarning className="min-h-full flex flex-col">
         <ThemeProvider>{children}</ThemeProvider>

@@ -22,6 +22,7 @@ import { RelatoriosView } from "@/app/components/RelatoriosView"
 import { IdeiasView } from "@/app/components/IdeiasView"
 import { EscritorioView } from "@/app/components/EscritorioView"
 import { AuditoriaView } from "@/app/components/AuditoriaView"
+import ParceirosForm from "@/app/parceiros/ParceirosForm"
 import PortalClient from "@/app/c/[token]/PortalClient"
 import { ClientePerfilModal } from "@/app/components/ClientePerfilModal"
 import { dados, config } from "./dados"
@@ -88,6 +89,13 @@ if (tela === "compositor-mic" && navigator.mediaDevices) navigator.mediaDevices.
 
 // O celular busca /api/data e /api/aprovacao/link: responde com os dados fictícios
 const orig = window.fetch
+{
+  const t = new URLSearchParams(location.search).get("tela") ?? ""
+  const passo = { "parceiro-servicos": 2, "parceiro-detalhes": 3, "parceiro-final": 4 }[t]
+  if (passo != null) localStorage.setItem("parceiros:rascunho", JSON.stringify({ passo, d: { tipoDocumento: "cnpj", nomeFantasia: "Gráfica Exemplo", documento: "11222333000181", cidade: "São Paulo", uf: "SP", responsavel: "Marcos Teste", whatsapp: "11988887777", email: "contato@exemplo.com.br",
+    servicos: [{ id: "corteVinco", cobranca: "milheiro", valor: 38, prazoDias: 3, prazoVaria: false }, { id: "colagem", cobranca: null, prazoDias: null, prazoVaria: true }, { id: "hotStamping", cobranca: "acertoMilheiro", acerto: 120, valor: 90, prazoDias: 4, prazoVaria: false }] } }))
+  else localStorage.removeItem("parceiros:rascunho")
+}
 window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
   const u = String(url)
   if (u.startsWith("/api/ia/licoes")) return new Response(JSON.stringify({ licoes: [
@@ -510,6 +518,7 @@ function Telas() {
     case "config": return <ThemeProvider><div style={{ height: "100vh" }}><ConfigView config={cfg} onSave={setCfg} onExportar={() => {}} onImportar={() => {}} clientes={["Cliente Relacionamento", "Outro Cliente"]} /></div></ThemeProvider>
     case "lancamento": return <ModalLancamento inicial={{ tipo: "despesa", descricao: "Impressão + Papel", valor: 3100 }} kanban={dados.kanban} onSave={() => {}} onClose={() => {}} />
     case "lancamento-criar": case "lancamento-sub": return <ModalLancamento inicial={{ tipo: "despesa", descricao: "Pix Papelaria", valor: 350, categoria: tela === "lancamento-sub" ? "materiais" : undefined }} kanban={dados.kanban} categoriasDespesa={[{ id: "materiais", nome: "Materiais", subcategorias: ["Papel", "Tinta"] }, { id: "transporte", nome: "Transporte", subcategorias: ["Lalamove"] }, { id: "marketing", nome: "Marketing" }]} onSave={() => {}} onClose={() => {}} />
+    case "parceiro-form": case "parceiro-form-d": case "parceiro-servicos": case "parceiro-detalhes": case "parceiro-final": return <ParceirosForm whatsappGerente="5511900000000" />
     case "parceiros": case "parceiros-modal": {
       const parc = [{ id: "p1", nome: "Jeferson Vidros", categoria: "Vidros", comissaoDefault: 3, criadoEm: "" }, { id: "p2", nome: "Marcelino", categoria: "Impressão", comissaoDefault: 0, criadoEm: "" }, { id: "p3", nome: "Denis Essências", categoria: "Essências", comissaoDefault: 0, criadoEm: "" }]
       const negs = [

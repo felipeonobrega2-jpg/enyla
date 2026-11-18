@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 
 // Páginas que o cliente abre pelo link (aprovação, pedido digital, portal, Pix, rastreio): sempre claras, mesmo com o
 // celular dele no modo escuro (foram desenhadas claras; o tema escuro do sistema é só para a equipe)
-export const PAGINA_DO_CLIENTE = /^\/(aprovar|d|c|pix|track|pedido|box-preview)(\/|$)/
+export const PAGINA_DO_CLIENTE = /^\/(aprovar|d|c|pix|track|pedido|box-preview|parceiros)(\/|$)/
 
 export type ThemeChoice = "system" | "light" | "dark"
 

@@ -1,20 +1,14 @@
-import { NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/app/lib/supabase"
+// Cadastros de parceiros (só a equipe): lista e muda o status (aprovado vira fornecedor pela tela Fornecedores)
+import { NextResponse } from "next/server"
+import { listarCadastros, mudarStatus } from "@/app/lib/parceirosServidor"
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json()
-    await supabase.from("Parceiro").upsert({
-      id:              body.id,
-      nome:            body.nome,
-      categoria:       body.categoria,
-      contato:         body.contato ?? null,
-      comissaoDefault: body.comissaoDefault ?? 0,
-      criadoEm:        body.criadoEm,
-    }, { onConflict: "id" })
-    return NextResponse.json({ ok: true })
-  } catch (e) {
-    console.error(e)
-    return NextResponse.json({ error: "DB error" }, { status: 500 })
-  }
+export const dynamic = "force-dynamic"
+
+export async function GET() { return NextResponse.json({ cadastros: await listarCadastros() }) }
+
+export async function POST(req: Request) {
+  const b = await req.json().catch(() => ({})) as { id?: string; status?: string; fornecedorId?: string }
+  if (!b.id || !["novo", "aprovado", "recusado"].includes(b.status ?? "")) return NextResponse.json({ erro: "dados" }, { status: 400 })
+  await mudarStatus(b.id, b.status as "novo" | "aprovado" | "recusado", b.fornecedorId)
+  return NextResponse.json({ ok: true })
 }
