@@ -10,7 +10,7 @@ import { CONFIG_PADRAO } from "@/app/config"
 import type { VisitaProposta } from "@/app/types"
 import { gravarCampos } from "@/app/lib/configAtomica"
 import { termosOffset, VERSAO_TERMOS_OFFSET } from "@/app/lib/termosOffset"
-import { asaasConfigurado, PAGO } from "@/app/lib/asaas"
+import { mpConfigurado, mpPublicKey } from "@/app/lib/mercadoPago"
 import { PARCELAS_MAX_CARTAO, type PagamentoCartao } from "@/app/lib/cartaoAprovacao"
 
 // Registra que o cliente abriu a proposta (não quando é a Enyla logada; no máximo uma vez a cada 30 min):
@@ -58,7 +58,7 @@ export default async function AprovarPage({ params, searchParams }: {
     const cartao = config.pagamentosCartao?.[numero]
     const { data: rec } = isAberto(p.card) ? { data: [] } : await supabase.from("LancamentoFinanceiro").select("id").eq("cardNumero", numero).eq("tipo", "receita").eq("status", "pago").limit(1)
     pagamento = { total, sinal, pix: `/pix/${encodeURIComponent(numero)}?v=${sinal.toFixed(2)}&c=${encodeURIComponent(p.card.nomeCliente)}`,
-      pago: (!!cartao && PAGO.has(cartao.status)) || !!rec?.length, parcelasMax: PARCELAS_MAX_CARTAO, cartao: asaasConfigurado() }
+      pago: cartao?.status === "approved" || !!rec?.length, parcelasMax: PARCELAS_MAX_CARTAO, cartao: mpConfigurado(), chavePublica: mpConfigurado() ? mpPublicKey() : "" }
   }
   return (
     <AprovarClient numero={numero} token={t ?? ""}
