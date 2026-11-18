@@ -3,7 +3,7 @@
 import React from "react"
 import {
   AlertTriangle, CircleCheck, CalendarClock, CalendarX2, CircleDollarSign, Clock, Factory, FileText, Hourglass,
-  MessageCircle, Percent, Plus, Receipt, TrendingUp, Truck, Users, Wallet, CheckCircle2, ArrowRight, Target, Trophy, Eye, MessageCircleHeart, Star, RotateCcw, Megaphone,
+  MessageCircle, Percent, Plus, Receipt, TrendingUp, Truck, Users, Wallet, CheckCircle2, ArrowRight, Target, Trophy, Eye, MessageCircleHeart, Star, RotateCcw, Megaphone, ChevronDown,
 } from "lucide-react"
 import { EnviarWhatsapp, Envio } from "./EnviarWhatsapp"
 import { GrandesNegociosCard } from "./GrandesNegociosCard"
@@ -29,9 +29,9 @@ import {
 
 type PeriodoId = "mes" | "mesPassado" | "90d" | "ano"
 
-const PERIODOS: { v: PeriodoId; nome: string }[] = [
+const PERIODOS: { v: PeriodoId; nome: string; curto?: string }[] = [
   { v: "mes", nome: "Este mês" },
-  { v: "mesPassado", nome: "Mês passado" },
+  { v: "mesPassado", nome: "Mês passado", curto: "Anterior" },
   { v: "90d", nome: "90 dias" },
   { v: "ano", nome: "Ano" },
 ]
@@ -121,6 +121,10 @@ export function PainelView({
     botao: x.aprovacao && onAprovacaoOnline ? { rotulo: x.aprovacao.tipo === "recompra_qtd" ? "Orçar" : "Lançar sinal", onClick: () => onAprovacaoOnline(x.aprovacao!) } : undefined,
   }))
   const [verTodas, setVerTodas] = React.useState(false)
+  // Números e acompanhamento recolhidos por padrão (lembra a sua escolha neste aparelho)
+  const [verNumeros, setVerNumeros] = React.useState(false)
+  React.useEffect(() => { try { setVerNumeros(localStorage.getItem("painel:numeros") === "1") } catch {} }, [])
+  const alternarNumeros = () => setVerNumeros(v => { try { localStorage.setItem("painel:numeros", v ? "0" : "1") } catch {} return !v })
   const [enviando, setEnviando] = React.useState<{ envio: Envio; link?: string } | null>(null)
   const acoesVisiveis = verTodas ? acoes : acoes.slice(0, 7)
 
@@ -280,36 +284,9 @@ export function PainelView({
         </>}
       />
 
-      <NegociacoesDigitalCard onAbrirConversa={onAbrirConversa} />
+      {onAbrirConversa && <HojeCard parte="acao" onAbrirConversa={onAbrirConversa} onNavegar={onNavegar} onOrcar={onOrcarConversa} />}
 
-      {onPropostaPronta && <PropostasProntasCard onAbrir={onPropostaPronta} onAbrirConversa={onAbrirConversa} />}
 
-      <RetornoAnunciosCard pedidos={pedidos} clientes={clientes} periodo={periodo} nomePeriodo={nomePeriodo} onAbrir={() => onNavegar("meta")} />
-
-      <GrandesNegociosCard onAbrirConversa={onAbrirConversa} />
-
-      {onAbrirConversa && <HojeCard onAbrirConversa={onAbrirConversa} onNavegar={onNavegar} onOrcar={onOrcarConversa} />}
-
-      <GradeKpis>
-        <Kpi rotulo="Vendido" icone={<TrendingUp className="w-3.5 h-3.5" />} tom="acento" destaque
-          valor={vendas.receita} formato={brlCurto} onClick={abrirVendas}
-          sub={`${vendas.pedidos.length} ${vendas.pedidos.length === 1 ? "pedido" : "pedidos"} · ${num(vendas.unidades)} un${vendas.precoMedioUnidade ? ` · ${brl(vendas.precoMedioUnidade)}/un` : ""}`} />
-        <Kpi rotulo="Recebido" icone={<Wallet className="w-3.5 h-3.5" />} tom="sucesso"
-          valor={caixa.recebido} formato={brlCurto} onClick={abrirCaixa}
-          sub={<>{brlCurto(rec.aReceber)} a receber{rec.vencido > 0.5 && <span className="text-[#d33a3c]"> · {`R$ ${num(rec.vencido, 0)}`} vencido</span>}</>} />
-        <Kpi rotulo="Conversão" icone={<Percent className="w-3.5 h-3.5" />}
-          valor={conv.decididos > 0 ? conv.taxa : null} formato={pct} onClick={abrirConversao}
-          sub={conv.decididos > 0 ? `${conv.ganhos} de ${conv.decididos} decididos` : `${conv.total} orçamentos, nenhum decidido`} />
-        <Kpi rotulo="Em negociação" icone={<CircleDollarSign className="w-3.5 h-3.5" />}
-          valor={pipe.valor} formato={brlCurto} onClick={abrirPipeline}
-          sub={`${pipe.count} orçamentos abertos${leadsQuentes.length ? ` · ${leadsQuentes.length} quentes` : ""}`} />
-        <Kpi rotulo="Margem de contribuição" icone={<Percent className="w-3.5 h-3.5" />}
-          tom={margem.pct == null ? "neutro" : margem.pct < 30 ? "perigo" : margem.pct < 45 ? "alerta" : "sucesso"}
-          valor={margem.pct} formato={pct} onClick={abrirMargem}
-          sub={margem.total > 0 ? `${margem.comCusto} de ${margem.total} pedidos com custo` : "sem pedidos no período"} />
-      </GradeKpis>
-
-      <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-4 items-start">
         <Cartao padding={false} className="ds-entrada">
           <div className="px-5 pt-5">
             <TituloCartao titulo="Precisa de você" icone={<AlertTriangle className="w-4 h-4" />}
@@ -352,6 +329,51 @@ export function PainelView({
             </button>
           )}
         </Cartao>
+
+      {onPropostaPronta && <PropostasProntasCard onAbrir={onPropostaPronta} onAbrirConversa={onAbrirConversa} />}
+
+      <NegociacoesDigitalCard onAbrirConversa={onAbrirConversa} />
+
+      {/* Números e acompanhamento: recolhido para o topo ficar só com o que pede você */}
+      <button onClick={() => alternarNumeros()}
+        className="ds-toque w-full flex items-center gap-3 rounded-xl bg-white ds-cartao px-5 py-3.5 text-left">
+        <TrendingUp className="w-4 h-4 text-[#8456e8] shrink-0" />
+        <span className="flex-1 min-w-0">
+          <span className="block text-[13.5px] font-semibold text-[#191625]">Números e acompanhamento</span>
+          <span className="block text-[12px] text-[#898892] truncate">
+            Vendido {brlCurto(vendas.receita)} · Recebido {brlCurto(caixa.recebido)}{meta ? ` · Meta ${Math.round(vendidoMes / meta * 100)}%` : ""} · grandes negócios, anúncio, produção
+          </span>
+        </span>
+        <ChevronDown className={`w-4 h-4 text-[#898892] shrink-0 transition-transform ${verNumeros ? "rotate-180" : ""}`} />
+      </button>
+
+      {verNumeros && (<div className="space-y-4 ds-escalonado">
+
+      <GradeKpis>
+        <Kpi rotulo="Vendido" icone={<TrendingUp className="w-3.5 h-3.5" />} tom="acento" destaque
+          valor={vendas.receita} formato={brlCurto} onClick={abrirVendas}
+          sub={`${vendas.pedidos.length} ${vendas.pedidos.length === 1 ? "pedido" : "pedidos"} · ${num(vendas.unidades)} un${vendas.precoMedioUnidade ? ` · ${brl(vendas.precoMedioUnidade)}/un` : ""}`} />
+        <Kpi rotulo="Recebido" icone={<Wallet className="w-3.5 h-3.5" />} tom="sucesso"
+          valor={caixa.recebido} formato={brlCurto} onClick={abrirCaixa}
+          sub={<>{brlCurto(rec.aReceber)} a receber{rec.vencido > 0.5 && <span className="text-[#d33a3c]"> · {`R$ ${num(rec.vencido, 0)}`} vencido</span>}</>} />
+        <Kpi rotulo="Conversão" icone={<Percent className="w-3.5 h-3.5" />}
+          valor={conv.decididos > 0 ? conv.taxa : null} formato={pct} onClick={abrirConversao}
+          sub={conv.decididos > 0 ? `${conv.ganhos} de ${conv.decididos} decididos` : `${conv.total} orçamentos, nenhum decidido`} />
+        <Kpi rotulo="Em negociação" icone={<CircleDollarSign className="w-3.5 h-3.5" />}
+          valor={pipe.valor} formato={brlCurto} onClick={abrirPipeline}
+          sub={`${pipe.count} orçamentos abertos${leadsQuentes.length ? ` · ${leadsQuentes.length} quentes` : ""}`} />
+        <Kpi rotulo="Margem de contribuição" icone={<Percent className="w-3.5 h-3.5" />}
+          tom={margem.pct == null ? "neutro" : margem.pct < 30 ? "perigo" : margem.pct < 45 ? "alerta" : "sucesso"}
+          valor={margem.pct} formato={pct} onClick={abrirMargem}
+          sub={margem.total > 0 ? `${margem.comCusto} de ${margem.total} pedidos com custo` : "sem pedidos no período"} />
+      </GradeKpis>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-4 items-start">
+        <div className="space-y-4">
+          <GrandesNegociosCard onAbrirConversa={onAbrirConversa} />
+          {onAbrirConversa && <HojeCard parte="resumo" onAbrirConversa={onAbrirConversa} onNavegar={onNavegar} onOrcar={onOrcarConversa} />}
+          <RetornoAnunciosCard pedidos={pedidos} clientes={clientes} periodo={periodo} nomePeriodo={nomePeriodo} onAbrir={() => onNavegar("meta")} />
+        </div>
 
         <div className="space-y-4">
         <Cartao className="ds-entrada">
@@ -426,7 +448,8 @@ export function PainelView({
                 <Selo tom={prod.atrasados.length ? "perigo" : "sucesso"}>{prod.atrasados.length} {prod.atrasados.length === 1 ? "atrasado" : "atrasados"}</Selo>
                 <Selo tom={prod.vencendo3d.length ? "alerta" : "neutro"}>{prod.vencendo3d.length} {prod.vencendo3d.length === 1 ? "entrega" : "entregam"} em 3 dias</Selo>
                 {prod.semPrazo.length > 0 && <Selo tom="info">{prod.semPrazo.length} sem prazo</Selo>}
-              </div>
+      </div>
+
             </>}
         </Cartao>
         </div>
@@ -473,6 +496,8 @@ export function PainelView({
           ))}
         </div>
       </Cartao>
+
+      </div>)}
 
       <Gaveta aberta={!!detalhe} titulo={detalhe?.titulo ?? ""} sub={detalhe?.sub} onFechar={fechar}
         rodape={detalhe?.destino ? <Botao variante="secundario" onClick={() => { const ir = detalhe.destino!.ir; fechar(); ir() }}>{detalhe.destino.nome} <ArrowRight className="w-3.5 h-3.5" /></Botao> : undefined}>

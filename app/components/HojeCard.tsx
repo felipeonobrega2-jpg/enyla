@@ -33,7 +33,10 @@ function doPedido(d: DadosPedido | null) {
   return p.length ? `${p.join(" · ")} · ` : ""
 }
 
-export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
+// parte: "acao" = só o que pede você (Painel, no topo); "resumo" = anúncio, digital e reativação (Painel, embaixo);
+// "tudo" = os dois juntos (como era)
+export function HojeCard({ onAbrirConversa, onNavegar, onOrcar, parte = "tudo" }: {
+  parte?: "tudo" | "acao" | "resumo"
   onAbrirConversa: (jid: string, nome?: string, dados?: DadosPedido) => void
   onOrcar?: (nome: string, jid: string, dados?: DadosPedido) => void
   onNavegar: (view: "whatsapp" | "meta" | "config" | "gastos" | "digital") => void
@@ -102,6 +105,49 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
   )
   const a = d.anuncio
   const r = d.reativacao
+  if (parte === "resumo") return (
+    <Cartao className="ds-entrada">
+      <div className="space-y-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-2">Do anúncio, últimas 24 h</p>
+            <div className="flex gap-2">
+              <Numero rotulo="Leads" valor={a.leads} />
+              <Numero rotulo="MQL" valor={a.mql} tom="sucesso" />
+              <Numero rotulo="Sem volume" valor={a.semClassificar} tom="alerta" />
+            </div>
+          </div>
+
+          {d.marketing && (
+            <button onClick={() => onNavegar("meta")} className="w-full text-left rounded-xl px-3.5 py-3 bg-[rgba(132,86,232,0.06)] hover:bg-[rgba(132,86,232,0.1)] transition-colors">
+              <p className="text-[10.5px] font-semibold text-[#8456e8] flex items-center gap-1.5">
+                <Megaphone className="w-3.5 h-3.5" />Relatório de {dm(d.marketing.dia)}{d.marketing.custoMql != null ? ` · ${brl(d.marketing.custoMql)} por MQL` : ""}
+              </p>
+              <p className="text-[12.5px] font-medium text-[#191625] leading-snug mt-1">{d.marketing.acao}</p>
+            </button>
+          )}
+
+          {d.digital && (d.digital.ligado || d.digital.ativos > 0) && (
+            <div className="flex items-center gap-2.5">
+              <Printer className="w-4 h-4 shrink-0 text-[#c2410c]" />
+              <p className="flex-1 min-w-0 text-[11.5px] text-[#5e5c68] leading-snug">
+                <span className="font-semibold text-[#191625]">Digital</span>
+                {[` · ${d.digital.aguardandoSinal ?? 0} esperando o sinal`, d.digital.pagos ? `${d.digital.pagos} ${d.digital.pagos === 1 ? "pago" : "pagos"}` : "", `${d.digital.ativos} na semana`].filter(Boolean).join(" · ")}
+              </p>
+              <Botao variante="fantasma" className="h-7 px-2 text-[11.5px] shrink-0" onClick={() => onNavegar("digital")}>Abrir <ArrowRight className="w-3.5 h-3.5" /></Botao>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2.5">
+            <RotateCcw className={`w-4 h-4 shrink-0 ${r.ligado ? "text-[#009351]" : "text-[#898892]"}`} />
+            <p className="flex-1 min-w-0 text-[11.5px] text-[#5e5c68] leading-snug">
+              <span className="font-semibold text-[#191625]">Reativação {r.ligado ? "ligada" : "desligada"}</span>
+              {r.ligado ? ` · ${r.hoje} de ${r.porDia} hoje` : ""} · {r.fila} {r.fila === 1 ? "bom negócio parado" : "bons negócios parados"}
+            </p>
+            <Botao variante="fantasma" className="h-7 px-2 text-[11.5px] shrink-0" onClick={() => { try { sessionStorage.setItem("config:aba", "agentes") } catch {} onNavegar("config"); setTimeout(() => document.getElementById("reativacao")?.scrollIntoView({ behavior: "smooth" }), 450) }}>Abrir <ArrowRight className="w-3.5 h-3.5" /></Botao>
+          </div>
+              </div>
+    </Cartao>
+  )
 
   return (
     <Cartao padding={false} className="ds-entrada">
@@ -149,7 +195,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
           </div>
         </div>
       )}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr]">
+      <div className={parte === "tudo" ? "grid grid-cols-1 lg:grid-cols-[1.6fr_1fr]" : ""}>
         {/* Responder e retomar */}
         <div className="min-w-0">
           <div className="px-5 pt-5">
@@ -227,6 +273,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
         </div>
 
         {/* Anúncio e agentes */}
+        {parte === "tudo" && (
         <div className="min-w-0 px-5 py-5 space-y-4 border-t lg:border-t-0 lg:border-l border-[rgba(60,60,67,0.06)]">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-2">Do anúncio, últimas 24 h</p>
@@ -266,6 +313,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
             <Botao variante="fantasma" className="h-7 px-2 text-[11.5px] shrink-0" onClick={() => { try { sessionStorage.setItem("config:aba", "agentes") } catch {} onNavegar("config"); setTimeout(() => document.getElementById("reativacao")?.scrollIntoView({ behavior: "smooth" }), 450) }}>Abrir <ArrowRight className="w-3.5 h-3.5" /></Botao>
           </div>
         </div>
+        )}
       </div>
     </Cartao>
   )

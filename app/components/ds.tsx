@@ -188,7 +188,7 @@ export function Botao({ children, onClick, variante = "secundario", icone, disab
 // ── Seletor segmentado (com indicador deslizante) ─────────────────────────────
 
 export function Segmentado<T extends string>({ valor, opcoes, onChange }: {
-  valor: T; opcoes: { v: T; nome: string }[]; onChange: (v: T) => void
+  valor: T; opcoes: { v: T; nome: string; curto?: string }[]; onChange: (v: T) => void   // curto: rótulo no celular
 }) {
   const achado = opcoes.findIndex(o => o.v === valor)
   const i = Math.max(0, achado)
@@ -199,9 +199,9 @@ export function Segmentado<T extends string>({ valor, opcoes, onChange }: {
         style={{ width: `calc((100% - 8px) / ${opcoes.length})`, transform: `translateX(${i * 100}%)`, opacity: achado < 0 ? 0 : 1 }} />
       {opcoes.map(o => (
         <button key={o.v} onClick={() => onChange(o.v)}
-          className={cx("relative z-10 h-7 px-3 rounded-md text-[12px] font-medium transition-colors duration-200 whitespace-nowrap",
+          className={cx("relative z-10 h-7 px-2 sm:px-3 min-w-0 truncate rounded-md text-[11.5px] sm:text-[12px] font-medium transition-colors duration-200 whitespace-nowrap",
             o.v === valor ? "text-[#191625]" : "text-[#72707d] hover:text-[#191625]")}>
-          {o.nome}
+          {o.curto ? <><span className="sm:hidden">{o.curto}</span><span className="hidden sm:inline">{o.nome}</span></> : o.nome}
         </button>
       ))}
     </div>

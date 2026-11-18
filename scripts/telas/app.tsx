@@ -1,3 +1,4 @@
+import { PainelView } from "../../app/components/PainelView"
 import { Esqueleto } from "../../app/components/ds"
 import { FornecedoresView } from "../../app/components/FornecedoresView"
 import { GrandesNegociosCard } from "../../app/components/GrandesNegociosCard"
@@ -650,6 +651,8 @@ function Telas() {
     case "grandes": case "grandes-m": case "grandes-editar": return <div className="p-4 max-w-3xl"><GrandesNegociosCard onAbrirConversa={() => {}} /></div>
     case "fornecedores-receber": case "fornecedores-receber-m": return pagina(<FornecedoresView config={cfg} kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} onSave={setCfg} />)
     case "esqueleto": return <div className="p-4 max-w-md space-y-3"><Esqueleto linhas={4} /><Esqueleto linhas={2} titulo={false} /></div>
+    case "painel": case "painel-m": case "painel-numeros": return pagina(<PainelView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} propostasCustom={[]} clientes={[]} config={cfg}
+      onAbrirCard={() => {}} onAbrirCliente={() => {}} onNavegar={() => {}} onNovoOrcamento={() => {}} onAbrirConversa={() => {}} onOrcarConversa={() => {}} onPropostaPronta={() => {}} />)
     case "mobile": return <MobilePage />
     case "portal": {
       const hoje = new Date()
