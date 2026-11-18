@@ -624,7 +624,7 @@ function Telas() {
     case "aprovar-pagar": return <AprovarClient numero="ORC-2026-001" token="x" proposta={{
       nomeCliente: "Cliente Teste", sinalPct: 50, validaAte: "2099-12-31", vencida: false, jaAprovado: true,
       especificacoes: [], opcoes: [{ quantidade: 3000, preco: 6540, unitario: 2.18 }],
-      pagamento: { total: 6540, sinal: 3270, pix: "#", pago: false, parcelasMax: 12, cartao: true, chavePublica: "" },
+      pagamento: { total: 6540, sinal: 3270, pix: "#", pago: false, cartao: true },
     }} />
     case "mobile": return <MobilePage />
     case "portal": {

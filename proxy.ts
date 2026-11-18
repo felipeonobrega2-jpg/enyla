@@ -17,7 +17,7 @@ export default auth((req) => {
     pathname.startsWith("/api/whatsapp/webhook") ||
     pathname === "/api/digital/varredura" ||     // a rota exige login ou o segredo do webhook
     pathname === "/api/frete/webhook" ||
-    pathname === "/api/mercadopago/webhook" ||  // Mercado Pago (só lê o id; status vem da API)
+    pathname === "/api/infinitepay/webhook" ||  // InfinitePay (sem assinatura: só dispara o payment_check)
     pathname === "/api/asaas/webhook" ||        // Asaas (token no cabeçalho; status vem da API)        // Lalamove (só lê o nº da corrida; status vem da API)
     pathname === "/api/meta/cron-refresh" ||
     pathname === "/api/whatsapp/verificar" ||    // agendador da Vercel (mesma regra)     // agendador da Vercel (exige CRON_SECRET na própria rota)

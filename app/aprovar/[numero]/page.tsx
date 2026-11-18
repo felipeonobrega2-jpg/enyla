@@ -10,8 +10,8 @@ import { CONFIG_PADRAO } from "@/app/config"
 import type { VisitaProposta } from "@/app/types"
 import { gravarCampos } from "@/app/lib/configAtomica"
 import { termosOffset, VERSAO_TERMOS_OFFSET } from "@/app/lib/termosOffset"
-import { mpConfigurado, mpPublicKey } from "@/app/lib/mercadoPago"
-import { PARCELAS_MAX_CARTAO, type PagamentoCartao } from "@/app/lib/cartaoAprovacao"
+import { infinitePayConfigurado } from "@/app/lib/infinitePay"
+import { confirmarPagamentoInfinitePay, type PagamentoCartao } from "@/app/lib/cartaoAprovacao"
 
 // Registra que o cliente abriu a proposta (não quando é a Enyla logada; no máximo uma vez a cada 30 min):
 // conta em config.visitasProposta (o Painel avisa) e deixa a marca no rastreio do pedido
@@ -37,11 +37,13 @@ export const dynamic = "force-dynamic"
 
 export default async function AprovarPage({ params, searchParams }: {
   params: Promise<{ numero: string }>
-  searchParams: Promise<{ t?: string }>
+  searchParams: Promise<{ t?: string; order_nsu?: string; transaction_nsu?: string; slug?: string }>
 }) {
   const numero = decodeURIComponent((await params).numero)
-  const { t } = await searchParams
+  const { t, order_nsu, transaction_nsu, slug } = await searchParams
   const p = tokenValido(numero, t) ? await carregarProposta(numero) : null
+  // Volta do checkout da InfinitePay: confere o pagamento antes de mostrar (os parâmetros da volta podem ser forjados)
+  const retorno = p && order_nsu && transaction_nsu && slug ? await confirmarPagamentoInfinitePay({ nsu: order_nsu, transacao: transaction_nsu, slug }).catch(() => "pendente" as const) : null
   const { data: cfg } = p ? await supabase.from("AppConfig").select("data").eq("id", 1).single() : { data: null }
   const config = (cfg?.data ?? {}) as { sinalPct?: number; producao?: unknown; feriados?: unknown; pagamentosCartao?: Record<string, PagamentoCartao> }
   const sinalPct = config.sinalPct ?? SINAL_PCT_PADRAO
@@ -58,7 +60,7 @@ export default async function AprovarPage({ params, searchParams }: {
     const cartao = config.pagamentosCartao?.[numero]
     const { data: rec } = isAberto(p.card) ? { data: [] } : await supabase.from("LancamentoFinanceiro").select("id").eq("cardNumero", numero).eq("tipo", "receita").eq("status", "pago").limit(1)
     pagamento = { total, sinal, pix: `/pix/${encodeURIComponent(numero)}?v=${sinal.toFixed(2)}&c=${encodeURIComponent(p.card.nomeCliente)}`,
-      pago: cartao?.status === "approved" || !!rec?.length, parcelasMax: PARCELAS_MAX_CARTAO, cartao: mpConfigurado(), chavePublica: mpConfigurado() ? mpPublicKey() : "" }
+      pago: !!cartao?.baixado || !!rec?.length, cartao: infinitePayConfigurado(), retorno: retorno === "invalido" ? null : retorno }
   }
   return (
     <AprovarClient numero={numero} token={t ?? ""}

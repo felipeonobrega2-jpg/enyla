@@ -21,7 +21,7 @@ type Proposta = {
   termos?: { titulo: string; itens: string[] }[]
   versaoTermos?: string
   // Pagamento: total do pedido aprovado, se já está pago e até quantas vezes no cartão
-  pagamento?: { total: number; sinal: number; pix: string; pago: boolean; parcelasMax: number; cartao: boolean; chavePublica: string } | null
+  pagamento?: { total: number; sinal: number; pix: string; pago: boolean; cartao: boolean; retorno?: "pago" | "pendente" | null } | null
 }
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -96,7 +96,7 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
             <div className="bg-white rounded-2xl p-5 space-y-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
               {proposta.pagamento?.cartao ? (
                 <PagamentoPedido numero={numero} token={token} total={escolhida!.preco} sinal={feito.sinal} sinalPct={proposta.sinalPct} pix={feito.pix}
-                  parcelasMax={proposta.pagamento.parcelasMax} nomeInicial={nome.trim()} chavePublica={proposta.pagamento.chavePublica} />
+                  nomeInicial={nome.trim()} />
               ) : (<>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8E8E93]">Próximo passo</p>
               <p className="text-[14px] text-[#191625] leading-relaxed">
@@ -113,11 +113,13 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
           </>
         ) : proposta.jaAprovado ? (
           <>
-            <Aviso icone={<CircleCheck className="w-6 h-6" />} titulo="Proposta já aprovada"
-              texto={proposta.pagamento && !proposta.pagamento.pago && proposta.pagamento.cartao ? `Pedido de ${brl(proposta.pagamento.total)}. Escolha abaixo como pagar.` : "Este orçamento já virou pedido. Você pode acompanhar a produção pelo link de rastreio que enviamos."} />
-            {proposta.pagamento && !proposta.pagamento.pago && proposta.pagamento.cartao && (
+            {proposta.pagamento?.retorno !== "pago" && (
+              <Aviso icone={<CircleCheck className="w-6 h-6" />} titulo="Proposta já aprovada"
+                texto={proposta.pagamento && !proposta.pagamento.pago && proposta.pagamento.cartao ? `Pedido de ${brl(proposta.pagamento.total)}. Escolha abaixo como pagar.` : "Este orçamento já virou pedido. Você pode acompanhar a produção pelo link de rastreio que enviamos."} />
+            )}
+            {proposta.pagamento && proposta.pagamento.cartao && (proposta.pagamento.retorno === "pago" || !proposta.pagamento.pago) && (
               <PagamentoPedido numero={numero} token={token} total={proposta.pagamento.total} sinal={proposta.pagamento.sinal} sinalPct={proposta.sinalPct}
-                pix={proposta.pagamento.pix} parcelasMax={proposta.pagamento.parcelasMax} chavePublica={proposta.pagamento.chavePublica} />
+                pix={proposta.pagamento.pix} retorno={proposta.pagamento.retorno} />
             )}
           </>
         ) : proposta.vencida ? (
