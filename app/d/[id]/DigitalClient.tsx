@@ -217,11 +217,13 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
       {pago ? (
         <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
           <p className="text-[15px] font-bold text-[#191625]">{p.quantidade.toLocaleString("pt-BR")} caixinhas{p.designer ? "" : ` · ${brl(p.total)}`}</p>
-          {!p.designer && <p className="text-[12.5px] text-[#009351] font-semibold mt-1 flex items-center gap-1.5"><Check className="w-4 h-4" />Sinal de {brl(p.sinal)} recebido</p>}
+          {!p.designer && <p className="text-[12.5px] text-[#009351] font-semibold mt-1 flex items-center gap-1.5"><Check className="w-4 h-4 ds-pop" />Sinal de {brl(p.sinal)} recebido</p>}
           <div className="mt-4 grid grid-cols-4 gap-1.5">
             {ETAPAS.map(([s, nome], i) => (
               <div key={s} className="text-center">
-                <div className={`h-1.5 rounded-full ${i <= etapa ? "bg-[#009351]" : "bg-[rgba(116,116,128,0.15)]"}`} />
+                <div className="h-1.5 rounded-full bg-[rgba(116,116,128,0.15)] overflow-hidden">
+                  {i <= etapa && <div className="h-full rounded-full bg-[#009351] ds-cresce-x" style={{ animationDelay: `${i * 120}ms` }} />}
+                </div>
                 <p className={`text-[11px] mt-1.5 ${i <= etapa ? "font-semibold text-[#191625]" : "text-[#898892]"}`}>{nome}</p>
               </div>
             ))}
@@ -482,7 +484,7 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
   }
   const cartao = p.cartao ? (
     <button onClick={() => void irParaCartao()} disabled={abrindo || (faltaTermos && !marcado)}
-      className="mt-2 w-full h-12 rounded-xl text-[14.5px] font-semibold text-[#191625] bg-[rgba(116,116,128,0.08)] hover:bg-[rgba(116,116,128,0.14)] flex items-center justify-center gap-2 disabled:opacity-40 transition-colors">
+      className="ds-toque mt-2 w-full h-12 rounded-xl text-[14.5px] font-semibold text-[#191625] bg-[rgba(116,116,128,0.08)] hover:bg-[rgba(116,116,128,0.14)] flex items-center justify-center gap-2 disabled:opacity-40 transition-colors">
       {abrindo ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}{abrindo ? "Abrindo…" : "Pagar no cartão em até 12x"}
     </button>
   ) : null
@@ -496,7 +498,7 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
         <p className="text-[12px] text-[#898892]">{sub}</p>
         <AceiteTermos p={p} marcado={marcado} setMarcado={setMarcado} />
         <button onClick={async () => { setGerando(true); setErro(null); try { await aceitar() } catch (e) { setErro((e as Error).message) } setGerando(false) }} disabled={!marcado || gerando}
-          className="mt-3 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40">
+          className="ds-toque mt-3 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40">
           {gerando ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Ver o Pix
         </button>
         {cartao}
@@ -518,7 +520,7 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
           className="self-stretch mt-1 h-12 rounded-xl px-3.5 text-[15px] text-[#191625] bg-[rgba(116,116,128,0.06)] outline-none focus:ring-2 focus:ring-[#8456e8]/20" /></>}
         {faltaTermos && <AceiteTermos p={p} marcado={marcado} setMarcado={setMarcado} />}
         <button onClick={() => void gerar(doc.trim() ? doc : undefined)} disabled={gerando || (faltaTermos && !marcado) || (!(p.documento && !doc.trim()) && doc.replace(/\D/g, "").length < 11)}
-          className="mt-3 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-60">
+          className="ds-toque mt-3 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-60">
           {gerando ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Gerar o Pix
         </button>
         {cartao}
@@ -543,7 +545,7 @@ function PixBloco({ titulo, valor, txid, descricao, sub, onConferir, conferindo,
       {/* eslint-disable-next-line @next/next/no-img-element */}
       {qr && <img src={qr} alt="QR Code do Pix" width={200} height={200} className="mt-4 rounded-xl" />}
       <button onClick={() => navigator.clipboard.writeText(payload).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000) })}
-        className="mt-4 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-colors">
+        className="ds-toque mt-4 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-colors">
         {copiado ? <><Check className="w-5 h-5" />Código copiado</> : <><Copy className="w-5 h-5" />Copiar Pix copia e cola</>}
       </button>
       {cartao}

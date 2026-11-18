@@ -235,7 +235,18 @@ html.dark .ds-borda  { border-color: #312e3e; }
 .wa-acoes      { animation: wa-acoes .14s ease-out backwards; }
 .wa-enviada    { animation: wa-enviada .4s cubic-bezier(.3,.9,.3,1) backwards; }
 
+/* Camada de movimento discreta: toque que afunda, sucesso que "pula", esqueleto enquanto carrega */
+@keyframes ds-pop { 0% { transform: scale(.55); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes ds-esqueleto { from { background-position: -240px 0; } to { background-position: calc(240px + 100%) 0; } }
+.ds-pop { animation: ds-pop .45s cubic-bezier(.3,.9,.3,1) backwards; }
+.ds-toque { transition: transform .12s ease, background-color .15s ease, box-shadow .15s ease; -webkit-tap-highlight-color: transparent; }
+.ds-toque:active:not(:disabled) { transform: scale(.97); }
+.ds-esqueleto { background-color: rgba(116,116,128,.09); background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.65) 50%, rgba(255,255,255,0) 100%); background-repeat: no-repeat; background-size: 240px 100%; animation: ds-esqueleto 1.4s ease-in-out infinite; border-radius: 10px; }
+html.dark .ds-esqueleto { background-color: rgba(255,255,255,.05); background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.06) 50%, rgba(255,255,255,0) 100%); }
+
 @media (prefers-reduced-motion: reduce) {
+  .ds-pop, .ds-esqueleto { animation: none !important; }
+  .ds-toque:active:not(:disabled) { transform: none; }
   .wa-bolha-eu, .wa-bolha-ele, .wa-espiar, .wa-brilho, .wa-acoes, .wa-enviada { animation: none !important; }
   .ds-entrada, .ds-escalonado > *, .ds-cresce-x, .ds-cresce-y, .ds-gaveta, .ds-troca-tela { animation: none !important; }
   .ds-clicavel:hover { transform: none; }

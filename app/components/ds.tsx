@@ -174,7 +174,7 @@ export function Botao({ children, onClick, variante = "secundario", icone, disab
   return (
     <button onClick={onClick} disabled={disabled} title={title}
       className={cx(
-        "h-9 px-3.5 rounded-lg text-[12.5px] font-semibold inline-flex items-center justify-center gap-1.5 transition-all duration-150 disabled:opacity-35 disabled:cursor-not-allowed whitespace-nowrap",
+        "ds-toque h-9 px-3.5 rounded-lg text-[12.5px] font-semibold inline-flex items-center justify-center gap-1.5 transition-all duration-150 disabled:opacity-35 disabled:cursor-not-allowed whitespace-nowrap",
         variante === "primario" && "bg-[#8456e8] hover:bg-[#7445d4] text-white shadow-sm shadow-[#8456e8]/20",
         variante === "secundario" && "bg-white text-[#191625] hover:bg-[rgba(116,116,128,0.06)] ds-borda",
         variante === "fantasma" && "text-[#5e5c68] hover:bg-[rgba(116,116,128,0.08)] hover:text-[#191625]",
@@ -393,5 +393,25 @@ export function Gaveta({ aberta, titulo, sub, onFechar, children, rodape }: {
       </aside>
     </div>,
     document.body,
+  )
+}
+
+// Esqueleto enquanto carrega (brilho suave): o cartão aparece no lugar, sem a tela pular quando os dados chegam
+export function Esqueleto({ linhas = 3, titulo = true }: { linhas?: number; titulo?: boolean }) {
+  return (
+    <div className="ds-cartao bg-white rounded-xl p-5" aria-busy="true" aria-label="Carregando">
+      {titulo && <div className="ds-esqueleto h-4 w-40 mb-4" />}
+      <div className="space-y-3">
+        {Array.from({ length: linhas }, (_, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <div className="ds-esqueleto w-9 h-9 shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <div className="ds-esqueleto h-3.5" style={{ width: `${70 - i * 12}%` }} />
+              <div className="ds-esqueleto h-3" style={{ width: `${50 - i * 8}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }

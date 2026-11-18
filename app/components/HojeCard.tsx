@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react"
 import { Sun, Clock, MessageCircle, RotateCcw, Megaphone, ArrowRight, CheckCircle2, CalendarClock, FileText, Printer, AlertTriangle, Flame, Truck, Wallet, ShieldAlert, Fish } from "lucide-react"
-import { Cartao, TituloCartao, LinhaLista, Selo, Botao, Tom } from "./ds"
+import { Cartao, TituloCartao, LinhaLista, Selo, Botao, Tom, Esqueleto } from "./ds"
 import { Hoje, ItemHoje, ItemMeta, haQuanto, tempoDeEspera } from "../lib/hoje"
 import { comMedidaPadrao, textoDoTravado, META_HORAS } from "../lib/metaMql"
 import { ProximoPasso } from "./ProximoPasso"
@@ -52,7 +52,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
     return () => clearInterval(t)
   }, [])
 
-  if (!d) return null
+  if (!d) return <Esqueleto linhas={4} />
   // Marcou o próximo passo: some na hora (o servidor confirma na próxima atualização)
   const responder = d.responder.filter(x => !feitos.has(x.jid))
   const retomar = (d.retomar ?? []).filter(x => !feitos.has(x.jid))
@@ -122,7 +122,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
               (() => { const v = resolver.reduce((t, x) => t + (x.valor ?? 0), 0); return v ? `${brl(v)} em jogo` : "" })(),
             ].filter(Boolean).join(" · ")}
             acao={<Selo tom={resolver.some(x => x.nivel === "perigo") ? "perigo" : "alerta"}>{resolver.length}</Selo>} />
-          <div className="mt-2 -mx-2">
+          <div className="mt-2 -mx-2 ds-escalonado">
             {(verResolver ? resolver : resolver.slice(0, MOSTRAR)).map(x => {
               const cor = x.nivel === "perigo" ? "#d33a3c" : x.nivel === "alerta" ? "#c57800" : "#8456e8"
               const [nome, numero] = x.titulo.split(" · ")

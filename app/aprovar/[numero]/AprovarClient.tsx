@@ -132,7 +132,7 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
                 const sel = o.quantidade === qtd
                 return (
                   <button key={o.quantidade} onClick={() => setQtd(o.quantidade)}
-                    className={`w-full bg-white rounded-2xl px-5 py-4 flex items-center gap-4 text-left transition-all duration-150 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${sel ? "ring-2 ring-[#8456e8]" : "ring-1 ring-transparent hover:ring-[rgba(60,60,67,0.15)]"}`}>
+                    className={`ds-toque w-full bg-white rounded-2xl px-5 py-4 flex items-center gap-4 text-left transition-all duration-150 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ${sel ? "ring-2 ring-[#8456e8]" : "ring-1 ring-transparent hover:ring-[rgba(60,60,67,0.15)]"}`}>
                     <span className={`w-5 h-5 rounded-full shrink-0 flex items-center justify-center transition-colors ${sel ? "bg-[#8456e8]" : "border-2 border-[rgba(60,60,67,0.25)]"}`}>
                       {sel && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
                     </span>
@@ -179,7 +179,7 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
               )}
               {erro && <p className="text-[13px] text-[#d33a3c] flex items-start gap-2"><AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />{erro}</p>}
               <button onClick={aprovar} disabled={!pode}
-                className="h-12 w-full rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-all disabled:opacity-35 disabled:cursor-not-allowed">
+                className="ds-toque h-12 w-full rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-all disabled:opacity-35 disabled:cursor-not-allowed">
                 {enviando ? "Aprovando…" : <><Check className="w-5 h-5" /> Aprovar pedido</>}
               </button>
               {proposta.entregaSeAprovarHoje && (

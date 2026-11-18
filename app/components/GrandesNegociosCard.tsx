@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react"
 import { Fish, Plus, MessageCircle, Trash2, Sparkles, X, CalendarClock } from "lucide-react"
-import { Cartao, TituloCartao, Botao, Gaveta, Selo } from "./ds"
+import { Cartao, TituloCartao, Botao, Gaveta, Selo, Esqueleto } from "./ds"
 import { ETAPAS_GRANDE, ABERTAS, precisaDeVoce, hojeSP, type GrandeNegocio, type SugestaoGrande, type EtapaGrande } from "../lib/grandesNegocios"
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
@@ -32,7 +32,7 @@ export function GrandesNegociosCard({ onAbrirConversa }: { onAbrirConversa?: (ji
 
   const carregar = () => fetch("/api/grandes").then(r => r.ok ? r.json() : null).then(x => { if (x) setD(x) }).catch(() => {})
   useEffect(() => { carregar() }, [])
-  if (!d) return null
+  if (!d) return <Esqueleto linhas={3} />
 
   const abertos = d.grandes.filter(g => ABERTAS.includes(g.etapa))
   const fechados = d.grandes.filter(g => !ABERTAS.includes(g.etapa))
@@ -108,7 +108,7 @@ export function GrandesNegociosCard({ onAbrirConversa }: { onAbrirConversa?: (ji
         </div>
       )}
 
-      <div className="mt-2 -mx-2">
+      <div className="mt-2 -mx-2 ds-escalonado">
         {abertos.map(linha)}
         {!abertos.length && <p className="px-2 py-4 text-[13px] text-[#898892]">Nenhum grande negócio ainda. Toque em <strong>Novo</strong> para o primeiro (a fábrica de 350 mil, por exemplo).</p>}
       </div>

@@ -42,7 +42,7 @@ export function PosAprovacao({ numero, token, primeiroNome, quantidade, total, s
     <>
       <div className={`bg-white rounded-2xl p-6 ${sombra} animate-[apple-slide-up_.3s_ease-out]`}>
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-[#009351]/10 flex items-center justify-center shrink-0"><CircleCheck className="w-7 h-7 text-[#009351]" /></div>
+          <div className="w-12 h-12 rounded-full bg-[#009351]/10 flex items-center justify-center shrink-0 ds-pop"><CircleCheck className="w-7 h-7 text-[#009351]" /></div>
           <div className="min-w-0">
             <p className="font-bold text-[#191625] text-[19px] leading-tight">{confirmado ? "Pedido confirmado!" : agoraAprovou ? "Pedido aprovado!" : "Seu pedido está aprovado"}</p>
             <p className="text-[13px] text-[#5e5c68] mt-0.5">{confirmado ? `Pagamento recebido. Obrigado, ${primeiroNome}!` : `Obrigado, ${primeiroNome}. Falta só o pagamento.`}</p>
@@ -72,7 +72,7 @@ export function PosAprovacao({ numero, token, primeiroNome, quantidade, total, s
             return (
               <button key={k} type="button" onClick={() => setModo(k)}
                 style={{ border: `2px solid ${sel ? "#8456e8" : "#E5E5EA"}` }}
-                className={`w-full rounded-xl px-4 py-3.5 flex items-center gap-3 text-left transition-colors ${sel ? "bg-[#8456e8]/[0.04]" : "bg-white"}`}>
+                className={`ds-toque w-full rounded-xl px-4 py-3.5 flex items-center gap-3 text-left ${sel ? "bg-[#8456e8]/[0.04]" : "bg-white"}`}>
                 <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${sel ? "bg-[#8456e8] text-white" : "bg-[rgba(116,116,128,0.08)] text-[#5e5c68]"}`}>{ic}</span>
                 <span className="flex-1 min-w-0">
                   <span className="flex items-center gap-2"><span className="text-[15px] font-semibold text-[#191625]">{t}</span>{selo && <span className="text-[10.5px] font-semibold text-[#009351] bg-[#009351]/10 px-1.5 py-0.5 rounded-full">{selo}</span>}</span>
@@ -84,10 +84,10 @@ export function PosAprovacao({ numero, token, primeiroNome, quantidade, total, s
           })}
           {erro && <p className="text-[13px] text-[#d33a3c] flex items-start gap-2"><AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />{erro}</p>}
           {modo === "pix" ? (
-            <a href={pix} className="h-12 w-full rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-colors"><QrCode className="w-5 h-5" /> Pagar sinal com Pix</a>
+            <a href={pix} className="ds-toque h-12 w-full rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-colors"><QrCode className="w-5 h-5" /> Pagar sinal com Pix</a>
           ) : (
             <button onClick={irParaCartao} disabled={abrindo}
-              className="h-12 w-full rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-all disabled:opacity-60">
+              className="ds-toque h-12 w-full rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-all disabled:opacity-60">
               {abrindo ? <><Loader2 className="w-5 h-5 animate-spin" /> Abrindo…</> : <>Continuar para o cartão <ChevronRight className="w-5 h-5" /></>}
             </button>
           )}
