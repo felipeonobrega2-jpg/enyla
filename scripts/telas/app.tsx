@@ -1,3 +1,4 @@
+import { FornecedoresView } from "../../app/components/FornecedoresView"
 import { GrandesNegociosCard } from "../../app/components/GrandesNegociosCard"
 import { pendencias } from "../../app/lib/pendenciasDono"
 // Telas principais com dados fictícios, para conferência visual (npm run telas).
@@ -646,6 +647,7 @@ function Telas() {
       pagamento: { total: 6540, sinal: 3270, pix: "#", pago: false, cartao: true, quantidade: 3000, entregaAte: "2026-12-04" },
     }} />
     case "grandes": case "grandes-m": case "grandes-editar": return <div className="p-4 max-w-3xl"><GrandesNegociosCard onAbrirConversa={() => {}} /></div>
+    case "fornecedores-receber": case "fornecedores-receber-m": return pagina(<FornecedoresView config={cfg} kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} onSave={setCfg} />)
     case "mobile": return <MobilePage />
     case "portal": {
       const hoje = new Date()

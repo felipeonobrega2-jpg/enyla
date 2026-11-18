@@ -13,7 +13,7 @@
 //   preço = custo total × multiplicador (sem imposto)
 
 import type { TipoCaixa } from "../types"
-import { somarDiasUteis } from "./diasUteis"
+import { somarDiasUteis, diasUteisEntre } from "./diasUteis"
 
 // ── Cadastro ──────────────────────────────────────────────────────────────────
 
@@ -93,6 +93,20 @@ export type MovimentoFornecedor = {
   recebidoEm?: string
   prazoPrevisto?: string
   historico?: boolean   // registrado depois, a partir de pedidos antigos
+  diasDescontados?: number   // dias úteis parados por algo do lado do cliente (arte, aprovação, pagamento): não contam para o fornecedor
+  motivoDesconto?: string
+}
+
+// Dias úteis que contam para o fornecedor (sem os descontados) e se ele atrasou de verdade
+export function diasNoFornecedor(m: Pick<MovimentoFornecedor, "enviadoEm" | "recebidoEm" | "diasDescontados">, ate?: string): number {
+  const fim = m.recebidoEm ?? ate
+  if (!fim) return 0
+  return Math.max(0, diasUteisEntre(m.enviadoEm, fim) - Math.max(0, Math.round(m.diasDescontados ?? 0)))
+}
+export function atrasouNoFornecedor(m: Pick<MovimentoFornecedor, "enviadoEm" | "recebidoEm" | "prazoPrevisto" | "diasDescontados">, ate?: string): boolean {
+  const fim = m.recebidoEm ?? ate
+  if (!fim || !m.prazoPrevisto) return false
+  return diasNoFornecedor(m, ate) > diasUteisEntre(m.enviadoEm, m.prazoPrevisto)
 }
 
 // Etapa do quadro correspondente a um conjunto de serviços

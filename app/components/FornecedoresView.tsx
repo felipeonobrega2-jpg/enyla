@@ -12,6 +12,7 @@ import { Configuracoes } from "../config"
 import {
   ConfigProducao, FornecedorProducao, RegraCobranca, Servico, SERVICOS, TipoRegra, Ferramental, TipoFerramental,
   MovimentoFornecedor, Ocorrencia, TIPOS_OCORRENCIA, TipoOcorrencia, normalizarProducao, descreverRegra, etapaDosServicos, nomeServicos,
+  diasNoFornecedor, atrasouNoFornecedor,
 } from "../lib/producao"
 import { somarDiasUteis, diasUteisEntre } from "../lib/diasUteis"
 import { montarPedidos, pedidoEntregue } from "../lib/negocio"
@@ -85,7 +86,7 @@ function estatisticasPorServico(movs: MovimentoFornecedor[]): PorServico[] {
     grupos.set(k, [...(grupos.get(k) ?? []), m])
   }
   return [...grupos.entries()].map(([nome, ms]) => {
-    const dias = ms.map(m => diasEntre(m.enviadoEm, m.recebidoEm!))
+    const dias = ms.map(m => diasNoFornecedor(m))
     const comPrazo = ms.filter(m => m.prazoPrevisto)
     return {
       nome, n: ms.length, prazoMedio: dias.reduce((a, b) => a + b, 0) / dias.length,
@@ -114,9 +115,9 @@ function calcularStats(p: ConfigProducao): Stats[] {
   return p.fornecedores.map(forn => {
     const movs = p.movimentos.filter(m => m.fornecedorId === forn.id)
     const concl = movs.filter(m => m.recebidoEm)
-    const prazos = concl.map(m => diasEntre(m.enviadoEm, m.recebidoEm!))
+    const prazos = concl.map(m => diasNoFornecedor(m))
     const comPrazo = concl.filter(m => m.prazoPrevisto)
-    const atrasados = comPrazo.filter(m => m.recebidoEm! > m.prazoPrevisto!)
+    const atrasados = comPrazo.filter(m => atrasouNoFornecedor(m))
     const ocorrencias = p.ocorrencias.filter(o => o.fornecedorId === forn.id).sort((a, b) => b.data.localeCompare(a.data))
     return {
       forn,
@@ -155,6 +156,7 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
       enviadoEm: hist.enviadoEm, recebidoEm: hist.recebidoEm,
       prazoPrevisto: forn?.prazoDias ? somarDias(hist.enviadoEm, forn.prazoDias) : undefined,
       historico: true,
+      ...(hist.diasDescontados ? { diasDescontados: Math.max(0, Math.round(hist.diasDescontados)), motivoDesconto: hist.motivoDesconto?.trim() || undefined } : {}),
     }
     salvar({ ...producao, movimentos: [...producao.movimentos, mov] })
     setRegistrados(n => n + 1)
@@ -186,8 +188,12 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
     setEnvio(null)
   }
 
-  function marcarRecebido(id: string, data: string) {
-    salvar({ ...producao, movimentos: producao.movimentos.map(m => m.id === id ? { ...m, recebidoEm: data } : m) })
+  // Recebendo: dá para descontar dias parados por algo do lado do cliente (não contam para o fornecedor)
+  const [recebendo, setRecebendo] = React.useState<{ id: string; dias: number; motivo: string } | null>(null)
+  function marcarRecebido(id: string, data: string, desconto?: { dias: number; motivo: string }) {
+    const dias = Math.max(0, Math.round(desconto?.dias ?? 0))
+    salvar({ ...producao, movimentos: producao.movimentos.map(m => m.id === id ? { ...m, recebidoEm: data, ...(dias ? { diasDescontados: dias, motivoDesconto: desconto?.motivo.trim() || undefined } : {}) } : m) })
+    setRecebendo(null)
   }
 
   function registrarOcorrencia() {
@@ -210,12 +216,12 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
     <div className="space-y-6">
       {/* Em andamento */}
       <div className="bg-white rounded-xl overflow-hidden" style={border}>
-        <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: "1px solid rgba(60,60,67,0.06)" }}>
-          <p className="text-[13px] font-semibold text-[#191625] flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5" style={{ borderBottom: "1px solid rgba(60,60,67,0.06)" }}>
+          <p className="text-[13px] font-semibold text-[#191625] flex items-center gap-2 whitespace-nowrap">
             <Send className="w-4 h-4 text-[#8456e8]" /> No fornecedor agora
             <span className="text-[11px] font-medium text-[#898892]">{emAndamento.length}</span>
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button onClick={() => { setOcorr({ tipo: "atraso", data: hoje() }); setEnvio(null); setHist(null) }}
               className="h-8 px-3 rounded-lg text-[12px] font-medium text-[#5e5c68] hover:bg-[rgba(116,116,128,0.06)] transition-colors flex items-center gap-1.5" style={border}>
               <AlertTriangle className="w-3.5 h-3.5" /> Ocorrência
@@ -295,13 +301,16 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
               <Campo label="Recebido em">
                 <input type="date" value={hist.recebidoEm ?? ""} min={hist.enviadoEm} onChange={e => setHist({ ...hist, recebidoEm: e.target.value })} className={inputCls} style={inputStyle} />
               </Campo>
+              <Campo label="Descontar dias (parado pelo cliente)">
+                <input type="number" inputMode="numeric" min={0} value={hist.diasDescontados ?? ""} onChange={e => setHist({ ...hist, diasDescontados: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)) })} placeholder="0" className={inputCls} style={inputStyle} />
+              </Campo>
             </div>
             <div>
               <p className="text-[10px] text-[rgba(60,60,67,0.55)] font-medium mb-1.5">O que o fornecedor fez</p>
               <ServicosChips forn={fornDe(hist.fornecedorId)} valor={hist.servicos ?? []} onChange={sv => setHist({ ...hist, servicos: sv })} />
             </div>
             <div className="flex items-center justify-end gap-2">
-              {hist.enviadoEm && hist.recebidoEm && <span className="text-[11.5px] text-[#898892] mr-auto">{diasEntre(hist.enviadoEm, hist.recebidoEm)} dias úteis no fornecedor</span>}
+              {hist.enviadoEm && hist.recebidoEm && <span className="text-[11.5px] text-[#898892] mr-auto">{diasNoFornecedor({ enviadoEm: hist.enviadoEm, recebidoEm: hist.recebidoEm, diasDescontados: hist.diasDescontados })} dias úteis no fornecedor{hist.diasDescontados ? ` (${hist.diasDescontados} descontados)` : ""}</span>}
               <button onClick={() => setHist(null)} className="h-9 px-3 rounded-lg text-[12px] text-[#898892] hover:bg-[rgba(116,116,128,0.06)]">Fechar</button>
               <button onClick={() => registrarHistorico(false)} disabled={!hist.fornecedorId || !hist.enviadoEm || !hist.recebidoEm || !hist.servicos?.length || !(hist.pedidoKey || hist.textoPedido?.trim())}
                 className="h-9 px-3 rounded-lg text-[12px] font-semibold text-[#191625] bg-white disabled:opacity-30" style={inputStyle}>Registrar</button>
@@ -352,21 +361,48 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
             {emAndamento.map(m => {
               const dias = diasEntre(m.enviadoEm, hoje())
               const atrasado = m.prazoPrevisto && hoje() > m.prazoPrevisto
+              const aqui = recebendo?.id === m.id ? recebendo : null
+              const conta = aqui ? Math.max(0, dias - aqui.dias) : dias
               return (
-                <div key={m.id} className="px-5 py-3 flex items-center gap-4 text-[12.5px]">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-[#191625] truncate">{m.pedidoLabel}</p>
+                <div key={m.id}>
+                <div className="px-5 py-3 flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-2 text-[12.5px]">
+                  <div className="w-full sm:w-auto sm:flex-1 min-w-0">
+                    <p className="font-medium text-[#191625] sm:truncate">{m.pedidoLabel}</p>
                     <p className="text-[11.5px] text-[#898892]">
                       {nomeForn(m.fornecedorId)} · {nomeServicos(m)} · enviado {dataBR(m.enviadoEm)}
                     </p>
                   </div>
-                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ds-num ${atrasado ? "bg-[#e5484d]/10 text-[#e5484d]" : "bg-[rgba(116,116,128,0.08)] text-[#5e5c68]"}`}>
-                    {dias} {dias === 1 ? "dia útil" : "dias úteis"}{m.prazoPrevisto ? ` · prazo ${dataBR(m.prazoPrevisto)}` : ""}
+                  <div className="flex items-center justify-between sm:justify-end gap-3">
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ds-num whitespace-nowrap ${atrasado ? "bg-[#e5484d]/10 text-[#e5484d]" : "bg-[rgba(116,116,128,0.08)] text-[#5e5c68]"}`}>
+                    {dias} {dias === 1 ? "dia útil" : "dias úteis"}{m.prazoPrevisto ? ` · prazo ${dataBR(m.prazoPrevisto).slice(0, 5)}` : ""}
                   </span>
-                  <button onClick={() => marcarRecebido(m.id, hoje())}
-                    className="h-8 px-3 rounded-lg text-[12px] font-semibold text-[#009351] hover:bg-[#009351]/[0.08] transition-colors flex items-center gap-1.5" style={border}>
+                  <button onClick={() => setRecebendo(aqui ? null : { id: m.id, dias: 0, motivo: "" })}
+                    className="h-9 px-3 rounded-lg text-[12.5px] font-semibold text-[#009351] hover:bg-[#009351]/[0.08] transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0" style={border}>
                     <PackageCheck className="w-3.5 h-3.5" /> Recebido hoje
                   </button>
+                  </div>
+                </div>
+                {aqui && (
+                  <div className="mx-5 mb-3 rounded-xl bg-[#009351]/[0.05] px-4 py-3 space-y-2.5">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-[12.5px] text-[#191625] font-medium">Descontar dias parados pelo cliente</span>
+                      <div className="flex items-center rounded-lg bg-white" style={border}>
+                        <button onClick={() => setRecebendo({ ...aqui, dias: Math.max(0, aqui.dias - 1) })} className="w-10 h-10 text-[18px] text-[#5e5c68]" aria-label="Menos um dia">−</button>
+                        <span className="w-8 text-center text-[14px] font-semibold ds-num">{aqui.dias}</span>
+                        <button onClick={() => setRecebendo({ ...aqui, dias: Math.min(dias, aqui.dias + 1) })} className="w-10 h-10 text-[18px] text-[#5e5c68]" aria-label="Mais um dia">+</button>
+                      </div>
+                      <span className="text-[12px] text-[#5e5c68]">conta para o fornecedor: <strong className="text-[#191625]">{conta} {conta === 1 ? "dia útil" : "dias úteis"}</strong></span>
+                    </div>
+                    {aqui.dias > 0 && (
+                      <input value={aqui.motivo} onChange={e => setRecebendo({ ...aqui, motivo: e.target.value })} placeholder="Motivo (opcional): ex.: cliente demorou para aprovar a arte"
+                        className="w-full h-10 rounded-lg px-3 text-[13px] bg-white outline-none focus:ring-2 focus:ring-[#009351]/20" style={border} />
+                    )}
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => setRecebendo(null)} className="h-9 px-3 rounded-lg text-[12px] text-[#898892] hover:bg-black/5">Cancelar</button>
+                      <button onClick={() => marcarRecebido(m.id, hoje(), aqui)} className="h-10 px-4 rounded-lg text-[13px] font-semibold text-white bg-[#009351] whitespace-nowrap">Confirmar</button>
+                    </div>
+                  </div>
+                )}
                 </div>
               )
             })}
@@ -390,7 +426,7 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
                 <p className="text-[11px] text-[#898892] mt-0.5 truncate">
                   {SERVICOS.filter(x => s.forn.servicos[x.id]).map(x => x.nome).join(" · ") || "Sem serviços cadastrados"}
                 </p>
-                <div className="grid grid-cols-4 gap-2 mt-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
                   {[
                     { l: "Prazo médio", v: s.prazoMedio != null ? `${num(s.prazoMedio, 1)} d` : "—", sub: s.forn.prazoDias ? `dias úteis · combinado ${s.forn.prazoDias}` : "dias úteis" },
                     { l: "Atrasos", v: s.atrasoPct != null ? `${num(s.atrasoPct, 0)}%` : "—", alerta: (s.atrasoPct ?? 0) >= 25 },
@@ -443,8 +479,8 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
                     <p className="text-[9.5px] uppercase tracking-wide text-[#898892] font-semibold mt-3 mb-1.5">Histórico</p>
                     {s.historico.length === 0 && <p className="text-[12px] text-[#898892]">Nenhum envio registrado ainda.</p>}
                     {s.historico.slice(0, 12).map(m => {
-                      const d = m.recebidoEm ? diasEntre(m.enviadoEm, m.recebidoEm) : null
-                      const atrasou = m.recebidoEm && m.prazoPrevisto && m.recebidoEm > m.prazoPrevisto
+                      const d = m.recebidoEm ? diasNoFornecedor(m) : null
+                      const atrasou = atrasouNoFornecedor(m)
                       return (
                         <div key={m.id} className="flex items-center gap-2 py-1 text-[12px]">
                           <span className="flex-1 min-w-0 truncate text-[#191625]">{m.pedidoLabel}</span>
@@ -453,6 +489,7 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
                           <span className={`text-[11px] ds-num w-[64px] text-right font-medium ${d == null ? "text-[#8456e8]" : atrasou ? "text-[#e5484d]" : "text-[#009351]"}`}>
                             {d == null ? "aberto" : `${d} d`}
                           </span>
+                          {m.diasDescontados ? <span className="text-[10.5px] text-[#898892] ds-num" title={m.motivoDesconto ? `Descontados (cliente): ${m.motivoDesconto}` : "Dias descontados: parado pelo cliente"}>−{m.diasDescontados}</span> : null}
                           <button onClick={() => salvar({ ...producao, movimentos: producao.movimentos.filter(x => x.id !== m.id) })}
                             className="text-[#898892] hover:text-[#e5484d] transition-colors" title="Remover"><Trash2 className="w-3 h-3" /></button>
                         </div>

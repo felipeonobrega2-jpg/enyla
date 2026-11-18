@@ -17,3 +17,14 @@ describe("digital parado além do prazo", () => {
     expect(r[0].detalhe).toMatch(/Leandro/)
   })
 })
+
+describe("fornecedor: dias descontados (parado pelo cliente)", () => {
+  it("não contam no prazo nem no atraso", async () => {
+    const { diasNoFornecedor, atrasouNoFornecedor } = await import("@/app/lib/producao")
+    // seg 02/11 → seg 09/11 = 5 dias úteis; prazo sex 06/11 = 4
+    const m = { enviadoEm: "2026-11-02", recebidoEm: "2026-11-09", prazoPrevisto: "2026-11-06" }
+    expect(atrasouNoFornecedor(m)).toBe(true)
+    expect(diasNoFornecedor({ ...m, diasDescontados: 2 })).toBe(diasNoFornecedor(m) - 2)
+    expect(atrasouNoFornecedor({ ...m, diasDescontados: 2 })).toBe(false)
+  })
+})
