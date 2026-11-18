@@ -100,13 +100,16 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
     .not("jid", "like", "%@g.us").gte("ultima_recebida_at", new Date(agora.getTime() - 3 * 86_400_000).toISOString()).limit(800)
   const lista = quemEspera((data ?? []) as never, agora.getTime())
   if (!lista.length) return "ninguém"
-  // O agente tenta (até 3 por rodada; uma vez por mensagem)
+  // O agente tenta (até 3 por rodada; uma vez por mensagem), mas só com folga na cota de envios da hora: quem acabou
+  // de chegar tem prioridade (o atrasado nunca pode tirar a vez de um lead novo nem estourar o limite do número)
+  const enviosHora = ((cfg as { agenteEnviosHora?: string[] }).agenteEnviosHora ?? []).filter(t => agora.getTime() - new Date(t).getTime() < 3_600_000).length
+  const folga = Math.max(0, Math.min(3, 22 - enviosHora))
   const { responderSozinho } = await import("./agenteAuto")
   const tentou = new Set(cfg.vigiaTentou ?? [])
   const novasTentativas: string[] = []
   const respondidas = new Set<string>()
   for (const e of lista) {
-    if (novasTentativas.length >= 3) break
+    if (novasTentativas.length >= folga) break
     const { data: ult } = await supabase.from("whatsapp_mensagens").select("id, from_me").eq("jid", e.jid).order("criado_em", { ascending: false }).limit(1).maybeSingle()
     if (!ult || ult.from_me || tentou.has(ult.id)) continue
     novasTentativas.push(ult.id)
