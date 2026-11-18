@@ -6,6 +6,7 @@ import {
   MessageCircle, Percent, Plus, Receipt, TrendingUp, Truck, Users, Wallet, CheckCircle2, ArrowRight, Target, Trophy, Eye, MessageCircleHeart, Star, RotateCcw, Megaphone,
 } from "lucide-react"
 import { EnviarWhatsapp, Envio } from "./EnviarWhatsapp"
+import { GrandesNegociosCard } from "./GrandesNegociosCard"
 import { HojeCard } from "./HojeCard"
 import { PropostasProntasCard } from "./PropostasProntasCard"
 import { NegociacoesDigitalCard } from "./NegociacoesDigitalCard"
@@ -284,6 +285,8 @@ export function PainelView({
       {onPropostaPronta && <PropostasProntasCard onAbrir={onPropostaPronta} onAbrirConversa={onAbrirConversa} />}
 
       <RetornoAnunciosCard pedidos={pedidos} clientes={clientes} periodo={periodo} nomePeriodo={nomePeriodo} onAbrir={() => onNavegar("meta")} />
+
+      <GrandesNegociosCard onAbrirConversa={onAbrirConversa} />
 
       {onAbrirConversa && <HojeCard onAbrirConversa={onAbrirConversa} onNavegar={onNavegar} onOrcar={onOrcarConversa} />}
 

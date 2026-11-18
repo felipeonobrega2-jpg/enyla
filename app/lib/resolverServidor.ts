@@ -7,7 +7,7 @@ import type { AprovacaoOnline } from "./aprovacao"
 import type { Passos } from "./hoje"
 
 export type ItemResolver = {
-  tipo: "proposta" | "pagamento" | "atrasado" | "sistema" | "digital"
+  tipo: "proposta" | "pagamento" | "atrasado" | "sistema" | "digital" | "grande"
   titulo: string            // "Márcio Santana · ORC-2026-283"
   detalhe: string           // "abriu a proposta 3× · sem retomada há 2 dias"
   valor: number | null
@@ -69,7 +69,7 @@ export function digitalParado(pedidos: PedDig[], agora = Date.now()): ItemResolv
   return out
 }
 
-export async function paraResolver(cfg: { pedidosDigitais?: PedDig[]; visitasProposta?: Record<string, { vezes: number; ultima: string }>; aprovacoesOnline?: AprovacaoOnline[]; proximosPassos?: Passos; agenteSemCreditoEm?: string; whatsappConexao?: { estado?: string; em?: string } }, agora = Date.now()): Promise<ItemResolver[]> {
+export async function paraResolver(cfg: { grandesNegocios?: import("./grandesNegocios").GrandeNegocio[]; pedidosDigitais?: PedDig[]; visitasProposta?: Record<string, { vezes: number; ultima: string }>; aprovacoesOnline?: AprovacaoOnline[]; proximosPassos?: Passos; agenteSemCreditoEm?: string; whatsappConexao?: { estado?: string; em?: string } }, agora = Date.now()): Promise<ItemResolver[]> {
   const itens: ItemResolver[] = []
   const hoje = new Date(agora - 3 * 3600_000).toISOString().slice(0, 10)
 
@@ -127,6 +127,14 @@ export async function paraResolver(cfg: { pedidosDigitais?: PedDig[]; visitasPro
   }
 
   itens.push(...digitalParado(cfg.pedidosDigitais ?? [], agora))
-  const ordem = { sistema: 0, pagamento: 1, atrasado: 2, digital: 3, proposta: 4 }
+  // Grande negócio com o próximo passo vencido (ou sem próximo passo): sobe logo depois do sistema
+  const { precisaDeVoce } = await import("./grandesNegocios")
+  for (const g of cfg.grandesNegocios ?? []) {
+    const p = precisaDeVoce(g, agora)
+    if (!p || p === "hoje") continue
+    itens.push({ tipo: "grande", titulo: g.nome, valor: g.valor ?? null, jid: g.jid ?? null, numero: null, desde: g.proximoEm ?? null, nivel: "perigo",
+      detalhe: p === "sem_passo" ? "grande negócio sem próximo passo: defina o que fazer e quando" : `venceu ${String(g.proximoEm).split("-").reverse().slice(0, 2).join("/")}: ${g.proximoPasso}` })
+  }
+  const ordem = { sistema: 0, grande: 1, pagamento: 2, atrasado: 3, digital: 4, proposta: 5 }
   return itens.sort((a, b) => ordem[a.tipo] - ordem[b.tipo] || (b.valor ?? 0) - (a.valor ?? 0))
 }

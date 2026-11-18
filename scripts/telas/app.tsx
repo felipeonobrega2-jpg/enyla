@@ -1,3 +1,4 @@
+import { GrandesNegociosCard } from "../../app/components/GrandesNegociosCard"
 import { pendencias } from "../../app/lib/pendenciasDono"
 // Telas principais com dados fictícios, para conferência visual (npm run telas).
 import React from "react"
@@ -300,6 +301,17 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       { cliente: "Marca Teste", tipo: "offset", fechou: "2026-08-12", valor: 4176, dias: 120 },
     ], semDado: ["Cliente Antigo A", "Cliente Antigo B", "Distribuidora Exemplo"] }))
   if (u.startsWith("/api/meta")) return new Response(JSON.stringify({ campaigns: [], totals: { spend: 1840, impressions: 0, clicks: 0, reach: 0, conversas: 96 } }))
+  if (u.startsWith("/api/grandes")) {
+    const d = (n: number) => new Date(Date.now() + n * 86_400_000 - 3 * 3600_000).toISOString().slice(0, 10)
+    return new Response(JSON.stringify({
+      grandes: [
+        { id: "g1", nome: "Carlos Exemplo", empresa: "Fábrica Modelo", produto: "caixas para cosméticos", volume: 350000, valor: 210000, etapa: "contato", proximoPasso: "visitar a fábrica e levar amostras", proximoEm: d(-1), origem: "ligacao", notas: [{ em: new Date().toISOString(), texto: "Me ligou, mostrou a fábrica por vídeo, volume de 350 mil" }], criadoEm: new Date().toISOString(), atualizadoEm: new Date().toISOString() },
+        { id: "g2", nome: "Marina Teste", produto: "embalagem de chocolate", volume: 5000, valor: 9800, etapa: "negociacao", proximoPasso: "confirmar a arte final", proximoEm: d(0), notas: [], criadoEm: new Date().toISOString(), atualizadoEm: new Date().toISOString(), jid: "1@lid" },
+        { id: "g3", nome: "Loja Fictícia", produto: "caixinhas para perfume", volume: 30000, valor: 27000, etapa: "amostra", proximoPasso: "", proximoEm: null, notas: [], criadoEm: new Date().toISOString(), atualizadoEm: new Date().toISOString() },
+      ],
+      sugestoes: [{ numero: "ORC-2026-241", nome: "Aromas Exemplo", valor: 18140, motivo: "proposta ORC-2026-241 de R$ 18.140" }, { jid: "7@lid", nome: "Cosméticos Modelo", volume: 20000, motivo: "falou em 20.000 un · caixa 50ml" }],
+    }))
+  }
   if (u.startsWith("/api/hoje")) {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
     return new Response(JSON.stringify({
@@ -633,6 +645,7 @@ function Telas() {
       especificacoes: [], opcoes: [{ quantidade: 3000, preco: 6540, unitario: 2.18 }],
       pagamento: { total: 6540, sinal: 3270, pix: "#", pago: false, cartao: true, quantidade: 3000, entregaAte: "2026-12-04" },
     }} />
+    case "grandes": case "grandes-m": case "grandes-editar": return <div className="p-4 max-w-3xl"><GrandesNegociosCard onAbrirConversa={() => {}} /></div>
     case "mobile": return <MobilePage />
     case "portal": {
       const hoje = new Date()
