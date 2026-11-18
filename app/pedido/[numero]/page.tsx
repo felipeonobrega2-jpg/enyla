@@ -2,6 +2,9 @@ import { notFound } from "next/navigation"
 import { supabase as supabaseAdmin } from "@/app/lib/supabase"
 import { KanbanCard, PedidoArquivo, COLUNAS_KANBAN } from "@/app/types"
 
+// Link do cliente: sempre claro (inclusive no modo escuro automático do Chrome/Samsung, que inverte as cores)
+export const viewport = { themeColor: "#ffffff", colorScheme: "only light" as const }
+
 function brl(n: number) {
   return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }

@@ -55,7 +55,7 @@ function LinhaDoTempo({ p }: { p: PedidoPortal }) {
               </span>
               <span className={`text-[11px] font-medium leading-tight ${i <= atual ? "text-[#191625]" : "text-[#8E8E93]"}`}>{m.nome}</span>
               <span className="text-[10px] text-[#8E8E93] leading-tight h-3">
-                {data ? curta(data) : m.nome === "Entregue" && p.dataEntregaPrevista ? `prev. ${curta(p.dataEntregaPrevista)}` : ""}
+                {data ? curta(data) : m.nome === "Entregue" && p.dataEntregaPrevista ? `até ${curta(p.dataEntregaPrevista)}` : ""}
               </span>
             </div>
           )
@@ -323,11 +323,11 @@ export default function PortalClient({ dados, token }: { dados: DadosPortal; tok
                 <div key={p.key} className="px-5 py-3.5 flex items-center gap-3">
                   <span className="w-9 h-9 rounded-xl bg-[#009351]/10 text-[#009351] grid place-items-center shrink-0"><Package className="w-4 h-4" /></span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13.5px] font-medium text-[#191625]">{num(p.quantidade)} embalagens · {p.numero}</p>
-                    <p className="text-[11.5px] text-[#8E8E93] flex items-center gap-1"><CalendarDays className="w-3 h-3" />{p.dataEntregaReal ? `entregue em ${curta(p.dataEntregaReal)}` : p.dataFechamento ? `pedido em ${curta(p.dataFechamento)}` : "entregue"}</p>
+                    <p className="text-[13.5px] font-medium text-[#191625] truncate">{num(p.quantidade)} embalagens</p>
+                    <p className="text-[11.5px] text-[#8E8E93] flex items-center gap-1 whitespace-nowrap"><CalendarDays className="w-3 h-3 shrink-0" /><span className="truncate">{p.numero} · {p.dataEntregaReal ? `${p.dataEntregaReal.slice(8, 10)}/${p.dataEntregaReal.slice(5, 7)}` : p.dataFechamento ? `pedido ${p.dataFechamento.slice(8, 10)}/${p.dataFechamento.slice(5, 7)}` : "entregue"}</span></p>
                   </div>
                   {p.aReceber > 0.5
-                    ? <a href={`/pix/${encodeURIComponent(p.numero)}?v=${p.aReceber.toFixed(2)}&c=${encodeURIComponent(dados.nome)}`} className="text-[12px] font-semibold text-[#8456e8] flex items-center gap-0.5">Pagar {brl(p.aReceber)}<ChevronRight className="w-3.5 h-3.5" /></a>
+                    ? <a href={`/pix/${encodeURIComponent(p.numero)}?v=${p.aReceber.toFixed(2)}&c=${encodeURIComponent(dados.nome)}`} className="text-[12px] font-semibold text-[#8456e8] flex items-center gap-0.5 whitespace-nowrap shrink-0">Pagar {brl(p.aReceber)}<ChevronRight className="w-3.5 h-3.5" /></a>
                     : <button onClick={() => setRepetindo(p)} className="h-8 px-3 rounded-full bg-[#8456e8]/10 text-[#8456e8] text-[12.5px] font-semibold flex items-center gap-1.5 active:scale-95 transition-transform"><RotateCw className="w-3.5 h-3.5" />Repetir</button>}
                 </div>
               ))}

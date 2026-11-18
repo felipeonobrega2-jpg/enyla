@@ -1,6 +1,9 @@
 import { Suspense } from "react"
 import BoxPreviewPage from "./BoxPreviewPage"
 
+// Link do cliente: sempre claro (inclusive no modo escuro automático do Chrome/Samsung, que inverte as cores)
+export const viewport = { themeColor: "#ffffff", colorScheme: "only light" as const }
+
 export const metadata = {
   title: "Visualização 3D — Enyla Embalagens",
   description: "Veja em 3D a estrutura da sua embalagem personalizada.",

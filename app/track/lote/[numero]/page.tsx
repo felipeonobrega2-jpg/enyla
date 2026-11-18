@@ -1,6 +1,9 @@
 import { supabase } from "@/app/lib/supabase"
 import LoteTrackingClient from "./LoteTrackingClient"
 
+// Link do cliente: sempre claro (inclusive no modo escuro automático do Chrome/Samsung, que inverte as cores)
+export const viewport = { themeColor: "#ffffff", colorScheme: "only light" as const }
+
 export default async function LoteTrackingPage({
   params,
 }: {

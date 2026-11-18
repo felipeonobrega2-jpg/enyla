@@ -4,6 +4,9 @@ import PortalClient from "./PortalClient"
 import { supabase } from "@/app/lib/supabase"
 import type { Avaliacao } from "@/app/types"
 
+// Link do cliente: sempre claro (inclusive no modo escuro automático do Chrome/Samsung, que inverte as cores)
+export const viewport = { themeColor: "#ffffff", colorScheme: "only light" as const }
+
 export const dynamic = "force-dynamic"
 export const metadata: Metadata = { title: "Seus pedidos — Enyla", robots: { index: false, follow: false } }
 

@@ -13,6 +13,9 @@ import { termosOffset, VERSAO_TERMOS_OFFSET } from "@/app/lib/termosOffset"
 import { infinitePayConfigurado } from "@/app/lib/infinitePay"
 import { confirmarPagamentoInfinitePay, type PagamentoCartao } from "@/app/lib/cartaoAprovacao"
 
+// Link do cliente: sempre claro (inclusive no modo escuro automático do Chrome/Samsung, que inverte as cores)
+export const viewport = { themeColor: "#ffffff", colorScheme: "only light" as const }
+
 // Registra que o cliente abriu a proposta (não quando é a Enyla logada; no máximo uma vez a cada 30 min):
 // conta em config.visitasProposta (o Painel avisa) e deixa a marca no rastreio do pedido
 async function registrarVisita(numero: string) {

@@ -31,8 +31,8 @@ export default function RootLayout({
       className="h-full antialiased"
     >
       <head>
-        {/* Anti-flash: apply dark class before first paint */}
-        <script dangerouslySetInnerHTML={{ __html: `(function(){var t=localStorage.getItem('theme')||'system';if(t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}})();` }} />
+        {/* Anti-flash: apply dark class before first paint. Páginas do cliente (links enviados) ficam sempre claras. */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){if(/^\\/(aprovar|d|c|pix|track|pedido|box-preview)(\\/|$)/.test(location.pathname))return;var t=localStorage.getItem('theme')||'system';if(t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}})();` }} />
       </head>
       <body suppressHydrationWarning className="min-h-full flex flex-col">
         <ThemeProvider>{children}</ThemeProvider>

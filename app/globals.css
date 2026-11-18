@@ -313,3 +313,6 @@ html.dark .leaflet-control-attribution a { color: #a5a2b0; }
   .sala-digita-a, .sala-digita-b, .sala-tela, .sala-alerta, .sala-respira, .sala-cochila, .sala-pisca, .sala-cafe, .sala-vapor, .sala-zzz,
   .sala-ponto-1, .sala-ponto-2, .sala-ponto-3, .sala-ronda, .sala-perna-a, .sala-perna-b, .sala-passo, .sala-nuvem, .sala-planta { animation: none; }
 }
+
+/* Páginas do cliente (links enviados): sempre claras, mesmo no modo escuro do sistema ou do navegador */
+html:not(.dark):has(body) { color-scheme: light only; }
