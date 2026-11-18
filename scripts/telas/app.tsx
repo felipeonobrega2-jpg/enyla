@@ -20,6 +20,7 @@ import { ModalDetalhe } from "@/app/components/ModalDetalhe"
 import { FinanceiroView } from "@/app/components/FinanceiroView"
 import { RelatoriosView } from "@/app/components/RelatoriosView"
 import { IdeiasView } from "@/app/components/IdeiasView"
+import { EscritorioView } from "@/app/components/EscritorioView"
 import PortalClient from "@/app/c/[token]/PortalClient"
 import { ClientePerfilModal } from "@/app/components/ClientePerfilModal"
 import { dados, config } from "./dados"
@@ -310,6 +311,24 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       { cliente: "Marca Teste", tipo: "offset", fechou: "2026-08-12", valor: 4176, dias: 120 },
     ], semDado: ["Cliente Antigo A", "Cliente Antigo B", "Distribuidora Exemplo"] }))
   if (u.startsWith("/api/meta")) return new Response(JSON.stringify({ campaigns: [], totals: { spend: 1840, impressions: 0, clicks: 0, reach: 0, conversas: 96 } }))
+  if (u.startsWith("/api/escritorio")) {
+    const { montarEscritorio } = await import("@/app/lib/escritorio")
+    const agora = Date.now(), m = (x: number) => new Date(agora - x * 60_000).toISOString()
+    const nomes = ["Ana Souza", "Perfumaria Modelo", "Carlos Lima", "Aromas Exemplo", "Bruna Teste", "Loja Fictícia", "Diego Exemplo"]
+    const registros = [
+      ...Array.from({ length: 26 }, (_, i) => ({ em: m(2 + i * 17), jid: `${i}@lid`, nome: nomes[i % 7], perfil: "medio" as const, enviou: i % 9 !== 4, texto: "", motivo: i % 9 === 4 ? "MQL: você atende" : "ok" })),
+      ...Array.from({ length: 7 }, (_, i) => ({ em: m(6 + i * 41), jid: `c${i}@lid`, nome: nomes[(i + 2) % 7], perfil: "icp" as const, enviou: true, texto: "", motivo: "ok", passo: "Levantando para orçar" })),
+      ...Array.from({ length: 9 }, (_, i) => ({ em: m(60 + i * 35), jid: `f${i}@lid`, nome: nomes[(i + 3) % 7], perfil: "medio" as const, enviou: true, texto: "", motivo: "ok", passo: `F${(i % 3) + 1}` })),
+      ...Array.from({ length: 3 }, (_, i) => ({ em: m(200 + i * 60), jid: `r${i}@lid`, nome: nomes[(i + 4) % 7], perfil: "medio" as const, enviou: true, texto: "", motivo: "ok", passo: "Reativação" })),
+    ]
+    return new Response(JSON.stringify(montarEscritorio({ registros, noHorario: true, agora, nomes: { "x@lid": "Marca Modelo" }, cfg: {
+      agenteAuto: { ligado: true }, agenteEnviosHora: Array.from({ length: 27 }, (_, i) => m(i * 2)), whatsappConexao: { estado: "open" }, vigiaRodouEm: m(3),
+      pedidosDigitais: Array.from({ length: 5 }, (_, i) => ({ id: `DIG-01${30 + i}`, em: m(14 + i * 50), nome: nomes[(i + 1) % 7], quantidade: [100, 200, 300, 150, 500][i], total: [480, 760, 990, 590, 1450][i], status: "aguardando_sinal" })),
+      propostasProntas: [{ em: m(95), nome: "Bruna Teste", quantidade: 3000, preco: 8940, status: "aguardando" }, { em: m(260), nome: "Diego Exemplo", quantidade: 1000, preco: 4120, status: "enviada" }],
+      fechadasPelaIA: [{ jid: "x@lid", motivo: "agradeceu e encerrou", em: m(48) }], rotinaEnviada: { [new Date(agora).toISOString().slice(0, 10) + "-13"]: m(120) },
+      conhecimentoAgente: [{ id: "a", tema: "venda", em: m(150), texto: "Quando o cliente pede foto de caixa pronta, mando 2 do Instagram parecidas com o produto dele." }, ...Array.from({ length: 40 }, (_, i) => ({ id: `k${i}`, tema: "venda", em: "2026-10-01T00:00:00.000Z", texto: "x" }))],
+    } })))
+  }
   if (u.startsWith("/api/funil-agora")) {
     const e = (id: string, nome: string, quantos: number, valor: number, parados: number) => ({ id, nome, quantos, valor, parados, itens: Array.from({ length: Math.min(quantos, 6) }, (_, i) => ({ nome: ["Perfumaria Modelo", "Aromas Exemplo", "Loja Fictícia", "Cosméticos Teste", "Essências Exemplo", "Marca Modelo"][i], sub: i === 0 ? "ORC-2026-283 · proposta enviada" : "conversa", valor: valor ? Math.round(valor / quantos) : null, jid: "1@lid", parado: i < parados ? "esperando resposta há 20h" : null })) })
     return new Response(JSON.stringify({ esperando: 12, offset: [e("leads", "Leads (7 dias)", 309, 0, 46), e("mql", "MQL", 58, 0, 10), e("proposta", "Proposta", 21, 141970, 0), e("fechado", "Fechado (sinal)", 4, 41040, 0), e("arte", "Arte", 0, 0, 0), e("producao", "Produção", 0, 0, 0), e("expedicao", "Expedição", 1, 9200, 1), e("entregue", "Entregue (30 dias)", 6, 38400, 0)],
@@ -691,6 +710,7 @@ function Telas() {
         itens={[]} propostas={[]} kanban={dados.kanban} lancamentos={lancs} onClose={() => {}} onReplicar={() => {}} onWhatsApp={() => {}} onSave={() => {}}
         origem={origemDoCliente("Ana Cosméticos", cfg.origensClientes, [])}
         onSalvarOrigem={o => setCfg({ ...cfg, origensClientes: o ? { "ana cosmeticos": o } : {} })} />
+    case "escritorio": case "escritorio-m": return <EscritorioView />
     case "ideias": return <div style={{ height: "100vh" }}><IdeiasView config={cfg} onSalvar={setCfg} /></div>
     case "precofecha": {
       const calc = calcular(dados.historico[3].form, cfg)!

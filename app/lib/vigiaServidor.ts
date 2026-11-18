@@ -64,6 +64,8 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
     await notificar("WhatsApp da Enyla desconectado", "Os leads não estão recebendo resposta. Abra Configurações → WhatsApp e leia o QR.", { prioridade: "alta", tags: ["rotating_light"], link: `${LINK_SISTEMA}/?aba=config` }).catch(() => null)
     out.whatsapp = "avisado"
   }
+  // Carimbo da ronda: o Escritório mostra se o vigia está de pé
+  await mudarConfig(() => ({ vigiaRodouEm: agora.toISOString() })).catch(() => null)
   return out
 }
 

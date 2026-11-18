@@ -265,3 +265,10 @@ html.dark .leaflet-control-attribution a { color: #a5a2b0; }
 @keyframes mapa-faixa { from { background-position: 0 0; } to { background-position: 28px 0; } }
 .mapa-faixa { width: 100%; background: repeating-linear-gradient(90deg, #f16622 0 14px, #ff9a62 14px 28px); animation: mapa-faixa .9s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .mapa-faixa { animation: none; } }
+
+/* Escritório: quem está trabalhando "digita" e o ponto de status pulsa, bem de leve */
+@keyframes esc-ponto { 0%, 60%, 100% { transform: translateY(0); opacity: .45; } 30% { transform: translateY(-2.5px); opacity: 1; } }
+@keyframes esc-pulso { 0% { transform: scale(1); opacity: .55; } 100% { transform: scale(2.4); opacity: 0; } }
+.esc-ponto { animation: esc-ponto 1.2s ease-in-out infinite; }
+.esc-pulso { animation: esc-pulso 1.8s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .esc-ponto, .esc-pulso { animation: none; } }
