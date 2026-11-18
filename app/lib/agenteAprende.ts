@@ -224,6 +224,9 @@ async function medirEstiloFelipe() {
 
 // O que você ensinou direto (pediu ao Claude): entra uma vez, pela versão
 const ENSINADO: { v: number; item: Conhecimento }[] = [
+  // v9 (18/11, pedido seu: chamar mais as pessoas pelo nome)
+  { v: 9, item: { id: "felipe-chamar-pelo-nome", tema: "venda", em: "2026-11-18T00:00:00.000Z",
+    texto: "Chamo as pessoas pelo nome: aproxima e deixa a conversa pessoal. Uso o nome no cumprimento (\"Oi, Ana, tudo bem?\") e de vez em quando no meio da conversa, principalmente quando confirmo algo ou faço uma pergunta importante (\"Ana, consegue me mandar a medida do frasco?\"), sem repetir em toda mensagem. Apelido também vale (Cadu, Dudu): é até melhor, mais próximo. O nome certo vem em cada atendimento como \"Nome para chamar\". Quando o contato não tem nome de pessoa (nome de loja, marca ou apelido estranho, como \"Comercial\" ou \"WSSACOLAS\"), não chamo a loja pelo nome nem invento: \"Oi, tudo bem?\". Se a pessoa disser como se chama na conversa, passo a usar esse nome." } },
   // v8 (16/11, regra sua: 500 de cada tamanho é a pior quantidade)
   { v: 8, item: { id: "felipe-500-de-cada", tema: "preco", em: "2026-11-16T00:00:00.000Z",
     texto: "500 unidades de cada tamanho é uma quantidade ruim: fica cara tanto na impressão digital quanto no offset, porque o offset precisa rodar pelo menos 1.000 folhas para valer a pena. Quando o cliente pedir por volta de 500 de cada tamanho (ou de cada modelo de caixa), ofereço as duas saídas: diminuir a quantidade e fazer na impressão digital, ou subir para pelo menos 1.000 de cada tamanho no offset, onde o unitário cai bastante. Não cotar 500 de cada sem apresentar essas duas opções." } },
