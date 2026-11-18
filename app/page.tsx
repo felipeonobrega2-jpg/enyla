@@ -608,10 +608,12 @@ export default function Home() {
     })
   }, [config])
 
-  function salvarConfigTudo(cfg: Configuracoes) {
+  // recalcular: false quando a mudança não mexe no cálculo (ex.: anotar o "porque disso" de uma correção). Recalcular
+  // ali usava o formulário de um instante antes e desfazia o valor que você acabou de mudar.
+  function salvarConfigTudo(cfg: Configuracoes, opts: { recalcular?: boolean } = {}) {
     configAtual.current = cfg
     setConfig(cfg)
-    setResult(calcular(form, cfg))
+    if (opts.recalcular !== false) setResult(calcular(form, cfg))
     fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg) }).catch(() => {})
   }
 
@@ -3117,8 +3119,8 @@ export default function Home() {
                 onOpcoes={o => mudarForm(p => ({ ...p, rota: o }))}
                 onRegistrarFaca={registrarFaca}
                 onCorrecao={c => {
-                  const novo = registrarCorrecao(config, c)
-                  salvarConfigTudo(novo)
+                  const novo = registrarCorrecao(configAtual.current, c)
+                  salvarConfigTudo(novo, { recalcular: false })
                   if (c.tipo === "excecao") { showToast("Anotado como exceção: o motor não muda por isso."); return }
                   const n = correcoesParecidas(novo, c)
                   showToast(n >= 3 ? "Anotado. Já há correções parecidas: veja a sugestão de calibragem em Fornecedores → Calibragem." : `Anotado (${n} de 3). Com 3 correções parecidas o motor sugere calibrar.`)
