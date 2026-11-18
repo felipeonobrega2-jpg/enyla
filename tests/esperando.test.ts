@@ -11,6 +11,7 @@ describe("ninguém sem resposta", () => {
       c({ jid: "a", nome: "Mateus", etiquetas: ["Digital"], ultima_msg: "Fico no aguardo dos valores", ultima_recebida_at: min(1200), ultima_enviada_at: min(1202) }),
       c({ jid: "h", nome: "Auto", ultima_msg: "Olá! Seja muito bem-vindo(a) à Loja Exemplo!" }),
       c({ jid: "i", nome: "Vai mandar", ultima_msg: "Vou providenciar" }),
+      c({ jid: "j", nome: "Fechada", fechada_em: min(30) }),
       c({ jid: "b", nome: "Bom", status_lead: "mql" }),
       c({ jid: "c", nome: "Recente", ultima_recebida_at: min(5) }),
       c({ jid: "d", nome: "Ok", ultima_msg: "ok, obrigado" }),

@@ -70,7 +70,7 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
   const { dentroDoHorario } = await import("./agenteLeads")
   if (cfg.agenteAuto?.horario && !dentroDoHorario(cfg.agenteAuto.horario as never)) return "fora do horário"
   const { quemEspera, tempoEspera } = await import("./esperando")
-  const { data } = await supabase.from("whatsapp_conversas").select("jid, nome, etiquetas, status_lead, ultima_msg, ultima_recebida_at, ultima_enviada_at, proxima_acao")
+  const { data } = await supabase.from("whatsapp_conversas").select("jid, nome, etiquetas, status_lead, ultima_msg, ultima_recebida_at, ultima_enviada_at, proxima_acao, fechada_em")
     .not("jid", "like", "%@g.us").gte("ultima_recebida_at", new Date(agora.getTime() - 3 * 86_400_000).toISOString()).limit(800)
   const lista = quemEspera((data ?? []) as never, agora.getTime())
   if (!lista.length) return "ninguém"

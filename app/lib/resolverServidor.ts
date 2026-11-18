@@ -130,7 +130,7 @@ export async function paraResolver(cfg: { grandesNegocios?: import("./grandesNeg
   // Quem está esperando resposta há 30+ min (o vigia já tentou o agente; se sobrou, é seu)
   {
     const { quemEspera, tempoEspera } = await import("./esperando")
-    const { data: cvs } = await supabase.from("whatsapp_conversas").select("jid, nome, etiquetas, status_lead, ultima_msg, ultima_recebida_at, ultima_enviada_at, proxima_acao")
+    const { data: cvs } = await supabase.from("whatsapp_conversas").select("jid, nome, etiquetas, status_lead, ultima_msg, ultima_recebida_at, ultima_enviada_at, proxima_acao, fechada_em")
       .not("jid", "like", "%@g.us").gte("ultima_recebida_at", new Date(agora - 3 * DIA).toISOString()).limit(800)
     for (const e of quemEspera((cvs ?? []) as never, agora, 30).filter(x => x.peso >= 2 || x.minutos >= 120).slice(0, 15))
       itens.push({ tipo: "esperando", titulo: e.nome, detalhe: `${e.rotulo} esperando há ${tempoEspera(e.minutos)}: “${e.mensagem}”`, valor: null, jid: e.jid, numero: null, desde: null, nivel: e.minutos >= 120 || e.peso >= 3 ? "perigo" : "alerta" })

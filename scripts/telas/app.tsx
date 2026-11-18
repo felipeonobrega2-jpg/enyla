@@ -327,6 +327,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       gastos: { totalDia: 140, alertas: [{ tipo: "meta", nivel: "perigo", texto: "Anúncios da Meta: saldo para menos de 1 dia (R$ 0,49). Recarregue para a operação não parar." }] },
       resolver: [
         { tipo: "sistema", titulo: "IA da Enyla sem crédito", detalhe: "o agente não responde enquanto não recarregar (Anthropic)", valor: null, jid: null, numero: null, desde: h(30), nivel: "perigo" },
+        { tipo: "esperando", titulo: "Mateus Exemplo", detalhe: "digital esperando há 20 h: “Fico no aguardo dos valores”", valor: null, jid: "8@lid", numero: null, desde: null, nivel: "perigo" },
         { tipo: "pagamento", titulo: "Loja Exemplo · ORC-2026-301", detalhe: "aprovou há 2 dias e o sinal de R$ 2.400 não caiu", valor: 4800, jid: "5@lid", numero: "ORC-2026-301", desde: h(2900), nivel: "alerta" },
         { tipo: "atrasado", titulo: "Marca Fictícia · ORC-2026-226", detalhe: "entrega era 03/11 (15 dias de atraso): avise o cliente e ajuste a data", valor: 9200, jid: "6@lid", numero: "ORC-2026-226", desde: h(9000), nivel: "perigo" },
         { tipo: "proposta", titulo: "Perfumaria Modelo · ORC-2026-283", detalhe: "abriu a proposta 3× · sem retomada há 2 dias", valor: 11786, jid: "1@lid", numero: "ORC-2026-283", desde: h(3000), nivel: "alerta" },

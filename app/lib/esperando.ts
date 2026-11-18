@@ -4,6 +4,7 @@
 export type ConvEspera = {
   jid: string; nome: string | null; etiquetas: string[] | null; status_lead: string | null; ultima_msg: string | null
   ultima_recebida_at: string | null; ultima_enviada_at: string | null; proxima_acao?: string | null
+  fechada_em?: string | null   // você fechou ("não precisa de resposta"); reabre sozinha quando o cliente escreve de novo
 }
 export type Esperando = { jid: string; nome: string; minutos: number; mensagem: string; peso: number; rotulo: string }
 
@@ -19,6 +20,7 @@ export function quemEspera(convs: ConvEspera[], agora = Date.now(), minimoMin = 
   for (const c of convs) {
     if (c.jid.includes("@g.us") || !c.ultima_recebida_at) continue
     if (c.ultima_enviada_at && c.ultima_enviada_at >= c.ultima_recebida_at) continue
+    if (c.fechada_em && c.fechada_em >= c.ultima_recebida_at) continue
     const min = Math.floor((agora - new Date(c.ultima_recebida_at).getTime()) / 60_000)
     if (min < minimoMin || min > maximoDias * 1440) continue
     const et = c.etiquetas ?? []

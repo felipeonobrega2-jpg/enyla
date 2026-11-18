@@ -47,6 +47,11 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar, parte = "tudo" }
   const [feitos, setFeitos] = useState<Set<string>>(new Set())
   const [verTravados, setVerTravados] = useState(false)
   const [verResolver, setVerResolver] = useState(false)
+  // Fechar conversa direto do "Para resolver agora": some na hora; volta se o cliente escrever de novo
+  const fecharConversa = (jid: string) => {
+    setFeitos(f => new Set(f).add(jid))
+    fetch("/api/whatsapp/conversas", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid, fechar: true }) }).catch(() => {})
+  }
 
   useEffect(() => {
     const carregar = () => fetch("/api/hoje").then(r => r.ok ? r.json() : null).then(x => { if (x) { setD(x); setFeitos(new Set()) } }).catch(() => {})
@@ -182,6 +187,12 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar, parte = "tudo" }
                   <span className="flex-1 min-w-0">
                     <span className="flex items-baseline gap-2">
                       <span className="flex-1 min-w-0 text-[14px] font-semibold text-[#191625] truncate">{nome}</span>
+                      {x.tipo === "esperando" && x.jid && (
+                        <span role="button" tabIndex={0} title="Não precisa de resposta: fecha a conversa (reabre sozinha se o cliente escrever)"
+                          onClick={e => { e.stopPropagation(); fecharConversa(x.jid!) }}
+                          onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); fecharConversa(x.jid!) } }}
+                          className="ds-toque shrink-0 text-[11.5px] font-semibold text-[#5e5c68] px-2 py-1 -my-1 rounded-lg hover:bg-[rgba(116,116,128,0.1)] flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />Fechar</span>
+                      )}
                       {x.valor ? <span className="text-[13.5px] font-bold ds-num shrink-0" style={{ color: cor }}>{brl(x.valor)}</span> : null}
                     </span>
                     <span className="block text-[12.5px] text-[#5e5c68] leading-snug mt-0.5">{numero ? <span className="font-medium text-[#898892]">{numero} · </span> : null}{x.detalhe}</span>
