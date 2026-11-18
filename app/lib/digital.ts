@@ -37,6 +37,7 @@ export function caberFrasco(pad: { a: number; l: number; p: number }, frasco: st
 export const SINAL_DIGITAL = 0.5
 
 export type StatusDigital = "aguardando_sinal" | "sinal_pago" | "arte" | "producao" | "enviado" | "cancelado"
+export type LinkCartao = { v: number; orderNsu: string; url: string; valor: number; em: string }
 export type PedidoDigital = {
   id: string                       // DIG-0001
   jid: string; nome: string | null
@@ -68,6 +69,8 @@ export type PedidoDigital = {
   documento?: string                                         // CPF/CNPJ (cobrança no Asaas e nota)
   teste?: boolean                                            // pedido de teste (você paga para você): fora de Villa, designer, acerto e margem
   asaas?: { cliente?: string; sinal?: CobrancaPix; restante?: CobrancaPix }
+  // Cartão na InfinitePay (o link aberto de cada parte; o Pix segue no Asaas)
+  infinitepay?: { sinal?: LinkCartao; restante?: LinkCartao }
 }
 export type CobrancaPix = { id: string; valor: number; payload: string; imagem: string; fatura: string; em: string }
 export type Arte = { url: string; nome: string; em: string }

@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import QRCode from "qrcode"
-import { Check, Copy, Loader2, Upload, FileText, AlertCircle, Sparkles, Palette, Truck, Send } from "lucide-react"
+import { Check, Copy, Loader2, Upload, FileText, AlertCircle, Sparkles, Palette, Truck, Send, CreditCard } from "lucide-react"
 import { Caixa3D } from "@/app/components/Caixa3D"
 import { gerarPixPayload } from "@/app/lib/pix"
 
@@ -24,6 +24,7 @@ type Pedido = {
   termos: { titulo: string; itens: string[] }[]; termosVersao: string; termosAceitosEm: string | null
   asaas: boolean; documento: string | null
   cobranca: { parte: "sinal" | "restante"; payload: string; imagem: string; fatura: string } | null
+  cartao?: boolean
 }
 const ehPdf = (u: string) => /\.pdf($|\?)/i.test(u)
 
@@ -49,6 +50,14 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
       const d = await r.json().catch(() => null)
       if (!r.ok) return setErro(d?.erro ?? "Não consegui abrir o orçamento.")
       setP(d); setBr({ marca: d.briefing.marca, cores: d.briefing.cores, referencias: d.briefing.referencias, laminacao: d.briefing.laminacao ?? "fosca" })
+      // Voltou do cartão (InfinitePay): o servidor confere antes de marcar como pago; a URL fica limpa
+      const q = new URLSearchParams(window.location.search)
+      if (q.get("transaction_nsu") && q.get("order_nsu")) {
+        const corpo = { t, acao: "cartaoVolta", order_nsu: q.get("order_nsu"), transaction_nsu: q.get("transaction_nsu"), slug: q.get("slug") }
+        window.history.replaceState(null, "", `${window.location.pathname}?t=${encodeURIComponent(t)}`)
+        const v = await fetch(`/api/d/${encodeURIComponent(id)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }).catch(() => null)
+        if (v?.ok) setP(await v.json())
+      }
     }).catch(() => setErro("Sem conexão. Tente de novo."))
   }, [id, t, dz])
 
@@ -463,6 +472,20 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
     setGerando(false)
   }
   const precisa = p.asaas && !semAsaas && !p.cobranca
+  // Cartão em até 12x (InfinitePay), a mesma parte da vez; no sinal, os termos são aceitos antes
+  const [abrindo, setAbrindo] = useState(false)
+  const irParaCartao = async () => {
+    setAbrindo(true); setErro(null)
+    try { await aceitar(); const d = await post({ acao: "cartao" }) as unknown as { url?: string }; if (d.url) { window.location.href = d.url; return } }
+    catch (e) { setErro((e as Error).message) }
+    setAbrindo(false)
+  }
+  const cartao = p.cartao ? (
+    <button onClick={() => void irParaCartao()} disabled={abrindo || (faltaTermos && !marcado)}
+      className="mt-2 w-full h-12 rounded-xl text-[14.5px] font-semibold text-[#191625] bg-[rgba(116,116,128,0.08)] hover:bg-[rgba(116,116,128,0.14)] flex items-center justify-center gap-2 disabled:opacity-40 transition-colors">
+      {abrindo ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}{abrindo ? "Abrindo…" : "Pagar no cartão em até 12x"}
+    </button>
+  ) : null
 
   // Pix sem pedir documento (ou cobrança já gerada) e termos ainda não aceitos: o aceite vem antes do QR
   if (faltaTermos && !(p.asaas && !semAsaas && !p.cobranca))
@@ -476,11 +499,12 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
           className="mt-3 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40">
           {gerando ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Ver o Pix
         </button>
+        {cartao}
         {erro && <p className="text-[12px] text-[#d33a3c] mt-2">{erro}</p>}
       </div>
     )
   if (p.asaas && !semAsaas && p.cobranca)
-    return <PixBloco titulo={`${titulo} pelo Pix`} valor={valor} txid={txid} descricao={descricao} sub={sub} pronto={{ payload: p.cobranca.payload, imagem: p.cobranca.imagem }} cartao={p.cobranca.fatura}
+    return <PixBloco titulo={`${titulo} pelo Pix`} valor={valor} txid={txid} descricao={descricao} sub={sub} pronto={{ payload: p.cobranca.payload, imagem: p.cobranca.imagem }} cartao={cartao}
       aviso="Assim que o Pix cair, a confirmação chega no seu WhatsApp." onConferir={onConferir} conferindo={conferindo} />
   if (precisa)
     return (
@@ -495,16 +519,17 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
         {faltaTermos && <AceiteTermos p={p} marcado={marcado} setMarcado={setMarcado} />}
         <button onClick={() => void gerar(doc.trim() ? doc : undefined)} disabled={gerando || (faltaTermos && !marcado) || (!(p.documento && !doc.trim()) && doc.replace(/\D/g, "").length < 11)}
           className="mt-3 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-60">
-          {gerando ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Gerar Pix (ou pagar no cartão)
+          {gerando ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Gerar o Pix
         </button>
-        <p className="text-[11.5px] text-[#898892] mt-2">É para a cobrança sair no seu nome. A confirmação do pagamento é na hora.</p>
+        {cartao}
+        <p className="text-[11.5px] text-[#898892] mt-2">O CPF/CNPJ é para o Pix sair no seu nome. No cartão, os dados são pedidos na página segura da InfinitePay.</p>
         {erro && <p className="text-[12px] text-[#d33a3c] mt-2">{erro}</p>}
       </div>
     )
-  return <PixBloco titulo={`${titulo} pelo Pix`} valor={valor} txid={txid} descricao={descricao} sub={sub} onConferir={onConferir} conferindo={conferindo} />
+  return <PixBloco titulo={`${titulo} pelo Pix`} valor={valor} txid={txid} descricao={descricao} sub={sub} onConferir={onConferir} conferindo={conferindo} cartao={cartao} />
 }
 
-function PixBloco({ titulo, valor, txid, descricao, sub, onConferir, conferindo, pronto, cartao, aviso }: { titulo: string; valor: number; txid: string; descricao: string; sub: string; onConferir: () => void; conferindo: boolean; pronto?: { payload: string; imagem: string }; cartao?: string; aviso?: string }) {
+function PixBloco({ titulo, valor, txid, descricao, sub, onConferir, conferindo, pronto, cartao, aviso }: { titulo: string; valor: number; txid: string; descricao: string; sub: string; onConferir: () => void; conferindo: boolean; pronto?: { payload: string; imagem: string }; cartao?: React.ReactNode; aviso?: string }) {
   const payload = useMemo(() => pronto?.payload ?? gerarPixPayload({ chave: "financeiro@enyla.com.br", nome: "Enyla", cidade: "Natal", valor, txid: txid.replace(/\W/g, ""), descricao }), [valor, txid, descricao, pronto?.payload])
   const [qrGerado, setQr] = useState<string | null>(null)
   const [copiado, setCopiado] = useState(false)
@@ -521,7 +546,7 @@ function PixBloco({ titulo, valor, txid, descricao, sub, onConferir, conferindo,
         className="mt-4 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-colors">
         {copiado ? <><Check className="w-5 h-5" />Código copiado</> : <><Copy className="w-5 h-5" />Copiar Pix copia e cola</>}
       </button>
-      {cartao && <a href={cartao} target="_blank" rel="noreferrer" className="mt-2 w-full h-11 rounded-xl text-[14px] font-semibold text-[#191625] bg-[rgba(116,116,128,0.08)] flex items-center justify-center">Prefiro pagar no cartão</a>}
+      {cartao}
       <p className="text-[11.5px] text-[#898892] mt-2">{aviso ?? `Pague exatamente ${brl(valor)}: é por esse valor que o sistema reconhece o seu pedido.`}</p>
       <button onClick={onConferir} disabled={conferindo}
         className="mt-3 w-full h-11 rounded-xl text-[14px] font-semibold text-[#8456e8] bg-[#8456e8]/[0.08] hover:bg-[#8456e8]/[0.14] disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">

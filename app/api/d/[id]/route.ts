@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { auth } from "@/auth"
-import { lerPedido, gravarPedido, tokenDigitalValido, tokenDesignerValido, conferirSinais, conferirNoAsaas, cobrarNoAsaas, aprovarPeloCliente, ajustePeloCliente, mandarArte, avisarDesigner } from "@/app/lib/digitalServidor"
+import { lerPedido, gravarPedido, tokenDigitalValido, tokenDesignerValido, conferirSinais, conferirNoAsaas, cobrarNoAsaas, cartaoNaInfinitePay, confirmarCartaoDigital, aprovarPeloCliente, ajustePeloCliente, mandarArte, avisarDesigner } from "@/app/lib/digitalServidor"
 import { opcoesDoPedido, trocarQuantidade, gravarEntrega, arteAtual, esperandoAprovacao, PedidoComBriefing, DIAS_VALIDADE_DIGITAL } from "@/app/lib/digital"
 import type { RegraDigital } from "@/app/lib/precoDigital"
 import { asaasConfigurado } from "@/app/lib/asaas"
+import { infinitePayConfigurado, numeroDoOrderNsu } from "@/app/lib/infinitePay"
 import { termosDigital, VERSAO_TERMOS } from "@/app/lib/termosDigital"
 import { mascararDocumento } from "@/app/lib/documento"
 
 // Página pública do pedido digital (/d/DIG-0001?t=…): só com o link assinado. Nunca devolve custo nem margem.
 // Link da arte (Leandro): nenhum valor de venda (total, sinal, restante, opções, cobrança), ele não pode saber por quanto foi vendido
 const publico = (p: PedidoComBriefing, regra?: RegraDigital, designer = false) => designer ? semValores({ ...dadosPublicos(p, regra, true), folha: p.folhaReal ?? p.folha }) : dadosPublicos(p, regra, false)
-const semValores = <T extends Record<string, unknown>>(d: T) => ({ ...d, nome: null, total: 0, sinal: 0, opcoes: [], restante: null, frete: null, cobranca: null, documento: null, asaas: false, entrega: null })
+const semValores = <T extends Record<string, unknown>>(d: T) => ({ ...d, nome: null, total: 0, sinal: 0, opcoes: [], restante: null, frete: null, cobranca: null, documento: null, asaas: false, cartao: false, entrega: null })
 const dadosPublicos = (p: PedidoComBriefing, regra?: RegraDigital, designer = false) => ({
   id: p.id, nome: p.nome, ml: p.ml, produto: p.produto, medidas: p.medidas, padrao: p.padrao, folha: p.folha,
   quantidade: p.quantidade, total: p.total, sinal: p.sinal, status: p.status, sinalPagoEm: p.sinalPagoEm ?? null,
@@ -28,6 +29,7 @@ const dadosPublicos = (p: PedidoComBriefing, regra?: RegraDigital, designer = fa
   designer,
   // Cobrança no Asaas: só a que vale para o valor de agora (se mudou, a página pede de novo)
   asaas: asaasConfigurado(),
+  cartao: infinitePayConfigurado(),
   documento: p.documento ? mascararDocumento(p.documento) : null,
   cobranca: (() => {
     const parte = p.status === "aguardando_sinal" ? "sinal" : p.restante && !p.restantePagoEm ? "restante" : null
@@ -53,7 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const id = decodeURIComponent((await params).id)
-  const b = await req.json().catch(() => ({})) as { t?: string; dz?: string; acao?: string; quantidade?: number; marca?: string; cores?: string; referencias?: string; laminacao?: string; texto?: string; cep?: string; endereco?: string; documento?: string }
+  const b = await req.json().catch(() => ({})) as { t?: string; dz?: string; acao?: string; quantidade?: number; marca?: string; cores?: string; referencias?: string; laminacao?: string; texto?: string; cep?: string; endereco?: string; documento?: string; order_nsu?: string; transaction_nsu?: string; slug?: string }
   if (!tokenDigitalValido(id, b.t)) return NextResponse.json({ erro: "Link inválido." }, { status: 403 })
   const { pedido, cfg } = await lerPedido(id)
   if (!pedido || pedido.status === "cancelado") return NextResponse.json({ erro: "Orçamento indisponível." }, { status: 404 })
@@ -98,6 +100,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const parte = pedido.status === "aguardando_sinal" ? "sinal" : "restante"
     const r = await cobrarNoAsaas(id, parte, b.documento)
     if (r.erro) return NextResponse.json({ erro: r.erro === "sem asaas" ? "Pagamento indisponível agora: use o Pix abaixo." : r.erro, semAsaas: true }, { status: 400 })
+    const { pedido: atual } = await lerPedido(id)
+    return NextResponse.json(publico(atual ?? pedido, cfg.digital))
+  }
+  // Cartão (InfinitePay): abre o link da parte da vez; na volta, confere antes de mostrar como pago
+  if (b.acao === "cartao") {
+    const r = await cartaoNaInfinitePay(id)
+    if (r.erro || !r.url) return NextResponse.json({ erro: r.erro ?? "Cartão indisponível agora: use o Pix." }, { status: 400 })
+    return NextResponse.json({ url: r.url })
+  }
+  if (b.acao === "cartaoVolta") {
+    const nsu = String(b.order_nsu ?? ""), dig = /^(DIG-\d+)-(sinal|restante)$/.exec(numeroDoOrderNsu(nsu) ?? "")
+    if (dig && dig[1] === id) await confirmarCartaoDigital(id, dig[2] as "sinal" | "restante", { nsu, transacao: String(b.transaction_nsu ?? ""), slug: String(b.slug ?? "") }).catch(() => null)
     const { pedido: atual } = await lerPedido(id)
     return NextResponse.json(publico(atual ?? pedido, cfg.digital))
   }

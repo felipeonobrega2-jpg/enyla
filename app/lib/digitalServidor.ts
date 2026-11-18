@@ -244,7 +244,7 @@ export async function talvezAcertoSemanal() {
 }
 
 // Pago pelo Asaas (webhook, já conferido na API): marca o sinal ou o restante e avisa igual ao extrato
-export async function pagoPeloAsaas(id: string, parte: "sinal" | "restante", tx: { txId: string; valor: number; data: string }) {
+export async function pagoPeloAsaas(id: string, parte: "sinal" | "restante", tx: { txId: string; valor: number; data: string }, via = "Asaas") {
   const { cfg } = await lerPedido(id)
   const agora = new Date().toISOString()
   const p = await gravarPedido(id, x => parte === "sinal"
@@ -257,10 +257,10 @@ export async function pagoPeloAsaas(id: string, parte: "sinal" | "restante", tx:
     const rumo = await import("./animarServidor").then(m => m.linhaDeComemoracao(p.total)).catch(() => "")
     await notificar(`Venda digital: ${p.id}`, `Sinal pago ${brl(tx.valor)} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas · total ${brl(p.total)}${rumo ? `\n${rumo}` : ""}`, { prioridade: "alta", tags: ["moneybag", "tada"] }).catch(() => null)
     const designer = await avisarDesigner(cfg, p)
-    await avisarVoce(cfg, `💰 *Digital ${p.id}* · sinal pago pelo Asaas ${brl(tx.valor)}\n${p.nome ?? ""} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas${designer ? "" : "\n\nSem o número do Leandro cadastrado (Digital → Contatos): mande para ele o link da arte (sem valores):\n" + linkDesigner(p.id)}`)
+    await avisarVoce(cfg, `💰 *Digital ${p.id}* · sinal pago pelo ${via} ${brl(tx.valor)}\n${p.nome ?? ""} · ${p.quantidade.toLocaleString("pt-BR")} caixinhas${designer ? "" : "\n\nSem o número do Leandro cadastrado (Digital → Contatos): mande para ele o link da arte (sem valores):\n" + linkDesigner(p.id)}`)
   } else {
     if (c) await enviar(c, textoRestantePago(p), undefined, { essencial: true }).catch(() => null)
-    await avisarVoce(cfg, `💰 *Digital ${p.id}* · restante pago pelo Asaas ${brl(tx.valor)}\n${p.nome ?? ""}${p.entrega ? `\nEntrega: ${p.entrega.endereco} · CEP ${p.entrega.cep}` : "\nSem endereço de entrega ainda"}`)
+    await avisarVoce(cfg, `💰 *Digital ${p.id}* · restante pago pelo ${via} ${brl(tx.valor)}\n${p.nome ?? ""}${p.entrega ? `\nEntrega: ${p.entrega.endereco} · CEP ${p.entrega.cep}` : "\nSem endereço de entrega ainda"}`)
   }
 }
 
@@ -292,7 +292,7 @@ export async function cobrarNoAsaas(id: string, parte: "sinal" | "restante", doc
   if (atual) await asaas(`/payments/${atual.id}`, { method: "DELETE" }).catch(() => null)   // valor mudou: a antiga sai
   const vence = new Date(Date.now() + (parte === "sinal" ? 3 : 7) * 86_400_000 - 3 * 3_600_000).toISOString().slice(0, 10)
   const cob = await asaas<CobrancaAsaas & { invoiceUrl?: string; errors?: { description: string }[] }>("/payments", { method: "POST", body: JSON.stringify({
-    customer: cliente, billingType: "UNDEFINED", value: valor, dueDate: vence,
+    customer: cliente, billingType: "PIX", value: valor, dueDate: vence,
     description: `${parte === "sinal" ? "Sinal" : "Restante"} do pedido ${pedido.id} · ${pedido.quantidade} caixinhas`, externalReference: `${pedido.id}:${parte}`,
   }) })
   if (!cob.ok || !cob.corpo?.id) return { erro: cob.corpo?.errors?.[0]?.description ?? "Asaas não criou a cobrança." }
@@ -301,6 +301,42 @@ export async function cobrarNoAsaas(id: string, parte: "sinal" | "restante", doc
   const nova: CobrancaPix = { id: cob.corpo.id, valor: valor!, payload: qr.corpo.payload, imagem: qr.corpo.encodedImage ?? "", fatura: cob.corpo.invoiceUrl ?? "", em: new Date().toISOString() }
   await gravarPedido(id, p => ({ ...p, documento, asaas: { ...(p.asaas ?? {}), cliente, [parte]: nova } }))
   return { cobranca: nova }
+}
+
+// ── Cartão na InfinitePay (sinal ou restante, a parte da vez) ───────────────
+// Abre (ou reaproveita, se o valor e as opções não mudaram, por até 2 h) o link do cartão. O cliente volta para a
+// página do pedido e o pagamento só vale depois de conferido na InfinitePay (confirmarCartaoDigital).
+export async function cartaoNaInfinitePay(id: string): Promise<{ url?: string; erro?: string }> {
+  const { infinitePayConfigurado, criarLinkInfinitePay, orderNsu, VERSAO_LINK } = await import("./infinitePay")
+  if (!infinitePayConfigurado()) return { erro: "Cartão indisponível agora: use o Pix." }
+  const { pedido } = await lerPedido(id)
+  if (!pedido) return { erro: "Pedido não encontrado." }
+  const parte = pedido.status === "aguardando_sinal" ? "sinal" as const : pedido.restante && !pedido.restantePagoEm ? "restante" as const : null
+  if (!parte) return { erro: "Nada a pagar agora." }
+  const valor = parte === "sinal" ? pedido.sinal : pedido.restante!
+  const atual = pedido.infinitepay?.[parte]
+  if (atual && atual.v === VERSAO_LINK && Math.round(atual.valor * 100) === Math.round(valor * 100) && Date.now() - new Date(atual.em).getTime() < 2 * 3600_000) return { url: atual.url }
+  const nsu = orderNsu(`${pedido.id}-${parte}`)
+  const link = await criarLinkInfinitePay({ numero: pedido.id, nsu, valor, voltarPara: linkPedido(pedido.id),
+    descricao: `${parte === "sinal" ? "Sinal" : "Restante"} do pedido ${pedido.id} · ${pedido.quantidade} caixinhas Enyla`,
+    cliente: (pedido.nome ?? "").trim().length >= 3 ? { name: pedido.nome!.trim().slice(0, 80) } : undefined })
+  if ("erro" in link) return { erro: link.erro }
+  await gravarPedido(id, p => ({ ...p, infinitepay: { ...(p.infinitepay ?? {}), [parte]: { v: VERSAO_LINK, orderNsu: nsu, url: link.url, valor, em: new Date().toISOString() } } }))
+  return { url: link.url }
+}
+
+// Volta do checkout ou webhook da InfinitePay de um pedido digital (order_nsu "DIG-0003-sinal_xxxx")
+export async function confirmarCartaoDigital(id: string, parte: "sinal" | "restante", a: { nsu: string; transacao: string; slug: string }): Promise<"pago" | "pendente" | "invalido"> {
+  const { conferirInfinitePay } = await import("./infinitePay")
+  const { pedido } = await lerPedido(id)
+  const reg = pedido?.infinitepay?.[parte]
+  if (!pedido || !reg || reg.orderNsu !== a.nsu) return "invalido"
+  if (parte === "sinal" ? pedido.status !== "aguardando_sinal" : !!pedido.restantePagoEm) return "pago"
+  const c = await conferirInfinitePay(a)
+  if (!c.pago) return "pendente"
+  if (c.valorCentavos != null && c.valorCentavos !== Math.round(reg.valor * 100)) { console.error("[infinitepay digital] valor não bate", id, c.valorCentavos, reg.valor); return "invalido" }
+  await pagoPeloAsaas(id, parte, { txId: `infinitepay:${a.transacao}`, valor: reg.valor, data: new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) }, "cartão")
+  return "pago"
 }
 
 // "Já paguei" com cobrança no Asaas: consulta a cobrança na hora

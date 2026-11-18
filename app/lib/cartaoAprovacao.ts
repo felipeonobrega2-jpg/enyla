@@ -34,6 +34,9 @@ export async function registrarPagoNoCartao(numero: string, card: Pick<KanbanCar
 export async function confirmarPagamentoInfinitePay(a: { nsu: string; transacao: string; slug: string }): Promise<"pago" | "pendente" | "invalido"> {
   const numero = numeroDoOrderNsu(a.nsu)
   if (!numero || !a.transacao || !a.slug) return "invalido"
+  // Pedido digital (sinal ou restante): confirma no próprio pedido
+  const dig = /^(DIG-\d+)-(sinal|restante)$/.exec(numero)
+  if (dig) { const { confirmarCartaoDigital } = await import("./digitalServidor"); return confirmarCartaoDigital(dig[1], dig[2] as "sinal" | "restante", a) }
   const { supabase } = await import("@/app/lib/supabase")
   const { gravarCampos } = await import("./configAtomica")
   const { data: cfg } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
