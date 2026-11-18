@@ -4,7 +4,7 @@
 // Cada etapa: quantos, quanto vale e quantos estão parados. Toque abre a lista (parados primeiro).
 
 import { useEffect, useState } from "react"
-import { GitBranch, ChevronRight } from "lucide-react"
+import { GitBranch } from "lucide-react"
 import { Cartao, TituloCartao, Gaveta, Esqueleto } from "./ds"
 import type { FunilAgora, EtapaFunil, ItemFunil } from "../lib/funilAgora"
 
@@ -26,26 +26,47 @@ export function FunilAgoraCard({ onAbrirConversa, onAbrirCardId, onNavegar }: {
   }, [])
   if (!d) return <Esqueleto linhas={2} />
 
-  const linha = (nome: string, etapas: EtapaFunil[]) => (
-    <div>
-      <p className="text-[10.5px] font-bold uppercase tracking-wider text-[#898892] mb-1.5">{nome}</p>
-      <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1 snap-x">
-        {etapas.map((e, i) => (
-          <button key={e.id} onClick={() => e.quantos && setAberta({ linha: nome, e })} disabled={!e.quantos}
-            className={`ds-toque snap-start shrink-0 relative text-left rounded-xl px-3 py-2.5 min-w-[118px] transition-colors ${e.quantos ? "bg-[rgba(116,116,128,0.06)] hover:bg-[rgba(116,116,128,0.1)]" : "bg-[rgba(116,116,128,0.03)] cursor-default"}`}>
-            <span className="flex items-center gap-1 text-[11px] font-semibold text-[#5e5c68] whitespace-nowrap">
-              {i > 0 && <ChevronRight className="w-3 h-3 -ml-1 text-[#c7c7cc]" />}{e.nome}
-            </span>
-            <span className="flex items-baseline gap-1.5 mt-0.5">
-              <span className={`text-[19px] font-bold ds-num leading-tight ${e.quantos ? "text-[#191625]" : "text-[#c7c7cc]"}`}>{e.quantos}</span>
-              {e.parados > 0 && <span className="text-[11px] font-bold text-[#d33a3c] ds-num ds-pop whitespace-nowrap">● {e.parados} parado{e.parados > 1 ? "s" : ""}</span>}
-            </span>
-            <span className="block text-[11px] text-[#898892] ds-num h-4">{e.valor ? brlCurto(e.valor) : ""}</span>
-          </button>
-        ))}
+  // Funil em barras: largura pelo volume (raiz, para a etapa pequena não sumir ao lado dos leads), a parte vermelha é
+  // o que está parado. Etapa vazia fica apagada.
+  const funil = (nome: string, etapas: EtapaFunil[], cor: string) => {
+    const max = Math.max(1, ...etapas.map(e => e.quantos))
+    const paradosLinha = etapas.reduce((t, e) => t + e.parados, 0)
+    const valorLinha = etapas.filter(e => !/leads|entregue|enviado/.test(e.id)).reduce((t, e) => t + e.valor, 0)
+    return (
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-x-2 gap-y-0.5 mb-2 flex-wrap">
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cor }} />
+          <p className="text-[13px] font-semibold text-[#191625]">{nome}</p>
+          <p className="text-[11.5px] text-[#898892] min-w-0">{valorLinha ? `${brlCurto(valorLinha)} em andamento` : ""}{paradosLinha ? <span className="text-[#d33a3c] font-semibold"> · {paradosLinha} parados</span> : null}</p>
+        </div>
+        <div className="space-y-1 ds-escalonado">
+          {etapas.map(e => {
+            const larg = e.quantos ? Math.max(8, Math.sqrt(e.quantos) / Math.sqrt(max) * 100) : 0
+            const pctParado = e.quantos ? e.parados / e.quantos * 100 : 0
+            return (
+              <button key={e.id} onClick={() => e.quantos && setAberta({ linha: nome, e })} disabled={!e.quantos}
+                className={`ds-toque w-full grid grid-cols-[1fr_auto] sm:grid-cols-[104px_1fr_auto] items-center gap-x-2.5 gap-y-1 rounded-lg px-1.5 py-1 sm:py-1.5 text-left ${e.quantos ? "hover:bg-[rgba(116,116,128,0.06)]" : "cursor-default"}`}>
+                <span className={`text-[12.5px] sm:text-[12px] leading-tight truncate ${e.quantos ? "text-[#5e5c68] font-medium" : "text-[#c7c7cc]"}`}>{e.nome}</span>
+                <span className={`relative ${e.quantos ? "h-3 sm:h-6" : "h-1.5 sm:h-6"} rounded-md bg-[rgba(116,116,128,0.06)] overflow-hidden col-span-2 row-start-2 sm:col-span-1 sm:row-start-auto sm:col-start-2`}>
+                  {e.quantos > 0 && (
+                    <span className="absolute inset-y-0 left-0 rounded-md flex overflow-hidden ds-cresce-x" style={{ width: `${larg}%`, background: `${cor}2e` }}>
+                      <span className="h-full" style={{ width: `${100 - pctParado}%`, background: cor, opacity: 0.85 }} />
+                      {e.parados > 0 && <span className="h-full bg-[#d33a3c]" style={{ width: `${pctParado}%` }} />}
+                    </span>
+                  )}
+                </span>
+                <span className="text-right min-w-[64px] row-start-1 col-start-2 sm:col-start-3 flex sm:block items-baseline justify-end gap-1.5">
+                  {e.valor > 0 && <span className="sm:hidden text-[11px] text-[#898892] ds-num">{brlCurto(e.valor)} ·</span>}
+                  <span className={`sm:block text-[13.5px] font-bold ds-num leading-tight ${e.quantos ? "text-[#191625]" : "text-[#c7c7cc]"}`}>{e.quantos}{e.parados > 0 && <span className="text-[11px] font-bold text-[#d33a3c]"> · {e.parados}</span>}</span>
+                  {e.valor > 0 && <span className="hidden sm:block text-[10.5px] text-[#898892] ds-num leading-tight">{brlCurto(e.valor)}</span>}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   const abrir = (x: ItemFunil) => {
     if (x.jid && onAbrirConversa) { setAberta(null); onAbrirConversa(x.jid, x.nome) }
@@ -57,11 +78,16 @@ export function FunilAgoraCard({ onAbrirConversa, onAbrirCardId, onNavegar }: {
   return (
     <Cartao className="ds-entrada">
       <TituloCartao titulo="Funil agora" icone={<GitBranch className="w-4 h-4" />}
-        sub={parados ? `${parados} parados · toque numa etapa para ver quem` : "Nada parado. Toque numa etapa para ver quem está nela"} />
-      <div className="space-y-3">
-        {linha("Offset", d.offset)}
-        {linha("Digital", d.digital)}
+        sub={parados ? `${parados} parados no total` : "Nada parado agora"} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-5">
+        {funil("Offset", d.offset, "#8456e8")}
+        {funil("Digital", d.digital, "#e07b1f")}
       </div>
+      <p className="mt-3 text-[11px] text-[#898892] flex items-center gap-3 flex-wrap">
+        <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm bg-[#8456e8] opacity-85" />andando</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm bg-[#d33a3c]" />parado (esperando resposta ou passou do prazo)</span>
+        <span>· toque na etapa para ver quem</span>
+      </p>
       <Gaveta aberta={!!aberta} titulo={aberta ? `${aberta.linha} · ${aberta.e.nome}` : ""} onFechar={() => setAberta(null)}
         sub={aberta ? `${aberta.e.quantos}${aberta.e.valor ? ` · ${brl(aberta.e.valor)}` : ""}${aberta.e.parados ? ` · ${aberta.e.parados} parados` : ""}` : undefined}>
         {aberta && (
