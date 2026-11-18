@@ -11,6 +11,7 @@ export const maxDuration = 60
 // Varredura do digital (rota do sistema, com login ou com o segredo do webhook):
 //   { acao: "orcar", jid }       → monta o orçamento digital com o que a conversa já tem e manda (como o agente faria)
 //   { acao: "reenviar", jid }    → manda de novo, com os valores na mensagem, o orçamento esperando o sinal
+//   { acao: "proposta", jid }    → MQL com medida e quantidade: monta a proposta para você revisar e enviar (não envia)
 //   { acao: "responder", jid }   → o agente responde agora a última mensagem do lead que ficou sem resposta (com
 //                                  "desculpa a demora"), com as travas de sempre
 // Sai pelo agente: a mensagem conta como dele e ele segue atendendo a conversa.
@@ -23,7 +24,16 @@ async function autorizado(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!await autorizado(req)) return NextResponse.json({ erro: "não autorizado" }, { status: 401 })
   const { acao, jid } = await req.json().catch(() => ({})) as { acao?: string; jid?: string }
-  if (!jid || !["orcar", "reenviar", "responder"].includes(acao ?? "")) return NextResponse.json({ erro: "acao (orcar|reenviar|responder) e jid" }, { status: 400 })
+  if (!jid || !["orcar", "reenviar", "responder", "proposta"].includes(acao ?? "")) return NextResponse.json({ erro: "acao (orcar|reenviar|responder|proposta) e jid" }, { status: 400 })
+  if (acao === "proposta") {
+    const { atender } = await import("@/app/lib/atendenteServidor")
+    const { prepararProposta } = await import("@/app/lib/propostaProntaServidor")
+    const a = await atender(jid, { automatico: true }).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
+    if (!a.ok) return NextResponse.json({ ok: false, erro: a.erro }, { status: 502 })
+    if (a.conversa.clienteCadastrado) return NextResponse.json({ ok: false, motivo: "cliente da casa: o preço é seu" })
+    const r = await prepararProposta(jid, a.r.dados, a.conversa.nome).catch(e => ({ ok: false as const, motivo: String(e) }))
+    return NextResponse.json(r.ok ? { ok: true, proposta: r.proposta.id, nova: r.nova } : { ok: false, motivo: r.motivo })
+  }
   if (acao === "responder") {
     const { data: ult } = await supabase.from("whatsapp_mensagens").select("id, from_me").eq("jid", jid).order("criado_em", { ascending: false }).limit(1).maybeSingle()
     if (!ult || ult.from_me) return NextResponse.json({ ok: true, enviou: false, motivo: "a última mensagem já é nossa" })
