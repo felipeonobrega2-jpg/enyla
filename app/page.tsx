@@ -384,10 +384,18 @@ export default function Home() {
       showToast(`Faca "${nomeDoDesenho(achadas[0].d)}" na mesa: combina com ${pedido}`)
     }
   }
+  // Mesa limpa para um orçamento NOVO: sem o "editando ORC-…" de antes (inclusive o que voltou do rascunho do F5),
+  // sem custos mudados à mão nem desenho do orçamento anterior
+  function comecarOrcamentoNovo(form?: FormData) {
+    setEditandoHistorico(null)
+    setCustomCustos({}); setCustomPacotesMap({}); setCustomAcabamentoCustos({})
+    setForm(form ?? FORM_INICIAL); setResult(null); setDxfNome(null); setDxfGeo(null); dxfChave.current = null
+    setSugestaoFaca(null)
+  }
   function orcamentoDaConversa(nome: string, jid: string, dados?: DadosPedido) {
     const { frente: _f, lateral: _l, alturaBox: _a, ...doChat } = dados ? formDoAtendimento(dados) : {}
     void _f; void _l; void _a
-    setForm({ ...FORM_INICIAL, nomeCliente: nome, ...doChat }); setResult(null); setDxfNome(null); setDxfGeo(null); dxfChave.current = null
+    comecarOrcamentoNovo({ ...FORM_INICIAL, nomeCliente: nome, ...doChat })
     setSugestaoFaca(null); buscaFacaVez.current++
     if (dados && (dados.caixa_cm || dados.volume_ml || dados.frasco_cm)) void procurarFacaDoPedido(nome, dados)
     if (config.vinculosWhatsapp?.[jid] !== nome) salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [jid]: nome } })
@@ -1264,7 +1272,7 @@ export default function Home() {
     if (config.vinculosWhatsapp?.[p.jid] !== f.nomeCliente) salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [p.jid]: f.nomeCliente } })
     propostaNaMesa.current = { id: p.id, nome: f.nomeCliente, quantidade: p.quantidade }
     if (enviar) { void salvar({ f, r, enviar: true, jid: p.jid }); return }
-    setForm(f); setResult(r); setDxfNome(null)
+    comecarOrcamentoNovo(f); setResult(r)
     setConversaOrc({ jid: p.jid, nome: p.nome ?? f.nomeCliente, dados: p.dados, cliente: f.nomeCliente })
     navigate("orcamento")
     showToast("Proposta do agente na mesa: ajuste e salve como sempre.")
@@ -1273,7 +1281,7 @@ export default function Home() {
 
 
   function replicar(item: { form: FormData; calculo: Calculo }) {
-    setForm(item.form)
+    comecarOrcamentoNovo(item.form)
     setResult(calcular(item.form, config))
     setView("orcamento")
     showToast("Orçamento replicado na mesa atual.")
@@ -2515,7 +2523,7 @@ export default function Home() {
                 className="flex-1 h-9 border border-[rgba(60,60,67,0.12)] hover:bg-[rgba(116,116,128,0.04)] text-[#8E8E93] text-[11.5px] font-medium rounded-xl transition-all duration-150">
                 Imprimir
               </button>
-              <button onClick={() => { setForm(FORM_INICIAL); setResult(null); setDxfNome(null) }}
+              <button onClick={() => { comecarOrcamentoNovo(); setConversaOrc(null) }}
                 className="flex-1 h-9 border border-[rgba(60,60,67,0.12)] hover:bg-[rgba(116,116,128,0.04)] text-[#8E8E93] text-[11.5px] font-medium rounded-xl transition-all duration-150">
                 Limpar
               </button>
