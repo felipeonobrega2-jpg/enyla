@@ -11,7 +11,9 @@ import {
 } from "../lib/negocio"
 import { brl, num } from "../utils"
 import { CabecalhoPagina, Segmentado, Botao, Cartao, TituloCartao, ColunasDuplas, Colunas, ListaBarras, Vazio } from "./ds"
-import { gerarHtmlRelatorio } from "../lib/relatorioHtml"
+import { montarRelatorio, htmlRelatorio, periodoAnterior, type ExtrasRelatorio } from "../lib/relatorioGerencial"
+import { LOGO_DARK_B64 } from "../pdf"
+import { Gaveta } from "./ds"
 import { TempoAteFecharCard } from "./TempoAteFecharCard"
 import { SaudeEmpresaCard } from "./SaudeEmpresaCard"
 import { PrevisaoCartao } from "./PrevisaoCartao"
@@ -78,7 +80,23 @@ function Delta({ atual, base, menorMelhor }: { atual: number | null; base: numbe
   )
 }
 
-export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, origensClientes, historico = [], fixosMes = 0 }: {
+// Opções de período do PDF (o mês passado fechado é o melhor para análise)
+type OpcaoPdf = "mesPassado" | "esteMes" | "trimestre" | "ano" | "personalizado"
+function periodoDoPdf(o: OpcaoPdf, hoje: Date, de: string, ate: string): { de: Date; ate: Date; nome: string } | null {
+  const y = hoje.getFullYear(), m = hoje.getMonth()
+  const nomeMes = (d: Date) => { const t = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }); return t.charAt(0).toUpperCase() + t.slice(1) }
+  if (o === "mesPassado") { const d = new Date(y, m - 1, 1); return { de: d, ate: new Date(y, m, 0), nome: nomeMes(d) } }
+  if (o === "esteMes") return { de: new Date(y, m, 1), ate: hoje, nome: `${nomeMes(hoje)} (até ${hoje.toLocaleDateString("pt-BR")})` }
+  if (o === "trimestre") { const d = new Date(y, m - 3, 1); return { de: d, ate: new Date(y, m, 0), nome: `${nomeMes(d)} a ${nomeMes(new Date(y, m - 1, 1))}` } }
+  if (o === "ano") return { de: new Date(y, 0, 1), ate: hoje, nome: `${y} (até ${hoje.toLocaleDateString("pt-BR")})` }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(de) || !/^\d{4}-\d{2}-\d{2}$/.test(ate) || de > ate) return null
+  const [a1, a2] = [new Date(de + "T12:00:00"), new Date(ate + "T12:00:00")]
+  return { de: a1, ate: a2, nome: `${a1.toLocaleDateString("pt-BR")} a ${a2.toLocaleDateString("pt-BR")}` }
+}
+
+export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, origensClientes, historico = [], fixosMes = 0, nomeCategoria = id => id, impostoPct }: {
+  nomeCategoria?: (id: string) => string
+  impostoPct?: number
   fixosMes?: number
   origensClientes?: OrigensClientes
   historico?: { numero?: string; calculo?: Pick<Calculo, "tabela"> }[]
@@ -190,34 +208,30 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, 
   }
   const materiais = [...porMaterial.entries()].sort((x, y) => y[1].valor - x[1].valor)
 
-  function abrirPdf() {
-    const v = vendasDoPeriodo(pedidos, lancamentos, per.atual)
-    const conv = conversao(orcamentosDoPeriodo(kanban, per.atual))
-    const rec = recebiveis(pedidos, lancamentos)
-    const top = new Map<string, { nome: string; total: number; count: number }>()
-    for (const p of v.pedidos) {
-      const k = nomeChave(p.nomeCliente)
-      const t = top.get(k) ?? { nome: p.nomeCliente, total: 0, count: 0 }
-      t.total += p.valor; t.count += 1; top.set(k, t)
-    }
-    const html = gerarHtmlRelatorio({
-      periodoLabel: per.nome,
-      dreRec: a.recebido, dreDesp: a.despesas,
-      kpisData: {
-        receita: v.receita, vendas: v.pedidos.length, ticket: v.ticketMedio, conversao: conv.taxa,
-        pipelineGlobal: pipelineComercial(kanban).valor, total: conv.total, clientesUnicos: new Set(v.pedidos.map(p => nomeChave(p.nomeCliente))).size,
-      },
-      topClientesData: [...top.values()].sort((x, y) => y.total - x.total).slice(0, 8),
-      materiaisData: materiais.slice(0, 8).map(([nome, m]) => ({ nome, count: m.qtd, value: m.valor })),
-      aReceber: rec.aReceber, aReceberCount: rec.comSaldo.length,
-      vencidos: rec.vencido, vencidosCount: rec.comSaldo.filter(p => p.vencido > 0.5).length,
-      dataGeracao: new Date().toLocaleString("pt-BR"),
-    })
+  const [pdfAberto, setPdfAberto] = React.useState(false)
+  const [opcaoPdf, setOpcaoPdf] = React.useState<OpcaoPdf>("mesPassado")
+  const [pdfDe, setPdfDe] = React.useState(""), [pdfAte, setPdfAte] = React.useState("")
+  const [gerando, setGerando] = React.useState(false)
+  const [erroPdf, setErroPdf] = React.useState<string | null>(null)
+  async function gerarPdf() {
+    const per = periodoDoPdf(opcaoPdf, hoje, pdfDe, pdfAte)
+    if (!per) { setErroPdf("Escolha as datas de início e fim."); return }
+    // A janela abre já no clique (o navegador bloqueia janela aberta depois de esperar a rede)
     const w = window.open("", "_blank")
-    if (!w) return
-    w.document.write(html)
-    w.document.close()
-    setTimeout(() => w.print(), 500)
+    if (!w) { setErroPdf("O navegador bloqueou a janela do PDF. Libere pop-ups para este site."); return }
+    w.document.write("<p style='font-family:sans-serif;padding:24px;color:#6b6878'>Montando o relatório…</p>")
+    setGerando(true); setErroPdf(null)
+    try {
+      const ant = periodoAnterior(per)
+      const iso = (d: Date) => d.toLocaleDateString("sv-SE")
+      const q = new URLSearchParams({ de: iso(per.de), ate: iso(per.ate), deAnt: iso(ant.de), ateAnt: iso(ant.ate) })
+      const extras = await fetch(`/api/relatorio?${q}`).then(r => r.ok ? r.json() as Promise<ExtrasRelatorio> : null).catch(() => null)
+      const dados = montarRelatorio({ kanban, lancamentos, periodo: per, periodoNome: per.nome, nomeCategoria, impostoPct, extras, hoje })
+      w.document.open(); w.document.write(htmlRelatorio(dados, LOGO_DARK_B64)); w.document.close()
+      setTimeout(() => w.print(), 600)
+      setPdfAberto(false)
+    } catch (e) { w.close(); setErroPdf(`Não consegui montar o relatório: ${String(e)}`) }
+    finally { setGerando(false) }
   }
 
   const nomeAnterior = escala === "mes" ? "Mês anterior" : escala === "trimestre" ? "Trimestre anterior" : "Ano anterior"
@@ -233,7 +247,7 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, 
           sub={`Comparação de ${per.nome} com o período anterior${temAnoPassado ? " e com o mesmo período do ano passado" : ""}, sempre até a data de hoje`}
           acoes={<>
             <Segmentado<Escala> valor={escala} onChange={setEscala} opcoes={ESCALAS} />
-            <Botao variante="secundario" icone={<FileDown className="w-4 h-4" />} onClick={abrirPdf}>Relatório em PDF</Botao>
+            <Botao variante="primario" icone={<FileDown className="w-4 h-4" />} onClick={() => setPdfAberto(true)}>Relatório gerencial (PDF)</Botao>
           </>}
         />
 
@@ -344,6 +358,26 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, 
                   itens={materiais.map(([nome, m], i) => ({ chave: i, rotulo: nome, qtd: m.qtd, valor: m.valor, peso: m.valor }))} />}
           </Cartao>
         </div>
+        <Gaveta aberta={pdfAberto} titulo="Relatório gerencial em PDF" sub="Resumo com comparação, resultado, caixa, comercial, pedidos e confiabilidade dos dados" onFechar={() => setPdfAberto(false)}
+          rodape={<Botao variante="primario" className="w-full justify-center" disabled={gerando} icone={<FileDown className="w-4 h-4" />} onClick={gerarPdf}>{gerando ? "Montando…" : "Gerar PDF"}</Botao>}>
+          <div className="px-5 pb-4 space-y-2">
+            <p className="text-[12.5px] text-[#5e5c68] mb-1">Período</p>
+            {([["mesPassado", "Mês passado (fechado)", "O melhor para análise: mês completo, comparado com o anterior"], ["esteMes", "Este mês até hoje", "Comparado com os mesmos dias do mês passado"], ["trimestre", "Últimos 3 meses fechados", "Comparado com os 3 meses antes"], ["ano", "Este ano até hoje", ""], ["personalizado", "Escolher datas", ""]] as [OpcaoPdf, string, string][]).map(([v, nome, sub]) => (
+              <button key={v} onClick={() => setOpcaoPdf(v)} className={`ds-toque w-full text-left rounded-xl px-3.5 py-2.5 border ${opcaoPdf === v ? "border-[#8456e8] bg-[rgba(132,86,232,0.06)]" : "border-[rgba(60,60,67,0.12)] bg-white"}`}>
+                <span className="block text-[13.5px] font-semibold text-[#191625]">{nome}</span>
+                {sub && <span className="block text-[12px] text-[#898892]">{sub}</span>}
+              </button>
+            ))}
+            {opcaoPdf === "personalizado" && (
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <label className="text-[12px] text-[#5e5c68]">De<input type="date" value={pdfDe} onChange={e => setPdfDe(e.target.value)} className="mt-1 w-full h-10 rounded-lg px-2 bg-white ds-borda text-[13px]" /></label>
+                <label className="text-[12px] text-[#5e5c68]">Até<input type="date" value={pdfAte} onChange={e => setPdfAte(e.target.value)} className="mt-1 w-full h-10 rounded-lg px-2 bg-white ds-borda text-[13px]" /></label>
+              </div>
+            )}
+            {erroPdf && <p className="text-[12.5px] text-[#d33a3c]">{erroPdf}</p>}
+            <p className="text-[11.5px] text-[#898892] pt-1">Na janela de impressão, escolha "Salvar como PDF".</p>
+          </div>
+        </Gaveta>
       </div>
     </div>
   )

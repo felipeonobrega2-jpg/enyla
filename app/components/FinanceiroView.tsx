@@ -168,7 +168,7 @@ const FORMAS: { value: FormaPagamento; label: string }[] = [
   { value: "outro",          label: "Outro" },
 ]
 
-const DEFAULT_CATS_DESP: CategoriaFinanceira[] = [
+export const DEFAULT_CATS_DESP: CategoriaFinanceira[] = [
   { id: "aluguel",    nome: "Aluguel" },
   { id: "fornecedor", nome: "Fornecedor" },
   { id: "materiais",  nome: "Materiais" },

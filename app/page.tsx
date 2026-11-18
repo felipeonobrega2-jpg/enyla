@@ -78,7 +78,7 @@ import { PedidosUnificadoView, OrderEntry } from "./components/PedidosUnificadoV
 import { ClientesView } from "./components/ClientesView"
 import { ConfigView } from "./components/ConfigView"
 import { KanbanView } from "./components/KanbanView"
-import { FinanceiroView, ModalLancamento } from "./components/FinanceiroView"
+import { FinanceiroView, ModalLancamento, DEFAULT_CATS_DESP } from "./components/FinanceiroView"
 import GastosView from "./components/GastosView"
 import DigitalPainelView from "./components/DigitalPainelView"
 import ChapasView from "./cartuxo/components/ChapasView"
@@ -2562,6 +2562,8 @@ export default function Home() {
             />
           ) : view === "dashboard" ? (
             <RelatoriosView kanban={kanban} lancamentos={lancamentos} clientes={clientes} origensClientes={config.origensClientes} historico={historico}
+              nomeCategoria={id => { const c = (config.categoriasDespesa ?? DEFAULT_CATS_DESP).find(x => x.id === id); if (c) return c.nome; const t = id.replace(/[-_]+/g, " ").trim(); return t.charAt(0).toUpperCase() + t.slice(1) }}
+              impostoPct={normalizarProducao(config.producao).impostoPct}
               fixosMes={(config.gastosFixos ?? []).filter(g => g.ativa !== false).reduce((t, g) => t + g.valor, 0)}
               onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }} />
           ) : view === "config" ? (
