@@ -304,6 +304,13 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
     return new Response(JSON.stringify({
       gastos: { totalDia: 140, alertas: [{ tipo: "meta", nivel: "perigo", texto: "Anúncios da Meta: saldo para menos de 1 dia (R$ 0,49). Recarregue para a operação não parar." }] },
+      resolver: [
+        { tipo: "sistema", titulo: "IA da Enyla sem crédito", detalhe: "o agente não responde enquanto não recarregar (Anthropic)", valor: null, jid: null, numero: null, desde: h(30), nivel: "perigo" },
+        { tipo: "pagamento", titulo: "Loja Exemplo · ORC-2026-301", detalhe: "aprovou há 2 dias e o sinal de R$ 2.400 não caiu", valor: 4800, jid: "5@lid", numero: "ORC-2026-301", desde: h(2900), nivel: "alerta" },
+        { tipo: "atrasado", titulo: "Marca Fictícia · ORC-2026-226", detalhe: "entrega era 03/11 (15 dias de atraso): avise o cliente e ajuste a data", valor: 9200, jid: "6@lid", numero: "ORC-2026-226", desde: h(9000), nivel: "perigo" },
+        { tipo: "proposta", titulo: "Perfumaria Modelo · ORC-2026-283", detalhe: "abriu a proposta 3× · sem retomada há 2 dias", valor: 11786, jid: "1@lid", numero: "ORC-2026-283", desde: h(3000), nivel: "alerta" },
+        { tipo: "proposta", titulo: "Aroma Teste · ORC-2026-282", detalhe: "abriu a proposta 4× · sem retomada há 2 dias", valor: 6330, jid: "2@lid", numero: "ORC-2026-282", desde: h(3000), nivel: "alerta" },
+      ],
       responder: [
         { jid: "9@lid", nome: "Essências Exemplo", mensagem: "Oi! Ainda quero sim, dá pra atualizar pra 5 mil?", desde: h(40), rotulo: "Retomada", retomada: true, lista: "responder" },
         { jid: "1@lid", nome: "Perfumaria Modelo", mensagem: "Preciso de 3 mil caixinhas de 50ml com hot stamping", desde: h(190), rotulo: "ICP", retomada: false, lista: "responder", cliente: null, dados: { produto: "caixinha", volume_ml: 50, caixa_cm: null, frasco_cm: null, quantidade: 3000, tem_arte: true, resumo: "" } },

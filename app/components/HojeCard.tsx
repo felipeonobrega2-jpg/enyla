@@ -4,7 +4,7 @@
 // respondeu à retomada primeiro), o que o anúncio trouxe em 24 h, a ação do relatório de marketing e a reativação.
 
 import { useEffect, useState } from "react"
-import { Sun, Clock, MessageCircle, RotateCcw, Megaphone, ArrowRight, CheckCircle2, CalendarClock, FileText, Printer, AlertTriangle } from "lucide-react"
+import { Sun, Clock, MessageCircle, RotateCcw, Megaphone, ArrowRight, CheckCircle2, CalendarClock, FileText, Printer, AlertTriangle, Flame, Truck, Wallet, ShieldAlert } from "lucide-react"
 import { Cartao, TituloCartao, LinhaLista, Selo, Botao, Tom } from "./ds"
 import { Hoje, ItemHoje, ItemMeta, haQuanto, tempoDeEspera } from "../lib/hoje"
 import { comMedidaPadrao, textoDoTravado, META_HORAS } from "../lib/metaMql"
@@ -43,6 +43,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
   const [verRetomar, setVerRetomar] = useState(false)
   const [feitos, setFeitos] = useState<Set<string>>(new Set())
   const [verTravados, setVerTravados] = useState(false)
+  const [verResolver, setVerResolver] = useState(false)
 
   useEffect(() => {
     const carregar = () => fetch("/api/hoje").then(r => r.ok ? r.json() : null).then(x => { if (x) { setD(x); setFeitos(new Set()) } }).catch(() => {})
@@ -58,6 +59,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
   const orcar = (d.orcar ?? []).filter(x => !feitos.has(x.jid))
   const retomadas = responder.filter(x => x.retomada).length
   const travados = (d.meta?.travados ?? []).filter(x => !feitos.has(x.jid))
+  const resolver = (d.resolver ?? []).filter(x => !x.jid || !feitos.has(x.jid))
   const m = d.meta?.resumo
 
   const linha = (x: ItemHoje) => (
@@ -111,6 +113,42 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar }: {
           <ArrowRight className="w-3.5 h-3.5 shrink-0 mt-0.5" />
         </button>
       ) : null}
+      {/* Para resolver agora: o que passou do prazo ou depende de você, por valor (sistema, sinal, atraso, proposta) */}
+      {resolver.length > 0 && (
+        <div className="px-5 pt-5">
+          <TituloCartao titulo="Para resolver agora" icone={<Flame className="w-4 h-4" />}
+            sub={[
+              resolver.filter(x => x.tipo === "sistema").length ? "o sistema precisa de você" : "",
+              (() => { const v = resolver.reduce((t, x) => t + (x.valor ?? 0), 0); return v ? `${brl(v)} em jogo` : "" })(),
+            ].filter(Boolean).join(" · ")}
+            acao={<Selo tom={resolver.some(x => x.nivel === "perigo") ? "perigo" : "alerta"}>{resolver.length}</Selo>} />
+          <div className="mt-2 -mx-2">
+            {(verResolver ? resolver : resolver.slice(0, MOSTRAR)).map(x => {
+              const cor = x.nivel === "perigo" ? "#d33a3c" : x.nivel === "alerta" ? "#c57800" : "#8456e8"
+              const [nome, numero] = x.titulo.split(" · ")
+              const abrir = x.jid ? () => onAbrirConversa(x.jid!, nome) : x.tipo === "sistema" ? () => onNavegar("config") : undefined
+              return (
+                <button key={`${x.tipo}-${x.numero ?? x.titulo}`} onClick={abrir} disabled={!abrir}
+                  className="w-full flex items-start gap-3 px-2 py-2.5 rounded-xl text-left hover:bg-[rgba(116,116,128,0.06)] transition-colors disabled:cursor-default">
+                  <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${cor}14`, color: cor }}>
+                    {x.tipo === "sistema" ? <ShieldAlert className="w-4 h-4" /> : x.tipo === "pagamento" ? <Wallet className="w-4 h-4" /> : x.tipo === "atrasado" ? <Truck className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="flex items-baseline gap-2">
+                      <span className="flex-1 min-w-0 text-[14px] font-semibold text-[#191625] truncate">{nome}</span>
+                      {x.valor ? <span className="text-[13.5px] font-bold ds-num shrink-0" style={{ color: cor }}>{brl(x.valor)}</span> : null}
+                    </span>
+                    <span className="block text-[12.5px] text-[#5e5c68] leading-snug mt-0.5">{numero ? <span className="font-medium text-[#898892]">{numero} · </span> : null}{x.detalhe}</span>
+                  </span>
+                </button>
+              )
+            })}
+            {resolver.length > MOSTRAR && (
+              <button onClick={() => setVerResolver(v => !v)} className="w-full text-center text-[12px] font-semibold text-[#8456e8] py-2">{verResolver ? "Mostrar menos" : `Ver todos (${resolver.length})`}</button>
+            )}
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr]">
         {/* Responder e retomar */}
         <div className="min-w-0">

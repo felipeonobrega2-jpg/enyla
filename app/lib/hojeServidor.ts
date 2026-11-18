@@ -17,6 +17,7 @@ import { notificar, LINK_SISTEMA } from "./notificar"
 import { dentroDoHorario } from "./agenteLeads"
 import { evo } from "./evolution"
 import { estadoDoMql, resumirMeta, DIAS_META, MsgMeta, Momento } from "./metaMql"
+import { ligarConversasAosOrcamentos, paraResolver } from "./resolverServidor"
 
 // O "momento" da última leitura da IA (de quem é a vez); conversa lida antes disso não tem
 const momentoDaConversa = (pa: string | null | undefined): Momento | null => { try { return (JSON.parse(pa ?? "") as { r?: { momento?: Momento } }).r?.momento ?? null } catch { return null } }
@@ -41,8 +42,15 @@ export async function montarHoje(): Promise<Hoje> {
   const fila = await candidatos(cfg).catch(() => [])
   const meta = await metaDoMql(convs, cfg.proximosPassos ?? {}, cfg.vinculosWhatsapp ?? {}, devendo).catch(() => undefined)
   const gastos = await gastosAtuais().then(g => ({ alertas: g.alertas, totalDia: g.totalDia })).catch(() => undefined)
+  // Liga conversa ↔ orçamento (no máximo a cada 10 min) e monta o "Para resolver agora"
+  const c2 = cfg as typeof cfg & { ligacoesEm?: string }
+  if (!c2.ligacoesEm || Date.now() - new Date(c2.ligacoesEm).getTime() > 10 * 60_000) {
+    await mudarConfig(() => ({ ligacoesEm: new Date().toISOString() })).catch(() => null)
+    await ligarConversasAosOrcamentos().catch(e => console.error("[ligar]", e))
+  }
+  const resolver = await paraResolver(cfg as never).catch(e => { console.error("[resolver]", e); return undefined })
   return {
-    gastos, meta,
+    gastos, meta, resolver,
     orcar, responder: responder.filter(x => !devendo.has(x.jid)), retomar: retomar.filter(x => !devendo.has(x.jid)), outrosEsperando: outros, anuncio: doAnuncio(convs),
     marketing: rel?.leitura?.acao ? { dia: rel.dia, acao: rel.leitura.acao, custoMql: t ? custoPor(t.gasto, t.mql) : null } : null,
     reativacao: {
