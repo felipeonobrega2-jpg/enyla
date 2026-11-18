@@ -64,6 +64,9 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
     await notificar("WhatsApp da Enyla desconectado", "Os leads não estão recebendo resposta. Abra Configurações → WhatsApp e leia o QR.", { prioridade: "alta", tags: ["rotating_light"], link: `${LINK_SISTEMA}/?aba=config` }).catch(() => null)
     out.whatsapp = "avisado"
   }
+  // Auditor de dados: conferência completa no máximo uma vez por hora
+  const { talvezAuditar } = await import("./auditoriaServidor")
+  out.auditoria = await talvezAuditar(cfg as never).catch(e => String(e))
   // Carimbo da ronda: o Escritório mostra se o vigia está de pé
   await mudarConfig(() => ({ vigiaRodouEm: agora.toISOString() })).catch(() => null)
   return out
@@ -142,6 +145,14 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
   return { esperando: lista.length, respondidas: respondidas.size, avisadas: paraAvisar.length }
 }
 
+// Fechamento das 18h: como estão os dados (do auditor), em uma linha
+async function linhaDosDados() {
+  const a = (await lerCfg() as { auditoriaDados?: { confianca: number; graves: number; total: number } }).auditoriaDados
+  if (!a) return ""
+  const pct = a.confianca.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
+  return `\n📊 *Dados:* ${pct}% conferem${a.graves ? ` · ${a.graves} problema${a.graves > 1 ? "s" : ""} grave${a.graves > 1 ? "s" : ""}` : ""}${a.total ? ` · ${a.total} para acertar` : ""} (${LINK_SISTEMA}/?aba=dados)`
+}
+
 // Texto da checagem/fechamento: o "Para resolver agora" e o que o Hoje pede, em poucas linhas
 export async function textoDaRotina(slot: "13" | "18"): Promise<string> {
   const { montarHoje } = await import("./hojeServidor")
@@ -155,6 +166,7 @@ export async function textoDaRotina(slot: "13" | "18"): Promise<string> {
     ...topo,
     [orcar ? `${orcar} orçamento${orcar > 1 ? "s" : ""} para fazer` : "", responder ? `${responder} para responder` : "", retomar ? `${retomar} para retomar` : ""].filter(Boolean).join(" · "),
     slot === "18" && (orcar || responder || res.length) ? "O que ficar vira a primeira coisa da manhã." : "",
+    slot === "18" ? await linhaDosDados() : "",
     `${LINK_SISTEMA}/?aba=painel`,
   ]
   return linhas.filter(Boolean).join("\n")

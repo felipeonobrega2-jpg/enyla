@@ -3,7 +3,7 @@
 import type { Conhecimento } from "./agenteLeads"
 import type { Registro } from "./registroAgente"
 
-export type IdMesa = "atendente" | "coletor" | "followup" | "reativacao" | "digital" | "propostas" | "vigia" | "aprendiz"
+export type IdMesa = "atendente" | "coletor" | "followup" | "reativacao" | "digital" | "propostas" | "vigia" | "aprendiz" | "auditor"
 export type EstadoMesa = "trabalhando" | "plantao" | "travado" | "descansando"
 export type Mesa = {
   id: IdMesa; nome: string; papel: string
@@ -33,6 +33,7 @@ export type CfgEscritorio = {
   vigiaRodouEm?: string; vigiaTentou?: string[]; respostasPendentes?: { em: string }[]
   fechadasPelaIA?: { jid: string; motivo: string; em: string }[]; rotinaEnviada?: Record<string, string>
   conhecimentoAgente?: Conhecimento[]; agenteAprendeuEm?: string; agenteRevisaoConhecimento?: number
+  auditoriaDados?: { em: string; confianca: number; total: number; graves: number; historico?: { em: string; confianca: number; total: number; graves: number }[] }
 }
 
 const NOMES: Record<IdMesa, { nome: string; papel: string }> = {
@@ -44,6 +45,7 @@ const NOMES: Record<IdMesa, { nome: string; papel: string }> = {
   propostas: { nome: "Propostas", papel: "Monta a proposta do offset para você aprovar" },
   vigia: { nome: "Vigia", papel: "Ninguém sem resposta, nada parado" },
   aprendiz: { nome: "Aprendiz", papel: "Aprende o seu jeito com as suas conversas" },
+  auditor: { nome: "Auditor de dados", papel: "Confere se todos os números batem" },
 }
 
 // Em que mesa cai cada linha do registro do agente
@@ -85,6 +87,8 @@ export function montarEscritorio(a: { registros: Registro[]; cfg: CfgEscritorio;
   for (const p of cfg.propostasProntas ?? []) add("propostas", p.em, `Montou proposta para ${p.nome?.trim() || "cliente"}: ${p.quantidade.toLocaleString("pt-BR")} caixas · ${brl(p.preco)}`, "ok")
   for (const f of cfg.fechadasPelaIA ?? []) add("vigia", f.em, `Fechou a conversa de ${a.nomes?.[f.jid]?.trim() || "um contato"}: ${f.motivo}`)
   for (const [slot, em] of Object.entries(cfg.rotinaEnviada ?? {})) add("vigia", em, `Mandou a checagem das ${slot.replace(/\D/g, "").slice(-2) || slot}h no seu WhatsApp`)
+  const pct = (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`
+  for (const h of cfg.auditoriaDados?.historico ?? []) add("auditor", h.em, `Conferiu os dados: ${pct(h.confianca)} batem${h.graves ? `, ${h.graves} graves` : ""}${h.total ? ` · ${h.total} para acertar` : ""}`, "ok")
   for (const k of cfg.conhecimentoAgente ?? []) add("aprendiz", k.em, `Aprendeu: ${k.texto.length > 90 ? k.texto.slice(0, 88).trimEnd() + "…" : k.texto}`)
   feed.sort((x, y) => y.em.localeCompare(x.em))
 
@@ -101,7 +105,7 @@ export function montarEscritorio(a: { registros: Registro[]; cfg: CfgEscritorio;
     const ultima = ev[0] ?? null
     const ativo = !!ultima && agora - new Date(ultima.em).getTime() < ATIVO_MIN * 60_000
     // O que trava quem fala com o cliente: WhatsApp fora, IA sem crédito, cota da hora cheia
-    const fala = id !== "aprendiz" && id !== "propostas"
+    const fala = id !== "aprendiz" && id !== "propostas" && id !== "auditor"
     let estado: EstadoMesa = ativo ? "trabalhando" : "plantao"
     let agoraTxt = ultima ? ultima.texto : "Ainda nada hoje"
     let extra: string | null = null
@@ -115,10 +119,15 @@ export function montarEscritorio(a: { registros: Registro[]; cfg: CfgEscritorio;
       if (cfg.vigiaRodouEm && agora - new Date(cfg.vigiaRodouEm).getTime() < ATIVO_MIN * 60_000 && estado === "plantao") estado = "trabalhando"
       if (cfg.vigiaRodouEm && agora - new Date(cfg.vigiaRodouEm).getTime() > 30 * 60_000) { estado = "travado"; agoraTxt = "Sem ronda há mais de 30 min" }
     }
+    if (id === "auditor") {
+      const a = cfg.auditoriaDados
+      extra = a ? (a.graves ? `${a.graves} graves para acertar` : `${pct(a.confianca)} dos dados batem`) : null
+      if (!ultima && a) agoraTxt = `Última conferência: ${pct(a.confianca)} dos dados batem`
+    }
     if (id === "aprendiz") extra = `${(cfg.conhecimentoAgente ?? []).length} coisas na base de conhecimento`
     if (id === "propostas") { const ag = (cfg.propostasProntas ?? []).filter(p => p.status === "aguardando").length; extra = ag ? `${ag} esperando você aprovar` : null }
     if (id === "digital") { const ag = (cfg.pedidosDigitais ?? []).filter(p => !p.teste && p.status === "aguardando_sinal" && ehHoje(p.em)).length; extra = ag ? `${ag} esperando o sinal` : null }
-    const rotulo = id === "atendente" ? "respostas" : id === "coletor" ? "perguntas" : id === "digital" || id === "propostas" ? "orçamentos" : id === "aprendiz" ? "lições" : id === "vigia" ? "ações" : "mensagens"
+    const rotulo = id === "atendente" ? "respostas" : id === "coletor" ? "perguntas" : id === "digital" || id === "propostas" ? "orçamentos" : id === "aprendiz" ? "lições" : id === "auditor" ? "conferências" : id === "vigia" ? "ações" : "mensagens"
     return { id, ...NOMES[id], estado, agora: agoraTxt, ultimaEm: ultima?.em ?? (id === "vigia" ? cfg.vigiaRodouEm ?? null : null), hoje: feitos.length, hojeRotulo: rotulo, extra, horas }
   })
 

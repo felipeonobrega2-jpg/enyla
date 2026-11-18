@@ -58,12 +58,14 @@ const MESA: Record<IdMesa, Ponto> = {
   followup: { sala: "comercial", x: 28, y: 72 }, reativacao: { sala: "comercial", x: 72, y: 72 },
   digital: { sala: "orcamentos", x: 22, y: 36 }, propostas: { sala: "orcamentos", x: 66, y: 36 },
   aprendiz: { sala: "treinamento", x: 30, y: 38 }, vigia: { sala: "recepcao", x: 46, y: 42 },
+  auditor: { sala: "diretoria", x: 72, y: 46 },
 }
 const DESCANSO: Record<IdMesa, Ponto> = {
   atendente: { sala: "copa", x: 60, y: 76 }, coletor: { sala: "copa", x: 74, y: 76 },
   followup: { sala: "recepcao", x: 14, y: 80 }, reativacao: { sala: "recepcao", x: 28, y: 80 },
   digital: { sala: "copa", x: 30, y: 56 }, propostas: { sala: "copa", x: 50, y: 56 },
   aprendiz: { sala: "treinamento", x: 16, y: 72 }, vigia: { sala: "diretoria", x: 18, y: 80 },
+  auditor: { sala: "copa", x: 40, y: 56 },
 }
 const PAUSA: Ponto[] = [{ sala: "copa", x: 16, y: 34 }, { sala: "copa", x: 32, y: 36 }, { sala: "copa", x: 66, y: 40 }, { sala: "copa", x: 22, y: 70 }]
 
@@ -76,6 +78,7 @@ const PERS: Record<IdMesa, { roupa: string; cabelo: string; pele: string; estilo
   propostas: { roupa: "#1f9d55", cabelo: "#5a5a62", pele: "#e0ac85", estilo: "careca", calca: "#2d2a40" },
   vigia: { roupa: "#3c3b52", cabelo: "#1d1d24", pele: "#b67a52", estilo: "bone", calca: "#22202e" },
   aprendiz: { roupa: "#c98a12", cabelo: "#7a3b1c", pele: "#f6d5b8", estilo: "coque", calca: "#334a6b" },
+  auditor: { roupa: "#0e7490", cabelo: "#2a2a30", pele: "#d9a07a", estilo: "curto", calca: "#2d2a40" },
 }
 
 // ── Personagens ──────────────────────────────────────────────────────────────
@@ -217,10 +220,10 @@ function ConteudoSala({ s, ceu, noite, tela, quadro }: { s: Exclude<IdSala, "cor
         {J(6, 32)}
         <O x={48} y={3} w={16} h={9} c="#c99a3c" /><R x={50} y={5} w={12} h={5} c="#5aa6d6" /><R x={50} y={8} w={12} h={2} c="#4f9a5a" />
         <Estante x={78} y={8} h={22} />
-        <R x={10} y={30} w={70} h={34} c="#d7c3a1" o={0.6} />
-        <Cadeira x={44} y={42} />
-        <Mesa x={24} y={42} w={40} tela={undefined} />
-        <O x={28} y={44} w={8} h={3} c="#2a2838" />
+        <R x={4} y={30} w={88} h={34} c="#d7c3a1" o={0.6} />
+        <Cadeira x={26} y={42} />
+        <Mesa x={8} y={42} w={36} tela={undefined} />
+        <O x={11} y={44} w={8} h={3} c="#2a2838" />
         <Sofa x={10} y={70} w={16} c="#8a5a36" />
         <Vaso x={84} y={66} />
       </g>
@@ -491,7 +494,7 @@ function Predio({ mesas, selecionada, onSelecionar, cota, licoes, noHorario, pl 
         {(() => { const o = origem(pl, "comercial"); return <span className="absolute pointer-events-none flex items-center justify-center font-semibold text-[#3a3150] leading-none" style={{ left: `${(o.x + 100) / W * 100}%`, width: `${40 / W * 100}%`, top: `${(o.y + 3.5) / H * 100}%`, height: `${4 / H * 100}%`, fontSize: "clamp(5px, 1cqw, 10px)" }}>Envios {cota.usados}/{cota.limite}</span> })()}
         {(() => { const o = origem(pl, "treinamento"); return <span className="absolute pointer-events-none flex items-center justify-center text-center font-semibold text-[#3a3150] leading-none" style={{ left: `${(o.x + 7) / W * 100}%`, width: `${40 / W * 100}%`, top: `${(o.y + 3) / H * 100}%`, height: `${9 / H * 100}%`, fontSize: "clamp(5px, 0.95cqw, 10px)" }}>{licoes} lições</span> })()}
         {(() => { const o = origem(pl, "producao"); return <span className="absolute pointer-events-none flex items-center justify-center font-bold text-[#5a4300] tracking-[0.1em] leading-none" style={{ left: `${(o.x + 6) / W * 100}%`, width: `${40 / W * 100}%`, top: `${(o.y + 3) / H * 100}%`, height: `${8 / H * 100}%`, fontSize: "clamp(5px, 0.9cqw, 9px)" }}>OFFSET</span> })()}
-        {(() => { const o = origem(pl, "diretoria"); return <span className="absolute pointer-events-none flex items-center justify-center font-semibold text-[#f4efff] leading-none" style={{ left: `${(o.x + 28) / W * 100}%`, width: `${8 / W * 100}%`, top: `${(o.y + 44) / H * 100}%`, height: `${3 / H * 100}%`, fontSize: "clamp(3px, 0.55cqw, 6px)" }}>Felipe</span> })()}
+        {(() => { const o = origem(pl, "diretoria"); return <span className="absolute pointer-events-none flex items-center justify-center font-semibold text-[#f4efff] leading-none" style={{ left: `${(o.x + 11) / W * 100}%`, width: `${8 / W * 100}%`, top: `${(o.y + 44) / H * 100}%`, height: `${3 / H * 100}%`, fontSize: "clamp(3px, 0.55cqw, 6px)" }}>Felipe</span> })()}
 
         {/* nomes de quem está no lugar (o vigia de ronda leva o nome na ronda) */}
         {mesas.map(m => {

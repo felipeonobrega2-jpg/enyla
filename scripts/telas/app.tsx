@@ -21,6 +21,7 @@ import { FinanceiroView } from "@/app/components/FinanceiroView"
 import { RelatoriosView } from "@/app/components/RelatoriosView"
 import { IdeiasView } from "@/app/components/IdeiasView"
 import { EscritorioView } from "@/app/components/EscritorioView"
+import { AuditoriaView } from "@/app/components/AuditoriaView"
 import PortalClient from "@/app/c/[token]/PortalClient"
 import { ClientePerfilModal } from "@/app/components/ClientePerfilModal"
 import { dados, config } from "./dados"
@@ -311,6 +312,20 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       { cliente: "Marca Teste", tipo: "offset", fechou: "2026-08-12", valor: 4176, dias: 120 },
     ], semDado: ["Cliente Antigo A", "Cliente Antigo B", "Distribuidora Exemplo"] }))
   if (u.startsWith("/api/meta")) return new Response(JSON.stringify({ campaigns: [], totals: { spend: 1840, impressions: 0, clicks: 0, reach: 0, conversas: 96 } }))
+  if (u.startsWith("/api/auditoria")) {
+    if (o?.method === "POST") return new Response(JSON.stringify({ ok: true }))
+    const { auditar } = await import("@/app/lib/auditoria")
+    const card = (id: string, numero: string, nome: string, preco: number, coluna: number, extra: object = {}) => ({ id, numero, nomeCliente: nome, dimensoes: "", materialNome: "", preco, quantidade: 1000, data: "2026-11-05", coluna, ...extra })
+    const l = (id: string, x: object) => ({ id, tipo: "receita", descricao: "Sinal", valor: 500, dataVencimento: "2026-11-06", status: "pago", dataPagamento: "2026-11-06", criadoEm: "2026-11-06", categoria: "venda", ...x })
+    const r = auditar({ hoje: "2026-11-18", conversas: [], pedidosDigitais: [],
+      cards: [card("a", "ORC-2026-280", "Perfumaria Modelo", 8940, 1), card("b", "ORC-2026-281", "Aromas Exemplo", 4120, 4), card("c", "ORC-2026-275", "Loja Fictícia", 2600, 9), card("d", "ORC-2026-275", "Marca Teste", 1800, 2), card("e", "ORC-2026-270", "Cosméticos Teste", 5200, 3)],
+      lancamentos: [l("1", { cardId: "b", valor: 2060 }), l("2", { cardId: "c", valor: 2600 }), l("3", { cardId: "d", valor: 1800 }), l("4", { cardId: "e", valor: 5200 }),
+        l("5", { tipo: "despesa", descricao: "Impressão", valor: 350, categoria: "producao", dataVencimento: "2026-11-03", dataPagamento: "2026-11-03" }), l("6", { tipo: "despesa", descricao: "Impressão", valor: 350, categoria: "producao", dataVencimento: "2026-11-03", dataPagamento: "2026-11-03" }),
+        l("7", { tipo: "despesa", descricao: "Papel", valor: 1240, status: "pendente", dataPagamento: undefined, dataVencimento: "2026-11-02", categoria: "materia_prima" }), l("8", { tipo: "despesa", descricao: "Gasolina", valor: 150, categoria: undefined })],
+      transacoes: [{ id: "t1", data: "2026-11-01", valor: 1000, tipo: "entrada", estado: "pendente", descricao: "PIX RECEBIDO CLIENTE EXEMPLO", lancamento_ids: [] }, { id: "t2", data: "2026-11-04", valor: 200, tipo: "saida", estado: "vinculada", descricao: "PIX ENVIADO FORNECEDOR EXEMPLO", lancamento_ids: ["5"] }],
+    } as never)
+    return new Response(JSON.stringify(r))
+  }
   if (u.startsWith("/api/escritorio")) {
     const { montarEscritorio } = await import("@/app/lib/escritorio")
     const agora = Date.now(), m = (x: number) => new Date(agora - x * 60_000).toISOString()
@@ -322,6 +337,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       ...Array.from({ length: 3 }, (_, i) => ({ em: m(200 + i * 60), jid: `r${i}@lid`, nome: nomes[(i + 4) % 7], perfil: "medio" as const, enviou: true, texto: "", motivo: "ok", passo: "Reativação" })),
     ]
     return new Response(JSON.stringify(montarEscritorio({ registros, noHorario: true, agora, nomes: { "x@lid": "Marca Modelo" }, cfg: {
+      auditoriaDados: { em: m(8), confianca: 97.4, total: 12, graves: 2, historico: [{ em: m(8), confianca: 97.4, total: 12, graves: 2 }, { em: m(68), confianca: 96.9, total: 15, graves: 3 }] },
       agenteAuto: { ligado: true }, agenteEnviosHora: Array.from({ length: 27 }, (_, i) => m(i * 2)), whatsappConexao: { estado: "open" }, vigiaRodouEm: m(3),
       pedidosDigitais: Array.from({ length: 5 }, (_, i) => ({ id: `DIG-01${30 + i}`, em: m(14 + i * 50), nome: nomes[(i + 1) % 7], quantidade: [100, 200, 300, 150, 500][i], total: [480, 760, 990, 590, 1450][i], status: "aguardando_sinal" })),
       propostasProntas: [{ em: m(95), nome: "Bruna Teste", quantidade: 3000, preco: 8940, status: "aguardando" }, { em: m(260), nome: "Diego Exemplo", quantidade: 1000, preco: 4120, status: "enviada" }],
@@ -710,6 +726,7 @@ function Telas() {
         itens={[]} propostas={[]} kanban={dados.kanban} lancamentos={lancs} onClose={() => {}} onReplicar={() => {}} onWhatsApp={() => {}} onSave={() => {}}
         origem={origemDoCliente("Ana Cosméticos", cfg.origensClientes, [])}
         onSalvarOrigem={o => setCfg({ ...cfg, origensClientes: o ? { "ana cosmeticos": o } : {} })} />
+    case "dados": case "dados-m": case "dados-aberto": return <div style={{ height: "100vh" }}><AuditoriaView onAbrirCard={() => {}} onNavegar={() => {}} /></div>
     case "escritorio": case "escritorio-m": case "escritorio-sel": return <div style={{ height: "100vh" }}><EscritorioView /></div>
     case "ideias": return <div style={{ height: "100vh" }}><IdeiasView config={cfg} onSalvar={setCfg} /></div>
     case "precofecha": {

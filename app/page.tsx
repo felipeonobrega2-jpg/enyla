@@ -1,9 +1,10 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
-import { Layers, ShoppingBag, Ruler, Calculator, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb, Truck, Gauge, Printer , Scissors, Building2 } from "lucide-react"
+import { Layers, ShoppingBag, Ruler, Calculator, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb, Truck, Gauge, Printer , Scissors, Building2, ShieldCheck } from "lucide-react"
 import { IdeiasView } from "./components/IdeiasView"
 import { EscritorioView } from "./components/EscritorioView"
+import { AuditoriaView } from "./components/AuditoriaView"
 import { signOut } from "next-auth/react"
 import WhatsAppView, { ConversaLateral } from "./components/WhatsAppView"
 import { podarDispensados } from "./lib/filaMensagens"
@@ -217,7 +218,7 @@ export default function Home() {
   const [editandoHistorico, setEditandoHistorico] = useState<string | null>(null)
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
   const [contador, setContador] = useState<number>(0)
-  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias" | "entregas" | "gastos" | "digital" | "cx-pedidos" | "cx-chapas" | "cx-facas" | "cx-custos" | "biblioteca" | "escritorio">("painel")
+  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias" | "entregas" | "gastos" | "digital" | "cx-pedidos" | "cx-chapas" | "cx-facas" | "cx-custos" | "biblioteca" | "escritorio" | "dados">("painel")
   const [perfilClienteExterno, setPerfilClienteExterno] = useState<string | null>(null)
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
   definirFeriadosLocais(config.feriados)
@@ -359,7 +360,7 @@ export default function Home() {
     // Link direto (ex.: resumo de marketing no WhatsApp abre em Campanhas: /?aba=meta)
     const aba = new URLSearchParams(window.location.search).get("aba")
     const saved = aba ?? sessionStorage.getItem("app:view")
-    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias","entregas","gastos","digital","cx-pedidos","cx-chapas","cx-facas","cx-custos","biblioteca","escritorio"]
+    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias","entregas","gastos","digital","cx-pedidos","cx-chapas","cx-facas","cx-custos","biblioteca","escritorio","dados"]
     // Conquistas virou o cartão "Meta do mês" do Painel
     if (saved === "conquistas") setView("painel")
     else if (saved && valid.includes(saved)) setView(saved as typeof view)
@@ -1849,6 +1850,8 @@ export default function Home() {
             icon={<Gauge className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "dashboard"} onClick={() => navigate("dashboard")} label="Relatórios"
             icon={<BarChart3 className="w-4 h-4" strokeWidth={1.8} />} />
+          <NavItem active={view === "dados"} onClick={() => navigate("dados")} label="Dados"
+            icon={<ShieldCheck className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "parceiros" || view === "terceirizados"} onClick={() => navigate("parceiros")} label="Parceiros"
             icon={<Handshake className="w-4 h-4" strokeWidth={1.8} />} />
 
@@ -2578,6 +2581,8 @@ export default function Home() {
               onExportar={exportarDados}
               onImportar={importarDados}
             />
+          ) : view === "dados" ? (
+            <AuditoriaView onAbrirCard={id => { const c = kanban.find(k => k.id === id); if (c) abrirDetalheCard(c) }} onNavegar={v => navigate(v)} />
           ) : view === "escritorio" ? (
             <EscritorioView />
           ) : view === "ideias" ? (

@@ -19,6 +19,7 @@ const VISUAL: Record<IdMesa, { cor: string; Icone: typeof MessageCircle }> = {
   propostas: { cor: "#1f9d55", Icone: FileText },
   vigia: { cor: "#5e5c68", Icone: ShieldCheck },
   aprendiz: { cor: "#c98a12", Icone: GraduationCap },
+  auditor: { cor: "#0e7490", Icone: ShieldCheck },
 }
 const ESTADO: Record<EstadoMesa, { rotulo: string; cor: string; fundo: string }> = {
   trabalhando: { rotulo: "Trabalhando", cor: "#1f9d55", fundo: "rgba(31,157,85,0.10)" },
