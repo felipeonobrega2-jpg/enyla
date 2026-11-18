@@ -310,6 +310,11 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       { cliente: "Marca Teste", tipo: "offset", fechou: "2026-08-12", valor: 4176, dias: 120 },
     ], semDado: ["Cliente Antigo A", "Cliente Antigo B", "Distribuidora Exemplo"] }))
   if (u.startsWith("/api/meta")) return new Response(JSON.stringify({ campaigns: [], totals: { spend: 1840, impressions: 0, clicks: 0, reach: 0, conversas: 96 } }))
+  if (u.startsWith("/api/funil-agora")) {
+    const e = (id: string, nome: string, quantos: number, valor: number, parados: number) => ({ id, nome, quantos, valor, parados, itens: Array.from({ length: Math.min(quantos, 6) }, (_, i) => ({ nome: ["Perfumaria Modelo", "Aromas Exemplo", "Loja Fictícia", "Cosméticos Teste", "Essências Exemplo", "Marca Modelo"][i], sub: i === 0 ? "ORC-2026-283 · proposta enviada" : "conversa", valor: valor ? Math.round(valor / quantos) : null, jid: "1@lid", parado: i < parados ? "esperando resposta há 20h" : null })) })
+    return new Response(JSON.stringify({ esperando: 12, offset: [e("leads", "Leads (7 dias)", 309, 0, 46), e("mql", "MQL", 58, 0, 10), e("proposta", "Proposta", 21, 141970, 0), e("fechado", "Fechado (sinal)", 4, 41040, 0), e("arte", "Arte", 0, 0, 0), e("producao", "Produção", 0, 0, 0), e("expedicao", "Expedição", 1, 9200, 1), e("entregue", "Entregue (30 dias)", 6, 38400, 0)],
+      digital: [e("dleads", "Leads (7 dias)", 62, 0, 8), e("dorcamento", "Orçamento", 110, 119295, 5), e("dsinal", "Sinal pago", 6, 4800, 2), e("darte", "Arte (cliente)", 0, 0, 0), e("dproducao", "Produção", 0, 0, 0), e("denviado", "Enviado (30 dias)", 0, 0, 0)] }))
+  }
   if (u.startsWith("/api/grandes")) {
     const d = (n: number) => new Date(Date.now() + n * 86_400_000 - 3 * 3600_000).toISOString().slice(0, 10)
     return new Response(JSON.stringify({

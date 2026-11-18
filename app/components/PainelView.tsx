@@ -1,4 +1,5 @@
 "use client"
+import { FunilAgoraCard } from "./FunilAgoraCard"
 
 import React from "react"
 import {
@@ -283,6 +284,8 @@ export function PainelView({
           <Botao variante="primario" icone={<Plus className="w-4 h-4" />} onClick={onNovoOrcamento}>Novo orçamento</Botao>
         </>}
       />
+
+      <FunilAgoraCard onAbrirConversa={onAbrirConversa} onAbrirCardId={id => { const k = kanban.find(c => c.id === id); if (k) onAbrirCard(k) }} onNavegar={() => onNavegar("digital")} />
 
       {onAbrirConversa && <HojeCard parte="acao" onAbrirConversa={onAbrirConversa} onNavegar={onNavegar} onOrcar={onOrcarConversa} />}
 
