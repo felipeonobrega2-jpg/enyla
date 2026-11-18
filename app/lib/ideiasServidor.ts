@@ -64,6 +64,10 @@ const LOTES: { v: number; ideias: string[] }[] = [
     // 14/11: pedido seu
     "WhatsApp invertido: você manda mensagem (texto ou áudio) para o número da Enyla e o sistema executa. Ex.: \"pedido da Ana foi para impressão\" (move o pedido e avisa o cliente), \"recebi 500 do Bruno\" (lança o pagamento), \"orça 2.000 caixas 10x5x5 para a Perfumaria X\" (monta o orçamento), \"o WR é ICP\" (etiqueta), \"quanto falta receber essa semana?\" (responde). Só do seu número; o que mexe em dinheiro ou fala com cliente pede um \"ok\" antes; tudo fica no histórico. Base pronta: o assistente Forma já consulta, registra pagamento e move pedido com confirmação.",
   ] },
+  { v: 7, ideias: [
+    // 18/11: pedido seu (detalhes você passa depois)
+    "Leads: separar o MQL em níveis (ex.: MQL forte, médio e fraco), inclusive para o digital, para priorizar o atendimento e medir o marketing por nível. Os critérios de cada nível você define depois.",
+  ] },
 ]
 
 // Gastos fixos que o sistema põe uma vez (marca no servidor); apagou ou editou, não volta

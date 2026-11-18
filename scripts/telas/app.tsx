@@ -621,6 +621,11 @@ function Telas() {
       caixa: { largura: 5.2, altura: 19, profundidade: 5.2, material: "Cartão 300g", verniz: true }, entregaSeAprovarHoje: "2026-11-24",
       termos: termosOffset({ quantidade: null, sinalPct: 50, prazoDiasUteis: 12, validaAte: "2099-12-31" }), versaoTermos: VERSAO_TERMOS_OFFSET,
     }} />
+    case "aprovar-pagar": return <AprovarClient numero="ORC-2026-001" token="x" proposta={{
+      nomeCliente: "Cliente Teste", sinalPct: 50, validaAte: "2099-12-31", vencida: false, jaAprovado: true,
+      especificacoes: [], opcoes: [{ quantidade: 3000, preco: 6540, unitario: 2.18 }],
+      pagamento: { total: 6540, sinal: 3270, pix: "#", pago: false, parcelasMax: 3, cartao: true },
+    }} />
     case "mobile": return <MobilePage />
     case "portal": {
       const hoje = new Date()

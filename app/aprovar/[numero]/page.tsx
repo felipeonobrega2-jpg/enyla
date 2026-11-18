@@ -10,6 +10,8 @@ import { CONFIG_PADRAO } from "@/app/config"
 import type { VisitaProposta } from "@/app/types"
 import { gravarCampos } from "@/app/lib/configAtomica"
 import { termosOffset, VERSAO_TERMOS_OFFSET } from "@/app/lib/termosOffset"
+import { asaasConfigurado, PAGO } from "@/app/lib/asaas"
+import { PARCELAS_MAX_CARTAO, type PagamentoCartao } from "@/app/lib/cartaoAprovacao"
 
 // Registra que o cliente abriu a proposta (não quando é a Enyla logada; no máximo uma vez a cada 30 min):
 // conta em config.visitasProposta (o Painel avisa) e deixa a marca no rastreio do pedido
@@ -41,13 +43,23 @@ export default async function AprovarPage({ params, searchParams }: {
   const { t } = await searchParams
   const p = tokenValido(numero, t) ? await carregarProposta(numero) : null
   const { data: cfg } = p ? await supabase.from("AppConfig").select("data").eq("id", 1).single() : { data: null }
-  const config = (cfg?.data ?? {}) as { sinalPct?: number; producao?: unknown; feriados?: unknown }
+  const config = (cfg?.data ?? {}) as { sinalPct?: number; producao?: unknown; feriados?: unknown; pagamentosCartao?: Record<string, PagamentoCartao> }
   const sinalPct = config.sinalPct ?? SINAL_PCT_PADRAO
   // Se aprovar hoje, entrega até: prazo padrão em dias úteis
   definirFeriadosLocais((config.feriados ?? CONFIG_PADRAO.feriados) as never)
   const prazoDias = normalizarProducao(config.producao as never).prazoEntregaPadraoDias
   const entregaSeAprovarHoje = p ? somarDiasUteis(new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }), normalizarProducao(config.producao as never).prazoEntregaPadraoDias) : null
   if (p && isAberto(p.card) && !(await auth())) await registrarVisita(numero).catch(() => {})
+  // Pedido já aprovado: pode pagar aqui (cartão 100% ou Pix do sinal), a não ser que já esteja pago
+  let pagamento = null
+  if (p) {
+    const total = Number(p.card.preco) || 0
+    const sinal = Math.round(total * sinalPct) / 100
+    const cartao = config.pagamentosCartao?.[numero]
+    const { data: rec } = isAberto(p.card) ? { data: [] } : await supabase.from("LancamentoFinanceiro").select("id").eq("cardNumero", numero).eq("tipo", "receita").eq("status", "pago").limit(1)
+    pagamento = { total, sinal, pix: `/pix/${encodeURIComponent(numero)}?v=${sinal.toFixed(2)}&c=${encodeURIComponent(p.card.nomeCliente)}`,
+      pago: (!!cartao && PAGO.has(cartao.status)) || !!rec?.length, parcelasMax: PARCELAS_MAX_CARTAO, cartao: asaasConfigurado() }
+  }
   return (
     <AprovarClient numero={numero} token={t ?? ""}
       proposta={p && {
@@ -55,7 +67,7 @@ export default async function AprovarPage({ params, searchParams }: {
         validaAte: p.validaAte, vencida: p.vencida, jaAprovado: !isAberto(p.card), sinalPct,
         caixa: p.caixa, entregaSeAprovarHoje,
         termos: termosOffset({ quantidade: p.opcoes.length === 1 ? p.opcoes[0].quantidade : null, sinalPct, prazoDiasUteis: prazoDias || null, validaAte: p.validaAte }),
-        versaoTermos: VERSAO_TERMOS_OFFSET,
+        versaoTermos: VERSAO_TERMOS_OFFSET, pagamento,
       }} />
   )
 }
