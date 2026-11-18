@@ -3,6 +3,7 @@
 //   {{nome_completo}}   nome do cliente ligado (ou do contato)
 //   {{pagina_cliente}}  link da página do cliente (pedidos, Pix, repetir)
 //   {{proposta}}        link de aprovação do orçamento aberto do cliente
+import { nomeParaChamar } from "./nomeDePessoa"
 
 export type Rapida = { id: string; atalho: string; quando_usar: string; corpo: string | null; ativa: boolean; ordem: number }
 
@@ -21,8 +22,10 @@ export function filtrar(lista: Rapida[], digitado: string): Rapida[] {
 // Preenche as variáveis; as de link vêm de funções (buscadas só se o texto usar)
 export async function preencher(corpo: string, ctx: { contato: string; cliente?: string | null; links: { pagina?: () => Promise<string | null>; proposta?: () => Promise<string | null> } }) {
   const completo = ctx.cliente ?? ctx.contato
-  const primeiro = (ctx.cliente ?? ctx.contato).trim().split(/\s+/)[0] ?? ""
-  let t = corpo.replace(/\{\{\s*nome\s*\}\}/g, primeiro).replace(/\{\{\s*nome_completo\s*\}\}/g, completo)
+  const primeiro = nomeParaChamar(ctx.cliente ?? ctx.contato)
+  // Sem nome de pessoa: "Oi, {{nome}}!" vira "Oi!" (sem vírgula sobrando)
+  let t = primeiro ? corpo.replace(/\{\{\s*nome\s*\}\}/g, primeiro) : corpo.replace(/[ \t]*,?[ \t]*\{\{\s*nome\s*\}\}[ \t]*,?/g, "").replace(/^\s*([!?.])/, "$1").replace(/(\w)\s+([!?.,])/g, "$1$2").replace(/^\s+/, "")
+  t = t.replace(/\{\{\s*nome_completo\s*\}\}/g, completo)
   if (/\{\{\s*pagina_cliente\s*\}\}/.test(t)) t = t.replace(/\{\{\s*pagina_cliente\s*\}\}/g, (await ctx.links.pagina?.()) ?? "")
   if (/\{\{\s*proposta\s*\}\}/.test(t)) t = t.replace(/\{\{\s*proposta\s*\}\}/g, (await ctx.links.proposta?.()) ?? "")
   return t

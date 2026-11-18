@@ -6,6 +6,7 @@
 import type { DadosPedido } from "./atendente"
 import { brl } from "../utils"
 import { cotarDigital } from "./digital"
+import { nomeParaChamar } from "./nomeDePessoa"
 
 export const POR_DIA_PADRAO = 10
 export const MINUTOS_ENTRE = [20, 40] as const        // um de cada vez, intervalo variando
@@ -54,10 +55,7 @@ export function candidato(c: ConvCampanha, perfilDoLog: string | null, agora = D
 export const ordenar = (xs: Candidato[]) => [...xs].sort((a, b) => b.prioridade - a.prioridade)
 
 // Nome só quando parece nome de gente: começa com maiúscula, 3+ letras, tem vogal ("umds", "Eu", "." ficam sem nome)
-export const primeiroNome = (n: string | null) => {
-  const x = (n ?? "").trim().split(/\s+/)[0] ?? ""
-  return /^[A-ZÀ-Ý][a-zà-ÿ]{2,}$/.test(x) && /[aeiouáéíóúâêôãõ]/i.test(x) ? x : ""
-}
+export const primeiroNome = (n: string | null) => nomeParaChamar(n)
 const oQue = (d: DadosPedido | null) => d?.volume_ml ? ` para frasco de ${d.volume_ml} ml` : d?.produto ? ` para ${d.produto}` : ""
 
 export function textoComOrcamento(nome: string | null, d: DadosPedido, p: { quantidade: number; total: number; padrao: boolean }, link: string) {

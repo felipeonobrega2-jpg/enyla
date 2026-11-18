@@ -14,7 +14,7 @@ describe("orçamento em lote", () => {
 
   it("mensagem lista cada tamanho com o seu link e o total", () => {
     const m = mensagemLote(itens.map((x, i) => ({ ...x, link: `https://x/aprovar/${i}` })))
-    expect(m).toContain("Oi, Perfumaria! Segue a proposta das 2 embalagens.")
+    expect(m).toContain("Oi! Segue a proposta das 2 embalagens.")   // "Perfumaria Modelo" é empresa: sem nome
     expect(m).toMatch(/1\. .*5 × 12 × 5 cm/)
     expect(m).toMatch(/2\. .*7 × 12 × 7 cm/)
     expect(m).toContain("https://x/aprovar/0")

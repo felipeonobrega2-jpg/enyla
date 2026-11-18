@@ -4,6 +4,7 @@
 import type { DadosPedido } from "./atendente"
 import { caixaDosDados } from "./propostaPronta"
 import { qualidadeDoLead } from "./marketing"
+import { nomeParaChamar } from "./nomeDePessoa"
 
 export const HORAS_ESPERA_MIN = 2        // dá 2 h para você responder primeiro
 export const HORAS_ESPERA_MAX = 72       // depois disso já é retomada, não pergunta de medida
@@ -26,10 +27,7 @@ export function devePedirMedida(c: ConvMedida, ja: Record<string, string>, vincu
   return h >= HORAS_ESPERA_MIN && h <= HORAS_ESPERA_MAX
 }
 
-const primeiroNome = (n: string | null) => {
-  const x = (n ?? "").trim().split(/\s+/)[0] ?? ""
-  return /^[A-ZÀ-Ý][a-zà-ÿ]{2,}$/.test(x) && /[aeiouáéíóúâêôãõ]/i.test(x) ? x : ""
-}
+const primeiroNome = (n: string | null) => nomeParaChamar(n)
 
 export function textoPedirMedida(nome: string | null, d: DadosPedido) {
   const n = primeiroNome(nome)

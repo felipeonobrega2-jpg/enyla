@@ -218,6 +218,8 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
 
 Siga o guia de atendimento: é a voz e o método dele.
 
+Nome: só chame o cliente pelo nome se ele mesmo disse o nome na conversa ("aqui é a Ana") ou assinou a mensagem. Nunca use o nome do contato do WhatsApp nem repita um nome que apareceu em mensagem antiga nossa: quase sempre é nome de loja, apelido ou marca ("Comercial", "Patoxx", "WSSACOLAS"), e chamar assim soa robô. Na dúvida, sem nome ("Oi, tudo bem?").
+
 <guia>
 ${cfg.guiaAtendimento?.trim() || "Mensagens curtas, cordiais, em primeira pessoa. Espelhe o tom do cliente."}
 </guia>

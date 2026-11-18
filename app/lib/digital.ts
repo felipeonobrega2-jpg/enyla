@@ -4,6 +4,7 @@
 
 import type { DadosPedido } from "./atendente"
 import { custoVilla, facaAberta, folhaDaFaca, precoDigital, quantidadesDa, Folha, RegraDigital, REGRA_DIGITAL_PADRAO } from "./precoDigital"
+import { nomeParaChamar } from "./nomeDePessoa"
 
 // Caixa padrão por ml (altura × largura × profundidade, cm), tirada das cotações com a Villa; o cliente confirma
 export const MEDIDA_PADRAO: { ml: number; a: number; l: number; p: number }[] = [
@@ -228,10 +229,7 @@ export const DIAS_VALIDADE_DIGITAL = 15
 export function pedidoPendente(pedidos: PedidoDigital[] | undefined, jid: string, agora = Date.now()): PedidoDigital | null {
   return (pedidos ?? []).find(p => p.jid === jid && p.status === "aguardando_sinal" && agora - new Date(p.em).getTime() < DIAS_VALIDADE_DIGITAL * 86_400_000) ?? null
 }
-const primeiroNome = (n: string | null) => {
-  const x = (n ?? "").trim().split(/\s+/)[0] ?? ""
-  return /^[A-Za-zÀ-ÿ]{2,}$/.test(x) ? x[0].toUpperCase() + x.slice(1).toLowerCase() : ""
-}
+const primeiroNome = (n: string | null) => nomeParaChamar(n)
 // Calibrado em 07/11 (estava repetitivo e insistente): no máximo 2 lembretes por pedido, o 1º depois de ~1 dia,
 // o 2º 3 dias depois, textos que variam de lead para lead, nunca "segue o link de novo" para todo mundo.
 // Lead que disse que vai se organizar/pagar depois: um lembrete só, sem pressa, 3 dias depois. Você entrou na

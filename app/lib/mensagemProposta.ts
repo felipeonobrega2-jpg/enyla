@@ -3,6 +3,7 @@
 
 import type { FormData, Calculo } from "../types"
 import { brl, num } from "../utils"
+import { nomeParaChamar } from "./nomeDePessoa"
 
 const TIPO_CAIXA: Record<string, string> = {
   simples: "Caixa cartucho", aviao: "Caixa avião", "fundo-automatico": "Caixa com fundo automático", americano: "Caixa fundo americano",
@@ -36,7 +37,7 @@ export function especificacaoDaProposta(form: FormData): string[] {
 
 export function mensagemProposta(form: FormData, calculo: Calculo, numero: string, link: string | null) {
   const ideal = calculo.tabela.find(l => l.quantidade === calculo.sweetSpotIdealQtd) ?? calculo.tabela[calculo.tabela.length - 1]
-  const primeiro = form.nomeCliente.trim().split(/\s+/)[0]
+  const primeiro = nomeParaChamar(form.nomeCliente)
   const total = ideal ? (form.comFaca ? ideal.precoComFaca : ideal.precoSemFaca) : 0
   const unit = ideal ? (form.comFaca ? ideal.unitarioComFaca : ideal.unitarioSemFaca) : 0
   const spec = especificacaoDaProposta(form)
@@ -51,7 +52,7 @@ export function mensagemProposta(form: FormData, calculo: Calculo, numero: strin
 
 // Lote: tamanhos diferentes do mesmo cliente numa mensagem só, cada item com o seu preço e o seu link de aprovação
 export function mensagemLote(itens: { form: FormData; calculo: Calculo; numero: string; link: string | null }[]) {
-  const primeiro = (itens[0]?.form.nomeCliente ?? "").trim().split(/\s+/)[0]
+  const primeiro = nomeParaChamar(itens[0]?.form.nomeCliente)
   let soma = 0
   const blocos = itens.map((it, i) => {
     const ideal = it.calculo.tabela.find(l => l.quantidade === it.calculo.sweetSpotIdealQtd) ?? it.calculo.tabela[it.calculo.tabela.length - 1]

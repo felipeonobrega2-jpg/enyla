@@ -8,6 +8,7 @@ import { KanbanCard, LancamentoFinanceiro } from "../types"
 import { Pedido, montarPedidos, recebiveis, nomeChave, pedidoEntregue } from "./negocio"
 import { posicaoNoFunil, estaFechada, DIAS_PERDIDO, ConversaFunil } from "./funilWhatsapp"
 import { clienteDaConversa, Vinculos } from "./vinculoWhatsapp"
+import { nomeParaChamar } from "./nomeDePessoa"
 
 export type TipoFila = "followup" | "producao" | "pronto" | "cobranca"
 export type AvisoPedido = "producao" | "pronto"
@@ -39,10 +40,7 @@ export const dentroDaJanela = (agora = new Date()) => {
   return h >= JANELA.inicio && h < JANELA.fim
 }
 
-const primeiroNome = (nome: string) => {
-  const n = nome.trim().split(/\s+/)[0] ?? ""
-  return /^[\p{L}]{2,}$/u.test(n) ? n[0].toUpperCase() + n.slice(1).toLowerCase() : ""
-}
+const primeiroNome = (nome: string) => nomeParaChamar(nome)
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 const dias = (iso: string | null | undefined, hoje: Date) => iso ? Math.floor((hoje.getTime() - new Date(iso).getTime()) / 86_400_000) : 0
 
