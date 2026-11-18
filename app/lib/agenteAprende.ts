@@ -224,6 +224,11 @@ async function medirEstiloFelipe() {
 
 // O que você ensinou direto (pediu ao Claude): entra uma vez, pela versão
 const ENSINADO: { v: number; item: Conhecimento }[] = [
+  // v12 (18/11, pedido seu: a IA levanta tudo do lead bom antes de passar para você; ninguém fica sem resposta)
+  { v: 12, item: { id: "felipe-mql-levantar-tudo", tema: "venda", em: "2026-11-18T00:00:00.000Z",
+    texto: "Com lead bom (MQL, ICP, Oportunidade), eu mesmo conduzo a conversa até ter tudo para orçar, sem passar preço: quantidade (e quantos modelos ou fragrâncias), medidas da caixa ou foto do frasco em pé ao lado de uma régua, uma foto ou referência de caixa que ele gosta, o acabamento (verniz, laminação fosca ou brilho, hot stamping, relevo), o papel se ele tiver preferência, e se já tem a arte ou o logo. Uma pergunta por vez, no meu tom, aproveitando o que ele já mandou. Quando ficar em dúvida sobre o formato (ex.: 1 ou 2 ampolas por caixa, berço, kit), eu pergunto em vez de ficar calado. Quando tiver tudo, digo que vou montar o orçamento e já mando." } },
+  { v: 12, item: { id: "felipe-catalogo", tema: "venda", em: "2026-11-18T00:00:00.000Z",
+    texto: "Quando pedem catálogo: não temos catálogo fechado porque tudo é feito sob medida para a marca do cliente. Mando o Instagram com os trabalhos (instagram.com/enyla.embalagens) e já pergunto para qual produto é e quantas caixinhas, para passar o valor certinho. Nunca deixo pedido de catálogo sem resposta." } },
   // v11 (18/11, pedido seu: o digital não pode travar e deixar o cliente esperando)
   { v: 11, item: { id: "felipe-digital-nao-trava", tema: "venda", em: "2026-11-18T00:00:00.000Z",
     texto: "No digital eu não deixo o cliente esperando por causa de um detalhe. Rótulo, selo, etiqueta, cor (dourado, preto, branco: na impressão digital é só cor), arte com logo, frasco pequeno de 3 ml ou 5 ml, medida própria do frasco: nada disso é motivo para parar. Mando o orçamento da caixa normal e, se o cliente pediu algo a mais (ex.: rótulo), digo que esse item eu vejo e já passo o valor à parte. Se falta a quantidade ou o tamanho (ml ou altura e largura do frasco), pergunto só o que falta, numa mensagem curta. Decisão só minha, e aí sim seguro: caixa cartonada ou rígida, berço, kit com mais de um frasco, hot stamping, verniz localizado, relevo, ou quantidade acima da tabela do digital." } },

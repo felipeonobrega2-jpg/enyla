@@ -35,6 +35,10 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
     out.pendentes = { fila: fila.length, respondidas: feitos.length }
   }
 
+  // 1b. Ninguém sem resposta: quem escreveu por último há 20+ min. O agente tenta uma vez por mensagem (se a conversa
+  //     não for sua, as travas dele seguram); o que sobra vira aviso no seu WhatsApp (cada conversa no máximo a cada 3 h)
+  out.esperando = await cuidarDeQuemEspera(cfg, agora).catch(e => String(e))
+
   // 2. Rotina (dias de trabalho do agente): 13h checagem, 18h fechamento
   const sp = new Date(agora.getTime() - 3 * 3600_000)
   const hora = sp.getUTCHours(), dia = sp.toISOString().slice(0, 10), semana = sp.getUTCDay()
@@ -60,6 +64,51 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
     out.whatsapp = "avisado"
   }
   return out
+}
+
+async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvisada?: Record<string, string>; esperaAvisoEm?: string; agenteAuto?: { horario?: { dias?: number[]; inicio?: string; fim?: string }; avisoNumero?: string } }, agora: Date) {
+  const { dentroDoHorario } = await import("./agenteLeads")
+  if (cfg.agenteAuto?.horario && !dentroDoHorario(cfg.agenteAuto.horario as never)) return "fora do horário"
+  const { quemEspera, tempoEspera } = await import("./esperando")
+  const { data } = await supabase.from("whatsapp_conversas").select("jid, nome, etiquetas, status_lead, ultima_msg, ultima_recebida_at, ultima_enviada_at, proxima_acao")
+    .not("jid", "like", "%@g.us").gte("ultima_recebida_at", new Date(agora.getTime() - 3 * 86_400_000).toISOString()).limit(800)
+  const lista = quemEspera((data ?? []) as never, agora.getTime())
+  if (!lista.length) return "ninguém"
+  // O agente tenta (até 3 por rodada; uma vez por mensagem)
+  const { responderSozinho } = await import("./agenteAuto")
+  const tentou = new Set(cfg.vigiaTentou ?? [])
+  const novasTentativas: string[] = []
+  const respondidas = new Set<string>()
+  for (const e of lista) {
+    if (novasTentativas.length >= 3) break
+    const { data: ult } = await supabase.from("whatsapp_mensagens").select("id, from_me").eq("jid", e.jid).order("criado_em", { ascending: false }).limit(1).maybeSingle()
+    if (!ult || ult.from_me || tentou.has(ult.id)) continue
+    novasTentativas.push(ult.id)
+    await responderSozinho(ult.id, { atrasada: e.minutos >= 60 }).catch(() => null)
+    const { data: depois } = await supabase.from("whatsapp_mensagens").select("from_me").eq("jid", e.jid).order("criado_em", { ascending: false }).limit(1).maybeSingle()
+    if (depois?.from_me) respondidas.add(e.jid)
+  }
+  if (novasTentativas.length) await mudarConfig((d: typeof cfg) => ({ vigiaTentou: [...novasTentativas, ...(d.vigiaTentou ?? [])].slice(0, 400) }))
+  // O resto é seu: aviso no WhatsApp (no máximo uma mensagem a cada 30 min; cada conversa a cada 3 h)
+  const avisadas = cfg.esperaAvisada ?? {}
+  const paraAvisar = lista.filter(e => !respondidas.has(e.jid) && (!avisadas[e.jid] || agora.getTime() - new Date(avisadas[e.jid]).getTime() > 3 * 3600_000) && (e.peso >= 2 || e.minutos >= 120))
+  if (!paraAvisar.length || (cfg.esperaAvisoEm && agora.getTime() - new Date(cfg.esperaAvisoEm).getTime() < 30 * 60_000)) return { esperando: lista.length, respondidas: respondidas.size }
+  const { evo } = await import("./evolution")
+  const { seuNumero } = await import("./agenteAuto")
+  const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
+  if (destino) {
+    const linhas = paraAvisar.slice(0, 8).map(e => `• *${e.nome}* (${e.rotulo}) há ${tempoEspera(e.minutos)}: “${e.mensagem}”`)
+    const texto = `⏳ *Esperando resposta sua (${paraAvisar.length})*\n${linhas.join("\n")}${paraAvisar.length > 8 ? `\n… e mais ${paraAvisar.length - 8}` : ""}\n\nO agente não pode responder essas (conversa sua, MQL pronto para orçar ou cliente da casa).\n${LINK_SISTEMA}/?aba=painel`
+    await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: texto }) }).catch(() => null)
+  }
+  const em = agora.toISOString()
+  await mudarConfig((d: typeof cfg) => {
+    const m = { ...(d.esperaAvisada ?? {}) }
+    for (const e of paraAvisar) m[e.jid] = em
+    for (const [k, v] of Object.entries(m)) if (agora.getTime() - new Date(v).getTime() > 4 * 86_400_000) delete m[k]
+    return { esperaAvisada: m, esperaAvisoEm: em }
+  })
+  return { esperando: lista.length, respondidas: respondidas.size, avisadas: paraAvisar.length }
 }
 
 // Texto da checagem/fechamento: o "Para resolver agora" e o que o Hoje pede, em poucas linhas

@@ -91,6 +91,7 @@ export type ContextoEnvio = {
   podeSozinho: boolean        // a IA achou seguro mandar sem você
   lead: LeadAvaliado
   conversaNova: boolean       // primeira mensagem do contato há poucos dias (não é fornecedor/cliente antigo)
+  coletando?: boolean         // lead bom que ainda não passou tudo para orçar: o agente segue levantando os dados
   clienteCadastrado: boolean
   manualRecente: boolean      // você mandou mensagem nos últimos minutos: você está na conversa
   enviadasHoje: number
@@ -117,8 +118,9 @@ export function travaDoEnvio(c: ContextoEnvio): string | null {
   if (!c.ligado) return "modo automático desligado"
   if (!c.resposta.trim()) return "nada a responder"
   if (c.lead.perfil === "nao_lead") return "não é lead"
-  if (c.emMql) return "MQL: você atende"
-  if (ehQualificado(c.lead.perfil)) return "bom negócio: foi para MQL, você atende"
+  // Lead bom com tudo para orçar fica com você; ainda faltando dado, o agente continua levantando (sem passar preço)
+  if (c.emMql && !c.coletando) return "MQL: você atende"
+  if (ehQualificado(c.lead.perfil) && !c.coletando) return "bom negócio: foi para MQL, você atende"
   if (c.clienteCadastrado) return "cliente cadastrado: fica com você"
   if (!c.conversaNova) return "contato antigo: fica com você"
   if (c.manualRecente) return "você está nessa conversa agora"

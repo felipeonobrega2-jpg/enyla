@@ -413,7 +413,16 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   // MQL: daqui em diante é você (o agente não responde), mas com medida e quantidade a proposta já fica pronta para aprovar
   // (vale também para o bom negócio antigo a quem o agente pediu a medida: a resposta dele vira proposta)
   const pediuMedida = !!(cfg as { medidaPedida?: Record<string, string> }).medidaPedida?.[jid]
-  if ((conversaNova && c.status_lead === "mql") || pediuMedida) { await talvezPropostaDoMql(jid).catch(() => null); return }
+  // MQL ainda sem tudo para orçar: o agente segue levantando (quantidade, medida, referência, acabamento) até ficar
+  // pronto; com tudo, a proposta fica pronta e a conversa é sua
+  let coletandoMql: string | null = null
+  if ((conversaNova && c.status_lead === "mql") || pediuMedida) {
+    const { data: pa } = await supabase.from("whatsapp_conversas").select("proxima_acao").eq("jid", jid).maybeSingle()
+    const antes = (() => { try { return (JSON.parse(pa?.proxima_acao ?? "") as { r?: { dados?: import("./atendente").DadosPedido } }).r?.dados ?? null } catch { return null } })()
+    const falta = pediuMedida ? null : faltaParaProposta(antes)
+    if (!falta) { await talvezPropostaDoMql(jid).catch(() => null); return }
+    coletandoMql = falta
+  }
   if (!conversaNova) return
   // Você escreveu nesta conversa nas últimas 24 h (celular ou tela do sistema): a conversa é sua, o agente não entra.
   // Lead do digital é a exceção: esse é todo do agente.
@@ -424,7 +433,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   const manualRecente = await voceNaConversa(jid, log, cfg)
   if (manualRecente) return
 
-  const a = await atender(jid, { cfg, automatico: true }).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
+  const a = await atender(jid, { cfg, automatico: true, ...(coletandoMql ? { coletandoMql } : {}) }).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
   if (!a.ok) {
     if (ehSemCredito(a.erro)) {
       await avisarSemCredito(cfg)
@@ -517,9 +526,16 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     }
   }
 
+  // MQL que acabou de passar o que faltava: a proposta fica pronta para você e o aviso chega no seu WhatsApp
+  if (coletandoMql && !conversa.clienteCadastrado && !faltaParaProposta(r.dados)) {
+    await prepararProposta(jid, r.dados, conversa.nome).catch(() => null)
+    await avisarMql(cfg, c, r).catch(() => null)
+  }
   const trava = travaDoEnvio({
     ligado: true, resposta: r.resposta, alerta: r.alerta, podeSozinho: r.pode_enviar_sozinho, lead: r.lead,
     conversaNova, clienteCadastrado: conversa.clienteCadastrado, manualRecente, emMql: false, ...ctx,
+    // Lead bom ainda sem quantidade e medida: o agente segue levantando até a proposta poder ser montada
+    coletando: !conversa.clienteCadastrado && (!!coletandoMql || ehQualificado(r.lead.perfil)) && !!faltaParaProposta(r.dados),
   })
   // Lead pequeno só vai para Descartado depois de orientado (senão sumiria da sua lista sem resposta)
   const organiza = !conversa.clienteCadastrado && r.lead.perfil !== "nao_lead"

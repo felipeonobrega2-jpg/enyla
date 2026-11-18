@@ -68,6 +68,10 @@ const LOTES: { v: number; ideias: string[] }[] = [
     // 18/11: pedido seu (detalhes você passa depois)
     "Leads: separar o MQL em níveis (ex.: MQL forte, médio e fraco), inclusive para o digital, para priorizar o atendimento e medir o marketing por nível. Os critérios de cada nível você define depois.",
   ] },
+  { v: 8, ideias: [
+    // 18/11: pedido seu
+    "Digital fora da A3 (caixa maior que a folha, quantidade acima da tabela, formato especial): o sistema manda mensagem ao Leandro em tom natural (\"Leandro, tem um cliente aqui querendo…\"), ele responde como dá para fazer e quanto custa, e cada resposta dele vira regra da tabela do digital. Assim o setor do digital vai sendo calibrado com o que a Villa realmente consegue fazer.",
+  ] },
 ]
 
 // Gastos fixos que o sistema põe uma vez (marca no servidor); apagou ou editou, não volta

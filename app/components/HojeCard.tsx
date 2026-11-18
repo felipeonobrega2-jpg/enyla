@@ -177,7 +177,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar, parte = "tudo" }
                 <button key={`${x.tipo}-${x.numero ?? x.titulo}`} onClick={abrir} disabled={!abrir}
                   className="w-full flex items-start gap-3 px-2 py-2.5 rounded-xl text-left hover:bg-[rgba(116,116,128,0.06)] transition-colors disabled:cursor-default">
                   <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${cor}14`, color: cor }}>
-                    {x.tipo === "sistema" ? <ShieldAlert className="w-4 h-4" /> : x.tipo === "pagamento" ? <Wallet className="w-4 h-4" /> : x.tipo === "atrasado" ? <Truck className="w-4 h-4" /> : x.tipo === "digital" ? <Printer className="w-4 h-4" /> : x.tipo === "grande" ? <Fish className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                    {x.tipo === "sistema" ? <ShieldAlert className="w-4 h-4" /> : x.tipo === "pagamento" ? <Wallet className="w-4 h-4" /> : x.tipo === "atrasado" ? <Truck className="w-4 h-4" /> : x.tipo === "digital" ? <Printer className="w-4 h-4" /> : x.tipo === "grande" ? <Fish className="w-4 h-4" /> : x.tipo === "esperando" ? <MessageCircle className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
                   </span>
                   <span className="flex-1 min-w-0">
                     <span className="flex items-baseline gap-2">

@@ -7,7 +7,7 @@ import type { AprovacaoOnline } from "./aprovacao"
 import type { Passos } from "./hoje"
 
 export type ItemResolver = {
-  tipo: "proposta" | "pagamento" | "atrasado" | "sistema" | "digital" | "grande"
+  tipo: "proposta" | "pagamento" | "atrasado" | "sistema" | "digital" | "grande" | "esperando"
   titulo: string            // "Márcio Santana · ORC-2026-283"
   detalhe: string           // "abriu a proposta 3× · sem retomada há 2 dias"
   valor: number | null
@@ -127,6 +127,14 @@ export async function paraResolver(cfg: { grandesNegocios?: import("./grandesNeg
   }
 
   itens.push(...digitalParado(cfg.pedidosDigitais ?? [], agora))
+  // Quem está esperando resposta há 30+ min (o vigia já tentou o agente; se sobrou, é seu)
+  {
+    const { quemEspera, tempoEspera } = await import("./esperando")
+    const { data: cvs } = await supabase.from("whatsapp_conversas").select("jid, nome, etiquetas, status_lead, ultima_msg, ultima_recebida_at, ultima_enviada_at, proxima_acao")
+      .not("jid", "like", "%@g.us").gte("ultima_recebida_at", new Date(agora - 3 * DIA).toISOString()).limit(800)
+    for (const e of quemEspera((cvs ?? []) as never, agora, 30).filter(x => x.peso >= 2 || x.minutos >= 120).slice(0, 15))
+      itens.push({ tipo: "esperando", titulo: e.nome, detalhe: `${e.rotulo} esperando há ${tempoEspera(e.minutos)}: “${e.mensagem}”`, valor: null, jid: e.jid, numero: null, desde: null, nivel: e.minutos >= 120 || e.peso >= 3 ? "perigo" : "alerta" })
+  }
   // Grande negócio com o próximo passo vencido (ou sem próximo passo): sobe logo depois do sistema
   const { precisaDeVoce } = await import("./grandesNegocios")
   for (const g of cfg.grandesNegocios ?? []) {
@@ -135,6 +143,6 @@ export async function paraResolver(cfg: { grandesNegocios?: import("./grandesNeg
     itens.push({ tipo: "grande", titulo: g.nome, valor: g.valor ?? null, jid: g.jid ?? null, numero: null, desde: g.proximoEm ?? null, nivel: "perigo",
       detalhe: p === "sem_passo" ? "grande negócio sem próximo passo: defina o que fazer e quando" : `venceu ${String(g.proximoEm).split("-").reverse().slice(0, 2).join("/")}: ${g.proximoPasso}` })
   }
-  const ordem = { sistema: 0, grande: 1, pagamento: 2, atrasado: 3, digital: 4, proposta: 5 }
+  const ordem = { sistema: 0, esperando: 1, grande: 2, pagamento: 3, atrasado: 4, digital: 5, proposta: 6 }
   return itens.sort((a, b) => ordem[a.tipo] - ordem[b.tipo] || (b.valor ?? 0) - (a.valor ?? 0))
 }

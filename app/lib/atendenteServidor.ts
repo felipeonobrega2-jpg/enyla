@@ -129,7 +129,7 @@ export async function lerConfigAtendente(): Promise<Cfg> {
   return (data?.data ?? {}) as Cfg
 }
 
-export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boolean; followUp?: 1 | 2 | 3; outra?: boolean; reativar?: { dias: number; motivo: string } } = {}): Promise<{ ok: true; r: ResultadoAtendente; conversa: ConversaLida } | { ok: false; erro: string; status: number }> {
+export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boolean; followUp?: 1 | 2 | 3; outra?: boolean; reativar?: { dias: number; motivo: string }; coletandoMql?: string } = {}): Promise<{ ok: true; r: ResultadoAtendente; conversa: ConversaLida } | { ok: false; erro: string; status: number }> {
   const cfg = opts.cfg ?? await lerConfigAtendente()
   if (!cfg.apiKey) return { ok: false, erro: "Chave da IA não configurada (Configurações).", status: 400 }
 
@@ -276,6 +276,7 @@ Regras que nunca quebram:
   const extra = [
     agoraParaIA(),
     nome ? `Nome para chamar: ${nome}` : "Nome para chamar: nenhum (o contato não tem nome de pessoa: não invente nem use o nome do contato)",
+    opts.coletandoMql ? `Este lead já é bom negócio (MQL) e ainda ${opts.coletandoMql}. Você continua a conversa como o Felipe para levantar o que falta (o jeito está no que você aprendeu); o orçamento quem faz é o Felipe, então não passe preço. Pergunta para levantar dado não é decisão do Felipe: pode_enviar_sozinho true.` : "",
     opts.automatico ? "Modo automático: a sua resposta pode sair sem o Felipe ver. Se tiver qualquer dúvida, pode_enviar_sozinho = false." : "",
     opts.followUp ? `Follow-up ${opts.followUp} de 3: o lead parou de responder depois da sua última mensagem. Escreva um follow-up curto, natural e sem pressão no estilo do guia (ex.: "Oi! Conseguiu ver?"), retomando o ponto em que pararam. ${opts.followUp === 3 ? "É o último: deixe a porta aberta, sem cobrar." : "Não repita a mensagem anterior."} Avalie o lead normalmente.` : "",
     opts.reativar ? `Retomada: a conversa parou há ${opts.reativar.dias} dias. ${instrucaoDoMotivo(opts.reativar.motivo)} Escreva UMA mensagem curta para retomar como o Felipe faria: pessoal e natural, lembrando em poucas palavras o que o cliente queria (produto, quantidade, orçamento) e terminando com uma pergunta fácil de responder (ex.: se ainda está de pé, se já fechou, se quer que você atualize o orçamento). Varie a abertura de um contato para outro (nada de fórmula fixa como "passei aqui porque lembrei de você"). Sem pressão e sem cobrar resposta; não cite quanto tempo passou de forma cobradora. Sem desconto, sem preço novo, sem prazo. Se a última mensagem foi do cliente e ficou sem resposta, comece pedindo desculpa pela demora. Se pela conversa não faz sentido retomar (já fechou com você, disse que não quer, pedido em andamento, fornecedor, conversa pessoal), deixe "resposta" vazia e explique em motivo_alerta. Aqui a regra de ICP não se aplica: a retomada pode sair (alerta "nenhum", pode_enviar_sozinho true); quem segue a conversa quando ele responder é o Felipe.` : "",
