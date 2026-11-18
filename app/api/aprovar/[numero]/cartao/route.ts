@@ -33,7 +33,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ num
   const link = await criarLinkInfinitePay({
     numero, nsu, valor: total, voltarPara,
     descricao: `Pedido ${numero} · ${(p.card.quantidade ?? 0).toLocaleString("pt-BR")} embalagens Enyla`,
-    cliente: { name: String(body.nome ?? "").trim().slice(0, 80) || undefined },
+    // A InfinitePay recusa nome com menos de 3 letras: usa o do pedido, e só manda se for válido
+    cliente: (() => { const n = [String(body.nome ?? ""), String(p.card.nomeCliente ?? "")].map(x => x.trim().replace(/\s+/g, " ")).find(x => x.length >= 3 && /[a-zA-ZÀ-ú]/.test(x)); return n ? { name: n.slice(0, 80) } : undefined })(),
   })
   if ("erro" in link) return NextResponse.json({ erro: link.erro }, { status: 502 })
   await gravarCampos({ pagamentosCartao: { ...pagamentos, [numero]: { orderNsu: nsu, url: link.url, status: "aguardando", valor: total, em: new Date().toISOString() } } })

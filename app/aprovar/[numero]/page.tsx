@@ -60,7 +60,8 @@ export default async function AprovarPage({ params, searchParams }: {
     const cartao = config.pagamentosCartao?.[numero]
     const { data: rec } = isAberto(p.card) ? { data: [] } : await supabase.from("LancamentoFinanceiro").select("id").eq("cardNumero", numero).eq("tipo", "receita").eq("status", "pago").limit(1)
     pagamento = { total, sinal, pix: `/pix/${encodeURIComponent(numero)}?v=${sinal.toFixed(2)}&c=${encodeURIComponent(p.card.nomeCliente)}`,
-      pago: !!cartao?.baixado || !!rec?.length, cartao: infinitePayConfigurado(), retorno: retorno === "invalido" ? null : retorno }
+      pago: !!cartao?.baixado || !!rec?.length, cartao: infinitePayConfigurado(), retorno: retorno === "invalido" ? null : retorno,
+      quantidade: Number(p.card.quantidade) || 0, entregaAte: p.card.dataEntregaPrevista ?? null }
   }
   return (
     <AprovarClient numero={numero} token={t ?? ""}

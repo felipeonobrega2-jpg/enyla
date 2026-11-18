@@ -4,7 +4,7 @@ import { useState } from "react"
 import Image from "next/image"
 import { Check, CircleCheck, Clock, FileText, QrCode, Truck, AlertCircle, CalendarCheck } from "lucide-react"
 import { Caixa3D } from "@/app/components/Caixa3D"
-import { PagamentoPedido } from "./PagamentoPedido"
+import { PosAprovacao } from "./PagamentoPedido"
 
 type Opcao = { quantidade: number; preco: number; unitario: number }
 type Proposta = {
@@ -21,7 +21,7 @@ type Proposta = {
   termos?: { titulo: string; itens: string[] }[]
   versaoTermos?: string
   // Pagamento: total do pedido aprovado, se já está pago e até quantas vezes no cartão
-  pagamento?: { total: number; sinal: number; pix: string; pago: boolean; cartao: boolean; retorno?: "pago" | "pendente" | null } | null
+  pagamento?: { total: number; sinal: number; pix: string; pago: boolean; cartao: boolean; retorno?: "pago" | "pendente" | null; quantidade: number; entregaAte?: string | null } | null
 }
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -85,43 +85,18 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
         {!proposta ? (
           <Aviso icone={<AlertCircle className="w-6 h-6" />} titulo="Link inválido" texto="Este link de aprovação não é válido. Peça um novo link para a Enyla." />
         ) : feito ? (
-          <>
-            <div className="bg-white rounded-2xl p-6 text-center space-y-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] animate-[apple-slide-up_.3s_ease-out]">
-              <div className="w-14 h-14 rounded-full bg-[#009351]/10 flex items-center justify-center mx-auto"><CircleCheck className="w-8 h-8 text-[#009351]" /></div>
-              <p className="font-bold text-[#191625] text-[18px]">Pedido aprovado!</p>
-              <p className="text-[13.5px] text-[#5e5c68] leading-relaxed">
-                Obrigado, {nome.trim().split(" ")[0]}. Recebemos a aprovação de <strong>{num(escolhida!.quantidade)} unidades</strong> por <strong>{brl(escolhida!.preco)}</strong>.
-              </p>
-            </div>
-            <div className="bg-white rounded-2xl p-5 space-y-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-              {proposta.pagamento?.cartao ? (
-                <PagamentoPedido numero={numero} token={token} total={escolhida!.preco} sinal={feito.sinal} sinalPct={proposta.sinalPct} pix={feito.pix}
-                  nomeInicial={nome.trim()} />
-              ) : (<>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8E8E93]">Próximo passo</p>
-              <p className="text-[14px] text-[#191625] leading-relaxed">
-                Para iniciar a produção, pague o sinal de <strong>{brl(feito.sinal)}</strong> ({proposta.sinalPct}% do pedido). O restante é combinado na entrega.
-              </p>
-              <a href={feito.pix} className="h-12 w-full rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-colors">
-                <QrCode className="w-5 h-5" /> Pagar sinal via Pix
-              </a>
-              </>)}
-              <a href={feito.rastreio} className="h-11 w-full rounded-xl bg-[rgba(116,116,128,0.08)] text-[#191625] font-medium text-[14px] flex items-center justify-center gap-2">
-                <Truck className="w-4 h-4" /> Acompanhar o pedido
-              </a>
-            </div>
-          </>
+          <PosAprovacao numero={numero} token={token} primeiroNome={nome.trim().split(" ")[0] || proposta.nomeCliente.split(" ")[0]} quantidade={escolhida!.quantidade}
+            total={escolhida!.preco} sinal={feito.sinal} sinalPct={proposta.sinalPct} pix={feito.pix} rastreio={feito.rastreio}
+            entregaAte={proposta.entregaSeAprovarHoje} cartao={!!proposta.pagamento?.cartao} pago={false} nomeAprovou={nome.trim()} agoraAprovou />
         ) : proposta.jaAprovado ? (
-          <>
-            {proposta.pagamento?.retorno !== "pago" && (
-              <Aviso icone={<CircleCheck className="w-6 h-6" />} titulo="Proposta já aprovada"
-                texto={proposta.pagamento && !proposta.pagamento.pago && proposta.pagamento.cartao ? `Pedido de ${brl(proposta.pagamento.total)}. Escolha abaixo como pagar.` : "Este orçamento já virou pedido. Você pode acompanhar a produção pelo link de rastreio que enviamos."} />
-            )}
-            {proposta.pagamento && proposta.pagamento.cartao && (proposta.pagamento.retorno === "pago" || !proposta.pagamento.pago) && (
-              <PagamentoPedido numero={numero} token={token} total={proposta.pagamento.total} sinal={proposta.pagamento.sinal} sinalPct={proposta.sinalPct}
-                pix={proposta.pagamento.pix} retorno={proposta.pagamento.retorno} />
-            )}
-          </>
+          proposta.pagamento ? (
+            <PosAprovacao numero={numero} token={token} primeiroNome={proposta.nomeCliente.split(" ")[0]} quantidade={proposta.pagamento.quantidade}
+              total={proposta.pagamento.total} sinal={proposta.pagamento.sinal} sinalPct={proposta.sinalPct} pix={proposta.pagamento.pix}
+              rastreio={`/track/${encodeURIComponent(numero)}`} entregaAte={proposta.pagamento.entregaAte} cartao={proposta.pagamento.cartao}
+              pago={proposta.pagamento.pago} retorno={proposta.pagamento.retorno} />
+          ) : (
+            <Aviso icone={<CircleCheck className="w-6 h-6" />} titulo="Proposta já aprovada" texto="Este orçamento já virou pedido. Você pode acompanhar a produção pelo link de rastreio que enviamos." />
+          )
         ) : proposta.vencida ? (
           <Aviso icone={<Clock className="w-6 h-6" />} titulo="Proposta vencida" texto={`Esta proposta valia até ${proposta.validaAte ? dataBR(proposta.validaAte) : "a data combinada"}. Fale com a Enyla para atualizarmos os valores.`} />
         ) : (
@@ -186,7 +161,7 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
               <label className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" checked={aceite} onChange={e => setAceite(e.target.checked)} className="mt-0.5 w-5 h-5 accent-[#8456e8] shrink-0" />
                 <span className="text-[13px] text-[#5e5c68] leading-relaxed">
-                  Aprovo a proposta {numero}{escolhida ? <> de <strong className="text-[#191625]">{num(escolhida.quantidade)} unidades</strong> por <strong className="text-[#191625]">{brl(escolhida.preco)}</strong></> : ""}. A produção começa após o sinal de {proposta.sinalPct}%{proposta.pagamento?.cartao ? " (ou o pagamento total no cartão)" : ""}.
+                  Aprovo a proposta {numero}{escolhida ? <> de <strong className="text-[#191625]">{num(escolhida.quantidade)} unidades</strong> por <strong className="text-[#191625]">{brl(escolhida.preco)}</strong></> : ""}. A produção começa após o sinal de {proposta.sinalPct}%{proposta.pagamento?.cartao ? " (ou o pagamento no cartão)" : ""}.
                   {proposta.termos?.length ? <> Li e aceito os <button type="button" onClick={e => { e.preventDefault(); setVerTermos(v => !v) }} className="text-[#8456e8] font-semibold underline underline-offset-2">termos do pedido</button>.</> : null}
                 </span>
               </label>
