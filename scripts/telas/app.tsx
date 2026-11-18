@@ -120,6 +120,9 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     { id: "m1", url: "#", mime: "video/mp4", nome: "v1.mp4", descricao: "Caixa rígida preta sendo montada", tipo: "video", em: "2026-11-07", usos: 4, ativo: true },
     { id: "m2", url: "#", mime: "image/jpeg", nome: "f1.jpg", descricao: "Caixinhas 50 ml prontas, laminação fosca", tipo: "foto", em: "2026-11-07", usos: 0, ativo: false },
   ] }))
+  if (u.startsWith("/api/d/") && o?.method === "POST" && String(o.body ?? "").includes('"acao":"medidas"')) {
+    return new Response(JSON.stringify({ previa: { medidas: { a: 12, l: 5, p: 5 }, total: 742.5, antes: 619.95, restante: 432.52, sinalPago: true } }))
+  }
   if (u.startsWith("/api/d/") && /DIG-(ARTE|PROD|DZ)/.test(u)) {
     const arte = u.includes("ARTE"), prod = u.includes("PROD"), dz = u.includes("DZ")
     const img = "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="#191625"/><rect x="200" y="60" width="200" height="280" fill="#2a2440" stroke="#c9a96e" stroke-width="3"/><text x="300" y="210" fill="#c9a96e" font-family="Georgia" font-size="28" text-anchor="middle">Essência Rara</text></svg>')
@@ -513,7 +516,7 @@ function Telas() {
         mensagem={l => `Oi, Perfumaria! Segue a proposta ORC-2026-999 da sua embalagem.\n\n3.000 unidades · R$ 8.476,64 à vista (R$ 2,83/un)\n\nPara ver a caixa em 3D e aprovar: ${l}\n\nQualquer dúvida, é só me chamar.`}
         onFechar={() => {}} /></div>
     }
-    case "pedidodigital": case "pedidodigital-termos": case "pedidodigital-pago": return <DigitalClient id={tela.endsWith("pago") ? "DIG-PAGO" : "DIG-0001"} t="x" />
+    case "pedidodigital": case "pedidodigital-termos": case "pedidodigital-pago": case "pedidodigital-medidas": return <DigitalClient id={tela.endsWith("pago") || tela.endsWith("medidas") ? "DIG-PAGO" : "DIG-0001"} t="x" />
     case "pedidodigital-asaas": return <DigitalClient id="DIG-ASAAS" t="x" />
     case "pedidodigital-arte": return <DigitalClient id="DIG-ARTE" t="x" />
     case "pedidodigital-prod": return <DigitalClient id="DIG-PROD" t="x" />

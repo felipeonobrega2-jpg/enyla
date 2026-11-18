@@ -44,6 +44,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
   const [ent, setEnt] = useState({ cep: "", endereco: "" })
   const [salvo, setSalvo] = useState(false)
   const [enviando, setEnviando] = useState(false)
+  const [rascunhoMedida, setRascunhoMedida] = useState<{ a: number; l: number; p: number } | null>(null)   // a caixa 3D acompanha o que o cliente digita
 
   useEffect(() => {
     fetch(`/api/d/${encodeURIComponent(id)}?t=${encodeURIComponent(t)}${dz ? `&dz=${encodeURIComponent(dz)}` : ""}`).then(async r => {
@@ -205,13 +206,18 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
       </div>
 
       <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] py-5 flex flex-col items-center">
-        <Caixa3D largura={p.medidas.l} altura={p.medidas.a} profundidade={p.medidas.p} material="Triplex 300g" laminacao="fosca" tamanho={pago ? 95 : 115} />
-        <p className="text-[13px] font-semibold text-[#191625] mt-4">{cm(p.medidas.a)} × {cm(p.medidas.l)} × {cm(p.medidas.p)} cm <span className="font-normal text-[#898892]">(A × L × P)</span></p>
+        {(() => { const mm = rascunhoMedida ?? p.medidas; return (<>
+        <Caixa3D largura={mm.l} altura={mm.a} profundidade={mm.p} material="Triplex 300g" laminacao="fosca" tamanho={pago ? 95 : 115} />
+        <p className="text-[13px] font-semibold text-[#191625] mt-4">{cm(mm.a)} × {cm(mm.l)} × {cm(mm.p)} cm <span className="font-normal text-[#898892]">(A × L × P){rascunhoMedida ? " · prévia" : ""}</span></p>
+        </>) })()}
         <ul className="mt-3 space-y-1 text-[12.5px] text-[#5e5c68] text-center px-6">
           <li>Triplex 300g com laminação fosca ou brilhante</li>
           <li>{p.designer ? "Arte criada a partir do briefing abaixo; o cliente aprova antes de imprimir" : "Arte criada pela nossa equipe, você aprova antes de imprimir"}</li>
-          {p.padrao && !pago && <li className="text-[#c57800]">Medida padrão para o seu frasco. Se for diferente, mande as medidas no WhatsApp que a gente ajusta.</li>}
+          {p.padrao && !pago && <li className="text-[#c57800]">Medida padrão para o seu frasco. Se o seu for diferente, ajuste abaixo.</li>}
         </ul>
+        {!p.designer && !p.arteAprovadaEm && ["aguardando_sinal", "sinal_pago", "arte"].includes(p.status) && (
+          <MudarMedidaCliente id={id} t={t} p={p} onPedido={x => { setP(x); setRascunhoMedida(null) }} onRascunho={setRascunhoMedida} />
+        )}
       </div>
 
       {pago ? (
@@ -554,6 +560,74 @@ function PixBloco({ titulo, valor, txid, descricao, sub, onConferir, conferindo,
         className="mt-3 w-full h-11 rounded-xl text-[14px] font-semibold text-[#8456e8] bg-[#8456e8]/[0.08] hover:bg-[#8456e8]/[0.14] disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
         {conferindo ? <><Loader2 className="w-4 h-4 animate-spin" />Conferindo…</> : "Já paguei"}
       </button>
+    </div>
+  )
+}
+
+// O cliente muda a medida da caixa até aprovar a arte: vê o valor na hora e confirma. O Leandro e o Felipe são avisados.
+function MudarMedidaCliente({ id, t, p, onPedido, onRascunho }: { id: string; t: string; p: Pedido; onPedido: (p: Pedido) => void; onRascunho: (m: { a: number; l: number; p: number } | null) => void }) {
+  const fmt = (n: number) => String(n).replace(".", ",")
+  const [aberto, setAberto] = useState(false)
+  const [m, setM] = useState({ a: fmt(p.medidas.a), l: fmt(p.medidas.l), p: fmt(p.medidas.p) })
+  const [previa, setPrevia] = useState<{ total: number; antes: number; restante: number; sinalPago: boolean } | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+  const [salvando, setSalvando] = useState(false)
+  const [feito, setFeito] = useState(false)
+  const n = (x: string) => Number(x.replace(",", "."))
+  const valido = n(m.a) > 0 && n(m.l) > 0 && n(m.p) > 0
+  const mesmas = n(m.a) === p.medidas.a && n(m.l) === p.medidas.l && n(m.p) === p.medidas.p
+  const enviar = (confirmar: boolean) => fetch(`/api/d/${encodeURIComponent(id)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ t, acao: "medidas", a: n(m.a), l: n(m.l), p: n(m.p), confirmar }) })
+  useEffect(() => { onRascunho(aberto && valido && !mesmas ? { a: n(m.a), l: n(m.l), p: n(m.p) } : null) }, [aberto, m.a, m.l, m.p])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!aberto || !valido || mesmas) { setPrevia(null); return }
+    const tm = setTimeout(async () => {
+      const r = await enviar(false).catch(() => null)
+      const d = r ? await r.json().catch(() => ({})) : {}
+      if (r?.ok && d.previa) { setPrevia(d.previa); setErro(null) } else { setPrevia(null); setErro(d.erro ?? "Não consegui calcular. Confira as medidas.") }
+    }, 400)
+    return () => clearTimeout(tm)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberto, m.a, m.l, m.p])
+  async function confirmar() {
+    setSalvando(true); setErro(null)
+    const r = await enviar(true).catch(() => null)
+    const d = r ? await r.json().catch(() => ({})) : {}
+    setSalvando(false)
+    if (!r?.ok) { setErro(d.erro ?? "Não deu certo. Tente de novo ou fale com a gente no WhatsApp."); return }
+    onPedido(d); setFeito(true); setAberto(false)
+  }
+  if (!aberto) return (
+    <div className="mt-3 text-center">
+      {feito && <p className="text-[12.5px] text-[#009351] font-semibold flex items-center justify-center gap-1.5 mb-1"><Check className="w-4 h-4 ds-pop" />Medida atualizada</p>}
+      <button onClick={() => setAberto(true)} className="text-[13px] font-semibold text-[#8456e8] underline underline-offset-2">Mudar a medida da caixa</button>
+    </div>
+  )
+  const mudou = previa && Math.round(previa.total * 100) !== Math.round(previa.antes * 100)
+  const campo = (k: "a" | "l" | "p", rotulo: string) => (
+    <label className="block min-w-0">
+      <span className="text-[11.5px] font-medium text-[#5e5c68]">{rotulo}</span>
+      <input value={m[k]} onChange={e => setM({ ...m, [k]: e.target.value })} inputMode="decimal"
+        className="mt-1 w-full h-11 rounded-xl px-3 text-[15px] text-center text-[#191625] bg-[rgba(116,116,128,0.06)] outline-none focus:bg-white focus:ring-2 focus:ring-[#8456e8]/25" />
+    </label>
+  )
+  return (
+    <div className="mt-4 self-stretch mx-5 rounded-2xl bg-[rgba(116,116,128,0.05)] px-4 py-4 space-y-3 ds-entrada">
+      <p className="text-[14px] font-semibold text-[#191625]">Medida da caixa, em cm</p>
+      <div className="grid grid-cols-3 gap-2">{campo("a", "Altura")}{campo("l", "Largura")}{campo("p", "Profundidade")}</div>
+      <p className="text-[11.5px] text-[#898892] leading-snug">É a medida da caixa por dentro. Se você mediu o frasco, some uns 3 mm em cada medida para ele entrar folgado.</p>
+      {erro && <p className="text-[12.5px] text-[#d33a3c]">{erro}</p>}
+      {previa && !mesmas && (
+        <p className={`text-[13px] rounded-xl px-3 py-2.5 leading-snug ${mudou ? "bg-[#c57800]/[0.08] text-[#8a5300]" : "bg-[#009351]/[0.07] text-[#0b7a45]"}`}>
+          {mudou ? <>Com essa medida o pedido fica em <strong>{brl(previa.total)}</strong>{previa.sinalPago ? <>: o sinal que você pagou continua valendo e o restante passa a {brl(previa.restante)}.</> : "."}</> : <>O valor continua o mesmo: {brl(previa.total)}.</>}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button onClick={() => { setAberto(false); setM({ a: fmt(p.medidas.a), l: fmt(p.medidas.l), p: fmt(p.medidas.p) }) }} className="ds-toque flex-1 h-12 rounded-xl text-[14px] font-semibold text-[#5e5c68] bg-white">Cancelar</button>
+        <button onClick={() => void confirmar()} disabled={!previa || mesmas || salvando}
+          className="ds-toque flex-[2] h-12 rounded-xl text-[14px] font-semibold text-white bg-[#8456e8] disabled:opacity-40 flex items-center justify-center gap-2">
+          {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : null}Confirmar medida
+        </button>
+      </div>
     </div>
   )
 }

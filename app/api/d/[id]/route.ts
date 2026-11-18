@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { auth } from "@/auth"
-import { lerPedido, gravarPedido, tokenDigitalValido, tokenDesignerValido, conferirSinais, conferirNoAsaas, cobrarNoAsaas, cartaoNaInfinitePay, confirmarCartaoDigital, aprovarPeloCliente, ajustePeloCliente, mandarArte, avisarDesigner } from "@/app/lib/digitalServidor"
+import { lerPedido, gravarPedido, tokenDigitalValido, tokenDesignerValido, conferirSinais, conferirNoAsaas, cobrarNoAsaas, cartaoNaInfinitePay, confirmarCartaoDigital, medidasPeloCliente, aprovarPeloCliente, ajustePeloCliente, mandarArte, avisarDesigner } from "@/app/lib/digitalServidor"
 import { opcoesDoPedido, trocarQuantidade, gravarEntrega, arteAtual, esperandoAprovacao, PedidoComBriefing, DIAS_VALIDADE_DIGITAL } from "@/app/lib/digital"
 import type { RegraDigital } from "@/app/lib/precoDigital"
 import { asaasConfigurado } from "@/app/lib/asaas"
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const id = decodeURIComponent((await params).id)
-  const b = await req.json().catch(() => ({})) as { t?: string; dz?: string; acao?: string; quantidade?: number; marca?: string; cores?: string; referencias?: string; laminacao?: string; texto?: string; cep?: string; endereco?: string; documento?: string; order_nsu?: string; transaction_nsu?: string; slug?: string }
+  const b = await req.json().catch(() => ({})) as { t?: string; dz?: string; acao?: string; quantidade?: number; marca?: string; cores?: string; referencias?: string; laminacao?: string; texto?: string; cep?: string; endereco?: string; documento?: string; order_nsu?: string; transaction_nsu?: string; slug?: string; a?: number; l?: number; p?: number; confirmar?: boolean }
   if (!tokenDigitalValido(id, b.t)) return NextResponse.json({ erro: "Link inválido." }, { status: 403 })
   const { pedido, cfg } = await lerPedido(id)
   if (!pedido || pedido.status === "cancelado") return NextResponse.json({ erro: "Orçamento indisponível." }, { status: 404 })
@@ -84,6 +84,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const r = b.acao === "aprovar" ? await aprovarPeloCliente(id) : await ajustePeloCliente(id, String(b.texto ?? ""))
     if (r.erro) return NextResponse.json({ erro: r.erro }, { status: 400 })
     return NextResponse.json(publico(r.pedido!, cfg.digital))
+  }
+  // O cliente muda a medida da caixa (até a arte ser aprovada): prévia do valor e, confirmando, grava e avisa
+  if (b.acao === "medidas") {
+    const r = await medidasPeloCliente(id, { a: Number(b.a), l: Number(b.l), p: Number(b.p) }, !!b.confirmar)
+    if ("erro" in r && r.erro) return NextResponse.json({ erro: r.erro }, { status: 400 })
+    if ("previa" in r) return NextResponse.json({ previa: r.previa })
+    return NextResponse.json(publico((r as { pedido: PedidoComBriefing }).pedido, cfg.digital))
   }
   if (b.acao === "entrega") {
     const novo = await gravarPedido(id, p => gravarEntrega(p, String(b.cep ?? ""), String(b.endereco ?? "")) as PedidoComBriefing | null)

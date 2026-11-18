@@ -129,6 +129,25 @@ export async function avisarDesigner(cfg: CfgDigital, p: PedidoComBriefing) {
   return ok
 }
 
+// Cliente mudou a medida pela página: grava, avisa o Leandro (se já passou do sinal) e você
+export async function medidasPeloCliente(id: string, m: { a: number; l: number; p: number }, confirmar: boolean) {
+  const { trocarMedidas, fmtMedidas } = await import("./digital")
+  const { pedido, cfg } = await lerPedido(id)
+  if (!pedido) return { erro: "Pedido não encontrado." }
+  const t = trocarMedidas((cfg.pedidosDigitais ?? []) as PedidoComBriefing[], pedido, m, cfg.digital)
+  if (!t.ok) return { erro: t.motivo }
+  const previa = { medidas: t.pedido.medidas, total: t.pedido.total, antes: t.antes.total, restante: Math.round((t.pedido.total - t.pedido.sinal) * 100) / 100, sinalPago: pedido.status !== "aguardando_sinal" }
+  if (!confirmar) return { previa }
+  const novo = await gravarPedido(id, (p, ts) => { const r = trocarMedidas(ts, p, m, cfg.digital); return r.ok ? r.pedido as PedidoComBriefing : null })
+  if (!novo) return { erro: "Não deu para mudar a medida agora. Fale com a gente no WhatsApp." }
+  if (novo.status !== "aguardando_sinal") await avisarDesignerMedidas(cfg, novo, t.antes.medidas).catch(() => null)
+  const mudou = Math.round(novo.total * 100) !== Math.round(t.antes.total * 100)
+  await avisarVoce(cfg, `📐 *Digital ${novo.id}* · o cliente mudou a medida pela página
+${novo.nome ?? ""}: de ${fmtMedidas(t.antes.medidas)} para *${fmtMedidas(novo.medidas)} cm*${mudou ? `
+Valor: ${brl(t.antes.total)} → *${brl(novo.total)}*` : "\nO valor não mudou"}${novo.status === "aguardando_sinal" ? "" : "\nO Leandro já recebeu as medidas novas."}`)
+  return { pedido: novo }
+}
+
 // Medidas mudaram depois de fechar: o Leandro recebe as antigas e as novas (sem valores) e o link do pedido
 export async function avisarDesignerMedidas(cfg: CfgDigital, p: PedidoComBriefing, antes: { a: number; l: number; p: number }) {
   if (p.teste) return true
