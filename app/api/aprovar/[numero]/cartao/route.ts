@@ -4,7 +4,7 @@ import { tokenValido } from "@/app/lib/aprovacao"
 import { carregarProposta } from "@/app/lib/propostaPublica"
 import { gravarCampos } from "@/app/lib/configAtomica"
 import { isAberto } from "@/app/lib/negocio"
-import { infinitePayConfigurado, criarLinkInfinitePay, orderNsu } from "@/app/lib/infinitePay"
+import { infinitePayConfigurado, criarLinkInfinitePay, orderNsu, VERSAO_LINK } from "@/app/lib/infinitePay"
 import { LINK_SISTEMA } from "@/app/lib/notificar"
 import type { PagamentoCartao } from "@/app/lib/cartaoAprovacao"
 
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ num
   const pagamentos = ((cfgRow?.data as Record<string, unknown> | null)?.pagamentosCartao ?? {}) as Record<string, PagamentoCartao>
   const atual = pagamentos[numero]
   if (atual?.baixado) return NextResponse.json({ erro: "Este pedido já está pago.", jaPago: true }, { status: 409 })
-  if (atual?.url && atual.valor === total && atual.em && Date.now() - new Date(atual.em).getTime() < 2 * 3600_000) return NextResponse.json({ ok: true, url: atual.url })
+  if (atual?.url && atual.v === VERSAO_LINK && atual.valor === total && atual.em && Date.now() - new Date(atual.em).getTime() < 2 * 3600_000) return NextResponse.json({ ok: true, url: atual.url })
 
   const nsu = orderNsu(numero)
   const voltarPara = `${LINK_SISTEMA}/aprovar/${encodeURIComponent(numero)}?t=${encodeURIComponent(body.t!)}`
@@ -37,6 +37,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ num
     cliente: (() => { const n = [String(body.nome ?? ""), String(p.card.nomeCliente ?? "")].map(x => x.trim().replace(/\s+/g, " ")).find(x => x.length >= 3 && /[a-zA-ZÀ-ú]/.test(x)); return n ? { name: n.slice(0, 80) } : undefined })(),
   })
   if ("erro" in link) return NextResponse.json({ erro: link.erro }, { status: 502 })
-  await gravarCampos({ pagamentosCartao: { ...pagamentos, [numero]: { orderNsu: nsu, url: link.url, status: "aguardando", valor: total, em: new Date().toISOString() } } })
+  await gravarCampos({ pagamentosCartao: { ...pagamentos, [numero]: { v: VERSAO_LINK, orderNsu: nsu, url: link.url, status: "aguardando", valor: total, em: new Date().toISOString() } } })
   return NextResponse.json({ ok: true, url: link.url })
 }

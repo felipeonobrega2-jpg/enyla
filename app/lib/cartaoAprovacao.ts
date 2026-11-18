@@ -4,7 +4,7 @@ import type { KanbanCard } from "@/app/types"
 import { conferirInfinitePay, numeroDoOrderNsu } from "./infinitePay"
 
 // pagamentosCartao[numero]: o link criado e o resultado. status: "aguardando" | "pago"
-export type PagamentoCartao = { orderNsu?: string; url?: string; status: string; valor: number; parcelas?: number; metodo?: string; transacao?: string; em?: string; baixado?: boolean }
+export type PagamentoCartao = { v?: number; orderNsu?: string; url?: string; status: string; valor: number; parcelas?: number; metodo?: string; transacao?: string; em?: string; baixado?: boolean }
 
 const metodoDe = (m?: string) => m === "pix" ? "pix" as const : "cartao_credito" as const
 

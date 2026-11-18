@@ -6,6 +6,8 @@
 import { LINK_SISTEMA } from "./notificar"
 
 const API = "https://api.checkout.infinitepay.io"
+// Versão das opções do link: mudou (ex.: tirou o endereço), link antigo não é reaproveitado
+export const VERSAO_LINK = 2
 export const infinitePayConfigurado = () => !!process.env.INFINITEPAY_HANDLE
 const handle = () => (process.env.INFINITEPAY_HANDLE ?? "").replace(/^\$/, "").trim()
 
