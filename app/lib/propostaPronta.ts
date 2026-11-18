@@ -57,6 +57,20 @@ export function faltaParaProposta(d: DadosPedido | null | undefined): string | n
   return null
 }
 
+// MQL: o que ainda falta para o Felipe orçar com precisão (além de quantidade e medida: referência/foto, acabamento,
+// quantos modelos e se tem arte). O agente segue conversando até isto voltar null.
+export function faltaParaOrcar(d: DadosPedido | null | undefined): string | null {
+  const base = faltaParaProposta(d)
+  const resto = !d ? [] : [
+    !d.referencia && "uma foto do produto ou referência da caixa que ele imagina",
+    !d.acabamento && "o acabamento (verniz, laminação, hot stamping, relevo ou o mais simples)",
+    !d.modelos && "quantos modelos ou fragrâncias diferentes",
+    d.tem_arte == null && "se já tem a arte ou o logo",
+  ].filter((x): x is string => !!x)
+  if (!base && !resto.length) return null
+  return [base, resto.length ? `falta ${resto.join(", ")}` : ""].filter(Boolean).join("; ")
+}
+
 // Quantidades da proposta: a pedida e as duas faixas padrão acima (mostra o ganho de escala)
 export function quantidadesDaProposta(q: number): number[] {
   const acima = QUANTIDADES_PADRAO.filter(x => x > q).slice(0, 2)
@@ -136,7 +150,9 @@ export function montarProposta(d: DadosPedido, nome: string | null, config: Conf
   if (falta) return { ok: false, motivo: falta }
   const cx = caixaDosDados(d)!
   const q = Math.round(d.quantidade!)
-  const obs = [d.resumo, d.frasco_cm ? `Frasco: ${d.frasco_cm}` : "", "Proposta montada pelo agente"].filter(Boolean).join(" · ")
+  const obs = [d.resumo, d.frasco_cm ? `Frasco: ${d.frasco_cm}` : "", d.acabamento ? `Acabamento: ${d.acabamento}` : "",
+    d.modelos && d.modelos > 1 ? `${d.modelos} modelos` : "", d.referencia ? `Referência: ${d.referencia}` : "", "Proposta montada pelo agente"].filter(Boolean).join(" · ")
+  const modelos = d.modelos && d.modelos > 1 && d.modelos <= 20 ? Math.round(d.modelos) : null
   const form: FormData = {
     ...FORM_PROPOSTA, ...base,
     nomeCliente: (nome ?? "").trim(),
@@ -144,6 +160,7 @@ export function montarProposta(d: DadosPedido, nome: string | null, config: Conf
     quantidades: quantidadesDaProposta(q),
     rota: { ...(base.rota ?? {}), multiplicador },
     obsInterna: obs,
+    ...(modelos ? { numSKUs: modelos, numArtes: modelos } : {}),
   }
   const calculo = calcular(form, config)
   if (!calculo?.tabela.length) return { ok: false, motivo: "o motor não conseguiu calcular essa caixa" }

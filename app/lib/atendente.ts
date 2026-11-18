@@ -21,6 +21,11 @@ export type DadosPedido = {
   frasco_cm: string | null
   quantidade: number | null
   tem_arte: boolean | null
+  // Para orçar com precisão (MQL): o que o cliente mostrou (foto do produto, caixa que gosta, ideia), o acabamento
+  // e quantos modelos. "sem preferência" / "não tem" contam como respondido.
+  referencia?: string | null
+  acabamento?: string | null
+  modelos?: number | null
   resumo: string
 }
 
@@ -55,6 +60,9 @@ export function formDoAtendimento(d: DadosPedido): Partial<FormData> {
     d.resumo,
     d.frasco_cm ? `Frasco: ${d.frasco_cm}` : "",
     d.tem_arte === true ? "Cliente já tem arte" : d.tem_arte === false ? "Arte por nossa conta" : "",
+    d.acabamento ? `Acabamento: ${d.acabamento}` : "",
+    d.modelos && d.modelos > 1 ? `${d.modelos} modelos` : "",
+    d.referencia ? `Referência: ${d.referencia}` : "",
   ].filter(Boolean).join(" · ")
   if (obs) f.obsInterna = obs
   return f

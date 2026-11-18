@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { caixaDosDados, faltaParaProposta, quantidadesDaProposta, markupAprendido, montarProposta, ajustarPreco, baseDoHistorico, mudouAProposta } from "@/app/lib/propostaPronta"
+import { caixaDosDados, faltaParaProposta, quantidadesDaProposta, markupAprendido, montarProposta, ajustarPreco, baseDoHistorico, mudouAProposta, faltaParaOrcar } from "@/app/lib/propostaPronta"
 import { retornoDoPeriodo, margemPorReal } from "@/app/lib/retornoCampanhas"
 import { config } from "./fixtures"
 import type { DadosPedido } from "@/app/lib/atendente"
@@ -93,5 +93,28 @@ describe("retorno dos anúncios no período", () => {
     expect(r.recebido).toBe(3500)
     expect(r.margemEstimada).toBe(true)
     expect(margemPorReal(r, 1000)).toBeCloseTo(r.margem / 1000)
+  })
+})
+
+describe("faltaParaOrcar (MQL: o agente segue até dar para orçar com precisão)", () => {
+  const base = { itens: [], produto: "perfume", volume_ml: 100, caixa_cm: { frente: 6, lateral: 4, altura: 12 }, frasco_cm: null, quantidade: 3000, tem_arte: null, resumo: "" }
+  it("com quantidade e medida ainda pede foto, acabamento, modelos e arte", () => {
+    const f = faltaParaOrcar(base)!
+    expect(f).toMatch(/foto/)
+    expect(f).toMatch(/acabamento/)
+    expect(f).toMatch(/modelos/)
+    expect(f).toMatch(/arte/)
+    expect(f).not.toMatch(/medidas|quantidade/)
+  })
+  it("sem medida pede a medida também", () => {
+    expect(faltaParaOrcar({ ...base, caixa_cm: null })).toMatch(/medidas/)
+  })
+  it("com tudo (\"sem preferência\" conta) está pronto", () => {
+    expect(faltaParaOrcar({ ...base, tem_arte: false, referencia: "foto do frasco", acabamento: "sem preferência", modelos: 2 })).toBeNull()
+  })
+  it("modelos viram SKUs e o acabamento vai na observação da proposta", () => {
+    const m = montarProposta({ ...base, tem_arte: true, referencia: "caixa preta fosca", acabamento: "laminação fosca + hot stamping", modelos: 3 }, "Ana", config(), {}, 2)
+    expect(m.ok).toBe(true)
+    if (m.ok) { expect(m.form.numSKUs).toBe(3); expect(m.form.obsInterna).toMatch(/hot stamping/) }
   })
 })

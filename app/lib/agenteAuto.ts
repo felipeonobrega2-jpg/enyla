@@ -7,7 +7,7 @@
 import { cotarItens, montarPedidosDoGrupo, mudouOGrupo, pedidosDoGrupo, textoLinkGrupo, registrarNegociacao, totalPedido } from "./digital"
 import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital, itensDoLembrete, lembreteDigitalAgora, ADIOU, prometeLinkSemLink, TEXTO_PEDE_MEDIDA } from "./digital"
 import { linkPedido } from "./digitalLink"
-import { faltaParaProposta } from "./propostaPronta"
+import { faltaParaProposta, faltaParaOrcar } from "./propostaPronta"
 import { emCampanha, type EstadoCampanha } from "./campanhaDigital"
 import { prepararProposta, talvezPropostaDoMql } from "./propostaProntaServidor"
 import type { RegraDigital } from "./precoDigital"
@@ -23,13 +23,18 @@ import {
   organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, ehSemCredito, proximoFollowUp, horarioDeFollowUp, dentroDoHorario, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE, ETIQUETAS_AGENTE,
   marcar, marcosDoRegistro, Marcos, paradoParaRetomar,
 } from "./agenteLeads"
-import { corrigirCumprimento } from "./atendente"
+import { corrigirCumprimento, type DadosPedido } from "./atendente"
 import { mudarConfig } from "./configAtomica"
 import { notificar, LINK_SISTEMA } from "./notificar"
 import { limparEmojis, leadEstaRindo } from "./estilo"
 import { escolherMidia, MidiaAgente } from "./midiaAgente"
 
 const DIAS_CONVERSA_NOVA = 4
+// MQL: o agente conduz até ter tudo para orçar; passou disso sem fechar os dados, a conversa é sua
+const MAX_PERGUNTAS_MQL = 8
+const PASSO_LEVANTANDO = "Levantando para orçar"
+const perguntasLevantando = (cfg: CfgAgente, jid: string) =>
+  (cfg.agenteLog ?? []).filter(l => l.jid === jid && l.enviou && l.passo === PASSO_LEVANTANDO && Date.now() - new Date(l.em).getTime() < 7 * 86_400_000).length
 const HORAS_RETOMAR = 24
 const RETOMADAS_POR_RODADA = 2   // por rodada (a cada 5 min), uma de cada vez
 const DIAS_FOLLOW_UP = 14            // follow-up vale para lead que chegou nos últimos 14 dias
@@ -245,13 +250,13 @@ export async function marcarNaoLida(c: Conversa, msgId: string) {
   }) }).catch(() => null)
 }
 
-export async function avisarMql(cfg: CfgAgente, c: Conversa, r: { lead: { perfil: PerfilLead; quantidade_total: number | null; motivo: string }; dados?: { resumo?: string } }) {
+export async function avisarMql(cfg: CfgAgente, c: Conversa, r: { lead: { perfil: PerfilLead; quantidade_total: number | null; motivo: string }; dados?: DadosPedido }, pronto = false) {
   // No celular pelo ntfy (chega mesmo com o WhatsApp caído): só perfil e quantidade, sem nome nem telefone
   const rotulo = r.lead.perfil === "icp" ? "ICP" : r.lead.perfil === "oportunidade" ? "Oportunidade" : "MQL"
-  await notificar(`Novo ${rotulo}`, `${r.lead.quantidade_total ? `${r.lead.quantidade_total.toLocaleString("pt-BR")} caixas` : "Bom negócio"}${r.dados?.resumo ? ` · ${r.dados.resumo.slice(0, 90)}` : ""}`, { prioridade: "alta", tags: ["star"] }).catch(() => null)
+  await notificar(pronto ? `${rotulo} pronto para orçar` : `Novo ${rotulo}`, `${r.lead.quantidade_total ? `${r.lead.quantidade_total.toLocaleString("pt-BR")} caixas` : "Bom negócio"}${r.dados?.resumo ? ` · ${r.dados.resumo.slice(0, 90)}` : ""}`, { prioridade: "alta", tags: ["star"] }).catch(() => null)
   const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
   if (!destino) return
-  const texto = textoAvisoMql({ nome: c.nome, telefone: c.telefone, perfil: r.lead.perfil, quantidade: r.lead.quantidade_total, motivo: r.lead.motivo, resumo: r.dados?.resumo })
+  const texto = textoAvisoMql({ nome: c.nome, telefone: c.telefone, perfil: r.lead.perfil, quantidade: r.lead.quantidade_total, motivo: r.lead.motivo, resumo: r.dados?.resumo, dados: pronto ? r.dados : undefined })
   await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: texto }) }).catch(() => null)
 }
 
@@ -419,8 +424,10 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   if ((conversaNova && c.status_lead === "mql") || pediuMedida) {
     const { data: pa } = await supabase.from("whatsapp_conversas").select("proxima_acao").eq("jid", jid).maybeSingle()
     const antes = (() => { try { return (JSON.parse(pa?.proxima_acao ?? "") as { r?: { dados?: import("./atendente").DadosPedido } }).r?.dados ?? null } catch { return null } })()
-    const falta = pediuMedida ? null : faltaParaProposta(antes)
-    if (!falta) { await talvezPropostaDoMql(jid).catch(() => null); return }
+    // Até o Felipe ter tudo para orçar com precisão (medida, quantidade, foto/referência, acabamento, modelos, arte).
+    // Teto: depois de muitas perguntas sem fechar, a conversa volta para você (não vira interrogatório).
+    const falta = pediuMedida ? null : faltaParaOrcar(antes)
+    if (!falta || perguntasLevantando(cfg, jid) >= MAX_PERGUNTAS_MQL) { await talvezPropostaDoMql(jid).catch(() => null); return }
     coletandoMql = falta
   }
   if (!conversaNova) return
@@ -527,15 +534,19 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   }
 
   // MQL que acabou de passar o que faltava: a proposta fica pronta para você e o aviso chega no seu WhatsApp
+  // Proposta de rascunho assim que há quantidade e medida (vai se atualizando com acabamento e modelos);
+  // quando chega o último dado, o aviso de "pronto para orçar" vai para o seu WhatsApp
   if (coletandoMql && !conversa.clienteCadastrado && !faltaParaProposta(r.dados)) {
     await prepararProposta(jid, r.dados, conversa.nome).catch(() => null)
-    await avisarMql(cfg, c, r).catch(() => null)
+    if (!faltaParaOrcar(r.dados)) await avisarMql(cfg, c, r, true).catch(() => null)
   }
+  const levantando = !conversa.clienteCadastrado && (!!coletandoMql || ehQualificado(r.lead.perfil)) && !!faltaParaOrcar(r.dados)
+    && perguntasLevantando(cfg, jid) < MAX_PERGUNTAS_MQL
   const trava = travaDoEnvio({
     ligado: true, resposta: r.resposta, alerta: r.alerta, podeSozinho: r.pode_enviar_sozinho, lead: r.lead,
     conversaNova, clienteCadastrado: conversa.clienteCadastrado, manualRecente, emMql: false, ...ctx,
     // Lead bom ainda sem quantidade e medida: o agente segue levantando até a proposta poder ser montada
-    coletando: !conversa.clienteCadastrado && (!!coletandoMql || ehQualificado(r.lead.perfil)) && !!faltaParaProposta(r.dados),
+    coletando: levantando,
   })
   // Lead pequeno só vai para Descartado depois de orientado (senão sumiria da sua lista sem resposta)
   const organiza = !conversa.clienteCadastrado && r.lead.perfil !== "nao_lead"
@@ -600,7 +611,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     const v = await mandarVitrine()
     env.ids.push(...v.ids)
   }
-  return registrar({ ...base, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? r.lead.motivo })
+  return registrar({ ...base, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? r.lead.motivo, ...(levantando ? { passo: PASSO_LEVANTANDO } : {}) })
 }
 
 // Nenhum lead novo fica sem resposta. Rodada a cada 5 min (carona no webhook): conversa nova (até 72 h) cuja última

@@ -37,7 +37,7 @@ const ESQUEMA = {
     dados: {
       type: "object",
       additionalProperties: false,
-      required: ["itens", "produto", "volume_ml", "caixa_cm", "frasco_cm", "quantidade", "tem_arte", "resumo"],
+      required: ["itens", "produto", "volume_ml", "caixa_cm", "frasco_cm", "quantidade", "tem_arte", "referencia", "acabamento", "modelos", "resumo"],
       properties: {
         itens: {
           type: "array",
@@ -66,6 +66,9 @@ const ESQUEMA = {
         frasco_cm: { type: ["string", "null"], description: "Medidas do frasco/produto como o cliente disse ou como você leu nas fotos/arquivos dele (ex.: \"altura 11,7 x diâmetro 3,9\"), em cm." },
         quantidade: { type: ["number", "null"], description: "Quantidade de caixas que o cliente quer." },
         tem_arte: { type: ["boolean", "null"] },
+        referencia: { type: ["string", "null"], description: "O que o cliente já mostrou para a gente entender a caixa: foto do produto/frasco, foto de uma caixa que ele gosta, desenho ou ideia (ex.: \"foto do frasco e caixa de referência preta fosca\"). \"sem referência\" se ele disse que não tem. null se ainda não falou disso." },
+        acabamento: { type: ["string", "null"], description: "Acabamento que ele quer (verniz, laminação fosca/brilho, hot stamping, relevo, papel especial). \"sem preferência\" se ele disse que tanto faz ou que quer o mais simples. null se ainda não falou disso." },
+        modelos: { type: ["number", "null"], description: "Quantos modelos/artes diferentes (fragrâncias, cores, sabores) na mesma caixa. 1 se é um só. null se ainda não falou disso." },
         resumo: { type: "string", description: "Resumo do pedido em 1 linha para a observação interna do orçamento." },
       },
     },
@@ -198,7 +201,7 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
   if (!outraPergunta && !opts.outra && saudacao && !clienteAtivo && soAbertura(mensagens)) {
     const r: ResultadoAtendente = {
       resposta: saudacao, etapa: "primeiro_contato", alerta: "nenhum", motivo_alerta: "", sugere_video: false,
-      dados: { itens: [], produto: "", volume_ml: null, caixa_cm: null, frasco_cm: null, quantidade: null, tem_arte: null, resumo: "" },
+      dados: { itens: [], produto: "", volume_ml: null, caixa_cm: null, frasco_cm: null, quantidade: null, tem_arte: null, referencia: null, acabamento: null, modelos: null, resumo: "" },
       lead: { perfil: "indefinido", quantidade_total: null, motivo: "Primeiro contato (mensagem do anúncio): saudação do filtro, sem IA.", fornecedor: false },
       pode_enviar_sozinho: true, ultimaId,
     }
@@ -276,7 +279,7 @@ Regras que nunca quebram:
   const extra = [
     agoraParaIA(),
     nome ? `Nome para chamar: ${nome}` : "Nome para chamar: nenhum (o contato não tem nome de pessoa: não invente nem use o nome do contato)",
-    opts.coletandoMql ? `Este lead já é bom negócio (MQL) e ainda ${opts.coletandoMql}. Você continua a conversa como o Felipe para levantar o que falta (o jeito está no que você aprendeu); o orçamento quem faz é o Felipe, então não passe preço. Pergunta para levantar dado não é decisão do Felipe: pode_enviar_sozinho true.` : "",
+    opts.coletandoMql ? `Este lead já é bom negócio (MQL) e ainda ${opts.coletandoMql}. Você continua a conversa como o Felipe até ele ter tudo para orçar com precisão (o jeito está no que você aprendeu): pode pedir foto do produto, da caixa que o cliente gosta ou da ideia dele. Uma coisa por mensagem. O orçamento quem faz é o Felipe, então não passe preço. Pergunta para levantar dado não é decisão do Felipe: pode_enviar_sozinho true.` : "",
     opts.automatico ? "Modo automático: a sua resposta pode sair sem o Felipe ver. Se tiver qualquer dúvida, pode_enviar_sozinho = false." : "",
     opts.followUp ? `Follow-up ${opts.followUp} de 3: o lead parou de responder depois da sua última mensagem. Escreva um follow-up curto, natural e sem pressão no estilo do guia (ex.: "Oi! Conseguiu ver?"), retomando o ponto em que pararam. ${opts.followUp === 3 ? "É o último: deixe a porta aberta, sem cobrar." : "Não repita a mensagem anterior."} Avalie o lead normalmente.` : "",
     opts.reativar ? `Retomada: a conversa parou há ${opts.reativar.dias} dias. ${instrucaoDoMotivo(opts.reativar.motivo)} Escreva UMA mensagem curta para retomar como o Felipe faria: pessoal e natural, lembrando em poucas palavras o que o cliente queria (produto, quantidade, orçamento) e terminando com uma pergunta fácil de responder (ex.: se ainda está de pé, se já fechou, se quer que você atualize o orçamento). Varie a abertura de um contato para outro (nada de fórmula fixa como "passei aqui porque lembrei de você"). Sem pressão e sem cobrar resposta; não cite quanto tempo passou de forma cobradora. Sem desconto, sem preço novo, sem prazo. Se a última mensagem foi do cliente e ficou sem resposta, comece pedindo desculpa pela demora. Se pela conversa não faz sentido retomar (já fechou com você, disse que não quer, pedido em andamento, fornecedor, conversa pessoal), deixe "resposta" vazia e explique em motivo_alerta. Aqui a regra de ICP não se aplica: a retomada pode sair (alerta "nenhum", pode_enviar_sozinho true); quem segue a conversa quando ele responder é o Felipe.` : "",

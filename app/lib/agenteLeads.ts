@@ -2,6 +2,7 @@
 // Aqui ficam só as travas duras (o que nunca sai sem você). O julgamento — quem é ICP, o que dizer —
 // está no texto "Filtro de leads" das Configurações, que a IA lê antes de responder.
 
+import type { DadosPedido } from "./atendente"
 export type PerfilLead = "icp" | "medio" | "oportunidade" | "pequeno" | "indefinido" | "nao_lead"
 
 export type LeadAvaliado = {
@@ -57,13 +58,24 @@ export function dentroDoHorario(h: HorarioAgente | null | undefined, d = new Dat
 }
 
 // Aviso de lead bom, mandado no seu WhatsApp: quem é, o que quer e o link para abrir a conversa
-export function textoAvisoMql(a: { nome: string | null; telefone: string | null; perfil: PerfilLead; quantidade: number | null; motivo: string; resumo?: string }) {
+export function textoAvisoMql(a: { nome: string | null; telefone: string | null; perfil: PerfilLead; quantidade: number | null; motivo: string; resumo?: string; dados?: DadosPedido }) {
   const rotulo = a.perfil === "icp" ? "ICP" : a.perfil === "oportunidade" ? "Oportunidade" : "Lead médio"
+  // Com os dados: o agente levantou tudo e o orçamento é com você (a ficha vai junto)
+  const d = a.dados
+  const cx = d?.caixa_cm ? `${d.caixa_cm.frente} x ${d.caixa_cm.lateral} x ${d.caixa_cm.altura} cm` : d?.frasco_cm ? `frasco ${d.frasco_cm}` : null
+  const ficha = d ? [
+    cx ? `Medida: ${cx}` : null,
+    d.modelos ? `Modelos: ${d.modelos}` : null,
+    d.acabamento ? `Acabamento: ${d.acabamento}` : null,
+    d.referencia ? `Referência: ${d.referencia}` : null,
+    d.tem_arte === true ? "Arte: já tem" : d.tem_arte === false ? "Arte: por nossa conta" : null,
+  ] : []
   return [
-    `🟢 *Novo MQL* · ${rotulo}${a.quantidade ? ` · ${a.quantidade.toLocaleString("pt-BR")} un` : ""}`,
+    `${d ? "✅ *Pronto para orçar*" : "🟢 *Novo MQL*"} · ${rotulo}${a.quantidade ? ` · ${a.quantidade.toLocaleString("pt-BR")} un` : ""}`,
     a.nome ? `*${a.nome}*` : null,
     a.resumo || null,
-    a.motivo,
+    ...ficha,
+    d ? null : a.motivo,
     a.telefone ? `wa.me/${a.telefone}` : null,
   ].filter(Boolean).join("\n")
 }
