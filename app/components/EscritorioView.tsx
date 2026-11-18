@@ -5,7 +5,8 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { MessageCircle, ClipboardList, Repeat, RotateCcw, Printer, FileText, ShieldCheck, GraduationCap, Wifi, WifiOff, Sparkles, Clock, Power } from "lucide-react"
-import { Pagina, CabecalhoPagina, Cartao, TituloCartao, Esqueleto } from "./ds"
+import { Pagina, CabecalhoPagina, Cartao, TituloCartao, Esqueleto, Segmentado } from "./ds"
+import { SalaAgentes } from "./SalaAgentes"
 import { HORA_INICIO, type Escritorio, type IdMesa, type Mesa, type EstadoMesa } from "../lib/escritorio"
 
 const VISUAL: Record<IdMesa, { cor: string; Icone: typeof MessageCircle }> = {
@@ -106,6 +107,9 @@ export function EscritorioView() {
   const [filtro, setFiltro] = useState<IdMesa | null>(null)
   const [agora, setAgora] = useState(() => Date.now())
   const [mostrar, setMostrar] = useState(12)
+  const [modo, setModo] = useState<"sala" | "detalhes">("sala")
+  useEffect(() => { try { if (localStorage.getItem("escritorio:modo") === "detalhes") setModo("detalhes") } catch { /* sem storage */ } }, [])
+  const trocarModo = (v: "sala" | "detalhes") => { setModo(v); try { localStorage.setItem("escritorio:modo", v) } catch { /* sem storage */ } }
   useEffect(() => {
     const carregar = () => fetch("/api/escritorio").then(r => r.ok ? r.json() : null).then(x => { if (x) { setD(x); setAgora(Date.now()) } }).catch(() => {})
     carregar()
@@ -126,8 +130,17 @@ export function EscritorioView() {
 
   return (
     <Pagina>
-      <CabecalhoPagina titulo="Escritório" sub={sub} />
+      <CabecalhoPagina titulo="Escritório" sub={sub}
+        acoes={<Segmentado valor={modo} onChange={trocarModo} opcoes={[{ v: "sala", nome: "Sala" }, { v: "detalhes", nome: "Detalhes" }]} />} />
 
+      {modo === "sala" && (
+        <div className="ds-entrada">
+          <SalaAgentes mesas={d.mesas} selecionada={filtro} cota={d.cota} onSelecionar={id => { setFiltro(id); setMostrar(12) }} />
+          <p className="mt-2 text-[11.5px] text-[#898892] text-center">Toque num agente para ver o que ele está fazendo</p>
+        </div>
+      )}
+
+      {modo === "detalhes" && <>
       <Cartao className="ds-entrada">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-4">
           <Status icone={<Power className="w-4 h-4" />} rotulo="Atendimento" tom={d.ligado && d.noHorario ? "ok" : "neutro"}
@@ -153,6 +166,7 @@ export function EscritorioView() {
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5 sm:gap-3 ds-escalonado">
         {d.mesas.map(m => <MesaCard key={m.id} m={m} agora={agora} ativa={filtro === m.id} onClick={() => { setFiltro(f => f === m.id ? null : m.id); setMostrar(12) }} />)}
       </div>
+      </>}
 
       <Cartao className="ds-entrada">
         <TituloCartao titulo={filtro ? `Hoje · ${d.mesas.find(m => m.id === filtro)?.nome}` : "Acontecendo hoje"}

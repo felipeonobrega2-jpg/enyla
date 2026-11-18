@@ -272,3 +272,44 @@ html.dark .leaflet-control-attribution a { color: #a5a2b0; }
 .esc-ponto { animation: esc-ponto 1.2s ease-in-out infinite; }
 .esc-pulso { animation: esc-pulso 1.8s ease-out infinite; }
 @media (prefers-reduced-motion: reduce) { .esc-ponto, .esc-pulso { animation: none; } }
+
+/* Sala dos agentes (pixel art): movimentos curtos, em passos, como jogo antigo */
+.sala-digita-a { animation: sala-digita .32s steps(1) infinite; }
+.sala-digita-b { animation: sala-digita .32s steps(1) infinite .16s; }
+@keyframes sala-digita { 0% { transform: translateY(0); } 50% { transform: translateY(-1px); } }
+.sala-tela { animation: sala-tela 1.4s steps(2) infinite; }
+@keyframes sala-tela { 50% { opacity: .55; } }
+.sala-alerta { animation: sala-alerta 1s steps(1) infinite; }
+@keyframes sala-alerta { 50% { opacity: .25; } }
+.sala-respira { animation: sala-respira 3.2s steps(1) infinite; }
+@keyframes sala-respira { 50% { transform: translateY(1px); } }
+.sala-cochila { transform: translateY(2px); animation: sala-cochila 2.6s steps(1) infinite; }
+@keyframes sala-cochila { 50% { transform: translateY(3px); } }
+.sala-pisca { animation: sala-pisca 4.2s steps(1) infinite; }
+@keyframes sala-pisca { 0%, 94% { opacity: 1; } 95%, 100% { opacity: 0; } }
+.sala-cafe { animation: sala-cafe 6s steps(1) infinite; }
+@keyframes sala-cafe { 0%, 80% { transform: translate(0, 0); } 81%, 95% { transform: translate(-6px, -9px); } }
+.sala-vapor { animation: sala-vapor 1.6s steps(3) infinite; }
+@keyframes sala-vapor { 0% { transform: translateY(0); opacity: .9; } 100% { transform: translateY(-4px); opacity: 0; } }
+.sala-zzz { animation: sala-zzz 2.4s steps(4) infinite; }
+@keyframes sala-zzz { 0% { transform: translate(0, 0); opacity: 1; } 100% { transform: translate(4px, -8px); opacity: 0; } }
+.sala-ponto-1, .sala-ponto-2, .sala-ponto-3 { animation: sala-ponto 1.2s steps(1) infinite; }
+.sala-ponto-2 { animation-delay: .2s; } .sala-ponto-3 { animation-delay: .4s; }
+@keyframes sala-ponto { 0%, 60%, 100% { opacity: .3; } 30% { opacity: 1; } }
+.sala-ronda { animation: sala-ronda 26s linear infinite; }
+@keyframes sala-ronda {
+  0% { transform: translate(var(--ini, 24px), 0) scaleX(1); } 49.9% { transform: translate(var(--fim, 232px), 0) scaleX(1); }
+  50% { transform: translate(var(--fim, 232px), 0) scaleX(-1); } 100% { transform: translate(var(--ini, 24px), 0) scaleX(-1); }
+}
+.sala-perna-a { animation: sala-perna .5s steps(1) infinite; } .sala-perna-b { animation: sala-perna .5s steps(1) infinite .25s; }
+@keyframes sala-perna { 50% { transform: translateY(-1px); } }
+.sala-passo { animation: sala-passo .5s steps(1) infinite; }
+@keyframes sala-passo { 50% { transform: translateY(-1px); } }
+.sala-nuvem { animation: sala-nuvem 30s linear infinite alternate; }
+@keyframes sala-nuvem { to { transform: translateX(14px); } }
+.sala-planta { transform-origin: bottom center; transform-box: fill-box; animation: sala-planta 5s steps(2) infinite; }
+@keyframes sala-planta { 50% { transform: skewX(4deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .sala-digita-a, .sala-digita-b, .sala-tela, .sala-alerta, .sala-respira, .sala-cochila, .sala-pisca, .sala-cafe, .sala-vapor, .sala-zzz,
+  .sala-ponto-1, .sala-ponto-2, .sala-ponto-3, .sala-ronda, .sala-perna-a, .sala-perna-b, .sala-passo, .sala-nuvem, .sala-planta { animation: none; }
+}
