@@ -123,8 +123,8 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
           <p className="text-[13px] text-[#5e5c68] mt-1">{situacao}</p>
         </div>
 
-        <div className="bg-white rounded-2xl ds-borda py-6 flex flex-col items-center">
-          <Caixa3D largura={p.medidas.l} altura={p.medidas.a} profundidade={p.medidas.p} material="Triplex 300g" laminacao={b.laminacao === "brilho" ? "brilho" : "fosca"} tamanho={150} />
+        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] py-5 flex flex-col items-center">
+          <Caixa3D largura={p.medidas.l} altura={p.medidas.a} profundidade={p.medidas.p} material="Triplex 300g" laminacao={b.laminacao === "brilho" ? "brilho" : "fosca"} tamanho={125} />
           <p className="text-[13px] font-semibold text-[#191625] mt-4">{cm(p.medidas.a)} × {cm(p.medidas.l)} × {cm(p.medidas.p)} cm <span className="font-normal text-[#898892]">(A × L × P)</span></p>
           <p className="text-[12.5px] text-[#5e5c68] mt-2 text-center px-6">
             {p.quantidade.toLocaleString("pt-BR")} caixas · folha {p.folha} · triplex 300g · laminação {b.laminacao === "brilho" ? "brilho" : "fosca"}
@@ -132,7 +132,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl ds-borda p-5">
+        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
           <p className="text-[15px] font-bold text-[#191625] mb-1">Briefing do cliente</p>
           {!(b.marca || b.cores || b.referencias || b.arquivos.length) && <p className="text-[13px] text-[#c57800] mt-1">O cliente ainda não preencheu. Assim que ele mandar, você recebe no WhatsApp.</p>}
           <Linha rotulo="Marca" valor={b.marca} />
@@ -156,7 +156,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
           )}
         </div>
 
-        <div className="bg-white rounded-2xl ds-borda p-5">
+        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
           <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Palette className="w-4 h-4 text-[#8456e8]" />Arte</p>
           {p.ajustes.length > 0 && (
             <div className="mt-3 rounded-xl bg-[#c57800]/[0.08] px-3.5 py-2.5 space-y-1">
@@ -178,7 +178,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
             )}
           </>)}
         </div>
-        {aviso && <p className="text-[12.5px] text-[#5e5c68] bg-white rounded-xl ds-borda px-4 py-3">{aviso}</p>}
+        {aviso && <p className="text-[12.5px] text-[#5e5c68] bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] px-4 py-3">{aviso}</p>}
       </Tela>
     )
   }
@@ -195,18 +195,18 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
         <p className="text-[13px] text-[#5e5c68] mt-1">Impressão digital {oque}, arte inclusa</p>
       </div>
 
-      <div className="bg-white rounded-2xl ds-borda py-6 flex flex-col items-center">
-        <Caixa3D largura={p.medidas.l} altura={p.medidas.a} profundidade={p.medidas.p} material="Triplex 300g" laminacao="fosca" tamanho={150} />
+      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] py-5 flex flex-col items-center">
+        <Caixa3D largura={p.medidas.l} altura={p.medidas.a} profundidade={p.medidas.p} material="Triplex 300g" laminacao="fosca" tamanho={pago ? 95 : 115} />
         <p className="text-[13px] font-semibold text-[#191625] mt-4">{cm(p.medidas.a)} × {cm(p.medidas.l)} × {cm(p.medidas.p)} cm <span className="font-normal text-[#898892]">(A × L × P)</span></p>
         <ul className="mt-3 space-y-1 text-[12.5px] text-[#5e5c68] text-center px-6">
           <li>Triplex 300g com laminação fosca ou brilhante</li>
           <li>{p.designer ? "Arte criada a partir do briefing abaixo; o cliente aprova antes de imprimir" : "Arte criada pela nossa equipe, você aprova antes de imprimir"}</li>
-          {p.padrao && <li className="text-[#c57800]">Medida padrão para o seu frasco. Se for diferente, mande as medidas no WhatsApp que a gente ajusta.</li>}
+          {p.padrao && !pago && <li className="text-[#c57800]">Medida padrão para o seu frasco. Se for diferente, mande as medidas no WhatsApp que a gente ajusta.</li>}
         </ul>
       </div>
 
       {pago ? (
-        <div className="bg-white rounded-2xl ds-borda p-5">
+        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
           <p className="text-[15px] font-bold text-[#191625]">{p.quantidade.toLocaleString("pt-BR")} caixinhas{p.designer ? "" : ` · ${brl(p.total)}`}</p>
           {!p.designer && <p className="text-[12.5px] text-[#009351] font-semibold mt-1 flex items-center gap-1.5"><Check className="w-4 h-4" />Sinal de {brl(p.sinal)} recebido</p>}
           <div className="mt-4 grid grid-cols-4 gap-1.5">
@@ -219,7 +219,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
           </div>
         </div>
       ) : (<>
-        <div className="bg-white rounded-2xl ds-borda overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
           <p className="px-5 pt-4 pb-2 text-[11px] font-bold uppercase tracking-wider text-[#898892]">Quantidade</p>
           {p.opcoes.map(o => {
             const sel = o.quantidade === p.quantidade
@@ -250,7 +250,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
 
 
       {p.designer && (
-        <div className="bg-white rounded-2xl ds-borda p-5">
+        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
           <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Palette className="w-4 h-4 text-[#8456e8]" />Arte</p>
           <p className="text-[12.5px] text-[#5e5c68] mt-1">Folha {p.folha} · {cm(p.medidas.a)} × {cm(p.medidas.l)} × {cm(p.medidas.p)} cm · laminação {p.briefing.laminacao === "brilho" ? "brilho" : "fosca"}. O briefing do cliente está logo abaixo.</p>
           {p.ajustes.length > 0 && (
@@ -277,7 +277,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
       )}
 
       {!p.designer && p.arte && (p.aprovar || p.arteAprovadaEm) && (
-        <div className="bg-white rounded-2xl ds-borda p-5">
+        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
           <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Palette className="w-4 h-4 text-[#8456e8]" />{p.arteAprovadaEm ? "Sua arte (aprovada)" : "Sua arte ficou pronta"}</p>
           <ArtePreview arte={p.arte} />
           {p.aprovar && (ajuste == null ? (
@@ -305,14 +305,14 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
 
       {!p.designer && p.restante != null && (
         p.restantePagoEm
-          ? <div className="bg-white rounded-2xl ds-borda p-5"><p className="text-[13px] text-[#009351] font-semibold flex items-center gap-1.5"><Check className="w-4 h-4" />Restante de {brl(p.restante)} recebido. Pedido quitado.</p></div>
+          ? <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5"><p className="text-[13px] text-[#009351] font-semibold flex items-center gap-1.5"><Check className="w-4 h-4" />Restante de {brl(p.restante)} recebido. Pedido quitado.</p></div>
           : <Pagamento p={p} titulo="Restante" valor={p.restante} txid={`${p.id}F`} descricao={`Restante ${p.id}`}
               sub={p.frete ? `${brl(p.restante - p.frete)} + frete ${brl(p.frete)}` : "Pague quando quiser: o envio sai depois que o restante cair"}
               post={post} setP={setP} onConferir={() => acao("conferir", { acao: "conferir" })} conferindo={ocupado === "conferir"} />
       )}
 
       {!p.designer && p.arteAprovadaEm && !p.restantePagoEm && (
-        <div className="bg-white rounded-2xl ds-borda p-5">
+        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
           <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Truck className="w-4 h-4 text-[#8456e8]" />Entrega</p>
           {p.entrega ? (
             <p className="text-[13px] text-[#5e5c68] mt-1">{p.entrega.endereco} · CEP {p.entrega.cep.replace(/(\d{5})(\d{3})/, "$1-$2")}</p>
@@ -329,11 +329,11 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
           </>)}
         </div>
       )}
-      {aviso && <p className="text-[12.5px] text-[#5e5c68] bg-white rounded-xl ds-borda px-4 py-3">{aviso}</p>}
+      {aviso && <p className="text-[12.5px] text-[#5e5c68] bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] px-4 py-3">{aviso}</p>}
 
-      {!p.arteAprovadaEm && <div className="bg-white rounded-2xl ds-borda p-5">
+      {!p.arteAprovadaEm && !p.arteEnviadaEm && <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
         <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Sparkles className="w-4 h-4 text-[#8456e8]" />Como você quer a sua arte</p>
-        <p className="text-[12.5px] text-[#5e5c68] mt-1">A arte começa assim que o sinal cair. Quanto mais você contar, mais rápido fica do seu jeito.</p>
+        <p className="text-[12.5px] text-[#5e5c68] mt-1">{pago ? "O sinal já caiu e a sua arte está na fila." : "A arte começa assim que o sinal cair."} Quanto mais você contar, mais rápido fica do seu jeito.</p>
         <label className="block mt-4 text-[12px] font-semibold text-[#191625]">Nome da marca</label>
         <input value={br.marca} onChange={e => setBr({ ...br, marca: e.target.value })} maxLength={80} placeholder="Ex.: Essência Rara"
           className="mt-1 w-full h-11 rounded-xl px-3.5 text-[14px] text-[#191625] bg-[rgba(116,116,128,0.06)] outline-none focus:ring-2 focus:ring-[#8456e8]/20" />
@@ -401,7 +401,7 @@ function AceiteTermos({ p, marcado, setMarcado }: { p: Pedido; marcado: boolean;
 function TermosAceitos({ p }: { p: Pedido }) {
   const [aberto, setAberto] = useState(false)
   return (
-    <div className={aberto ? "bg-white rounded-2xl ds-borda p-5" : ""}>
+    <div className={aberto ? "bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5" : ""}>
       <p className="text-[12px] text-[#5e5c68] text-center flex items-center justify-center gap-1.5">
         <Check className="w-3.5 h-3.5 text-[#009351]" />Termos do pedido aceitos em {new Date(p.termosAceitosEm!).toLocaleDateString("pt-BR")}
         <button onClick={() => setAberto(a => !a)} className="text-[#8456e8] underline underline-offset-2">{aberto ? "fechar" : "ver"}</button>
@@ -413,7 +413,7 @@ function TermosAceitos({ p }: { p: Pedido }) {
 
 function Tela({ children, rodape = "Enyla Embalagens · dúvidas, é só responder no WhatsApp", parceria = false }: { children: React.ReactNode; rodape?: string; parceria?: boolean }) {
   return (
-    <div className="min-h-[100dvh] bg-[#f5f5f7]">
+    <div className="min-h-[100dvh] bg-[#F2F2F7]">
       <div className="max-w-md mx-auto px-4 py-6 space-y-4">
         <div className="flex justify-center"><Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1335} height={328} className="h-5 w-auto" priority /></div>
         {parceria && (
@@ -467,7 +467,7 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
   // Pix sem pedir documento (ou cobrança já gerada) e termos ainda não aceitos: o aceite vem antes do QR
   if (faltaTermos && !(p.asaas && !semAsaas && !p.cobranca))
     return (
-      <div className="bg-white rounded-2xl ds-borda p-5 flex flex-col items-center text-center">
+      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5 flex flex-col items-center text-center">
         <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">{titulo}</p>
         <p className="text-[28px] font-bold text-[#191625] ds-num mt-1">{brl(valor)}</p>
         <p className="text-[12px] text-[#898892]">{sub}</p>
@@ -484,7 +484,7 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
       aviso="Assim que o Pix cair, a confirmação chega no seu WhatsApp." onConferir={onConferir} conferindo={conferindo} />
   if (precisa)
     return (
-      <div className="bg-white rounded-2xl ds-borda p-5 flex flex-col items-center text-center">
+      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5 flex flex-col items-center text-center">
         <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">{titulo}</p>
         <p className="text-[28px] font-bold text-[#191625] ds-num mt-1">{brl(valor)}</p>
         <p className="text-[12px] text-[#898892]">{sub}</p>
@@ -511,7 +511,7 @@ function PixBloco({ titulo, valor, txid, descricao, sub, onConferir, conferindo,
   useEffect(() => { if (!pronto?.imagem) QRCode.toDataURL(payload, { width: 220, margin: 1, color: { dark: "#191625", light: "#ffffff" } }).then(setQr).catch(() => setQr(null)) }, [payload, pronto?.imagem])
   const qr = pronto?.imagem ? `data:image/png;base64,${pronto.imagem}` : qrGerado
   return (
-    <div className="bg-white rounded-2xl ds-borda p-5 flex flex-col items-center text-center">
+    <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5 flex flex-col items-center text-center">
       <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">{titulo}</p>
       <p className="text-[28px] font-bold text-[#191625] ds-num mt-1">{brl(valor)}</p>
       <p className="text-[12px] text-[#898892]">{sub}</p>
