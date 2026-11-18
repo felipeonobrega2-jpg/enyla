@@ -1318,8 +1318,19 @@ export default function Home() {
     setView("orcamentos")
   }
 
+  // Editando um orçamento, mas o cliente da mesa é outro: é um orçamento NOVO (nunca grava por cima do pedido de outro
+  // cliente — foi assim que o pedido do Raniere virou "Camilla")
+  const donoEditando = editandoHistorico ? (kanban.find(c => c.numero === editandoHistorico)?.nomeCliente ?? historico.find(h => h.numero === editandoHistorico)?.form?.nomeCliente ?? null) : null
+  const pedidoEditandoFechado = editandoHistorico ? (kanban.find(c => c.numero === editandoHistorico)?.coluna ?? 0) >= COL_FECHADO && (kanban.find(c => c.numero === editandoHistorico)?.coluna ?? 0) !== COL_PERDIDO : false
+  const trocouCliente = !!(editandoHistorico && donoEditando && form.nomeCliente.trim() && nomeChave(donoEditando) !== nomeChave(form.nomeCliente))
+  function salvarComoNovo() {
+    setEditandoHistorico(null)
+    void salvar()
+  }
+
   function salvarEdicaoHistorico() {
     if (!result || !editandoHistorico) return
+    if (trocouCliente) return salvarComoNovo()
     const numero = editandoHistorico
     const original = historico.find(h => h.numero === numero)
     const data = original?.data ?? new Date().toLocaleString("pt-BR")
@@ -2487,13 +2498,20 @@ export default function Home() {
 
           {/* Ações */}
           <div className="p-5 mt-auto space-y-2 border-t border-[rgba(60,60,67,0.08)] bg-white">
-            {editandoHistorico && (
+            {editandoHistorico && !trocouCliente && (
               <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#8456e8]/[0.06] border border-[#8456e8]/15">
-                <p className="text-[11.5px] font-semibold text-[#8456e8]">Editando {editandoHistorico}</p>
+                <p className="text-[11.5px] font-semibold text-[#8456e8]">Editando {editandoHistorico}{donoEditando ? ` · ${donoEditando}` : ""}{pedidoEditandoFechado ? " (pedido já fechado)" : ""}</p>
                 <button onClick={cancelarEdicaoHistorico}
                   className="text-[11px] font-medium text-[#8E8E93] hover:text-[#191625] transition-colors">
                   Cancelar
                 </button>
+              </div>
+            )}
+            {editandoHistorico && trocouCliente && (
+              <div className="px-3 py-2.5 rounded-xl bg-[#e07b1f]/[0.08] border border-[#e07b1f]/25">
+                <p className="text-[12px] font-semibold text-[#9a4f0a]">{editandoHistorico} é de {donoEditando}{pedidoEditandoFechado ? " (pedido já fechado)" : ""}.</p>
+                <p className="text-[11.5px] text-[#9a4f0a]/90 mt-0.5">Você trocou o cliente para {form.nomeCliente.trim()}: vai salvar como orçamento novo, sem mexer no de {donoEditando}.</p>
+                <button onClick={cancelarEdicaoHistorico} className="mt-1.5 text-[11px] font-semibold text-[#8E8E93] hover:text-[#191625]">Sair da edição</button>
               </div>
             )}
             {!editandoHistorico && (
@@ -2503,7 +2521,7 @@ export default function Home() {
             )}
             <button onClick={editandoHistorico ? salvarEdicaoHistorico : () => { void salvar() }} disabled={!r}
               className="w-full h-11 bg-[#8456e8] hover:bg-[#7445d4] active:bg-[#6234bc] active:scale-[0.99] disabled:opacity-30 disabled:cursor-not-allowed text-white text-[13px] font-bold rounded-xl transition-all duration-150 shadow-sm shadow-[#8456e8]/15 disabled:shadow-none">
-              {editandoHistorico ? "Salvar alterações" : "Salvar orçamento"}
+              {editandoHistorico && !trocouCliente ? "Salvar alterações" : trocouCliente ? "Salvar como orçamento novo" : "Salvar orçamento"}
             </button>
             {r && (
               <>
