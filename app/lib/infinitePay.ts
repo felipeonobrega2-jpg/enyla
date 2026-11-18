@@ -1,5 +1,6 @@
 // InfinitePay (Checkout Integrado): cartão em até 12x e Pix, com o recebimento da sua conta InfinitePay.
-// Só precisa da sua InfiniteTag na Vercel: INFINITEPAY_HANDLE (sem o "$"). Não há chave secreta.
+// Na Vercel: INFINITEPAY_HANDLE (sem o "$") e, opcional, INFINITEPAY_API_KEY (inchk_…, só no servidor), que liga
+// o link de pagamento único (não deixa pagar duas vezes) com validade de 24 h.
 // O checkout é a página da InfinitePay (não pode ser embutida): o cliente vai, paga e volta para a aprovação.
 // Nem o webhook nem a volta são assinados: o pagamento só vale depois de confirmado no payment_check.
 import { LINK_SISTEMA } from "./notificar"
@@ -14,13 +15,15 @@ export const numeroDoOrderNsu = (nsu: string | null | undefined) => /^(.+)_[a-z0
 
 export async function criarLinkInfinitePay(a: { numero: string; nsu: string; valor: number; descricao: string; voltarPara: string; cliente?: { name?: string; email?: string; phone_number?: string } }):
   Promise<{ url: string } | { erro: string }> {
+  const chave = process.env.INFINITEPAY_API_KEY
   const r = await fetch(`${API}/links`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
+    method: "POST", headers: { "Content-Type": "application/json", ...(chave ? { "X-Api-Key": chave } : {}) },
     body: JSON.stringify({
       handle: handle(), order_nsu: a.nsu,
       items: [{ description: a.descricao.slice(0, 120), price: Math.round(a.valor * 100), quantity: 1 }],
       redirect_url: a.voltarPara, webhook_url: `${LINK_SISTEMA}/api/infinitepay/webhook`,
       ...(a.cliente && Object.values(a.cliente).some(Boolean) ? { customer: a.cliente } : {}),
+      ...(chave ? { options: { single_payment: true, valid_until: new Date(Date.now() + 24 * 3600_000).toISOString() } } : {}),
     }),
   }).catch(() => null)
   const corpo = r ? await r.json().catch(() => null) as Record<string, unknown> | null : null
