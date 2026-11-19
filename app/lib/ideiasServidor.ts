@@ -72,6 +72,15 @@ const LOTES: { v: number; ideias: string[] }[] = [
     // 18/11: pedido seu
     "Digital fora da A3 (caixa maior que a folha, quantidade acima da tabela, formato especial): o sistema manda mensagem ao Leandro em tom natural (\"Leandro, tem um cliente aqui querendo…\"), ele responde como dá para fazer e quanto custa, e cada resposta dele vira regra da tabela do digital. Assim o setor do digital vai sendo calibrado com o que a Villa realmente consegue fazer.",
   ] },
+  { v: 9, ideias: [
+    // 18/11: indicações do Claude, anotadas a pedido seu
+    "PRIORIDADE — Dinheiro do digital no Financeiro: hoje o sinal e o restante pagos no digital (Asaas/InfinitePay) andam o pedido, mas nenhuma receita é lançada, então o DRE, o relatório gerencial em PDF e o Auditor de dados ficam sem o digital, e parte dos movimentos do banco sem conciliar deve ser isso. Fazer: (1) cada pagamento confirmado vira receita automática ligada ao DIG-xxxx, paga e com a data certa; (2) a taxa do cartão/Asaas entra como despesa, para a margem ser a real; (3) os pagamentos antigos do digital são lançados de uma vez (simulação primeiro, você roda); (4) a conciliação bancária sugere ligar o Pix do banco ao lançamento do digital; (5) DRE, relatório em PDF e Auditor passam a contar o digital.",
+    "Parceiros: ao registrar um envio em Fornecedores, além do e-mail, sair a mensagem pronta no WhatsApp do parceiro com os dados e os arquivos do pedido (fecha o circuito da rede de parceiros).",
+    "E-mails da ENYLA: definir qual e-mail recebe as respostas dos parceiros (hoje o remetente é parceiros@enyla.com.br, que pode não existir) ou criar o parceiros@ no Email Routing da Cloudflare; e gerar uma chave nova da Resend (a atual foi colada na conversa).",
+    "Grandes negócios: deixar mais prático (você disse que ainda não está o ideal).",
+    "Painel: juntar as listas de ação repetidas no topo (Para resolver agora, Precisa de você, Propostas) numa lista só.",
+    "Parceiros ENYLA: os valores das notificações da página (R$ 2.480 / R$ 1.150) são ilustração; avaliar colocar um \"exemplo\" discreto e confirmar a promessa \"pagamento combinado antes de começar\". Trocar a foto do Unsplash por uma foto real da produção da ENYLA quando tiver.",
+  ] },
 ]
 
 // Gastos fixos que o sistema põe uma vez (marca no servidor); apagou ou editou, não volta
