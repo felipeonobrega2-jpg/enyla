@@ -3,6 +3,7 @@
 // Página do pedido digital: a caixa em 3D, as quantidades com o preço, o Pix do sinal (50%) e o briefing da arte.
 // Depois do sinal, a mesma página mostra o andamento.
 
+import { prazoDigital } from "../../lib/prazoDigital"
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import QRCode from "qrcode"
@@ -258,6 +259,10 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
               </button>
             )
           })}
+          <p className="px-5 py-3 border-t border-[rgba(60,60,67,0.07)] text-[12.5px] leading-snug text-[#5e5c68] flex items-start gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#8456e8] shrink-0 mt-[6px]" />
+            <span>Produção de {p.quantidade.toLocaleString("pt-BR")} caixinhas: <b className="text-[#191625] font-semibold">{prazoDigital(p.quantidade).texto}</b> depois do sinal e da arte aprovada.</span>
+          </p>
         </div>
 
         <Pagamento p={p} titulo="Sinal de 50%" valor={p.sinal} txid={p.id} descricao={`Sinal ${p.id}`} sub={`O restante (${brl(p.total - p.sinal)}) no final, antes do envio`}

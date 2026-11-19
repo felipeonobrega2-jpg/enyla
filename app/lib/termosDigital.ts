@@ -1,9 +1,10 @@
 // Termos do pedido digital: o cliente lê e aceita na página do pedido antes de pagar o sinal. A versão aceita fica
+import { prazoDigital } from "./prazoDigital"
 // guardada no pedido (quando e qual versão). Mudou o texto: suba a VERSAO (quem já aceitou fica com a dele).
 // Decisões do Felipe (12/11/2026): 2 rodadas de ajuste na arte; sinal devolvido até a aprovação da arte; quantidade
 // exata (o digital não tem perda).
 
-export const VERSAO_TERMOS = "2026-11-12.2"   // .2: quem vende (Jerograf, CNPJ e endereço)
+export const VERSAO_TERMOS = "2026-11-19.1"   // 19/11: prazo por quantidade (até 200: 7 a 10 dias úteis; 500+: 14)
 
 export type SecaoTermos = { titulo: string; itens: string[] }
 
@@ -31,7 +32,7 @@ export function termosDigital(p: { quantidade: number; medidas: { a: number; l: 
       "A cor impressa pode variar um pouco em relação à tela do celular ou do computador.",
     ] },
     { titulo: "Prazo", itens: [
-      "A produção leva de 3 a 5 dias úteis, contados depois do sinal pago e da arte aprovada. O tempo da entrega (frete) é à parte.",
+      `A produção de ${p.quantidade.toLocaleString("pt-BR")} caixinhas leva ${prazoDigital(p.quantidade).texto}, contados depois do sinal pago e da arte aprovada. O tempo da entrega (frete) é à parte.`,
     ] },
     { titulo: "Pagamento", itens: [
       "50% de sinal para começar. O restante, com o frete, é pago antes do envio: o pedido sai quando estiver quitado.",

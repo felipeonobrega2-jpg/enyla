@@ -1,6 +1,7 @@
 // "Para resolver agora": o que passou do prazo ou depende de você, num lugar só, por valor.
 // Liga sozinho cada conversa ao orçamento que ela recebeu (mensagem nossa com "ORC-2026-123" ou o link de aprovação),
 // gravando em whatsapp_conversas.kanban_card_id. Só roda no servidor.
+import { prazoDigital } from "./prazoDigital"
 import { supabase } from "./supabase"
 import { COL_FECHADO, COL_HOT, COL_ENTREGUE, COL_PERDIDO } from "../types"
 import type { AprovacaoOnline } from "./aprovacao"
@@ -48,7 +49,7 @@ export async function ligarConversasAosOrcamentos(diasAtras = 45): Promise<numbe
 
 // Digital parado além do prazo de cada etapa (dono entre parênteses no texto)
 export const PRAZO_DIGITAL = { arteFazer: 2, arteCliente: 2, producao: 7 }   // dias
-type PedDig = { id: string; nome?: string | null; jid: string; total: number; status: string; statusEm?: string; sinalPagoEm?: string; arteEnviadaEm?: string; arteAprovadaEm?: string; artes?: unknown[]; teste?: boolean; restante?: number | null; restantePagoEm?: string }
+type PedDig = { id: string; nome?: string | null; jid: string; total: number; quantidade?: number; status: string; statusEm?: string; sinalPagoEm?: string; arteEnviadaEm?: string; arteAprovadaEm?: string; artes?: unknown[]; teste?: boolean; restante?: number | null; restantePagoEm?: string }
 export function digitalParado(pedidos: PedDig[], agora = Date.now()): ItemResolver[] {
   const out: ItemResolver[] = []
   for (const p of pedidos) {
@@ -63,7 +64,8 @@ export function digitalParado(pedidos: PedDig[], agora = Date.now()): ItemResolv
       if (d >= PRAZO_DIGITAL.arteCliente) out.push({ ...base, tipo: "digital", detalhe: `arte com o cliente há ${d} dias sem aprovar: dê um toque`, desde: p.arteEnviadaEm, nivel: "info" })
     } else if (p.status === "producao") {
       const d = desde(p.arteAprovadaEm ?? p.statusEm)
-      if (d >= PRAZO_DIGITAL.producao) out.push({ ...base, tipo: "digital", detalhe: `em produção há ${d} dias (Villa): confira quando sai`, desde: p.arteAprovadaEm ?? p.statusEm ?? null, nivel: "alerta" })
+      const limite = p.quantidade ? prazoDigital(p.quantidade).max : PRAZO_DIGITAL.producao
+      if (d >= limite) out.push({ ...base, tipo: "digital", detalhe: `em produção há ${d} dias (Villa; prazo ${p.quantidade ? prazoDigital(p.quantidade).texto : `${limite} dias`}): confira quando sai`, desde: p.arteAprovadaEm ?? p.statusEm ?? null, nivel: "alerta" })
     }
   }
   return out
