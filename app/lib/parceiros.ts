@@ -33,13 +33,12 @@ export type Formato = { l: number; a: number }   // cm
 export type Resposta = string | string[] | number | boolean | Formato
 
 const CLICHE = ["Eu faço o clichê", "Uso o que mandarem", "Mando fazer fora"]
-const FORMATO_MAX = (rotulo = "Formato máximo da folha", dica = "O maior tamanho que a máquina aceita, em cm"): Pergunta => ({ id: "formatoMax", rotulo, dica, tipo: "formato" })
-const FORMATO_MIN: Pergunta = { id: "formatoMin", rotulo: "Formato mínimo da folha", dica: "A menor folha que dá para rodar, em cm", tipo: "formato" }
+const FORMATO_MAX = (rotulo = "Qual o maior formato?", dica = "A maior folha que a máquina aceita, em cm"): Pergunta => ({ id: "formatoMax", rotulo, dica, tipo: "formato" })
 
 export const PERGUNTAS: Record<IdServicoParceiro, Pergunta[]> = {
   impressaoOffset: [
     { id: "cores", rotulo: "Quantas cores a máquina imprime de uma vez?", tipo: "um", opcoes: ["1 cor", "2 cores", "4 cores", "5 cores", "6 cores ou mais"] },
-    FORMATO_MAX(), FORMATO_MIN,
+    FORMATO_MAX(),
     { id: "gramaturaMax", rotulo: "Gramatura máxima", tipo: "numero", unidade: "g/m²", max: 1000 },
     { id: "materiais", rotulo: "Materiais que imprime", tipo: "multi", opcoes: ["Cartão triplex", "Cartão duplex", "Kraft", "Couché", "Papel offset", "Metalizado", "Adesivo"] },
     { id: "corEspecial", rotulo: "Imprime cor especial (Pantone)?", tipo: "simnao" },
@@ -76,7 +75,7 @@ export const PERGUNTAS: Record<IdServicoParceiro, Pergunta[]> = {
   ],
   corteVinco: [
     { id: "maquina", rotulo: "Tipo de máquina", tipo: "um", opcoes: ["Automática (Bobst ou similar)", "Plana / Minerva", "Laser ou plotter"] },
-    FORMATO_MAX(), FORMATO_MIN,
+    FORMATO_MAX(),
     { id: "materiais", rotulo: "Materiais que corta", tipo: "multi", opcoes: ["Cartão até 350 g", "Cartão acima de 350 g", "Micro-ondulado", "Papelão ondulado", "Adesivo"] },
     { id: "faca", rotulo: "Faca", tipo: "um", opcoes: ["Fabrico a faca", "Uso a faca que mandarem", "Mando fazer fora"] },
     { id: "destaque", rotulo: "Faz o destaque (tirar o refile)?", tipo: "simnao" },
