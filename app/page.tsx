@@ -143,9 +143,10 @@ const TIPOS_LAMINACAO = ["Fosca", "Brilhante", "Soft Touch", "Holográfica"] as 
 const ACOMPANHAMENTOS = ["Berço interno", "Tampa separada", "Divisória", "Calço", "Gaveta interna"] as const
 const OUTROS_ACABAMENTOS = ["Hot Stamping", "Alto Relevo", "Baixo Relevo", "Janela PVC", "Vinco especial", "Corte e vinco"] as const
 
-function NavItem({ active, onClick, icon, label, badge, accent, badgeVerde }: {
+function NavItem({ active, onClick, icon, label, badge, accent, badgeVerde, aviso }: {
   active: boolean
   badgeVerde?: number   // conversas esperando resposta
+  aviso?: { n: number; cor: string; titulo?: string } | { ponto: true; cor: string; titulo?: string } | null   // pede ação sua
   onClick: () => void
   icon: React.ReactNode
   label: string
@@ -176,6 +177,9 @@ function NavItem({ active, onClick, icon, label, badge, accent, badgeVerde }: {
           {badgeVerde}
         </span>
       )}
+      {aviso && ("ponto" in aviso
+        ? <span title={aviso.titulo} className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{ background: aviso.cor }} />
+        : aviso.n > 0 && <span key={aviso.n} title={aviso.titulo} className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full ds-num min-w-[18px] text-center text-white wa-enviada" style={{ background: aviso.cor }}>{aviso.n}</span>)}
       {badge !== undefined && badge > 0 && (
         <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full ds-num min-w-[18px] text-center"
           style={{ background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}>
@@ -248,6 +252,14 @@ export default function Home() {
   const [modalLancPedidos, setModalLancPedidos] = useState<Partial<LancamentoFinanceiro> | null>(null)
   const [entregasPrefill, setEntregasPrefill] = useState<PrefillEntrega | null>(null)
   const [whatsPendentes, setWhatsPendentes] = useState(0)
+  // Avisos do menu (só o que pede ação): atualiza a cada 2 min
+  const [avisosMenu, setAvisosMenu] = useState<{ parceirosNovos: number; digitalParados: number; dadosGraves: number; agenteTravado: boolean } | null>(null)
+  useEffect(() => {
+    const ler = () => fetch("/api/menu-avisos").then(r => r.ok ? r.json() : null).then(d => { if (d) setAvisosMenu(d) }).catch(() => null)
+    ler()
+    const t = setInterval(ler, 120_000)
+    return () => clearInterval(t)
+  }, [])
   const [whatsAbrir, setWhatsAbrir] = useState<{ jid: string; vez: number } | undefined>()
   // Conversa do cliente do orçamento (botão "Ver conversa"): vem do Orçar ou é achada pelo nome
   const [conversaOrc, setConversaOrc] = useState<{ jid: string; nome: string; dados: DadosPedido | null; cliente: string } | null>(null)
@@ -1848,6 +1860,8 @@ export default function Home() {
 
           <NavGroup label="Produção" />
           <NavItem active={view === "fornecedores"} onClick={() => navigate("fornecedores")} label="Fornecedores"
+            aviso={(() => { const hojeIso = new Date().toLocaleDateString("sv-SE"); const atras = (config.producao?.movimentos ?? []).filter(m => !m.recebidoEm && m.prazoPrevisto && m.prazoPrevisto < hojeIso).length; const n = (avisosMenu?.parceirosNovos ?? 0) + atras
+              return n ? { n, cor: "#8456e8", titulo: [avisosMenu?.parceirosNovos ? `${avisosMenu.parceirosNovos} parceiro(s) para aprovar` : "", atras ? `${atras} envio(s) com prazo estourado` : ""].filter(Boolean).join(" · ") } : null })()}
             icon={<Factory className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "entregas"} onClick={() => { setEntregasPrefill(null); navigate("entregas") }} label="Entregas"
             icon={<Truck className="w-4 h-4" strokeWidth={1.8} />} />
@@ -1862,6 +1876,7 @@ export default function Home() {
           <NavItem active={view === "dashboard"} onClick={() => navigate("dashboard")} label="Relatórios"
             icon={<BarChart3 className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "dados"} onClick={() => navigate("dados")} label="Dados"
+            aviso={avisosMenu?.dadosGraves ? { n: avisosMenu.dadosGraves, cor: "#d33a3c", titulo: `${avisosMenu.dadosGraves} problema(s) grave(s) nos dados` } : null}
             icon={<ShieldCheck className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "parceiros" || view === "terceirizados"} onClick={() => navigate("parceiros")} label="Parceiros"
             icon={<Handshake className="w-4 h-4" strokeWidth={1.8} />} />
@@ -1870,10 +1885,12 @@ export default function Home() {
           <NavItem active={view === "meta"} onClick={() => navigate("meta")} label="Campanhas"
             icon={<Megaphone className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "escritorio"} onClick={() => navigate("escritorio")} label="Escritório"
+            aviso={avisosMenu?.agenteTravado ? { ponto: true, cor: "#d33a3c", titulo: "Algum agente está travado" } : null}
             icon={<Building2 className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "whatsapp"} onClick={() => navigate("whatsapp")} label="WhatsApp" badgeVerde={whatsPendentes}
             icon={<MessageCircle className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "digital"} onClick={() => navigate("digital")} label="Digital"
+            aviso={avisosMenu?.digitalParados ? { n: avisosMenu.digitalParados, cor: "#e07b1f", titulo: `${avisosMenu.digitalParados} pedido(s) do digital parado(s)` } : null}
             icon={<Printer className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "forma"} onClick={() => navigate("forma")} label="Forma IA"
             icon={<Box className="w-4 h-4" strokeWidth={1.8} />} />
