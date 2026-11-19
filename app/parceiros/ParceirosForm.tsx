@@ -45,12 +45,48 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
   const [enviando, setEnviando] = useState(false)
   const [erroEnvio, setErroEnvio] = useState<string | null>(null)
   const site = useRef<HTMLInputElement>(null)
-  const topo = useRef<HTMLDivElement>(null)
+  const conteudo = useRef<HTMLDivElement>(null)
+  const [anim, setAnim] = useState<"in-fwd" | "in-back" | "out-fwd" | "out-back">("in-fwd")
+  const trocando = useRef(false)
+
+  // Troca de etapa: a atual sai (160 ms), a página volta ao topo e a próxima entra pelo lado certo
+  function irPara(n: number) {
+    if (trocando.current || n === passo) return
+    const frente = n > passo
+    const semMovimento = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    const trocar = () => {
+      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior })
+      setPasso(n); setAnim(frente ? "in-fwd" : "in-back"); trocando.current = false
+    }
+    ;(document.activeElement as HTMLElement | null)?.blur?.()
+    if (semMovimento || passo < 0 || n > 4) { trocar(); return }
+    trocando.current = true
+    setAnim(frente ? "out-fwd" : "out-back")
+    setTimeout(trocar, 160)
+  }
+  // Campo com erro: rola até ele (abaixo do cabeçalho) e dá uma tremidinha
+  function mostrarErro() {
+    setTimeout(() => {
+      const el = document.querySelector("[data-erro]") as HTMLElement | null
+      if (!el) return
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" })
+      el.classList.remove("par-shake"); void el.offsetWidth; el.classList.add("par-shake")
+      setTimeout(() => el.classList.remove("par-shake"), 450)
+    }, 30)
+  }
+  // Enter no teclado do celular: próximo campo; no último, continua
+  function aoTeclar(e: React.KeyboardEvent<HTMLDivElement>) {
+    const alvo = e.target as HTMLElement
+    if (e.key !== "Enter" || alvo.tagName !== "INPUT") return
+    e.preventDefault()
+    const campos = [...(conteudo.current?.querySelectorAll<HTMLElement>("input:not([type=file]):not([tabindex='-1']), select, textarea") ?? [])].filter(x => x.offsetParent)
+    const i = campos.indexOf(alvo)
+    if (i >= 0 && i < campos.length - 1) campos[i + 1].focus(); else avancar()
+  }
 
   // Rascunho no aparelho (volta de onde parou)
   useEffect(() => { try { const r = JSON.parse(localStorage.getItem(RASCUNHO) ?? "null"); if (r?.d) { setD({ ...VAZIO, ...r.d }); if (typeof r.passo === "number" && r.passo >= 0 && r.passo < 5) setPasso(r.passo) } } catch { /* sem rascunho */ } }, [])
   useEffect(() => { if (passo >= 0 && passo < 5) try { localStorage.setItem(RASCUNHO, JSON.stringify({ d, passo })) } catch { /* sem storage */ } }, [d, passo])
-  useEffect(() => { topo.current?.scrollIntoView({ behavior: "smooth", block: "start" }) }, [passo])
 
   const set = <K extends keyof Dados>(k: K, v: Dados[K]) => { setD(x => ({ ...x, [k]: v })); setErros(e => { const n = { ...e }; delete n[k as string]; return n }) }
   const servico = (id: IdServicoParceiro) => d.servicos.find(s => s.id === id)
@@ -64,8 +100,8 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
     const et = ETAPAS[passo].id
     const e = errosDaEtapa(d, et)
     setErros(e)
-    if (Object.keys(e).length) { setTimeout(() => document.querySelector("[data-erro]")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50); return }
-    if (passo < 4) setPasso(passo + 1); else void enviar()
+    if (Object.keys(e).length) { mostrarErro(); return }
+    if (passo < 4) irPara(passo + 1); else void enviar()
   }
   async function enviar() {
     setEnviando(true); setErroEnvio(null)
@@ -74,8 +110,9 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
     for (const a of arquivos) f.append("arquivos", a)
     try {
       const r = await fetch("/api/parceiros/cadastro", { method: "POST", body: f }).then(x => x.json())
-      if (!r.ok) { setErroEnvio(r.erro ?? "Não deu certo. Tente de novo."); if (r.campos) setErros(r.campos); return }
+      if (!r.ok) { setErroEnvio(r.erro ?? "Não deu certo. Tente de novo."); if (r.campos) { setErros(r.campos); mostrarErro() } return }
       try { localStorage.removeItem(RASCUNHO) } catch { /* ok */ }
+      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior })
       setPasso(5)
     } catch { setErroEnvio("Sem conexão. Confira a internet e tente de novo.") }
     finally { setEnviando(false) }
@@ -110,7 +147,7 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
             </div>
           ))}
         </div>
-        <button onClick={() => setPasso(0)} className="mt-6 w-full h-14 rounded-2xl text-white text-[16.5px] font-bold flex items-center justify-center gap-2 active:scale-[0.99] transition shadow-[0_8px_24px_rgba(124,78,228,0.35)]" style={{ background: ROXO }}>
+        <button onClick={() => { window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior }); setAnim("in-fwd"); setPasso(0) }} className="mt-6 w-full h-14 rounded-2xl text-white text-[16.5px] font-bold flex items-center justify-center gap-2 active:scale-[0.99] transition shadow-[0_8px_24px_rgba(124,78,228,0.35)]" style={{ background: ROXO }}>
           Quero ser parceiro<ArrowRight className="w-5 h-5" />
         </button>
         <p className="text-center text-[12.5px] text-[#9a97a5] mt-3 pb-10">Leva uns 5 minutos · você pode parar e voltar depois</p>
@@ -139,55 +176,55 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
   const E = (k: string) => erros[k]
   return (
     <main className="min-h-[100dvh] bg-[#fbfaff]">
-      <div ref={topo} className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-[#efedf5]">
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-[#efedf5]">
         <div className="max-w-[640px] mx-auto px-5 h-14 flex items-center gap-3">
-          <button onClick={() => setPasso(passo - 1)} aria-label="Voltar" className="w-9 h-9 -ml-2 rounded-xl grid place-items-center text-[#4a4658] active:bg-[#f1eff7]"><ChevronLeft className="w-5 h-5" /></button>
+          <button onClick={() => irPara(passo - 1)} aria-label="Voltar" className="w-9 h-9 -ml-2 rounded-xl grid place-items-center text-[#4a4658] active:bg-[#f1eff7]"><ChevronLeft className="w-5 h-5" /></button>
           <div className="flex-1">
             <p className="text-[12px] font-semibold text-[#9a97a5] leading-none">Etapa {passo + 1} de 5</p>
-            <p className="text-[15px] font-bold text-[#1d1a29] leading-tight mt-0.5">{ETAPAS[passo].nome}</p>
+            <p key={passo} className="text-[15px] font-bold text-[#1d1a29] leading-tight mt-0.5 par-surge">{ETAPAS[passo].nome}</p>
           </div>
           <span className="text-[12px] font-semibold" style={{ color: ROXO }}>Parceiros ENYLA</span>
         </div>
         <div className="h-1 bg-[#efedf5]"><div className="h-full transition-all duration-500" style={{ width: `${progresso}%`, background: ROXO }} /></div>
       </div>
 
-      <div className="max-w-[640px] mx-auto px-5 pt-6 pb-36 space-y-6 ds-entrada" key={passo}>
+      <div ref={conteudo} onKeyDown={aoTeclar} className={`max-w-[640px] mx-auto px-5 pt-6 pb-36 space-y-6 par-${anim}`} key={passo}>
         {et === "empresa" && <>
           <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Conta um pouco da sua empresa</h2>
           <div data-erro={E("nomeFantasia") ? "" : undefined}><Campo rotulo="Nome da empresa" dica="Como vocês são conhecidos no mercado" erro={E("nomeFantasia")}>
-            <input className={inputCls(E("nomeFantasia"))} value={d.nomeFantasia ?? ""} onChange={e => set("nomeFantasia", e.target.value)} placeholder="Ex.: Gráfica Bom Corte" autoComplete="organization" />
+            <input enterKeyHint="next" className={inputCls(E("nomeFantasia"))} value={d.nomeFantasia ?? ""} onChange={e => set("nomeFantasia", e.target.value)} placeholder="Ex.: Gráfica Bom Corte" autoComplete="organization" />
           </Campo></div>
           <div data-erro={E("documento") ? "" : undefined}><Campo rotulo={d.tipoDocumento === "cpf" ? "CPF" : "CNPJ"} erro={E("documento")}>
             <div className="flex p-1 rounded-xl bg-[#f1eff7] w-fit mb-2">
               {(["cnpj", "cpf"] as const).map(t => <button key={t} type="button" onClick={() => { set("tipoDocumento", t); set("documento", "") }} className={`h-9 px-4 rounded-lg text-[13.5px] font-semibold transition ${d.tipoDocumento === t ? "bg-white shadow-sm text-[#1d1a29]" : "text-[#6b6878]"}`}>{t === "cnpj" ? "Tenho CNPJ" : "Ainda não tenho CNPJ"}</button>)}
             </div>
-            <input className={inputCls(E("documento"))} inputMode="numeric" value={mascaraDocumento(d.documento ?? "", d.tipoDocumento ?? "cnpj")} onChange={e => set("documento", e.target.value.replace(/\D/g, ""))} placeholder={d.tipoDocumento === "cpf" ? "000.000.000-00" : "00.000.000/0000-00"} />
+            <input enterKeyHint="next" className={inputCls(E("documento"))} inputMode="numeric" value={mascaraDocumento(d.documento ?? "", d.tipoDocumento ?? "cnpj")} onChange={e => set("documento", e.target.value.replace(/\D/g, ""))} placeholder={d.tipoDocumento === "cpf" ? "000.000.000-00" : "00.000.000/0000-00"} />
           </Campo></div>
           {d.tipoDocumento === "cnpj" && <Campo rotulo="Razão social" opcional>
-            <input className={inputCls()} value={d.razaoSocial ?? ""} onChange={e => set("razaoSocial", e.target.value)} placeholder="Como está no CNPJ" />
+            <input enterKeyHint="next" className={inputCls()} value={d.razaoSocial ?? ""} onChange={e => set("razaoSocial", e.target.value)} placeholder="Como está no CNPJ" />
           </Campo>}
           <div className="grid grid-cols-[1fr_96px] gap-3" data-erro={E("cidade") || E("uf") ? "" : undefined}>
-            <Campo rotulo="Cidade" erro={E("cidade")}><input className={inputCls(E("cidade"))} value={d.cidade ?? ""} onChange={e => set("cidade", e.target.value)} autoComplete="address-level2" /></Campo>
+            <Campo rotulo="Cidade" erro={E("cidade")}><input enterKeyHint="next" className={inputCls(E("cidade"))} value={d.cidade ?? ""} onChange={e => set("cidade", e.target.value)} autoComplete="address-level2" /></Campo>
             <Campo rotulo="UF" erro={E("uf")}>
               <select className={inputCls(E("uf"))} value={d.uf ?? ""} onChange={e => set("uf", e.target.value)}><option value="">—</option>{UFS.map(u => <option key={u}>{u}</option>)}</select>
             </Campo>
           </div>
           <Campo rotulo="Endereço" dica="Para levar e buscar material" opcional>
-            <input className={inputCls()} value={d.endereco ?? ""} onChange={e => set("endereco", e.target.value)} placeholder="Rua, número, bairro" autoComplete="street-address" />
+            <input enterKeyHint="next" className={inputCls()} value={d.endereco ?? ""} onChange={e => set("endereco", e.target.value)} placeholder="Rua, número, bairro" autoComplete="street-address" />
           </Campo>
         </>}
 
         {et === "contato" && <>
           <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Como a gente fala com você?</h2>
-          <div data-erro={E("responsavel") ? "" : undefined}><Campo rotulo="Seu nome" erro={E("responsavel")}><input className={inputCls(E("responsavel"))} value={d.responsavel ?? ""} onChange={e => set("responsavel", e.target.value)} autoComplete="name" /></Campo></div>
+          <div data-erro={E("responsavel") ? "" : undefined}><Campo rotulo="Seu nome" erro={E("responsavel")}><input enterKeyHint="next" className={inputCls(E("responsavel"))} value={d.responsavel ?? ""} onChange={e => set("responsavel", e.target.value)} autoComplete="name" /></Campo></div>
           <div data-erro={E("whatsapp") ? "" : undefined}><Campo rotulo="WhatsApp" dica="É por aqui que os pedidos chegam primeiro" erro={E("whatsapp")}>
-            <input className={inputCls(E("whatsapp"))} inputMode="tel" value={mascaraTelefone(d.whatsapp ?? "")} onChange={e => set("whatsapp", e.target.value.replace(/\D/g, ""))} placeholder="(11) 90000-0000" autoComplete="tel" />
+            <input enterKeyHint="next" className={inputCls(E("whatsapp"))} inputMode="tel" value={mascaraTelefone(d.whatsapp ?? "")} onChange={e => set("whatsapp", e.target.value.replace(/\D/g, ""))} placeholder="(11) 90000-0000" autoComplete="tel" />
           </Campo></div>
           <div data-erro={E("email") ? "" : undefined}><Campo rotulo="Seu melhor e-mail" dica="Você também recebe por lá os pedidos que chegarem pelo WhatsApp, com os arquivos." erro={E("email")}>
-            <input className={inputCls(E("email"))} type="email" inputMode="email" value={d.email ?? ""} onChange={e => set("email", e.target.value)} placeholder="voce@empresa.com.br" autoComplete="email" />
+            <input enterKeyHint="next" className={inputCls(E("email"))} type="email" inputMode="email" value={d.email ?? ""} onChange={e => set("email", e.target.value)} placeholder="voce@empresa.com.br" autoComplete="email" />
           </Campo></div>
           <Campo rotulo="Quem recebe o material na produção" dica="Nome e telefone, se for outra pessoa" opcional>
-            <input className={inputCls()} value={d.contatoProducao ?? ""} onChange={e => set("contatoProducao", e.target.value)} placeholder="Ex.: Marcos · (11) 98888-0000" />
+            <input enterKeyHint="next" className={inputCls()} value={d.contatoProducao ?? ""} onChange={e => set("contatoProducao", e.target.value)} placeholder="Ex.: Marcos · (11) 98888-0000" />
           </Campo>
         </>}
 
@@ -201,11 +238,11 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
               const on = !!servico(s.id), I = ICONE[s.id]
               return (
                 <button key={s.id} type="button" onClick={() => alternarServico(s.id)} aria-pressed={on}
-                  className={`relative text-left rounded-2xl p-3.5 border-2 transition active:scale-[0.98] ${on ? "bg-[#7c4ee4]/[0.07]" : "bg-white border-[#ece9f4]"}`} style={on ? { borderColor: ROXO } : undefined}>
+                  className={`relative text-left rounded-2xl p-3.5 border-2 transition-all duration-200 active:scale-[0.97] ${on ? "bg-[#7c4ee4]/[0.07]" : "bg-white border-[#ece9f4]"}`} style={on ? { borderColor: ROXO } : undefined}>
                   <span className="w-9 h-9 rounded-xl grid place-items-center mb-2" style={{ background: on ? ROXO : "#f1eff7", color: on ? "#fff" : "#6b6878" }}><I className="w-[18px] h-[18px]" /></span>
                   <span className="block text-[14px] font-semibold text-[#1d1a29] leading-tight">{s.nome}</span>
                   <span className="block text-[12px] text-[#8a8796] leading-snug mt-0.5">{s.dica}</span>
-                  {on && <span className="absolute top-3 right-3 w-5 h-5 rounded-full grid place-items-center text-white" style={{ background: ROXO }}><Check className="w-3.5 h-3.5" strokeWidth={3} /></span>}
+                  {on && <span className="absolute top-3 right-3 w-5 h-5 rounded-full grid place-items-center text-white ds-pop" style={{ background: ROXO }}><Check className="w-3.5 h-3.5" strokeWidth={3} /></span>}
                 </button>
               )
             })}
@@ -228,20 +265,20 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
                   <span className="w-10 h-10 rounded-2xl grid place-items-center text-white" style={{ background: ROXO }}><I className="w-5 h-5" /></span>
                   <p className="text-[17px] font-bold text-[#1d1a29]">{sv.id === "outro" ? (s.qual || "Outro serviço") : sv.nome}</p>
                 </div>
-                {sv.id === "outro" && <Campo rotulo="Qual serviço?" erro={E(`${sv.id}.qual`)}><input className={inputCls(E(`${sv.id}.qual`))} value={s.qual ?? ""} onChange={e => mudarServico(sv.id, { qual: e.target.value })} /></Campo>}
+                {sv.id === "outro" && <Campo rotulo="Qual serviço?" erro={E(`${sv.id}.qual`)}><input enterKeyHint="next" className={inputCls(E(`${sv.id}.qual`))} value={s.qual ?? ""} onChange={e => mudarServico(sv.id, { qual: e.target.value })} /></Campo>}
 
                 <Campo rotulo="Seja sincero: qual é o tempo de entrega médio?" dica="Em dias úteis, do material chegar até ficar pronto" erro={E(`${sv.id}.prazo`)}>
-                  {!s.prazoVaria && (
-                    <div className="flex items-center gap-3">
+                  <div className={`par-colapsa ${s.prazoVaria ? "fechado" : ""}`} aria-hidden={s.prazoVaria}><div>
+                    <div className="flex items-center gap-3 pb-0.5">
                       <button type="button" onClick={() => mudarServico(sv.id, { prazoDias: Math.max(1, (s.prazoDias ?? 2) - 1) })} className="w-12 h-12 rounded-xl bg-[#f1eff7] text-[22px] font-bold text-[#4a4658] active:scale-95">−</button>
                       <div className="flex-1 h-12 rounded-xl bg-[#f6f5fa] grid place-items-center">
-                        <span className="text-[18px] font-bold text-[#1d1a29]">{s.prazoDias ?? "—"} <span className="text-[13px] font-medium text-[#6b6878]">{s.prazoDias === 1 ? "dia útil" : "dias úteis"}</span></span>
+                        <span className="text-[18px] font-bold text-[#1d1a29]"><span key={s.prazoDias ?? 0} className="par-bump">{s.prazoDias ?? "—"}</span> <span className="text-[13px] font-medium text-[#6b6878]">{s.prazoDias === 1 ? "dia útil" : "dias úteis"}</span></span>
                       </div>
                       <button type="button" onClick={() => mudarServico(sv.id, { prazoDias: Math.min(60, (s.prazoDias ?? 0) + 1) })} className="w-12 h-12 rounded-xl text-white text-[22px] font-bold active:scale-95" style={{ background: ROXO }}>+</button>
                     </div>
-                  )}
+                  </div></div>
                   <button type="button" onClick={() => mudarServico(sv.id, { prazoVaria: !s.prazoVaria, prazoDias: s.prazoVaria ? 3 : null })}
-                    className={`mt-2.5 w-full text-left rounded-xl px-3.5 py-3 border flex gap-3 items-start transition ${s.prazoVaria ? "bg-[#7c4ee4]/[0.07]" : "bg-white border-[#ece9f4]"}`} style={s.prazoVaria ? { borderColor: ROXO } : undefined}>
+                    className={`${s.prazoVaria ? "mt-0" : "mt-2.5"} w-full text-left rounded-xl px-3.5 py-3 border flex gap-3 items-start transition-all duration-300 ${s.prazoVaria ? "bg-[#7c4ee4]/[0.07]" : "bg-white border-[#ece9f4]"}`} style={s.prazoVaria ? { borderColor: ROXO } : undefined}>
                     <span className={`mt-0.5 w-5 h-5 rounded-md border-2 grid place-items-center shrink-0 ${s.prazoVaria ? "text-white" : "border-[#cfcbdb]"}`} style={s.prazoVaria ? { background: ROXO, borderColor: ROXO } : undefined}>{s.prazoVaria && <Check className="w-3.5 h-3.5" strokeWidth={3} />}</span>
                     <span className="text-[13.5px] text-[#4a4658] leading-snug">Não consigo mensurar agora: varia muito de pedido para pedido, a ponto de eu não ter uma média ou tabela.</span>
                   </button>
@@ -256,15 +293,15 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
                   </div>
                 </Campo>
                 {forma?.unidade && (
-                  <div className={`grid gap-3 ${s.cobranca === "acertoMilheiro" ? "grid-cols-2" : "grid-cols-1"}`}>
-                    {s.cobranca === "acertoMilheiro" && <Campo rotulo="Acerto (R$)" opcional><input className={inputCls()} inputMode="decimal" value={s.acerto ?? ""} onChange={e => mudarServico(sv.id, { acerto: Number(e.target.value.replace(",", ".")) || null })} placeholder="0,00" /></Campo>}
+                  <div key={s.cobranca} className={`grid gap-3 par-surge ${s.cobranca === "acertoMilheiro" ? "grid-cols-2" : "grid-cols-1"}`}>
+                    {s.cobranca === "acertoMilheiro" && <Campo rotulo="Acerto (R$)" opcional><input enterKeyHint="next" className={inputCls()} inputMode="decimal" value={s.acerto ?? ""} onChange={e => mudarServico(sv.id, { acerto: Number(e.target.value.replace(",", ".")) || null })} placeholder="0,00" /></Campo>}
                     <Campo rotulo={`Valor ${forma.unidade} (R$)`} dica={s.cobranca === "acertoMilheiro" ? undefined : "Um valor médio de referência"} opcional>
-                      <input className={inputCls()} inputMode="decimal" value={s.valor ?? ""} onChange={e => mudarServico(sv.id, { valor: Number(e.target.value.replace(",", ".")) || null })} placeholder="0,00" />
+                      <input enterKeyHint="next" className={inputCls()} inputMode="decimal" value={s.valor ?? ""} onChange={e => mudarServico(sv.id, { valor: Number(e.target.value.replace(",", ".")) || null })} placeholder="0,00" />
                     </Campo>
                   </div>
                 )}
-                {(s.cobranca === "tabela" || s.cobranca === "varia") && <p className="text-[13px] text-[#6b6878] -mt-2">Perfeito. Na última etapa você pode mandar a tabela ou um orçamento que já fez: a gente aprende o seu jeito de cobrar.</p>}
-                <Campo rotulo="Pedido mínimo" opcional><input className={inputCls()} value={s.minimo ?? ""} onChange={e => mudarServico(sv.id, { minimo: e.target.value })} placeholder="Ex.: 1.000 folhas, R$ 150, 1 dia de máquina" /></Campo>
+                {(s.cobranca === "tabela" || s.cobranca === "varia") && <p key={s.cobranca} className="text-[13px] text-[#6b6878] -mt-2 par-surge">Perfeito. Na última etapa você pode mandar a tabela ou um orçamento que já fez: a gente aprende o seu jeito de cobrar.</p>}
+                <Campo rotulo="Pedido mínimo" opcional><input enterKeyHint="next" className={inputCls()} value={s.minimo ?? ""} onChange={e => mudarServico(sv.id, { minimo: e.target.value })} placeholder="Ex.: 1.000 folhas, R$ 150, 1 dia de máquina" /></Campo>
                 <Campo rotulo="Algo mais sobre esse serviço?" opcional>
                   <textarea className={`${inputCls()} h-24 py-3 resize-none`} value={s.obs ?? ""} onChange={e => mudarServico(sv.id, { obs: e.target.value })} placeholder="Tipos que faz, limitações, formatos, cores…" />
                 </Campo>
@@ -279,10 +316,10 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
             <textarea className={`${inputCls()} h-24 py-3 resize-none`} value={d.maquinas ?? ""} onChange={e => set("maquinas", e.target.value)} />
           </Campo>
           <Campo rotulo="Capacidade" dica="Quanto vocês conseguem por dia ou semana" opcional>
-            <input className={inputCls()} value={d.capacidade ?? ""} onChange={e => set("capacidade", e.target.value)} placeholder="Ex.: 20 mil folhas por dia" />
+            <input enterKeyHint="next" className={inputCls()} value={d.capacidade ?? ""} onChange={e => set("capacidade", e.target.value)} placeholder="Ex.: 20 mil folhas por dia" />
           </Campo>
           <Campo rotulo="Horário de funcionamento" opcional>
-            <input className={inputCls()} value={d.horario ?? ""} onChange={e => set("horario", e.target.value)} placeholder="Ex.: seg a sex, 8h às 18h; sábado até 12h" />
+            <input enterKeyHint="next" className={inputCls()} value={d.horario ?? ""} onChange={e => set("horario", e.target.value)} placeholder="Ex.: seg a sex, 8h às 18h; sábado até 12h" />
           </Campo>
           <Campo rotulo="Tabela de preços ou orçamento de exemplo" dica="Mande um orçamento que você já fez ou a sua tabela. A gente aprende o seu formato de cobrança. PDF, imagem ou planilha, até 10 MB." opcional>
             <label className="flex items-center justify-center gap-2 h-14 rounded-xl border-2 border-dashed border-[#d9d4e8] bg-white text-[14px] font-semibold cursor-pointer active:scale-[0.99]" style={{ color: ROXO }}>
@@ -296,7 +333,7 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
                 <button type="button" onClick={() => setArquivos(x => x.filter((_, j) => j !== i))} aria-label="Tirar"><X className="w-4 h-4 text-[#9a97a5]" /></button>
               </li>))}</ul>}
           </Campo>
-          <Campo rotulo="Como conheceu a ENYLA?" opcional><input className={inputCls()} value={d.comoConheceu ?? ""} onChange={e => set("comoConheceu", e.target.value)} placeholder="Indicação, Instagram, já trabalhamos juntos…" /></Campo>
+          <Campo rotulo="Como conheceu a ENYLA?" opcional><input enterKeyHint="next" className={inputCls()} value={d.comoConheceu ?? ""} onChange={e => set("comoConheceu", e.target.value)} placeholder="Indicação, Instagram, já trabalhamos juntos…" /></Campo>
 
           <div className="rounded-3xl p-5 text-white" style={{ background: "linear-gradient(150deg,#2a1a5e,#5b34c8)" }}>
             <p className="flex items-center gap-2 text-[15px] font-bold"><ShieldCheck className="w-5 h-5" />Como a parceria funciona</p>
@@ -319,7 +356,7 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
 
       <div className="fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t border-[#efedf5]" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="max-w-[640px] mx-auto px-5 py-3 flex gap-3">
-          {passo > 0 && <button onClick={() => setPasso(passo - 1)} className="h-13 px-5 rounded-2xl bg-[#f1eff7] text-[#4a4658] text-[15px] font-semibold" style={{ height: 52 }}>Voltar</button>}
+          {passo > 0 && <button onClick={() => irPara(passo - 1)} className="h-13 px-5 rounded-2xl bg-[#f1eff7] text-[#4a4658] text-[15px] font-semibold" style={{ height: 52 }}>Voltar</button>}
           <button onClick={avancar} disabled={enviando} className="flex-1 rounded-2xl text-white text-[16px] font-bold flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.99] transition shadow-[0_6px_20px_rgba(124,78,228,0.3)]" style={{ background: ROXO, height: 52 }}>
             {enviando ? <><Loader2 className="w-5 h-5 animate-spin" />Enviando…</> : passo === 4 ? <>Enviar cadastro<Check className="w-5 h-5" /></> : <>Continuar<ArrowRight className="w-5 h-5" /></>}
           </button>

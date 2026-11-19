@@ -316,3 +316,27 @@ html.dark .leaflet-control-attribution a { color: #a5a2b0; }
 
 /* Páginas do cliente (links enviados): sempre claras, mesmo no modo escuro do sistema ou do navegador */
 html:not(.dark):has(body) { color-scheme: light only; }
+
+/* Parceiros ENYLA: troca de etapa (sai, volta ao topo, entra pelo lado certo) e microinterações */
+@keyframes par-in-fwd { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes par-in-back { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+@keyframes par-out-fwd { to { opacity: 0; transform: translateX(-22px); } }
+@keyframes par-out-back { to { opacity: 0; transform: translateX(22px); } }
+.par-in-fwd { animation: par-in-fwd .36s cubic-bezier(.2,.8,.2,1) both; }
+.par-in-back { animation: par-in-back .36s cubic-bezier(.2,.8,.2,1) both; }
+.par-out-fwd { animation: par-out-fwd .16s ease-in both; }
+.par-out-back { animation: par-out-back .16s ease-in both; }
+@keyframes par-shake { 0%,100% { transform: none; } 20% { transform: translateX(-6px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
+.par-shake { animation: par-shake .4s ease; }
+@keyframes par-bump { 0% { transform: scale(1); } 40% { transform: scale(1.16); } 100% { transform: scale(1); } }
+.par-bump { display: inline-block; animation: par-bump .24s ease; }
+@keyframes par-surge { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.par-surge { animation: par-surge .26s ease both; }
+.par-colapsa { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows .32s cubic-bezier(.2,.8,.2,1), opacity .22s ease, margin .32s ease; }
+.par-colapsa > * { overflow: hidden; min-height: 0; }
+.par-colapsa.fechado { grid-template-rows: 0fr; opacity: 0; }
+[data-erro] { scroll-margin-top: 96px; scroll-margin-bottom: 110px; }
+@media (prefers-reduced-motion: reduce) {
+  .par-in-fwd, .par-in-back, .par-out-fwd, .par-out-back, .par-shake, .par-bump, .par-surge { animation: none; }
+  .par-colapsa { transition: none; }
+}
