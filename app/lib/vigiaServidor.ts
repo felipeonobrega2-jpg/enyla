@@ -163,7 +163,8 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
   const lista = quemEspera(convs as never, agora.getTime()).sort((a, b) => (b.peso ?? 0) - (a.peso ?? 0) || b.minutos - a.minutos)
   if (!lista.length) return "ninguém"
   // O agente tenta uma vez por mensagem, nas vagas que a fila de recuperação deixou (cada uma numa função própria)
-  const tentou = new Set(cfg.vigiaTentou ?? [])
+  // vigiaTentouV2: as marcas antigas (de quando o vigia estourava o tempo sem responder ninguém) ficam para trás
+  const tentou = new Set((cfg as { vigiaTentouV2?: string[] }).vigiaTentouV2 ?? [])
   const novasTentativas: string[] = []
   const respondidas = despachadas
   let ordem = despachadas.size
@@ -172,10 +173,15 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
     if (despachadas.has(e.jid)) continue
     const ult = await ultimaReal(e.jid)
     if (!ult || ult.from_me || tentou.has(ult.id)) continue
+    // O agente já olhou esta mensagem e decidiu (segurou para você, conversa sua, decisão sua): o aviso é seu.
+    // Só volta a tentar se o que segurou foi falha (IA fora, cota cheia) ou "conversa sua" (você parou há 3 h+).
+    const { data: m } = await supabase.from("whatsapp_mensagens").select("ts").eq("id", ult.id).maybeSingle()
+    const { data: reg } = m ? await supabase.from("agente_registro").select("motivo").eq("jid", e.jid).gte("em", m.ts).order("em", { ascending: false }).limit(1).maybeSingle() : { data: null }
+    if (reg && !/sem crédito|IA falhou|limite|fila de envio|conversa sua/i.test((reg as { motivo?: string }).motivo ?? "")) { novasTentativas.push(ult.id); continue }
     novasTentativas.push(ult.id)
     if (await despachar(ult.id, ordem)) { despachadas.add(e.jid); vagas.n--; ordem++ }
   }
-  if (novasTentativas.length) await mudarConfig((d: typeof cfg) => ({ vigiaTentou: [...novasTentativas, ...(d.vigiaTentou ?? [])].slice(0, 400) }))
+  if (novasTentativas.length) await mudarConfig((d: typeof cfg & { vigiaTentouV2?: string[] }) => ({ vigiaTentouV2: [...novasTentativas, ...(d.vigiaTentouV2 ?? [])].slice(0, 400) }))
   // O resto é seu: aviso no WhatsApp (no máximo uma mensagem a cada 30 min; cada conversa a cada 3 h)
   const avisadas = cfg.esperaAvisada ?? {}
   const paraAvisar = lista.filter(e => !respondidas.has(e.jid) && (!avisadas[e.jid] || agora.getTime() - new Date(avisadas[e.jid]).getTime() > 3 * 3600_000) && (e.peso >= 2 || e.minutos >= 120))
