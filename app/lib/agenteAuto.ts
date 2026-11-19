@@ -394,12 +394,24 @@ async function segurarSemIA(c: Conversa, msgId: string) {
   })
   if (!ja && !nossas?.length) await enviar(c, TEXTO_SEM_IA).catch(() => null)
 }
+async function reservarAtrasada(msgId: string) {
+  let minha = false
+  await mudarConfig((d: Record<string, unknown> & { agenteAtrasadas?: Record<string, string> }) => {
+    const agora = Date.now()
+    const m = Object.fromEntries(Object.entries(d.agenteAtrasadas ?? {}).filter(([, em]) => agora - new Date(em).getTime() < 10 * 60_000))
+    if (m[msgId]) return null
+    minha = true
+    return { agenteAtrasadas: { ...m, [msgId]: new Date(agora).toISOString() } }
+  })
+  return minha
+}
 // Resposta atrasada que falhou de novo (IA ainda fora, cota cheia): volta para a fila, sem mandar nada ao lead
 async function voltarParaFila(jid: string, msgId: string) {
-  await mudarConfig((d: Record<string, unknown> & { respostasPendentes?: { msgId: string; jid: string; em: string; segurou?: boolean }[] }) => {
+  await mudarConfig((d: Record<string, unknown> & { agenteAtrasadas?: Record<string, string>; respostasPendentes?: { msgId: string; jid: string; em: string; segurou?: boolean }[] }) => {
     const fila = d.respostasPendentes ?? []
     const antes = fila.find(f => f.jid === jid)
-    return { respostasPendentes: [...fila.filter(f => f.jid !== jid), { msgId, jid, em: antes?.em ?? new Date().toISOString(), segurou: true }].slice(-150) }
+    const { [msgId]: _, ...travas } = d.agenteAtrasadas ?? {}   // libera a trava: a próxima rodada tenta de novo
+    return { agenteAtrasadas: travas, respostasPendentes: [...fila.filter(f => f.jid !== jid), { msgId, jid, em: antes?.em ?? new Date().toISOString(), segurou: true }].slice(-150) }
   })
 }
 
@@ -426,6 +438,9 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   if (!jid) return
   // Cada mensagem do lead é respondida uma vez só (dois disparos ao mesmo tempo: só um passa)
   if (!await reservarMensagem(msgId) && !opts.atrasada) return
+  // Atrasada passa por cima da reserva (a tentativa que falhou já reservou): trava própria de 10 min por mensagem,
+  // para duas rodadas ao mesmo tempo não mandarem a mesma resposta duas vezes
+  if (opts.atrasada && !await reservarAtrasada(msgId)) return
 
   // Resposta a convite de parceiro (Captador): a conversa é sua, o agente de vendas não atende
   {
