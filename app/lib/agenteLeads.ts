@@ -214,8 +214,11 @@ export const partesDaResposta = (r: string) => {
 // Respostas automáticas do WhatsApp Business ("fora do horário") não contam como você na conversa. Nem as
 // mensagens com botões sem texto (interactive/template) que o app/Meta dispara sozinho em rajada para vários leads
 // no mesmo minuto: você digitando sempre tem texto.
+// O "já te respondo" que o sistema manda quando a IA cai também não é resposta: o lead continua esperando.
+export const TEXTO_SEM_IA = "Oi, tudo bem? Recebi sua mensagem! Já te respondo com os detalhes."
+export const ehSeguraSemIA = (t: string | null | undefined) => !!t && /^oi, tudo bem\? recebi sua mensagem! j[áa] te respondo/i.test(t.trim())
 export const ehMensagemAutomaticaDoWhatsapp = (t: string | null, tipo?: string | null) =>
-  (!!t && /^estou fora do hor[aá]rio/i.test(t.trim())) || (!t?.trim() && /interactive|template|buttons|list/i.test(tipo ?? ""))
+  (!!t && /^estou fora do hor[aá]rio/i.test(t.trim())) || ehSeguraSemIA(t) || (!t?.trim() && /interactive|template|buttons|list/i.test(tipo ?? ""))
 
 // Filtro inicial, tirado das conversas reais do Felipe com os leads do anúncio (04/11/2026). Fica editável em Configurações.
 export const FILTRO_PADRAO = `OBJETIVO

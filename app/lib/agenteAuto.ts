@@ -19,7 +19,7 @@ import { lerRegistros, gravarRegistro, lerIdsAgente, guardarIdAgente, reservarTr
 import { garantirTelefone } from "./contatosServidor"
 import { textoAvisoReativacao } from "./reativacao"
 import {
-  AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, filtroEfetivo,
+  AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, TEXTO_SEM_IA, filtroEfetivo,
   organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, ehSemCredito, proximoFollowUp, horarioDeFollowUp, dentroDoHorario, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE, ETIQUETAS_AGENTE,
   marcar, marcosDoRegistro, Marcos, paradoParaRetomar,
 } from "./agenteLeads"
@@ -383,7 +383,7 @@ async function reservarMensagem(msgId: string): Promise<boolean> {
 
 // 2ª etapa: mais um tempo (como quem viu e vai responder), pensa, lê e digita
 // IA fora: "já te respondo" uma vez (se nada nosso saiu nos últimos 10 min) e a mensagem na fila respostasPendentes
-export const TEXTO_SEM_IA = "Oi, tudo bem? Recebi sua mensagem! Já te respondo com os detalhes."
+export { TEXTO_SEM_IA }
 async function segurarSemIA(c: Conversa, msgId: string) {
   const { data: nossas } = await supabase.from("whatsapp_mensagens").select("id").eq("jid", c.jid).eq("from_me", true).gte("criado_em", new Date(Date.now() - 10 * 60_000).toISOString()).limit(1)
   let ja = false
@@ -393,6 +393,14 @@ async function segurarSemIA(c: Conversa, msgId: string) {
     return { respostasPendentes: [...fila.filter(f => f.jid !== c.jid), { msgId, jid: c.jid, em: new Date().toISOString(), segurou: ja || !nossas?.length }].slice(-150) }
   })
   if (!ja && !nossas?.length) await enviar(c, TEXTO_SEM_IA).catch(() => null)
+}
+// Resposta atrasada que falhou de novo (IA ainda fora, cota cheia): volta para a fila, sem mandar nada ao lead
+async function voltarParaFila(jid: string, msgId: string) {
+  await mudarConfig((d: Record<string, unknown> & { respostasPendentes?: { msgId: string; jid: string; em: string; segurou?: boolean }[] }) => {
+    const fila = d.respostasPendentes ?? []
+    const antes = fila.find(f => f.jid === jid)
+    return { respostasPendentes: [...fila.filter(f => f.jid !== jid), { msgId, jid, em: antes?.em ?? new Date().toISOString(), segurou: true }].slice(-150) }
+  })
 }
 
 // "Desculpa a demora" antes da primeira frase (sem repetir se a IA já pediu desculpa)
@@ -468,6 +476,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
       // de verdade assim que a IA voltar
       if (!opts.atrasada) await segurarSemIA(c, msgId).catch(() => null)
     }
+    if (opts.atrasada) await voltarParaFila(jid, msgId).catch(() => null)
     return registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: "indefinido", enviou: false, texto: "", motivo: ehSemCredito(a.erro) ? "IA sem crédito na Anthropic" : `IA falhou: ${a.erro.slice(0, 120)}` })
   }
   const { r, conversa } = a
@@ -625,6 +634,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   // Instagram na mesma mensagem da primeira resposta (um envio só: metade da cota e menos cara de robô)
   const quente = leadQuente({ etiquetas: c.etiquetas, status_lead: c.status_lead, perfil: r.lead.perfil, jid, pedidosDigitais: cfg.pedidosDigitais, propostas: (cfg as { propostasProntas?: { jid: string; status: string; em: string; enviadaEm?: string }[] }).propostasProntas })
   const env = await enviar(c, querVitrine ? `${r.resposta.trim()}\n\n${vitrine}` : r.resposta, msgId, { essencial: quente })
+  if (opts.atrasada && !env.ids.length) await voltarParaFila(jid, msgId).catch(() => null)
   await pequeno(env.ids.length > 0)
   // Orçamento digital enviado: o pedido fica esperando o sinal (o anterior desta conversa, se havia, é trocado)
   if (novoPedido && env.ids.length) {
