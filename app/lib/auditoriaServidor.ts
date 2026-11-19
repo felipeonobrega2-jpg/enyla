@@ -54,6 +54,15 @@ export async function ignorarProblema(id: string, voltar = false) {
 export async function talvezAuditar(cfg: { auditoriaDados?: { em?: string } }) {
   const ult = cfg.auditoriaDados?.em
   if (ult && Date.now() - new Date(ult).getTime() < 55 * 60_000) return null
+  // Marca o início antes de varrer: se a rodada cair no meio (tempo da Vercel), não tenta de novo a cada 2 min
+  // (19/11: a varredura completa repetindo a cada rodada do vigia engasgou o banco)
+  let minha = false
+  await mudarConfig((d: Record<string, unknown> & { auditoriaComecouEm?: string }) => {
+    if (d.auditoriaComecouEm && Date.now() - new Date(d.auditoriaComecouEm).getTime() < 55 * 60_000) return null
+    minha = true
+    return { auditoriaComecouEm: new Date().toISOString() }
+  })
+  if (!minha) return null
   const r = await rodarAuditoria({ guardar: true })
   return { confianca: r.confianca, problemas: r.total }
 }
