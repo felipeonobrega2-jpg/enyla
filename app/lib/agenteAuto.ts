@@ -501,6 +501,8 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     return registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: "indefinido", enviou: false, texto: "", motivo: ehSemCredito(a.erro) ? "IA sem crédito na Anthropic" : `IA falhou: ${a.erro.slice(0, 120)}` })
   }
   const { r, conversa } = a
+  // A IA respondeu: o aviso de "sem crédito" sai da tela (ficava 3 h mesmo depois da recarga)
+  if (cfg.agenteSemCreditoEm) await gravarCfg(() => ({ agenteSemCreditoEm: null } as never)).catch(() => null)
   // Perfil do lead: o classificador é a fonte (prova do volume no que o cliente disse; menos de 1.000 nunca é MQL).
   // Chamado quando o atendimento viu bom negócio ou pequeno, ou o lead acabou de falar de volume.
   if (r.lead.perfil !== "nao_lead" && !conversa.clienteCadastrado && (ehQualificado(r.lead.perfil) || r.lead.perfil === "pequeno"
@@ -600,7 +602,8 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     conversaNova, clienteCadastrado: conversa.clienteCadastrado, manualRecente, emMql: false, ...ctx,
     // Lead bom ainda sem quantidade e medida: o agente segue levantando até a proposta poder ser montada
     coletando: levantando,
-    naoDeixarEsperando: !!opts.atrasada,
+    // Digital / quantidade pequena é todo da IA (pedido do Felipe, 19/11): só o firme segura
+    naoDeixarEsperando: !!opts.atrasada || r.lead.perfil === "pequeno" || (c.etiquetas ?? []).includes(ETIQUETAS_AGENTE.digital),
   })
   // Lead pequeno só vai para Descartado depois de orientado (senão sumiria da sua lista sem resposta)
   const organiza = !conversa.clienteCadastrado && r.lead.perfil !== "nao_lead"
@@ -645,7 +648,9 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     if (!conversa.clienteCadastrado && !faltaParaProposta(r.dados)) await prepararProposta(jid, r.dados, conversa.nome).catch(() => null)
   }
   // Segurou para você: aviso na hora no seu WhatsApp (nada fica esquecido no registro)
-  if (trava && !viraMql && TRAVAS_COM_AVISO.some(t => trava.startsWith(t))) await avisarSegurado(cfg, c, trava + (r.motivo_alerta ? ` · ${r.motivo_alerta}` : ""), r.resposta).catch(() => null)
+  // Lead pequeno/digital não vira aviso para você: você fica só com o que vale a pena
+  const ehPequeno = r.lead.perfil === "pequeno" || (c.etiquetas ?? []).includes(ETIQUETAS_AGENTE.digital)
+  if (trava && !viraMql && !ehPequeno && TRAVAS_COM_AVISO.some(t => trava.startsWith(t))) await avisarSegurado(cfg, c, trava + (r.motivo_alerta ? ` · ${r.motivo_alerta}` : ""), r.resposta).catch(() => null)
   // Digital sem preço na tabela (quantidade acima da tabela, caixa maior que A3): aviso uma vez por conversa
   if (semTabela && !log.some(l => l.passo === "Sem tabela")) {
     await avisarSegurado(cfg, c, `orçamento digital sem preço na tabela: ${semTabela}`, trava || velha ? "" : r.resposta).catch(() => null)

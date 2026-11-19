@@ -237,7 +237,7 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
   if (novasTentativas.length) await mudarConfig((d: typeof cfg & { vigiaTentouV3?: string[] }) => ({ vigiaTentouV3: [...novasTentativas, ...(d.vigiaTentouV3 ?? [])].slice(0, 600) }))
   // O resto é seu: aviso no WhatsApp (no máximo uma mensagem a cada 30 min; cada conversa a cada 3 h)
   const avisadas = cfg.esperaAvisada ?? {}
-  const paraAvisar = lista.filter(e => !respondidas.has(e.jid) && (!avisadas[e.jid] || agora.getTime() - new Date(avisadas[e.jid]).getTime() > 3 * 3600_000) && (e.peso >= 2 || e.minutos >= 120))
+  const paraAvisar = lista.filter(e => !respondidas.has(e.jid) && (!avisadas[e.jid] || agora.getTime() - new Date(avisadas[e.jid]).getTime() > 3 * 3600_000) && e.peso >= 3)   // só bom negócio vira aviso seu
   if (!paraAvisar.length || (cfg.esperaAvisoEm && agora.getTime() - new Date(cfg.esperaAvisoEm).getTime() < 30 * 60_000)) return { esperando: lista.length, despachadas: respondidas.size }
   const { evo } = await import("./evolution")
   const { seuNumero } = await import("./agenteAuto")
