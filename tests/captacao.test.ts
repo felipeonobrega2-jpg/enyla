@@ -44,3 +44,15 @@ describe("digital: só recota com dado novo", () => {
     expect(trouxeDadosNovos([m(true, "Montei…"), m(false, "", "image")])).toBe(true)
   })
 })
+
+import { leadQuente } from "@/app/lib/agenteAuto"
+describe("lead quente ignora o limite por hora", () => {
+  it("MQL, etiqueta boa, perfil bom, pedido digital ou proposta em aberto", () => {
+    expect(leadQuente({ jid: "a", status_lead: "mql" })).toBe(true)
+    expect(leadQuente({ jid: "a", etiquetas: ["Lead médio"] })).toBe(true)
+    expect(leadQuente({ jid: "a", perfil: "icp" })).toBe(true)
+    expect(leadQuente({ jid: "a", pedidosDigitais: [{ jid: "a", status: "aguardando_sinal" }] })).toBe(true)
+    expect(leadQuente({ jid: "a", propostas: [{ jid: "a", status: "enviada", em: new Date().toISOString() }] })).toBe(true)
+    expect(leadQuente({ jid: "a", etiquetas: ["Lead pequeno"], perfil: "pequeno" })).toBe(false)
+  })
+})

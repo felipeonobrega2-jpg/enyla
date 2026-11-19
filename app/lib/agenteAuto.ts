@@ -168,12 +168,22 @@ async function marcarLida(c: Conversa, msgId?: string) {
 // limite não se perde: fica como "não enviou" e é tentado de novo nas próximas rodadas.
 // Responder quem escreveu é o que menos parece robô: 60 por hora. O que a ENYLA puxa (follow-up, reativação,
 // convite de parceiro) fica em 24 por hora. Depois de reconectar, o aquecimento vale para tudo.
-const LIMITE_HORA = 60
+// Responder quem escreveu: teto alto (rede de segurança) e o espaçamento natural entre mensagens.
+// Lead quente (MQL/ICP/Oportunidade/médio, pedido digital ou proposta em andamento) não tem teto.
+const LIMITE_HORA = 120
 const LIMITE_HORA_AQUECENDO = 20
 const HORAS_AQUECENDO = 2
-const FRACAO_PROATIVO = 0.4        // 24 por hora para o proativo: resposta a lead tem prioridade
+const FRACAO_PROATIVO = 0.2        // 24 por hora para o proativo (follow-up, reativação, convite)
 const INTERVALO_MIN_SEG = 8
 export const ESPERA_MAX_VEZ_SEG = 20   // cabe no minuto da Vercel; passou disso, tenta na próxima rodada
+
+// Lead quente: responde sempre, sem teto por hora (só o espaçamento natural)
+export function leadQuente(a: { etiquetas?: string[] | null; status_lead?: string | null; perfil?: string | null; jid: string; pedidosDigitais?: { jid: string; status: string; teste?: boolean }[]; propostas?: { jid: string; status: string; em: string; enviadaEm?: string }[] }) {
+  if (a.status_lead === "mql" || (a.etiquetas ?? []).some(e => /^(MQL|ICP|Oportunidade|Lead médio)$/.test(e))) return true
+  if (a.perfil && ["icp", "oportunidade", "medio"].includes(a.perfil)) return true
+  if ((a.pedidosDigitais ?? []).some(p => p.jid === a.jid && !p.teste && ["aguardando_sinal", "sinal_pago", "arte", "producao"].includes(p.status))) return true
+  return (a.propostas ?? []).some(p => p.jid === a.jid && p.status === "enviada" && Date.now() - new Date(p.enviadaEm ?? p.em).getTime() < 14 * 86_400_000)
+}
 
 export async function reservarVezDeEnviar(opcoes: { essencial?: boolean; proativo?: boolean } = {}): Promise<{ esperaMs: number } | { erro: string }> {
   const { essencial = false, proativo = false } = opcoes
@@ -273,8 +283,10 @@ async function avisarSegurado(cfg: CfgAgente, c: Conversa, motivo: string, suges
 }
 
 async function avisarSemCredito(cfg: CfgAgente) {
-  if (cfg.agenteSemCreditoEm && Date.now() - new Date(cfg.agenteSemCreditoEm).getTime() < 6 * 3_600_000) return
+  // A cada hora enquanto durar (o de 6 em 6 h passava batido e os leads ficavam horas sem resposta)
+  if (cfg.agenteSemCreditoEm && Date.now() - new Date(cfg.agenteSemCreditoEm).getTime() < 3_600_000) return
   await gravarCfg(() => ({ agenteSemCreditoEm: new Date().toISOString() }))
+  await notificar("IA parada: sem crédito na Anthropic", "Os leads estão ficando sem resposta. Recarregue em console.anthropic.com (Billing) e ligue a recarga automática.", { prioridade: "urgente", tags: ["rotating_light"] }).catch(() => null)
   const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
   if (!destino) return
   await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text:
@@ -611,7 +623,8 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   if (trava || velha) return registrar({ ...base, enviou: false, motivo: trava ?? "chegou mensagem nova enquanto preparava" + (r.motivo_alerta ? ` · ${r.motivo_alerta}` : "") })
 
   // Instagram na mesma mensagem da primeira resposta (um envio só: metade da cota e menos cara de robô)
-  const env = await enviar(c, querVitrine ? `${r.resposta.trim()}\n\n${vitrine}` : r.resposta, msgId)
+  const quente = leadQuente({ etiquetas: c.etiquetas, status_lead: c.status_lead, perfil: r.lead.perfil, jid, pedidosDigitais: cfg.pedidosDigitais, propostas: (cfg as { propostasProntas?: { jid: string; status: string; em: string; enviadaEm?: string }[] }).propostasProntas })
+  const env = await enviar(c, querVitrine ? `${r.resposta.trim()}\n\n${vitrine}` : r.resposta, msgId, { essencial: quente })
   await pequeno(env.ids.length > 0)
   // Orçamento digital enviado: o pedido fica esperando o sinal (o anterior desta conversa, se havia, é trocado)
   if (novoPedido && env.ids.length) {

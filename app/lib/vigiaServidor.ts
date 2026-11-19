@@ -106,12 +106,13 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
   const { quemEspera, tempoEspera } = await import("./esperando")
   const { data } = await supabase.from("whatsapp_conversas").select("jid, nome, etiquetas, status_lead, ultima_msg, ultima_recebida_at, ultima_enviada_at, proxima_acao, fechada_em")
     .not("jid", "like", "%@g.us").gte("ultima_recebida_at", new Date(agora.getTime() - 3 * 86_400_000).toISOString()).limit(800)
-  const lista = quemEspera((data ?? []) as never, agora.getTime())
+  // Lead quente primeiro (bom negócio, digital com pedido), depois quem espera há mais tempo
+  const lista = quemEspera((data ?? []) as never, agora.getTime()).sort((a, b) => (b.peso ?? 0) - (a.peso ?? 0) || b.minutos - a.minutos)
   if (!lista.length) return "ninguém"
   // O agente tenta (até 3 por rodada; uma vez por mensagem), mas só com folga na cota de envios da hora: quem acabou
   // de chegar tem prioridade (o atrasado nunca pode tirar a vez de um lead novo nem estourar o limite do número)
   const enviosHora = ((cfg as { agenteEnviosHora?: string[] }).agenteEnviosHora ?? []).filter(t => agora.getTime() - new Date(t).getTime() < 3_600_000).length
-  const folga = Math.max(0, Math.min(3, 45 - enviosHora))   // limite de respostas: 60/h; sobram 15 para quem acabou de chegar
+  const folga = Math.max(0, Math.min(6, 100 - enviosHora))   // limite de respostas: 120/h; sobram 20 para quem acabou de chegar
   const { responderSozinho } = await import("./agenteAuto")
   const tentou = new Set(cfg.vigiaTentou ?? [])
   const novasTentativas: string[] = []
