@@ -20,6 +20,8 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
 
   // Lições novas da base de conhecimento valem antes de responder a fila (barato: só grava quando a versão muda)
   await import("./agenteAprende").then(m => m.revisarConhecimento()).catch(() => null)
+  // 0. Lead rebaixado para digital/pequeno que ficou com o status MQL antigo: sai de MQL (o que você marcou à mão fica)
+  out.mqlCorrigidos = await corrigirMqlRebaixado(cfg).catch(e => String(e))
   // 1. Recuperação de quem ficou sem resposta (IA fora, cota cheia), bons negócios primeiro
   const vagas = { n: vagasDaRodada(cfg, agora) }
   const despachadas = new Set<string>()
@@ -90,6 +92,14 @@ async function fecharOObvio(agora: Date) {
   await supabase.from("whatsapp_conversas").update({ fechada_em: em }).in("jid", fechar.map(f => f.jid))
   await mudarConfig((d: Cfg & { fechadasPelaIA?: { jid: string; motivo: string; em: string }[] }) => ({ fechadasPelaIA: [...fechar.map(f => ({ ...f, em })), ...(d.fechadasPelaIA ?? [])].slice(0, 300) }))
   return fechar.length
+}
+
+async function corrigirMqlRebaixado(cfg: Cfg) {
+  const { data } = await supabase.from("whatsapp_conversas").select("jid").eq("status_lead", "mql").overlaps("etiquetas", ["Lead pequeno", "Digital"]).limit(200)
+  const manual = (cfg as { leadManual?: Record<string, string> }).leadManual ?? {}
+  const jids = (data ?? []).map(c => c.jid as string).filter(j => !manual[j])
+  if (jids.length) await supabase.from("whatsapp_conversas").update({ status_lead: null }).in("jid", jids)
+  return jids.length
 }
 
 // ── Recuperação (lógica de atendimento quando a IA volta) ───────────────────

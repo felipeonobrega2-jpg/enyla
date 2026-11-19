@@ -81,6 +81,11 @@ const LOTES: { v: number; ideias: string[] }[] = [
     "Painel: juntar as listas de ação repetidas no topo (Para resolver agora, Precisa de você, Propostas) numa lista só.",
     "Parceiros ENYLA: os valores das notificações da página (R$ 2.480 / R$ 1.150) são ilustração; avaliar colocar um \"exemplo\" discreto e confirmar a promessa \"pagamento combinado antes de começar\". Trocar a foto do Unsplash por uma foto real da produção da ENYLA quando tiver.",
   ] },
+  { v: 10, ideias: [
+    // 19/11, anotadas a pedido seu
+    "Digital maior que A3: pedir à Villa a tabela de preço para folha maior (SRA3 32×45 ou 33×48) e colocar no sistema. Hoje caixa que aberta passa do A3 (ex.: café 15×12×8, Master Bacth) fica \"sem preço na tabela\" e cai para você consultar; com a tabela, a IA cota sozinha.",
+    "Proposta pronta na sua conversa: quando você responde um bom negócio e o cliente manda o dado que faltava (medida, quantidade, acabamento), o sistema lê, monta a proposta e ela volta para o topo da sua lista com \"Enviar\" (caso Samuel). Você só confirma.",
+  ] },
 ]
 
 // Gastos fixos que o sistema põe uma vez (marca no servidor); apagou ou editou, não volta

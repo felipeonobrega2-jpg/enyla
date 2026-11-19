@@ -671,7 +671,8 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   const pequeno = async (orientado: boolean) => {
     if (!organiza || r.lead.perfil !== "pequeno") return
     // Você vende em digital: etiqueta Digital, fica aberto (não vai para Descartado)
-    if (auto.pequenoParceiro === false) { const o = organizarLead(c.etiquetas ?? [], "pequeno", true); return aplicar(c, o.etiquetas, o.etapa) }
+    // Digital: tira também o status MQL antigo (19/11, Master Bacth ficou "MQL" com etiqueta Lead pequeno)
+    if (auto.pequenoParceiro === false) { const o = organizarLead(c.etiquetas ?? [], "pequeno", true); return aplicarStatus(c, o.etiquetas, c.status_lead === "mql" ? null : undefined) }
     if (orientado || log.some(l => l.enviou && l.perfil === "pequeno")) return organizar(c, "pequeno")
     return aplicar(c, [...(c.etiquetas ?? []).filter(e => !ehEtiquetaDoAgente(e) || e.startsWith("F")), ETIQUETA_PERFIL.pequeno!], null)
   }
