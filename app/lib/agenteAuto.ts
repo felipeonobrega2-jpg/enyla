@@ -527,7 +527,14 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   const manualRecente = await voceNaConversa(jid, log, cfg)
   if (manualRecente) return
 
-  const a = await atender(jid, { cfg, automatico: true, ...(coletandoMql ? { coletandoMql } : {}) }).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
+  // Atrasada: a IA sabe quanto tempo passou e responde ligada ao resto da conversa (19/11: respostas da recuperação
+  // soavam soltas, como se a mensagem tivesse acabado de chegar)
+  let atrasoMin: number | undefined
+  if (opts.atrasada) {
+    const { data: m } = await supabase.from("whatsapp_mensagens").select("ts").eq("id", msgId).maybeSingle()
+    if (m?.ts) atrasoMin = Math.round((Date.now() - new Date(m.ts as string).getTime()) / 60_000)
+  }
+  const a = await atender(jid, { cfg, automatico: true, ...(coletandoMql ? { coletandoMql } : {}), ...(atrasoMin ? { atrasoMin } : {}) }).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
   if (!a.ok) {
     if (ehSemCredito(a.erro)) {
       await avisarSemCredito(cfg)
@@ -614,7 +621,8 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     const ultimaDele = [...conversa.mensagens].reverse().find(m => !m.from_me)
     const esperou = ultimaDele?.ts ? Date.now() - new Date(ultimaDele.ts).getTime() : 0
     const jaPediu = conversa.mensagens.some(m => m.from_me && /desculp/i.test(m.corpo ?? "") && m.ts && Date.now() - new Date(m.ts).getTime() < 86_400_000)
-    if (esperou >= 3_600_000 && !jaPediu) r.resposta = comDesculpa(r.resposta)
+    // A IA já recebe o atraso e decide a desculpa no texto; aqui só garante quando ela esqueceu numa espera longa (3 h+)
+    if (esperou >= 3 * 3_600_000 && !jaPediu && !/desculp|perd[aã]o/i.test(r.resposta)) r.resposta = comDesculpa(r.resposta)
   }
   const ctx = contexto(cfg, log, jid)
   for (const p of novoGrupo ?? (novoPedido ? [novoPedido] : [])) ctx.precosDoFiltro.push(...valoresDoPedido(p))
