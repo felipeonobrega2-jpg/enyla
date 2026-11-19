@@ -98,7 +98,7 @@ async function fecharOObvio(agora: Date) {
 // Ordem: lead quente (MQL/ICP/Oportunidade/médio, pedido digital, proposta enviada), digital, quem espera há mais
 // tempo. Quem já foi respondido sai. O que falhar de novo (IA fora, cota cheia) volta para a fila sozinho.
 // O "já te respondo" automático não conta como resposta (ehMensagemAutomaticaDoWhatsapp).
-const POR_RODADA = 8
+const POR_RODADA = 3   // 8 em paralelo engasgou o banco (19/11); 3 a cada 3 min é ~60 por hora
 const HORAS_FILA = 48
 const vagasDaRodada = (cfg: Cfg, agora: Date) => {
   const enviosHora = ((cfg as { agenteEnviosHora?: string[] }).agenteEnviosHora ?? []).filter(t => agora.getTime() - new Date(t).getTime() < 3_600_000).length
@@ -108,7 +108,7 @@ const vagasDaRodada = (cfg: Cfg, agora: Date) => {
 
 async function despachar(msgId: string, ordem: number) {
   const r = await fetch(`${LINK_SISTEMA}/api/whatsapp/webhook/responder?token=${encodeURIComponent(process.env.WHATSAPP_WEBHOOK_SECRET ?? "")}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ msgId, atrasada: true, atrasoSeg: ordem * 6 }), signal: AbortSignal.timeout(8000),
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ msgId, atrasada: true, atrasoSeg: ordem * 12 }), signal: AbortSignal.timeout(8000),
   }).catch(() => null)
   return !!r?.ok
 }

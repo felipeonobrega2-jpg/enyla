@@ -396,24 +396,24 @@ async function segurarSemIA(c: Conversa, msgId: string) {
   })
   if (!ja && !nossas?.length) await enviar(c, TEXTO_SEM_IA).catch(() => null)
 }
+// Trava da resposta atrasada na tabela agente_tratadas (leve), não no AppConfig: com várias respostas ao mesmo tempo,
+// regravar o AppConfig inteiro (600 KB) a cada trava engasgou o banco (19/11)
+const chaveAtrasada = (msgId: string, janela = Math.floor(Date.now() / 600_000)) => `atrasada:${msgId}:${janela}`
 async function reservarAtrasada(msgId: string) {
-  let minha = false
-  await mudarConfig((d: Record<string, unknown> & { agenteAtrasadas?: Record<string, string> }) => {
-    const agora = Date.now()
-    const m = Object.fromEntries(Object.entries(d.agenteAtrasadas ?? {}).filter(([, em]) => agora - new Date(em).getTime() < 10 * 60_000))
-    if (m[msgId]) return null
-    minha = true
-    return { agenteAtrasadas: { ...m, [msgId]: new Date(agora).toISOString() } }
-  })
-  return minha
+  const anterior = await reservarTratada(chaveAtrasada(msgId, Math.floor(Date.now() / 600_000) - 1))
+  if (anterior === false) return false   // a janela anterior (últimos 10 min) já pegou
+  if (anterior === true) await liberarTratada(chaveAtrasada(msgId, Math.floor(Date.now() / 600_000) - 1))
+  return (await reservarTratada(chaveAtrasada(msgId))) !== false
 }
 // Resposta atrasada que falhou de novo (IA ainda fora, cota cheia): volta para a fila, sem mandar nada ao lead
 async function voltarParaFila(jid: string, msgId: string) {
-  await mudarConfig((d: Record<string, unknown> & { agenteAtrasadas?: Record<string, string>; respostasPendentes?: { msgId: string; jid: string; em: string; segurou?: boolean }[] }) => {
+  // libera a trava: a próxima rodada tenta de novo
+  await liberarTratada(chaveAtrasada(msgId)).catch(() => null)
+  await liberarTratada(chaveAtrasada(msgId, Math.floor(Date.now() / 600_000) - 1)).catch(() => null)
+  await mudarConfig((d: Record<string, unknown> & { respostasPendentes?: { msgId: string; jid: string; em: string; segurou?: boolean }[] }) => {
     const fila = d.respostasPendentes ?? []
     const antes = fila.find(f => f.jid === jid)
-    const { [msgId]: _, ...travas } = d.agenteAtrasadas ?? {}   // libera a trava: a próxima rodada tenta de novo
-    return { agenteAtrasadas: travas, respostasPendentes: [...fila.filter(f => f.jid !== jid), { msgId, jid, em: antes?.em ?? new Date().toISOString(), segurou: true }].slice(-150) }
+    return { respostasPendentes: [...fila.filter(f => f.jid !== jid), { msgId, jid, em: antes?.em ?? new Date().toISOString(), segurou: true }].slice(-150) }
   })
 }
 
