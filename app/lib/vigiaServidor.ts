@@ -18,6 +18,8 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
   const out: Record<string, unknown> = {}
   const cfg = await lerCfg()
 
+  // Lições novas da base de conhecimento valem antes de responder a fila (barato: só grava quando a versão muda)
+  await import("./agenteAprende").then(m => m.revisarConhecimento()).catch(() => null)
   // 1. Recuperação de quem ficou sem resposta (IA fora, cota cheia), bons negócios primeiro
   const vagas = { n: vagasDaRodada(cfg, agora) }
   const despachadas = new Set<string>()
@@ -96,16 +98,17 @@ async function fecharOObvio(agora: Date) {
 // Ordem: lead quente (MQL/ICP/Oportunidade/médio, pedido digital, proposta enviada), digital, quem espera há mais
 // tempo. Quem já foi respondido sai. O que falhar de novo (IA fora, cota cheia) volta para a fila sozinho.
 // O "já te respondo" automático não conta como resposta (ehMensagemAutomaticaDoWhatsapp).
-const POR_RODADA = 4
+const POR_RODADA = 8
 const HORAS_FILA = 48
 const vagasDaRodada = (cfg: Cfg, agora: Date) => {
   const enviosHora = ((cfg as { agenteEnviosHora?: string[] }).agenteEnviosHora ?? []).filter(t => agora.getTime() - new Date(t).getTime() < 3_600_000).length
-  return Math.max(0, Math.min(POR_RODADA, 100 - enviosHora))   // limite de respostas 120/h: 20 ficam para quem acabou de chegar
+  void enviosHora
+  return POR_RODADA   // sem teto por hora para responder: o espaçamento entre mensagens é o ritmo
 }
 
 async function despachar(msgId: string, ordem: number) {
   const r = await fetch(`${LINK_SISTEMA}/api/whatsapp/webhook/responder?token=${encodeURIComponent(process.env.WHATSAPP_WEBHOOK_SECRET ?? "")}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ msgId, atrasada: true, atrasoSeg: ordem * 10 }), signal: AbortSignal.timeout(8000),
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ msgId, atrasada: true, atrasoSeg: ordem * 6 }), signal: AbortSignal.timeout(8000),
   }).catch(() => null)
   return !!r?.ok
 }
@@ -126,10 +129,11 @@ async function recuperarFila(cfg: Cfg, agora: Date, vagas: { n: number }, despac
   const { leadQuente } = await import("./agenteAuto")
   const { data: convs } = await supabase.from("whatsapp_conversas").select("jid, etiquetas, status_lead").in("jid", fila.map(p => p.jid))
   const info = new Map((convs ?? []).map(c => [c.jid as string, c as { etiquetas: string[] | null; status_lead: string | null }]))
+  const { rankQualificacao } = await import("./esperando")
   const peso = (jid: string) => {
     const c = info.get(jid)
-    if (leadQuente({ etiquetas: c?.etiquetas, status_lead: c?.status_lead, jid, pedidosDigitais: cfg.pedidosDigitais as never, propostas: cfg.propostasProntas as never })) return 2
-    return (c?.etiquetas ?? []).includes("Digital") ? 1 : 0
+    const quente = leadQuente({ etiquetas: c?.etiquetas, status_lead: c?.status_lead, jid, pedidosDigitais: cfg.pedidosDigitais as never, propostas: cfg.propostasProntas as never })
+    return Math.max(rankQualificacao(c?.etiquetas, c?.status_lead), quente ? 3 : 0)
   }
   const ordem = [...fila].sort((a, b) => peso(b.jid) - peso(a.jid) || a.em.localeCompare(b.em))
   const sair = new Set<string>()
@@ -149,7 +153,7 @@ async function recuperarFila(cfg: Cfg, agora: Date, vagas: { n: number }, despac
     await mudarConfig((d: Cfg) => ({ respostasPendentes: [...(d.respostasPendentes ?? []).filter(p => p.jid !== v.p.jid), v.p] }))
   }
   vagas.n -= ok
-  return { fila: fila.length, despachadas: ok, quentes: vez.filter(v => peso(v.p.jid) === 2).length, jaRespondidas: sair.size - vez.length }
+  return { fila: fila.length, despachadas: ok, quentes: vez.filter(v => peso(v.p.jid) >= 3).length, jaRespondidas: sair.size - vez.length }
 }
 
 // ── Cobrador de promessas ───────────────────────────────────────────────────
@@ -208,7 +212,7 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
   if (cfg.agenteAuto?.horario && !dentroDoHorario(cfg.agenteAuto.horario as never)) return "fora do horário"
   const { quemEspera, tempoEspera } = await import("./esperando")
   const { data } = await supabase.from("whatsapp_conversas").select("jid, nome, etiquetas, status_lead, ultima_msg, ultima_recebida_at, ultima_enviada_at, proxima_acao, fechada_em")
-    .not("jid", "like", "%@g.us").gte("ultima_recebida_at", new Date(agora.getTime() - 3 * 86_400_000).toISOString()).limit(800)
+    .not("jid", "like", "%@g.us").gte("ultima_recebida_at", new Date(agora.getTime() - 7 * 86_400_000).toISOString()).limit(1000)
   // O "já te respondo" automático não é resposta: a conversa segue esperando (com o peso dela)
   const { ehSeguraSemIA } = await import("./agenteLeads")
   const convs = (data ?? []).map(c => ehSeguraSemIA(c.ultima_msg as string | null) ? { ...c, ultima_enviada_at: null, ultima_msg: "" } : c)
@@ -216,8 +220,9 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
   const lista = quemEspera(convs as never, agora.getTime()).sort((a, b) => (b.peso ?? 0) - (a.peso ?? 0) || b.minutos - a.minutos)
   if (!lista.length) return "ninguém"
   // O agente tenta uma vez por mensagem, nas vagas que a fila de recuperação deixou (cada uma numa função própria)
-  // vigiaTentouV2: as marcas antigas (de quando o vigia estourava o tempo sem responder ninguém) ficam para trás
-  const tentou = new Set((cfg as { vigiaTentouV2?: string[] }).vigiaTentouV2 ?? [])
+  // vigiaTentouV3 (19/11, "ninguém sem resposta"): cada mensagem esperando ganha uma tentativa com as regras novas,
+  // em que só segura o que nunca pode sair (preço fora da tabela, fala de robô, não é lead)
+  const tentou = new Set((cfg as { vigiaTentouV3?: string[] }).vigiaTentouV3 ?? [])
   const novasTentativas: string[] = []
   const respondidas = despachadas
   let ordem = despachadas.size
@@ -226,15 +231,10 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
     if (despachadas.has(e.jid)) continue
     const ult = await ultimaReal(e.jid)
     if (!ult || ult.from_me || tentou.has(ult.id)) continue
-    // O agente já olhou esta mensagem e decidiu (segurou para você, conversa sua, decisão sua): o aviso é seu.
-    // Só volta a tentar se o que segurou foi falha (IA fora, cota cheia) ou "conversa sua" (você parou há 3 h+).
-    const { data: m } = await supabase.from("whatsapp_mensagens").select("ts").eq("id", ult.id).maybeSingle()
-    const { data: reg } = m ? await supabase.from("agente_registro").select("motivo").eq("jid", e.jid).gte("em", m.ts).order("em", { ascending: false }).limit(1).maybeSingle() : { data: null }
-    if (reg && !/sem crédito|IA falhou|limite|fila de envio|conversa sua/i.test((reg as { motivo?: string }).motivo ?? "")) { novasTentativas.push(ult.id); continue }
     novasTentativas.push(ult.id)
     if (await despachar(ult.id, ordem)) { despachadas.add(e.jid); vagas.n--; ordem++ }
   }
-  if (novasTentativas.length) await mudarConfig((d: typeof cfg & { vigiaTentouV2?: string[] }) => ({ vigiaTentouV2: [...novasTentativas, ...(d.vigiaTentouV2 ?? [])].slice(0, 400) }))
+  if (novasTentativas.length) await mudarConfig((d: typeof cfg & { vigiaTentouV3?: string[] }) => ({ vigiaTentouV3: [...novasTentativas, ...(d.vigiaTentouV3 ?? [])].slice(0, 600) }))
   // O resto é seu: aviso no WhatsApp (no máximo uma mensagem a cada 30 min; cada conversa a cada 3 h)
   const avisadas = cfg.esperaAvisada ?? {}
   const paraAvisar = lista.filter(e => !respondidas.has(e.jid) && (!avisadas[e.jid] || agora.getTime() - new Date(avisadas[e.jid]).getTime() > 3 * 3600_000) && (e.peso >= 2 || e.minutos >= 120))

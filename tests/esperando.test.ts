@@ -6,7 +6,7 @@ const min = (m: number) => new Date(agora - m * 60_000).toISOString()
 const c = (p: Record<string, unknown>) => ({ jid: "1@s.whatsapp.net", nome: "Ana", etiquetas: [], status_lead: null, ultima_msg: "Quanto fica?", ultima_recebida_at: min(40), ultima_enviada_at: min(60), ...p })
 
 describe("ninguém sem resposta", () => {
-  it("pega quem escreveu por último há 20+ min e prioriza bom negócio e digital", () => {
+  it("pega quem escreveu por último há 20+ min e ordena pela qualificação", () => {
     const r = quemEspera([
       c({ jid: "a", nome: "Mateus", etiquetas: ["Digital"], ultima_msg: "Fico no aguardo dos valores", ultima_recebida_at: min(1200), ultima_enviada_at: min(1202) }),
       c({ jid: "h", nome: "Auto", ultima_msg: "Olá! Seja muito bem-vindo(a) à Loja Exemplo!" }),
@@ -19,7 +19,7 @@ describe("ninguém sem resposta", () => {
       c({ jid: "f", nome: "Fornec", etiquetas: ["Fornecedora"] }),
       c({ jid: "g", nome: "Volta", proxima_acao: JSON.stringify({ r: { momento: "com_ele" } }) }),
     ], agora)
-    expect(r.map(x => x.nome)).toEqual(["Mateus", "Bom"])
+    expect(r.map(x => x.nome)).toEqual(["Bom", "Mateus"])   // qualificação primeiro: MQL antes de digital
   })
 })
 

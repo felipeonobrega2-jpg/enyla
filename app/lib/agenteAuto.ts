@@ -196,7 +196,9 @@ export async function reservarVezDeEnviar(opcoes: { essencial?: boolean; proativ
     const desde = con?.aquecimentoV === 2 ? con.aquecerDesde : undefined
     const aquecendo = !!desde && agora - new Date(desde).getTime() < HORAS_AQUECENDO * 3_600_000
     const limite = Math.floor((aquecendo ? LIMITE_HORA_AQUECENDO : LIMITE_HORA) * (proativo ? FRACAO_PROATIVO : 1))
-    if (!essencial && lista.length >= limite) { res = { erro: `não enviou (limite de ${limite} por hora${proativo ? " para follow-up" : ""}${aquecendo ? ", aquecendo depois de conectar" : ""})` }; return null }
+    // Responder quem escreveu não tem teto por hora (só o espaçamento entre mensagens); o teto vale para o que a ENYLA
+    // puxa (follow-up, reativação, convite) e para o aquecimento logo depois de reconectar o número
+    if (!essencial && (proativo || aquecendo) && lista.length >= limite) { res = { erro: `não enviou (limite de ${limite} por hora${proativo ? " para follow-up" : ""}${aquecendo ? ", aquecendo depois de conectar" : ""})` }; return null }
     const ultima = Math.max(0, ...lista.map(t => new Date(t).getTime()))
     const vez = Math.max(agora, ultima + (INTERVALO_MIN_SEG + Math.random() * 7) * 1000)
     if (vez - agora > ESPERA_MAX_VEZ_SEG * 1000 && !essencial) { res = { erro: "não enviou (fila de envio cheia)" }; return null }
@@ -428,7 +430,6 @@ export function comDesculpa(texto: string): string {
 // atrasada: resposta que não saiu na hora (ex.: IA sem crédito). Sai já, sem a espera, mesmo que a mensagem já
 // tenha sido "reservada" pela tentativa que falhou, e começa pedindo desculpa pela demora. As travas são as de sempre
 // (cliente antigo, conversa sua, MQL, limites): só muda o tempo e a primeira frase.
-const HORAS_VOCE_ATRASADA = 3
 export async function responderSozinho(msgId: string, opts: { atrasada?: boolean } = {}) {
   const cfg = await lerCfg()
   const auto = cfg.agenteAuto
@@ -471,14 +472,17 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     // Até o Felipe ter tudo para orçar com precisão (medida, quantidade, foto/referência, acabamento, modelos, arte).
     // Teto: depois de muitas perguntas sem fechar, a conversa volta para você (não vira interrogatório).
     const falta = pediuMedida ? null : faltaParaOrcar(antes)
-    if (!falta || perguntasLevantando(cfg, jid) >= MAX_PERGUNTAS_MQL) { await talvezPropostaDoMql(jid).catch(() => null); return }
-    coletandoMql = falta
+    if (!falta || perguntasLevantando(cfg, jid) >= MAX_PERGUNTAS_MQL) {
+      await talvezPropostaDoMql(jid).catch(() => null)
+      if (!opts.atrasada) return   // esperando há 20+ min: o agente responde (sem preço) e a proposta segue com você
+    } else coletandoMql = falta
   }
-  if (!conversaNova) return
+  if (!conversaNova && !opts.atrasada) return
   // Você escreveu nesta conversa nas últimas 24 h (celular ou tela do sistema): a conversa é sua, o agente não entra.
   // Lead do digital é a exceção: esse é todo do agente.
-  // Recuperação (atrasada): o lead está esperando e você não mexe na conversa há HORAS_VOCE_ATRASADA: o agente assume
-  if (!(c.etiquetas ?? []).includes(ETIQUETAS_AGENTE.digital) && await voceAtende(jid, cfg, opts.atrasada ? HORAS_VOCE_ATRASADA : 24))
+  // Atrasada (o cliente esperou 20+ min e ninguém respondeu): ninguém fica sem resposta, o agente responde mesmo
+  // em conversa sua (só não entra se você escreveu nos últimos minutos: voceNaConversa, abaixo)
+  if (!opts.atrasada && !(c.etiquetas ?? []).includes(ETIQUETAS_AGENTE.digital) && await voceAtende(jid, cfg))
     return registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: "indefinido", enviou: false, texto: "", motivo: "conversa sua (você escreveu nas últimas 24 h)" })
 
   const log = (cfg.agenteLog ?? []).filter(l => l.jid === jid)
@@ -596,6 +600,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     conversaNova, clienteCadastrado: conversa.clienteCadastrado, manualRecente, emMql: false, ...ctx,
     // Lead bom ainda sem quantidade e medida: o agente segue levantando até a proposta poder ser montada
     coletando: levantando,
+    naoDeixarEsperando: !!opts.atrasada,
   })
   // Lead pequeno só vai para Descartado depois de orientado (senão sumiria da sua lista sem resposta)
   const organiza = !conversa.clienteCadastrado && r.lead.perfil !== "nao_lead"

@@ -15,7 +15,17 @@ const AUTOMATICA = /seja (muito )?bem[- ]?vind|(é|e) um prazer ter voc|agradece
 const ELE_VAI = /\b(vou (providenciar|mandar|enviar|ver|medir|falar|conversar|pensar|passar|te (mandar|enviar|passar|falar))|(te|lhe) (mando|envio|passo|falo|retorno|respondo)|mando( (sim|já|ja|amanh[ãa]|depois|aí|ai))?|j[áa] (te )?mando|vou dar uma olhada|obrigad[oa] pela (aten[çc][ãa]o|ajuda|paci[êe]ncia)|assim que (eu )?(tiver|puder|chegar)|depois (eu )?(te )?(mando|falo|passo))\b/i
 const momento = (pa?: string | null) => { try { return (JSON.parse(pa ?? "") as { r?: { momento?: string } }).r?.momento ?? null } catch { return null } }
 
-export function quemEspera(convs: ConvEspera[], agora = Date.now(), minimoMin = 20, maximoDias = 3): Esperando[] {
+export function rankQualificacao(et: string[] | null | undefined, status?: string | null): number {
+  const e = et ?? []
+  if (e.includes("ICP")) return 5
+  if (e.includes("Oportunidade")) return 4
+  if (status === "mql" || e.includes("MQL") || e.includes("Lead médio")) return 3
+  if (e.includes("Digital")) return 2
+  if (e.includes("Lead pequeno")) return 1
+  return 0
+}
+
+export function quemEspera(convs: ConvEspera[], agora = Date.now(), minimoMin = 20, maximoDias = 7): Esperando[] {
   const out: Esperando[] = []
   for (const c of convs) {
     if (c.jid.includes("@g.us") || !c.ultima_recebida_at) continue
@@ -31,8 +41,8 @@ export function quemEspera(convs: ConvEspera[], agora = Date.now(), minimoMin = 
     if (mo === "com_ele" || mo === "sem_pressa" || mo === "nao_atende") continue
     const bom = c.status_lead === "mql" || et.some(e => /^(ICP|Oportunidade|Lead médio|MQL)$/.test(e))
     const digital = et.includes("Digital")
-    const pergunta = /\?|catálog|catalog|quanto|valor|preço|preco|orçament|orcament|aguardo/i.test(msg)
-    const peso = (bom ? 3 : 0) + (digital ? 2 : 0) + (pergunta ? 1 : 0) + Math.min(3, Math.floor(min / 120))
+    // Ordem pela qualificação (ICP > Oportunidade > MQL/médio > digital > o resto); no mesmo nível, quem espera há mais tempo
+    const peso = rankQualificacao(et, c.status_lead)
     out.push({ jid: c.jid, nome: c.nome ?? c.jid.split("@")[0], minutos: min, mensagem: msg.slice(0, 80), peso, rotulo: bom ? "bom negócio" : digital ? "digital" : "lead" })
   }
   return out.sort((a, b) => b.peso - a.peso || b.minutos - a.minutos)

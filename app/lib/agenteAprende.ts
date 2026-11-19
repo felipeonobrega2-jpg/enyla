@@ -224,6 +224,9 @@ async function medirEstiloFelipe() {
 
 // O que você ensinou direto (pediu ao Claude): entra uma vez, pela versão
 const ENSINADO: { v: number; item: Conhecimento }[] = [
+  // v16 (19/11, Mateus Hatzemberger: 2 ampolas por caixa ficou 2 dias como "decisão sua" e é caixa normal)
+  { v: 16, item: { id: "felipe-ampolas-lado-a-lado", tema: "produto", em: "2026-11-19T19:30:00.000Z",
+    texto: "Caixinha para 2 (ou mais) ampolas ou vials iguais, lado a lado, é caixa normal do digital (cartucho reto de triplex), não é kit nem berço. O blister de plástico que segura as ampolas é do cliente, não é da caixa. Cotação: a caixa leva as ampolas lado a lado (largura = soma dos diâmetros mais uma folga, altura = altura da ampola). Se já tenho a medida, mando o orçamento direto. Se não tenho, peço numa mensagem curta a altura e o diâmetro da ampola (ou a medida do blister) e já mando os valores. Nunca deixo esse cliente esperando por causa disso." } },
   // v15 (19/11: prazo do digital; frete só se o cliente perguntar)
   { v: 15, item: { id: "felipe-digital-prazo", tema: "prazo", em: "2026-11-19T13:00:00.000Z",
     texto: "Prazo de produção do digital (caixinhas impressas na Villa), contado depois do sinal pago e da arte aprovada: de 20 a 200 caixinhas, de 7 a 10 dias úteis; de 500 para cima, 14 dias úteis. Não falo de frete se o cliente não perguntar: responder o prazo não é hora de lembrar custo. Quando o cliente tem pressa, falo o prazo certo para a quantidade dele e, se a data não cabe, sugiro uma quantidade menor para sair mais rápido. Sábado a gente trabalha até meio-dia." } },
@@ -236,8 +239,8 @@ const ENSINADO: { v: number; item: Conhecimento }[] = [
   { v: 12, item: { id: "felipe-catalogo", tema: "venda", em: "2026-11-18T00:00:00.000Z",
     texto: "Quando pedem catálogo: não temos catálogo fechado porque tudo é feito sob medida para a marca do cliente. Mando o Instagram com os trabalhos (instagram.com/enyla.embalagens) e já pergunto para qual produto é e quantas caixinhas, para passar o valor certinho. Nunca deixo pedido de catálogo sem resposta." } },
   // v11 (18/11, pedido seu: o digital não pode travar e deixar o cliente esperando)
-  { v: 11, item: { id: "felipe-digital-nao-trava", tema: "venda", em: "2026-11-18T00:00:00.000Z",
-    texto: "No digital eu não deixo o cliente esperando por causa de um detalhe. Rótulo, selo, etiqueta, cor (dourado, preto, branco: na impressão digital é só cor), arte com logo, frasco pequeno de 3 ml ou 5 ml, medida própria do frasco: nada disso é motivo para parar. Mando o orçamento da caixa normal e, se o cliente pediu algo a mais (ex.: rótulo), digo que esse item eu vejo e já passo o valor à parte. Se falta a quantidade ou o tamanho (ml ou altura e largura do frasco), pergunto só o que falta, numa mensagem curta. Decisão só minha, e aí sim seguro: caixa cartonada ou rígida, berço, kit com mais de um frasco, hot stamping, verniz localizado, relevo, ou quantidade acima da tabela do digital." } },
+  { v: 16, item: { id: "felipe-digital-nao-trava", tema: "venda", em: "2026-11-18T00:00:00.000Z",
+    texto: "No digital eu não deixo o cliente esperando por causa de um detalhe. Rótulo, selo, etiqueta, cor (dourado, preto, branco: na impressão digital é só cor), arte com logo, frasco pequeno de 3 ml ou 5 ml, medida própria do frasco: nada disso é motivo para parar. Mando o orçamento da caixa normal e, se o cliente pediu algo a mais (ex.: rótulo), digo que esse item eu vejo e já passo o valor à parte. Se falta a quantidade ou o tamanho (ml ou altura e largura do frasco), pergunto só o que falta, numa mensagem curta. Decisão só minha, e aí sim seguro: caixa cartonada ou rígida, berço interno de papel, kit com produtos diferentes, hot stamping, verniz localizado, relevo, ou quantidade acima da tabela do digital." } },
   // v10 (18/11, pedido seu: nome e o seu "meu amigo"/"irmão" juntos; a v9 só falava do nome e tirou o seu jeito)
   { v: 10, item: { id: "felipe-chamar-pelo-nome", tema: "venda", em: "2026-11-18T00:00:00.000Z",
     texto: "Chamo as pessoas pelo nome ou do meu jeito: \"meu amigo\", \"meu irmão\", \"meu querido\" (com quem já tem intimidade, \"mano\", \"cara\"). É assim que eu falo e é o que faz parecer conversa de gente, não de atendimento. Alterno: no cumprimento uso o nome (\"Oi, Ana, tudo bem?\") ou o meu jeito (\"Fala, meu amigo, tudo bem?\"), e no meio da conversa volto a chamar de vez em quando, principalmente ao confirmar algo (\"Perfeito, meu amigo\") ou numa pergunta importante (\"Ana, consegue me mandar a medida do frasco?\"), sem repetir em toda mensagem. Apelido também vale (Cadu, Dudu): é até melhor, mais próximo. O nome certo vem em cada atendimento como \"Nome para chamar\". Quando o contato não tem nome de pessoa (nome de loja, marca ou apelido estranho, como \"Comercial\" ou \"WSSACOLAS\"), não chamo a loja pelo nome nem invento: \"Oi, tudo bem?\". Se a pessoa disser como se chama na conversa, passo a usar esse nome. Contato sem nome de pessoa: \"meu amigo\" resolve." } },
@@ -245,8 +248,8 @@ const ENSINADO: { v: number; item: Conhecimento }[] = [
   { v: 8, item: { id: "felipe-500-de-cada", tema: "preco", em: "2026-11-16T00:00:00.000Z",
     texto: "500 unidades de cada tamanho é uma quantidade ruim: fica cara tanto na impressão digital quanto no offset, porque o offset precisa rodar pelo menos 1.000 folhas para valer a pena. Quando o cliente pedir por volta de 500 de cada tamanho (ou de cada modelo de caixa), ofereço as duas saídas: diminuir a quantidade e fazer na impressão digital, ou subir para pelo menos 1.000 de cada tamanho no offset, onde o unitário cai bastante. Não cotar 500 de cada sem apresentar essas duas opções." } },
   // v7 (12/11, conversa com o Carlos Júnior)
-  { v: 7, item: { id: "felipe-cartonada", tema: "produto", em: "2026-11-12T00:00:00.000Z",
-    texto: "Caixa cartonada é outra coisa: papelão revestido, rígida, com aspecto de caixa de iPhone; bem mais cara que o cartucho de triplex. Berço interno, divisória, kit com mais de um frasco ou ampola, verniz localizado e hot stamping também fogem do digital padrão (um frasco por caixa, triplex 300 g). Quando o cliente pede ou manda foto disso, quem orça sou eu: não prometo que faço nem passo preço do digital, digo que vou ver o melhor formato e já falo." } },
+  { v: 16, item: { id: "felipe-cartonada", tema: "produto", em: "2026-11-12T00:00:00.000Z",
+    texto: "Caixa cartonada é outra coisa: papelão revestido, rígida, com aspecto de caixa de iPhone; bem mais cara que o cartucho de triplex. Berço interno de papel, divisória, kit com produtos diferentes juntos (frasco + sabonete, por exemplo), verniz localizado e hot stamping também fogem do digital padrão (cartucho de triplex 300 g). Duas ou mais ampolas iguais lado a lado na mesma caixa NÃO é kit: é cartucho normal. Quando o cliente pede ou manda foto disso, quem orça sou eu: não prometo que faço nem passo preço do digital, digo que vou ver o melhor formato e já falo." } },
   // v6 (12/11, termos do pedido digital, aceitos na página antes do sinal)
   // v5 (12/11, conversa com o Will)
   { v: 5, item: { id: "felipe-medida-por-foto", tema: "produto", em: "2026-11-12T00:00:00.000Z",
@@ -267,7 +270,7 @@ const ENSINADO: { v: number; item: Conhecimento }[] = [
   { v: 2, item: { id: "felipe-cigarro", tema: "recusa", em: "2026-11-07T00:00:00.000Z",
     texto: "Não trabalhamos com embalagem de cigarro (maço, caixa de cigarro, tabaco). Se o lead pedir, diga com educação que esse tipo de embalagem a gente não faz e não siga com o orçamento." } },
 ]
-async function revisarConhecimento() {
+export async function revisarConhecimento() {
   const ultima = Math.max(1, ...ENSINADO.map(e => e.v))
   await mudarConfig((d: Record<string, unknown> & { conhecimentoAgente?: Conhecimento[]; agenteRevisaoConhecimento?: number }) => {
     const v = d.agenteRevisaoConhecimento ?? 0

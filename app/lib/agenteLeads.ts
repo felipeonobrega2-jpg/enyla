@@ -111,6 +111,9 @@ export type ContextoEnvio = {
   jaEncerrouPequeno: boolean  // o agente já explicou e indicou o parceiro para este lead pequeno
   emMql?: boolean             // já está em MQL: daqui em diante quem atende é você
   precosDoFiltro: string[]    // valores em R$ que estão escritos no filtro (os únicos que podem sair)
+  // Ninguém sem resposta: o cliente já esperou (20+ min) e você não respondeu. Só seguram o que não pode sair nunca
+  // (não é lead, preço fora da tabela, fala de sistema/robô, resposta enorme); o resto sai e vira aviso para você
+  naoDeixarEsperando?: boolean
 }
 
 // Valores em reais citados num texto ("R$ 0,85", "R$500", "0,85 centavos")
@@ -130,6 +133,10 @@ export function travaDoEnvio(c: ContextoEnvio): string | null {
   if (!c.ligado) return "modo automático desligado"
   if (!c.resposta.trim()) return "nada a responder"
   if (c.lead.perfil === "nao_lead") return "não é lead"
+  if (c.naoDeixarEsperando) {
+    if (c.manualRecente) return "você está nessa conversa agora"
+    return travaFirme(c)
+  }
   // Lead bom com tudo para orçar fica com você; ainda faltando dado, o agente continua levantando (sem passar preço)
   if (c.emMql && !c.coletando) return "MQL: você atende"
   if (ehQualificado(c.lead.perfil) && !c.coletando) return "bom negócio: foi para MQL, você atende"
@@ -140,6 +147,10 @@ export function travaDoEnvio(c: ContextoEnvio): string | null {
   if (!c.podeSozinho) return "a IA pediu para você decidir"
   if (c.enviadasHoje >= c.maxPorDia) return `já respondeu ${c.enviadasHoje}× hoje`
   if (c.jaEncerrouPequeno && c.lead.perfil === "pequeno") return "lead pequeno já foi orientado"
+  return travaFirme(c)
+}
+// O que nunca sai, nem para não deixar esperando
+function travaFirme(c: ContextoEnvio): string | null {
   if (c.resposta.length > 900) return "resposta longa demais"
   // Você é o Felipe: nunca fala de sistema, automático, robô ou IA para o cliente
   if (FALA_DE_SISTEMA.test(c.resposta)) return "precisa de você: a resposta falava de sistema/automático"
