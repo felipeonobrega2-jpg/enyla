@@ -1,6 +1,7 @@
 "use client"
 
 import { CadastrosParceirosCard } from "./CadastrosParceirosCard"
+import { CaptacaoParceirosCard } from "./CaptacaoParceirosCard"
 import React from "react"
 import {
   Factory, Clock, AlertTriangle, Gauge, History, PackageCheck, Plus, Trash2, Send, ChevronDown, Wrench, SlidersHorizontal, Save, Check, MapPin, Mail,
@@ -943,6 +944,7 @@ export function FornecedoresView({ config, kanban, lancamentos, historico, onSav
 
       <div key={aba} className="animate-[apple-slide-up_.22s_ease-out]">
         {aba === "desempenho" && <CadastrosParceirosCard onAprovar={f => { const p = { ...producao, fornecedores: [...producao.fornecedores, f] }; salvarProducao(p); setDraft(p) }} />}
+        {aba === "desempenho" && <CaptacaoParceirosCard />}
         {aba === "desempenho" && <PrazoProducaoCartao kanban={kanban} />}
         {aba === "desempenho" && <Desempenho producao={producao} pedidosOpcoes={pedidosOpcoes} todosPedidos={todosPedidos} salvar={salvarProducao} />}
         {aba === "cadastro" && <Cadastro draft={draft} setDraft={setDraft} fornecedoresFin={(config.fornecedores ?? []).filter(f => f.ativo)} />}

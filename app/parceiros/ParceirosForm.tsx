@@ -123,6 +123,17 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
   const [sub, setSub] = useState(0)                // Detalhes: um serviço por vez
   const trocando = useRef(false)
 
+  // Convite do Captador (?c=…): marca que abriu e acompanha até o envio
+  const convite = useRef<string | null>(null)
+  useEffect(() => {
+    const c = new URLSearchParams(window.location.search).get("c")
+    if (c && /^CV[A-Z0-9]{6,20}$/.test(c)) {
+      convite.current = c
+      try { localStorage.setItem("parceiros:convite", c) } catch { /* ok */ }
+      fetch("/api/parceiros/convite", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ c }) }).catch(() => {})
+    } else { try { convite.current = localStorage.getItem("parceiros:convite") } catch { /* ok */ } }
+  }, [])
+
   // Rascunho no aparelho (volta de onde parou)
   useEffect(() => { try { const r = JSON.parse(localStorage.getItem(RASCUNHO) ?? "null"); if (r?.d) { setD({ ...VAZIO, ...r.d }); if (typeof r.passo === "number" && r.passo >= 0 && r.passo < N) { setPasso(r.passo); if (typeof r.sub === "number") setSub(r.sub) } } } catch { /* sem rascunho */ } }, [])
   useEffect(() => { if (passo >= 0 && passo < N) try { localStorage.setItem(RASCUNHO, JSON.stringify({ d, passo, sub })) } catch { /* sem storage */ } }, [d, passo, sub])
@@ -205,6 +216,7 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
     setEnviando(true); setErroEnvio(null)
     const f = new FormData()
     f.set("dados", JSON.stringify(d)); f.set("site", site.current?.value ?? "")
+    if (convite.current) f.set("convite", convite.current)
     for (const a of arquivos) f.append("arquivos", a)
     try {
       const r = await fetch("/api/parceiros/cadastro", { method: "POST", body: f }).then(x => x.json())
