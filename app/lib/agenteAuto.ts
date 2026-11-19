@@ -187,7 +187,8 @@ export const ESPERA_MAX_VEZ_SEG = 20   // cabe no minuto da Vercel; passou disso
 
 // Lead quente: responde sempre, sem teto por hora (só o espaçamento natural)
 export function leadQuente(a: { etiquetas?: string[] | null; status_lead?: string | null; perfil?: string | null; jid: string; pedidosDigitais?: { jid: string; status: string; teste?: boolean }[]; propostas?: { jid: string; status: string; em: string; enviadaEm?: string }[] }) {
-  if (a.status_lead === "mql" || (a.etiquetas ?? []).some(e => /^(MQL|ICP|Oportunidade|Lead médio)$/.test(e))) return true
+  const rebaixado = (a.etiquetas ?? []).some(e => e === "Lead pequeno" || e === "Digital")
+  if ((a.status_lead === "mql" && !rebaixado) || (a.etiquetas ?? []).some(e => /^(MQL|ICP|Oportunidade|Lead médio)$/.test(e))) return true
   if (a.perfil && ["icp", "oportunidade", "medio"].includes(a.perfil)) return true
   if ((a.pedidosDigitais ?? []).some(p => p.jid === a.jid && !p.teste && ["aguardando_sinal", "sinal_pago", "arte", "producao"].includes(p.status))) return true
   return (a.propostas ?? []).some(p => p.jid === a.jid && p.status === "enviada" && Date.now() - new Date(p.enviadaEm ?? p.em).getTime() < 14 * 86_400_000)
@@ -504,7 +505,10 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   // MQL ainda sem tudo para orçar: o agente segue levantando (quantidade, medida, referência, acabamento) até ficar
   // pronto; com tudo, a proposta fica pronta e a conversa é sua
   let coletandoMql: string | null = null
-  if ((conversaNova && c.status_lead === "mql") || pediuMedida) {
+  // MQL de verdade: status mql que a classificação atual não rebaixou (etiqueta "Lead pequeno"/Digital vale mais que
+  // o status antigo; 19/11, Master Bacth: 100 un de amostra ficou como MQL e o agente prometeu orçamento do Felipe)
+  const mqlAtual = c.status_lead === "mql" && !(c.etiquetas ?? []).some(e => e === "Lead pequeno" || e === ETIQUETAS_AGENTE.digital)
+  if ((conversaNova && mqlAtual) || pediuMedida) {
     const { data: pa } = await supabase.from("whatsapp_conversas").select("proxima_acao").eq("jid", jid).maybeSingle()
     const antes = (() => { try { return (JSON.parse(pa?.proxima_acao ?? "") as { r?: { dados?: import("./atendente").DadosPedido } }).r?.dados ?? null } catch { return null } })()
     // Até o Felipe ter tudo para orçar com precisão (medida, quantidade, foto/referência, acabamento, modelos, arte).

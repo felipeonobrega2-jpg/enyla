@@ -19,7 +19,8 @@ export function rankQualificacao(et: string[] | null | undefined, status?: strin
   const e = et ?? []
   if (e.includes("ICP")) return 5
   if (e.includes("Oportunidade")) return 4
-  if (status === "mql" || e.includes("MQL") || e.includes("Lead médio")) return 3
+  const rebaixado = e.includes("Lead pequeno") || e.includes("Digital")   // classificação atual vale mais que o status antigo
+  if ((status === "mql" && !rebaixado) || e.includes("MQL") || e.includes("Lead médio")) return 3
   if (e.includes("Digital")) return 2
   if (e.includes("Lead pequeno")) return 1
   return 0
@@ -39,7 +40,7 @@ export function quemEspera(convs: ConvEspera[], agora = Date.now(), minimoMin = 
     if (FECHO.test(msg) || AUTOMATICA.test(msg) || ELE_VAI.test(msg)) continue
     const mo = momento(c.proxima_acao)
     if (mo === "com_ele" || mo === "sem_pressa" || mo === "nao_atende") continue
-    const bom = c.status_lead === "mql" || et.some(e => /^(ICP|Oportunidade|Lead médio|MQL)$/.test(e))
+    const bom = rankQualificacao(et, c.status_lead) >= 3
     const digital = et.includes("Digital")
     // Ordem pela qualificação (ICP > Oportunidade > MQL/médio > digital > o resto); no mesmo nível, quem espera há mais tempo
     const peso = rankQualificacao(et, c.status_lead)
