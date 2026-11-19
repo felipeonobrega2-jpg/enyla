@@ -166,10 +166,12 @@ async function marcarLida(c: Conversa, msgId?: string) {
 // Toda mensagem automática passa por aqui: no máximo LIMITE_HORA por hora (menos nas primeiras horas depois de
 // conectar de novo, o "aquecimento") e nunca duas a menos de INTERVALO_MIN_SEG uma da outra. O que passa do
 // limite não se perde: fica como "não enviou" e é tentado de novo nas próximas rodadas.
-const LIMITE_HORA = 40
+// Responder quem escreveu é o que menos parece robô: 60 por hora. O que a ENYLA puxa (follow-up, reativação,
+// convite de parceiro) fica em 24 por hora. Depois de reconectar, o aquecimento vale para tudo.
+const LIMITE_HORA = 60
 const LIMITE_HORA_AQUECENDO = 20
 const HORAS_AQUECENDO = 2
-const FRACAO_PROATIVO = 0.6        // follow-up e reativação só usam até 60% do limite: resposta a lead tem prioridade
+const FRACAO_PROATIVO = 0.4        // 24 por hora para o proativo: resposta a lead tem prioridade
 const INTERVALO_MIN_SEG = 8
 export const ESPERA_MAX_VEZ_SEG = 20   // cabe no minuto da Vercel; passou disso, tenta na próxima rodada
 
@@ -605,17 +607,13 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   }
   if (trava || velha) return registrar({ ...base, enviou: false, motivo: trava ?? "chegou mensagem nova enquanto preparava" + (r.motivo_alerta ? ` · ${r.motivo_alerta}` : "") })
 
-  const env = await enviar(c, r.resposta, msgId)
+  // Instagram na mesma mensagem da primeira resposta (um envio só: metade da cota e menos cara de robô)
+  const env = await enviar(c, querVitrine ? `${r.resposta.trim()}\n\n${vitrine}` : r.resposta, msgId)
   await pequeno(env.ids.length > 0)
   // Orçamento digital enviado: o pedido fica esperando o sinal (o anterior desta conversa, se havia, é trocado)
   if (novoPedido && env.ids.length) {
     const novos = novoGrupo ?? [novoPedido]
     await gravarCfg(d => ({ pedidosDigitais: [...novos, ...(d.pedidosDigitais ?? []).map(p => p.jid === jid && p.status === "aguardando_sinal" ? { ...p, status: "cancelado" as const } : p)].slice(0, 500) }))
-  }
-  // Instagram só se ainda cabe no minuto da Vercel (senão vai na próxima resposta)
-  if (env.ids.length && querVitrine && Date.now() - inicio < 47_000) {
-    const v = await mandarVitrine()
-    env.ids.push(...v.ids)
   }
   return registrar({ ...base, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? r.lead.motivo, ...(levantando ? { passo: PASSO_LEVANTANDO } : {}) })
 }

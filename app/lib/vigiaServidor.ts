@@ -111,19 +111,23 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
   // O agente tenta (até 3 por rodada; uma vez por mensagem), mas só com folga na cota de envios da hora: quem acabou
   // de chegar tem prioridade (o atrasado nunca pode tirar a vez de um lead novo nem estourar o limite do número)
   const enviosHora = ((cfg as { agenteEnviosHora?: string[] }).agenteEnviosHora ?? []).filter(t => agora.getTime() - new Date(t).getTime() < 3_600_000).length
-  const folga = Math.max(0, Math.min(3, 22 - enviosHora))
+  const folga = Math.max(0, Math.min(3, 45 - enviosHora))   // limite de respostas: 60/h; sobram 15 para quem acabou de chegar
   const { responderSozinho } = await import("./agenteAuto")
   const tentou = new Set(cfg.vigiaTentou ?? [])
   const novasTentativas: string[] = []
   const respondidas = new Set<string>()
+  let tentadas = 0
   for (const e of lista) {
-    if (novasTentativas.length >= folga) break
+    if (tentadas >= folga) break
     const { data: ult } = await supabase.from("whatsapp_mensagens").select("id, from_me").eq("jid", e.jid).order("criado_em", { ascending: false }).limit(1).maybeSingle()
     if (!ult || ult.from_me || tentou.has(ult.id)) continue
-    novasTentativas.push(ult.id)
+    tentadas++
     await responderSozinho(ult.id, { atrasada: e.minutos >= 60 }).catch(() => null)
     const { data: depois } = await supabase.from("whatsapp_mensagens").select("from_me").eq("jid", e.jid).order("criado_em", { ascending: false }).limit(1).maybeSingle()
-    if (depois?.from_me) respondidas.add(e.jid)
+    if (depois?.from_me) { respondidas.add(e.jid); novasTentativas.push(ult.id); continue }
+    // Segurou pela cota cheia: não conta como tentativa (tenta de novo na próxima rodada)
+    const { data: reg } = await supabase.from("agente_registro").select("motivo").eq("jid", e.jid).order("em", { ascending: false }).limit(1).maybeSingle()
+    if (!/limite|fila de envio/.test((reg as { motivo?: string } | null)?.motivo ?? "")) novasTentativas.push(ult.id)
   }
   if (novasTentativas.length) await mudarConfig((d: typeof cfg) => ({ vigiaTentou: [...novasTentativas, ...(d.vigiaTentou ?? [])].slice(0, 400) }))
   // O resto é seu: aviso no WhatsApp (no máximo uma mensagem a cada 30 min; cada conversa a cada 3 h)
