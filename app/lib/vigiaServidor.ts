@@ -27,6 +27,8 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
   //     não for sua, as travas dele seguram); o que sobra vira aviso no seu WhatsApp (cada conversa no máximo a cada 3 h)
   out.fechadas = await fecharOObvio(agora).catch(e => String(e))
   out.esperando = await cuidarDeQuemEspera(cfg, agora, vagas, despachadas).catch(e => String(e))
+  // 1c. Orçamento prometido e não enviado: cobra você (2 h, depois a cada 4 h) até sair
+  out.promessas = await cobrarPromessas(cfg, agora).catch(e => String(e))
 
   // 2. Rotina (dias de trabalho do agente): 13h checagem, 18h fechamento
   const sp = new Date(agora.getTime() - 3 * 3600_000)
@@ -148,6 +150,50 @@ async function recuperarFila(cfg: Cfg, agora: Date, vagas: { n: number }, despac
   }
   vagas.n -= ok
   return { fila: fila.length, despachadas: ok, quentes: vez.filter(v => peso(v.p.jid) === 2).length, jaRespondidas: sair.size - vez.length }
+}
+
+// ── Cobrador de promessas ───────────────────────────────────────────────────
+// "Vou preparar o orçamento e te mando" e o orçamento não saiu: o lead agradece, fica quieto e fecha em outro lugar.
+// A cada 15 min, nas conversas dos últimos 3 dias, acha a promessa em aberto e cobra você no WhatsApp e no celular.
+async function cobrarPromessas(cfg: Cfg & { promessasEm?: string; promessasCobradas?: Record<string, string> }, agora: Date) {
+  if (cfg.promessasEm && agora.getTime() - new Date(cfg.promessasEm).getTime() < 15 * 60_000) return null
+  const { dentroDoHorario } = await import("./agenteLeads")
+  const h = (cfg.agenteAuto as { horario?: unknown } | undefined)?.horario
+  await mudarConfig(() => ({ promessasEm: agora.toISOString() }))
+  if (h && !dentroDoHorario(h as never)) return "fora do horário"
+  const { promessaAberta, deveCobrar } = await import("./promessas")
+  const { data: convs } = await supabase.from("whatsapp_conversas").select("jid, nome, etiquetas, status_lead").not("jid", "like", "%@g.us")
+    .gte("ultima_enviada_at", new Date(agora.getTime() - 3 * 86_400_000).toISOString()).order("ultima_enviada_at", { ascending: false }).limit(200)
+  const cobradas = cfg.promessasCobradas ?? {}
+  const cobrar: { jid: string; nome: string; horas: number; texto: string; bom: boolean; chave: string }[] = []
+  for (const c of convs ?? []) {
+    const et = (c.etiquetas ?? []) as string[]
+    if (et.some(e => /fornecedor|descartado/i.test(e)) || ["descartado", "perdido"].includes(c.status_lead ?? "")) continue
+    const { data: ms } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo, tipo").eq("jid", c.jid).order("ts", { ascending: false }).limit(25)
+    const p = promessaAberta((ms ?? []) as never, agora.getTime())
+    if (!p) continue
+    const chave = `${c.jid}|${p.msgId}`
+    if (!deveCobrar(p, cobradas[chave], agora.getTime())) continue
+    const bom = c.status_lead === "mql" || et.some(e => /^(MQL|ICP|Oportunidade|Lead médio)$/.test(e))
+    cobrar.push({ jid: c.jid, nome: (c.nome as string | null) ?? c.jid.split("@")[0], horas: p.horas, texto: p.texto, bom, chave })
+  }
+  if (!cobrar.length) return { cobradas: 0 }
+  cobrar.sort((a, b) => Number(b.bom) - Number(a.bom) || b.horas - a.horas)
+  const linhas = cobrar.slice(0, 8).map(x => `• *${x.nome}*${x.bom ? " (bom negócio)" : ""}, prometido há ${x.horas} h: “${x.texto.replace(/\s+/g, " ").slice(0, 90)}”`)
+  const texto = `🔴 *Orçamento prometido e ainda não enviado (${cobrar.length})*\n${linhas.join("\n")}${cobrar.length > 8 ? `\n… e mais ${cobrar.length - 8}` : ""}\n\nCada hora sem o orçamento é chance de o lead fechar em outro lugar.\n${LINK_SISTEMA}/?aba=painel`
+  const { evo } = await import("./evolution")
+  const { seuNumero } = await import("./agenteAuto")
+  const destino = ((cfg.agenteAuto as { avisoNumero?: string } | undefined)?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
+  if (destino) await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: texto }) }).catch(() => null)
+  await notificar(`Orçamento prometido não enviado (${cobrar.length})`, cobrar.slice(0, 4).map(x => `${x.nome} há ${x.horas} h`).join(" · "), { prioridade: "urgente", tags: ["rotating_light"], link: `${LINK_SISTEMA}/?aba=painel` }).catch(() => null)
+  const em = agora.toISOString()
+  await mudarConfig((d: typeof cfg) => {
+    const m = { ...(d.promessasCobradas ?? {}) }
+    for (const x of cobrar) m[x.chave] = em
+    for (const [k, v] of Object.entries(m)) if (agora.getTime() - new Date(v).getTime() > 4 * 86_400_000) delete m[k]
+    return { promessasCobradas: m }
+  })
+  return { cobradas: cobrar.length }
 }
 
 async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvisada?: Record<string, string>; esperaAvisoEm?: string; agenteAuto?: { horario?: { dias?: number[]; inicio?: string; fim?: string }; avisoNumero?: string } }, agora: Date, vagas: { n: number }, despachadas: Set<string>) {
