@@ -1,3 +1,4 @@
+import { reservarTratada } from "@/app/lib/registroAgente"
 import { NextRequest, NextResponse, after } from "next/server"
 import { transcreverPendentes } from "@/app/lib/transcricao"
 import { registrarConexao, registrarRecibos, registrarContatos } from "@/app/lib/whatsappEventos"
@@ -40,8 +41,11 @@ export async function POST(req: NextRequest) {
     // Tarefas periódicas pegam carona nos eventos, mas no máximo 1 vez por minuto (por instância) e só em mensagem
     // nova ou mudança de conexão. Antes rodavam em todo evento (inclusive cada "lida"/"entregue"), e cada uma lê a
     // configuração inteira: com muito volume isso sufocava o banco (12/11: leitura simples levando 20-120 s).
-    if ((event === "messages.upsert" || event === "connection.update") && Date.now() - ultimaRodada > 60_000) {
-      ultimaRodada = Date.now()
+    // 19/11: "1 vez por minuto por instância" não bastava: com muito lead a Vercel abre várias instâncias e cada uma
+    // rodava as ~25 tarefas (cada uma lendo o AppConfig de 600 KB). Agora é 1 vez a cada 5 min no sistema todo
+    // (trava na tabela leve agente_tratadas, uma linha por janela de 5 min).
+    if ((event === "messages.upsert" || event === "connection.update") && Date.now() - ultimaRodada > 60_000
+      && (ultimaRodada = Date.now()) && await reservarTratada(`carona:${Math.floor(Date.now() / 300_000)}`).catch(() => false) !== false) {
       // Follow-ups do agente de leads pegam carona nos eventos (no máximo uma rodada a cada 10 min)
       after(() => talvezFollowUps().catch(e => console.error("[agente follow-up]", e)))
       // Lead que respondeu enquanto você estava na conversa e ficou sem resposta: o agente retoma
