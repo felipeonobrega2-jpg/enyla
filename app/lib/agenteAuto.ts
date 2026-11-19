@@ -63,7 +63,7 @@ export async function lerCfg() {
   return cfg
 }
 
-export async function gravarCfg(mudar: (d: Record<string, unknown> & CfgAgente) => Partial<CfgAgente>) {
+export async function gravarCfg(mudar: (d: Record<string, unknown> & CfgAgente) => Partial<CfgAgente> | null) {
   await mudarConfig(d => mudar(d as Record<string, unknown> & CfgAgente))
 }
 
@@ -73,9 +73,17 @@ export const registrar = async (r: Registro) => {
   return gravarCfg(d => {
     const defs = [...(d.etiquetasWhatsapp ?? [])]
     for (const [nome, cor] of Object.entries(COR_ETIQUETA_AGENTE)) if (!defs.some(e => e.nome === nome)) defs.push({ nome, cor })
+    // Só regrava o AppConfig (600 KB) quando algo mudou de verdade: passo, motivo de segurar, etiqueta nova, ou o
+    // marco tem 6 h+. Regravar a cada registro estourou o disco do banco em 19/11 (tudo ficou lento)
+    const antes = d.agenteMarcos?.[r.jid]
+    const marcos = marcar(d.agenteMarcos ?? marcosDoRegistro(d.agenteLog ?? []), r)
+    const depois = marcos[r.jid]
+    const igual = !!antes && !!d.agenteMarcos && JSON.stringify(antes.passos ?? {}) === JSON.stringify(depois.passos ?? {})
+      && (antes.segurou?.motivo ?? null) === (depois.segurou?.motivo ?? null) && Date.now() - new Date(antes.em).getTime() < 6 * 3_600_000
+    if (naTabela && igual && defs.length === (d.etiquetasWhatsapp ?? []).length) return null
     return {
       etiquetasWhatsapp: defs, ...(naTabela ? {} : { agenteLog: [r, ...(d.agenteLog ?? [])].slice(0, MAX_REGISTROS) }),
-      agenteMarcos: marcar(d.agenteMarcos ?? marcosDoRegistro(d.agenteLog ?? []), r),
+      agenteMarcos: marcos,
     }
   })
 }
@@ -185,8 +193,35 @@ export function leadQuente(a: { etiquetas?: string[] | null; status_lead?: strin
   return (a.propostas ?? []).some(p => p.jid === a.jid && p.status === "enviada" && Date.now() - new Date(p.enviadaEm ?? p.em).getTime() < 14 * 86_400_000)
 }
 
+// Envios da última hora na tabela leve (linhas "envio:<horário>"): o AppConfig de 600 KB não é regravado a cada
+// mensagem (19/11: isso estourou o disco do banco). Sem a tabela, cai no jeito antigo (AppConfig).
+async function vezPelaTabela(essencial: boolean, proativo: boolean): Promise<{ esperaMs: number } | { erro: string } | null> {
+  if (!await temTabelas()) return null
+  const agora = Date.now()
+  const desde = `envio:${new Date(agora - 3_600_000).toISOString()}`
+  const { data, error } = await supabase.from("agente_tratadas").select("id").gte("id", desde).lt("id", "envio;").order("id", { ascending: false }).limit(500)
+  if (error) return null
+  const lista = (data ?? []).map(x => (x.id as string).slice(6, 30))
+  const cfg = await supabase.from("AppConfig").select("data->whatsappConexao").eq("id", 1).maybeSingle()
+  const con = (cfg.data as { whatsappConexao?: { aquecerDesde?: string; aquecimentoV?: number } } | null)?.whatsappConexao
+  const desdeAq = con?.aquecimentoV === 2 ? con.aquecerDesde : undefined
+  const aquecendo = !!desdeAq && agora - new Date(desdeAq).getTime() < HORAS_AQUECENDO * 3_600_000
+  const limite = Math.floor((aquecendo ? LIMITE_HORA_AQUECENDO : LIMITE_HORA) * (proativo ? FRACAO_PROATIVO : 1))
+  if (!essencial && (proativo || aquecendo) && lista.length >= limite) return { erro: `não enviou (limite de ${limite} por hora${proativo ? " para follow-up" : ""}${aquecendo ? ", aquecendo depois de conectar" : ""})` }
+  const ultima = Math.max(0, ...lista.map(t => new Date(t).getTime()).filter(n => !isNaN(n)))
+  const vez = Math.max(agora, ultima + (INTERVALO_MIN_SEG + Math.random() * 7) * 1000)
+  if (vez - agora > ESPERA_MAX_VEZ_SEG * 1000 && !essencial) return { erro: "não enviou (fila de envio cheia)" }
+  const id = `envio:${new Date(vez).toISOString()}:${Math.random().toString(36).slice(2, 7)}`
+  if (await reservarTratada(id) === null) return null
+  // limpeza: envios com mais de 2 h saem da tabela
+  void supabase.from("agente_tratadas").delete().lt("id", `envio:${new Date(agora - 2 * 3_600_000).toISOString()}`).gte("id", "envio:").then(() => null)
+  return { esperaMs: vez - agora }
+}
+
 export async function reservarVezDeEnviar(opcoes: { essencial?: boolean; proativo?: boolean } = {}): Promise<{ esperaMs: number } | { erro: string }> {
   const { essencial = false, proativo = false } = opcoes
+  const pelaTabela = await vezPelaTabela(essencial, proativo).catch(() => null)
+  if (pelaTabela) return pelaTabela
   let res: { esperaMs: number } | { erro: string } = { erro: "não enviou (limite por hora)" }
   await mudarConfig((d: Record<string, unknown> & { agenteEnviosHora?: string[]; whatsappConexao?: { estado?: string; aquecerDesde?: string; aquecimentoV?: number } }) => {
     const agora = Date.now()
@@ -678,6 +713,9 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
 // Trava atômica da rodada: com vários eventos ao mesmo tempo (reconexão, rajada), só uma execução passa.
 // Ler e depois gravar deixava duas passarem juntas e o mesmo follow-up saía duas vezes.
 async function pegarRodada(campo: "agenteRetomadaEm" | "agenteFollowupEm", minutos: number) {
+  // Trava na tabela leve (uma linha por janela de tempo): o AppConfig não é regravado a cada evento do webhook
+  const naTabela = await reservarTratada(`rodada:${campo}:${Math.floor(Date.now() / (minutos * 60_000))}`)
+  if (naTabela !== null) return naTabela
   let minha = false
   await mudarConfig((d: Record<string, unknown> & CfgAgente) => {
     const ult = d[campo]
