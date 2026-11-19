@@ -1,13 +1,13 @@
 "use client"
 
-// Parceiros ENYLA: cadastro de quem presta serviço. Em etapas curtas (empresa, contato, serviços, como cobra e
-// em quanto tempo entrega, operação), gostoso no celular e no computador. O rascunho fica no aparelho.
+// Parceiros ENYLA: cadastro de quem presta serviço. Em etapas curtas (empresa, base, contato, serviços, detalhes
+// técnicos/preço/prazo, operação), gostoso no celular e no computador. O rascunho fica no aparelho.
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Printer, Layers, Sparkles, Stamp, Mountain, Scissors, Package, Shapes, FileStack, Palette, FileCheck, Truck, Plus, Check, ChevronLeft, ArrowRight, Paperclip, X, Clock, BarChart3, ShieldCheck, Handshake, Loader2, MessageCircle } from "lucide-react"
+import { Printer, Layers, Sparkles, Stamp, Mountain, Scissors, Package, Shapes, FileStack, Palette, FileCheck, Truck, Plus, Check, ChevronLeft, ArrowRight, Paperclip, X, Clock, BarChart3, ShieldCheck, Handshake, Loader2, MessageCircle, MapPin, Zap } from "lucide-react"
 import {
-  SERVICOS_PARCEIRO, FORMAS_COBRANCA, errosDaEtapa, mascaraDocumento, mascaraTelefone, GERENTE_PADRAO,
-  type CadastroParceiro, type ServicoCadastrado, type IdServicoParceiro, type Etapa,
+  SERVICOS_PARCEIRO, FORMAS_COBRANCA, PERGUNTAS, ETAPAS_IDS, errosDaEtapa, mascaraDocumento, mascaraTelefone, mascaraCep, GERENTE_PADRAO,
+  type CadastroParceiro, type ServicoCadastrado, type IdServicoParceiro, type Pergunta, type Resposta, type Formato,
 } from "../lib/parceiros"
 
 const ICONE: Record<IdServicoParceiro, typeof Printer> = {
@@ -15,66 +15,111 @@ const ICONE: Record<IdServicoParceiro, typeof Printer> = {
   corteVinco: Scissors, colagem: Package, faca: Shapes, papel: FileStack, arte: Palette, fechamento: FileCheck, transporte: Truck, outro: Plus,
 }
 const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ")
-const ETAPAS: { id: Etapa; nome: string }[] = [
-  { id: "empresa", nome: "Empresa" }, { id: "contato", nome: "Contato" }, { id: "servicos", nome: "Serviços" },
-  { id: "detalhes", nome: "Prazos e preços" }, { id: "final", nome: "Operação" },
-]
+const NOMES_ETAPA: Record<(typeof ETAPAS_IDS)[number], string> = { empresa: "Empresa", endereco: "Endereço", contato: "Contato", servicos: "Serviços", detalhes: "Detalhes", final: "Operação" }
+const N = ETAPAS_IDS.length
 const RASCUNHO = "parceiros:rascunho"
 const ROXO = "#7c4ee4"
 
 type Dados = Partial<CadastroParceiro> & { servicos: ServicoCadastrado[] }
 const VAZIO: Dados = { tipoDocumento: "cnpj", servicos: [], uf: "" }
 
-function Campo({ rotulo, dica, erro, children, opcional }: { rotulo: string; dica?: string; erro?: string; children: React.ReactNode; opcional?: boolean }) {
+function Campo({ rotulo, dica, erro, children, opcional }: { rotulo: string; dica?: React.ReactNode; erro?: string; children: React.ReactNode; opcional?: boolean }) {
   return (
-    <label className="block">
+    <div className="block">
       <span className="flex items-baseline gap-2 text-[14px] font-semibold text-[#1d1a29]">{rotulo}{opcional && <span className="text-[12px] font-normal text-[#9a97a5]">opcional</span>}</span>
       {dica && <span className="block text-[12.5px] text-[#6b6878] mt-0.5 leading-snug">{dica}</span>}
       <span className="block mt-2">{children}</span>
-      {erro && <span className="block text-[12.5px] text-[#d33a3c] mt-1.5 font-medium">{erro}</span>}
-    </label>
+      {erro && <span className="block text-[12.5px] text-[#d33a3c] mt-1.5 font-medium par-surge">{erro}</span>}
+    </div>
   )
 }
-const inputCls = (erro?: string) => `w-full h-12 rounded-xl px-4 text-[16px] text-[#1d1a29] bg-[#f6f5fa] border ${erro ? "border-[#d33a3c] bg-[#fff6f6]" : "border-transparent"} focus:bg-white focus:border-[${ROXO}] focus:outline-none focus:ring-4 focus:ring-[#7c4ee4]/15 transition placeholder:text-[#b1aebb]`
+const inputCls = (erro?: string) => `w-full h-12 rounded-xl px-4 text-[16px] text-[#1d1a29] bg-[#f6f5fa] border ${erro ? "border-[#d33a3c] bg-[#fff6f6]" : "border-transparent"} focus:bg-white focus:border-[#7c4ee4] focus:outline-none focus:ring-4 focus:ring-[#7c4ee4]/15 transition placeholder:text-[#b1aebb]`
+const Chip = ({ on, children, onClick }: { on: boolean; children: React.ReactNode; onClick: () => void }) => (
+  <button type="button" onClick={onClick} aria-pressed={on}
+    className={`h-10 px-3.5 rounded-full text-[13.5px] font-semibold border transition-all duration-200 active:scale-95 ${on ? "text-white" : "bg-white text-[#4a4658] border-[#e3e0ec]"}`} style={on ? { background: ROXO, borderColor: ROXO } : undefined}>{children}</button>
+)
+
+// Formato da folha: largura × altura em cm, com o retângulo desenhado em escala
+function CampoFormato({ v, onChange }: { v?: Formato; onChange: (f: Formato | undefined) => void }) {
+  const [l, setL] = useState(v?.l ? String(v.l).replace(".", ",") : "")
+  const [a, setA] = useState(v?.a ? String(v.a).replace(".", ",") : "")
+  const num = (s: string) => Number(s.replace(",", "."))
+  const mudar = (nl: string, na: string) => { setL(nl); setA(na); const L = num(nl), A = num(na); onChange(L > 0 && A > 0 ? { l: L, a: A } : undefined) }
+  const L = num(l), A = num(a), ok = L > 0 && A > 0
+  const esc = ok ? 44 / Math.max(L, A) : 0
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <input enterKeyHint="next" inputMode="decimal" className={inputCls()} value={l} onChange={e => mudar(e.target.value.replace(/[^\d,.]/g, ""), a)} placeholder="Largura" aria-label="Largura em cm" />
+        <span className="text-[#9a97a5] font-semibold">×</span>
+        <input enterKeyHint="next" inputMode="decimal" className={inputCls()} value={a} onChange={e => mudar(l, e.target.value.replace(/[^\d,.]/g, ""))} placeholder="Altura" aria-label="Altura em cm" />
+        <span className="text-[13px] text-[#6b6878] shrink-0">cm</span>
+      </div>
+      <span className="w-12 h-12 grid place-items-center shrink-0">
+        <span className="rounded-[3px] border-2 transition-all duration-300" style={{ width: ok ? L * esc : 20, height: ok ? A * esc : 28, borderColor: ok ? ROXO : "#d9d4e8", background: ok ? "#7c4ee41a" : "transparent" }} />
+      </span>
+    </div>
+  )
+}
+
+function PerguntaTecnica({ p, v, onChange }: { p: Pergunta; v: Resposta | undefined; onChange: (v: Resposta | undefined) => void }) {
+  if (p.tipo === "multi") {
+    const xs = (Array.isArray(v) ? v : []) as string[]
+    return <Campo rotulo={p.rotulo} dica={p.dica ?? "Pode marcar mais de um"}><div className="flex flex-wrap gap-2">{p.opcoes!.map(o => <Chip key={o} on={xs.includes(o)} onClick={() => { const n = xs.includes(o) ? xs.filter(x => x !== o) : [...xs, o]; onChange(n.length ? n : undefined) }}>{o}</Chip>)}</div></Campo>
+  }
+  if (p.tipo === "um") return <Campo rotulo={p.rotulo} dica={p.dica}><div className="flex flex-wrap gap-2">{p.opcoes!.map(o => <Chip key={o} on={v === o} onClick={() => onChange(v === o ? undefined : o)}>{o}</Chip>)}</div></Campo>
+  if (p.tipo === "simnao") return <Campo rotulo={p.rotulo} dica={p.dica}><div className="flex gap-2"><Chip on={v === true} onClick={() => onChange(v === true ? undefined : true)}>Sim</Chip><Chip on={v === false} onClick={() => onChange(v === false ? undefined : false)}>Não</Chip></div></Campo>
+  if (p.tipo === "numero") return (
+    <Campo rotulo={p.rotulo} dica={p.dica}>
+      <div className="relative"><input enterKeyHint="next" inputMode="numeric" className={`${inputCls()} pr-28`} value={typeof v === "number" ? String(v) : ""} onChange={e => { const n = Number(e.target.value.replace(/\D/g, "")); onChange(n > 0 ? n : undefined) }} />
+        {p.unidade && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[13px] text-[#9a97a5] pointer-events-none">{p.unidade}</span>}</div>
+    </Campo>
+  )
+  return <Campo rotulo={p.rotulo} dica={p.dica}><CampoFormato v={v as Formato | undefined} onChange={onChange} /></Campo>
+}
 
 export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: string | null }) {
-  const [passo, setPasso] = useState(-1)          // -1 = boas-vindas; 0..4 = etapas; 5 = enviado
+  const [passo, setPasso] = useState(-1)          // -1 = boas-vindas; 0..N-1 = etapas; N = enviado
   const [d, setD] = useState<Dados>(VAZIO)
   const [erros, setErros] = useState<Record<string, string>>({})
   const [arquivos, setArquivos] = useState<File[]>([])
   const [enviando, setEnviando] = useState(false)
   const [erroEnvio, setErroEnvio] = useState<string | null>(null)
+  const [buscandoCep, setBuscandoCep] = useState(false)
+  const [cepAchado, setCepAchado] = useState<boolean | null>(null)
   const site = useRef<HTMLInputElement>(null)
   const conteudo = useRef<HTMLDivElement>(null)
+  const numeroRef = useRef<HTMLInputElement>(null)
   const [anim, setAnim] = useState<"in-fwd" | "in-back" | "out-fwd" | "out-back">("in-fwd")
+  const [sub, setSub] = useState(0)                // Detalhes: um serviço por vez
   const trocando = useRef(false)
 
+  // Rascunho no aparelho (volta de onde parou)
+  useEffect(() => { try { const r = JSON.parse(localStorage.getItem(RASCUNHO) ?? "null"); if (r?.d) { setD({ ...VAZIO, ...r.d }); if (typeof r.passo === "number" && r.passo >= 0 && r.passo < N) { setPasso(r.passo); if (typeof r.sub === "number") setSub(r.sub) } } } catch { /* sem rascunho */ } }, [])
+  useEffect(() => { if (passo >= 0 && passo < N) try { localStorage.setItem(RASCUNHO, JSON.stringify({ d, passo, sub })) } catch { /* sem storage */ } }, [d, passo, sub])
+
   // Troca de etapa: a atual sai (160 ms), a página volta ao topo e a próxima entra pelo lado certo
-  function irPara(n: number) {
-    if (trocando.current || n === passo) return
-    const frente = n > passo
-    const semMovimento = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    const trocar = () => {
-      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior })
-      setPasso(n); setAnim(frente ? "in-fwd" : "in-back"); trocando.current = false
-    }
+  function irPara(n: number, novoSub?: number) {
+    if (trocando.current || (n === passo && (novoSub ?? sub) === sub)) return
+    const frente = n > passo || (n === passo && (novoSub ?? 0) > sub)
+    const semMovimento = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    const alvoSub = novoSub ?? (ETAPAS_IDS[n] === "detalhes" ? (frente ? 0 : Math.max(0, d.servicos.length - 1)) : 0)
+    const trocar = () => { window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior }); setPasso(n); setSub(alvoSub); setAnim(frente ? "in-fwd" : "in-back"); trocando.current = false }
     ;(document.activeElement as HTMLElement | null)?.blur?.()
-    if (semMovimento || passo < 0 || n > 4) { trocar(); return }
+    if (semMovimento || passo < 0 || n >= N) { trocar(); return }
     trocando.current = true
     setAnim(frente ? "out-fwd" : "out-back")
     setTimeout(trocar, 160)
   }
-  // Campo com erro: rola até ele (abaixo do cabeçalho) e dá uma tremidinha
   function mostrarErro() {
     setTimeout(() => {
       const el = document.querySelector("[data-erro]") as HTMLElement | null
       if (!el) return
-      el.scrollIntoView({ behavior: "smooth", block: "nearest" })
+      el.scrollIntoView({ behavior: "smooth", block: "center" })
       el.classList.remove("par-shake"); void el.offsetWidth; el.classList.add("par-shake")
       setTimeout(() => el.classList.remove("par-shake"), 450)
     }, 30)
   }
-  // Enter no teclado do celular: próximo campo; no último, continua
   function aoTeclar(e: React.KeyboardEvent<HTMLDivElement>) {
     const alvo = e.target as HTMLElement
     if (e.key !== "Enter" || alvo.tagName !== "INPUT") return
@@ -84,10 +129,6 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
     if (i >= 0 && i < campos.length - 1) campos[i + 1].focus(); else avancar()
   }
 
-  // Rascunho no aparelho (volta de onde parou)
-  useEffect(() => { try { const r = JSON.parse(localStorage.getItem(RASCUNHO) ?? "null"); if (r?.d) { setD({ ...VAZIO, ...r.d }); if (typeof r.passo === "number" && r.passo >= 0 && r.passo < 5) setPasso(r.passo) } } catch { /* sem rascunho */ } }, [])
-  useEffect(() => { if (passo >= 0 && passo < 5) try { localStorage.setItem(RASCUNHO, JSON.stringify({ d, passo })) } catch { /* sem storage */ } }, [d, passo])
-
   const set = <K extends keyof Dados>(k: K, v: Dados[K]) => { setD(x => ({ ...x, [k]: v })); setErros(e => { const n = { ...e }; delete n[k as string]; return n }) }
   const servico = (id: IdServicoParceiro) => d.servicos.find(s => s.id === id)
   const alternarServico = (id: IdServicoParceiro) => set("servicos", servico(id) ? d.servicos.filter(s => s.id !== id) : [...d.servicos, { id, cobranca: null, prazoDias: null, prazoVaria: false }])
@@ -95,13 +136,41 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
     setD(x => ({ ...x, servicos: x.servicos.map(s => s.id === id ? { ...s, ...m } : s) }))
     setErros(e => { const n = { ...e }; for (const k of Object.keys(n)) if (k.startsWith(`${id}.`)) delete n[k]; return n })
   }
+  const mudarTecnico = (id: IdServicoParceiro, pid: string, v: Resposta | undefined) => setD(x => ({ ...x, servicos: x.servicos.map(s => {
+    if (s.id !== id) return s
+    const t = { ...(s.tecnico ?? {}) }
+    if (v === undefined) delete t[pid]; else t[pid] = v
+    return { ...s, tecnico: t }
+  }) }))
+
+  // CEP: busca rua, bairro, cidade e UF (ViaCEP) e leva o cursor para o número
+  async function buscarCep(cep: string) {
+    const c = cep.replace(/\D/g, "")
+    if (c.length !== 8) return
+    setBuscandoCep(true); setCepAchado(null)
+    try {
+      const v = await fetch(`https://viacep.com.br/ws/${c}/json/`).then(r => r.json()) as { logradouro?: string; bairro?: string; localidade?: string; uf?: string; erro?: boolean }
+      if (v.erro) { setCepAchado(false); return }
+      setD(x => ({ ...x, rua: v.logradouro || x.rua, bairro: v.bairro || x.bairro, cidade: v.localidade || x.cidade, uf: v.uf || x.uf }))
+      setErros(e => { const n = { ...e }; for (const k of ["cep", "rua", "bairro", "cidade", "uf"]) delete n[k]; return n })
+      setCepAchado(true)
+      setTimeout(() => numeroRef.current?.focus(), 80)
+    } catch { setCepAchado(null) }
+    finally { setBuscandoCep(false) }
+  }
 
   function avancar() {
-    const et = ETAPAS[passo].id
-    const e = errosDaEtapa(d, et)
+    const et = ETAPAS_IDS[passo]
+    let e = errosDaEtapa(d, et)
+    // Detalhes: confere só o serviço da tela e vai para o próximo
+    if (et === "detalhes") { const atual = escolhidos[sub]?.id; e = Object.fromEntries(Object.entries(e).filter(([k]) => k.startsWith(`${atual}.`))) }
     setErros(e)
     if (Object.keys(e).length) { mostrarErro(); return }
-    if (passo < 4) irPara(passo + 1); else void enviar()
+    if (et === "detalhes" && sub < escolhidos.length - 1) { irPara(passo, sub + 1); return }
+    if (passo < N - 1) irPara(passo + 1); else void enviar()
+  }
+  function voltar() {
+    if (ETAPAS_IDS[passo] === "detalhes" && sub > 0) irPara(passo, sub - 1); else irPara(passo - 1)
   }
   async function enviar() {
     setEnviando(true); setErroEnvio(null)
@@ -113,20 +182,21 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
       if (!r.ok) { setErroEnvio(r.erro ?? "Não deu certo. Tente de novo."); if (r.campos) { setErros(r.campos); mostrarErro() } return }
       try { localStorage.removeItem(RASCUNHO) } catch { /* ok */ }
       window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior })
-      setPasso(5)
+      setPasso(N)
     } catch { setErroEnvio("Sem conexão. Confira a internet e tente de novo.") }
     finally { setEnviando(false) }
   }
 
-  const progresso = passo < 0 ? 0 : Math.min(100, (passo + (passo === 5 ? 0 : 0.5)) / 5 * 100)
-  const escolhidos = useMemo(() => SERVICOS_PARCEIRO.filter(s => servico(s.id)), [d.servicos])   // eslint-disable-line react-hooks/exhaustive-deps
+  const escolhidos = useMemo(() => SERVICOS_PARCEIRO.filter(s => d.servicos.some(x => x.id === s.id)), [d.servicos])
+  const fracaoSub = ETAPAS_IDS[passo] === "detalhes" && escolhidos.length ? (sub + 1) / (escolhidos.length + 1) : 0.5
+  const progresso = passo < 0 ? 0 : Math.min(100, (passo + fracaoSub) / N * 100)
 
   // ── Boas-vindas ──
   if (passo === -1) return (
     <main className="min-h-[100dvh] bg-white">
       <div className="relative overflow-hidden" style={{ background: "linear-gradient(160deg,#2a1a5e 0%,#5b34c8 55%,#7c4ee4 100%)" }}>
         <div className="absolute -right-24 -top-24 w-80 h-80 rounded-full bg-white/10" /><div className="absolute -left-16 bottom-0 w-56 h-56 rounded-full bg-[#2fd39a]/15" />
-        <div className="relative max-w-[640px] mx-auto px-5 pt-8 pb-12 sm:pt-12 sm:pb-16">
+        <div className="relative max-w-[640px] mx-auto px-5 pt-8 pb-12 sm:pt-12 sm:pb-16 par-in-fwd">
           <img src="/brand/enyla-wordmark-light.png" alt="ENYLA" className="h-7 mb-10" onError={e => { (e.target as HTMLImageElement).style.display = "none" }} />
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 text-white text-[12.5px] font-semibold px-3 py-1"><Handshake className="w-3.5 h-3.5" />Parceiros ENYLA</span>
           <h1 className="mt-4 text-white text-[36px] sm:text-[46px] leading-[1.05] font-extrabold tracking-tight">Nunca mais fique ocioso.</h1>
@@ -134,7 +204,7 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
         </div>
       </div>
       <div className="max-w-[640px] mx-auto px-5 -mt-6 relative">
-        <div className="rounded-3xl bg-white shadow-[0_10px_40px_rgba(40,20,90,0.12)] p-5 sm:p-7 space-y-4">
+        <div className="rounded-3xl bg-white shadow-[0_10px_40px_rgba(40,20,90,0.12)] p-5 sm:p-7 space-y-4 ds-escalonado">
           {[
             { I: BarChart3, t: "Pedidos frequentes", s: "Mandamos trabalho de forma recorrente, sem você precisar correr atrás." },
             { I: FileCheck, t: "Tudo organizado", s: "Arquivo, medida, quantidade e prazo claros em cada pedido." },
@@ -156,9 +226,9 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
   )
 
   // ── Enviado ──
-  if (passo === 5) return (
+  if (passo === N) return (
     <main className="min-h-[100dvh] bg-white grid place-items-center px-5">
-      <div className="max-w-[460px] w-full text-center py-16">
+      <div className="max-w-[460px] w-full text-center py-16 par-in-fwd">
         <span className="mx-auto w-20 h-20 rounded-full grid place-items-center bg-[#2fd39a]/15 text-[#13a06f] ds-pop"><Check className="w-10 h-10" strokeWidth={2.5} /></span>
         <h1 className="mt-6 text-[28px] font-extrabold text-[#1d1a29] tracking-tight">Cadastro recebido!</h1>
         <p className="mt-3 text-[15.5px] text-[#4a4658] leading-relaxed">Obrigado, {d.responsavel?.split(" ")[0] || "parceiro"}. O {GERENTE_PADRAO}, seu gerente de contas na ENYLA, vai olhar o seu cadastro e falar com você pelo WhatsApp.</p>
@@ -172,29 +242,30 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
   )
 
   // ── Etapas ──
-  const et = ETAPAS[passo].id
+  const et = ETAPAS_IDS[passo]
   const E = (k: string) => erros[k]
+  const marca = (k: string | string[]) => ([] as string[]).concat(k).some(x => erros[x]) ? "" : undefined
   return (
     <main className="min-h-[100dvh] bg-[#fbfaff]">
       <div className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-[#efedf5]">
         <div className="max-w-[640px] mx-auto px-5 h-14 flex items-center gap-3">
-          <button onClick={() => irPara(passo - 1)} aria-label="Voltar" className="w-9 h-9 -ml-2 rounded-xl grid place-items-center text-[#4a4658] active:bg-[#f1eff7]"><ChevronLeft className="w-5 h-5" /></button>
+          <button onClick={voltar} aria-label="Voltar" className="w-9 h-9 -ml-2 rounded-xl grid place-items-center text-[#4a4658] active:bg-[#f1eff7]"><ChevronLeft className="w-5 h-5" /></button>
           <div className="flex-1">
-            <p className="text-[12px] font-semibold text-[#9a97a5] leading-none">Etapa {passo + 1} de 5</p>
-            <p key={passo} className="text-[15px] font-bold text-[#1d1a29] leading-tight mt-0.5 par-surge">{ETAPAS[passo].nome}</p>
+            <p className="text-[12px] font-semibold text-[#9a97a5] leading-none">Etapa {passo + 1} de {N}</p>
+            <p key={`${passo}-${sub}`} className="text-[15px] font-bold text-[#1d1a29] leading-tight mt-0.5 par-surge truncate">{et === "detalhes" && escolhidos[sub] ? `${escolhidos[sub].nome}${escolhidos.length > 1 ? ` · ${sub + 1} de ${escolhidos.length}` : ""}` : NOMES_ETAPA[et]}</p>
           </div>
           <span className="text-[12px] font-semibold" style={{ color: ROXO }}>Parceiros ENYLA</span>
         </div>
         <div className="h-1 bg-[#efedf5]"><div className="h-full transition-all duration-500" style={{ width: `${progresso}%`, background: ROXO }} /></div>
       </div>
 
-      <div ref={conteudo} onKeyDown={aoTeclar} className={`max-w-[640px] mx-auto px-5 pt-6 pb-36 space-y-6 par-${anim}`} key={passo}>
+      <div ref={conteudo} onKeyDown={aoTeclar} className={`max-w-[640px] mx-auto px-5 pt-6 pb-36 space-y-6 par-${anim}`} key={`${passo}-${sub}`}>
         {et === "empresa" && <>
           <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Conta um pouco da sua empresa</h2>
-          <div data-erro={E("nomeFantasia") ? "" : undefined}><Campo rotulo="Nome da empresa" dica="Como vocês são conhecidos no mercado" erro={E("nomeFantasia")}>
+          <div data-erro={marca("nomeFantasia")}><Campo rotulo="Nome da empresa" dica="Como vocês são conhecidos no mercado" erro={E("nomeFantasia")}>
             <input enterKeyHint="next" className={inputCls(E("nomeFantasia"))} value={d.nomeFantasia ?? ""} onChange={e => set("nomeFantasia", e.target.value)} placeholder="Ex.: Gráfica Bom Corte" autoComplete="organization" />
           </Campo></div>
-          <div data-erro={E("documento") ? "" : undefined}><Campo rotulo={d.tipoDocumento === "cpf" ? "CPF" : "CNPJ"} erro={E("documento")}>
+          <div data-erro={marca("documento")}><Campo rotulo={d.tipoDocumento === "cpf" ? "CPF" : "CNPJ"} erro={E("documento")}>
             <div className="flex p-1 rounded-xl bg-[#f1eff7] w-fit mb-2">
               {(["cnpj", "cpf"] as const).map(t => <button key={t} type="button" onClick={() => { set("tipoDocumento", t); set("documento", "") }} className={`h-9 px-4 rounded-lg text-[13.5px] font-semibold transition ${d.tipoDocumento === t ? "bg-white shadow-sm text-[#1d1a29]" : "text-[#6b6878]"}`}>{t === "cnpj" ? "Tenho CNPJ" : "Ainda não tenho CNPJ"}</button>)}
             </div>
@@ -203,24 +274,42 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
           {d.tipoDocumento === "cnpj" && <Campo rotulo="Razão social" opcional>
             <input enterKeyHint="next" className={inputCls()} value={d.razaoSocial ?? ""} onChange={e => set("razaoSocial", e.target.value)} placeholder="Como está no CNPJ" />
           </Campo>}
-          <div className="grid grid-cols-[1fr_96px] gap-3" data-erro={E("cidade") || E("uf") ? "" : undefined}>
+        </>}
+
+        {et === "endereco" && <>
+          <div>
+            <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Onde fica a sua base?</h2>
+            <p className="text-[14px] text-[#6b6878] mt-1.5">É daqui que a gente leva e busca o material. Com o endereço certinho, o motorista chega direto e o frete sai mais barato.</p>
+          </div>
+          <div data-erro={marca("cep")}><Campo rotulo="CEP" erro={E("cep")} dica={buscandoCep ? <span className="inline-flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" />Buscando o endereço…</span> : cepAchado === false ? "Não achamos esse CEP. Preencha o endereço abaixo." : cepAchado ? <span className="inline-flex items-center gap-1.5 text-[#13a06f] font-medium par-surge"><Check className="w-3.5 h-3.5" />Endereço encontrado. Confira e complete o número.</span> : "A gente preenche o resto para você"}>
+            <input enterKeyHint="next" className={`${inputCls(E("cep"))} max-w-[200px]`} inputMode="numeric" autoComplete="postal-code" value={mascaraCep(d.cep ?? "")} placeholder="00000-000"
+              onChange={e => { const v = e.target.value.replace(/\D/g, "").slice(0, 8); set("cep", v); if (v.length === 8) void buscarCep(v); else setCepAchado(null) }} />
+          </Campo></div>
+          <div data-erro={marca("rua")}><Campo rotulo="Rua" erro={E("rua")}><input enterKeyHint="next" className={inputCls(E("rua"))} value={d.rua ?? ""} onChange={e => set("rua", e.target.value)} autoComplete="address-line1" /></Campo></div>
+          <div className="grid grid-cols-[120px_1fr] gap-3" data-erro={marca("numero")}>
+            <Campo rotulo="Número" erro={E("numero")}><input ref={numeroRef} enterKeyHint="next" className={inputCls(E("numero"))} value={d.numero ?? ""} onChange={e => set("numero", e.target.value)} placeholder="123 ou s/n" /></Campo>
+            <Campo rotulo="Complemento" opcional><input enterKeyHint="next" className={inputCls()} value={d.complemento ?? ""} onChange={e => set("complemento", e.target.value)} placeholder="Galpão 2, fundos…" autoComplete="address-line2" /></Campo>
+          </div>
+          <div data-erro={marca("bairro")}><Campo rotulo="Bairro" erro={E("bairro")}><input enterKeyHint="next" className={inputCls(E("bairro"))} value={d.bairro ?? ""} onChange={e => set("bairro", e.target.value)} /></Campo></div>
+          <div className="grid grid-cols-[1fr_96px] gap-3" data-erro={marca(["cidade", "uf"])}>
             <Campo rotulo="Cidade" erro={E("cidade")}><input enterKeyHint="next" className={inputCls(E("cidade"))} value={d.cidade ?? ""} onChange={e => set("cidade", e.target.value)} autoComplete="address-level2" /></Campo>
             <Campo rotulo="UF" erro={E("uf")}>
               <select className={inputCls(E("uf"))} value={d.uf ?? ""} onChange={e => set("uf", e.target.value)}><option value="">—</option>{UFS.map(u => <option key={u}>{u}</option>)}</select>
             </Campo>
           </div>
-          <Campo rotulo="Endereço" dica="Para levar e buscar material" opcional>
-            <input enterKeyHint="next" className={inputCls()} value={d.endereco ?? ""} onChange={e => set("endereco", e.target.value)} placeholder="Rua, número, bairro" autoComplete="street-address" />
+          <Campo rotulo="Ponto de referência ou como chegar" dica="Portão de carga, horário de recebimento, interfone…" opcional>
+            <input enterKeyHint="next" className={inputCls()} value={d.referencia ?? ""} onChange={e => set("referencia", e.target.value)} />
           </Campo>
+          <p className="flex items-start gap-2 text-[12.5px] text-[#6b6878]"><MapPin className="w-4 h-4 shrink-0 mt-px" style={{ color: ROXO }} />Usamos o endereço só para levar e buscar material e calcular o frete.</p>
         </>}
 
         {et === "contato" && <>
           <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Como a gente fala com você?</h2>
-          <div data-erro={E("responsavel") ? "" : undefined}><Campo rotulo="Seu nome" erro={E("responsavel")}><input enterKeyHint="next" className={inputCls(E("responsavel"))} value={d.responsavel ?? ""} onChange={e => set("responsavel", e.target.value)} autoComplete="name" /></Campo></div>
-          <div data-erro={E("whatsapp") ? "" : undefined}><Campo rotulo="WhatsApp" dica="É por aqui que os pedidos chegam primeiro" erro={E("whatsapp")}>
+          <div data-erro={marca("responsavel")}><Campo rotulo="Seu nome" erro={E("responsavel")}><input enterKeyHint="next" className={inputCls(E("responsavel"))} value={d.responsavel ?? ""} onChange={e => set("responsavel", e.target.value)} autoComplete="name" /></Campo></div>
+          <div data-erro={marca("whatsapp")}><Campo rotulo="WhatsApp" dica="É por aqui que os pedidos chegam primeiro" erro={E("whatsapp")}>
             <input enterKeyHint="next" className={inputCls(E("whatsapp"))} inputMode="tel" value={mascaraTelefone(d.whatsapp ?? "")} onChange={e => set("whatsapp", e.target.value.replace(/\D/g, ""))} placeholder="(11) 90000-0000" autoComplete="tel" />
           </Campo></div>
-          <div data-erro={E("email") ? "" : undefined}><Campo rotulo="Seu melhor e-mail" dica="Você também recebe por lá os pedidos que chegarem pelo WhatsApp, com os arquivos." erro={E("email")}>
+          <div data-erro={marca("email")}><Campo rotulo="Seu melhor e-mail" dica="Você também recebe por lá os pedidos que chegarem pelo WhatsApp, com os arquivos." erro={E("email")}>
             <input enterKeyHint="next" className={inputCls(E("email"))} type="email" inputMode="email" value={d.email ?? ""} onChange={e => set("email", e.target.value)} placeholder="voce@empresa.com.br" autoComplete="email" />
           </Campo></div>
           <Campo rotulo="Quem recebe o material na produção" dica="Nome e telefone, se for outra pessoa" opcional>
@@ -231,15 +320,15 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
         {et === "servicos" && <>
           <div>
             <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Vocês prestam qual serviço?</h2>
-            <p className="text-[14px] text-[#6b6878] mt-1.5">Marque tudo o que fazem. Na próxima etapa, cada um ganha prazo e preço.</p>
+            <p className="text-[14px] text-[#6b6878] mt-1.5">Marque tudo o que fazem. Na próxima etapa a gente entende cada um.</p>
           </div>
-          <div className="grid grid-cols-2 gap-2.5" data-erro={E("servicos") ? "" : undefined}>
+          <div className="grid grid-cols-2 gap-2.5" data-erro={marca("servicos")}>
             {SERVICOS_PARCEIRO.map(s => {
               const on = !!servico(s.id), I = ICONE[s.id]
               return (
                 <button key={s.id} type="button" onClick={() => alternarServico(s.id)} aria-pressed={on}
                   className={`relative text-left rounded-2xl p-3.5 border-2 transition-all duration-200 active:scale-[0.97] ${on ? "bg-[#7c4ee4]/[0.07]" : "bg-white border-[#ece9f4]"}`} style={on ? { borderColor: ROXO } : undefined}>
-                  <span className="w-9 h-9 rounded-xl grid place-items-center mb-2" style={{ background: on ? ROXO : "#f1eff7", color: on ? "#fff" : "#6b6878" }}><I className="w-[18px] h-[18px]" /></span>
+                  <span className="w-9 h-9 rounded-xl grid place-items-center mb-2 transition-colors duration-200" style={{ background: on ? ROXO : "#f1eff7", color: on ? "#fff" : "#6b6878" }}><I className="w-[18px] h-[18px]" /></span>
                   <span className="block text-[14px] font-semibold text-[#1d1a29] leading-tight">{s.nome}</span>
                   <span className="block text-[12px] text-[#8a8796] leading-snug mt-0.5">{s.dica}</span>
                   {on && <span className="absolute top-3 right-3 w-5 h-5 rounded-full grid place-items-center text-white ds-pop" style={{ background: ROXO }}><Check className="w-3.5 h-3.5" strokeWidth={3} /></span>}
@@ -251,47 +340,30 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
         </>}
 
         {et === "detalhes" && <>
-          <div>
-            <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Prazo e preço de cada serviço</h2>
-            <p className="text-[14px] text-[#6b6878] mt-1.5">Seja sincero: é com isso que a gente planeja a produção. Valor é só referência, sem compromisso.</p>
-          </div>
-          {escolhidos.map(sv => {
+          {sub === 0 && <div className="par-surge">
+            <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Conta como cada serviço funciona</h2>
+            <p className="text-[14px] text-[#6b6878] mt-1.5">Um serviço por vez. Com isso a gente manda para você só o que cabe na sua máquina. Tudo é opcional, menos como você cobra e o prazo.</p>
+          </div>}
+          {escolhidos.length > 1 && <div className="flex gap-1.5" aria-hidden>{escolhidos.map((x, i) => <span key={x.id} className="h-1.5 flex-1 rounded-full transition-colors duration-300" style={{ background: i <= sub ? ROXO : "#e6e2f0" }} />)}</div>}
+          {escolhidos.filter((_, i) => i === sub).map(sv => {
             const s = servico(sv.id)!, I = ICONE[sv.id]
             const forma = FORMAS_COBRANCA.find(f => f.id === s.cobranca)
             const temErro = Object.keys(erros).some(k => k.startsWith(`${sv.id}.`))
+            const perguntas = PERGUNTAS[sv.id] ?? []
             return (
-              <section key={sv.id} data-erro={temErro ? "" : undefined} className={`rounded-3xl bg-white p-5 border ${temErro ? "border-[#d33a3c]/40" : "border-[#ece9f4]"} shadow-[0_2px_10px_rgba(40,20,90,0.04)] space-y-5`}>
+              <section key={sv.id} className={`rounded-3xl bg-white p-5 border ${temErro ? "border-[#d33a3c]/40" : "border-[#ece9f4]"} shadow-[0_2px_10px_rgba(40,20,90,0.04)] space-y-5`}>
                 <div className="flex items-center gap-3">
                   <span className="w-10 h-10 rounded-2xl grid place-items-center text-white" style={{ background: ROXO }}><I className="w-5 h-5" /></span>
                   <p className="text-[17px] font-bold text-[#1d1a29]">{sv.id === "outro" ? (s.qual || "Outro serviço") : sv.nome}</p>
                 </div>
-                {sv.id === "outro" && <Campo rotulo="Qual serviço?" erro={E(`${sv.id}.qual`)}><input enterKeyHint="next" className={inputCls(E(`${sv.id}.qual`))} value={s.qual ?? ""} onChange={e => mudarServico(sv.id, { qual: e.target.value })} /></Campo>}
+                {sv.id === "outro" && <div data-erro={marca(`${sv.id}.qual`)}><Campo rotulo="Qual serviço?" erro={E(`${sv.id}.qual`)}><input enterKeyHint="next" className={inputCls(E(`${sv.id}.qual`))} value={s.qual ?? ""} onChange={e => mudarServico(sv.id, { qual: e.target.value })} /></Campo></div>}
 
-                <Campo rotulo="Seja sincero: qual é o tempo de entrega médio?" dica="Em dias úteis, do material chegar até ficar pronto" erro={E(`${sv.id}.prazo`)}>
-                  <div className={`par-colapsa ${s.prazoVaria ? "fechado" : ""}`} aria-hidden={s.prazoVaria}><div>
-                    <div className="flex items-center gap-3 pb-0.5">
-                      <button type="button" onClick={() => mudarServico(sv.id, { prazoDias: Math.max(1, (s.prazoDias ?? 2) - 1) })} className="w-12 h-12 rounded-xl bg-[#f1eff7] text-[22px] font-bold text-[#4a4658] active:scale-95">−</button>
-                      <div className="flex-1 h-12 rounded-xl bg-[#f6f5fa] grid place-items-center">
-                        <span className="text-[18px] font-bold text-[#1d1a29]"><span key={s.prazoDias ?? 0} className="par-bump">{s.prazoDias ?? "—"}</span> <span className="text-[13px] font-medium text-[#6b6878]">{s.prazoDias === 1 ? "dia útil" : "dias úteis"}</span></span>
-                      </div>
-                      <button type="button" onClick={() => mudarServico(sv.id, { prazoDias: Math.min(60, (s.prazoDias ?? 0) + 1) })} className="w-12 h-12 rounded-xl text-white text-[22px] font-bold active:scale-95" style={{ background: ROXO }}>+</button>
-                    </div>
-                  </div></div>
-                  <button type="button" onClick={() => mudarServico(sv.id, { prazoVaria: !s.prazoVaria, prazoDias: s.prazoVaria ? 3 : null })}
-                    className={`${s.prazoVaria ? "mt-0" : "mt-2.5"} w-full text-left rounded-xl px-3.5 py-3 border flex gap-3 items-start transition-all duration-300 ${s.prazoVaria ? "bg-[#7c4ee4]/[0.07]" : "bg-white border-[#ece9f4]"}`} style={s.prazoVaria ? { borderColor: ROXO } : undefined}>
-                    <span className={`mt-0.5 w-5 h-5 rounded-md border-2 grid place-items-center shrink-0 ${s.prazoVaria ? "text-white" : "border-[#cfcbdb]"}`} style={s.prazoVaria ? { background: ROXO, borderColor: ROXO } : undefined}>{s.prazoVaria && <Check className="w-3.5 h-3.5" strokeWidth={3} />}</span>
-                    <span className="text-[13.5px] text-[#4a4658] leading-snug">Não consigo mensurar agora: varia muito de pedido para pedido, a ponto de eu não ter uma média ou tabela.</span>
-                  </button>
-                </Campo>
+                {perguntas.map(p => <PerguntaTecnica key={p.id} p={p} v={s.tecnico?.[p.id]} onChange={v => mudarTecnico(sv.id, p.id, v)} />)}
 
-                <Campo rotulo="Como você cobra?" erro={E(`${sv.id}.cobranca`)}>
-                  <div className="flex flex-wrap gap-2">
-                    {FORMAS_COBRANCA.map(f => (
-                      <button key={f.id} type="button" onClick={() => mudarServico(sv.id, { cobranca: f.id })}
-                        className={`h-10 px-3.5 rounded-full text-[13.5px] font-semibold border transition active:scale-95 ${s.cobranca === f.id ? "text-white" : "bg-white text-[#4a4658] border-[#e3e0ec]"}`} style={s.cobranca === f.id ? { background: ROXO, borderColor: ROXO } : undefined}>{f.nome}</button>
-                    ))}
-                  </div>
-                </Campo>
+                {perguntas.length > 0 && <div className="h-px bg-[#efedf5]" />}
+                <div data-erro={marca(`${sv.id}.cobranca`)}><Campo rotulo="Como você cobra?" erro={E(`${sv.id}.cobranca`)}>
+                  <div className="flex flex-wrap gap-2">{FORMAS_COBRANCA.map(f => <Chip key={f.id} on={s.cobranca === f.id} onClick={() => mudarServico(sv.id, { cobranca: f.id })}>{f.nome}</Chip>)}</div>
+                </Campo></div>
                 {forma?.unidade && (
                   <div key={s.cobranca} className={`grid gap-3 par-surge ${s.cobranca === "acertoMilheiro" ? "grid-cols-2" : "grid-cols-1"}`}>
                     {s.cobranca === "acertoMilheiro" && <Campo rotulo="Acerto (R$)" opcional><input enterKeyHint="next" className={inputCls()} inputMode="decimal" value={s.acerto ?? ""} onChange={e => mudarServico(sv.id, { acerto: Number(e.target.value.replace(",", ".")) || null })} placeholder="0,00" /></Campo>}
@@ -301,10 +373,32 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
                   </div>
                 )}
                 {(s.cobranca === "tabela" || s.cobranca === "varia") && <p key={s.cobranca} className="text-[13px] text-[#6b6878] -mt-2 par-surge">Perfeito. Na última etapa você pode mandar a tabela ou um orçamento que já fez: a gente aprende o seu jeito de cobrar.</p>}
-                <Campo rotulo="Pedido mínimo" opcional><input enterKeyHint="next" className={inputCls()} value={s.minimo ?? ""} onChange={e => mudarServico(sv.id, { minimo: e.target.value })} placeholder="Ex.: 1.000 folhas, R$ 150, 1 dia de máquina" /></Campo>
+                <Campo rotulo="Pedido mínimo" opcional><input enterKeyHint="next" className={inputCls()} value={s.minimo ?? ""} onChange={e => mudarServico(sv.id, { minimo: e.target.value })} placeholder="Ex.: 1.000 folhas, R$ 150" /></Campo>
                 <Campo rotulo="Algo mais sobre esse serviço?" opcional>
-                  <textarea className={`${inputCls()} h-24 py-3 resize-none`} value={s.obs ?? ""} onChange={e => mudarServico(sv.id, { obs: e.target.value })} placeholder="Tipos que faz, limitações, formatos, cores…" />
+                  <textarea className={`${inputCls()} h-24 py-3 resize-none`} value={s.obs ?? ""} onChange={e => mudarServico(sv.id, { obs: e.target.value })} placeholder="Limitações, especialidades, o que faz melhor…" />
                 </Campo>
+
+                {/* Prazo por último, com o porquê vale a pena informar */}
+                <div data-erro={marca(`${sv.id}.prazo`)} className={`rounded-2xl p-4 bg-[#7c4ee4]/[0.05] border ${E(`${sv.id}.prazo`) ? "border-[#d33a3c]/50" : "border-[#7c4ee4]/15"}`}>
+                  <Campo rotulo="Qual o seu prazo médio?" erro={E(`${sv.id}.prazo`)}
+                    dica={<span className="flex items-start gap-1.5"><Zap className="w-3.5 h-3.5 shrink-0 mt-[2px]" style={{ color: ROXO }} /><span>Quem informa o prazo médio <b className="text-[#4a4658]">recebe primeiro</b> os pedidos com data marcada. É uma média em dias úteis, não um compromisso: cada pedido a gente combina com você.</span></span>}>
+                    <div className={`par-colapsa ${s.prazoVaria ? "fechado" : ""}`} aria-hidden={s.prazoVaria}><div>
+                      <div className="flex items-center gap-3 pb-0.5">
+                        <button type="button" onClick={() => mudarServico(sv.id, { prazoDias: Math.max(1, (s.prazoDias ?? 2) - 1) })} className="w-12 h-12 rounded-xl bg-white text-[22px] font-bold text-[#4a4658] active:scale-95 border border-[#e3e0ec]">−</button>
+                        <div className="flex-1 h-12 rounded-xl bg-white grid place-items-center border border-[#e3e0ec]">
+                          <span className="text-[18px] font-bold text-[#1d1a29]"><span key={s.prazoDias ?? 0} className="par-bump">{s.prazoDias ?? "—"}</span> <span className="text-[13px] font-medium text-[#6b6878]">{s.prazoDias === 1 ? "dia útil" : "dias úteis"}</span></span>
+                        </div>
+                        <button type="button" onClick={() => mudarServico(sv.id, { prazoDias: Math.min(60, (s.prazoDias ?? 0) + 1) })} className="w-12 h-12 rounded-xl text-white text-[22px] font-bold active:scale-95" style={{ background: ROXO }}>+</button>
+                      </div>
+                    </div></div>
+                    <button type="button" onClick={() => mudarServico(sv.id, { prazoVaria: !s.prazoVaria, prazoDias: s.prazoVaria ? 3 : null })}
+                      className={`${s.prazoVaria ? "mt-0" : "mt-2.5"} w-full text-left rounded-xl px-3.5 py-3 border flex gap-3 items-start transition-all duration-300 bg-white ${s.prazoVaria ? "" : "border-[#ece9f4]"}`} style={s.prazoVaria ? { borderColor: ROXO } : undefined}>
+                      <span className={`mt-0.5 w-5 h-5 rounded-md border-2 grid place-items-center shrink-0 transition ${s.prazoVaria ? "text-white" : "border-[#cfcbdb]"}`} style={s.prazoVaria ? { background: ROXO, borderColor: ROXO } : undefined}>{s.prazoVaria && <Check className="w-3.5 h-3.5 ds-pop" strokeWidth={3} />}</span>
+                      <span className="text-[13.5px] text-[#4a4658] leading-snug">Não consigo mensurar agora: varia muito de pedido para pedido, a ponto de eu não ter uma média ou tabela.</span>
+                    </button>
+                    {s.prazoVaria && <p className="mt-2 text-[12.5px] text-[#6b6878] par-surge">Tudo bem! Você continua recebendo pedidos; o prazo a gente combina em cada um.</p>}
+                  </Campo>
+                </div>
               </section>
             )
           })}
@@ -312,7 +406,7 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
 
         {et === "final" && <>
           <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Sua operação</h2>
-          <Campo rotulo="Máquinas e formato máximo" dica="Ex.: Heidelberg 4 cores 66×96; coladeira automática" opcional>
+          <Campo rotulo="Outras máquinas e equipamentos" dica="Marca e modelo ajudam (ex.: Heidelberg Speedmaster, Bobst SP 102)" opcional>
             <textarea className={`${inputCls()} h-24 py-3 resize-none`} value={d.maquinas ?? ""} onChange={e => set("maquinas", e.target.value)} />
           </Campo>
           <Campo rotulo="Capacidade" dica="Quanto vocês conseguem por dia ou semana" opcional>
@@ -327,13 +421,13 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
               <input type="file" multiple className="hidden" accept=".pdf,image/*,.xlsx,.xls,.csv,.docx" onChange={e => { const fs = [...(e.target.files ?? [])]; setArquivos(a => [...a, ...fs].slice(0, 5)); e.target.value = "" }} />
             </label>
             {arquivos.length > 0 && <ul className="mt-2 space-y-1.5">{arquivos.map((a, i) => (
-              <li key={i} className="flex items-center gap-2 rounded-xl bg-[#f6f5fa] px-3 py-2 text-[13px] text-[#4a4658]">
+              <li key={i} className="flex items-center gap-2 rounded-xl bg-[#f6f5fa] px-3 py-2 text-[13px] text-[#4a4658] par-surge">
                 <Paperclip className="w-3.5 h-3.5 shrink-0" /><span className="flex-1 truncate">{a.name}</span>
                 {a.size > 10 * 1024 * 1024 && <span className="text-[#d33a3c] text-[12px]">grande demais</span>}
                 <button type="button" onClick={() => setArquivos(x => x.filter((_, j) => j !== i))} aria-label="Tirar"><X className="w-4 h-4 text-[#9a97a5]" /></button>
               </li>))}</ul>}
           </Campo>
-          <Campo rotulo="Como conheceu a ENYLA?" opcional><input enterKeyHint="next" className={inputCls()} value={d.comoConheceu ?? ""} onChange={e => set("comoConheceu", e.target.value)} placeholder="Indicação, Instagram, já trabalhamos juntos…" /></Campo>
+          <Campo rotulo="Como conheceu a ENYLA?" opcional><input enterKeyHint="done" className={inputCls()} value={d.comoConheceu ?? ""} onChange={e => set("comoConheceu", e.target.value)} placeholder="Indicação, Instagram, já trabalhamos juntos…" /></Campo>
 
           <div className="rounded-3xl p-5 text-white" style={{ background: "linear-gradient(150deg,#2a1a5e,#5b34c8)" }}>
             <p className="flex items-center gap-2 text-[15px] font-bold"><ShieldCheck className="w-5 h-5" />Como a parceria funciona</p>
@@ -344,21 +438,21 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
               <li>• Seu gerente de contas na ENYLA: <b className="text-white">{GERENTE_PADRAO}</b>.</li>
             </ul>
           </div>
-          <button type="button" data-erro={E("aceite") ? "" : undefined} onClick={() => set("aceite", !d.aceite)} className="w-full text-left flex gap-3 items-start">
-            <span className={`mt-0.5 w-6 h-6 rounded-lg border-2 grid place-items-center shrink-0 ${d.aceite ? "text-white" : E("aceite") ? "border-[#d33a3c]" : "border-[#cfcbdb]"}`} style={d.aceite ? { background: ROXO, borderColor: ROXO } : undefined}>{d.aceite && <Check className="w-4 h-4" strokeWidth={3} />}</span>
+          <button type="button" data-erro={marca("aceite")} onClick={() => set("aceite", !d.aceite)} className="w-full text-left flex gap-3 items-start">
+            <span className={`mt-0.5 w-6 h-6 rounded-lg border-2 grid place-items-center shrink-0 transition ${d.aceite ? "text-white" : E("aceite") ? "border-[#d33a3c]" : "border-[#cfcbdb]"}`} style={d.aceite ? { background: ROXO, borderColor: ROXO } : undefined}>{d.aceite && <Check className="w-4 h-4 ds-pop" strokeWidth={3} />}</span>
             <span className="text-[14px] text-[#4a4658] leading-snug">Concordo que a ENYLA registre o tempo e a qualidade das entregas, e que as informações deste cadastro estão corretas.</span>
           </button>
-          {E("aceite") && <p className="text-[13px] text-[#d33a3c] font-medium -mt-3">{E("aceite")}</p>}
+          {E("aceite") && <p className="text-[13px] text-[#d33a3c] font-medium -mt-3 par-surge">{E("aceite")}</p>}
           <input ref={site} name="site" tabIndex={-1} autoComplete="off" className="absolute -left-[9999px] w-px h-px opacity-0" aria-hidden />
-          {erroEnvio && <p className="rounded-xl bg-[#fff1f1] text-[#c92f31] text-[13.5px] font-medium px-4 py-3">{erroEnvio}</p>}
+          {erroEnvio && <p className="rounded-xl bg-[#fff1f1] text-[#c92f31] text-[13.5px] font-medium px-4 py-3 par-surge">{erroEnvio}</p>}
         </>}
       </div>
 
       <div className="fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t border-[#efedf5]" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="max-w-[640px] mx-auto px-5 py-3 flex gap-3">
-          {passo > 0 && <button onClick={() => irPara(passo - 1)} className="h-13 px-5 rounded-2xl bg-[#f1eff7] text-[#4a4658] text-[15px] font-semibold" style={{ height: 52 }}>Voltar</button>}
+          {passo > 0 && <button onClick={voltar} className="px-5 rounded-2xl bg-[#f1eff7] text-[#4a4658] text-[15px] font-semibold active:scale-[0.98] transition" style={{ height: 52 }}>Voltar</button>}
           <button onClick={avancar} disabled={enviando} className="flex-1 rounded-2xl text-white text-[16px] font-bold flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.99] transition shadow-[0_6px_20px_rgba(124,78,228,0.3)]" style={{ background: ROXO, height: 52 }}>
-            {enviando ? <><Loader2 className="w-5 h-5 animate-spin" />Enviando…</> : passo === 4 ? <>Enviar cadastro<Check className="w-5 h-5" /></> : <>Continuar<ArrowRight className="w-5 h-5" /></>}
+            {enviando ? <><Loader2 className="w-5 h-5 animate-spin" />Enviando…</> : passo === N - 1 ? <>Enviar cadastro<Check className="w-5 h-5" /></> : <>Continuar<ArrowRight className="w-5 h-5" /></>}
           </button>
         </div>
       </div>

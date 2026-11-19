@@ -5,7 +5,7 @@
 
 import React from "react"
 import { Handshake, Copy, Check, ChevronDown, Paperclip, MessageCircle, Mail, X } from "lucide-react"
-import { nomeServico, textoCobranca, textoPrazo, paraFornecedor, type CadastroParceiro } from "../lib/parceiros"
+import { nomeServico, textoCobranca, textoPrazo, textoTecnico, textoEndereco, paraFornecedor, type CadastroParceiro } from "../lib/parceiros"
 import type { FornecedorProducao } from "../lib/producao"
 
 const LINK = "https://app.enyla.com.br/parceiros"
@@ -68,7 +68,7 @@ export function CadastrosParceirosCard({ onAprovar }: { onAprovar: (f: Fornecedo
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[12.5px] text-[#5e5c68]">
                       <p><b className="text-[#191625] font-medium">{c.tipoDocumento.toUpperCase()}:</b> {doc(c)}{c.razaoSocial ? ` · ${c.razaoSocial}` : ""}</p>
                       <p><b className="text-[#191625] font-medium">Responsável:</b> {c.responsavel}</p>
-                      {c.endereco && <p><b className="text-[#191625] font-medium">Endereço:</b> {c.endereco}</p>}
+                      <p className="sm:col-span-2"><b className="text-[#191625] font-medium">Base:</b> {textoEndereco(c)}{c.referencia ? ` · ${c.referencia}` : ""}{c.base ? <> · <a className="text-[#8456e8] font-medium" href={`https://www.google.com/maps?q=${c.base.lat},${c.base.lng}`} target="_blank" rel="noreferrer">ver no mapa</a></> : <span className="text-[#c26a0a]"> · não achei no mapa</span>}</p>
                       {c.contatoProducao && <p><b className="text-[#191625] font-medium">Recebe material:</b> {c.contatoProducao}</p>}
                       {c.maquinas && <p className="sm:col-span-2"><b className="text-[#191625] font-medium">Máquinas:</b> {c.maquinas}</p>}
                       {c.capacidade && <p><b className="text-[#191625] font-medium">Capacidade:</b> {c.capacidade}</p>}
@@ -80,6 +80,7 @@ export function CadastrosParceirosCard({ onAprovar }: { onAprovar: (f: Fornecedo
                         <div key={s.id} className="px-3 py-2 text-[12.5px]">
                           <p className="font-semibold text-[#191625]">{nomeServico(s)}</p>
                           <p className="text-[#5e5c68]">{textoCobranca(s)} · {textoPrazo(s)}{s.minimo ? ` · mínimo ${s.minimo}` : ""}</p>
+                          {textoTecnico(s) && <p className="text-[#5e5c68] mt-0.5">{textoTecnico(s)}</p>}
                           {s.obs && <p className="text-[#898892] mt-0.5">{s.obs}</p>}
                         </div>
                       ))}

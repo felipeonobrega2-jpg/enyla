@@ -1,7 +1,9 @@
 // Parceiros ENYLA: cadastro público de quem presta serviço (impressão, acabamento, corte e vinco, colagem, faca…).
-// Cada serviço tem o jeito de cobrar, o tempo médio de entrega (ou "não consigo mensurar") e observações.
-// Puro: tipos, opções e validação (o formulário e o servidor usam os mesmos).
+// Cada serviço tem as perguntas técnicas que a operação precisa (formato da máquina, materiais, tipos), o jeito de
+// cobrar e o tempo médio de entrega (ou "não consigo mensurar"). O endereço vem pelo CEP e vira a base dele no
+// mapa (de onde levamos e buscamos material). Puro: tipos, opções e validação (formulário e servidor usam os mesmos).
 import type { FornecedorProducao, Servico } from "./producao"
+import type { Endereco } from "./frete"
 
 export type IdServicoParceiro =
   | "impressaoOffset" | "impressaoDigital" | "laminacao" | "verniz" | "hotStamping" | "relevo"
@@ -24,6 +26,93 @@ export const SERVICOS_PARCEIRO: { id: IdServicoParceiro; nome: string; dica: str
   { id: "outro", nome: "Outro serviço", dica: "Conta pra gente qual" },
 ]
 
+// ── Perguntas técnicas por serviço (todas opcionais: quanto mais, melhor a gente encaixa os pedidos) ──
+export type TipoPergunta = "multi" | "um" | "simnao" | "numero" | "formato"
+export type Pergunta = { id: string; rotulo: string; dica?: string; tipo: TipoPergunta; opcoes?: string[]; unidade?: string; max?: number }
+export type Formato = { l: number; a: number }   // cm
+export type Resposta = string | string[] | number | boolean | Formato
+
+const CLICHE = ["Eu faço o clichê", "Uso o que mandarem", "Mando fazer fora"]
+const FORMATO_MAX = (rotulo = "Formato máximo da folha", dica = "O maior tamanho que a máquina aceita, em cm"): Pergunta => ({ id: "formatoMax", rotulo, dica, tipo: "formato" })
+const FORMATO_MIN: Pergunta = { id: "formatoMin", rotulo: "Formato mínimo da folha", dica: "A menor folha que dá para rodar, em cm", tipo: "formato" }
+
+export const PERGUNTAS: Record<IdServicoParceiro, Pergunta[]> = {
+  impressaoOffset: [
+    { id: "cores", rotulo: "Quantas cores a máquina imprime de uma vez?", tipo: "um", opcoes: ["1 cor", "2 cores", "4 cores", "5 cores", "6 cores ou mais"] },
+    FORMATO_MAX(), FORMATO_MIN,
+    { id: "gramaturaMax", rotulo: "Gramatura máxima", tipo: "numero", unidade: "g/m²", max: 1000 },
+    { id: "materiais", rotulo: "Materiais que imprime", tipo: "multi", opcoes: ["Cartão triplex", "Cartão duplex", "Kraft", "Couché", "Papel offset", "Metalizado", "Adesivo"] },
+    { id: "corEspecial", rotulo: "Imprime cor especial (Pantone)?", tipo: "simnao" },
+    { id: "chapa", rotulo: "E a chapa (CTP)?", tipo: "um", opcoes: ["Inclusa no preço", "Cobro à parte", "Mando fazer fora"] },
+    { id: "tiragemMin", rotulo: "Tiragem mínima", tipo: "numero", unidade: "folhas", max: 1_000_000 },
+  ],
+  impressaoDigital: [
+    FORMATO_MAX(),
+    { id: "gramaturaMax", rotulo: "Gramatura máxima", tipo: "numero", unidade: "g/m²", max: 1000 },
+    { id: "materiais", rotulo: "Materiais que imprime", tipo: "multi", opcoes: ["Cartão", "Kraft", "Couché", "Adesivo de papel", "Adesivo vinil", "Metalizado"] },
+    { id: "frenteVerso", rotulo: "Imprime frente e verso?", tipo: "simnao" },
+    { id: "corteEletronico", rotulo: "Faz corte ou meio-corte eletrônico (plotter)?", tipo: "simnao" },
+  ],
+  laminacao: [
+    { id: "tipos", rotulo: "Tipos de laminação", tipo: "multi", opcoes: ["Fosca", "Brilho", "Soft touch", "Holográfica", "Metalizada"] },
+    FORMATO_MAX(),
+    { id: "lados", rotulo: "Lamina", tipo: "um", opcoes: ["Só um lado", "Os dois lados"] },
+  ],
+  verniz: [
+    { id: "tipos", rotulo: "Tipos de verniz", tipo: "multi", opcoes: ["UV total", "UV localizado", "Com relevo (3D)", "Base água", "Fosco/brilho seletivo"] },
+    FORMATO_MAX(),
+    { id: "tela", rotulo: "Faz a tela/clichê do localizado?", tipo: "simnao" },
+  ],
+  hotStamping: [
+    { id: "fitas", rotulo: "Cores de fita", tipo: "multi", opcoes: ["Dourado", "Prata", "Holográfico", "Cobre / rosé", "Preto", "Outras cores"] },
+    FORMATO_MAX("Área máxima de gravação", "O maior tamanho de gravação por batida, em cm"),
+    { id: "cliche", rotulo: "Clichê", tipo: "um", opcoes: CLICHE },
+    { id: "comRelevo", rotulo: "Faz hot com relevo junto?", tipo: "simnao" },
+  ],
+  relevo: [
+    { id: "tipos", rotulo: "Tipos", tipo: "multi", opcoes: ["Relevo seco", "Baixo-relevo", "Relevo americano", "Relevo com hot"] },
+    FORMATO_MAX("Área máxima", "Em cm"),
+    { id: "cliche", rotulo: "Clichê", tipo: "um", opcoes: CLICHE },
+  ],
+  corteVinco: [
+    { id: "maquina", rotulo: "Tipo de máquina", tipo: "um", opcoes: ["Automática (Bobst ou similar)", "Plana / Minerva", "Laser ou plotter"] },
+    FORMATO_MAX(), FORMATO_MIN,
+    { id: "materiais", rotulo: "Materiais que corta", tipo: "multi", opcoes: ["Cartão até 350 g", "Cartão acima de 350 g", "Micro-ondulado", "Papelão ondulado", "Adesivo"] },
+    { id: "faca", rotulo: "Faca", tipo: "um", opcoes: ["Fabrico a faca", "Uso a faca que mandarem", "Mando fazer fora"] },
+    { id: "destaque", rotulo: "Faz o destaque (tirar o refile)?", tipo: "simnao" },
+  ],
+  colagem: [
+    { id: "modo", rotulo: "Como cola", tipo: "um", opcoes: ["Manual", "Coladeira automática", "Os dois"] },
+    { id: "tipos", rotulo: "Tipos de caixa que cola", tipo: "multi", opcoes: ["Cartucho (cola lateral)", "Fundo automático", "Fundo 4 ou 6 pontos", "Berço / interno", "Com visor (janela)", "Display"] },
+    { id: "porDia", rotulo: "Quantas caixas por dia, em média", tipo: "numero", unidade: "caixas/dia", max: 10_000_000 },
+  ],
+  faca: [
+    { id: "arquivos", rotulo: "Arquivos que recebe", tipo: "multi", opcoes: ["DXF", "PDF", "AI", "CDR"] },
+    { id: "tipo", rotulo: "Tipo de faca", tipo: "um", opcoes: ["Plana (lâmina em madeira)", "Rotativa", "As duas"] },
+    { id: "montada", rotulo: "Entrega a faca pronta para a máquina (com borracha)?", tipo: "simnao" },
+  ],
+  papel: [
+    { id: "tipos", rotulo: "O que vende", tipo: "multi", opcoes: ["Cartão triplex", "Cartão duplex", "Kraft", "Couché", "Papel offset", "Adesivo", "Papelão"] },
+    { id: "gramaturas", rotulo: "Gramaturas", tipo: "multi", opcoes: ["até 200 g", "250 g", "300 g", "350 g", "400 g ou mais"] },
+    { id: "formatos", rotulo: "Formatos", tipo: "multi", opcoes: ["66 × 96", "77 × 113", "Bobina", "Corta no formato"] },
+    { id: "entrega", rotulo: "Entrega no endereço?", tipo: "simnao" },
+  ],
+  arte: [
+    { id: "programas", rotulo: "Programas", tipo: "multi", opcoes: ["Illustrator", "CorelDRAW", "Photoshop", "ArtiosCAD / Esko"] },
+    { id: "dieline", rotulo: "Monta a planificação (faca/dieline)?", tipo: "simnao" },
+    { id: "mockup", rotulo: "Faz mockup 3D?", tipo: "simnao" },
+  ],
+  fechamento: [
+    { id: "entregas", rotulo: "O que entrega", tipo: "multi", opcoes: ["Fechamento de arquivo", "Prova de cor", "Imposição", "Chapa (CTP)"] },
+  ],
+  transporte: [
+    { id: "veiculos", rotulo: "Veículos", tipo: "multi", opcoes: ["Moto", "Carro", "Utilitário / Fiorino", "Van", "Caminhão"] },
+    { id: "regiao", rotulo: "Onde atende", tipo: "multi", opcoes: ["Mesma cidade", "Região metropolitana", "Interior do estado", "Outros estados"] },
+    { id: "cargaKg", rotulo: "Carga por viagem", tipo: "numero", unidade: "kg", max: 100_000 },
+  ],
+  outro: [],
+}
+
 export type FormaCobranca = "milheiro" | "folha" | "unidade" | "m2" | "acertoMilheiro" | "trabalho" | "hora" | "kg" | "tabela" | "varia"
 export const FORMAS_COBRANCA: { id: FormaCobranca; nome: string; unidade: string | null }[] = [
   { id: "milheiro", nome: "Por milheiro", unidade: "por mil" },
@@ -41,12 +130,13 @@ export const FORMAS_COBRANCA: { id: FormaCobranca; nome: string; unidade: string
 export type ServicoCadastrado = {
   id: IdServicoParceiro
   qual?: string                    // "outro": qual serviço
+  tecnico?: Record<string, Resposta>
   cobranca: FormaCobranca | null
-  valor?: number | null            // valor de referência na unidade da cobrança
-  acerto?: number | null           // acerto + milheiro
+  valor?: number | null
+  acerto?: number | null
   prazoDias: number | null         // dias úteis em média
   prazoVaria: boolean              // "não consigo mensurar agora"
-  minimo?: string                  // pedido mínimo
+  minimo?: string
   obs?: string
 }
 
@@ -54,30 +144,37 @@ export type CadastroParceiro = {
   id: string
   em: string
   status: "novo" | "aprovado" | "recusado"
-  gerente: string                  // gerente de contas da ENYLA que fala com ele
+  gerente: string
   // empresa
   nomeFantasia: string
   razaoSocial?: string
-  documento: string                // CNPJ ou CPF (só números)
+  documento: string
   tipoDocumento: "cnpj" | "cpf"
+  // base (onde levamos e buscamos material)
+  cep: string
+  rua: string
+  numero: string
+  complemento?: string
+  bairro: string
   cidade: string
   uf: string
-  endereco?: string
+  referencia?: string              // ponto de referência / como chegar
+  base?: Endereco | null           // geocodificado no envio (para o frete)
   // contato
   responsavel: string
-  whatsapp: string                 // só números, com DDD
+  whatsapp: string
   email: string
-  contatoProducao?: string         // quem recebe o material
+  contatoProducao?: string
   // serviços
   servicos: ServicoCadastrado[]
   // operação
   capacidade?: string
   horario?: string
   maquinas?: string
-  arquivos: { nome: string; url: string }[]  // tabela de preços, orçamento de exemplo
+  arquivos: { nome: string; url: string }[]
   comoConheceu?: string
   aceite: boolean
-  fornecedorId?: string            // depois de aprovado: o fornecedor criado no sistema
+  fornecedorId?: string
 }
 
 export const GERENTE_PADRAO = "Felipe"
@@ -100,6 +197,7 @@ export function cpfValido(v: string): boolean {
 }
 export const emailValido = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((e ?? "").trim())
 export const whatsappValido = (w: string) => { const d = soDigitos(w).replace(/^55(?=\d{10,11}$)/, ""); return d.length === 10 || d.length === 11 }
+export const cepValido = (c: string) => soDigitos(c).length === 8
 
 export function mascaraDocumento(v: string, tipo: "cnpj" | "cpf") {
   const d = soDigitos(v).slice(0, tipo === "cnpj" ? 14 : 11)
@@ -114,14 +212,21 @@ export function mascaraTelefone(v: string) {
   if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
 }
+export const mascaraCep = (v: string) => soDigitos(v).slice(0, 8).replace(/^(\d{5})(\d)/, "$1-$2")
 
-// Erros por etapa do formulário (o mesmo vale no servidor)
-export type Etapa = "empresa" | "contato" | "servicos" | "detalhes" | "final"
+export const ETAPAS_IDS = ["empresa", "endereco", "contato", "servicos", "detalhes", "final"] as const
+export type Etapa = typeof ETAPAS_IDS[number]
 export function errosDaEtapa(c: Partial<CadastroParceiro>, etapa: Etapa): Record<string, string> {
   const e: Record<string, string> = {}
   if (etapa === "empresa") {
     if (!c.nomeFantasia?.trim()) e.nomeFantasia = "Como sua empresa é conhecida?"
     if (c.tipoDocumento === "cpf" ? !cpfValido(c.documento ?? "") : !cnpjValido(c.documento ?? "")) e.documento = c.tipoDocumento === "cpf" ? "Confira o CPF" : "Confira o CNPJ"
+  }
+  if (etapa === "endereco") {
+    if (!cepValido(c.cep ?? "")) e.cep = "CEP com 8 números"
+    if (!c.rua?.trim()) e.rua = "Qual a rua?"
+    if (!c.numero?.trim()) e.numero = "Número (ou s/n)"
+    if (!c.bairro?.trim()) e.bairro = "Qual o bairro?"
     if (!c.cidade?.trim()) e.cidade = "Qual a cidade?"
     if (!/^[A-Za-z]{2}$/.test(c.uf ?? "")) e.uf = "UF"
   }
@@ -133,28 +238,46 @@ export function errosDaEtapa(c: Partial<CadastroParceiro>, etapa: Etapa): Record
   if (etapa === "servicos" && !(c.servicos?.length)) e.servicos = "Escolha pelo menos um serviço"
   if (etapa === "detalhes") for (const s of c.servicos ?? []) {
     if (s.id === "outro" && !s.qual?.trim()) e[`${s.id}.qual`] = "Qual serviço?"
-    if (!s.cobranca) e[`${s.id}.cobranca`] = "Como você cobra?"
-    if (!s.prazoVaria && !(s.prazoDias && s.prazoDias > 0 && s.prazoDias <= 120)) e[`${s.id}.prazo`] = "Informe o tempo médio ou marque que varia"
+    if (!s.cobranca) e[`${s.id}.cobranca`] = "Escolha uma das opções"
+    if (!s.prazoVaria && !(s.prazoDias && s.prazoDias > 0 && s.prazoDias <= 120)) e[`${s.id}.prazo`] = "Informe o prazo médio ou marque que varia"
   }
   if (etapa === "final" && !c.aceite) e.aceite = "Precisa concordar para enviar"
   return e
 }
-export const errosDoCadastro = (c: Partial<CadastroParceiro>) =>
-  (["empresa", "contato", "servicos", "detalhes", "final"] as Etapa[]).reduce((t, et) => ({ ...t, ...errosDaEtapa(c, et) }), {} as Record<string, string>)
+export const errosDoCadastro = (c: Partial<CadastroParceiro>) => ETAPAS_IDS.reduce((t, et) => ({ ...t, ...errosDaEtapa(c, et) }), {} as Record<string, string>)
 
-// Limpa o que veio do formulário (texto curto, números dentro do razoável)
-export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParceiro, "id" | "em" | "status" | "gerente" | "arquivos"> {
+// Respostas técnicas: só as perguntas que existem, dentro das opções e de tamanhos razoáveis
+export function limparTecnico(id: IdServicoParceiro, t: unknown): Record<string, Resposta> | undefined {
+  if (!t || typeof t !== "object") return undefined
+  const out: Record<string, Resposta> = {}
+  for (const p of PERGUNTAS[id] ?? []) {
+    const v = (t as Record<string, unknown>)[p.id]
+    if (v == null || v === "") continue
+    if (p.tipo === "multi" && Array.isArray(v)) { const xs = v.filter(x => p.opcoes?.includes(String(x))).map(String); if (xs.length) out[p.id] = xs }
+    else if (p.tipo === "um" && p.opcoes?.includes(String(v))) out[p.id] = String(v)
+    else if (p.tipo === "simnao" && typeof v === "boolean") out[p.id] = v
+    else if (p.tipo === "numero") { const n = Number(v); if (Number.isFinite(n) && n > 0 && n <= (p.max ?? 1e7)) out[p.id] = Math.round(n * 100) / 100 }
+    else if (p.tipo === "formato" && typeof v === "object") {
+      const f = v as Partial<Formato>, l = Number(f.l), a = Number(f.a)
+      if (Number.isFinite(l) && Number.isFinite(a) && l > 0 && a > 0 && l <= 300 && a <= 300) out[p.id] = { l: Math.round(l * 10) / 10, a: Math.round(a * 10) / 10 }
+    }
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
+export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParceiro, "id" | "em" | "status" | "gerente" | "arquivos" | "base"> {
   const t = (s: unknown, max = 200) => String(s ?? "").replace(/\s+/g, " ").trim().slice(0, max)
   const n = (v: unknown, max: number) => { const k = Number(v); return Number.isFinite(k) && k > 0 && k <= max ? Math.round(k * 100) / 100 : null }
   const ids = new Set(SERVICOS_PARCEIRO.map(s => s.id)), formas = new Set(FORMAS_COBRANCA.map(f => f.id))
   return {
     nomeFantasia: t(x.nomeFantasia, 120), razaoSocial: t(x.razaoSocial, 160) || undefined,
     tipoDocumento: x.tipoDocumento === "cpf" ? "cpf" : "cnpj", documento: soDigitos(x.documento ?? "").slice(0, 14),
-    cidade: t(x.cidade, 80), uf: t(x.uf, 2).toUpperCase(), endereco: t(x.endereco, 240) || undefined,
+    cep: soDigitos(x.cep ?? "").slice(0, 8), rua: t(x.rua, 160), numero: t(x.numero, 20), complemento: t(x.complemento, 80) || undefined,
+    bairro: t(x.bairro, 80), cidade: t(x.cidade, 80), uf: t(x.uf, 2).toUpperCase(), referencia: t(x.referencia, 200) || undefined,
     responsavel: t(x.responsavel, 100), whatsapp: soDigitos(x.whatsapp ?? "").slice(-13), email: t(x.email, 160).toLowerCase(),
     contatoProducao: t(x.contatoProducao, 160) || undefined,
     servicos: (x.servicos ?? []).filter(s => ids.has(s.id)).slice(0, 20).map(s => ({
-      id: s.id, qual: s.id === "outro" ? t(s.qual, 80) : undefined,
+      id: s.id, qual: s.id === "outro" ? t(s.qual, 80) : undefined, tecnico: limparTecnico(s.id, s.tecnico),
       cobranca: s.cobranca && formas.has(s.cobranca) ? s.cobranca : null,
       valor: n(s.valor, 1_000_000), acerto: n(s.acerto, 1_000_000),
       prazoDias: s.prazoVaria ? null : n(s.prazoDias, 120), prazoVaria: !!s.prazoVaria,
@@ -174,15 +297,31 @@ export function textoCobranca(s: ServicoCadastrado) {
   if (s.cobranca === "acertoMilheiro" && (s.valor || s.acerto)) return `${s.acerto ? `acerto ${brl(s.acerto)} + ` : ""}${s.valor ? `${brl(s.valor)} por mil` : "milheiro"}`
   return s.valor && f.unidade ? `${brl(s.valor)} ${f.unidade}` : f.nome
 }
+export function textoResposta(p: Pergunta, v: Resposta): string {
+  if (p.tipo === "formato" && typeof v === "object" && !Array.isArray(v)) return `${String((v as Formato).l).replace(".", ",")} × ${String((v as Formato).a).replace(".", ",")} cm`
+  if (Array.isArray(v)) return v.join(", ")
+  if (typeof v === "boolean") return v ? "sim" : "não"
+  if (typeof v === "number") return `${v.toLocaleString("pt-BR")}${p.unidade ? ` ${p.unidade}` : ""}`
+  return String(v)
+}
+// "Formato máximo: 66 × 96 cm · Cores: 4 cores · …"
+export const textoTecnico = (s: ServicoCadastrado) =>
+  (PERGUNTAS[s.id] ?? []).filter(p => s.tecnico?.[p.id] != null).map(p => `${p.rotulo.replace(/\?$/, "")}: ${textoResposta(p, s.tecnico![p.id])}`).join(" · ")
+export const textoEndereco = (c: Pick<CadastroParceiro, "rua" | "numero" | "complemento" | "bairro" | "cidade" | "uf" | "cep">) =>
+  `${c.rua}, ${c.numero}${c.complemento ? ` (${c.complemento})` : ""} · ${c.bairro} · ${c.cidade}/${c.uf} · CEP ${mascaraCep(c.cep)}`
 
-// Aprovado: vira fornecedor de produção no sistema (preços ficam para você conferir; o prazo vem do que ele disse)
+// Aprovado: vira fornecedor de produção (prazo, contato, base no mapa e a máquina de impressão, se informada)
 export function paraFornecedor(c: CadastroParceiro, id: string): FornecedorProducao {
   const prazos = c.servicos.map(s => s.prazoDias).filter((d): d is number => !!d)
-  const resumo = c.servicos.map(s => `${nomeServico(s)}: ${textoCobranca(s)} · ${textoPrazo(s)}${s.minimo ? ` · mínimo ${s.minimo}` : ""}`).join(" | ")
+  const resumo = c.servicos.map(s => [`${nomeServico(s)}: ${textoCobranca(s)} · ${textoPrazo(s)}${s.minimo ? ` · mínimo ${s.minimo}` : ""}`, textoTecnico(s)].filter(Boolean).join(" · ")).join(" | ")
+  const offset = c.servicos.find(s => s.id === "impressaoOffset")
+  const fmax = offset?.tecnico?.formatoMax as Formato | undefined
   return {
     id, nome: c.nomeFantasia, ativo: true, servicos: {}, frete: 0,
     prazoDias: prazos.length ? Math.max(...prazos) : 5,
-    obs: `Cadastro Parceiros ENYLA (${new Date(c.em).toLocaleDateString("pt-BR")}): ${resumo}`.slice(0, 1500),
+    obs: `Cadastro Parceiros ENYLA (${new Date(c.em).toLocaleDateString("pt-BR")}): ${resumo}`.slice(0, 2000),
     contato: c.contatoProducao || c.responsavel, telefone: c.whatsapp,
+    ...(c.base ? { endereco: c.base } : {}),
+    ...(fmax ? { maquina: { nome: `${String(offset?.tecnico?.cores ?? "Offset")} ${fmax.l}×${fmax.a}`, largura: Math.round(fmax.l * 10), altura: Math.round(fmax.a * 10), pinca: 10, margem: 5 } } : {}),
   }
 }

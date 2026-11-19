@@ -3,7 +3,8 @@
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
 import { notificar, LINK_SISTEMA } from "./notificar"
-import { limparCadastro, errosDoCadastro, nomeServico, textoPrazo, GERENTE_PADRAO, type CadastroParceiro } from "./parceiros"
+import { limparCadastro, errosDoCadastro, nomeServico, textoPrazo, textoEndereco, GERENTE_PADRAO, type CadastroParceiro } from "./parceiros"
+import { textoEndereco as textoParaMotorista, type Endereco } from "./frete"
 
 type Cfg = Record<string, unknown> & { cadastrosParceiros?: CadastroParceiro[]; agenteAuto?: { avisoNumero?: string } }
 const TIPOS = /^(application\/pdf|image\/(png|jpe?g|webp|heic|heif)|application\/vnd\.(ms-excel|openxmlformats-officedocument\.(spreadsheetml\.sheet|wordprocessingml\.document))|text\/csv)$/
@@ -34,7 +35,17 @@ export async function receberCadastro(form: FormData): Promise<{ ok: true; id: s
     arquivos.push({ nome: f.name.slice(0, 120), url: supabase.storage.from("pedido-arquivos").getPublicUrl(caminho).data.publicUrl })
   }
 
-  const cadastro: CadastroParceiro = { ...dados, id, em: new Date().toISOString(), status: "novo", gerente: GERENTE_PADRAO, arquivos }
+  // Base no mapa (para o frete de levar e buscar material): coordenada pelo CEP + número; rua e bairro como ele escreveu
+  let base: Endereco | null = null
+  try {
+    const { enderecoPeloCep } = await import("./geocodificar")
+    const g = await Promise.race([enderecoPeloCep(dados.cep, dados.numero, dados.complemento), new Promise<{ erro: string }>(r => setTimeout(() => r({ erro: "tempo" }), 12_000))])
+    if (!("erro" in g)) {
+      const partes = { cep: g.cep, rua: dados.rua || g.rua, numero: dados.numero, complemento: dados.complemento, bairro: dados.bairro || g.bairro, cidade: dados.cidade || g.cidade, uf: dados.uf || g.uf }
+      base = { ...partes, texto: textoParaMotorista(partes), lat: g.lat, lng: g.lng }
+    }
+  } catch { /* sem coordenada: você ajusta na aprovação */ }
+  const cadastro: CadastroParceiro = { ...dados, id, em: new Date().toISOString(), status: "novo", gerente: GERENTE_PADRAO, arquivos, base }
   await mudarConfig((d: Cfg) => ({ cadastrosParceiros: [cadastro, ...(d.cadastrosParceiros ?? [])].slice(0, 500) }))
 
   // Aviso para você (celular e WhatsApp)
@@ -46,7 +57,7 @@ export async function receberCadastro(form: FormData): Promise<{ ok: true; id: s
     const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
     if (destino) {
       const linhas = cadastro.servicos.map(s => `• ${nomeServico(s)} · ${textoPrazo(s)}`)
-      const texto = [`🤝 *Novo parceiro: ${cadastro.nomeFantasia}*`, `${cadastro.cidade}/${cadastro.uf} · ${cadastro.responsavel}`, `wa.me/55${cadastro.whatsapp.replace(/^55/, "")}`, ...linhas, arquivos.length ? `📎 ${arquivos.length} arquivo(s) com preços` : "", `${LINK_SISTEMA}/?aba=fornecedores`].filter(Boolean).join("\n")
+      const texto = [`🤝 *Novo parceiro: ${cadastro.nomeFantasia}*`, `${cadastro.responsavel} · ${textoEndereco(cadastro)}${base ? "" : " (não achei no mapa)"}`, `wa.me/55${cadastro.whatsapp.replace(/^55/, "")}`, ...linhas, arquivos.length ? `📎 ${arquivos.length} arquivo(s) com preços` : "", `${LINK_SISTEMA}/?aba=fornecedores`].filter(Boolean).join("\n")
       await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: texto }) })
     }
   } catch { /* o cadastro já está salvo */ }
