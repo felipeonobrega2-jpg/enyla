@@ -174,10 +174,10 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
     const ult = await ultimaReal(e.jid)
     if (!ult || ult.from_me || tentou.has(ult.id)) continue
     // O agente já olhou esta mensagem e decidiu (segurou para você, conversa sua, decisão sua): o aviso é seu.
-    // Só volta a tentar se o que segurou foi falha (IA fora, cota cheia) ou "conversa sua" (você parou há 3 h+).
+    // Só volta a tentar se o que segurou foi falha (IA fora, cota cheia). "Conversa sua" nunca: o aviso é seu.
     const { data: m } = await supabase.from("whatsapp_mensagens").select("ts").eq("id", ult.id).maybeSingle()
     const { data: reg } = m ? await supabase.from("agente_registro").select("motivo").eq("jid", e.jid).gte("em", m.ts).order("em", { ascending: false }).limit(1).maybeSingle() : { data: null }
-    if (reg && !/sem crédito|IA falhou|limite|fila de envio|conversa sua/i.test((reg as { motivo?: string }).motivo ?? "")) { novasTentativas.push(ult.id); continue }
+    if (reg && !/sem crédito|IA falhou|limite|fila de envio/i.test((reg as { motivo?: string }).motivo ?? "")) { novasTentativas.push(ult.id); continue }
     novasTentativas.push(ult.id)
     if (await despachar(ult.id, ordem)) { despachadas.add(e.jid); vagas.n--; ordem++ }
   }

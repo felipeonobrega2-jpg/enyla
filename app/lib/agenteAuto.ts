@@ -428,7 +428,6 @@ export function comDesculpa(texto: string): string {
 // atrasada: resposta que não saiu na hora (ex.: IA sem crédito). Sai já, sem a espera, mesmo que a mensagem já
 // tenha sido "reservada" pela tentativa que falhou, e começa pedindo desculpa pela demora. As travas são as de sempre
 // (cliente antigo, conversa sua, MQL, limites): só muda o tempo e a primeira frase.
-const HORAS_VOCE_ATRASADA = 3
 export async function responderSozinho(msgId: string, opts: { atrasada?: boolean } = {}) {
   const cfg = await lerCfg()
   const auto = cfg.agenteAuto
@@ -477,8 +476,10 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   if (!conversaNova) return
   // Você escreveu nesta conversa nas últimas 24 h (celular ou tela do sistema): a conversa é sua, o agente não entra.
   // Lead do digital é a exceção: esse é todo do agente.
-  // Recuperação (atrasada): o lead está esperando e você não mexe na conversa há HORAS_VOCE_ATRASADA: o agente assume
-  if (!(c.etiquetas ?? []).includes(ETIQUETAS_AGENTE.digital) && await voceAtende(jid, cfg, opts.atrasada ? HORAS_VOCE_ATRASADA : 24))
+  // Você escreveu nesta conversa (em qualquer momento da vida dela como conversa nova): é sua, o agente nunca entra,
+  // nem na recuperação. 19/11: o agente entrou na conversa do Anderson (você tinha prometido o orçamento) pedindo foto
+  // do frasco, sem contexto. Quem espera numa conversa sua vira aviso para você, não mensagem do agente.
+  if (!(c.etiquetas ?? []).includes(ETIQUETAS_AGENTE.digital) && await voceAtende(jid, cfg, DIAS_CONVERSA_NOVA * 24))
     return registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: "indefinido", enviou: false, texto: "", motivo: "conversa sua (você escreveu nas últimas 24 h)" })
 
   const log = (cfg.agenteLog ?? []).filter(l => l.jid === jid)
