@@ -348,3 +348,50 @@ html:not(.dark):has(body) { color-scheme: light only; }
 .lp-zoom { animation: lp-zoom 24s ease-in-out infinite alternate; }
 .lp-num { font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .lp-flutua, .lp-zoom { animation: none; } }
+
+/* Gráfica virtual (link de acompanhamento): máquinas vivas, bem leves */
+.gv-gira { animation: gv-gira 1.1s linear infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes gv-gira { to { transform: rotate(360deg); } }
+.gv-folha { animation: gv-folha 2.7s linear infinite; }
+@keyframes gv-folha { 0% { transform: translateX(10px); opacity: 0; } 8% { opacity: 1; } 85% { opacity: 1; } 100% { transform: translateX(150px); opacity: 0; } }
+.gv-folha-uv { animation: gv-folha-uv 2.6s linear infinite; }
+@keyframes gv-folha-uv { 0% { transform: translateX(0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateX(120px); opacity: 0; } }
+.gv-prensa { animation: gv-prensa 1.4s cubic-bezier(.6,0,.4,1) infinite; }
+@keyframes gv-prensa { 0%, 30%, 100% { transform: translateY(0); } 50%, 60% { transform: translateY(40px); } }
+.gv-caixinha { animation: gv-caixinha 3.3s linear infinite; }
+@keyframes gv-caixinha { 0% { transform: translateX(0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateX(80px); opacity: 0; } }
+.gv-esteira { animation: gv-esteira 0.9s linear infinite; }
+@keyframes gv-esteira { to { stroke-dashoffset: -18; } }
+.gv-uv { animation: gv-uv 1.6s ease-in-out infinite; }
+@keyframes gv-uv { 50% { opacity: 0.45; } }
+.gv-pisca { animation: gv-pisca 1.2s steps(2) infinite; }
+@keyframes gv-pisca { 50% { opacity: 0.25; } }
+.gv-tela { animation: gv-pisca 2.4s ease-in-out infinite; }
+.gv-desenha { animation: gv-desenha 3.2s ease-in-out infinite; }
+@keyframes gv-desenha { 0% { stroke-dashoffset: 160; } 60%, 100% { stroke-dashoffset: 0; } }
+.gv-chapa { animation: gv-chapa 3s ease-in-out infinite; }
+@keyframes gv-chapa { 0%, 20% { transform: translateY(-26px); opacity: 0; } 45%, 80% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(0); opacity: 0; } }
+.gv-postit { animation: gv-postit 2.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes gv-postit { 50% { transform: rotate(-6deg) translateY(-2px); } }
+.gv-ponteiro { animation: gv-gira 4s linear infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+.gv-respira { animation: gv-respira 2.6s ease-in-out infinite; }
+@keyframes gv-respira { 50% { transform: translateY(-1.5px); } }
+.gv-van { animation: gv-van 6s ease-in-out infinite; }
+@keyframes gv-van { 0%, 40% { transform: translateX(0); } 55% { transform: translateX(6px); } 70%, 100% { transform: translateX(0); } }
+.gv-roda { animation: gv-gira 1s linear infinite; transform-box: fill-box; transform-origin: center; }
+.gv-pedido { animation: gv-pedido 2.2s ease-in-out infinite; }
+@keyframes gv-pedido { 50% { transform: translateY(-3px); } }
+.gv-pino { animation: gv-pino 1.4s ease-in-out infinite; }
+@keyframes gv-pino { 50% { transform: translateY(-6px); } }
+.gv-spot { animation: gv-spot 3s ease-in-out infinite; }
+@keyframes gv-spot { 50% { opacity: 0.7; } }
+.gv-surge { animation: par-surge .26s ease both; }
+@media (prefers-reduced-motion: reduce) {
+  .gv-gira, .gv-folha, .gv-folha-uv, .gv-prensa, .gv-caixinha, .gv-esteira, .gv-uv, .gv-pisca, .gv-tela, .gv-desenha, .gv-chapa, .gv-postit,
+  .gv-ponteiro, .gv-respira, .gv-van, .gv-roda, .gv-pedido, .gv-pino, .gv-spot, .gv-surge { animation: none; }
+}
+.gv-nuvem { animation: gv-nuvem 14s ease-in-out infinite alternate; }
+@keyframes gv-nuvem { to { transform: translateX(60px); } }
+.gv-pulso { animation: gv-pulso 1.8s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes gv-pulso { 0% { transform: scale(0.6); opacity: 0.5; } 100% { transform: scale(2.2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .gv-nuvem, .gv-pulso { animation: none; } }

@@ -3,6 +3,7 @@
 import { somarDiasUteis, DIAS_UTEIS_ESTIMATIVA } from "@/app/lib/diasUteis"
 import React, { useState, useEffect } from "react"
 import Image from "next/image"
+import { GraficaVirtualOpcional } from '../../GraficaVirtual'
 
 const ETAPAS = [
   { coluna: 1, label: "Pedido confirmado",    desc: "Seu pedido foi aprovado e entrou em nossa agenda.", icon: "confirmed" },
@@ -681,6 +682,9 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
             </div>
           </div>
 
+          {/* Gráfica virtual (opcional) */}
+          <GraficaVirtualOpcional coluna={card.coluna} numero={lote.numero} quantidade={card.quantidade} />
+
           {/* Cancelled */}
           {isCancelled && (
             <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] p-5 text-center space-y-2 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
@@ -816,6 +820,9 @@ export default function LoteTrackingClient({ initialLote, initialCards, initialP
             Acompanhe cada produto do seu pedido abaixo.
           </p>
         </div>
+
+        {/* Gráfica virtual (opcional): o produto mais atrasado define a entrega */}
+        {activeCards.length > 0 && <GraficaVirtualOpcional coluna={minColuna} numero={lote.numero} quantidade={totalQtd} />}
 
         {/* Summary hero */}
         <div className="rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]" style={{ background: allEntregue ? "#009351" : "#8456e8" }}>

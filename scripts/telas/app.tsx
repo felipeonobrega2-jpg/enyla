@@ -23,6 +23,7 @@ import { IdeiasView } from "@/app/components/IdeiasView"
 import { EscritorioView } from "@/app/components/EscritorioView"
 import { AuditoriaView } from "@/app/components/AuditoriaView"
 import { CaptacaoParceirosCard } from "@/app/components/CaptacaoParceirosCard"
+import TrackingClient from "@/app/track/[numero]/TrackingClient"
 import ParceirosForm from "@/app/parceiros/ParceirosForm"
 import PortalClient from "@/app/c/[token]/PortalClient"
 import { ClientePerfilModal } from "@/app/components/ClientePerfilModal"
@@ -749,6 +750,12 @@ function Telas() {
         origem={origemDoCliente("Ana Cosméticos", cfg.origensClientes, [])}
         onSalvarOrigem={o => setCfg({ ...cfg, origensClientes: o ? { "ana cosmeticos": o } : {} })} />
     case "dados": case "dados-m": case "dados-aberto": return <div style={{ height: "100vh" }}><AuditoriaView onAbrirCard={() => {}} onNavegar={() => {}} /></div>
+    case "gv": case "gv-m": case "gv-pre": case "gv-entregue": {
+      try { localStorage.setItem("track:grafica", "1") } catch { /* ok */ }
+      const col = tela === "gv-pre" ? 3 : tela === "gv-entregue" ? 9 : 5
+      const et = Array.from({ length: col }, (_, i) => ({ coluna: i + 1, dataHora: `1${i}/11/2026, 10:00:00` }))
+      return <TrackingClient numero="ORC-2026-290" initialData={{ numero: "ORC-2026-290", nomeCliente: "Ana Exemplo", descricao: "Caixa cartucho 6×15×6", materialNome: "Cartão 300g", quantidade: 12000, preco: 9540, colunaAtual: col, etapas: et, criadoEm: "10/11/2026" } as never} />
+    }
     case "captacao": case "captacao-m": return <div style={{ padding: 16, background: "#f4f3f8", minHeight: "100vh" }}><CaptacaoParceirosCard /></div>
     case "escritorio": case "escritorio-m": case "escritorio-sel": return <div style={{ height: "100vh" }}><EscritorioView /></div>
     case "ideias": return <div style={{ height: "100vh" }}><IdeiasView config={cfg} onSalvar={setCfg} /></div>

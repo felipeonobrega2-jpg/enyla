@@ -4,6 +4,7 @@ import { somarDiasUteis, DIAS_UTEIS_ESTIMATIVA } from "@/app/lib/diasUteis"
 import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
 import type { TrackingEntry, TrackingEtapa } from '../../utils/tracking-store'
+import { GraficaVirtualOpcional } from '../GraficaVirtual'
 
 const ETAPAS = [
   { coluna: 1, label: "Pedido confirmado",    desc: "Seu pedido foi aprovado e entrou em nossa agenda.",    icon: "confirmed"  },
@@ -209,6 +210,9 @@ export default function TrackingClient({ initialData, numero }: Props) {
             </div>
           </div>
         </div>
+
+        {/* ── Gráfica virtual (opcional) ─────────────────────────────── */}
+        <GraficaVirtualOpcional coluna={data.colunaAtual} numero={numero} quantidade={data.quantidade} />
 
         {/* ── Cancelled ──────────────────────────────────────────────── */}
         {isCancelled && (
