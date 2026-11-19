@@ -33,7 +33,7 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
       // decisão sua) já virou aviso para você e sai da fila, sem travar quem vem atrás
       const { data: reg } = await supabase.from("agente_registro").select("motivo, em").eq("jid", p.jid).gte("em", antes).order("em", { ascending: false }).limit(1).maybeSingle()
       const motivo = (reg as { motivo?: string } | null)?.motivo ?? ""
-      if (!reg || /sem crédito|IA falhou|limite|fila de envio/i.test(motivo)) break
+      if (reg && /sem crédito|IA falhou|limite|fila de envio/i.test(motivo)) break
       feitos.push(p.msgId)
     }
     await mudarConfig((d: Cfg) => ({ respostasPendentes: (d.respostasPendentes ?? []).filter(p => !feitos.includes(p.msgId) && agora.getTime() - new Date(p.em).getTime() < 24 * 3600_000) }))
