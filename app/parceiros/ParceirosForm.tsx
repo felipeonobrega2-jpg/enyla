@@ -4,7 +4,7 @@
 // técnicos/preço/prazo, operação), gostoso no celular e no computador. O rascunho fica no aparelho.
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Printer, Layers, Sparkles, Stamp, Mountain, Scissors, Package, Shapes, FileStack, Palette, FileCheck, Truck, Plus, Check, ChevronLeft, ArrowRight, Paperclip, X, Clock, BarChart3, ShieldCheck, Handshake, Loader2, MessageCircle, MapPin, Zap } from "lucide-react"
+import { Printer, Layers, Sparkles, Stamp, Mountain, Scissors, Package, Shapes, FileStack, Palette, FileCheck, Truck, Plus, Check, ChevronLeft, ArrowRight, Paperclip, X, Clock, BarChart3, ShieldCheck, Handshake, Loader2, MessageCircle, MapPin, Zap, Banknote, Wallet, Camera, Globe } from "lucide-react"
 import {
   SERVICOS_PARCEIRO, FORMAS_COBRANCA, PERGUNTAS, ETAPAS_IDS, errosDaEtapa, mascaraDocumento, mascaraTelefone, mascaraCep, GERENTE_PADRAO,
   type CadastroParceiro, type ServicoCadastrado, type IdServicoParceiro, type Pergunta, type Resposta, type Formato,
@@ -76,6 +76,35 @@ function PerguntaTecnica({ p, v, onChange }: { p: Pergunta; v: Resposta | undefi
     </Campo>
   )
   return <Campo rotulo={p.rotulo} dica={p.dica}><CampoFormato v={v as Formato | undefined} onChange={onChange} /></Campo>
+}
+
+// Rodapé da LP e do final
+function Rodape({ whatsappGerente }: { whatsappGerente: string | null }) {
+  return (
+    <footer className="mt-14 text-white/75" style={{ background: "#140c33" }}>
+      <div className="max-w-[1040px] mx-auto px-5 pt-10 pb-8 grid sm:grid-cols-[1.4fr_1fr_1fr] gap-8">
+        <div>
+          <img src="/brand/enyla-wordmark-light.png" alt="ENYLA" className="h-6" onError={e => { (e.target as HTMLImageElement).style.display = "none" }} />
+          <p className="mt-3 text-[13.5px] leading-relaxed max-w-[320px]">Embalagens personalizadas para marcas de todo o Brasil, produzidas com uma rede de parceiros de confiança.</p>
+        </div>
+        <div>
+          <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-white/50">Fale com a gente</p>
+          <ul className="mt-3 space-y-2 text-[14px]">
+            {whatsappGerente && <li><a className="hover:text-white inline-flex items-center gap-2" href={`https://wa.me/${whatsappGerente}`} target="_blank" rel="noreferrer"><MessageCircle className="w-4 h-4" />Gerente de contas · {GERENTE_PADRAO}</a></li>}
+            <li><a className="hover:text-white inline-flex items-center gap-2" href="https://instagram.com/enyla.embalagens" target="_blank" rel="noreferrer"><Camera className="w-4 h-4" />@enyla.embalagens</a></li>
+            <li><a className="hover:text-white inline-flex items-center gap-2" href="https://enyla.com.br" target="_blank" rel="noreferrer"><Globe className="w-4 h-4" />enyla.com.br</a></li>
+          </ul>
+        </div>
+        <div>
+          <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-white/50">Parceiros ENYLA</p>
+          <p className="mt-3 text-[13.5px] leading-relaxed">Gráficas, acabamentos, corte e vinco, colagem, faca, papel e transporte. Cadastro gratuito.</p>
+        </div>
+      </div>
+      <div className="border-t border-white/10">
+        <p className="max-w-[1040px] mx-auto px-5 py-4 text-[12px] text-white/45">© {new Date().getFullYear()} ENYLA Embalagens. Seus dados ficam só com a gente e são usados para enviar pedidos.</p>
+      </div>
+    </footer>
+  )
 }
 
 export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: string | null }) {
@@ -191,43 +220,102 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
   const fracaoSub = ETAPAS_IDS[passo] === "detalhes" && escolhidos.length ? (sub + 1) / (escolhidos.length + 1) : 0.5
   const progresso = passo < 0 ? 0 : Math.min(100, (passo + fracaoSub) / N * 100)
 
-  // ── Boas-vindas ──
+  // ── Boas-vindas (LP) ──
+  const comecar = () => { window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior }); setAnim("in-fwd"); setPasso(0) }
   if (passo === -1) return (
     <main className="min-h-[100dvh] bg-white">
-      <div className="relative overflow-hidden" style={{ background: "linear-gradient(160deg,#2a1a5e 0%,#5b34c8 55%,#7c4ee4 100%)" }}>
-        <div className="absolute -right-24 -top-24 w-80 h-80 rounded-full bg-white/10" /><div className="absolute -left-16 bottom-0 w-56 h-56 rounded-full bg-[#2fd39a]/15" />
-        <div className="relative max-w-[640px] mx-auto px-5 pt-8 pb-12 sm:pt-12 sm:pb-16 par-in-fwd">
-          <img src="/brand/enyla-wordmark-light.png" alt="ENYLA" className="h-7 mb-10" onError={e => { (e.target as HTMLImageElement).style.display = "none" }} />
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 text-white text-[12.5px] font-semibold px-3 py-1"><Handshake className="w-3.5 h-3.5" />Parceiros ENYLA</span>
-          <h1 className="mt-4 text-white text-[36px] sm:text-[46px] leading-[1.05] font-extrabold tracking-tight">Nunca mais fique ocioso.</h1>
-          <p className="mt-4 text-white/85 text-[16.5px] leading-relaxed max-w-[520px]">A ENYLA produz embalagens para marcas de todo o Brasil e distribui a produção entre parceiros de confiança. Cadastre o que você faz e receba pedidos com frequência.</p>
+      {/* Topo: foto de gráfica com o véu da marca, a promessa e os "pedidos pagos" chegando */}
+      <section className="relative overflow-hidden">
+        <picture>
+          <source media="(min-width: 640px)" srcSet="/parceiros/grafica.jpg" />
+          <img src="/parceiros/grafica-m.jpg" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover scale-105 lp-zoom" />
+        </picture>
+        <div className="absolute inset-0" style={{ background: "linear-gradient(165deg, rgba(26,14,64,0.92) 0%, rgba(58,30,140,0.80) 45%, rgba(124,78,228,0.52) 100%)" }} />
+        <div className="absolute -right-32 -bottom-40 w-[420px] h-[420px] rounded-full bg-[#2fd39a]/10 blur-2xl" />
+        <div className="relative max-w-[1040px] mx-auto px-5 pt-7 pb-14 sm:pt-10 sm:pb-20 grid lg:grid-cols-[1.15fr_1fr] gap-10 items-center">
+          <div className="par-in-fwd">
+            <img src="/brand/enyla-wordmark-light.png" alt="ENYLA" className="h-7 mb-10" onError={e => { (e.target as HTMLImageElement).style.display = "none" }} />
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 backdrop-blur text-white text-[12.5px] font-semibold px-3 py-1"><Handshake className="w-3.5 h-3.5" />Parceiros ENYLA</span>
+            <h1 className="mt-4 text-white text-[38px] sm:text-[52px] leading-[1.03] font-extrabold tracking-tight">Nunca mais<br />fique ocioso.</h1>
+            <p className="mt-4 text-white/85 text-[16.5px] sm:text-[18px] leading-relaxed max-w-[520px]">A ENYLA produz embalagens para marcas de todo o Brasil e distribui a produção entre parceiros de confiança. <b className="text-white font-semibold">Máquina parada não paga conta:</b> cadastre o que você faz e receba pedidos com frequência.</p>
+            <button onClick={comecar} className="mt-7 w-full sm:w-auto inline-flex justify-center h-14 px-8 rounded-2xl bg-white text-[16.5px] font-bold items-center gap-2 active:scale-[0.99] transition shadow-[0_10px_30px_rgba(0,0,0,0.25)]" style={{ color: ROXO }}>
+              Quero ser parceiro<ArrowRight className="w-5 h-5" />
+            </button>
+          </div>
+          {/* Notificações de pedido (ilustração de como os pedidos e pagamentos chegam) */}
+          <div className="relative h-[196px] sm:h-[230px] lg:h-[300px]" aria-hidden>
+            <div className="absolute left-0 right-6 sm:right-16 top-0 lp-flutua" style={{ animationDelay: "0s" }}>
+              <div className="rounded-2xl bg-white/95 backdrop-blur shadow-[0_14px_40px_rgba(10,5,40,0.35)] p-3.5 flex items-center gap-3 par-in-fwd" style={{ animationDelay: ".15s" }}>
+                <span className="w-11 h-11 rounded-xl grid place-items-center shrink-0 bg-[#13a06f] text-white"><Banknote className="w-5 h-5" /></span>
+                <span className="flex-1 min-w-0">
+                  <span className="flex items-center justify-between gap-2"><span className="text-[12px] font-semibold text-[#13a06f]">Pagamento recebido</span><span className="text-[11px] text-[#9a97a5]">agora</span></span>
+                  <span className="block text-[19px] font-extrabold text-[#1d1a29] leading-tight lp-num">R$ 2.480,00</span>
+                  <span className="block text-[12px] text-[#6b6878] truncate">Corte e vinco · 12.000 caixas</span>
+                </span>
+              </div>
+            </div>
+            <div className="absolute right-0 left-10 sm:left-20 top-[92px] sm:top-[108px] lg:top-[128px] lp-flutua" style={{ animationDelay: "1.2s" }}>
+              <div className="rounded-2xl bg-white/95 backdrop-blur shadow-[0_14px_40px_rgba(10,5,40,0.35)] p-3.5 flex items-center gap-3 par-in-fwd" style={{ animationDelay: ".35s" }}>
+                <span className="w-11 h-11 rounded-xl grid place-items-center shrink-0 text-white" style={{ background: ROXO }}><Package className="w-5 h-5" /></span>
+                <span className="flex-1 min-w-0">
+                  <span className="flex items-center justify-between gap-2"><span className="text-[12px] font-semibold" style={{ color: ROXO }}>Novo pedido para você</span><span className="text-[11px] text-[#9a97a5]">2 min</span></span>
+                  <span className="block text-[15px] font-bold text-[#1d1a29] leading-tight">Colagem · fundo automático</span>
+                  <span className="block text-[12px] text-[#6b6878] whitespace-nowrap">8.000 un · 4 dias úteis · <b className="text-[#13a06f]">R$ 1.150</b></span>
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-      <div className="max-w-[640px] mx-auto px-5 -mt-6 relative">
-        <div className="rounded-3xl bg-white shadow-[0_10px_40px_rgba(40,20,90,0.12)] p-5 sm:p-7 space-y-4 ds-escalonado">
+      </section>
+
+      {/* Vantagens */}
+      <section className="max-w-[1040px] mx-auto px-5 -mt-7 relative">
+        <div className="rounded-3xl bg-white shadow-[0_10px_40px_rgba(40,20,90,0.12)] p-5 sm:p-7 grid sm:grid-cols-2 gap-5 ds-escalonado">
           {[
-            { I: BarChart3, t: "Pedidos frequentes", s: "Mandamos trabalho de forma recorrente, sem você precisar correr atrás." },
-            { I: FileCheck, t: "Tudo organizado", s: "Arquivo, medida, quantidade e prazo claros em cada pedido." },
+            { I: BarChart3, t: "Pedidos frequentes", s: "Trabalho recorrente para encher a sua agenda, sem você precisar correr atrás." },
+            { I: Banknote, t: "Pagamento sem surpresa", s: "Valor e forma de pagamento combinados antes de começar cada pedido." },
             { I: Clock, t: "Quem entrega bem, recebe mais", s: "Registramos tempo e qualidade de cada trabalho. Parceiro pontual ganha prioridade." },
             { I: MessageCircle, t: `Gerente de contas: ${GERENTE_PADRAO}`, s: "Uma pessoa da ENYLA fala com você sempre que precisar." },
           ].map(({ I, t, s }) => (
             <div key={t} className="flex gap-3.5">
-              <span className="w-10 h-10 rounded-2xl grid place-items-center shrink-0" style={{ background: "#7c4ee41a", color: ROXO }}><I className="w-5 h-5" /></span>
-              <span><span className="block text-[15px] font-semibold text-[#1d1a29]">{t}</span><span className="block text-[13.5px] text-[#6b6878] leading-snug mt-0.5">{s}</span></span>
+              <span className="w-11 h-11 rounded-2xl grid place-items-center shrink-0" style={{ background: "#7c4ee41a", color: ROXO }}><I className="w-5 h-5" /></span>
+              <span><span className="block text-[15.5px] font-semibold text-[#1d1a29]">{t}</span><span className="block text-[13.5px] text-[#6b6878] leading-snug mt-0.5">{s}</span></span>
             </div>
           ))}
         </div>
-        <button onClick={() => { window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior }); setAnim("in-fwd"); setPasso(0) }} className="mt-6 w-full h-14 rounded-2xl text-white text-[16.5px] font-bold flex items-center justify-center gap-2 active:scale-[0.99] transition shadow-[0_8px_24px_rgba(124,78,228,0.35)]" style={{ background: ROXO }}>
+      </section>
+
+      {/* Como funciona */}
+      <section className="max-w-[1040px] mx-auto px-5 pt-12 pb-4">
+        <p className="text-[12.5px] font-bold uppercase tracking-[0.14em]" style={{ color: ROXO }}>Como funciona</p>
+        <h2 className="mt-1.5 text-[26px] sm:text-[30px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Do cadastro ao dinheiro na conta</h2>
+        <ol className="mt-6 grid sm:grid-cols-3 gap-3">
+          {[
+            { n: "1", I: FileCheck, t: "Cadastre o que você faz", s: "Serviços, máquina, prazo e como você cobra. Uns 5 minutos." },
+            { n: "2", I: Package, t: "Receba os pedidos", s: "Arquivo, medida, quantidade e prazo chegam pelo WhatsApp." },
+            { n: "3", I: Banknote, t: "Entregue e receba", s: "Pagamento como combinado. Quem entrega bem recebe mais pedidos." },
+          ].map(({ n, I, t, s }) => (
+            <li key={n} className="relative rounded-2xl bg-[#f8f7fc] p-5 overflow-hidden">
+              <span className="absolute -right-2 -top-4 text-[86px] font-black text-[#7c4ee4]/[0.07] leading-none select-none">{n}</span>
+              <span className="w-10 h-10 rounded-xl grid place-items-center text-white" style={{ background: n === "3" ? "#13a06f" : ROXO }}><I className="w-5 h-5" /></span>
+              <p className="mt-3 text-[15.5px] font-bold text-[#1d1a29]">{t}</p>
+              <p className="mt-1 text-[13.5px] text-[#6b6878] leading-snug">{s}</p>
+            </li>
+          ))}
+        </ol>
+        <button onClick={comecar} className="mt-8 w-full sm:w-auto sm:px-10 h-14 rounded-2xl text-white text-[16.5px] font-bold flex items-center justify-center gap-2 active:scale-[0.99] transition shadow-[0_8px_24px_rgba(124,78,228,0.35)]" style={{ background: ROXO }}>
           Quero ser parceiro<ArrowRight className="w-5 h-5" />
         </button>
-        <p className="text-center text-[12.5px] text-[#9a97a5] mt-3 pb-10">Leva uns 5 minutos · você pode parar e voltar depois</p>
-      </div>
+        <p className="text-[12.5px] text-[#9a97a5] mt-3">Leva uns 5 minutos · você pode parar e voltar depois · sem custo</p>
+      </section>
+      <Rodape whatsappGerente={whatsappGerente} />
     </main>
   )
 
   // ── Enviado ──
   if (passo === N) return (
-    <main className="min-h-[100dvh] bg-white grid place-items-center px-5">
+    <main className="min-h-[100dvh] bg-white flex flex-col">
+      <div className="flex-1 grid place-items-center px-5">
       <div className="max-w-[460px] w-full text-center py-16 par-in-fwd">
         <span className="mx-auto w-20 h-20 rounded-full grid place-items-center bg-[#2fd39a]/15 text-[#13a06f] ds-pop"><Check className="w-10 h-10" strokeWidth={2.5} /></span>
         <h1 className="mt-6 text-[28px] font-extrabold text-[#1d1a29] tracking-tight">Cadastro recebido!</h1>
@@ -238,6 +326,8 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
         </div>
         {whatsappGerente && <a href={`https://wa.me/${whatsappGerente}?text=${encodeURIComponent(`Oi, ${GERENTE_PADRAO}! Acabei de me cadastrar como parceiro: ${d.nomeFantasia}.`)}`} className="mt-6 inline-flex items-center gap-2 h-12 px-6 rounded-2xl bg-[#25d366] text-white font-semibold text-[15px]"><MessageCircle className="w-5 h-5" />Falar com o {GERENTE_PADRAO}</a>}
       </div>
+      </div>
+      <Rodape whatsappGerente={whatsappGerente} />
     </main>
   )
 

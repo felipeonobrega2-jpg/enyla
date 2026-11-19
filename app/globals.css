@@ -340,3 +340,11 @@ html:not(.dark):has(body) { color-scheme: light only; }
   .par-in-fwd, .par-in-back, .par-out-fwd, .par-out-back, .par-shake, .par-bump, .par-surge { animation: none; }
   .par-colapsa { transition: none; }
 }
+
+/* LP Parceiros: notificações flutuando de leve e a foto com zoom bem lento */
+@keyframes lp-flutua { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+.lp-flutua { animation: lp-flutua 5.5s ease-in-out infinite; }
+@keyframes lp-zoom { from { transform: scale(1.05); } to { transform: scale(1.14); } }
+.lp-zoom { animation: lp-zoom 24s ease-in-out infinite alternate; }
+.lp-num { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .lp-flutua, .lp-zoom { animation: none; } }
