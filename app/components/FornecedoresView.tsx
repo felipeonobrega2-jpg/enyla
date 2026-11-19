@@ -3,7 +3,7 @@
 import { CadastrosParceirosCard } from "./CadastrosParceirosCard"
 import React from "react"
 import {
-  Factory, Clock, AlertTriangle, Gauge, History, PackageCheck, Plus, Trash2, Send, ChevronDown, Wrench, SlidersHorizontal, Save, Check, MapPin,
+  Factory, Clock, AlertTriangle, Gauge, History, PackageCheck, Plus, Trash2, Send, ChevronDown, Wrench, SlidersHorizontal, Save, Check, MapPin, Mail,
 } from "lucide-react"
 import { KanbanCard, LancamentoFinanceiro, FormData } from "../types"
 import { CalibragemView } from "./CalibragemView"
@@ -164,7 +164,7 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
     setHist(continuar ? { fornecedorId: hist.fornecedorId, servicos: hist.servicos } : null)
   }
   const stats = calcularStats(producao)
-  const [envio, setEnvio] = React.useState<Partial<MovimentoFornecedor> | null>(null)
+  const [envio, setEnvio] = React.useState<(Partial<MovimentoFornecedor> & { avisarEmail?: boolean }) | null>(null)
   const [ocorr, setOcorr] = React.useState<Partial<Ocorrencia> | null>(null)
   const [aberto, setAberto] = React.useState<string | null>(null)
   const nomeForn = (id: string) => producao.fornecedores.find(f => f.id === id)?.nome ?? "—"
@@ -185,9 +185,22 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
       enviadoEm,
       prazoPrevisto: envio.prazoPrevisto || (forn?.prazoDias ? somarDias(enviadoEm, forn.prazoDias) : undefined),
     }
-    salvar({ ...producao, movimentos: [...producao.movimentos, mov] })
+    const novo = { ...producao, movimentos: [...producao.movimentos, mov] }
+    salvar(novo)
     setEnvio(null)
+    // Aviso por e-mail ao fornecedor (se ele tem e-mail e a opção ficou marcada)
+    if (forn?.email && envio.avisarEmail !== false) {
+      setAvisoEmail({ texto: `Avisando ${forn.nome} por e-mail…`, ok: null })
+      fetch("/api/fornecedores/avisar-pedido", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fornecedorId: mov.fornecedorId, pedidoKey: mov.pedidoKey, servicos: mov.servicos, enviadoEm: mov.enviadoEm, prazoPrevisto: mov.prazoPrevisto }) })
+        .then(r => r.json()).then((r: { ok: boolean; erro?: string }) => {
+          if (r.ok) { salvar({ ...novo, movimentos: novo.movimentos.map(m => m.id === mov.id ? { ...m, emailEm: new Date().toISOString() } : m) }); setAvisoEmail({ texto: `${forn.nome} recebeu o pedido por e-mail.`, ok: true }) }
+          else setAvisoEmail({ texto: `E-mail não saiu: ${r.erro ?? "erro"}.`, ok: false })
+        }).catch(() => setAvisoEmail({ texto: "E-mail não saiu (sem conexão).", ok: false }))
+        .finally(() => setTimeout(() => setAvisoEmail(null), 6000))
+    }
   }
+  const [avisoEmail, setAvisoEmail] = React.useState<{ texto: string; ok: boolean | null } | null>(null)
 
   // Recebendo: dá para descontar dias parados por algo do lado do cliente (não contam para o fornecedor)
   const [recebendo, setRecebendo] = React.useState<{ id: string; dias: number; motivo: string } | null>(null)
@@ -265,6 +278,12 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
               <p className="text-[10px] text-[rgba(60,60,67,0.55)] font-medium mb-1.5">O que o fornecedor vai fazer</p>
               <ServicosChips forn={fornDe(envio.fornecedorId)} valor={envio.servicos ?? []} onChange={sv => setEnvio({ ...envio, servicos: sv })} />
             </div>
+            {fornDe(envio.fornecedorId)?.email && (
+              <label className="col-span-2 md:col-span-6 flex items-center gap-2 text-[12px] text-[#5e5c68] cursor-pointer">
+                <input type="checkbox" checked={envio.avisarEmail !== false} onChange={e => setEnvio({ ...envio, avisarEmail: e.target.checked })} className="accent-[#8456e8]" />
+                <Mail className="w-3.5 h-3.5 text-[#8456e8]" />Avisar {fornDe(envio.fornecedorId)?.nome} por e-mail ({fornDe(envio.fornecedorId)?.email}) com os dados e os arquivos do pedido
+              </label>
+            )}
           </div>
         )}
 
@@ -359,6 +378,7 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
           <p className="px-5 py-6 text-[12.5px] text-[#898892]">Nenhum pedido em fornecedor. Use “Enviar pedido” quando mandar um trabalho para fora; o prazo é medido sozinho.</p>
         ) : (
           <div className="divide-y divide-[rgba(60,60,67,0.06)]">
+            {avisoEmail && <p className={`px-5 py-2 text-[12px] font-medium flex items-center gap-1.5 ${avisoEmail.ok === false ? "text-[#c26a0a]" : avisoEmail.ok ? "text-[#009351]" : "text-[#898892]"}`}><Mail className="w-3.5 h-3.5" />{avisoEmail.texto}</p>}
             {emAndamento.map(m => {
               const dias = diasEntre(m.enviadoEm, hoje())
               const atrasado = m.prazoPrevisto && hoje() > m.prazoPrevisto
@@ -371,6 +391,7 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
                     <p className="font-medium text-[#191625] sm:truncate">{m.pedidoLabel}</p>
                     <p className="text-[11.5px] text-[#898892]">
                       {nomeForn(m.fornecedorId)} · {nomeServicos(m)} · enviado {dataBR(m.enviadoEm)}
+                      {m.emailEm && <span className="inline-flex items-center gap-1 ml-1.5 text-[#8456e8]"><Mail className="w-3 h-3" />avisado por e-mail</span>}
                     </p>
                   </div>
                   <div className="flex items-center justify-between sm:justify-end gap-3">
@@ -629,6 +650,7 @@ function Cadastro({ draft, setDraft, fornecedoresFin }: {
                   <div className="grid grid-cols-2 gap-2.5">
                     <Campo label="Quem entrega/recebe lá"><input value={f.contato ?? ""} onChange={e => upd(f.id, { contato: e.target.value || undefined })} className={inputCls} style={inputStyle} /></Campo>
                     <Campo label="Telefone"><input value={f.telefone ?? ""} onChange={e => upd(f.id, { telefone: e.target.value || undefined })} placeholder="(11) 9…" className={inputCls} style={inputStyle} /></Campo>
+                    <Campo label="E-mail (recebe os pedidos)" className="col-span-2"><input type="email" value={f.email ?? ""} onChange={e => upd(f.id, { email: e.target.value.trim() || undefined })} placeholder="producao@fornecedor.com.br" className={inputCls} style={inputStyle} /></Campo>
                   </div>
                   <BuscaEndereco valor={f.endereco ?? null} onMudar={e => { if (e) upd(f.id, { endereco: e }) }} />
                 </div>

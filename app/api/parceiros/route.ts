@@ -9,6 +9,6 @@ export async function GET() { return NextResponse.json({ cadastros: await listar
 export async function POST(req: Request) {
   const b = await req.json().catch(() => ({})) as { id?: string; status?: string; fornecedorId?: string }
   if (!b.id || !["novo", "aprovado", "recusado"].includes(b.status ?? "")) return NextResponse.json({ erro: "dados" }, { status: 400 })
-  await mudarStatus(b.id, b.status as "novo" | "aprovado" | "recusado", b.fornecedorId)
-  return NextResponse.json({ ok: true })
+  const email = await mudarStatus(b.id, b.status as "novo" | "aprovado" | "recusado", b.fornecedorId)
+  return NextResponse.json({ ok: true, email })
 }

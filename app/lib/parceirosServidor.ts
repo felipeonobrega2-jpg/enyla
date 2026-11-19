@@ -48,6 +48,13 @@ export async function receberCadastro(form: FormData): Promise<{ ok: true; id: s
   const cadastro: CadastroParceiro = { ...dados, id, em: new Date().toISOString(), status: "novo", gerente: GERENTE_PADRAO, arquivos, base }
   await mudarConfig((d: Cfg) => ({ cadastrosParceiros: [cadastro, ...(d.cadastrosParceiros ?? [])].slice(0, 500) }))
 
+  // E-mail "Cadastro recebido" para o parceiro (se a Resend estiver configurada)
+  try {
+    const { emailDoCadastro } = await import("./emailsServidor")
+    const r = await emailDoCadastro(cadastro, "recebido")
+    await mudarConfig((d: Cfg) => ({ cadastrosParceiros: (d.cadastrosParceiros ?? []).map(x => x.id === id ? { ...x, emails: [...(x.emails ?? []), r] } : x) }))
+  } catch { /* o cadastro já está salvo */ }
+
   // Aviso para você (celular e WhatsApp)
   const servicos = cadastro.servicos.map(nomeServico).join(", ")
   await notificar("Novo parceiro cadastrado", `${cadastro.nomeFantasia} · ${cadastro.cidade}/${cadastro.uf} · ${servicos}`.slice(0, 180), { prioridade: "alta", link: `${LINK_SISTEMA}/?aba=fornecedores`, tags: ["handshake"] }).catch(() => null)
@@ -70,5 +77,19 @@ export async function listarCadastros(): Promise<CadastroParceiro[]> {
 }
 
 export async function mudarStatus(id: string, status: CadastroParceiro["status"], fornecedorId?: string) {
-  await mudarConfig((d: Cfg) => ({ cadastrosParceiros: (d.cadastrosParceiros ?? []).map(x => x.id === id ? { ...x, status, ...(fornecedorId ? { fornecedorId } : {}) } : x) }))
+  let antes: CadastroParceiro | undefined
+  await mudarConfig((d: Cfg) => {
+    antes = (d.cadastrosParceiros ?? []).find(x => x.id === id)
+    return { cadastrosParceiros: (d.cadastrosParceiros ?? []).map(x => x.id === id ? { ...x, status, ...(fornecedorId ? { fornecedorId } : {}) } : x) }
+  })
+  // Aprovado agora: e-mail de boas-vindas à rede
+  if (status === "aprovado" && antes && antes.status !== "aprovado") {
+    try {
+      const { emailDoCadastro } = await import("./emailsServidor")
+      const r = await emailDoCadastro({ ...antes, status }, "aprovado")
+      await mudarConfig((d: Cfg) => ({ cadastrosParceiros: (d.cadastrosParceiros ?? []).map(x => x.id === id ? { ...x, emails: [...(x.emails ?? []), r] } : x) }))
+      return r
+    } catch { return null }
+  }
+  return null
 }

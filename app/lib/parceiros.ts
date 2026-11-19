@@ -174,6 +174,7 @@ export type CadastroParceiro = {
   comoConheceu?: string
   aceite: boolean
   fornecedorId?: string
+  emails?: { tipo: "recebido" | "aprovado"; em: string; ok: boolean; erro?: string }[]
 }
 
 export const GERENTE_PADRAO = "Felipe"
@@ -319,7 +320,7 @@ export function paraFornecedor(c: CadastroParceiro, id: string): FornecedorProdu
     id, nome: c.nomeFantasia, ativo: true, servicos: {}, frete: 0,
     prazoDias: prazos.length ? Math.max(...prazos) : 5,
     obs: `Cadastro Parceiros ENYLA (${new Date(c.em).toLocaleDateString("pt-BR")}): ${resumo}`.slice(0, 2000),
-    contato: c.contatoProducao || c.responsavel, telefone: c.whatsapp,
+    contato: c.contatoProducao || c.responsavel, telefone: c.whatsapp, email: c.email,
     ...(c.base ? { endereco: c.base } : {}),
     ...(fmax ? { maquina: { nome: `${String(offset?.tecnico?.cores ?? "Offset")} ${fmax.l}×${fmax.a}`, largura: Math.round(fmax.l * 10), altura: Math.round(fmax.a * 10), pinca: 10, margem: 5 } } : {}),
   }

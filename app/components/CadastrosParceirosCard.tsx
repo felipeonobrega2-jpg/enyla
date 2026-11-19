@@ -97,6 +97,7 @@ export function CadastrosParceirosCard({ onAprovar }: { onAprovar: (f: Fornecedo
                       </>}
                     </div>
                     {c.status === "aprovado" && <p className="mt-2 text-[11.5px] text-[#898892]">Já é fornecedor: confira os preços na aba Cadastro.</p>}
+                    {(c.emails ?? []).length > 0 && <p className="mt-1.5 text-[11.5px] text-[#898892]">{(c.emails ?? []).map(e => `E-mail ${e.tipo === "recebido" ? "de cadastro recebido" : "de boas-vindas"}: ${e.ok ? "enviado" : `não saiu (${e.erro})`}`).join(" · ")}</p>}
                   </div>
                 )}
               </div>

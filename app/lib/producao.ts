@@ -62,6 +62,7 @@ export type FornecedorProducao = {
   endereco?: import("./frete").Endereco   // para a Lalamove (página Entregas)
   contato?: string                 // quem entrega/recebe a mercadoria lá
   telefone?: string
+  email?: string                   // recebe os pedidos por e-mail também
 }
 
 export type TipoFerramental = "faca" | "cliche" | "fotolito"
@@ -95,6 +96,7 @@ export type MovimentoFornecedor = {
   historico?: boolean   // registrado depois, a partir de pedidos antigos
   diasDescontados?: number   // dias úteis parados por algo do lado do cliente (arte, aprovação, pagamento): não contam para o fornecedor
   motivoDesconto?: string
+  emailEm?: string            // quando o pedido foi avisado por e-mail ao fornecedor
 }
 
 // Dias úteis que contam para o fornecedor (sem os descontados) e se ele atrasou de verdade
