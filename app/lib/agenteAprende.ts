@@ -224,6 +224,9 @@ async function medirEstiloFelipe() {
 
 // O que você ensinou direto (pediu ao Claude): entra uma vez, pela versão
 const ENSINADO: { v: number; item: Conhecimento }[] = [
+  // v17 (19/11, conversa da caixa Landerlan: a mesma pergunta saiu duas vezes com as mesmas palavras)
+  { v: 17, item: { id: "felipe-nao-repetir-pergunta", tema: "venda", em: "2026-11-19T22:45:00.000Z",
+    texto: "Nunca repito uma frase que eu já mandei na conversa. Se perguntei a quantidade e o cliente respondeu outra coisa, primeiro respondo o que ele perguntou e depois volto na quantidade com outras palavras e de um jeito mais leve, de preferência dando uma referência que ajude ele a responder (ex.: \"Pra eu te passar o valor, seria mais umas 500, mil, ou mais que isso?\"). Pedido de desculpa pela demora, uma vez só na conversa." } },
   // v16 (19/11, Mateus Hatzemberger: 2 ampolas por caixa ficou 2 dias como "decisão sua" e é caixa normal)
   { v: 16, item: { id: "felipe-ampolas-lado-a-lado", tema: "produto", em: "2026-11-19T19:30:00.000Z",
     texto: "Caixinha para 2 (ou mais) ampolas ou vials iguais, lado a lado, é caixa normal do digital (cartucho reto de triplex), não é kit nem berço. O blister de plástico que segura as ampolas é do cliente, não é da caixa. Cotação: a caixa leva as ampolas lado a lado (largura = soma dos diâmetros mais uma folga, altura = altura da ampola). Se já tenho a medida, mando o orçamento direto. Se não tenho, peço numa mensagem curta a altura e o diâmetro da ampola (ou a medida do blister) e já mando os valores. Nunca deixo esse cliente esperando por causa disso." } },

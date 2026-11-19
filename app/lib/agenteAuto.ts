@@ -488,8 +488,11 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   // Filtro barato antes de chamar a IA: só contato novo (fornecedor e cliente antigo nunca)
   const primeira = await primeiraDa(jid)
   // Respondeu à campanha digital (conversa antiga): o agente atende como conversa nova
+  // Conversa em que o agente já está atendendo (respondeu nas últimas 48 h) também é dele, mesmo com contato antigo:
+  // 19/11, depois da recuperação o cliente respondia e a próxima resposta só saía 20 min depois, pelo vigia
+  const agenteAtendendo = (cfg.agenteLog ?? []).some(l => l.jid === jid && l.enviou && Date.now() - new Date(l.em).getTime() < 48 * 3_600_000)
   const conversaNova = (!!primeira && Date.now() - new Date(primeira.ts).getTime() < DIAS_CONVERSA_NOVA * 86_400_000)
-    || emCampanha((cfg as { campanhaDigital?: EstadoCampanha }).campanhaDigital, jid)
+    || agenteAtendendo || emCampanha((cfg as { campanhaDigital?: EstadoCampanha }).campanhaDigital, jid)
   const c = await lerConversa(jid)
   if (!c) return
   // Respondeu: sai do follow-up (vale também para lead que você está atendendo)
@@ -605,7 +608,14 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   }
   // Emoji só do jeito que você usa (👋 na primeira mensagem, risada quando o lead ri)
   if (!novoPedido) r.resposta = limparEmojis(r.resposta, emojiCtx(conversa.mensagens, cfg))
-  if (opts.atrasada && r.resposta.trim()) r.resposta = comDesculpa(r.resposta)
+  // "Desculpa a demora" só quando a demora foi de verdade (1 h+) e sem repetir: se já pedimos desculpa nas últimas
+  // 24 h nesta conversa, não pede de novo (19/11: saiu duas vezes seguidas, a segunda depois de 21 min)
+  if (opts.atrasada && r.resposta.trim()) {
+    const ultimaDele = [...conversa.mensagens].reverse().find(m => !m.from_me)
+    const esperou = ultimaDele?.ts ? Date.now() - new Date(ultimaDele.ts).getTime() : 0
+    const jaPediu = conversa.mensagens.some(m => m.from_me && /desculp/i.test(m.corpo ?? "") && m.ts && Date.now() - new Date(m.ts).getTime() < 86_400_000)
+    if (esperou >= 3_600_000 && !jaPediu) r.resposta = comDesculpa(r.resposta)
+  }
   const ctx = contexto(cfg, log, jid)
   for (const p of novoGrupo ?? (novoPedido ? [novoPedido] : [])) ctx.precosDoFiltro.push(...valoresDoPedido(p))
   if (digitalPequeno) {
