@@ -32,3 +32,15 @@ describe("Captador de parceiros", () => {
     expect(funil([c, { ...c, id: "2", status: "cadastrou" }, { ...c, id: "3", status: "fila" }])).toMatchObject({ naFila: 1, enviados: 2, cadastraram: 1 })
   })
 })
+
+import { trouxeDadosNovos } from "@/app/lib/digital"
+describe("digital: só recota com dado novo", () => {
+  const m = (from_me: boolean, corpo: string, tipo = "text") => ({ from_me, corpo, tipo })
+  it("pergunta sem número depois do orçamento: não recota (caso Thays)", () => {
+    expect(trouxeDadosNovos([m(false, "150 do sérum e 100 do gel"), m(true, "Montei os orçamentos…"), m(false, "Bom dia!"), m(false, "quanto tempo me entregam, após a aprovação da arte?")])).toBe(false)
+  })
+  it("mudou a quantidade ou mandou foto: recota", () => {
+    expect(trouxeDadosNovos([m(true, "Montei…"), m(false, "na verdade quero 300")])).toBe(true)
+    expect(trouxeDadosNovos([m(true, "Montei…"), m(false, "", "image")])).toBe(true)
+  })
+})

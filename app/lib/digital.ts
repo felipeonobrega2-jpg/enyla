@@ -557,3 +557,10 @@ export const textoNegociacaoRecusada = (p: Pick<PedidoDigital, "nome" | "quantid
   const n = primeiroNome(p.nome)
   return `${n ? `${n}, ` : ""}olhei aqui com carinho, mas nessa quantidade esse já é o melhor valor que consigo: *${brl(p.total)}* pelas ${p.quantidade.toLocaleString("pt-BR")} caixinhas, com a arte inclusa. Se fizer sentido pra você, é só seguir pelo link:\n${link}`
 }
+
+// O cliente trouxe dado novo depois da nossa última mensagem (número, foto, arquivo, áudio)? Só aí recota o digital:
+// pergunta sem dado ("quanto tempo me entregam?") é respondida, e o orçamento em aberto fica como está.
+export function trouxeDadosNovos(mensagens: { from_me: boolean; corpo?: string | null; tipo: string }[]): boolean {
+  const ultimaNossa = mensagens.map(m => m.from_me).lastIndexOf(true)
+  return mensagens.slice(ultimaNossa + 1).some(m => !m.from_me && (/\d/.test(m.corpo ?? "") || /image|document|audio|ptt/i.test(m.tipo)))
+}

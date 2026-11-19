@@ -4,7 +4,7 @@
 // sem resposta → F1, F2, F3 e Sem resposta. As etiquetas vão também para o WhatsApp Business, quando existem lá.
 // Tudo fica registrado (Configurações → Agente de leads) com o motivo de ter enviado ou segurado.
 
-import { cotarItens, montarPedidosDoGrupo, mudouOGrupo, pedidosDoGrupo, textoLinkGrupo, registrarNegociacao, totalPedido } from "./digital"
+import { cotarItens, montarPedidosDoGrupo, mudouOGrupo, trouxeDadosNovos, pedidosDoGrupo, textoLinkGrupo, registrarNegociacao, totalPedido } from "./digital"
 import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital, itensDoLembrete, lembreteDigitalAgora, ADIOU, prometeLinkSemLink, TEXTO_PEDE_MEDIDA } from "./digital"
 import { linkPedido } from "./digitalLink"
 import { faltaParaProposta, faltaParaOrcar } from "./propostaPronta"
@@ -481,6 +481,9 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   const mandouArquivo = conversa.mensagens.slice(-12).some(m => !m.from_me && /image|document/i.test(m.tipo))
   let novoGrupo: PedidoDigital[] | null = null
   let segurouPelaFoto = false   // cotava pela medida padrão, mas o cliente mandou foto/arquivo
+  // Recota só quando o cliente trouxe dado novo depois da nossa última mensagem (número, foto, arquivo, áudio).
+  // Pergunta sem dado ("quanto tempo me entregam?") é respondida pela IA; o orçamento em aberto fica como está.
+  const trouxeDados = trouxeDadosNovos(conversa.mensagens)
   const grupo = digitalPequeno && !naoFazemos ? cotarItens(r.dados, cfg.digital) : null
   // A IA disse que é decisão sua (caixa cartonada/rígida, berço, kit, acabamento especial): nada de orçamento automático
   const decisaoSua = r.alerta === "decisao_sua"
@@ -488,7 +491,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     if (!grupo.ok && !/falta/.test(grupo.motivo)) semTabela = grupo.motivo
     const anteriores = anterior ? pedidosDoGrupo(cfg.pedidosDigitais, anterior) : []
     if (grupo.ok && mandouArquivo && grupo.itens.some(i => i.cot.padrao)) segurouPelaFoto = true
-    if (grupo.ok && !(mandouArquivo && grupo.itens.some(i => i.cot.padrao)) && (!anteriores.length || mudouOGrupo(anteriores, grupo.itens))) {
+    if (grupo.ok && !(mandouArquivo && grupo.itens.some(i => i.cot.padrao)) && (!anteriores.length || (trouxeDados && mudouOGrupo(anteriores, grupo.itens)))) {
       novoGrupo = montarPedidosDoGrupo(cfg.pedidosDigitais ?? [], jid, conversa.nome, grupo.itens)
       r.resposta = textoLinkGrupo(novoGrupo, novoGrupo.map(p => linkPedido(p.id)))
       r.alerta = "nenhum"; r.pode_enviar_sozinho = true
@@ -499,7 +502,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     // Já tem grupo (mais de uma caixa) aberto: uma leitura com uma caixa só não desfaz o grupo
     const emGrupo = !!anterior && pedidosDoGrupo(cfg.pedidosDigitais, anterior).length > 1
     if (cot.ok && !emGrupo && mandouArquivo && cot.padrao) segurouPelaFoto = true
-    if (cot.ok && !emGrupo && !(mandouArquivo && cot.padrao) && (!anterior || mudouACotacao(anterior, cot))) {
+    if (cot.ok && !emGrupo && !(mandouArquivo && cot.padrao) && (!anterior || (trouxeDados && mudouACotacao(anterior, cot)))) {
       novoPedido = montarPedido(cfg.pedidosDigitais ?? [], jid, conversa.nome, r.dados, cot)
       r.resposta = textoLinkPedido(novoPedido, linkPedido(novoPedido.id))
       r.alerta = "nenhum"; r.pode_enviar_sozinho = true
