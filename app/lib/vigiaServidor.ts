@@ -166,11 +166,18 @@ async function cobrarPromessas(cfg: Cfg & { promessasEm?: string; promessasCobra
     .gte("ultima_enviada_at", new Date(agora.getTime() - 3 * 86_400_000).toISOString()).order("ultima_enviada_at", { ascending: false }).limit(200)
   const cobradas = cfg.promessasCobradas ?? {}
   const cobrar: { jid: string; nome: string; horas: number; texto: string; bom: boolean; chave: string }[] = []
-  for (const c of convs ?? []) {
+  const alvo = (convs ?? []).filter(c => !((c.etiquetas ?? []) as string[]).some(e => /fornecedor|descartado/i.test(e)) && !["descartado", "perdido"].includes(c.status_lead ?? ""))
+  // Em lotes paralelos (uma a uma, 200 conversas estouravam o minuto da Vercel)
+  const msgs = new Map<string, unknown[]>()
+  for (let i = 0; i < alvo.length; i += 25) {
+    await Promise.all(alvo.slice(i, i + 25).map(async c => {
+      const { data } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo, tipo").eq("jid", c.jid).order("ts", { ascending: false }).limit(25)
+      msgs.set(c.jid, data ?? [])
+    }))
+  }
+  for (const c of alvo) {
     const et = (c.etiquetas ?? []) as string[]
-    if (et.some(e => /fornecedor|descartado/i.test(e)) || ["descartado", "perdido"].includes(c.status_lead ?? "")) continue
-    const { data: ms } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo, tipo").eq("jid", c.jid).order("ts", { ascending: false }).limit(25)
-    const p = promessaAberta((ms ?? []) as never, agora.getTime())
+    const p = promessaAberta((msgs.get(c.jid) ?? []) as never, agora.getTime())
     if (!p) continue
     const chave = `${c.jid}|${p.msgId}`
     if (!deveCobrar(p, cobradas[chave], agora.getTime())) continue
