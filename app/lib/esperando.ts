@@ -8,7 +8,7 @@ export type ConvEspera = {
 }
 export type Esperando = { jid: string; nome: string; minutos: number; mensagem: string; peso: number; rotulo: string }
 
-const PALAVRA_FECHO = "ok(ay)?|okk+|blz|beleza|show|top|obrigad[oa]|agrade[çc]o|agradecid[oa]|grat[oa]|obg|valeu|vlw|tmj|certo|perfeito|combinado|fechado|t[áa] bom|tudo bem|👍|🙏|👌|❤️|😊|kk+|rs+|ah t[áa]|entendi|ótimo|otimo|maravilha|gostei|legal|bacana|tranquilo|de nada"
+const PALAVRA_FECHO = "ok(ay)?|okk+|blz|beleza|show|top|obrigad[oa]|obg|valeu|vlw|tmj|certo|perfeito|combinado|fechado|t[áa] bom|tudo bem|👍|🙏|👌|❤️|😊|kk+|rs+|ah t[áa]|entendi|ótimo|otimo|maravilha|gostei|legal|bacana|tranquilo|de nada"
 const FECHO = new RegExp(`^\\s*((${PALAVRA_FECHO})[\\s!.,]*)+$`, "i")
 // Resposta automática da empresa do próprio lead, mensagem técnica e "eu te mando": não é a nossa vez
 const AUTOMATICA = /seja (muito )?bem[- ]?vind|(é|e) um prazer ter voc|agradecemos (o seu |seu )?contato|em breve (retornaremos|responderemos|daremos)|fora do (nosso )?hor[aá]rio|mensagem autom[aá]tica|^\[(protocolMessage|reactionMessage|ephemeralMessage|senderKeyDistributionMessage)\]$/i
