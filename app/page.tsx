@@ -211,7 +211,7 @@ export default function Home() {
   useEffect(() => {
     const ler = () => fetch("/api/digital/vendas").then(r => r.ok ? r.json() : null).then(d => { if (d?.vendas) setVendasDigitais(d.vendas) }).catch(() => null)
     ler()
-    const t = setInterval(ler, 5 * 60_000)
+    const t = setInterval(() => { if (!document.hidden) ler() }, 5 * 60_000)
     return () => clearInterval(t)
   }, [])   // de que desenho/peça é o dxfGeo que está na tela
   const [dxfPreview, setDxfPreview] = useState<{ result: DXFResult; nome: string; texto: string } | null>(null)
@@ -257,7 +257,7 @@ export default function Home() {
   useEffect(() => {
     const ler = () => fetch("/api/menu-avisos").then(r => r.ok ? r.json() : null).then(d => { if (d) setAvisosMenu(d) }).catch(() => null)
     ler()
-    const t = setInterval(ler, 120_000)
+    const t = setInterval(() => { if (!document.hidden) ler() }, 300_000)
     return () => clearInterval(t)
   }, [])
   const [whatsAbrir, setWhatsAbrir] = useState<{ jid: string; vez: number } | undefined>()

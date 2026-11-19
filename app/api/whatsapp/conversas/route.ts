@@ -5,8 +5,11 @@ import { mudarConfig } from "@/app/lib/configAtomica"
 export async function GET() {
   const { data, error } = await supabase
     .from("whatsapp_conversas")
-    .select("*")
+    // Só as colunas da lista (sem o resumo da IA, proxima_acao): a tela pede isto a cada poucos segundos, e o
+    // select("*") de todas as conversas estourou a cota de tráfego do Supabase em 19/11
+    .select("jid, nome, ultima_msg, ultima_at, nao_lidas, foto_url, campanha, ultima_recebida_at, ultima_enviada_at, status_lead, ultima_classificacao_at, fechada_em, etiquetas, telefone, kanban_card_id")
     .order("ultima_at", { ascending: false })
+    .limit(1500)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data ?? [])

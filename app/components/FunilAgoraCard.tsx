@@ -21,7 +21,7 @@ export function FunilAgoraCard({ onAbrirConversa, onAbrirCardId, onNavegar }: {
   useEffect(() => {
     const carregar = () => fetch("/api/funil-agora").then(r => r.ok ? r.json() : null).then(x => { if (x) setD(x) }).catch(() => {})
     carregar()
-    const t = setInterval(carregar, 120_000)
+    const t = setInterval(() => { if (!document.hidden) carregar() }, 300_000)
     return () => clearInterval(t)
   }, [])
   if (!d) return <Esqueleto linhas={2} />

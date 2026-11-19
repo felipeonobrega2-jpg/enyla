@@ -56,7 +56,7 @@ export function HojeCard({ onAbrirConversa, onNavegar, onOrcar, parte = "tudo" }
   useEffect(() => {
     const carregar = () => fetch("/api/hoje").then(r => r.ok ? r.json() : null).then(x => { if (x) { setD(x); setFeitos(new Set()) } }).catch(() => {})
     carregar()
-    const t = setInterval(carregar, 60_000)
+    const t = setInterval(() => { if (!document.hidden) carregar() }, 180_000)
     return () => clearInterval(t)
   }, [])
 

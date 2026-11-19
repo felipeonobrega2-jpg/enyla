@@ -188,14 +188,14 @@ export default function WhatsAppView({
 
   useEffect(() => {
     carregarConversas()
-    pollRef.current = setInterval(carregarConversas, 8000)
+    pollRef.current = setInterval(() => { if (!document.hidden) carregarConversas() }, 15000)
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [carregarConversas])
 
   useEffect(() => {
     if (!ativa) return
     carregarMensagens(ativa.jid, !cache.current.has(ativa.jid))
-    const t = setInterval(() => carregarMensagens(ativa.jid), 5000)
+    const t = setInterval(() => { if (!document.hidden) carregarMensagens(ativa.jid) }, 8000)
     return () => clearInterval(t)
   }, [ativa, carregarMensagens])
 
@@ -649,7 +649,7 @@ export function ConexaoWhats({ status, onAtualizar }: { status: StatusWhats | nu
       if (r.qr) setQr(r.qr); else if (r.erro) setErro(r.erro)
     }
     buscar()
-    const t = setInterval(buscar, 15_000)
+    const t = setInterval(() => { if (!document.hidden) buscar() }, 30_000)
     return () => { vivo = false; clearInterval(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pareando])

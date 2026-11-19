@@ -1,3 +1,4 @@
+import { lerCampos } from "@/app/lib/configAtomica"
 import { NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { montarFunilAgora } from "@/app/lib/funilAgora"
@@ -11,7 +12,7 @@ export async function GET() {
     supabase.from("whatsapp_conversas").select("jid, nome, etiquetas, status_lead, criado_em, ultima_at, fechada_em, ultima_recebida_at, ultima_enviada_at, ultima_msg, proxima_acao, kanban_card_id")
       .not("jid", "like", "%@g.us").gte("ultima_at", desde).limit(2000),
     supabase.from("KanbanCard").select("id, numero, nomeCliente, preco, coluna, createdAt, dataEntregaPrevista, dataEntregaReal, materialNome, quantidade").neq("coluna", 10).limit(3000),
-    supabase.from("AppConfig").select("data").eq("id", 1).single(),
+    lerCampos(["pedidosDigitais"]).then(d => ({ data: { data: d } })),
   ])
   const convs = (conv.data ?? []) as never[]
   const esperando = quemEspera(convs as never, Date.now())

@@ -60,7 +60,7 @@ export function FretesDoPedido({ pedido, entregue, versao, onMarcarEntregue, onL
   // Enquanto alguma corrida anda, confere a cada 30 s
   useEffect(() => {
     if (!lista.some(f => !statusFinal(f.status))) return
-    const t = setInterval(carregar, 30_000)
+    const t = setInterval(() => { if (!document.hidden) carregar() }, 30_000)
     return () => clearInterval(t)
   }, [lista, carregar])
 

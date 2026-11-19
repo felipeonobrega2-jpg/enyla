@@ -116,7 +116,7 @@ export function EscritorioView() {
   useEffect(() => {
     const carregar = () => fetch("/api/escritorio").then(r => r.ok ? r.json() : null).then(x => { if (x) { setD(x); setAgora(Date.now()) } }).catch(() => {})
     carregar()
-    const t = setInterval(carregar, 30_000)
+    const t = setInterval(() => { if (!document.hidden) carregar() }, 60_000)
     return () => clearInterval(t)
   }, [])
   const feed = useMemo(() => (d?.feed ?? []).filter(e => !filtro || e.mesa === filtro), [d, filtro])

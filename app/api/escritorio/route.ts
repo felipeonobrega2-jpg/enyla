@@ -1,3 +1,4 @@
+import { lerCampos } from "@/app/lib/configAtomica"
 // Escritório dos agentes: o que cada um está fazendo agora e o que fez hoje
 import { NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
@@ -11,7 +12,7 @@ export async function GET() {
   const desde = new Date(Date.now() - 24 * 3_600_000).toISOString()
   const [regs, c] = await Promise.all([
     lerRegistros(600, { desde }),
-    supabase.from("AppConfig").select("data").eq("id", 1).single(),
+    lerCampos(["agenteAuto", "agenteEnviosHora", "agenteSemCreditoEm", "whatsappConexao", "pedidosDigitais", "propostasProntas", "vigiaRodouEm", "vigiaTentou", "respostasPendentes", "fechadasPelaIA", "auditoriaDados", "rotinaEnviada", "conhecimentoAgente"]).then(d => ({ data: { data: d } })),
   ])
   const cfg = (c.data?.data ?? {}) as CfgEscritorio & { agenteLog?: never[]; agenteAuto?: { ligado?: boolean; horario?: never } }
   const registros = regs ?? (cfg.agenteLog ?? [])

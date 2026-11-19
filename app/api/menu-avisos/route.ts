@@ -1,3 +1,4 @@
+import { lerCampos } from "@/app/lib/configAtomica"
 // Avisos do menu: só o que pede uma ação sua agora (parceiros para aprovar, digital parado, dados graves,
 // agente travado). Leve: lê só o AppConfig.
 import { NextResponse } from "next/server"
@@ -7,8 +8,7 @@ import { digitalParado } from "@/app/lib/resolverServidor"
 export const dynamic = "force-dynamic"
 
 export async function GET() {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
-  const cfg = (data?.data ?? {}) as {
+  const cfg = await lerCampos(["cadastrosParceiros", "pedidosDigitais", "auditoriaDados", "whatsappConexao", "agenteSemCreditoEm", "vigiaRodouEm"]) as {
     cadastrosParceiros?: { status: string }[]; pedidosDigitais?: never[]
     auditoriaDados?: { graves?: number }; whatsappConexao?: { estado?: string }; agenteSemCreditoEm?: string; vigiaRodouEm?: string
   }

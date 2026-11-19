@@ -34,3 +34,11 @@ export async function mudarConfig<T extends Dados = Dados>(mudar: (d: T) => Part
 
 // Atalho: grava estes campos por cima (sem depender do que está salvo)
 export const gravarCampos = (campos: Dados) => mudarConfig(() => campos)
+
+// Lê só estes campos do AppConfig (o registro inteiro tem 600 KB: lido a cada minuto por tela aberta, estourou a
+// cota de tráfego do Supabase em 19/11). Use nas rotas chamadas com frequência.
+export async function lerCampos<T extends Dados = Dados>(campos: string[]): Promise<T> {
+  const { data, error } = await supabase.from("AppConfig").select(campos.map(c => `${c}:data->${c}`).join(", ")).eq("id", 1).maybeSingle()
+  if (error) throw new Error(`config: ${error.message}`)
+  return Object.fromEntries(Object.entries((data ?? {}) as Record<string, unknown>).filter(([, v]) => v != null)) as T
+}
