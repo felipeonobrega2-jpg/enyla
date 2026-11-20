@@ -386,3 +386,21 @@ export async function conferirNoAsaas(id: string) {
 }
 
 export const conversaDoPedido = (jid: string) => conversa(jid)
+
+// Material pronto (painel ou assistente): libera o restante na página do cliente e avisa ele pelo WhatsApp do sistema
+// (o e-mail sai pelo vigia)
+export async function marcarProntoDigital(id: string): Promise<{ ok?: true; erro?: string; aviso?: string }> {
+  const { pedido } = await lerPedido(id)
+  if (!pedido) return { erro: "Pedido não encontrado." }
+  if (pedido.status !== "producao") return { erro: "O pedido precisa estar em produção." }
+  const novo = await gravarPedido(id, p => p.prontoEm ? null : { ...p, prontoEm: new Date().toISOString() })
+  if (!novo) return { erro: "Já estava marcado como pronto." }
+  if (!novo.restantePagoEm) {
+    const { textoMaterialPronto } = await import("./digital")
+    const { enviar } = await import("./agenteAuto")
+    const c = await conversaDoPedido(novo.jid)
+    const env = c ? await enviar(c, textoMaterialPronto(novo, linkPedido(novo.id)), undefined, { essencial: true }) : { ids: [], erro: "conversa não encontrada" }
+    if (!env.ids.length) return { ok: true, aviso: `Marcado como pronto, mas a mensagem não saiu (${env.erro ?? "erro"}). Avise o cliente à mão.` }
+  }
+  return { ok: true }
+}

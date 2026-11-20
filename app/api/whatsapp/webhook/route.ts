@@ -95,6 +95,9 @@ export async function POST(req: NextRequest) {
         const { data: salva } = await supabase.from("whatsapp_mensagens").select("jid, ts").eq("id", data.key.id).maybeSingle()
         if (salva?.jid) await marcarOrigemPelaFrase(salva.jid, extractBody(data).corpo, salva.ts).catch(() => null)
       }
+      // Assistente do Felipe: mensagem dele no chat "você mesmo" (só a digitada no celular; os avisos do sistema não)
+      if (data?.key?.fromMe && data.key.id && novas.has(data.key.id) && !/^3EB0/i.test(data.key.id))
+        after(() => import("@/app/lib/assistente").then(m => m.talvezAssistente(data.key.id, data.key.remoteJid ?? "", true, extractBody(data).tipo)).catch(e => console.error("[assistente]", e)))
       // Áudio novo: transcreve depois de responder ao Evolution (não atrasa o recebimento)
       if (data?.message?.audioMessage && data.key?.id) after(() => transcreverPendentes({ ids: [data.key.id] }).catch(() => {}))
       // Agente de leads no modo automático (desligado por padrão; ele mesmo confere as travas)
