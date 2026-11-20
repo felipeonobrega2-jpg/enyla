@@ -12,7 +12,7 @@ export const GRUPOS: { id: GrupoCaixa; nome: string }[] = [
 export const PESO: Record<string, number> = {
   "sistema-perigo": 100,                          // IA sem crédito, WhatsApp fora: a operação para
   aprovado: 92, cobrancaVencida: 88, pagamento: 86, semCobranca: 80,          // dinheiro
-  propostaPronta: 84, negociacao: 82, orcar: 78, grande: 74, esperando: 72, responder: 70, travado: 62,   // vendas
+  propostaPronta: 84, promessa: 83, negociacao: 82, orcar: 78, grande: 74, esperando: 72, responder: 70, travado: 62,   // vendas
   orcamentoVencendo: 58, abriuProposta: 56, proposta: 54,
   atrasado: 60, fornecedor: 58, entregaProxima: 50, semPrazo: 30, conferir: 28, digital: 46,   // produção
   sistema: 60, whatsapp: 100, meta: 52,
@@ -20,7 +20,7 @@ export const PESO: Record<string, number> = {
 }
 const TIPO_GRUPO: Record<string, GrupoCaixa> = {
   aprovado: "dinheiro", cobrancaVencida: "dinheiro", pagamento: "dinheiro", semCobranca: "dinheiro",
-  propostaPronta: "vendas", negociacao: "vendas", orcar: "vendas", grande: "vendas", esperando: "vendas", responder: "vendas", travado: "vendas",
+  propostaPronta: "vendas", promessa: "vendas", negociacao: "vendas", orcar: "vendas", grande: "vendas", esperando: "vendas", responder: "vendas", travado: "vendas",
   orcamentoVencendo: "vendas", abriuProposta: "vendas", proposta: "vendas",
   atrasado: "producao", fornecedor: "producao", entregaProxima: "producao", semPrazo: "producao", conferir: "producao", digital: "producao",
   sistema: "sistema", whatsapp: "sistema", meta: "sistema",
@@ -55,4 +55,25 @@ export function adiarAte(quando: "3h" | "amanha", agora = new Date()): string {
   const dia = new Date(agora.getTime() - 3 * 3_600_000)   // data em Brasília
   const amanha = new Date(Date.UTC(dia.getUTCFullYear(), dia.getUTCMonth(), dia.getUTCDate() + 1, 11, 0, 0))   // 8 h BRT
   return amanha.toISOString()
+}
+
+// Resumo da caixa no WhatsApp (8h, 13h, 18h): os mais importantes de cada grupo, na ordem do Painel
+export type ItemResumo = { chave: string; tipo: string; nivel?: NivelCaixa; titulo: string; sub?: string; valor?: number | null }
+const ICONE_GRUPO: Record<GrupoCaixa, string> = { dinheiro: "💰", vendas: "🤝", producao: "🏭", sistema: "⚠️", relacionamento: "💬" }
+export function textoResumo(itens: (ItemResumo & { grupo: GrupoCaixa })[], slot: "8" | "13" | "18", link: string, porGrupo = 4): string {
+  const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
+  const cab = slot === "8" ? "☀️ *Bom dia! Sua caixa de entrada*" : slot === "13" ? "🕐 *Caixa de entrada · 13h*" : "🌙 *Fechamento do dia · caixa de entrada*"
+  if (!itens.length) return [cab, "Tudo em dia: nenhum bom negócio esperando, nenhuma cobrança vencida e nada atrasado. 👏", link].join("\n")
+  const emJogo = itens.reduce((t, i) => t + (i.grupo === "dinheiro" || i.grupo === "vendas" ? i.valor ?? 0 : 0), 0)
+  const linhas = [`${cab} (${itens.length})${emJogo ? ` · ${brl(emJogo)} em jogo` : ""}`]
+  for (const g of GRUPOS) {
+    const doGrupo = itens.filter(i => i.grupo === g.id)
+    if (!doGrupo.length) continue
+    linhas.push("", `${ICONE_GRUPO[g.id]} *${g.nome}* (${doGrupo.length})`)
+    for (const i of doGrupo.slice(0, porGrupo)) linhas.push(`• *${i.titulo}*${i.valor ? ` · ${brl(i.valor)}` : ""}${i.sub ? `: ${i.sub.length > 90 ? `${i.sub.slice(0, 88)}…` : i.sub}` : ""}`)
+    if (doGrupo.length > porGrupo) linhas.push(`  … e mais ${doGrupo.length - porGrupo}`)
+  }
+  if (slot === "18") linhas.push("", "O que ficar vira a primeira coisa da manhã.")
+  linhas.push("", link)
+  return linhas.join("\n")
 }

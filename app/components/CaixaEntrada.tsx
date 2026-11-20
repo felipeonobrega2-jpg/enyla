@@ -91,7 +91,8 @@ export function CaixaEntrada({ extras, onAbrirConversa, onOrcar, onNavegar, onPr
       acao: onOrcar && (tipo === "orcar" || tipo === "travado") ? <BotaoTexto onClick={() => onOrcar(x.cliente || x.nome || x.jid.split("@")[0], x.jid, x.dados ?? undefined)} titulo="Novo orçamento com o que o cliente já contou">Orçar</BotaoTexto> : undefined,
     })
     for (const x of hoje.orcar ?? []) lista.push(daConversa(x, "orcar", "alerta", `Esperando o seu orçamento ${haQuanto(x.desde)}${doPedido(x.dados) ? ` · ${doPedido(x.dados)}` : ""}`))
-    for (const x of hoje.meta?.travados ?? []) lista.push(daConversa(x, "travado", "info", `MQL sem orçamento ${haQuanto(x.desde)}${x.falta?.length ? ` · falta ${x.falta.join(", ")}` : ""}`))
+    // MQL ainda faltando dado é da IA (checklist antes de passar para você)
+    for (const x of (hoje.meta?.travados ?? []).filter(x => !x.falta?.length)) lista.push(daConversa(x, "travado", "info", `MQL sem orçamento ${haQuanto(x.desde)}${x.falta?.length ? ` · falta ${x.falta.join(", ")}` : ""}`))
     for (const x of hoje.responder) lista.push(daConversa(x, "responder", x.retomada ? "sucesso" : "info", `${x.rotulo} · ${haQuanto(x.desde)}${x.mensagem ? ` · “${x.mensagem}”` : ""}`))
     for (const x of hoje.retomar ?? []) lista.push(daConversa(x, "retomar", "info", x.nota ? `Lembrete: ${x.nota}` : `Sem resposta ${haQuanto(x.desde)}${doPedido(x.dados) ? ` · ${doPedido(x.dados)}` : ""}`))
     // Propostas prontas e negociações do digital: a decisão abre aqui mesmo

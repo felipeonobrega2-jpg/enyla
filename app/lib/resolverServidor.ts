@@ -8,7 +8,7 @@ import type { AprovacaoOnline } from "./aprovacao"
 import type { Passos } from "./hoje"
 
 export type ItemResolver = {
-  tipo: "proposta" | "pagamento" | "atrasado" | "sistema" | "digital" | "grande" | "esperando"
+  tipo: "proposta" | "pagamento" | "atrasado" | "sistema" | "digital" | "grande" | "esperando" | "promessa"
   titulo: string            // "Márcio Santana · ORC-2026-283"
   detalhe: string           // "abriu a proposta 3× · sem retomada há 2 dias"
   valor: number | null
@@ -145,6 +145,9 @@ export async function paraResolver(cfg: { grandesNegocios?: import("./grandesNeg
     itens.push({ tipo: "grande", titulo: g.nome, valor: g.valor ?? null, jid: g.jid ?? null, numero: null, desde: g.proximoEm ?? null, nivel: "perigo",
       detalhe: p === "sem_passo" ? "grande negócio sem próximo passo: defina o que fazer e quando" : `venceu ${String(g.proximoEm).split("-").reverse().slice(0, 2).join("/")}: ${g.proximoPasso}` })
   }
-  const ordem = { sistema: 0, esperando: 1, grande: 2, pagamento: 3, atrasado: 4, digital: 5, proposta: 6 }
+  // Orçamento prometido e não enviado (o vigia confere a cada 15 min)
+  for (const p of ((cfg as { promessasAbertas?: { jid: string; nome: string; horas: number; texto: string; bom: boolean; chave: string }[] }).promessasAbertas ?? []))
+    itens.push({ tipo: "promessa", titulo: p.nome, detalhe: `você prometeu orçamento há ${p.horas} h: “${p.texto.slice(0, 80)}”`, valor: null, jid: p.jid, numero: null, desde: p.chave.split("|")[1] ?? null, nivel: p.bom || p.horas >= 6 ? "perigo" : "alerta" })
+  const ordem = { sistema: 0, promessa: 1, esperando: 2, grande: 3, pagamento: 4, atrasado: 5, digital: 6, proposta: 7 }
   return itens.sort((a, b) => ordem[a.tipo] - ordem[b.tipo] || (b.valor ?? 0) - (a.valor ?? 0))
 }

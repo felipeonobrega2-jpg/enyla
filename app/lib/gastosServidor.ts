@@ -86,9 +86,10 @@ export async function talvezAvisarGastos() {
   const cfg = await lerCfg()
   const avisos = cfg.gastosAvisoEm ?? {}
   const agora = Date.now()
+  // Só o que para a operação (saldo acabando de verdade), no máximo a cada 12 h; o resto está na caixa de entrada
   const enviar = g.alertas.filter(a => {
     const ultimo = avisos[a.tipo] ? agora - new Date(avisos[a.tipo]).getTime() : Infinity
-    return ultimo > (a.nivel === "perigo" ? 4 : 12) * 3_600_000
+    return a.nivel === "perigo" && ultimo > 12 * 3_600_000
   })
   if (!enviar.length) return
   const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()

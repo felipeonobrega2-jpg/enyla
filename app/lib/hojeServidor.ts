@@ -175,9 +175,6 @@ export async function talvezAvisarOrcamentoAtrasando() {
   const linhas = atrasados.slice(0, 5).map(x => `${x.rotulo} · ${x.nome ?? x.cliente ?? "Lead"} · esperando há ${tempoDeEspera(x.horas)}${x.dados?.resumo ? ` · ${x.dados.resumo.slice(0, 80)}` : ""}`)
   if (atrasados.length > 5) linhas.push(`e mais ${atrasados.length - 5}`)
   const titulo = atrasados.length === 1 ? "Orçamento esperando você" : `${atrasados.length} orçamentos esperando você`
-  await notificar(titulo, linhas.join("\n"), { prioridade: "alta", tags: ["hourglass"], link: LINK_SISTEMA }).catch(() => null)
-  const { seuNumero } = await import("./agenteAuto")
-  const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero().catch(() => null)
-  if (destino) await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino,
-    text: [`⏳ *${titulo}*`, "O cliente já passou tudo e ainda não recebeu o orçamento:", ...linhas.map(l => `• ${l}`), `${LINK_SISTEMA}`].join("\n") }) }).catch(() => null)
+  // (aviso solto desligado: vira item "orçar" da caixa de entrada e sai no resumo das 8h, 13h e 18h)
+  void titulo; void linhas
 }

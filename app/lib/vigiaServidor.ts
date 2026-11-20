@@ -40,7 +40,7 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
   const sp = new Date(agora.getTime() - 3 * 3600_000)
   const hora = sp.getUTCHours(), dia = sp.toISOString().slice(0, 10), semana = sp.getUTCDay()
   const dias = cfg.agenteAuto?.horario?.dias ?? [1, 2, 3, 4, 5, 6]
-  const slot = hora === 13 ? "13" : hora === 18 ? "18" : null
+  const slot = hora === 8 ? "8" : hora === 13 ? "13" : hora === 18 ? "18" : null
   if (slot && dias.includes(semana) && !cfg.rotinaEnviada?.[`${dia}-${slot}`]) {
     let marcou = false
     await mudarConfig((d: Cfg) => {
@@ -202,13 +202,8 @@ async function cobrarPromessas(cfg: Cfg & { promessasEm?: string; promessasCobra
   }
   if (!cobrar.length) return { cobradas: 0 }
   cobrar.sort((a, b) => Number(b.bom) - Number(a.bom) || b.horas - a.horas)
-  const linhas = cobrar.slice(0, 8).map(x => `• *${x.nome}*${x.bom ? " (bom negócio)" : ""}, prometido há ${x.horas} h: “${x.texto.replace(/\s+/g, " ").slice(0, 90)}”`)
-  const texto = `🔴 *Orçamento prometido e ainda não enviado (${cobrar.length})*\n${linhas.join("\n")}${cobrar.length > 8 ? `\n… e mais ${cobrar.length - 8}` : ""}\n\nCada hora sem o orçamento é chance de o lead fechar em outro lugar.\n${LINK_SISTEMA}/?aba=painel`
-  const { evo } = await import("./evolution")
-  const { seuNumero } = await import("./agenteAuto")
-  const destino = ((cfg.agenteAuto as { avisoNumero?: string } | undefined)?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
-  if (destino) await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: texto }) }).catch(() => null)
-  await notificar(`Orçamento prometido não enviado (${cobrar.length})`, cobrar.slice(0, 4).map(x => `${x.nome} há ${x.horas} h`).join(" · "), { prioridade: "urgente", tags: ["rotating_light"], link: `${LINK_SISTEMA}/?aba=painel` }).catch(() => null)
+  // Vira item da caixa de entrada (Painel e resumo das 8h/13h/18h), não mensagem solta
+  await mudarConfig(() => ({ promessasAbertas: cobrar.map(x => ({ jid: x.jid, nome: x.nome, horas: x.horas, texto: x.texto.replace(/\s+/g, " ").slice(0, 140), bom: x.bom, chave: x.chave })) }))
   const em = agora.toISOString()
   await mudarConfig((d: typeof cfg) => {
     const m = { ...(d.promessasCobradas ?? {}) }
@@ -251,14 +246,7 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
   const avisadas = cfg.esperaAvisada ?? {}
   const paraAvisar = lista.filter(e => !respondidas.has(e.jid) && (!avisadas[e.jid] || agora.getTime() - new Date(avisadas[e.jid]).getTime() > 3 * 3600_000) && paraOFelipe(e))   // só bom negócio com o checklist completo vira aviso seu
   if (!paraAvisar.length || (cfg.esperaAvisoEm && agora.getTime() - new Date(cfg.esperaAvisoEm).getTime() < 30 * 60_000)) return { esperando: lista.length, despachadas: respondidas.size }
-  const { evo } = await import("./evolution")
-  const { seuNumero } = await import("./agenteAuto")
-  const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
-  if (destino) {
-    const linhas = paraAvisar.slice(0, 8).map(e => `• *${e.nome}* (${e.rotulo}) há ${tempoEspera(e.minutos)}: “${e.mensagem}”`)
-    const texto = `⏳ *Esperando resposta sua (${paraAvisar.length})*\n${linhas.join("\n")}${paraAvisar.length > 8 ? `\n… e mais ${paraAvisar.length - 8}` : ""}\n\nBons negócios com tudo para orçar (ou que a IA não conseguiu seguir).\n${LINK_SISTEMA}/?aba=painel`
-    await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: texto }) }).catch(() => null)
-  }
+  // (o aviso no WhatsApp virou item da caixa de entrada e sai no resumo das 8h, 13h e 18h)
   const em = agora.toISOString()
   await mudarConfig((d: typeof cfg) => {
     const m = { ...(d.esperaAvisada ?? {}) }
@@ -278,25 +266,16 @@ async function linhaDosDados() {
 }
 
 // Texto da checagem/fechamento: o "Para resolver agora" e o que o Hoje pede, em poucas linhas
-export async function textoDaRotina(slot: "13" | "18"): Promise<string> {
-  const { montarHoje } = await import("./hojeServidor")
-  const h = await montarHoje()
-  const res = h.resolver ?? [], orcar = h.orcar?.length ?? 0, responder = h.responder.length, retomar = h.retomar?.length ?? 0
-  const emJogo = res.reduce((t, x) => t + (x.valor ?? 0), 0)
-  const topo = res.slice(0, 6).map(x => `• ${x.titulo}${x.valor ? ` (${brl(x.valor)})` : ""}: ${x.detalhe}`)
-  const linhas = [
-    slot === "13" ? "🕐 *Checagem das 13h*" : "🌙 *Fechamento do dia*",
-    res.length ? `*${res.length} para resolver*${emJogo ? ` · ${brl(emJogo)} em jogo` : ""}` : "Nada passou do prazo. 👏",
-    ...topo,
-    [orcar ? `${orcar} orçamento${orcar > 1 ? "s" : ""} para fazer` : "", responder ? `${responder} para responder` : "", retomar ? `${retomar} para retomar` : ""].filter(Boolean).join(" · "),
-    slot === "18" && (orcar || responder || res.length) ? "O que ficar vira a primeira coisa da manhã." : "",
-    slot === "18" ? await linhaDosDados() : "",
-    `${LINK_SISTEMA}/?aba=painel`,
-  ]
-  return linhas.filter(Boolean).join("\n")
+// Resumo da caixa de entrada (8h, 13h e 18h): o mesmo que está no Painel, no lugar dos avisos soltos
+export async function textoDaRotina(slot: "8" | "13" | "18"): Promise<string> {
+  const { montarCaixaServidor } = await import("./caixaServidor")
+  const { textoResumo } = await import("./caixaEntrada")
+  const itens = await montarCaixaServidor()
+  const texto = textoResumo(itens, slot, `${LINK_SISTEMA}/?aba=painel`)
+  return slot === "18" ? `${texto}${await linhaDosDados()}` : texto
 }
 
-async function mandarRotina(slot: "13" | "18", cfg: Cfg) {
+async function mandarRotina(slot: "8" | "13" | "18", cfg: Cfg) {
   const { evo } = await import("./evolution")
   const { seuNumero } = await import("./agenteAuto")
   const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
