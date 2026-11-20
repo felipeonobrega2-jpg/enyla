@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { mudarConfig } from "@/app/lib/configAtomica"
+import { CONFIG_PADRAO } from "@/app/config"
 
 // Campos gravados só pelo servidor (renovação do token da Meta, aprovações online dos clientes). A tela envia a
 // configuração inteira que carregou; sem isto, salvar qualquer ajuste regravaria
@@ -9,12 +10,29 @@ const CAMPOS_DO_SERVIDOR = ["metaToken", "metaTokenExpiry", "metaTokenTipo", "me
 // Campos novos que uma aba aberta antes deles existirem não conhece: se não vierem, mantém o que está salvo
 const MANTER_SE_AUSENTE = ["guiaAtendimento", "avisosPedido", "filaDispensados", "filtroLeads"] as const
 
+// Dado preenchido nunca é trocado por vazio ou pelo padrão de fábrica. 19/11: uma aba que abriu com o banco fora
+// ficou com a configuração de fábrica e, no primeiro salvar, apagou ideias, gastos fixos, fornecedores, contas,
+// categorias, metas, produção e a chave da IA. Aba nesse estado (2+ campos voltando ao padrão) é recusada inteira.
+const vazio = (v: unknown) => v == null || v === "" || (Array.isArray(v) && v.length === 0)
+const igualPadrao = (k: string, v: unknown) => k in CONFIG_PADRAO && JSON.stringify(v) === JSON.stringify((CONFIG_PADRAO as Record<string, unknown>)[k])
+const empobrece = (k: string, novo: unknown, salvo: unknown) =>
+  !vazio(salvo) && !igualPadrao(k, salvo) && (vazio(novo) || igualPadrao(k, novo))
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as Record<string, unknown>
+    let recusada = false
+    await mudarConfig(salvo => {
+      const perdas = Object.keys(body).filter(k => empobrece(k, body[k], salvo[k]))
+      if (perdas.length >= 2) recusada = true
+      return null
+    })
+    if (recusada) return NextResponse.json({ erro: "tela desatualizada: recarregue a página antes de salvar" }, { status: 409 })
     // Lido de novo a cada tentativa: o que o servidor gravou no meio (registro do agente, Pix) não se perde
     await mudarConfig(salvo => {
       const proximo: Record<string, unknown> = { ...body }
+      // Campo a campo: vazio/padrão por cima de dado preenchido não passa (fica o salvo)
+      for (const k of Object.keys(body)) if (empobrece(k, body[k], salvo[k])) proximo[k] = salvo[k]
       for (const k of CAMPOS_DO_SERVIDOR) {
         if (k in salvo) proximo[k] = salvo[k]
         else delete proximo[k]

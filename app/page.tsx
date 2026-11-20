@@ -227,6 +227,15 @@ export default function Home() {
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
   definirFeriadosLocais(config.feriados)
   const configAtual = useRef<Configuracoes>(CONFIG_PADRAO)
+  // Só salva a configuração depois de carregar a do banco: aberta com o banco fora, a tela ficava com a de fábrica e o
+  // primeiro salvar apagava tudo (19/11). Salvar passa por aqui.
+  const configCarregada = useRef(false)
+  const postarConfig = useCallback((cfg: Configuracoes) => {
+    if (!configCarregada.current) { alert("As configurações ainda não carregaram do servidor. Recarregue a página antes de salvar."); return }
+    fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg) })
+      .then(r => { if (r.status === 409) alert("Esta tela está desatualizada e não salvou. Recarregue a página (Cmd+Shift+R) e faça de novo.") })
+      .catch(() => {})
+  }, [])
   useEffect(() => { configAtual.current = config }, [config])
   // Lote: o mesmo cliente com tamanhos diferentes, numa proposta só (fica guardado neste navegador até salvar)
   const [loteOrc, setLoteOrc] = useState<ItemLote[]>([])
@@ -434,7 +443,7 @@ export default function Home() {
         if (d.propostasCustom)        setPropostasCustom(d.propostasCustom)
         if (d.contadorProp !== undefined) setContadorProp(d.contadorProp)
         if (d.kanban)                 setKanban(d.kanban.map(unpackTerceirizado))
-        if (d.config)                 setConfig(c => ({ ...CONFIG_PADRAO, ...c, ...d.config }))
+        if (d.config)                 { setConfig(c => ({ ...CONFIG_PADRAO, ...c, ...d.config })); configCarregada.current = true }
         restaurarRascunho({ ...CONFIG_PADRAO, ...(d.config ?? {}) })
         const novasAprovacoes = (d.config?.aprovacoesOnline ?? []).filter((a: AprovacaoOnline) => !a.visto && !a.desfeita).length
         if (novasAprovacoes) showToast(novasAprovacoes === 1 ? "Um cliente aprovou o orçamento online. Veja no Painel." : `${novasAprovacoes} orçamentos aprovados online. Veja no Painel.`)
@@ -636,7 +645,7 @@ export default function Home() {
     configAtual.current = cfg
     setConfig(cfg)
     if (opts.recalcular !== false) setResult(calcular(form, cfg))
-    fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg) }).catch(() => {})
+    postarConfig(cfg)
   }
 
   function registrarFaca(rota: import("./lib/producao").Rota) {
@@ -1618,7 +1627,7 @@ export default function Home() {
         if (d.propostasCustom) setPropostasCustom(d.propostasCustom)
         if (d.contadorProp)   setContadorProp(d.contadorProp)
         if (d.kanban)         setKanban(d.kanban)
-        if (d.config)         { const cfg = { ...CONFIG_PADRAO, ...d.config }; setConfig(cfg); setResult(calcular(form, cfg)) }
+        if (d.config)         { const cfg = { ...CONFIG_PADRAO, ...d.config }; setConfig(cfg); setResult(calcular(form, cfg)); configCarregada.current = true }
         showToast("Backup restaurado com sucesso!")
       } catch {
         alert("Erro ao ler o arquivo. Verifique se é um backup válido.")
@@ -2609,11 +2618,7 @@ export default function Home() {
               onSave={cfg => {
               setConfig(cfg)
               setResult(calcular(form, cfg))
-              fetch("/api/config", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(cfg),
-              }).catch(() => {})
+              postarConfig(cfg)
             }}
               onExportar={exportarDados}
               onImportar={importarDados}
@@ -2926,7 +2931,7 @@ export default function Home() {
               }}
               onUpdateConfig={cfg => {
                 setConfig(cfg)
-                fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg) }).catch(() => {})
+                postarConfig(cfg)
               }}
               onRegistrarSobra={abrirSobra}
               onDeleteCard={id => {
