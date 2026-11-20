@@ -22,7 +22,6 @@ import { RelatoriosView } from "@/app/components/RelatoriosView"
 import { IdeiasView } from "@/app/components/IdeiasView"
 import { EscritorioView } from "@/app/components/EscritorioView"
 import { AuditoriaView } from "@/app/components/AuditoriaView"
-import { CaptacaoParceirosCard } from "@/app/components/CaptacaoParceirosCard"
 import TrackingClient from "@/app/track/[numero]/TrackingClient"
 import ParceirosForm from "@/app/parceiros/ParceirosForm"
 import PortalClient from "@/app/c/[token]/PortalClient"
@@ -336,18 +335,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     } as never)
     return new Response(JSON.stringify(r))
   }
-  if (u.startsWith("/api/captacao")) {
-    const c = (jid: string, nome: string, motivo: string | null, origem = "whatsapp") => ({ jid, nome, origem, relevante: !!motivo, motivo, ultimaConversa: "2026-11-10T12:00:00Z" })
-    const agora = Date.now(), d = (x: number) => new Date(agora - x * 86_400_000).toISOString()
-    return new Response(JSON.stringify({
-      candidatos: [c("1@s", "Gráfica Exemplo", "gráfica"), c("2@s", "Colagem Teste", "fornecedor da casa"), c("3@s", "Rótulos Modelo", "rótulos e adesivos"), c("4@s", "Papéis Fictícios", "papel"), c("5@s", "Transportes Exemplo", "transporte"), c("6@s", "Frascos Modelo", null), c("7@s", "Essências Teste", null)],
-      convites: [
-        { id: "CV1", jid: "8@s", nome: "Corte Bom", origem: "whatsapp", status: "cadastrou", texto: "", criadoEm: d(6), enviadoEm: d(6), abriuEm: d(5), cadastrouEm: d(5) },
-        { id: "CV2", jid: "9@s", nome: "Verniz & Cia", origem: "whatsapp", status: "abriu", texto: "", criadoEm: d(3), enviadoEm: d(3), abriuEm: d(2) },
-        { id: "CV3", jid: "10@s", nome: "Laminação Teste", origem: "manual", status: "enviado", texto: "", criadoEm: d(1), enviadoEm: d(1) },
-        { id: "CV4", jid: "11@s", nome: "Faca Rápida", origem: "manual", status: "fila", texto: "", criadoEm: d(0) },
-      ] }))
-  }
+
   if (u.startsWith("/api/escritorio")) {
     const { montarEscritorio } = await import("@/app/lib/escritorio")
     const agora = Date.now(), m = (x: number) => new Date(agora - x * 60_000).toISOString()
@@ -756,7 +744,6 @@ function Telas() {
       const et = Array.from({ length: col }, (_, i) => ({ coluna: i + 1, dataHora: `1${i}/11/2026, 10:00:00` }))
       return <TrackingClient numero="ORC-2026-290" initialData={{ numero: "ORC-2026-290", nomeCliente: "Ana Exemplo", descricao: "Caixa cartucho 6×15×6", materialNome: "Cartão 300g", quantidade: 12000, preco: 9540, colunaAtual: col, etapas: et, criadoEm: "10/11/2026" } as never} />
     }
-    case "captacao": case "captacao-m": return <div style={{ padding: 16, background: "#f4f3f8", minHeight: "100vh" }}><CaptacaoParceirosCard /></div>
     case "escritorio": case "escritorio-m": case "escritorio-sel": return <div style={{ height: "100vh" }}><EscritorioView /></div>
     case "ideias": return <div style={{ height: "100vh" }}><IdeiasView config={cfg} onSalvar={setCfg} /></div>
     case "precofecha": {

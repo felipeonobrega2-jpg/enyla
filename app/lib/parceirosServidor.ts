@@ -48,9 +48,6 @@ export async function receberCadastro(form: FormData): Promise<{ ok: true; id: s
   const cadastro: CadastroParceiro = { ...dados, id, em: new Date().toISOString(), status: "novo", gerente: GERENTE_PADRAO, arquivos, base }
   await mudarConfig((d: Cfg) => ({ cadastrosParceiros: [cadastro, ...(d.cadastrosParceiros ?? [])].slice(0, 500) }))
 
-  // Veio de um convite do Captador: marca "cadastrou"
-  const convite = String(form.get("convite") ?? "")
-  if (/^CV[A-Z0-9]{6,20}$/.test(convite)) { const { conviteCadastrou } = await import("./captacaoServidor"); await conviteCadastrou(convite, id).catch(() => null) }
 
   // E-mail "Cadastro recebido" para o parceiro (se a Resend estiver configurada)
   try {

@@ -504,12 +504,6 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   // para duas rodadas ao mesmo tempo não mandarem a mesma resposta duas vezes
   if (opts.atrasada && !await reservarAtrasada(msgId)) return
 
-  // Resposta a convite de parceiro (Captador): a conversa é sua, o agente de vendas não atende
-  {
-    const { data: m } = await supabase.from("whatsapp_mensagens").select("corpo").eq("id", msgId).maybeSingle()
-    const { talvezRespostaDeConvite } = await import("./captacaoServidor")
-    if (await talvezRespostaDeConvite(jid, (m as { corpo?: string | null } | null)?.corpo ?? null).catch(() => false)) return
-  }
   // Filtro barato antes de chamar a IA: só contato novo (fornecedor e cliente antigo nunca)
   const primeira = await primeiraDa(jid)
   // Respondeu à campanha digital (conversa antiga): o agente atende como conversa nova

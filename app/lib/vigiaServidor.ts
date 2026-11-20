@@ -64,8 +64,6 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
   const { talvezAuditar } = await import("./auditoriaServidor")
   out.auditoria = await talvezAuditar(cfg as never).catch(e => String(e))
   // Captador de parceiros: convites aprovados por você saem aos poucos
-  const { processarFilaCaptacao } = await import("./captacaoServidor")
-  out.captacao = await processarFilaCaptacao().catch(e => String(e))
   // Carimbo da ronda: o Escritório mostra se o vigia está de pé
   await mudarConfig(() => ({ vigiaRodouEm: agora.toISOString() })).catch(() => null)
   return out

@@ -10,7 +10,7 @@ export default auth((req) => {
     pathname.startsWith("/aprovar") ||
     pathname === "/parceiros" ||                // cadastro público Parceiros ENYLA
     pathname === "/api/parceiros/cadastro" ||
-    pathname === "/api/parceiros/convite" ||
+
     pathname.startsWith("/d/") ||               // pedido digital (link assinado)
     pathname.startsWith("/api/d/") ||
     pathname.startsWith("/c/") ||
