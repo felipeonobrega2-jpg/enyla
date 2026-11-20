@@ -360,7 +360,15 @@ const primeiraDa = async (jid: string) =>
   (await supabase.from("whatsapp_mensagens").select("ts").eq("jid", jid).order("ts", { ascending: true }).limit(1).maybeSingle()).data
 
 // Você mandou mensagem nesta conversa nas últimas `horas` (o que não foi o agente)
+// Conversa que o Felipe passou para o agente ("assuma"): o agente atende mesmo ele tendo escrito antes
+export const conversaAssumida = async (jid: string) =>
+  !!(await supabase.from("agente_tratadas").select("id").eq("id", `assumida|${jid}`).maybeSingle()).data
+export async function assumirConversa(jid: string) {
+  await supabase.from("agente_tratadas").upsert({ id: `assumida|${jid}` }, { onConflict: "id", ignoreDuplicates: true })
+}
+
 export async function voceAtende(jid: string, cfg: CfgAgente, horas = 24) {
+  if (await conversaAssumida(jid)) return false
   const ids = new Set([...(cfg.agenteLog ?? []).flatMap(l => l.ids ?? []), ...(cfg.agenteIds ?? [])])
   const desde = new Date(Date.now() - horas * 3_600_000).toISOString()
   const { data } = await supabase.from("whatsapp_mensagens").select("id, corpo, tipo").eq("jid", jid).eq("from_me", true).gte("ts", desde).limit(200)
@@ -368,6 +376,7 @@ export async function voceAtende(jid: string, cfg: CfgAgente, horas = 24) {
 }
 
 async function voceNaConversa(jid: string, log: Registro[], cfg?: CfgAgente) {
+  if (await conversaAssumida(jid)) return false
   const idsDoAgente = new Set([...log.flatMap(l => l.ids ?? []), ...(cfg?.agenteIds ?? [])])
   const desde = new Date(Date.now() - MINUTOS_VOCE_NA_CONVERSA * 60_000).toISOString()
   const { data: minhas } = await supabase.from("whatsapp_mensagens").select("id, corpo, tipo").eq("jid", jid).eq("from_me", true).gte("ts", desde)
@@ -999,4 +1008,23 @@ export async function talvezMoverRegistroAntigo() {
   for (const id of (d.agenteTratadas ?? []).slice(0, 200)) await reservarTratada(id)
   // undefined some na gravação (o JSON não leva a chave)
   await mudarConfig(() => ({ agenteLog: undefined, agenteIds: undefined, agenteTratadas: undefined }))
+}
+
+// O agente assume a conversa e continua de onde o Felipe parou (a última mensagem pode ser dele). Se a última for do
+// cliente, responde como sempre; se for do Felipe, a IA escreve o próximo passo (orçamento, pergunta que falta).
+export async function assumirEContinuar(jid: string): Promise<{ ok: boolean; texto?: string; motivo?: string }> {
+  await assumirConversa(jid)
+  const ult = await ultimaDa(jid)
+  if (ult && !ult.from_me) { await responderSozinho(ult.id, { atrasada: true }); return { ok: true, motivo: "respondeu a última mensagem do cliente" } }
+  const cfg = await lerCfg()
+  const c = await lerConversa(jid)
+  if (!c) return { ok: false, motivo: "conversa não encontrada" }
+  const a = await atender(jid, { cfg, automatico: true, assumir: true }).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
+  if (!a.ok) return { ok: false, motivo: a.erro }
+  const texto = a.r.resposta?.trim()
+  if (!texto) return { ok: true, motivo: "a IA achou que não há o que mandar agora" }
+  const quente = leadQuente({ etiquetas: c.etiquetas, status_lead: c.status_lead, perfil: a.r.lead.perfil, jid, pedidosDigitais: cfg.pedidosDigitais })
+  const env = await enviar(c, limparEmojis(texto, emojiCtx(a.conversa.mensagens, cfg)), undefined, { essencial: quente })
+  await registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: a.r.lead.perfil, texto, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? "assumiu a conversa do Felipe" })
+  return { ok: env.ids.length > 0, texto, motivo: env.erro }
 }

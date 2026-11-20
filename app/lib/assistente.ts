@@ -10,7 +10,7 @@ import { mudarConfig } from "./configAtomica"
 import { clienteClaude, MODELO, FALLBACK } from "./claude"
 import { COLUNAS_KANBAN, COL_FECHADO, COL_ENTREGUE, type KanbanCard, type LancamentoFinanceiro } from "../types"
 
-type Pendente = { acao: "mover" | "recebimento" | "despesa" | "pronto"; params: Record<string, unknown>; resumo: string; em: string }
+type Pendente = { acao: "mover" | "recebimento" | "despesa" | "pronto" | "assumir"; params: Record<string, unknown>; resumo: string; em: string }
 type Fala = { r: "user" | "assistant"; t: string; em: string }
 type Lote = { id: string; numero: string; nomeCliente: string }
 type Cfg = Record<string, unknown> & {
@@ -95,6 +95,7 @@ const FERRAMENTAS: Anthropic.Tool[] = [
   { name: "propor_recebimento", description: "Propõe registrar dinheiro recebido de um cliente/lote (dá baixa no lançamento em aberto de mesmo valor ou lança a receita no lote). Só executa depois da confirmação.", input_schema: { type: "object", properties: { lote: { type: "string" }, valor: { type: "number" }, forma: { type: "string", enum: ["pix", "dinheiro", "cartao", "boleto", "transferencia"] } }, required: ["lote", "valor"] } },
   { name: "propor_despesa", description: "Propõe lançar uma despesa paga hoje (opcionalmente ligada a um lote). Só executa depois da confirmação.", input_schema: { type: "object", properties: { descricao: { type: "string" }, valor: { type: "number" }, forma: { type: "string", enum: ["pix", "dinheiro", "cartao", "boleto", "debito"] }, lote: { type: "string" } }, required: ["descricao", "valor"] } },
   { name: "propor_digital_pronto", description: "Propõe marcar um pedido do digital como pronto (o cliente é avisado para pagar o restante). Só executa depois da confirmação.", input_schema: { type: "object", properties: { pedido: { type: "string", description: "DIG-xxxx ou nome do cliente" } }, required: ["pedido"] } },
+  { name: "propor_passar_conversa", description: "Propõe passar uma conversa do WhatsApp para o agente de vendas assumir (ele continua de onde o Felipe parou e segue atendendo). Só executa depois da confirmação.", input_schema: { type: "object", properties: { contato: { type: "string", description: "nome do contato/cliente na conversa" } }, required: ["contato"] } },
   { name: "anotar_ideia", description: "Anota uma ideia no banco de ideias do sistema.", input_schema: { type: "object", properties: { texto: { type: "string" } }, required: ["texto"] } },
 ]
 
@@ -187,6 +188,13 @@ async function rodarFerramenta(nome: string, e: Record<string, unknown>, cfg: Cf
     if (!ped) return "Não achei pedido do digital em produção com esse nome ou número."
     p = { acao: "pronto", params: { id: ped.id }, resumo: `Marcar *${ped.id}* (${ped.nome ?? "cliente"}) como pronto: o cliente recebe no WhatsApp o aviso do restante de ${brl(ped.restante ?? 0)}`, em: new Date().toISOString() }
   }
+  if (nome === "propor_passar_conversa") {
+    const t = String(e.contato ?? "").trim()
+    const { data } = await supabase.from("whatsapp_conversas").select("jid, nome").ilike("nome", `%${t}%`).not("jid", "like", "%@g.us").order("ultima_at", { ascending: false }).limit(3)
+    if (!data?.length) return "Não achei conversa com esse nome."
+    if (data.length > 1 && norm(data[0].nome ?? "") !== norm(t)) return `Achei mais de uma: ${data.map(d => d.nome).join(", ")}. Qual?`
+    p = { acao: "assumir", params: { jid: data[0].jid, nome: data[0].nome }, resumo: `Passar a conversa de *${data[0].nome}* para o agente: ele continua de onde você parou e segue atendendo`, em: new Date().toISOString() }
+  }
   if (!p) return "Ferramenta desconhecida."
   await mudarConfig(() => ({ assistentePendente: p }))
   return `PROPOSTA GUARDADA, aguardando o Felipe confirmar: ${p.resumo}`
@@ -226,6 +234,11 @@ export async function executar(p: Pendente, cfg: Cfg): Promise<string> {
     const { marcarProntoDigital } = await import("./digitalServidor")
     const r = await marcarProntoDigital(String(p.params.id))
     return r.erro ? `Não deu: ${r.erro}` : r.aviso ?? `Feito: ${p.params.id} marcado como pronto e o cliente foi avisado do restante.`
+  }
+  if (p.acao === "assumir") {
+    const { assumirEContinuar } = await import("./agenteAuto")
+    const r = await assumirEContinuar(String(p.params.jid))
+    return r.ok ? `Feito: o agente assumiu ${p.params.nome}.${r.texto ? ` Mandou: “${r.texto.slice(0, 200)}”` : ` ${r.motivo ?? ""}`}` : `Não deu: ${r.motivo ?? "erro"}`
   }
   return "Ação desconhecida."
 }

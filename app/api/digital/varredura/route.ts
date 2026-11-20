@@ -24,7 +24,12 @@ async function autorizado(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!await autorizado(req)) return NextResponse.json({ erro: "não autorizado" }, { status: 401 })
   const { acao, jid } = await req.json().catch(() => ({})) as { acao?: string; jid?: string }
-  if (!jid || !["orcar", "reenviar", "responder", "proposta"].includes(acao ?? "")) return NextResponse.json({ erro: "acao (orcar|reenviar|responder|proposta) e jid" }, { status: 400 })
+  if (!jid || !["orcar", "reenviar", "responder", "proposta", "assumir"].includes(acao ?? "")) return NextResponse.json({ erro: "acao (orcar|reenviar|responder|proposta|assumir) e jid" }, { status: 400 })
+  // O agente assume a conversa (mesmo você tendo escrito) e continua de onde você parou
+  if (acao === "assumir") {
+    const { assumirEContinuar } = await import("@/app/lib/agenteAuto")
+    return NextResponse.json(await assumirEContinuar(jid))
+  }
   if (acao === "proposta") {
     const { atender } = await import("@/app/lib/atendenteServidor")
     const { prepararProposta } = await import("@/app/lib/propostaProntaServidor")
