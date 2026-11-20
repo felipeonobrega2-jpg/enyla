@@ -36,7 +36,7 @@ async function fecharSozinho(card: KanbanCard, numero: string, sinal: number, ho
 // e deixa a aprovação para o painel avisar (sinal e lote ficam com a Enyla).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ numero: string }> }) {
   const numero = decodeURIComponent((await params).numero)
-  const body = await req.json().catch(() => ({})) as { t?: string; quantidade?: number; nome?: string; termos?: string }
+  const body = await req.json().catch(() => ({})) as { t?: string; quantidade?: number; nome?: string; termos?: string; email?: string }
   if (!tokenValido(numero, body.t)) return NextResponse.json({ erro: "Link inválido." }, { status: 403 })
 
   const p = await carregarProposta(numero)
@@ -76,11 +76,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ num
     }).eq("numero", numero)
   }
 
+  // E-mail do cliente (opcional): resumo do pedido aprovado e aviso de envio; fica também no cadastro do cliente
+  const emailCliente = typeof body.email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(body.email.trim()) ? body.email.trim().toLowerCase().slice(0, 120) : undefined
+  if (emailCliente) await supabase.from("Cliente").update({ email: emailCliente }).eq("nome", p.card.nomeCliente).then(() => null, () => null)
+
   // Aviso para o painel (campo do servidor: salvar a configuração na tela não apaga)
   const sinal = Math.round(opcao.preco * ((cfg.sinalPct as number | undefined) ?? SINAL_PCT_PADRAO)) / 100
   const aprovacao: AprovacaoOnline = {
     numero, cardId: p.card.id, nomeCliente: p.card.nomeCliente, aprovadoPor: nome,
     quantidade: opcao.quantidade, preco: opcao.preco, sinal, em: new Date().toISOString(), termos,
+    ...(emailCliente ? { email: emailCliente } : {}),
     ...(await fecharSozinho(p.card, numero, sinal, hoje).catch(() => ({}))),
   }
   const lista = [aprovacao, ...((cfg.aprovacoesOnline as AprovacaoOnline[] | undefined) ?? [])].slice(0, 100)

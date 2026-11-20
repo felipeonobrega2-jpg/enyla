@@ -31,6 +31,8 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
   //     não for sua, as travas dele seguram); o que sobra vira aviso no seu WhatsApp (cada conversa no máximo a cada 3 h)
   out.fechadas = await fecharOObvio(agora).catch(e => String(e))
   out.esperando = await cuidarDeQuemEspera(cfg, agora, vagas, despachadas).catch(e => String(e))
+  // 1d. E-mails para o cliente (pedido aprovado, sinal, arte, arte aprovada, enviado): cada um uma vez só
+  out.emailsCliente = await import("./emailsClienteServidor").then(m => m.talvezEmailsDoCliente(cfg as never)).catch(e => String(e))
   // 1c. Orçamento prometido e não enviado: cobra você (2 h, depois a cada 4 h) até sair
   out.promessas = await cobrarPromessas(cfg, agora).catch(e => String(e))
 

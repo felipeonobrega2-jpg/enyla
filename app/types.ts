@@ -290,6 +290,7 @@ export type AprovacaoOnline = {
   preco: number
   sinal: number
   em: string            // ISO
+  email?: string        // do cliente, se informou na aprovação
   visto?: boolean
   desfeita?: boolean    // o pedido voltou para orçamento depois da aprovação
   // recompra: cliente repetiu um pedido pela página dele (mesmo preço); recompra_qtd: quer outra quantidade (precisa de orçamento)

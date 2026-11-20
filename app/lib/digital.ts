@@ -64,6 +64,7 @@ export type PedidoDigital = {
   medidasAntes?: { medidas: { a: number; l: number; p: number }; total: number; em: string }[]   // mudanças de medida (a mais recente por último)
   designerAvisadoEm?: string; villaEnviadoEm?: string
   frete?: number; entrega?: Entrega
+  email?: string                                             // do cliente (opcional, no aceite dos termos): comprovante, arte, envio
   restante?: number; restantePagoEm?: string; pagamentoFinal?: { txId: string; valor: number; data: string; nome: string | null }
   acertadoEm?: string
   lembreteDepois?: string; lembreteParado?: boolean           // lead adiou (espera) · você assumiu a conversa (sem lembrete)

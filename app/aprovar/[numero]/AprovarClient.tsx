@@ -52,6 +52,7 @@ function Aviso({ icone, titulo, texto }: { icone: React.ReactNode; titulo: strin
 export default function AprovarClient({ numero, token, proposta }: { numero: string; token: string; proposta: Proposta | null }) {
   const [qtd, setQtd] = useState<number | null>(proposta?.opcoes.length === 1 ? proposta.opcoes[0].quantidade : null)
   const [nome, setNome] = useState("")
+  const [email, setEmail] = useState("")
   const [aceite, setAceite] = useState(false)
   const [verTermos, setVerTermos] = useState(false)
   const [enviando, setEnviando] = useState(false)
@@ -67,7 +68,7 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
     try {
       const r = await fetch(`/api/aprovar/${encodeURIComponent(numero)}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ t: token, quantidade: qtd, nome: nome.trim(), termos: proposta?.versaoTermos }),
+        body: JSON.stringify({ t: token, quantidade: qtd, nome: nome.trim(), termos: proposta?.versaoTermos, email: email.trim() || undefined }),
       })
       const d = await r.json()
       if (!r.ok) setErro(d.erro ?? "Não foi possível aprovar agora. Tente de novo.")
@@ -157,6 +158,12 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
                 <span className="text-[12px] font-medium text-[#5e5c68]">Seu nome</span>
                 <input value={nome} onChange={e => setNome(e.target.value)} placeholder="Quem está aprovando" autoComplete="name"
                   className="mt-1.5 w-full h-12 rounded-xl px-4 text-[15px] text-[#191625] bg-[rgba(116,116,128,0.06)] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/30 transition-colors" />
+              </label>
+              <label className="block">
+                <span className="text-[12px] font-medium text-[#5e5c68]">Seu e-mail <span className="text-[#9a98a3] font-normal">(opcional)</span></span>
+                <input type="email" inputMode="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="voce@exemplo.com" autoComplete="email" maxLength={120}
+                  className="mt-1.5 w-full h-12 rounded-xl px-4 text-[15px] text-[#191625] bg-[rgba(116,116,128,0.06)] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8456e8]/30 transition-colors" />
+                <span className="block text-[11.5px] text-[#9a98a3] mt-1">Você recebe o resumo do pedido aprovado e o aviso de envio.</span>
               </label>
               <label className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" checked={aceite} onChange={e => setAceite(e.target.checked)} className="mt-0.5 w-5 h-5 accent-[#8456e8] shrink-0" />

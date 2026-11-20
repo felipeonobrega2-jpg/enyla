@@ -403,10 +403,14 @@ function ListaTermos({ p }: { p: Pedido }) {
     </div>
   )
 }
-function AceiteTermos({ p, marcado, setMarcado }: { p: Pedido; marcado: boolean; setMarcado: (v: boolean) => void }) {
+function AceiteTermos({ p, marcado, setMarcado, email, setEmail }: { p: Pedido; marcado: boolean; setMarcado: (v: boolean) => void; email: string; setEmail: (v: string) => void }) {
   const [aberto, setAberto] = useState(false)
   return (
     <div className="self-stretch text-left mt-4 rounded-xl bg-[rgba(116,116,128,0.06)] px-3.5 py-3">
+      <label className="block text-[12.5px] text-[#5e5c68] mb-1.5">Seu e-mail <span className="text-[#9a98a3]">(opcional)</span></label>
+      <input type="email" inputMode="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} maxLength={120} placeholder="voce@exemplo.com"
+        className="w-full h-11 rounded-xl px-3.5 text-[14px] text-[#191625] bg-white outline-none focus:ring-2 focus:ring-[#8456e8]/20" />
+      <p className="text-[11.5px] text-[#9a98a3] mt-1 mb-3 leading-snug">Você recebe o comprovante, a arte para aprovar e o aviso de envio.</p>
       <label className="flex items-start gap-2.5 cursor-pointer select-none">
         <input type="checkbox" checked={marcado} onChange={e => setMarcado(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#8456e8] shrink-0" />
         <span className="text-[13px] text-[#191625] leading-snug">Li e aceito os <button type="button" onClick={e => { e.preventDefault(); setAberto(a => !a) }} className="text-[#8456e8] font-semibold underline underline-offset-2">termos do pedido</button></span>
@@ -468,7 +472,8 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
 }) {
   const faltaTermos = !!pedeTermos && !p.termosAceitosEm
   const [marcado, setMarcado] = useState(false)
-  const aceitar = async () => { if (faltaTermos) setP(await post({ acao: "termos" })) }
+  const [email, setEmail] = useState("")
+  const aceitar = async () => { if (faltaTermos) setP(await post({ acao: "termos", email: email.trim() || undefined })) }
   const [doc, setDoc] = useState("")
   const [gerando, setGerando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -502,7 +507,7 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
         <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">{titulo}</p>
         <p className="text-[28px] font-bold text-[#191625] ds-num mt-1">{brl(valor)}</p>
         <p className="text-[12px] text-[#898892]">{sub}</p>
-        <AceiteTermos p={p} marcado={marcado} setMarcado={setMarcado} />
+        <AceiteTermos p={p} marcado={marcado} setMarcado={setMarcado} email={email} setEmail={setEmail} />
         <button onClick={async () => { setGerando(true); setErro(null); try { await aceitar() } catch (e) { setErro((e as Error).message) } setGerando(false) }} disabled={!marcado || gerando}
           className="ds-toque mt-3 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40">
           {gerando ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Ver o Pix
@@ -524,7 +529,7 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
         <label className="self-stretch text-left mt-4 text-[12px] font-semibold text-[#191625]">CPF ou CNPJ de quem vai pagar</label>
         <input value={doc.trim() ? doc : ""} autoFocus={!!p.documento} onChange={e => setDoc(e.target.value)} inputMode="numeric" maxLength={18} placeholder="000.000.000-00"
           className="self-stretch mt-1 h-12 rounded-xl px-3.5 text-[15px] text-[#191625] bg-[rgba(116,116,128,0.06)] outline-none focus:ring-2 focus:ring-[#8456e8]/20" /></>}
-        {faltaTermos && <AceiteTermos p={p} marcado={marcado} setMarcado={setMarcado} />}
+        {faltaTermos && <AceiteTermos p={p} marcado={marcado} setMarcado={setMarcado} email={email} setEmail={setEmail} />}
         <button onClick={() => void gerar(doc.trim() ? doc : undefined)} disabled={gerando || (faltaTermos && !marcado) || (!(p.documento && !doc.trim()) && doc.replace(/\D/g, "").length < 11)}
           className="ds-toque mt-3 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-60">
           {gerando ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Gerar o Pix

@@ -55,7 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const id = decodeURIComponent((await params).id)
-  const b = await req.json().catch(() => ({})) as { t?: string; dz?: string; acao?: string; quantidade?: number; marca?: string; cores?: string; referencias?: string; laminacao?: string; texto?: string; cep?: string; endereco?: string; documento?: string; order_nsu?: string; transaction_nsu?: string; slug?: string; a?: number; l?: number; p?: number; confirmar?: boolean }
+  const b = await req.json().catch(() => ({})) as { t?: string; dz?: string; acao?: string; quantidade?: number; marca?: string; cores?: string; referencias?: string; laminacao?: string; texto?: string; cep?: string; endereco?: string; documento?: string; order_nsu?: string; transaction_nsu?: string; slug?: string; a?: number; l?: number; p?: number; confirmar?: boolean; email?: string }
   if (!tokenDigitalValido(id, b.t)) return NextResponse.json({ erro: "Link inválido." }, { status: 403 })
   const { pedido, cfg } = await lerPedido(id)
   if (!pedido || pedido.status === "cancelado") return NextResponse.json({ erro: "Orçamento indisponível." }, { status: 404 })
@@ -68,7 +68,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Cliente aceitou os termos (só pelo link dele, antes de pagar): guarda a versão e quando
   if (b.acao === "termos") {
     if (tokenDesignerValido(id, b.dz)) return NextResponse.json({ erro: "Só o cliente aceita os termos." }, { status: 403 })
-    const novo = await gravarPedido(id, p => p.termos ? null : { ...p, termos: { versao: VERSAO_TERMOS, em: new Date().toISOString() } })
+    // E-mail opcional (comprovante, arte para aprovar, aviso de envio)
+    const email = typeof b.email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(b.email.trim()) ? b.email.trim().toLowerCase().slice(0, 120) : undefined
+    const novo = await gravarPedido(id, p => p.termos ? null : { ...p, termos: { versao: VERSAO_TERMOS, em: new Date().toISOString() }, ...(email ? { email } : {}) })
     return NextResponse.json(publico(novo ?? pedido, cfg.digital))
   }
   if (b.acao === "briefing") {

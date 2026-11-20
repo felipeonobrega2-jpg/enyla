@@ -8,7 +8,7 @@ const SITE = "https://app.enyla.com.br"
 const esc = (s: string) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
 
 // Moldura: topo roxo com o logo, cartão branco, rodapé da marca
-export function moldura(a: { preheader: string; titulo: string; corpo: string; rodapeExtra?: string }): string {
+export function moldura(a: { preheader: string; titulo: string; corpo: string; rodapeExtra?: string; assinatura?: string }): string {
   return `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">
@@ -32,7 +32,7 @@ export function moldura(a: { preheader: string; titulo: string; corpo: string; r
       ${a.corpo}
     </td></tr>
     <tr><td style="background:#ffffff;border-radius:0 0 20px 20px;padding:8px 32px 30px;" class="pad">
-      <p style="margin:18px 0 0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:${CINZA};">Um abraço,<br><b style="color:${ESCURO};">Felipe · ENYLA Embalagens</b><br>Gerente de contas dos parceiros</p>
+      <p style="margin:18px 0 0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:${CINZA};">Um abraço,<br>${a.assinatura ?? `<b style="color:${ESCURO};">Felipe · ENYLA Embalagens</b><br>Gerente de contas dos parceiros`}</p>
     </td></tr>
     <tr><td style="padding:22px 24px 6px;text-align:center;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#9a97a5;">
       ${a.rodapeExtra ? `${a.rodapeExtra}<br>` : ""}
