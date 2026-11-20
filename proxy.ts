@@ -19,6 +19,7 @@ export default auth((req) => {
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/whatsapp/webhook") ||
     pathname === "/api/digital/varredura" ||
+    pathname === "/api/relatorio/semanal" ||     // relatório semanal do VPS (exige o segredo do webhook na rota)
     pathname === "/api/sistema/vigia" ||          // vigia do VPS (exige o segredo do webhook na rota)     // a rota exige login ou o segredo do webhook
     pathname === "/api/frete/webhook" ||
     pathname === "/api/infinitepay/webhook" ||  // InfinitePay (sem assinatura: só dispara o payment_check)
