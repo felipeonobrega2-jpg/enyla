@@ -1,3 +1,4 @@
+import { faltaParaOrcar } from "./propostaPronta"
 // Ninguém sem resposta: quem escreveu por último e está esperando a gente. Puro (o servidor busca as conversas).
 // Não conta "ok", "obrigado", 👍 (fim de conversa), quem disse que volta depois (a IA marca "com ele"/"sem pressa") nem fornecedor.
 
@@ -6,13 +7,19 @@ export type ConvEspera = {
   ultima_recebida_at: string | null; ultima_enviada_at: string | null; proxima_acao?: string | null
   fechada_em?: string | null   // você fechou ("não precisa de resposta"); reabre sozinha quando o cliente escreve de novo
 }
-export type Esperando = { jid: string; nome: string; minutos: number; mensagem: string; peso: number; rotulo: string }
+export type Esperando = { jid: string; nome: string; minutos: number; mensagem: string; peso: number; rotulo: string
+  checklistOk?: boolean   // já tem tudo para orçar (quantidade, medida, referência, acabamento, modelos, arte)
+}
+// Bom negócio só chega para o Felipe com o checklist completo; antes disso a IA segue levantando. Rede de segurança:
+// esperando há 3 h+ aparece mesmo assim (a IA não conseguiu seguir)
+export const paraOFelipe = (e: Esperando) => e.peso >= 3 && (!!e.checklistOk || e.minutos >= 180)
 
 const PALAVRA_FECHO = "ok(ay)?|okk+|blz|beleza|show|top|obrigad[oa]|agrade[çc]o|agradecid[oa]|obg|valeu|vlw|tmj|certo|perfeito|combinado|fechado|t[áa] bom|tudo bem|👍|🙏|👌|❤️|😊|kk+|rs+|ah t[áa]|entendi|ótimo|otimo|maravilha|gostei|legal|bacana|tranquilo|de nada"
 const FECHO = new RegExp(`^\\s*((${PALAVRA_FECHO})[\\s!.,]*)+$`, "i")
 // Resposta automática da empresa do próprio lead, mensagem técnica e "eu te mando": não é a nossa vez
 const AUTOMATICA = /seja (muito )?bem[- ]?vind|(é|e) um prazer ter voc|agradecemos (o seu |seu )?contato|em breve (retornaremos|responderemos|daremos)|fora do (nosso )?hor[aá]rio|mensagem autom[aá]tica|^\[(protocolMessage|reactionMessage|ephemeralMessage|senderKeyDistributionMessage)\]$/i
 const ELE_VAI = /\b(vou (providenciar|mandar|enviar|ver|medir|falar|conversar|pensar|passar|te (mandar|enviar|passar|falar))|(te|lhe) (mando|envio|passo|falo|retorno|respondo)|mando( (sim|já|ja|amanh[ãa]|depois|aí|ai))?|j[áa] (te )?mando|vou dar uma olhada|obrigad[oa] pela (aten[çc][ãa]o|ajuda|paci[êe]ncia)|assim que (eu )?(tiver|puder|chegar)|depois (eu )?(te )?(mando|falo|passo))\b/i
+const dadosDe = (pa?: string | null) => { try { return (JSON.parse(pa ?? "") as { r?: { dados?: Parameters<typeof faltaParaOrcar>[0] } }).r?.dados ?? null } catch { return null } }
 const momento = (pa?: string | null) => { try { return (JSON.parse(pa ?? "") as { r?: { momento?: string } }).r?.momento ?? null } catch { return null } }
 
 export function rankQualificacao(et: string[] | null | undefined, status?: string | null): number {
@@ -44,7 +51,7 @@ export function quemEspera(convs: ConvEspera[], agora = Date.now(), minimoMin = 
     const digital = et.includes("Digital")
     // Ordem pela qualificação (ICP > Oportunidade > MQL/médio > digital > o resto); no mesmo nível, quem espera há mais tempo
     const peso = rankQualificacao(et, c.status_lead)
-    out.push({ jid: c.jid, nome: c.nome ?? c.jid.split("@")[0], minutos: min, mensagem: msg.slice(0, 80), peso, rotulo: bom ? "bom negócio" : digital ? "digital" : "lead" })
+    out.push({ jid: c.jid, nome: c.nome ?? c.jid.split("@")[0], minutos: min, mensagem: msg.slice(0, 80), peso, rotulo: bom ? "bom negócio" : digital ? "digital" : "lead", checklistOk: !faltaParaOrcar(dadosDe(c.proxima_acao)) })
   }
   return out.sort((a, b) => b.peso - a.peso || b.minutos - a.minutos)
 }

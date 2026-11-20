@@ -26,8 +26,6 @@ const POR_RODADA = 4                 // chamadas de IA por rodada (cabe no minut
 const MIN_DIGITANDO = 2              // espera o lead terminar de escrever
 const MIN_MQL_ESPERANDO = 20         // MQL sem resposta sua há tanto tempo: avisa
 const NAO_MEXE = ["pedido", "perdido"]
-// 2 (20/11): base v18, "vou lançar" + "umas mil" não é MQL — revisa os MQLs atuais
-const REVISAO_V = 2
 
 async function lerCfg(): Promise<Cfg> {
   const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
@@ -147,12 +145,10 @@ export async function talvezClassificarLeads() {
   await mudarConfig((d: Record<string, unknown> & Cfg) => {
     if (d.classificandoEm && Date.now() - new Date(d.classificandoEm).getTime() < 2 * 60_000) return null
     minha = true
-    // Revisão nova (REVISAO_V): todas as conversas voltam a ser classificadas uma vez, MQL primeiro, com a base atual
-    const nova = ((d as { revisaoLeadsV?: number }).revisaoLeadsV ?? 0) < REVISAO_V
-    return { classificandoEm: agora, ...(d.revisaoLeadsAte && !nova ? {} : { revisaoLeadsAte: agora, revisaoLeadsV: REVISAO_V }) }
+    return { classificandoEm: agora, ...(d.revisaoLeadsAte ? {} : { revisaoLeadsAte: agora }) }
   })
   if (!minha) return
-  const revisaoAte = ((cfg as { revisaoLeadsV?: number }).revisaoLeadsV ?? 0) < REVISAO_V ? agora : (cfg.revisaoLeadsAte ?? agora)
+  const revisaoAte = cfg.revisaoLeadsAte ?? agora
   try {
     const desde = new Date(Date.now() - DIAS_JANELA * 86_400_000).toISOString()
     const { data } = await supabase.from("whatsapp_conversas").select("jid, nome, telefone, etiquetas, status_lead, ultima_at, ultima_classificacao_at")

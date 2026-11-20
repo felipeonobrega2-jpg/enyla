@@ -224,9 +224,6 @@ async function medirEstiloFelipe() {
 
 // O que você ensinou direto (pediu ao Claude): entra uma vez, pela versão
 const ENSINADO: { v: number; item: Conhecimento }[] = [
-  // v18 (20/11, Adriano: "vou lançar" + "umas mil caixas" virou MQL e não está qualificado)
-  { v: 18, item: { id: "felipe-lancamento-umas-mil", tema: "venda", em: "2026-11-20T10:00:00.000Z",
-    texto: "Quem ainda vai lançar a marca (não vende ainda) e fala em volume aproximado (\"umas mil\", \"uns mil e pouco\") ainda não está qualificado: não é MQL nem lead médio, é lead em qualificação (indefinido) e a conversa segue comigo no automático. Continuo levantando os dados e deixo claro, com naturalidade, que em mil o custo por unidade fica mais alto e que o ponto bom é a partir de 5 mil (ou que dá para começar menor no digital). Só passa a ser bom negócio quando o volume fica firme (número fechado, recorrência, ou mais de um produto/modelo somando volume) ou quando ele já vende e tem histórico." } },
   // v17 (19/11, conversa da caixa Landerlan: a mesma pergunta saiu duas vezes com as mesmas palavras)
   { v: 17, item: { id: "felipe-nao-repetir-pergunta", tema: "venda", em: "2026-11-19T22:45:00.000Z",
     texto: "Nunca repito uma frase que eu já mandei na conversa. Se perguntei a quantidade e o cliente respondeu outra coisa, primeiro respondo o que ele perguntou e depois volto na quantidade com outras palavras e de um jeito mais leve, de preferência dando uma referência que ajude ele a responder (ex.: \"Pra eu te passar o valor, seria mais umas 500, mil, ou mais que isso?\"). Pedido de desculpa pela demora, uma vez só na conversa." } },
@@ -276,8 +273,10 @@ const ENSINADO: { v: number; item: Conhecimento }[] = [
   { v: 2, item: { id: "felipe-cigarro", tema: "recusa", em: "2026-11-07T00:00:00.000Z",
     texto: "Não trabalhamos com embalagem de cigarro (maço, caixa de cigarro, tabaco). Se o lead pedir, diga com educação que esse tipo de embalagem a gente não faz e não siga com o orçamento." } },
 ]
+// 19 (20/11): a regra "lançamento + umas mil não é MQL" estava errada (o Felipe: com a quantidade ele já orça)
+const RETIRADOS: { v: number; id: string }[] = [{ v: 19, id: "felipe-lancamento-umas-mil" }]
 export async function revisarConhecimento() {
-  const ultima = Math.max(1, ...ENSINADO.map(e => e.v))
+  const ultima = Math.max(1, ...ENSINADO.map(e => e.v), ...RETIRADOS.map(r => r.v))
   await mudarConfig((d: Record<string, unknown> & { conhecimentoAgente?: Conhecimento[]; agenteRevisaoConhecimento?: number }) => {
     const v = d.agenteRevisaoConhecimento ?? 0
     if (v >= ultima) return null
@@ -285,6 +284,8 @@ export async function revisarConhecimento() {
     if (v < 1) lista = lista.filter(c => !REVISAO_1.includes(c.id))
     // Item ensinado de novo numa versão nova (mesmo id) substitui o antigo
     for (const e of ENSINADO) if (e.v > v) lista = [...lista.filter(c => c.id !== e.item.id), e.item]
+    // Ensinado por engano e retirado (sai da base de quem já tinha)
+    for (const r of RETIRADOS) if (r.v > v) lista = lista.filter(c => c.id !== r.id)
     return { conhecimentoAgente: lista, agenteRevisaoConhecimento: ultima }
   })
 }

@@ -220,7 +220,7 @@ async function cobrarPromessas(cfg: Cfg & { promessasEm?: string; promessasCobra
 async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvisada?: Record<string, string>; esperaAvisoEm?: string; agenteAuto?: { horario?: { dias?: number[]; inicio?: string; fim?: string }; avisoNumero?: string } }, agora: Date, vagas: { n: number }, despachadas: Set<string>) {
   const { dentroDoHorario } = await import("./agenteLeads")
   if (cfg.agenteAuto?.horario && !dentroDoHorario(cfg.agenteAuto.horario as never)) return "fora do horário"
-  const { quemEspera, tempoEspera } = await import("./esperando")
+  const { quemEspera, tempoEspera, paraOFelipe } = await import("./esperando")
   const { data } = await supabase.from("whatsapp_conversas").select("jid, nome, etiquetas, status_lead, ultima_msg, ultima_recebida_at, ultima_enviada_at, proxima_acao, fechada_em")
     .not("jid", "like", "%@g.us").gte("ultima_recebida_at", new Date(agora.getTime() - 7 * 86_400_000).toISOString()).limit(1000)
   // O "já te respondo" automático não é resposta: a conversa segue esperando (com o peso dela)
@@ -247,14 +247,14 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
   if (novasTentativas.length) await mudarConfig((d: typeof cfg & { vigiaTentouV3?: string[] }) => ({ vigiaTentouV3: [...novasTentativas, ...(d.vigiaTentouV3 ?? [])].slice(0, 600) }))
   // O resto é seu: aviso no WhatsApp (no máximo uma mensagem a cada 30 min; cada conversa a cada 3 h)
   const avisadas = cfg.esperaAvisada ?? {}
-  const paraAvisar = lista.filter(e => !respondidas.has(e.jid) && (!avisadas[e.jid] || agora.getTime() - new Date(avisadas[e.jid]).getTime() > 3 * 3600_000) && e.peso >= 3)   // só bom negócio vira aviso seu
+  const paraAvisar = lista.filter(e => !respondidas.has(e.jid) && (!avisadas[e.jid] || agora.getTime() - new Date(avisadas[e.jid]).getTime() > 3 * 3600_000) && paraOFelipe(e))   // só bom negócio com o checklist completo vira aviso seu
   if (!paraAvisar.length || (cfg.esperaAvisoEm && agora.getTime() - new Date(cfg.esperaAvisoEm).getTime() < 30 * 60_000)) return { esperando: lista.length, despachadas: respondidas.size }
   const { evo } = await import("./evolution")
   const { seuNumero } = await import("./agenteAuto")
   const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
   if (destino) {
     const linhas = paraAvisar.slice(0, 8).map(e => `• *${e.nome}* (${e.rotulo}) há ${tempoEspera(e.minutos)}: “${e.mensagem}”`)
-    const texto = `⏳ *Esperando resposta sua (${paraAvisar.length})*\n${linhas.join("\n")}${paraAvisar.length > 8 ? `\n… e mais ${paraAvisar.length - 8}` : ""}\n\nO agente não pode responder essas (conversa sua, MQL pronto para orçar ou cliente da casa).\n${LINK_SISTEMA}/?aba=painel`
+    const texto = `⏳ *Esperando resposta sua (${paraAvisar.length})*\n${linhas.join("\n")}${paraAvisar.length > 8 ? `\n… e mais ${paraAvisar.length - 8}` : ""}\n\nBons negócios com tudo para orçar (ou que a IA não conseguiu seguir).\n${LINK_SISTEMA}/?aba=painel`
     await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: texto }) }).catch(() => null)
   }
   const em = agora.toISOString()

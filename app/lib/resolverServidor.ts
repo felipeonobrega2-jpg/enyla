@@ -131,10 +131,10 @@ export async function paraResolver(cfg: { grandesNegocios?: import("./grandesNeg
   // Digital é da IA e da operação (menu Digital tem o aviso próprio): fora da sua lista
   // Quem está esperando resposta há 30+ min, só bom negócio (ICP, Oportunidade, MQL/médio): o resto a IA atende
   {
-    const { quemEspera, tempoEspera } = await import("./esperando")
+    const { quemEspera, tempoEspera, paraOFelipe } = await import("./esperando")
     const { data: cvs } = await supabase.from("whatsapp_conversas").select("jid, nome, etiquetas, status_lead, ultima_msg, ultima_recebida_at, ultima_enviada_at, proxima_acao, fechada_em")
       .not("jid", "like", "%@g.us").gte("ultima_recebida_at", new Date(agora - 3 * DIA).toISOString()).limit(800)
-    for (const e of quemEspera((cvs ?? []) as never, agora, 30).filter(x => x.peso >= 3).slice(0, 15))
+    for (const e of quemEspera((cvs ?? []) as never, agora, 30).filter(paraOFelipe).slice(0, 15))
       itens.push({ tipo: "esperando", titulo: e.nome, detalhe: `${e.rotulo} esperando há ${tempoEspera(e.minutos)}: “${e.mensagem}”`, valor: null, jid: e.jid, numero: null, desde: null, nivel: e.minutos >= 120 || e.peso >= 3 ? "perigo" : "alerta" })
   }
   // Grande negócio com o próximo passo vencido (ou sem próximo passo): sobe logo depois do sistema

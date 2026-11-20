@@ -35,3 +35,14 @@ describe("a IA fecha só o óbvio", () => {
     expect(podeFecharSozinha({ ...base, etiquetas: ["Descartado"], ultima_msg: "Quanto custa?", ultima_recebida_at: min(90), ultima_enviada_at: min(80) }, agora)).toBe("não é lead e já foi respondido")
   })
 })
+
+describe("checklist antes de passar para o Felipe", () => {
+  it("bom negócio só vai para o Felipe com tudo para orçar (ou esperando 3 h+)", async () => {
+    const { paraOFelipe } = await import("@/app/lib/esperando")
+    const e = { jid: "x", nome: "Adriano", minutos: 30, mensagem: "", peso: 3, rotulo: "bom negócio" }
+    expect(paraOFelipe({ ...e, checklistOk: false })).toBe(false)
+    expect(paraOFelipe({ ...e, checklistOk: true })).toBe(true)
+    expect(paraOFelipe({ ...e, checklistOk: false, minutos: 200 })).toBe(true)
+    expect(paraOFelipe({ ...e, peso: 2, checklistOk: true })).toBe(false)
+  })
+})
