@@ -96,8 +96,9 @@ export async function POST(req: NextRequest) {
         if (salva?.jid) await marcarOrigemPelaFrase(salva.jid, extractBody(data).corpo, salva.ts).catch(() => null)
       }
       // Assistente do Felipe: mensagem dele no chat "você mesmo" (só a digitada no celular; os avisos do sistema não)
-      if (data?.key?.fromMe && data.key.id && novas.has(data.key.id) && !/^3EB0/i.test(data.key.id))
-        after(() => import("@/app/lib/assistente").then(m => m.talvezAssistente(data.key.id, data.key.remoteJid ?? "", true, extractBody(data).tipo)).catch(e => console.error("[assistente]", e)))
+      // (com o WhatsApp institucional: também a mensagem que chega do número pessoal dele, agenteAuto.avisoNumero)
+      if (data?.key?.id && novas.has(data.key.id) && !/^3EB0/i.test(data.key.id) && !deveIgnorar(data.key.remoteJid ?? ""))
+        after(() => import("@/app/lib/assistente").then(m => m.talvezAssistente(data.key.id, data.key.remoteJid ?? "", !!data.key.fromMe, extractBody(data).tipo)).catch(e => console.error("[assistente]", e)))
       // Áudio novo: transcreve depois de responder ao Evolution (não atrasa o recebimento)
       if (data?.message?.audioMessage && data.key?.id) after(() => transcreverPendentes({ ids: [data.key.id] }).catch(() => {}))
       // Agente de leads no modo automático (desligado por padrão; ele mesmo confere as travas)

@@ -392,6 +392,12 @@ export async function agendarResposta(msgId: string, origem: string) {
     if (c) await respondeuRetomada(cfg, c, msgId).catch(() => null)
     return
   }
+  // O número pessoal do Felipe (WhatsApp institucional) é o assistente dele, nunca um lead
+  {
+    const { data: m } = await supabase.from("whatsapp_mensagens").select("jid").eq("id", msgId).maybeSingle()
+    const pessoal = (cfg.agenteAuto as { avisoNumero?: string } | undefined)?.avisoNumero?.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "")
+    if (pessoal && pessoal.length >= 10 && String(m?.jid ?? "").split("@")[0].replace(/^55(?=\d{10,11}$)/, "") === pessoal) return
+  }
   // Ritmo de gente (somado à 2ª etapa): de dia ~40 s a 1 min; de madrugada mais devagar (~1 a 1,5 min)
   const hSP = Number(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false })) % 24
   await (hSP >= 8 && hSP < 22 ? espera(20, 32) : espera(35, 50))
