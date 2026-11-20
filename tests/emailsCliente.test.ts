@@ -8,10 +8,12 @@ describe("e-mails para o cliente", () => {
     const e = emailPedidoAprovado({ nome: "Ana Souza", numero: "ORC-2026-300", quantidade: 5000, preco: 9540, sinal: 4770, aprovadoPor: "Ana Souza", em: "2026-11-20T15:00:00Z",
       descricao: "6×12×3 cm · Triplex", prazo: null, linkPix: "https://app.enyla.com.br/pix/ORC-2026-300?v=4770.00", linkRastreio: "https://app.enyla.com.br/track/ORC-2026-300" })
     expect(e.assunto).toContain("ORC-2026-300")
-    expect(e.html).toContain("Ana, seu pedido foi aprovado")
-    expect(e.html).toContain("5.000 caixas")
+    expect(e.html).toContain("Olá, Ana.")
+    expect(e.html).toContain("5.000 unidades")
     expect(h(e)).toContain("R$ 4.770,00")
-    expect(e.html).toContain("Luiz Felipe")
+    expect(e.html).toContain("Equipe ENYLA Embalagens")
+    expect(e.html).toContain("CNPJ 03.999.896/0001-52")
+    expect(e.html).not.toMatch(/\b(eu|comigo|me chame)\b/i)
     expect(e.html).toContain("Sinal")   // linha do tempo
     expect(e.texto).toContain("/pix/ORC-2026-300")
   })
@@ -21,10 +23,10 @@ describe("e-mails para o cliente", () => {
     expect(emailSinalRecebido({ nome: "joão", id: "D", quantidade: 1, total: 2, sinal: 1, em: "2026-11-20T15:00:00Z", link: "L", whatsapp: "5511999998888" }).html).toContain("wa.me/5511999998888")
     const ok = emailArteAprovada({ nome: "João", id: "DIG-120", em: "2026-11-20T15:00:00Z", versao: 1, link: "L", arteUrl: "https://x/arte.png" })
     expect(ok.html).toContain("https://x/arte.png")
-    expect(ok.html).toContain("Quando as caixinhas ficarem prontas")   // restante só quando ficar pronto, não depois da arte
+    expect(ok.html).toContain("Quando o pedido estiver pronto")   // restante só quando ficar pronto, não depois da arte
     expect(emailArteParaAprovar({ nome: "João", id: "DIG-120", versao: 1, link: "L", arteUrl: "https://x/arte.pdf" }).html).not.toContain("arte.pdf\"")   // PDF não vira imagem
     expect(h(emailMaterialPronto({ nome: "João", id: "DIG-120", quantidade: 100, restante: 339.97, frete: 30, link: "L", temEndereco: true }))).toContain("R$ 339,97")
-    expect(emailPedidoEnviado({ nome: "João", numero: "DIG-120", quantidade: 200, link: "L" }).assunto).toContain("saiu para entrega")
+    expect(emailPedidoEnviado({ nome: "João", numero: "DIG-120", quantidade: 200, link: "L" }).assunto).toContain("enviado")
   })
   it("data do rastreio (horário de Brasília) vira ISO", () => {
     expect(paraIso("20/11/2026, 14:05:33")).toBe("2026-11-20T17:05:33.000Z")
