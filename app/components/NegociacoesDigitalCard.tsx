@@ -9,7 +9,8 @@ import { Handshake, Check, X, MessageCircle, AlertTriangle } from "lucide-react"
 import { Cartao, TituloCartao, Botao } from "./ds"
 import type { Negociacao } from "../lib/digital"
 
-type Pedido = { id: string; jid: string; nome: string | null; quantidade: number; total: number; custo: number; arte: number; status: string; negociacao: Negociacao | null }
+export type PedidoNegociacao = { id: string; jid: string; nome: string | null; quantidade: number; total: number; custo: number; arte: number; status: string; negociacao: Negociacao | null }
+type Pedido = PedidoNegociacao
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 const parseValor = (s: string) => { const n = parseFloat(s.replace(/[^\d,.]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".")); return Number.isFinite(n) ? n : 0 }
@@ -18,7 +19,7 @@ const haQuanto = (iso: string) => {
   return m < 60 ? `há ${Math.max(1, m)} min` : m < 1440 ? `há ${Math.round(m / 60)} h` : `há ${Math.round(m / 1440)} d`
 }
 
-function Item({ p, onFeito, onAbrirConversa }: { p: Pedido; onFeito: () => void; onAbrirConversa?: (jid: string, nome?: string) => void }) {
+export function ItemNegociacao({ p, onFeito, onAbrirConversa }: { p: Pedido; onFeito: () => void; onAbrirConversa?: (jid: string, nome?: string) => void }) {
   const n = p.negociacao!
   const [outro, setOutro] = useState(false)
   const [valor, setValor] = useState(n.pedidoTotal ? n.pedidoTotal.toFixed(2).replace(".", ",") : "")
@@ -93,7 +94,7 @@ export function NegociacoesDigitalCard({ onAbrirConversa, iniciais }: { onAbrirC
       <TituloCartao icone={<Handshake size={16} />} titulo="Negociações do digital"
         sub="Cliente pediu desconto num orçamento esperando o sinal. Aprovado, o pedido muda e ele recebe o valor novo pelo mesmo link; recusado, ele recebe que esse já é o melhor valor." />
       <div className="flex flex-col gap-2.5">
-        {abertas.map(p => <Item key={p.id} p={p} onAbrirConversa={onAbrirConversa} onFeito={() => iniciais ? setLista(l => (l ?? []).filter(x => x.id !== p.id)) : carregar()} />)}
+        {abertas.map(p => <ItemNegociacao key={p.id} p={p} onAbrirConversa={onAbrirConversa} onFeito={() => iniciais ? setLista(l => (l ?? []).filter(x => x.id !== p.id)) : carregar()} />)}
       </div>
     </Cartao>
   )

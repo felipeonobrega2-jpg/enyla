@@ -1,4 +1,5 @@
 "use client"
+import { CaixaEntrada, type ItemExterno } from "./CaixaEntrada"
 import { FunilAgoraCard } from "./FunilAgoraCard"
 
 import React from "react"
@@ -9,8 +10,6 @@ import {
 import { EnviarWhatsapp, Envio } from "./EnviarWhatsapp"
 import { GrandesNegociosCard } from "./GrandesNegociosCard"
 import { HojeCard } from "./HojeCard"
-import { PropostasProntasCard } from "./PropostasProntasCard"
-import { NegociacoesDigitalCard } from "./NegociacoesDigitalCard"
 import { RetornoAnunciosCard } from "./RetornoAnunciosCard"
 import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COL_HOT, AprovacaoOnline } from "../types"
 import { Configuracoes } from "../config"
@@ -112,7 +111,8 @@ export function PainelView({
     abriuProposta: <Eye className="w-4 h-4" />, comoFicou: <MessageCircleHeart className="w-4 h-4" />, avaliado: <Star className="w-4 h-4" />, reposicao: <RotateCcw className="w-4 h-4" />, meta: <Megaphone className="w-4 h-4" />, whatsapp: <MessageCircle className="w-4 h-4" />,
   }
   type Acao = { id: string; tom: Tom; icone: React.ReactNode; titulo: string; sub: string; valor?: string; ir: () => void; whatsapp?: string; envio?: Envio; cobrar?: Partial<LancamentoFinanceiro>; botao?: { rotulo: string; onClick: () => void } }
-  const acoes: Acao[] = pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom, clientes, config, hoje }).map(x => ({
+  const acoes: (Acao & { tipo: string; numero?: string; valorNum?: number | null })[] = pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom, clientes, config, hoje }).map(x => ({
+    tipo: x.tipo, numero: (x as { card?: { numero?: string } }).card?.numero, valorNum: x.valor ?? null,
     id: x.id, tom: x.tom, icone: ICONE[x.tipo], titulo: x.titulo, sub: x.sub,
     valor: x.valor != null ? brl(x.valor) : undefined,
     ir: x.tipo === "fornecedor" ? () => onNavegar("fornecedores") : x.tipo === "meta" ? () => onNavegar("meta") : x.tipo === "whatsapp" ? () => onNavegar("whatsapp") : x.tipo === "conferir" ? () => abrirCaixa() : x.cliente ? () => onAbrirCliente(x.cliente!) : () => { if (x.card) onAbrirCard(x.card) },
@@ -121,13 +121,37 @@ export function PainelView({
     cobrar: x.cobrar,
     botao: x.aprovacao && onAprovacaoOnline ? { rotulo: x.aprovacao.tipo === "recompra_qtd" ? "Orçar" : "Lançar sinal", onClick: () => onAprovacaoOnline(x.aprovacao!) } : undefined,
   }))
-  const [verTodas, setVerTodas] = React.useState(false)
+  const acaoDe = (a: Acao) => (a.botao ? (
+      <button onClick={a.botao.onClick}
+        className="h-8 px-2.5 mr-1 rounded-lg text-[11.5px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors shrink-0 whitespace-nowrap">
+        {a.botao.rotulo}
+      </button>
+    ) : a.cobrar && onLancarCobranca ? (
+      <button onClick={() => onLancarCobranca(a.cobrar!)} title="Lançar a cobrança deste saldo"
+        className="h-8 px-2.5 mr-1 rounded-lg text-[11.5px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors shrink-0 whitespace-nowrap">
+        Lançar cobrança
+      </button>
+    ) : a.envio ? (
+      <button onClick={() => setEnviando({ envio: a.envio!, link: a.whatsapp })} title="Mandar mensagem pelo WhatsApp do sistema"
+        className="w-8 h-8 rounded-lg flex items-center justify-center text-[#25a35a] hover:bg-[#25a35a]/10 transition-colors shrink-0 mr-1">
+        <MessageCircle className="w-4 h-4" />
+      </button>
+    ) : a.whatsapp ? (
+      <a href={a.whatsapp} target="_blank" rel="noreferrer" title="Mandar mensagem no WhatsApp"
+        className="w-8 h-8 rounded-lg flex items-center justify-center text-[#25a35a] hover:bg-[#25a35a]/10 transition-colors shrink-0 mr-1">
+        <MessageCircle className="w-4 h-4" />
+      </a>
+    ) : undefined)
+  const nivelDe = (t: Tom): "perigo" | "alerta" | "info" | "sucesso" => t === "perigo" ? "perigo" : t === "alerta" ? "alerta" : t === "sucesso" ? "sucesso" : "info"
+  const extrasCaixa: ItemExterno[] = acoes.map(a => ({
+    chave: `p:${a.id}`, tipo: a.tipo, nivel: nivelDe(a.tom), numero: a.numero ?? null, titulo: a.titulo, sub: a.sub,
+    valor: a.valorNum ?? null, valorTexto: a.valor, icone: a.icone, onClick: a.ir, acao: acaoDe(a),
+  }))
   // Números e acompanhamento recolhidos por padrão (lembra a sua escolha neste aparelho)
   const [verNumeros, setVerNumeros] = React.useState(false)
   React.useEffect(() => { try { setVerNumeros(localStorage.getItem("painel:numeros") === "1") } catch {} }, [])
   const alternarNumeros = () => setVerNumeros(v => { try { localStorage.setItem("painel:numeros", v ? "0" : "1") } catch {} return !v })
   const [enviando, setEnviando] = React.useState<{ envio: Envio; link?: string } | null>(null)
-  const acoesVisiveis = verTodas ? acoes : acoes.slice(0, 7)
 
   // ── Série mensal (últimos 6 meses) ─────────────────────────────────────────
   const meses = Array.from({ length: 6 }, (_, i) => {
@@ -285,57 +309,13 @@ export function PainelView({
         </>}
       />
 
+      {/* Caixa de entrada: tudo o que pede você numa lista só, por prioridade */}
+      {onAbrirConversa && <CaixaEntrada extras={extrasCaixa} onAbrirConversa={onAbrirConversa} onNavegar={onNavegar} onOrcar={onOrcarConversa} onPropostaPronta={onPropostaPronta} />}
+
       <FunilAgoraCard onAbrirConversa={onAbrirConversa} onAbrirCardId={id => { const k = kanban.find(c => c.id === id); if (k) onAbrirCard(k) }} onNavegar={() => onNavegar("digital")} />
 
-      {onAbrirConversa && <HojeCard parte="acao" onAbrirConversa={onAbrirConversa} onNavegar={onNavegar} onOrcar={onOrcarConversa} />}
 
 
-        <Cartao padding={false} className="ds-entrada">
-          <div className="px-5 pt-5">
-            <TituloCartao titulo="Precisa de você" icone={<AlertTriangle className="w-4 h-4" />}
-              sub={acoes.length ? `${acoes.length} ${acoes.length === 1 ? "item" : "itens"} em ordem de urgência` : undefined}
-              acao={acoes.length > 0 ? <Selo tom={acoes.some(a => a.tom === "perigo") ? "perigo" : "alerta"}>{acoes.length}</Selo> : undefined} />
-          </div>
-          <div className="px-2 pb-2 -mt-1 ds-escalonado">
-            {acoes.length === 0
-              ? <Vazio icone={<CheckCircle2 className="w-9 h-9" />} titulo="Nada pendente" sub="Entregas no prazo, recebimentos em dia e nenhum orçamento vencendo." />
-              : acoesVisiveis.map(a => (
-                <LinhaLista key={a.id} titulo={a.titulo} sub={a.sub} valor={a.valor} tom={a.tom} icone={a.icone} onClick={a.ir}
-                  acao={a.botao ? (
-                    <button onClick={a.botao.onClick}
-                      className="h-8 px-2.5 mr-1 rounded-lg text-[11.5px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors shrink-0 whitespace-nowrap">
-                      {a.botao.rotulo}
-                    </button>
-                  ) : a.cobrar && onLancarCobranca ? (
-                    <button onClick={() => onLancarCobranca(a.cobrar!)} title="Lançar a cobrança deste saldo"
-                      className="h-8 px-2.5 mr-1 rounded-lg text-[11.5px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors shrink-0 whitespace-nowrap">
-                      Lançar cobrança
-                    </button>
-                  ) : a.envio ? (
-                    <button onClick={() => setEnviando({ envio: a.envio!, link: a.whatsapp })} title="Mandar mensagem pelo WhatsApp do sistema"
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-[#25a35a] hover:bg-[#25a35a]/10 transition-colors shrink-0 mr-1">
-                      <MessageCircle className="w-4 h-4" />
-                    </button>
-                  ) : a.whatsapp ? (
-                    <a href={a.whatsapp} target="_blank" rel="noreferrer" title="Mandar mensagem no WhatsApp"
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-[#25a35a] hover:bg-[#25a35a]/10 transition-colors shrink-0 mr-1">
-                      <MessageCircle className="w-4 h-4" />
-                    </a>
-                  ) : undefined} />
-              ))}
-          </div>
-          {acoes.length > 7 && (
-            <button onClick={() => setVerTodas(v => !v)}
-              className="w-full py-2.5 text-[12px] font-medium text-[#8456e8] hover:bg-[#8456e8]/[0.04] transition-colors"
-              style={{ borderTop: "1px solid rgba(60,60,67,0.06)" }}>
-              {verTodas ? "Mostrar menos" : `Ver todos (${acoes.length})`}
-            </button>
-          )}
-        </Cartao>
-
-      {onPropostaPronta && <PropostasProntasCard onAbrir={onPropostaPronta} onAbrirConversa={onAbrirConversa} />}
-
-      <NegociacoesDigitalCard onAbrirConversa={onAbrirConversa} />
 
       {/* Números e acompanhamento: recolhido para o topo ficar só com o que pede você */}
       <button onClick={() => alternarNumeros()}

@@ -86,6 +86,14 @@ const LOTES: { v: number; ideias: string[] }[] = [
     "Digital maior que A3: pedir à Villa a tabela de preço para folha maior (SRA3 32×45 ou 33×48) e colocar no sistema. Hoje caixa que aberta passa do A3 (ex.: café 15×12×8, Master Bacth) fica \"sem preço na tabela\" e cai para você consultar; com a tabela, a IA cota sozinha.",
     "Proposta pronta na sua conversa: quando você responde um bom negócio e o cliente manda o dado que faltava (medida, quantidade, acabamento), o sistema lê, monta a proposta e ela volta para o topo da sua lista com \"Enviar\" (caso Samuel). Você só confirma.",
   ] },
+  { v: 11, ideias: [
+    // 20/11: plano "complexo organizado" (o Felipe: "vamos fazer tudo"), na ordem combinada: 3, 1, 2, 4, 5
+    "ORGANIZAR 1 · Gaveta única: tirar do AppConfig (600 KB) o que não é configuração. Pedidos digitais, ideias, base de conhecimento, propostas e eventos em tabelas próprias; a configuração volta a ser só preços, metas e chaves. Mais rápido, mais barato e um erro numa tela não apaga o resto.",
+    "ORGANIZAR 2 · Motores escondidos: um agendador único com a lista de rotinas (webhook de carona, vigia, relatório de segunda), frequência, última execução, duração e erro, numa tela do Escritório. Nada roda escondido nem em dobro.",
+    "ORGANIZAR 3 · Uma caixa de entrada: juntar Para resolver agora, Precisa de você, Propostas e Hoje numa lista só por prioridade (dinheiro e bom negócio primeiro), com resolvido e lembrar depois; no WhatsApp, um resumo único em horários fixos no lugar dos avisos soltos.",
+    "ORGANIZAR 4 · Um mundo de pedido: offset, digital e Cartuxo com as mesmas etapas (aprovado, arte, produção, pronto, enviado) e o dinheiro de todos no mesmo Financeiro.",
+    "ORGANIZAR 5 · Etapa do lead num lugar só: status e etiquetas deixam de dizer coisas diferentes; as etiquetas viram consequência da etapa.",
+  ] },
 ]
 
 // Gastos fixos que o sistema põe uma vez (marca no servidor); apagou ou editou, não volta

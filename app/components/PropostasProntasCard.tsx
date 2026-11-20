@@ -17,7 +17,7 @@ const haQuanto = (iso: string) => {
   return m < 60 ? `há ${Math.max(1, m)} min` : m < 1440 ? `há ${Math.round(m / 60)} h` : `há ${Math.round(m / 1440)} d`
 }
 
-function Proposta({ p, onAbrir, onDescartar, onAbrirConversa }: {
+export function Proposta({ p, onAbrir, onDescartar, onAbrirConversa }: {
   p: PropostaPronta; onAbrir: (p: PropostaPronta, enviar: boolean) => void; onDescartar: () => void; onAbrirConversa?: (jid: string, nome?: string) => void
 }) {
   const margem = p.preco > 0 ? (p.preco - p.custo) / p.preco : 0
