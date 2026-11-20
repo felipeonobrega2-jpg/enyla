@@ -5,7 +5,7 @@
 // briefing da arte e os botões para avançar o status.
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Printer, Clock, CheckCircle2, Truck, Wallet, MessageCircle, ExternalLink, ArrowRight, X, Eye, EyeOff, Copy, Check, Upload, Send, Palette, Users, Loader2 } from "lucide-react"
+import { Printer, Clock, CheckCircle2, Truck, Wallet, MessageCircle, ExternalLink, ArrowRight, X, Eye, EyeOff, Copy, Check, Upload, Send, Palette, Users, Loader2, PackageCheck } from "lucide-react"
 import { CampanhaDigitalCard } from "./CampanhaDigitalCard"
 import { Pagina, CabecalhoPagina, Cartao, Kpi, GradeKpis, Selo, Botao, Segmentado, LinhaLista, Vazio, Gaveta, type Tom } from "./ds"
 import { ROTULO_STATUS, PROXIMO_STATUS, type StatusDigital } from "@/app/lib/digital"
@@ -22,7 +22,7 @@ type Pedido = {
   vence: string; link: string; linkDesigner: string
   arteAtual: { url: string; nome: string; em: string } | null; versoes: number; arteEnviadaEm: string | null; arteAprovadaEm: string | null
   ajustes: { texto: string; em: string }[]; designerAvisadoEm: string | null; villaEnviadoEm: string | null
-  frete: number | null; restante: number | null; restantePagoEm: string | null; entrega: { cep: string; endereco: string } | null; acertadoEm: string | null
+  frete: number | null; restante: number | null; restantePagoEm: string | null; prontoEm?: string | null; entrega: { cep: string; endereco: string } | null; acertadoEm: string | null
   teste?: boolean
 }
 type Contatos = { villa?: string; designer?: string; designerNome?: string }
@@ -101,8 +101,9 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
     setOcupado(nome)
     try {
       const r = await fetch("/api/digital", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) })
-      const j = await r.json() as { erro?: string }
+      const j = await r.json() as { erro?: string; aviso?: string }
       if (!r.ok) alert(j.erro ?? "Não deu certo.")
+      else if (j.aviso) alert(j.aviso)
       aplicar(await buscar())
     } finally { setOcupado(null) }
   }
@@ -292,6 +293,11 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
                   {!sel.villaEnviadoEm && <button className="text-[#8456e8] hover:underline ml-1" disabled={!!ocupado} onClick={() => void acao("villa", { id: sel.id, acao: "villa" })}>mandar agora</button>}</p>
                 <p className="flex items-center gap-2"><Wallet className="w-3.5 h-3.5" />Restante {brl(sel.restante ?? 0)}{sel.frete ? ` (com frete ${brl(sel.frete)})` : ""}: {sel.restantePagoEm ? <b className="text-[#009351]">pago {haQuanto(sel.restantePagoEm)}</b> : "esperando Pix"}</p>
                 <p className="flex items-center gap-2"><Truck className="w-3.5 h-3.5" />{sel.entrega ? `${sel.entrega.endereco} · CEP ${sel.entrega.cep}` : "Cliente ainda não mandou o endereço"}</p>
+                {sel.status === "producao" && (
+                  <p className="flex items-center gap-2"><PackageCheck className="w-3.5 h-3.5" />{sel.prontoEm
+                    ? <>Material pronto desde {haQuanto(sel.prontoEm)}{sel.restantePagoEm ? "" : " · cliente avisado do restante"}</>
+                    : <>Ainda em produção <button className="text-[#8456e8] hover:underline ml-1 font-semibold" disabled={!!ocupado} onClick={() => { if (confirm(`Marcar o pedido ${sel.id} como pronto? O cliente recebe o aviso com o restante${sel.restante ? ` de ${brl(sel.restante)}` : ""} para pagar.`)) void acao("pronto", { id: sel.id, acao: "pronto" }) }}>Material pronto</button></>}</p>
+                )}
                 {!sel.restantePagoEm && (
                   <div className="flex gap-2 items-center pt-1">
                     <input value={frete} onChange={e => setFrete(e.target.value)} placeholder={sel.frete ? String(sel.frete) : "Frete R$"} inputMode="decimal"

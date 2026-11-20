@@ -21,7 +21,7 @@ const dadosPublicos = (p: PedidoComBriefing, regra?: RegraDigital, designer = fa
   arte: (designer || p.arteEnviadaEm || p.arteAprovadaEm) ? arteAtual(p) : null,
   aprovar: esperandoAprovacao(p), arteAprovadaEm: p.arteAprovadaEm ?? null, arteEnviadaEm: p.arteEnviadaEm ?? null,
   ajustes: designer ? (p.ajustes ?? []) : [],
-  restante: p.restante ?? null, frete: p.frete ?? null, restantePagoEm: p.restantePagoEm ?? null,
+  restante: p.restante ?? null, frete: p.frete ?? null, restantePagoEm: p.restantePagoEm ?? null, prontoEm: p.prontoEm ?? null,
   // Termos: o texto já na medida e quantidade deste pedido, e se (e quando) o cliente aceitou
   termos: termosDigital({ quantidade: p.quantidade, medidas: p.medidas, validadeDias: DIAS_VALIDADE_DIGITAL }), termosVersao: VERSAO_TERMOS,
   termosAceitosEm: p.termos?.em ?? null,

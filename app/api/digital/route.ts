@@ -3,7 +3,7 @@ import { lerPedido, gravarPedido, linkPedido, linkDesigner, mandarArte, mandarPa
 import { seuNumero, enviar } from "@/app/lib/agenteAuto"
 import { pedidoDeTeste, textoLinkPedido, opcoesDoPedido, trocarQuantidade, trocarMedidas, fmtMedidas, aprovarNegociacao, recusarNegociacao, textoNegociacaoAprovada, textoNegociacaoRecusada } from "@/app/lib/digital"
 import { supabase } from "@/app/lib/supabase"
-import { mudarStatus, trocarFrete, restanteUnico, arteAtual, acertoDaSemana, PedidoComBriefing, StatusDigital, DIAS_VALIDADE_DIGITAL } from "@/app/lib/digital"
+import { mudarStatus, textoMaterialPronto, trocarFrete, restanteUnico, arteAtual, acertoDaSemana, PedidoComBriefing, StatusDigital, DIAS_VALIDADE_DIGITAL } from "@/app/lib/digital"
 import { mudarConfig } from "@/app/lib/configAtomica"
 
 type Dados = { pedidosDigitais?: PedidoComBriefing[]; digitalContatos?: ContatosDigital; digital?: import("@/app/lib/precoDigital").RegraDigital }
@@ -26,7 +26,7 @@ export async function GET() {
     opcoes: p.status === "aguardando_sinal" ? opcoesDoPedido(p, d.digital) : [],
     arteAtual: arteAtual(p), versoes: (p.artes ?? []).length, arteEnviadaEm: p.arteEnviadaEm ?? null, arteAprovadaEm: p.arteAprovadaEm ?? null,
     ajustes: p.ajustes ?? [], designerAvisadoEm: p.designerAvisadoEm ?? null, villaEnviadoEm: p.villaEnviadoEm ?? null,
-    frete: p.frete ?? null, restante: p.restante ?? null, restantePagoEm: p.restantePagoEm ?? null, entrega: p.entrega ?? null, acertadoEm: p.acertadoEm ?? null,
+    frete: p.frete ?? null, restante: p.restante ?? null, restantePagoEm: p.restantePagoEm ?? null, prontoEm: p.prontoEm ?? null, entrega: p.entrega ?? null, acertadoEm: p.acertadoEm ?? null,
     negociacao: p.negociacao ?? null, termosAceitosEm: p.termos?.em ?? null,
   }))
   const acerto = acertoDaSemana(todos)
@@ -127,6 +127,18 @@ O pedido está aqui: ${linkPedido(novo.id)}`
   if (b.acao === "mandarArte") {
     const r = await mandarArte(b.id)
     return r.erro ? NextResponse.json({ erro: r.erro }, { status: 400 }) : NextResponse.json({ ok: true })
+  }
+  // Material pronto: libera o restante na página do cliente e avisa ele (WhatsApp pelo sistema; o e-mail sai pelo vigia)
+  if (b.acao === "pronto") {
+    if (pedido.status !== "producao") return NextResponse.json({ erro: "O pedido precisa estar em produção." }, { status: 400 })
+    const novo = await gravarPedido(b.id, p => p.prontoEm ? null : { ...p, prontoEm: new Date().toISOString() })
+    if (!novo) return NextResponse.json({ erro: "Já estava marcado como pronto." }, { status: 400 })
+    if (!novo.restantePagoEm) {
+      const c = await conversaDoPedido(novo.jid)
+      const env = c ? await enviar(c, textoMaterialPronto(novo, linkPedido(novo.id)), undefined, { essencial: true }) : { ids: [], erro: "conversa não encontrada" }
+      if (!env.ids.length) return NextResponse.json({ ok: true, aviso: `Marcado como pronto, mas a mensagem não saiu (${env.erro ?? "erro"}). Avise o cliente à mão.` })
+    }
+    return NextResponse.json({ ok: true })
   }
   if (b.acao === "villa") {
     if (!pedido.arteAprovadaEm) return NextResponse.json({ erro: "A arte ainda não foi aprovada." }, { status: 400 })

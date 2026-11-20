@@ -64,6 +64,7 @@ export type PedidoDigital = {
   medidasAntes?: { medidas: { a: number; l: number; p: number }; total: number; em: string }[]   // mudanças de medida (a mais recente por último)
   designerAvisadoEm?: string; villaEnviadoEm?: string
   frete?: number; entrega?: Entrega
+  prontoEm?: string                                          // material pronto (você marcou): libera o restante
   email?: string                                             // do cliente (opcional, no aceite dos termos): comprovante, arte, envio
   restante?: number; restantePagoEm?: string; pagamentoFinal?: { txId: string; valor: number; data: string; nome: string | null }
   acertadoEm?: string
@@ -389,6 +390,15 @@ export const textoArteAprovada = (p: Pick<PedidoDigital, "restante" | "entrega">
   `Quando ficar pronto, fica o restante de *${brl(p.restante ?? 0)}* pelo Pix, antes do envio.${p.entrega ? "" : " Me deixa o CEP e o endereço de entrega no link:"}`,
   p.entrega ? null : link,
 ].filter(Boolean).join("\n\n")
+// Material pronto: só agora o restante (com o frete) é cobrado, antes do envio
+export const textoMaterialPronto = (p: Pick<PedidoDigital, "nome" | "restante" | "frete" | "entrega">, link: string) => {
+  const oi = primeiroNome(p.nome) ? `${primeiroNome(p.nome)}, ` : ""
+  return [
+    `${oi}suas caixinhas ficaram prontas!`,
+    `Falta só o restante de *${brl(p.restante ?? 0)}*${p.frete ? " (já com o frete)" : ""} pelo Pix para eu despachar.${p.entrega ? "" : " Aproveita e me deixa o CEP e o endereço de entrega:"}`,
+    link,
+  ].join("\n\n")
+}
 export const textoRestantePago = (p: Pick<PedidoDigital, "restante">) =>
   `Recebi o restante (${brl(p.restante ?? 0)}). Obrigado! Assim que sair para entrega eu te aviso aqui.`
 

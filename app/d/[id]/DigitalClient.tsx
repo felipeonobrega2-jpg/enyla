@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import QRCode from "qrcode"
-import { Check, Copy, Loader2, Upload, FileText, AlertCircle, Sparkles, Palette, Truck, Send, CreditCard } from "lucide-react"
+import { Check, Copy, Loader2, Upload, FileText, AlertCircle, Sparkles, Palette, Truck, Send, CreditCard, Wallet } from "lucide-react"
 import { Caixa3D } from "@/app/components/Caixa3D"
 import { gerarPixPayload } from "@/app/lib/pix"
 
@@ -18,7 +18,7 @@ type Pedido = {
   opcoes: Opcao[]
   arte: { url: string; nome: string; em: string } | null; aprovar: boolean; arteAprovadaEm: string | null; arteEnviadaEm: string | null
   ajustes: { texto: string; em: string }[]
-  restante: number | null; frete: number | null; restantePagoEm: string | null
+  restante: number | null; frete: number | null; restantePagoEm: string | null; prontoEm: string | null
   entrega: { cep: string; endereco: string } | null
   designer: boolean
   termos: { titulo: string; itens: string[] }[]; termosVersao: string; termosAceitosEm: string | null
@@ -320,11 +320,17 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
         </div>
       )}
 
-      {!p.designer && p.restante != null && (
+      {!p.designer && p.restante != null && !p.restantePagoEm && !p.prontoEm && (
+        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
+          <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Wallet className="w-4 h-4 text-[#8456e8]" />Restante</p>
+          <p className="text-[13px] text-[#5e5c68] mt-1 leading-snug">Suas caixinhas estão em produção. Quando ficarem prontas, a gente te avisa e você paga o restante de <strong className="text-[#191625]">{brl(p.restante)}</strong>{p.frete ? " (com o frete)" : ""} para o envio.</p>
+        </div>
+      )}
+      {!p.designer && p.restante != null && (p.prontoEm || p.restantePagoEm) && (
         p.restantePagoEm
           ? <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5"><p className="text-[13px] text-[#009351] font-semibold flex items-center gap-1.5"><Check className="w-4 h-4" />Restante de {brl(p.restante)} recebido. Pedido quitado.</p></div>
           : <Pagamento p={p} titulo="Restante" valor={p.restante} txid={`${p.id}F`} descricao={`Restante ${p.id}`}
-              sub={p.frete ? `${brl(p.restante - p.frete)} + frete ${brl(p.frete)}` : "Pague quando quiser: o envio sai depois que o restante cair"}
+              sub={p.frete ? `Suas caixinhas estão prontas · ${brl(p.restante - p.frete)} + frete ${brl(p.frete)}` : "Suas caixinhas estão prontas: o envio sai assim que o restante cair"}
               post={post} setP={setP} onConferir={() => acao("conferir", { acao: "conferir" })} conferindo={ocupado === "conferir"} />
       )}
 

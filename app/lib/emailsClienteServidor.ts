@@ -4,7 +4,7 @@
 import { supabase } from "./supabase"
 import { enviarEmail, emailConfigurado } from "./email"
 import { reservarTratada, liberarTratada } from "./registroAgente"
-import { emailPedidoAprovado, emailSinalRecebido, emailArteParaAprovar, emailArteAprovada, emailPedidoEnviado } from "./emailsCliente"
+import { emailPedidoAprovado, emailSinalRecebido, emailArteParaAprovar, emailArteAprovada, emailMaterialPronto, emailPedidoEnviado } from "./emailsCliente"
 import type { Email } from "./emailsEnyla"
 
 const DESDE = "2026-11-20T12:00:00.000Z"
@@ -13,7 +13,8 @@ const SITE = "https://app.enyla.com.br"
 const recente = (iso?: string | null) => !!iso && iso >= DESDE && Date.now() - new Date(iso).getTime() < 7 * 86_400_000
 
 type Ped = { id: string; nome: string | null; email?: string; quantidade: number; total: number; sinal: number; status: string; statusEm?: string
-  sinalPagoEm?: string; arteEnviadaEm?: string; arteAprovadaEm?: string; artes?: unknown[]; restante?: number; teste?: boolean }
+  sinalPagoEm?: string; arteEnviadaEm?: string; arteAprovadaEm?: string; artes?: { url: string }[]; restante?: number; teste?: boolean
+  prontoEm?: string; restantePagoEm?: string; frete?: number; entrega?: unknown }
 type Aprov = { numero: string; cardId: string; nomeCliente: string; aprovadoPor: string; quantidade: number; preco: number; sinal: number; em: string; email?: string }
 type Cfg = { pedidosDigitais?: Ped[]; aprovacoesOnline?: Aprov[] }
 type Envio = { chave: string; para: string; email: Email }
@@ -23,16 +24,20 @@ export async function talvezEmailsDoCliente(cfg: Cfg): Promise<{ enviados: numbe
   const fila: Envio[] = []
   const { linkPedido } = await import("./digitalLink")
   const { prazoDigital } = await import("./prazoDigital")
+  const whatsapp = await import("./agenteAuto").then(m => m.seuNumero()).catch(() => null)
 
   // Digital
   for (const p of cfg.pedidosDigitais ?? []) {
     if (p.teste || !p.email || p.status === "cancelado") continue
     const link = linkPedido(p.id)
-    if (recente(p.sinalPagoEm)) fila.push({ chave: `email:sinal:${p.id}`, para: p.email, email: emailSinalRecebido({ nome: p.nome, id: p.id, quantidade: p.quantidade, total: p.total, sinal: p.sinal, em: p.sinalPagoEm!, link, prazo: prazoDigital(p.quantidade).texto }) })
+    const arteUrl = (p.artes ?? []).at(-1)?.url ?? null
+    const prazo = prazoDigital(p.quantidade).texto
+    if (recente(p.sinalPagoEm)) fila.push({ chave: `email:sinal:${p.id}`, para: p.email, email: emailSinalRecebido({ nome: p.nome, id: p.id, quantidade: p.quantidade, total: p.total, sinal: p.sinal, em: p.sinalPagoEm!, link, prazo, whatsapp }) })
     const versao = Math.max(1, (p.artes ?? []).length)
-    if (recente(p.arteEnviadaEm) && !p.arteAprovadaEm) fila.push({ chave: `email:arte:${p.id}:${p.arteEnviadaEm}`, para: p.email, email: emailArteParaAprovar({ nome: p.nome, id: p.id, versao, link }) })
-    if (recente(p.arteAprovadaEm)) fila.push({ chave: `email:arteok:${p.id}`, para: p.email, email: emailArteAprovada({ nome: p.nome, id: p.id, em: p.arteAprovadaEm!, versao, link, restante: p.restante ?? null }) })
-    if (p.status === "enviado" && recente(p.statusEm)) fila.push({ chave: `email:enviado:${p.id}`, para: p.email, email: emailPedidoEnviado({ nome: p.nome, numero: p.id, quantidade: p.quantidade, link }) })
+    if (recente(p.arteEnviadaEm) && !p.arteAprovadaEm) fila.push({ chave: `email:arte:${p.id}:${p.arteEnviadaEm}`, para: p.email, email: emailArteParaAprovar({ nome: p.nome, id: p.id, versao, link, arteUrl, whatsapp }) })
+    if (recente(p.arteAprovadaEm)) fila.push({ chave: `email:arteok:${p.id}`, para: p.email, email: emailArteAprovada({ nome: p.nome, id: p.id, em: p.arteAprovadaEm!, versao, link, arteUrl, prazo, whatsapp }) })
+    if (recente(p.prontoEm) && !p.restantePagoEm && p.restante) fila.push({ chave: `email:pronto:${p.id}`, para: p.email, email: emailMaterialPronto({ nome: p.nome, id: p.id, quantidade: p.quantidade, restante: p.restante, frete: p.frete ?? null, link, temEndereco: !!p.entrega, whatsapp }) })
+    if (p.status === "enviado" && recente(p.statusEm)) fila.push({ chave: `email:enviado:${p.id}`, para: p.email, email: emailPedidoEnviado({ nome: p.nome, numero: p.id, quantidade: p.quantidade, link, digital: true, whatsapp }) })
   }
 
   // Offset: aprovado na página
@@ -46,7 +51,7 @@ export async function talvezEmailsDoCliente(cfg: Cfg): Promise<{ enviados: numbe
         nome: a.aprovadoPor || a.nomeCliente, numero: a.numero, quantidade: a.quantidade, preco: a.preco, sinal: a.sinal, aprovadoPor: a.aprovadoPor, em: a.em,
         descricao: c ? [c.dimensoes && c.dimensoes !== "0×0×0" ? `${c.dimensoes} cm` : null, c.materialNome].filter(Boolean).join(" · ") || null : null, prazo,
         linkPix: `${SITE}/pix/${encodeURIComponent(a.numero)}?v=${a.sinal.toFixed(2)}&c=${encodeURIComponent(a.nomeCliente)}`,
-        linkRastreio: `${SITE}/track/${encodeURIComponent(a.numero)}`,
+        linkRastreio: `${SITE}/track/${encodeURIComponent(a.numero)}`, whatsapp,
       }) })
     }
   }
@@ -63,7 +68,7 @@ export async function talvezEmailsDoCliente(cfg: Cfg): Promise<{ enviados: numbe
       const etapa = ((trks ?? []).find(t => t.numero === c.numero)?.etapas as { coluna: number; dataHora: string }[] | undefined ?? []).filter(e => e.coluna === 8).pop()
       const iso = etapa ? paraIso(etapa.dataHora) : null
       if (!recente(iso)) continue
-      fila.push({ chave: `email:expedicao:${c.numero}`, para: email, email: emailPedidoEnviado({ nome: c.nomeCliente, numero: c.numero, quantidade: c.quantidade, link: `${SITE}/track/${encodeURIComponent(c.numero)}` }) })
+      fila.push({ chave: `email:expedicao:${c.numero}`, para: email, email: emailPedidoEnviado({ nome: c.nomeCliente, numero: c.numero, quantidade: c.quantidade, link: `${SITE}/track/${encodeURIComponent(c.numero)}`, whatsapp }) })
     }
   }
 
