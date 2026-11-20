@@ -437,7 +437,7 @@ export default function Home() {
 
   useEffect(() => {
     fetch("/api/data")
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json() })
       .then(d => {
         if (d.historico)              { setHistorico(d.historico); dadosCarregados.current = true }
         if (d.contador  !== undefined) setContador(d.contador)
@@ -468,7 +468,11 @@ export default function Home() {
           if (orfaos.length > 0) console.warn("Cards sem histórico correspondente:", orfaos.map(o => o.numero))
         }
       })
-      .catch(() => restaurarRascunho(configAtual.current))
+      .catch(() => {
+        restaurarRascunho(configAtual.current)
+        // Não carregou do servidor: avisa (a tela vazia parecia normal e um salvar gravava por cima, 19/11)
+        alert("Não consegui carregar os dados do servidor agora. Nada vai ser salvo nesta tela até carregar: recarregue a página em instantes.")
+      })
   }, [])
 
   // ── Rascunho da mesa de orçamento: o que você está montando fica guardado neste navegador e volta depois do F5
