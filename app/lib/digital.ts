@@ -3,7 +3,7 @@
 // único (para reconhecer o Pix no extrato) e o texto que vai para o cliente.
 
 import type { DadosPedido } from "./atendente"
-import { custoVilla, facaAberta, folhaDaFaca, precoDigital, quantidadesDa, Folha, RegraDigital, REGRA_DIGITAL_PADRAO } from "./precoDigital"
+import { precoMaiorQueA3, MAIOR_A3, custoVilla, facaAberta, folhaDaFaca, precoDigital, quantidadesDa, Folha, RegraDigital, REGRA_DIGITAL_PADRAO } from "./precoDigital"
 import { nomeParaChamar } from "./nomeDePessoa"
 
 // Caixa padrão por ml (altura × largura × profundidade, cm), tirada das cotações com a Villa; o cliente confirma
@@ -82,7 +82,7 @@ export type Ajuste = { texto: string; em: string }
 export type Entrega = { cep: string; endereco: string; em: string }
 
 export type Cotacao =
-  | { ok: true; medidas: { a: number; l: number; p: number }; padrao: boolean; ml: number | null; folha: Folha; folhaReal: Folha; quantidade: number; faixa: number; pedida: number; custo: number; arte: number; margem: number; total: number }
+  | { ok: true; medidas: { a: number; l: number; p: number }; padrao: boolean; ml: number | null; folha: Folha; folhaReal: Folha; quantidade: number; faixa: number; pedida: number; custo: number; arte: number; margem: number; total: number; maiorQueA3?: boolean }
   | { ok: false; motivo: string }
 
 // Cota pelo que a IA tirou da conversa: medidas da caixa (ou o padrão do ml) e a quantidade
@@ -97,7 +97,12 @@ export function cotarDigital(d: DadosPedido | null, regra: RegraDigital = REGRA_
   const medidas = cx ? { a: cx.altura, l: cx.frente, p: cx.lateral } : doFrasco ?? caberFrasco(pad!, d.frasco_cm, d.caixa_cm?.altura)
   const faca = facaAberta(medidas.a, medidas.l, medidas.p)
   const naFolha = folhaDaFaca(faca.largura, faca.altura)
-  if (!naFolha) return { ok: false, motivo: "caixa maior que A3 (consultar a Villa)" }
+  if (!naFolha) {
+    // Maior que A3: regra própria (custo R$ 4,40, venda R$ 7,96 a unidade, final quebrado)
+    const g = precoMaiorQueA3(d.quantidade)
+    if (!g) return { ok: false, motivo: `caixa maior que A3 acima de ${MAIOR_A3.maxUn} un (consultar)` }
+    return { ok: true, medidas, padrao: !cx && !doFrasco, ml: d.volume_ml ?? pad?.ml ?? null, folha: "A3", folhaReal: "A3", maiorQueA3: true, quantidade: g.faixa, faixa: g.faixa, pedida: d.quantidade, custo: g.custo, arte: g.arte, margem: g.margem, total: g.total }
+  }
   // Cabe na A4 mas a quantidade passa da tabela A4 (só vai até 100): usa a tabela A3, que é mais cara (nunca cobra a menos)
   const folha = naFolha === "A4" && !custoVilla(d.quantidade, "A4") ? "A3" : naFolha
   const p = precoDigital(d.quantidade, folha, regra, naFolha)

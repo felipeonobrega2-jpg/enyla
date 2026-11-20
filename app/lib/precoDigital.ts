@@ -58,3 +58,13 @@ export function precoDigital(q: number, folha: Folha, regra: RegraDigital = REGR
   const custo = custoReal(c.faixa, folhaReal) ?? c.custo
   return { q, faixa: c.faixa, custo, arte: 0, margem: Math.round((total - custo) * 100) / 100, total, unit: total / q }
 }
+
+// Caixa maior que A3 (20/11/2026, regra do Felipe): custo R$ 4,40 a unidade e venda a R$ 7,96, com o final quebrado
+// padrão (total terminando em ,95). Até 500 un; acima disso é caso de offset/consulta.
+export const MAIOR_A3 = { custoUnit: 4.4, vendaUnit: 7.96, maxUn: 500 }
+export function precoMaiorQueA3(q: number): PrecoDigital | null {
+  if (q <= 0 || q > MAIOR_A3.maxUn) return null
+  const total = Math.max(0.95, Math.round(q * MAIOR_A3.vendaUnit) - 0.05)
+  const custo = Math.round(q * MAIOR_A3.custoUnit * 100) / 100
+  return { q, faixa: q, custo, arte: 0, margem: Math.round((total - custo) * 100) / 100, total, unit: total / q }
+}

@@ -22,3 +22,15 @@ describe("lead quente ignora o limite por hora", () => {
     expect(leadQuente({ jid: "a", etiquetas: ["Lead pequeno"], perfil: "pequeno" })).toBe(false)
   })
 })
+
+describe("digital: caixa maior que A3", () => {
+  it("custo R$ 4,40 e venda R$ 7,96 a unidade, final quebrado (caso Master Bacth, 15×12×8, 100 un)", async () => {
+    const { cotarDigital } = await import("@/app/lib/digital")
+    const c = cotarDigital({ quantidade: 100, caixa_cm: { frente: 12, lateral: 8, altura: 15 } } as never)
+    expect(c.ok).toBe(true)
+    if (c.ok) { expect(c.total).toBe(795.95); expect(c.custo).toBe(440); expect(c.margem).toBe(355.95) }
+    const { precoMaiorQueA3 } = await import("@/app/lib/precoDigital")
+    expect(precoMaiorQueA3(50)?.total).toBe(397.95)
+    expect(precoMaiorQueA3(600)).toBeNull()
+  })
+})
