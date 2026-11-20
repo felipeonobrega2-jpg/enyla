@@ -4,17 +4,30 @@ import { supabase } from "@/app/lib/supabase"
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { form, calculo, data, numero, contador } = body
+    const { form, calculo, data, numero, contador, editar } = body
+    if (!numero) return NextResponse.json({ error: "numero" }, { status: 400 })
+    // Orçamento NOVO nunca grava por cima de um número que já existe (com o banco fora a tela chegou a inventar
+    // número repetido; ORC-2026-234 ficou com dois clientes). Edição manda editar: true.
+    if (!editar) {
+      const { data: ja } = await supabase.from("HistoricoItem").select("numero").eq("numero", numero).maybeSingle()
+      if (ja) return NextResponse.json({ error: "número já usado", numero }, { status: 409 })
+    }
+    // Contador só sobe (um valor menor faria os próximos números repetirem)
+    let contadorOk: number | undefined
+    if (contador !== undefined) {
+      const { data: c } = await supabase.from("Contador").select("valor").eq("chave", "orc").maybeSingle()
+      if (Number(contador) > Number(c?.valor ?? 0)) contadorOk = Number(contador)
+    }
 
     const ops: PromiseLike<unknown>[] = [
       supabase.from("HistoricoItem")
         .upsert({ id: crypto.randomUUID(), numero, form, calculo, data }, { onConflict: "numero" }),
     ]
 
-    if (contador !== undefined) {
+    if (contadorOk !== undefined) {
       ops.push(
         supabase.from("Contador")
-          .upsert({ chave: "orc", valor: contador }, { onConflict: "chave" })
+          .upsert({ chave: "orc", valor: contadorOk }, { onConflict: "chave" })
       )
     }
 

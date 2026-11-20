@@ -27,7 +27,9 @@ export async function POST(req: NextRequest) {
       }, { onConflict: "id" }),
     ]
 
-    if (contadorProp !== undefined) {
+    // Contador só sobe (uma tela que não carregou mandaria um valor menor e os próximos números repetiriam)
+    const { data: cAtual } = contadorProp !== undefined ? await supabase.from("Contador").select("valor").eq("chave", "prop").maybeSingle() : { data: null }
+    if (contadorProp !== undefined && Number(contadorProp) > Number(cAtual?.valor ?? 0)) {
       ops.push(
         supabase.from("Contador")
           .upsert({ chave: "prop", valor: contadorProp }, { onConflict: "chave" })

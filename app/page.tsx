@@ -230,6 +230,8 @@ export default function Home() {
   // Só salva a configuração depois de carregar a do banco: aberta com o banco fora, a tela ficava com a de fábrica e o
   // primeiro salvar apagava tudo (19/11). Salvar passa por aqui.
   const configCarregada = useRef(false)
+  // Orçamentos, propostas e contadores carregados do banco: sem isso, nada que numere ou grave lista pode rodar
+  const dadosCarregados = useRef(false)
   const postarConfig = useCallback((cfg: Configuracoes) => {
     if (!configCarregada.current) { alert("As configurações ainda não carregaram do servidor. Recarregue a página antes de salvar."); return }
     fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg) })
@@ -437,7 +439,7 @@ export default function Home() {
     fetch("/api/data")
       .then(r => r.json())
       .then(d => {
-        if (d.historico)              setHistorico(d.historico)
+        if (d.historico)              { setHistorico(d.historico); dadosCarregados.current = true }
         if (d.contador  !== undefined) setContador(d.contador)
         if (d.clientes)               setClientes(d.clientes)
         if (d.propostasCustom)        setPropostasCustom(d.propostasCustom)
@@ -1118,9 +1120,10 @@ export default function Home() {
       if (!j?.numero) throw new Error()
       numero = j.numero; novoContador = j.contador; doServidor = true
     } catch {
-      const ano = new Date().getFullYear()
-      novoContador = Math.max(contador, ...historico.map(h => Number(h.numero?.match(new RegExp(`^ORC-${ano}-(\\d+)$`))?.[1] ?? 0))) + 1
-      numero = `ORC-${ano}-${String(novoContador).padStart(3, "0")}`
+      // Sem o servidor não inventa número (com o banco fora, a lista na tela pode estar vazia e o número repetir)
+      salvandoRef.current = false
+      alert("Não consegui reservar o número do orçamento agora (servidor fora). Nada foi salvo: tente de novo em instantes.")
+      return null
     } finally { salvandoRef.current = false }
     const data  = new Date().toLocaleString("pt-BR")
     setContador(novoContador)
@@ -1360,7 +1363,7 @@ export default function Home() {
     fetch("/api/historico", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(historicoItem),
+      body: JSON.stringify({ ...historicoItem, editar: true }),
     }).catch(() => {})
 
     // Sincroniza o card do kanban vinculado (se existir)
@@ -1637,6 +1640,10 @@ export default function Home() {
   }
 
   function salvarPropostaCustom(draft: Omit<PropostaCustom, "id" | "numero" | "cardId">): PropostaCustom {
+    if (!dadosCarregados.current) {
+      alert("Os dados ainda não carregaram do servidor. Recarregue a página antes de criar a proposta (senão o número pode repetir).")
+      throw new Error("dados não carregados")
+    }
     const data = draft.data || new Date().toLocaleString("pt-BR")
     const ano  = new Date().getFullYear()
     const novoContador = contadorProp + 1
