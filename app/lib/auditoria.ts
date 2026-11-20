@@ -106,7 +106,8 @@ export function auditar(a: {
   const venceuHa = (l: LancamentoFinanceiro) => Math.floor((new Date(hoje).getTime() - new Date(l.dataVencimento).getTime()) / DIA)
   regra("vencido_em_aberto", "Vencido e ainda em aberto", "financeiro", "media",
     "Venceu há mais de 3 dias e continua em aberto: ou foi pago e não deu baixa, ou está atrasado de verdade. Os dois mudam o caixa.",
-    recentes.filter(l => l.status !== "pago" && l.categoria !== "pix_link" && l.categoria !== "sobra" && l.dataVencimento && venceuHa(l) > 3).map(l => ({
+    // Conta corrente com fornecedor (Jerograf, forma "conta") não tem vencimento: é saldo devedor pago aos poucos
+    recentes.filter(l => l.status !== "pago" && l.formaPagamento !== "conta" && l.categoria !== "pix_link" && l.categoria !== "sobra" && l.dataVencimento && venceuHa(l) > 3).map(l => ({
       id: `vencido_em_aberto:${l.id}:${l.dataVencimento}`, regra: "vencido_em_aberto", titulo: l.descricao || (l.nomeCliente ?? "Lançamento"),
       detalhe: `${l.tipo === "receita" ? "A receber" : "A pagar"} ${brl(l.valor)} · venceu ${dataBR(l.dataVencimento)} (${venceuHa(l)} dias)`, valor: l.valor, ref: { lancamentoId: l.id, cardId: l.cardId }, data: l.dataVencimento,
     })))

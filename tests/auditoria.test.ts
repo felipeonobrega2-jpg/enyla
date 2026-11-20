@@ -20,6 +20,11 @@ describe("auditor de dados", () => {
     const ok = auditar({ ...base, cards: [card({})], lancamentos: [lanc({ cardId: "c1", valor: 500 }), lanc({ id: "l2", cardId: "c1", valor: 498 })] })
     expect(da(ok, "receita_diverge")).toHaveLength(0)
   })
+  it("conta corrente do fornecedor (Jerograf) não é 'vencido': é saldo pago aos poucos", () => {
+    const aberto = { tipo: "despesa" as const, status: "pendente" as const, dataVencimento: "2026-09-06", dataPagamento: undefined, categoria: "materiais" }
+    const r = auditar({ ...base, cards: [], lancamentos: [lanc({ id: "j", ...aberto, formaPagamento: "conta" }), lanc({ id: "p", ...aberto, formaPagamento: "pix" })] })
+    expect(da(r, "vencido_em_aberto").map(p => p.ref.lancamentoId)).toEqual(["p"])
+  })
   it("lançamento em dobro, mas não quando cada um tem o seu movimento no banco", () => {
     const d = [lanc({ id: "a", tipo: "despesa", descricao: "Pedágio", valor: 3.65, categoria: "transporte" }), lanc({ id: "b", tipo: "despesa", descricao: "Pedágio", valor: 3.65, categoria: "transporte" })]
     expect(da(auditar({ ...base, cards: [], lancamentos: d }), "lancamento_duplicado")).toHaveLength(1)
