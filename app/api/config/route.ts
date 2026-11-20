@@ -38,6 +38,9 @@ export async function POST(req: NextRequest) {
         else delete proximo[k]
       }
       for (const k of MANTER_SE_AUSENTE) if (!(k in body) && k in salvo) proximo[k] = salvo[k]
+      // Campo que a tela não mandou nunca é apagado (20/11: o salvar da aba desatualizada sumiu com etiquetas do
+      // WhatsApp, locais de retirada, origens dos clientes e outros campos que o sistema grava sozinho)
+      for (const k of Object.keys(salvo)) if (!(k in body) && !(k in proximo)) proximo[k] = salvo[k]
       // Ideia que o sistema pôs há menos de 1 dia e a tela aberta antes ainda não conhecia: não some no salvar
       if (Array.isArray(body.ideias) && Array.isArray(salvo.ideias)) {
         const naTela = new Set((body.ideias as { id: string }[]).map(i => i.id))
