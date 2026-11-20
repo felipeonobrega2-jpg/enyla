@@ -30,3 +30,19 @@ describe("lote e número pessoal", () => {
     expect(ehDoNumeroPessoal({ fromMe: false, remoteJid: "5511988887777@s.whatsapp.net" }, null)).toBe(false)
   })
 })
+
+describe("memória da conversa inteira", () => {
+  it("das mensagens antigas fica só o que foi combinado", async () => {
+    const { resumoDoHistorico } = await import("@/app/lib/atendenteServidor")
+    const r = resumoDoHistorico([
+      { from_me: false, corpo: "bom dia", ts: "2026-09-01T12:00:00Z" },
+      { from_me: false, corpo: "preciso de 2000 caixas de 50ml", ts: "2026-09-01T12:01:00Z" },
+      { from_me: true, corpo: "fica R$ 1,72 a unidade, prazo de 12 dias", ts: "2026-09-01T12:05:00Z" },
+      { from_me: false, corpo: "ok obrigado", ts: "2026-09-01T12:06:00Z" },
+    ])
+    expect(r).toContain("2000 caixas")
+    expect(r).toContain("EU: fica R$ 1,72")
+    expect(r).not.toContain("bom dia")
+    expect(r).not.toContain("ok obrigado")
+  })
+})

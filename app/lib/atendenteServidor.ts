@@ -149,6 +149,12 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
   ])
   const mensagens = (msgs ?? []).reverse()
   if (!mensagens.length) return { ok: false, erro: "Conversa sem mensagens.", status: 404 }
+  // Memória da conversa inteira: das mensagens mais antigas que as 50 de cima, só as que importam (valor, quantidade,
+  // medida, prazo, pagamento, arte, proposta), para a IA não esquecer o que já foi combinado semanas atrás
+  const historicoAnterior = (msgs?.length ?? 0) >= 50 ? await (async () => {
+    const { data: antigas } = await supabase.from("whatsapp_mensagens").select("from_me, corpo, ts").eq("jid", jid).lt("ts", mensagens[0].ts).order("ts", { ascending: false }).limit(400)
+    return resumoDoHistorico((antigas ?? []).reverse() as { from_me: boolean; corpo: string | null; ts: string }[])
+  })().catch(() => "") : ""
 
   // Cliente ligado: pedidos e orçamentos dele, para a IA saber em que pé está
   const nomes = [...new Set((cards ?? []).map(c => c.nomeCliente).filter(Boolean))] as string[]
@@ -294,7 +300,7 @@ Regras que nunca quebram:
     system: [{ type: "text", text: system, cache_control: { type: "ephemeral", ttl: "1h" } }],
     messages: [{ role: "user", content: [
       ...anexos.blocos,
-      { type: "text" as const, text: `${contexto}${origem}\n\nConversa (mais antiga primeiro):\n<conversa>\n${historico}\n</conversa>\n\n${anexos.blocos.length ? "Os arquivos que o cliente mandou estão anexados acima (veja as medidas neles).\n\n" : ""}${extra ? extra + "\n\n" : ""}Prepare a próxima mensagem do Felipe.` },
+      { type: "text" as const, text: `${contexto}${origem}\n\n${historicoAnterior ? `Antes disso, o que importava na conversa (mensagens mais antigas, resumidas):\n<historico_anterior>\n${historicoAnterior}\n</historico_anterior>\n\n` : ""}Conversa (mais antiga primeiro):\n<conversa>\n${historico}\n</conversa>\n\n${anexos.blocos.length ? "Os arquivos que o cliente mandou estão anexados acima (veja as medidas neles).\n\n" : ""}${extra ? extra + "\n\n" : ""}Prepare a próxima mensagem do Felipe.` },
     ] }],
   })
   if (r.stop_reason === "refusal") return { ok: false, erro: "A IA não pôde responder a esse pedido.", status: 422 }
@@ -306,4 +312,14 @@ Regras que nunca quebram:
   // Guarda para reaproveitar enquanto não chegar mensagem nova (follow-up e retomada não: são outra pergunta)
   if (!outraPergunta) await supabase.from("whatsapp_conversas").update({ proxima_acao: JSON.stringify({ assinatura, ultimaId, auto: !!opts.automatico, em: new Date().toISOString(), r: { ...resultado, uso: undefined } }) }).eq("jid", jid)
   return { ok: true, r: resultado, conversa: conversaLida }
+}
+
+// Das mensagens antigas, as que carregam o que foi combinado (números, valores, medidas, prazos, pagamento, arte)
+const IMPORTA = /\d|r\$|or[çc]amento|proposta|medida|tamanho|\bcm\b|\bml\b|unidade|caixa|prazo|entrega|frete|pix|sinal|pag|arte|logo|aprov|acabamento|verniz|lamina|hot|fosc|brilho|modelo/i
+export function resumoDoHistorico(ms: { from_me: boolean; corpo: string | null; ts: string }[], maxLinhas = 60): string {
+  const linhas = ms.filter(m => m.corpo && m.corpo.trim().length > 2 && IMPORTA.test(m.corpo)).map(m => {
+    const quando = new Date(m.ts).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "2-digit" })
+    return `${quando} ${m.from_me ? "EU" : "CLIENTE"}: ${m.corpo!.replace(/\s+/g, " ").slice(0, 220)}`
+  })
+  return linhas.slice(-maxLinhas).join("\n")
 }
