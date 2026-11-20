@@ -359,7 +359,8 @@ async function voceNaConversa(jid: string, log: Registro[], cfg?: CfgAgente) {
 
 const contexto = (cfg: CfgAgente, log: Registro[], jid: string) => ({
   enviadasHoje: log.filter(l => l.enviou && new Date(l.em).getTime() > Date.now() - 86_400_000).length,
-  maxPorDia: cfg.agenteAuto?.maxPorDia ?? 6,
+  // Cliente conversando não fica falando sozinho (20/11, Adriano parou em "já respondeu 7× hoje" no meio da conversa)
+  maxPorDia: Math.max(cfg.agenteAuto?.maxPorDia ?? 6, 30),
   // Vendendo em digital, o lead pequeno segue na conversa até o orçamento (não é só uma mensagem)
   jaEncerrouPequeno: cfg.agenteAuto?.pequenoParceiro !== false && (log.some(l => l.enviou && l.perfil === "pequeno") || !!cfg.agenteMarcos?.[jid]?.passos?.["Pequeno"]),
   // Valores do orçamento digital desta conversa também podem sair (a IA responde dúvidas sobre ele)

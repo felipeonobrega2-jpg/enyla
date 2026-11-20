@@ -224,6 +224,9 @@ async function medirEstiloFelipe() {
 
 // O que você ensinou direto (pediu ao Claude): entra uma vez, pela versão
 const ENSINADO: { v: number; item: Conhecimento }[] = [
+  // v18 (20/11, Adriano: "vou lançar" + "umas mil caixas" virou MQL e não está qualificado)
+  { v: 18, item: { id: "felipe-lancamento-umas-mil", tema: "venda", em: "2026-11-20T10:00:00.000Z",
+    texto: "Quem ainda vai lançar a marca (não vende ainda) e fala em volume aproximado (\"umas mil\", \"uns mil e pouco\") ainda não está qualificado: não é MQL nem lead médio, é lead em qualificação (indefinido) e a conversa segue comigo no automático. Continuo levantando os dados e deixo claro, com naturalidade, que em mil o custo por unidade fica mais alto e que o ponto bom é a partir de 5 mil (ou que dá para começar menor no digital). Só passa a ser bom negócio quando o volume fica firme (número fechado, recorrência, ou mais de um produto/modelo somando volume) ou quando ele já vende e tem histórico." } },
   // v17 (19/11, conversa da caixa Landerlan: a mesma pergunta saiu duas vezes com as mesmas palavras)
   { v: 17, item: { id: "felipe-nao-repetir-pergunta", tema: "venda", em: "2026-11-19T22:45:00.000Z",
     texto: "Nunca repito uma frase que eu já mandei na conversa. Se perguntei a quantidade e o cliente respondeu outra coisa, primeiro respondo o que ele perguntou e depois volto na quantidade com outras palavras e de um jeito mais leve, de preferência dando uma referência que ajude ele a responder (ex.: \"Pra eu te passar o valor, seria mais umas 500, mil, ou mais que isso?\"). Pedido de desculpa pela demora, uma vez só na conversa." } },
