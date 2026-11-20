@@ -39,8 +39,9 @@ export async function POST(req: NextRequest) {
     const dia = b.data && /^\d{4}-\d{2}-\d{2}$/.test(b.data) ? b.data : diaSP(new Date(agora.getTime() + Math.min(90, Math.max(1, Number(b.dias) || 1)) * 86_400_000))
     passo = { tipo: "lembrar", em: agora.toISOString(), ate: nove(dia), ...(b.nota?.trim() ? { nota: b.nota.trim().slice(0, 120) } : {}) }
   } else if (b.tipo === "fechou" || b.tipo === "perdido") {
-    const { error } = await supabase.from("whatsapp_conversas").update({ status_lead: b.tipo === "fechou" ? "pedido" : "perdido", ultima_classificacao_at: agora.toISOString() }).eq("jid", b.jid)
-    if (error) return NextResponse.json({ erro: error.message }, { status: 500 })
+    // Etapa num lugar só: grava o status e tira o reflexo antigo (ex.: a etiqueta MQL de quem perdeu)
+    const { definirEtapaManual } = await import("@/app/lib/agenteAuto")
+    await definirEtapaManual(b.jid, b.tipo === "fechou" ? "pedido" : "perdido")
   } else if (b.tipo !== "limpar") return NextResponse.json({ erro: "tipo inválido" }, { status: 400 })
 
   // Grava lendo a versão mais nova (o resto da configuração não muda) e esquece passos velhos

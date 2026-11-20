@@ -25,12 +25,16 @@ export async function PATCH(req: Request) {
   const alvo = jids ?? (jid ? [jid] : [])
   if (!alvo.length) return NextResponse.json({ error: "jid" }, { status: 400 })
   const agora = new Date().toISOString()
-  const campos = etapa !== undefined ? { status_lead: etapa, ultima_classificacao_at: etapa ? agora : null }
-    : fechar !== undefined ? { fechada_em: fechar ? agora : null }
-    : etiquetas !== undefined ? { etiquetas: [...new Set(etiquetas.map(e => e.trim()).filter(Boolean))] }
-    : { nao_lidas: 0 }
-  const { error } = await supabase.from("whatsapp_conversas").update(campos).in("jid", alvo)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // Etapa e etiquetas: num lugar só (status manda, etiqueta MQL/Descartado é o reflexo), sincronizado no WhatsApp
+  if (etapa !== undefined || etiquetas !== undefined) {
+    const { definirEtapaManual } = await import("@/app/lib/agenteAuto")
+    const limpas = etiquetas !== undefined ? [...new Set(etiquetas.map(e => e.trim()).filter(Boolean))] : undefined
+    for (const j of alvo) await definirEtapaManual(j, etapa, limpas)
+  } else {
+    const campos = fechar !== undefined ? { fechada_em: fechar ? agora : null } : { nao_lidas: 0 }
+    const { error } = await supabase.from("whatsapp_conversas").update(campos).in("jid", alvo)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
   // Você decidiu a etapa ou as etiquetas: o classificador automático não rebaixa mais esta conversa
   if (etapa !== undefined || etiquetas !== undefined) await mudarConfig((d: Record<string, unknown> & { leadManual?: Record<string, string> }) => {
     const m = { ...(d.leadManual ?? {}) }

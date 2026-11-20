@@ -101,7 +101,20 @@ async function corrigirMqlRebaixado(cfg: Cfg) {
   const manual = (cfg as { leadManual?: Record<string, string> }).leadManual ?? {}
   const jids = (data ?? []).map(c => c.jid as string).filter(j => !manual[j])
   if (jids.length) await supabase.from("whatsapp_conversas").update({ status_lead: null }).in("jid", jids)
-  return jids.length
+  // Etapa num lugar só: etiqueta MQL/Descartado sem o status correspondente (ou o contrário) fica coerente,
+  // aos poucos (sincroniza as etiquetas no WhatsApp Business)
+  const [a, b, c, d] = await Promise.all([
+    supabase.from("whatsapp_conversas").select("jid").contains("etiquetas", ["MQL"]).or("status_lead.is.null,status_lead.neq.mql").limit(40),
+    supabase.from("whatsapp_conversas").select("jid").contains("etiquetas", ["Descartado"]).or("status_lead.is.null,status_lead.neq.descartado").limit(40),
+    supabase.from("whatsapp_conversas").select("jid").eq("status_lead", "mql").not("etiquetas", "cs", "{MQL}").limit(40),
+    supabase.from("whatsapp_conversas").select("jid").eq("status_lead", "descartado").not("etiquetas", "cs", "{Descartado}").limit(40),
+  ])
+  const incoerentes = [...new Set([a, b, c, d].flatMap(r => (r.data ?? []).map(x => x.jid as string)))].slice(0, 40)
+  if (incoerentes.length) {
+    const { lerConversa, aplicarStatus } = await import("./agenteAuto")
+    for (const j of incoerentes) { const conv = await lerConversa(j); if (conv) await aplicarStatus(conv, conv.etiquetas ?? [], undefined).catch(() => null) }
+  }
+  return { rebaixados: jids.length, etiquetasAcertadas: incoerentes.length }
 }
 
 // ── Recuperação (lógica de atendimento quando a IA volta) ───────────────────

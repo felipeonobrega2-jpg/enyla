@@ -15,6 +15,7 @@ import { supabase } from "./supabase"
 import { evo } from "./evolution"
 import { gravarLote, WaMessage, deveIgnorar } from "./whatsappDados"
 import { atender, lerConfigAtendente } from "./atendenteServidor"
+import { etapaDoLead } from "./etapaLead"
 import { lerRegistros, gravarRegistro, lerIdsAgente, guardarIdAgente, reservarTratada, liberarTratada, temTabelas } from "./registroAgente"
 import { garantirTelefone } from "./contatosServidor"
 import { textoAvisoReativacao } from "./reativacao"
@@ -134,8 +135,11 @@ export async function enviarEtiquetasAoWhatsapp(pagina: number, tamanho = 30) {
 }
 
 // Troca as etiquetas (e a etapa do funil, se veio) no sistema e no WhatsApp
-export async function aplicar(c: Conversa, etiquetas: string[], etapa: string | null) {
+export async function aplicar(c: Conversa, etiquetasPedidas: string[], etapa: string | null, statusFinal?: string | null) {
   const antes = c.etiquetas ?? []
+  // Etapa num lugar só: a etiqueta MQL/Descartado é o reflexo do status que fica gravado
+  const { etiquetasCoerentes } = await import("./etapaLead")
+  const etiquetas = etiquetasCoerentes(statusFinal !== undefined ? statusFinal : (etapa ?? c.status_lead), etiquetasPedidas)
   const mesmas = antes.length === etiquetas.length && antes.every(e => etiquetas.includes(e))
   const campos: Record<string, unknown> = {}
   if (!mesmas) campos.etiquetas = etiquetas
@@ -147,9 +151,22 @@ export async function aplicar(c: Conversa, etiquetas: string[], etapa: string | 
   if (etapa) c.status_lead = etapa
 }
 
+// Mudança manual (tela do WhatsApp, próximo passo): grava a etapa e as etiquetas coerentes, e sincroniza no WhatsApp.
+// etiquetas undefined = mantém as atuais. Se só as etiquetas vierem, a etapa segue a etiqueta de reflexo (MQL/Descartado).
+export async function definirEtapaManual(jid: string, status: string | null | undefined, etiquetas?: string[]) {
+  const c = await lerConversa(jid)
+  if (!c) return
+  let st = status
+  if (st === undefined && etiquetas) {
+    st = etiquetas.includes("MQL") ? "mql" : etiquetas.includes("Descartado") ? "descartado"
+      : c.status_lead === "mql" || c.status_lead === "descartado" ? null : c.status_lead
+  }
+  await aplicarStatus(c, etiquetas ?? c.etiquetas ?? [], st)
+}
+
 // Como aplicar, mas status null tira da etapa (ex.: MQL sem prova volta para automática); undefined não mexe
 export async function aplicarStatus(c: Conversa, etiquetas: string[], status: string | null | undefined) {
-  await aplicar(c, etiquetas, status ?? null)
+  await aplicar(c, etiquetas, status ?? null, status === undefined ? c.status_lead : status)
   if (status === null && c.status_lead) {
     await supabase.from("whatsapp_conversas").update({ status_lead: null }).eq("jid", c.jid)
     c.status_lead = null
@@ -187,8 +204,8 @@ export const ESPERA_MAX_VEZ_SEG = 20   // cabe no minuto da Vercel; passou disso
 
 // Lead quente: responde sempre, sem teto por hora (só o espaçamento natural)
 export function leadQuente(a: { etiquetas?: string[] | null; status_lead?: string | null; perfil?: string | null; jid: string; pedidosDigitais?: { jid: string; status: string; teste?: boolean }[]; propostas?: { jid: string; status: string; em: string; enviadaEm?: string }[] }) {
-  const rebaixado = (a.etiquetas ?? []).some(e => e === "Lead pequeno" || e === "Digital")
-  if ((a.status_lead === "mql" && !rebaixado) || (a.etiquetas ?? []).some(e => /^(MQL|ICP|Oportunidade|Lead médio)$/.test(e))) return true
+  // Etapa num lugar só: bom negócio de agora (perdido/descartado não é quente só pela etiqueta antiga)
+  if (etapaDoLead({ status_lead: a.status_lead, etiquetas: a.etiquetas }) === "bom") return true
   if (a.perfil && ["icp", "oportunidade", "medio"].includes(a.perfil)) return true
   if ((a.pedidosDigitais ?? []).some(p => p.jid === a.jid && !p.teste && ["aguardando_sinal", "sinal_pago", "arte", "producao"].includes(p.status))) return true
   return (a.propostas ?? []).some(p => p.jid === a.jid && p.status === "enviada" && Date.now() - new Date(p.enviadaEm ?? p.em).getTime() < 14 * 86_400_000)
@@ -514,7 +531,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   let coletandoMql: string | null = null
   // MQL de verdade: status mql que a classificação atual não rebaixou (etiqueta "Lead pequeno"/Digital vale mais que
   // o status antigo; 19/11, Master Bacth: 100 un de amostra ficou como MQL e o agente prometeu orçamento do Felipe)
-  const mqlAtual = c.status_lead === "mql" && !(c.etiquetas ?? []).some(e => e === "Lead pequeno" || e === ETIQUETAS_AGENTE.digital)
+  const mqlAtual = c.status_lead === "mql" && etapaDoLead(c) === "bom"
   if ((conversaNova && mqlAtual) || pediuMedida) {
     const { data: pa } = await supabase.from("whatsapp_conversas").select("proxima_acao").eq("jid", jid).maybeSingle()
     const antes = (() => { try { return (JSON.parse(pa?.proxima_acao ?? "") as { r?: { dados?: import("./atendente").DadosPedido } }).r?.dados ?? null } catch { return null } })()

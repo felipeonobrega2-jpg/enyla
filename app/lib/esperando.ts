@@ -1,3 +1,4 @@
+import { etapaDoLead, perfilDoLead } from "./etapaLead"
 import { faltaParaOrcar } from "./propostaPronta"
 // Ninguém sem resposta: quem escreveu por último e está esperando a gente. Puro (o servidor busca as conversas).
 // Não conta "ok", "obrigado", 👍 (fim de conversa), quem disse que volta depois (a IA marca "com ele"/"sem pressa") nem fornecedor.
@@ -23,13 +24,17 @@ const dadosDe = (pa?: string | null) => { try { return (JSON.parse(pa ?? "") as 
 const momento = (pa?: string | null) => { try { return (JSON.parse(pa ?? "") as { r?: { momento?: string } }).r?.momento ?? null } catch { return null } }
 
 export function rankQualificacao(et: string[] | null | undefined, status?: string | null): number {
-  const e = et ?? []
-  if (e.includes("ICP")) return 5
-  if (e.includes("Oportunidade")) return 4
-  const rebaixado = e.includes("Lead pequeno") || e.includes("Digital")   // classificação atual vale mais que o status antigo
-  if ((status === "mql" && !rebaixado) || e.includes("MQL") || e.includes("Lead médio")) return 3
-  if (e.includes("Digital")) return 2
-  if (e.includes("Lead pequeno")) return 1
+  // Etapa num lugar só (etapaLead): descartado e fornecedor não pedem você; perdido que volta a escrever vale pelo perfil
+  const etapa = etapaDoLead({ status_lead: status, etiquetas: et })
+  if (etapa === "descartado" || etapa === "fornecedor") return 0
+  if (etapa === "bom" || etapa === "perdido" || etapa === "pedido") {
+    const perfil = perfilDoLead({ etiquetas: et })
+    if (perfil === "icp") return 5
+    if (perfil === "oportunidade") return 4
+    if (etapa === "bom" || perfil === "medio") return 3
+  }
+  if (etapa === "digital") return 2
+  if (etapa === "pequeno") return 1
   return 0
 }
 
