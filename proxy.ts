@@ -20,7 +20,8 @@ export default auth((req) => {
     pathname.startsWith("/api/whatsapp/webhook") ||
     pathname === "/api/digital/varredura" ||
     pathname === "/api/relatorio/semanal" ||
-    pathname === "/api/emails/teste" ||          // amostra dos e-mails (exige o segredo do webhook na rota)     // relatório semanal do VPS (exige o segredo do webhook na rota)
+    pathname === "/api/emails/teste" ||
+    pathname === "/api/whatsapp/historico" ||    // histórico do Evolution pelo VPS (exige o segredo do webhook na rota)          // amostra dos e-mails (exige o segredo do webhook na rota)     // relatório semanal do VPS (exige o segredo do webhook na rota)
     pathname === "/api/sistema/vigia" ||          // vigia do VPS (exige o segredo do webhook na rota)     // a rota exige login ou o segredo do webhook
     pathname === "/api/frete/webhook" ||
     pathname === "/api/infinitepay/webhook" ||  // InfinitePay (sem assinatura: só dispara o payment_check)
