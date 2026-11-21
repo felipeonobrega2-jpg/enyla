@@ -7,7 +7,7 @@
 
 import React, { useEffect, useMemo, useState } from "react"
 import { Inbox, Check, AlarmClock, ShieldAlert, Wallet, Truck, FileText, MessageCircle, RotateCcw, CalendarClock, Handshake, FileCheck2, Flame, Gem, ChevronDown, CheckCircle2, ArrowRight } from "lucide-react"
-import { Cartao, TituloCartao, Selo, Vazio, Esqueleto } from "./ds"
+import { Cartao, Vazio, Esqueleto } from "./ds"
 import { ordenar, adiarAte, GRUPOS, type GrupoCaixa, type NivelCaixa } from "../lib/caixaEntrada"
 import type { Hoje, ItemHoje } from "../lib/hoje"
 import type { DadosPedido } from "../lib/atendente"
@@ -115,53 +115,105 @@ export function CaixaEntrada({ extras, onAbrirConversa, onOrcar, onNavegar, onPr
   }, [hoje, propostas, negociacoes, extras, ocultos])   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!hoje) return <Esqueleto linhas={5} />
-  const porGrupo = (g: GrupoCaixa) => itens.filter(i => i.grupo === g).length
-  const visiveis = grupo === "tudo" ? itens : itens.filter(i => i.grupo === grupo)
-  const mostrados = verTodos ? visiveis : visiveis.slice(0, MOSTRAR)
-  const emJogo = itens.reduce((t, i) => t + (i.grupo === "dinheiro" || i.grupo === "vendas" ? i.valor ?? 0 : 0), 0)
+  // Alertas do sistema (saldo, crédito, WhatsApp) viram uma faixa no topo; o resto é a lista de trabalho
+  const alertas = itens.filter(i => i.grupo === "sistema")
+  const trabalho = juntarMesmoPedido(itens.filter(i => i.grupo !== "sistema"))
+  const doGrupo = (g: GrupoCaixa) => trabalho.filter(i => i.grupo === g)
+  const valorDe = (l: typeof trabalho) => l.reduce((t, i) => t + (i.valor ?? 0), 0)
+  const emJogo = valorDe(trabalho.filter(i => i.grupo === "dinheiro" || i.grupo === "vendas"))
   const m = hoje.meta?.resumo
+  const metaMql = m && m.total > 0 ? (
+    <span>MQL orçado em 24 h · 7 dias: <span className="font-semibold" style={{ color: m.orcados / m.total >= 0.8 ? "#009351" : m.orcados / m.total >= 0.5 ? "#c57800" : "#d33a3c" }}>{m.orcados} de {m.total}</span></span>
+  ) : null
+  const resolver = (i: Item & { chaves?: string[] }) => (i.chaves ?? [i.chave]).forEach(c => marcar(c, "sempre"))
+  const amanha = (i: Item & { chaves?: string[] }) => (i.chaves ?? [i.chave]).forEach(c => marcar(c, adiarAte("amanha")))
+  const linha = (i: Item & { chaves?: string[] }) => (
+    <div key={i.chave}>
+      <Linha i={i} aberto={aberto === i.chave}
+        onAbrir={i.expande ? () => setAberto(a => a === i.chave ? null : i.chave) : i.onClick}
+        onResolvido={() => resolver(i)} onAmanha={() => amanha(i)} />
+      {aberto === i.chave && i.expande && <div className="px-3 pb-3 md:pl-14">{i.expande(() => setAberto(null))}</div>}
+    </div>
+  )
+  const grupos = GRUPOS.filter(g => g.id !== "sistema").map(g => ({ ...g, itens: doGrupo(g.id) })).filter(g => g.itens.length)
+  const POR_GRUPO = 4
 
   return (
     <Cartao padding={false} className="ds-entrada">
       <div className="px-5 pt-5">
-        <TituloCartao titulo="Caixa de entrada" icone={<Inbox className="w-4 h-4" />}
-          sub={itens.length ? [`${itens.length} ${itens.length === 1 ? "item" : "itens"} por prioridade`, emJogo ? `${brl(emJogo)} em jogo` : ""].filter(Boolean).join(" · ") : undefined}
-          acao={itens.length ? <Selo tom={itens.some(i => i.nivel === "perigo") ? "perigo" : "alerta"}>{itens.length}</Selo> : undefined} />
-        {itens.length > 0 && (
-          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 mt-1" style={{ scrollbarWidth: "none" }}>
-            {[{ id: "tudo" as const, nome: "Tudo", n: itens.length }, ...GRUPOS.map(g => ({ ...g, n: porGrupo(g.id) })).filter(g => g.n)].map(g => (
+        <div className="flex items-start gap-3">
+          <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#8456e814", color: "#8456e8" }}><Inbox className="w-4 h-4" /></span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[15px] font-semibold text-[#191625] leading-tight">Caixa de entrada</p>
+            <p className="text-[12px] text-[#898892] mt-0.5">
+              {trabalho.length ? <>{trabalho.length} {trabalho.length === 1 ? "coisa pede" : "coisas pedem"} você{emJogo ? <> · <span className="font-semibold text-[#191625]">{brl(emJogo)}</span> em jogo</> : null}</> : "Nada pedindo você agora"}
+            </p>
+          </div>
+        </div>
+        {trabalho.length > 0 && (
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 mt-3" style={{ scrollbarWidth: "none" }}>
+            {[{ id: "tudo" as const, nome: "Tudo", n: trabalho.length }, ...grupos.map(g => ({ id: g.id, nome: g.nome, n: g.itens.length }))].map(g => (
               <button key={g.id} onClick={() => { setGrupo(g.id); setVerTodos(false) }}
-                className={`ds-toque shrink-0 h-8 px-3 rounded-full text-[12.5px] font-semibold transition-colors ${grupo === g.id ? "bg-[#191625] text-white" : "bg-[rgba(116,116,128,0.08)] text-[#5e5c68] hover:bg-[rgba(116,116,128,0.14)]"}`}>
+                className={`ds-toque shrink-0 h-7 px-3 rounded-full text-[12px] font-semibold transition-colors ${grupo === g.id ? "bg-[#191625] text-white" : "bg-[rgba(116,116,128,0.08)] text-[#5e5c68] hover:bg-[rgba(116,116,128,0.14)]"}`}>
                 {g.nome} <span className={grupo === g.id ? "text-white/70" : "text-[#898892]"}>{g.n}</span>
               </button>
             ))}
           </div>
         )}
-        {m && m.total > 0 && (
-          <p className="text-[11.5px] text-[#898892] mt-2">
-            Meta: orçar todo MQL em 24 h · 7 dias: <span className="font-semibold" style={{ color: m.orcados / m.total >= 0.8 ? "#009351" : m.orcados / m.total >= 0.5 ? "#c57800" : "#d33a3c" }}>{m.orcados} de {m.total}</span> orçados
-          </p>
-        )}
       </div>
-      <div className="px-2 pb-2 pt-1 ds-escalonado">
-        {visiveis.length === 0
-          ? <Vazio icone={<CheckCircle2 className="w-9 h-9" />} titulo="Tudo em dia" sub="Nenhum bom negócio esperando, nenhuma cobrança vencida e nada atrasado." />
-          : mostrados.map(i => (
-            <div key={i.chave}>
-              <Linha i={i} aberto={aberto === i.chave}
-                onAbrir={i.expande ? () => setAberto(a => a === i.chave ? null : i.chave) : i.onClick}
-                onResolvido={() => marcar(i.chave, "sempre")} onAmanha={() => marcar(i.chave, adiarAte("amanha"))} />
-              {aberto === i.chave && i.expande && <div className="px-3 pb-3">{i.expande(() => setAberto(null))}</div>}
+
+      {alertas.length > 0 && (
+        <div className="mx-5 mt-3 rounded-xl divide-y divide-[#d33a3c]/10" style={{ background: "rgba(211,58,60,0.06)" }}>
+          {alertas.map(a => (
+            <div key={a.chave} className="flex items-center gap-2.5 pl-3 pr-1.5 py-1.5">
+              <ShieldAlert className="w-4 h-4 shrink-0" style={{ color: COR[a.nivel ?? "perigo"] }} />
+              <button onClick={a.onClick} disabled={!a.onClick} className="flex-1 min-w-0 text-left text-[12.5px] leading-snug py-1 disabled:cursor-default">
+                <span className="font-semibold text-[#191625]">{a.titulo}</span>
+                {a.sub && <span className="text-[#5e5c68]"> · {a.sub}</span>}
+              </button>
+              {a.onClick && <span className="hidden md:inline"><BotaoTexto titulo="Abrir" onClick={a.onClick}>Resolver</BotaoTexto></span>}
+              <BotaoIcone titulo="Lembrar amanhã às 8 h" onClick={() => marcar(a.chave, adiarAte("amanha"))}><AlarmClock className="w-4 h-4" /></BotaoIcone>
             </div>
           ))}
-        {visiveis.length > MOSTRAR && (
-          <button onClick={() => setVerTodos(v => !v)} className="w-full py-2.5 text-[12px] font-medium text-[#8456e8] hover:bg-[#8456e8]/[0.04] rounded-lg transition-colors">
-            {verTodos ? "Mostrar menos" : `Ver todos (${visiveis.length})`}
-          </button>
-        )}
+        </div>
+      )}
+
+      <div className="px-2 pb-2 pt-1">
+        {trabalho.length === 0
+          ? <Vazio icone={<CheckCircle2 className="w-9 h-9" />} titulo="Tudo em dia" sub="Nenhum bom negócio esperando, nenhuma cobrança vencida e nada atrasado." />
+          : grupo === "tudo"
+            ? grupos.map(g => (
+              <section key={g.id} className="ds-escalonado">
+                <div className="flex items-baseline gap-2 px-3 pt-4 pb-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[#898892]">{g.nome}</span>
+                  <span className="text-[11px] text-[#aeadb5]">{g.itens.length}</span>
+                  <span className="flex-1" />
+                  {g.id === "vendas" && metaMql && <span className="text-[11px] text-[#898892] truncate">{metaMql}</span>}
+                  {g.id !== "vendas" && valorDe(g.itens) > 0 && <span className="text-[11.5px] font-semibold ds-num text-[#5e5c68]">{brl(valorDe(g.itens))}</span>}
+                </div>
+                {g.itens.slice(0, POR_GRUPO).map(linha)}
+                {g.itens.length > POR_GRUPO && (
+                  <button onClick={() => setGrupo(g.id)} className="w-full text-left px-3 md:pl-14 py-2 text-[12px] font-medium text-[#8456e8] hover:bg-[#8456e8]/[0.04] rounded-lg transition-colors">
+                    Ver mais {g.itens.length - POR_GRUPO} em {g.nome.toLowerCase()}
+                  </button>
+                )}
+              </section>
+            ))
+            : (() => {
+              const lista = doGrupo(grupo), mostrados = verTodos ? lista : lista.slice(0, MOSTRAR)
+              return <div className="pt-2 ds-escalonado">
+                {grupo === "vendas" && metaMql && <p className="px-3 pb-1 text-[11.5px] text-[#898892]">{metaMql}</p>}
+                {mostrados.map(linha)}
+                {lista.length > MOSTRAR && (
+                  <button onClick={() => setVerTodos(v => !v)} className="w-full py-2.5 text-[12px] font-medium text-[#8456e8] hover:bg-[#8456e8]/[0.04] rounded-lg transition-colors">
+                    {verTodos ? "Mostrar menos" : `Ver todos (${lista.length})`}
+                  </button>
+                )}
+              </div>
+            })()}
         {hoje.outrosEsperando > 0 && (
-          <button onClick={() => onNavegar("whatsapp")} className="w-full flex items-center justify-between px-3 py-2 text-[11.5px] text-[#898892] hover:bg-[rgba(116,116,128,0.06)] rounded-lg transition-colors">
-            <span>Mais {hoje.outrosEsperando} {hoje.outrosEsperando === 1 ? "conversa esperando" : "conversas esperando"} com a IA</span>
+          <button onClick={() => onNavegar("whatsapp")} className="w-full flex items-center justify-between px-3 py-2.5 mt-1 text-[11.5px] text-[#898892] hover:bg-[rgba(116,116,128,0.06)] rounded-lg transition-colors border-t border-[rgba(60,60,67,0.08)]">
+            <span>Mais {hoje.outrosEsperando} {hoje.outrosEsperando === 1 ? "conversa" : "conversas"} com a IA, sem precisar de você</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         )}
@@ -170,27 +222,56 @@ export function CaixaEntrada({ extras, onAbrirConversa, onOrcar, onNavegar, onPr
   )
 }
 
-// Linha em duas camadas (cabe no celular): nome e valor em cima; o que é e as ações embaixo
+// O mesmo pedido em dois itens do mesmo grupo (ex.: cobrança vencida e saldo sem cobrança) vira uma linha só:
+// fica o mais importante, o valor soma (no dinheiro) e "resolvido" tira os dois
+function juntarMesmoPedido<T extends Item & { grupo: GrupoCaixa; peso: number }>(itens: T[]): (T & { chaves?: string[] })[] {
+  const saida: (T & { chaves?: string[] })[] = []
+  const porNumero = new Map<string, T & { chaves?: string[] }>()
+  for (const i of itens) {
+    const k = i.numero ? `${i.grupo}|${i.numero}` : null
+    const ja = k ? porNumero.get(k) : undefined
+    if (!ja) { const novo = { ...i, chaves: [i.chave] }; if (k) porNumero.set(k, novo); saida.push(novo); continue }
+    ja.chaves!.push(i.chave)
+    if (i.grupo !== "dinheiro" || !i.valor) continue
+    ja.valor = (ja.valor ?? 0) + i.valor; ja.valorTexto = undefined
+    // Junta a explicação só se ela já não estiver dita ("mais R$ 4.470,00 sem cobrança")
+    const inteiro = Math.round(i.valor).toLocaleString("pt-BR")
+    if (i.sub && !(ja.sub ?? "").includes(inteiro)) ja.sub = [ja.sub, i.sub].filter(Boolean).join(" · ")
+  }
+  return saida
+}
+
+// Linha: no computador, tudo numa linha (o que é · valor · ações); no celular, ações embaixo
 const COR: Record<NivelCaixa, string> = { perigo: "#d33a3c", alerta: "#c57800", info: "#8456e8", sucesso: "#009351" }
 function Linha({ i, aberto, onAbrir, onResolvido, onAmanha }: { i: Item; aberto: boolean; onAbrir?: () => void; onResolvido: () => void; onAmanha: () => void }) {
   const cor = COR[i.nivel ?? "info"]
+  const valor = (i.valorTexto || i.valor) ? <span className="text-[13.5px] font-bold ds-num shrink-0" style={{ color: cor }}>{i.valorTexto ?? brl(i.valor!)}</span> : null
   return (
-    <div className="flex items-start gap-3 px-3 py-3 rounded-xl hover:bg-[rgba(116,116,128,0.05)] transition-colors">
-      <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ background: `${cor}14`, color: cor }}>{i.icone}</span>
-      <div className="flex-1 min-w-0">
-        <button onClick={onAbrir} disabled={!onAbrir} className="w-full text-left disabled:cursor-default">
+    <div className="group flex items-start md:items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[rgba(116,116,128,0.05)] transition-colors">
+      <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 md:mt-0" style={{ background: `${cor}14`, color: cor }}>{i.icone}</span>
+      <div className="flex-1 min-w-0 flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
+        <button onClick={onAbrir} disabled={!onAbrir} className="flex-1 min-w-0 text-left disabled:cursor-default">
           <span className="flex items-baseline gap-2">
-            <span className="flex-1 min-w-0 text-[14px] font-semibold text-[#191625] truncate">{i.titulo}</span>
-            {(i.valorTexto || i.valor) ? <span className="text-[13.5px] font-bold ds-num shrink-0" style={{ color: cor }}>{i.valorTexto ?? brl(i.valor!)}</span> : null}
+            <span className="flex-1 min-w-0 text-[13.5px] font-semibold text-[#191625] truncate">{i.titulo}</span>
+            <span className="md:hidden">{valor}</span>
           </span>
-          {i.sub && <span className="block text-[12.5px] text-[#5e5c68] leading-snug mt-0.5 line-clamp-2">{i.sub}</span>}
+          {i.sub && <span className="block text-[12px] text-[#5e5c68] leading-snug mt-0.5 line-clamp-2 md:line-clamp-1">{i.sub}</span>}
         </button>
-        <div className="flex items-center gap-0.5 mt-1 -ml-2">
+        {!(i.expande || i.acao) && (
+          <span className="flex md:hidden items-center justify-end -mt-1 -mb-1.5 -mr-1">
+            <BotaoIcone titulo="Resolvido: tirar da caixa" onClick={onResolvido}><Check className="w-4 h-4" /></BotaoIcone>
+            <BotaoIcone titulo="Lembrar amanhã às 8 h" onClick={onAmanha}><AlarmClock className="w-4 h-4" /></BotaoIcone>
+          </span>
+        )}
+        <span className="hidden md:block w-[104px] text-right">{valor}</span>
+        <div className={`items-center gap-0.5 -ml-2 md:ml-0 shrink-0 md:w-[188px] md:justify-end md:flex ${i.expande || i.acao ? "flex -mb-1" : "hidden"}`}>
           {i.expande && <BotaoTexto titulo="Ver e decidir" onClick={onAbrir ?? (() => {})}>{aberto ? "Fechar" : "Decidir"}<ChevronDown className={`inline w-3.5 h-3.5 ml-0.5 transition-transform ${aberto ? "rotate-180" : ""}`} /></BotaoTexto>}
           {i.acao}
-          <span className="flex-1" />
-          <BotaoIcone titulo="Resolvido: tirar da caixa" onClick={onResolvido}><Check className="w-4 h-4" /></BotaoIcone>
-          <BotaoIcone titulo="Lembrar amanhã às 8 h" onClick={onAmanha}><AlarmClock className="w-4 h-4" /></BotaoIcone>
+          <span className="flex-1 md:hidden" />
+          <span className="flex items-center md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
+            <BotaoIcone titulo="Resolvido: tirar da caixa" onClick={onResolvido}><Check className="w-4 h-4" /></BotaoIcone>
+            <BotaoIcone titulo="Lembrar amanhã às 8 h" onClick={onAmanha}><AlarmClock className="w-4 h-4" /></BotaoIcone>
+          </span>
         </div>
       </div>
     </div>
@@ -199,7 +280,7 @@ function Linha({ i, aberto, onAbrir, onResolvido, onAmanha }: { i: Item; aberto:
 
 function BotaoIcone({ titulo, onClick, children }: { titulo: string; onClick: () => void; children: React.ReactNode }) {
   return <button title={titulo} aria-label={titulo} onClick={e => { e.stopPropagation(); onClick() }}
-    className="ds-toque w-9 h-9 rounded-lg flex items-center justify-center text-[#898892] hover:text-[#191625] hover:bg-[rgba(116,116,128,0.1)] transition-colors shrink-0">{children}</button>
+    className="ds-toque w-8 h-8 rounded-lg flex items-center justify-center text-[#898892] hover:text-[#191625] hover:bg-[rgba(116,116,128,0.1)] transition-colors shrink-0">{children}</button>
 }
 function BotaoTexto({ titulo, onClick, children }: { titulo: string; onClick: () => void; children: React.ReactNode }) {
   return <button title={titulo} onClick={e => { e.stopPropagation(); onClick() }}
