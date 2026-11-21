@@ -216,10 +216,12 @@ export function leadQuente(a: { etiquetas?: string[] | null; status_lead?: strin
 async function vezPelaTabela(essencial: boolean, proativo: boolean): Promise<{ esperaMs: number } | { erro: string } | null> {
   if (!await temTabelas()) return null
   const agora = Date.now()
-  const desde = `envio:${new Date(agora - 3_600_000).toISOString()}`
-  const { data, error } = await supabase.from("agente_tratadas").select("id").gte("id", desde).lt("id", "envio;").order("id", { ascending: false }).limit(500)
+  // Só pelo prefixo: comparar faixa de texto ("envio:" até "envio;") não funciona com a ordenação do banco, que ignora
+  // a pontuação (21/11: voltava vazio e o limite por hora não valia). A tabela só guarda 2 h de envios.
+  const { data, error } = await supabase.from("agente_tratadas").select("id").like("id", "envio:%").limit(2000)
   if (error) return null
-  const lista = (data ?? []).map(x => (x.id as string).slice(6, 30))
+  const todos = (data ?? []).map(x => ({ id: x.id as string, t: new Date((x.id as string).slice(6, 30)).getTime() })).filter(x => !isNaN(x.t))
+  const lista = todos.filter(x => x.t >= agora - 3_600_000).map(x => new Date(x.t).toISOString())
   const cfg = await supabase.from("AppConfig").select("data->whatsappConexao").eq("id", 1).maybeSingle()
   const con = (cfg.data as { whatsappConexao?: { aquecerDesde?: string; aquecimentoV?: number } } | null)?.whatsappConexao
   const desdeAq = con?.aquecimentoV === 2 ? con.aquecerDesde : undefined
@@ -232,7 +234,8 @@ async function vezPelaTabela(essencial: boolean, proativo: boolean): Promise<{ e
   const id = `envio:${new Date(vez).toISOString()}:${Math.random().toString(36).slice(2, 7)}`
   if (await reservarTratada(id) === null) return null
   // limpeza: envios com mais de 2 h saem da tabela
-  void supabase.from("agente_tratadas").delete().lt("id", `envio:${new Date(agora - 2 * 3_600_000).toISOString()}`).gte("id", "envio:").then(() => null)
+  const velhos = todos.filter(x => x.t < agora - 2 * 3_600_000).map(x => x.id).slice(0, 300)
+  if (velhos.length) void supabase.from("agente_tratadas").delete().in("id", velhos).then(() => null)
   return { esperaMs: vez - agora }
 }
 

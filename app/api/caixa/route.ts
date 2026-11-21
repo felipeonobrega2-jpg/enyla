@@ -8,7 +8,7 @@ import { lerCampos } from "@/app/lib/configAtomica"
 const PREFIXO = "caixa|"
 
 export async function GET() {
-  const { data } = await supabase.from("agente_tratadas").select("id").gte("id", PREFIXO).lt("id", "caixa}").limit(3000)
+  const { data } = await supabase.from("agente_tratadas").select("id").like("id", `${PREFIXO}%`).limit(3000)
   const agora = new Date().toISOString()
   const ocultos: Record<string, string> = {}
   const vencidos: string[] = []

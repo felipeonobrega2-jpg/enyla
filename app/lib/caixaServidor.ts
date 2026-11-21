@@ -12,7 +12,7 @@ async function todas<T>(tabela: string, sel = "*"): Promise<T[]> {
 const haQuanto = (iso: string) => { const m = Math.round((Date.now() - new Date(iso).getTime()) / 60_000); return m < 60 ? `há ${Math.max(1, m)} min` : m < 1440 ? `há ${Math.round(m / 60)} h` : `há ${Math.round(m / 1440)} d` }
 
 export async function ocultosDaCaixa(): Promise<Record<string, string>> {
-  const { data } = await supabase.from("agente_tratadas").select("id").gte("id", "caixa|").lt("id", "caixa}").limit(3000)
+  const { data } = await supabase.from("agente_tratadas").select("id").like("id", "caixa|%").limit(3000)
   const o: Record<string, string> = {}
   for (const { id } of data ?? []) { const [, ate, ...r] = (id as string).split("|"); o[decodeURIComponent(r.join("|"))] = ate }
   return o
