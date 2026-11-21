@@ -1,5 +1,6 @@
 // Caixa de entrada montada no servidor (para o resumo no WhatsApp às 8h, 13h e 18h e para o assistente): os mesmos
 // itens e as mesmas chaves do Painel, então o que o Felipe marcou como resolvido ou adiou não aparece.
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { ordenar, type ItemResumo } from "./caixaEntrada"
 
@@ -26,7 +27,7 @@ export async function montarCaixaServidor() {
   const [hoje, kanbanBruto, lancamentos, historico, propostasCustom, clientes, cfgRow, ocultos] = await Promise.all([
     montarHoje(), todas<import("../types").KanbanCard>("KanbanCard"), todas<import("../types").LancamentoFinanceiro>("LancamentoFinanceiro"),
     todas<{ form: import("../types").FormData; numero?: string }>("HistoricoItem", "numero, form"), todas<import("../types").PropostaCustom>("PropostaCustom"),
-    todas<import("../types").Cliente>("Cliente"), supabase.from("AppConfig").select("data").eq("id", 1).single(), ocultosDaCaixa(),
+    todas<import("../types").Cliente>("Cliente"), lerConfigLinha(), ocultosDaCaixa(),
   ])
   const cfg = { ...CONFIG_PADRAO, ...((cfgRow.data?.data ?? {}) as object) } as import("../config").Configuracoes & {
     propostasProntas?: { id: string; nome: string | null; quantidade: number; preco: number; status: string }[]

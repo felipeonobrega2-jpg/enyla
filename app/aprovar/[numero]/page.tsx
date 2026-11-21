@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../lib/configAtomica"
 import { tokenValido, SINAL_PCT_PADRAO } from "@/app/lib/aprovacao"
 import { supabase } from "@/app/lib/supabase"
 import { carregarProposta } from "@/app/lib/propostaPublica"
@@ -19,7 +20,7 @@ export const viewport = { themeColor: "#ffffff", colorScheme: "only light" as co
 // Registra que o cliente abriu a proposta (não quando é a Enyla logada; no máximo uma vez a cada 30 min):
 // conta em config.visitasProposta (o Painel avisa) e deixa a marca no rastreio do pedido
 async function registrarVisita(numero: string) {
-  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfgRow } = await lerConfigLinha()
   const cfg = (cfgRow?.data ?? {}) as Record<string, unknown>
   const visitas = { ...((cfg.visitasProposta as Record<string, VisitaProposta> | undefined) ?? {}) }
   const agora = new Date()
@@ -47,7 +48,7 @@ export default async function AprovarPage({ params, searchParams }: {
   const p = tokenValido(numero, t) ? await carregarProposta(numero) : null
   // Volta do checkout da InfinitePay: confere o pagamento antes de mostrar (os parâmetros da volta podem ser forjados)
   const retorno = p && order_nsu && transaction_nsu && slug ? await confirmarPagamentoInfinitePay({ nsu: order_nsu, transacao: transaction_nsu, slug }).catch(() => "pendente" as const) : null
-  const { data: cfg } = p ? await supabase.from("AppConfig").select("data").eq("id", 1).single() : { data: null }
+  const { data: cfg } = p ? await lerConfigLinha() : { data: null }
   const config = (cfg?.data ?? {}) as { sinalPct?: number; producao?: unknown; feriados?: unknown; pagamentosCartao?: Record<string, PagamentoCartao> }
   const sinalPct = config.sinalPct ?? SINAL_PCT_PADRAO
   // Se aprovar hoje, entrega até: prazo padrão em dias úteis

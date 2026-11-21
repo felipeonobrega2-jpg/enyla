@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { clienteDaConversa, ligacaoForte, Vinculos } from "@/app/lib/vinculoWhatsapp"
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
   const [{ data: convs }, { data: cad }, { data: cfgRow }] = await Promise.all([
     supabase.from("whatsapp_conversas").select("jid, nome, telefone, ultima_at").not("jid", "like", "%@g.us").order("ultima_at", { ascending: false }).limit(3000),
     supabase.from("Cliente").select("nome, telefone"),
-    supabase.from("AppConfig").select("data").eq("id", 1).single(),
+    lerConfigLinha(),
   ])
   const vinculos = ((cfgRow?.data as { vinculosWhatsapp?: Vinculos } | null)?.vinculosWhatsapp) ?? {}
   const k = nomeChave(cliente)

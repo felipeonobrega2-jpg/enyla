@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { mudarConfig } from "@/app/lib/configAtomica"
@@ -11,7 +12,7 @@ type Dados = {
 }
 
 export async function GET() {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   const d = (data?.data ?? {}) as Dados
   const g = await gastosAtuais().catch(() => null)
   const exp = d.metaTokenExpiry ? new Date(typeof d.metaTokenExpiry === "number" && d.metaTokenExpiry < 1e12 ? d.metaTokenExpiry * 1000 : d.metaTokenExpiry) : null

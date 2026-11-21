@@ -1,5 +1,6 @@
 // Confere o crédito dos anúncios na Meta (no máximo 1 vez por hora, pegando carona no webhook) e avisa pelo ntfy:
 // "acabando" no máximo a cada 12 h, "parada" a cada 3 h enquanto durar.
+import { lerConfigLinha } from "./configAtomica"
 import { mudarConfig } from "./configAtomica"
 import { supabase } from "./supabase"
 import { notificar } from "./notificar"
@@ -15,7 +16,7 @@ export async function talvezConferirMeta() {
     return { metaSaldoVistoEm: new Date().toISOString() }
   })
   if (!minha) return
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   const cfg = (data?.data ?? {}) as { metaToken?: string; metaContaId?: string; metaSaldoAviso?: { tipo: string; em: string } }
   const token = cfg.metaToken ?? process.env.META_ACCESS_TOKEN
   const bruta = cfg.metaContaId ?? process.env.META_AD_ACCOUNT_ID

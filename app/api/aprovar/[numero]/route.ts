@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { tokenValido, AprovacaoOnline, SINAL_PCT_PADRAO } from "@/app/lib/aprovacao"
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ num
   if (body.termos !== VERSAO_TERMOS_OFFSET) return NextResponse.json({ erro: "Os termos do pedido foram atualizados. Recarregue a página e aprove de novo." }, { status: 409 })
   const termos = { versao: VERSAO_TERMOS_OFFSET, em: new Date().toISOString() }
 
-  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfgRow } = await lerConfigLinha()
   const cfg = (cfgRow?.data ?? {}) as Record<string, unknown>
   const prod = normalizarProducao(cfg.producao as never)
   definirFeriadosLocais((cfg.feriados ?? CONFIG_PADRAO.feriados) as never)

@@ -1,5 +1,6 @@
 // Parceiros ENYLA no servidor: recebe o cadastro público (com tabela de preços / orçamento de exemplo), guarda no
 // AppConfig e avisa você. Aprovar/recusar é pela tela Fornecedores (só a equipe).
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
 import { notificar, LINK_SISTEMA } from "./notificar"
@@ -18,7 +19,7 @@ export async function receberCadastro(form: FormData): Promise<{ ok: true; id: s
   const campos = errosDoCadastro(dados)
   if (Object.keys(campos).length) return { ok: false, erro: "Confira os campos destacados.", campos }
 
-  const { data: c } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: c } = await lerConfigLinha()
   const cfg = (c?.data ?? {}) as Cfg
   const ultimaHora = (cfg.cadastrosParceiros ?? []).filter(x => Date.now() - new Date(x.em).getTime() < 3_600_000)
   if (ultimaHora.length >= 30) return { ok: false, erro: "Muitos cadastros agora. Tente de novo em alguns minutos." }
@@ -73,7 +74,7 @@ export async function receberCadastro(form: FormData): Promise<{ ok: true; id: s
 }
 
 export async function listarCadastros(): Promise<CadastroParceiro[]> {
-  const { data: c } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: c } = await lerConfigLinha()
   return ((c?.data ?? {}) as Cfg).cadastrosParceiros ?? []
 }
 

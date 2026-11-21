@@ -1,5 +1,6 @@
 // Proposta pronta (servidor): monta e guarda a proposta do lead bom, avisa você no celular, e ao aprovar cria o
 // orçamento (ORC), o card, o rastreio e manda a proposta com o link de aprovação no WhatsApp do cliente.
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
 import { notificar, LINK_SISTEMA } from "./notificar"
@@ -19,7 +20,7 @@ const MAX_GUARDADAS = 200
 
 async function lerTudo() {
   const [{ data: cfgRow }, { data: hist }] = await Promise.all([
-    supabase.from("AppConfig").select("data").eq("id", 1).single(),
+    lerConfigLinha(),
     supabase.from("HistoricoItem").select("form").order("createdAt", { ascending: false }).limit(60),
   ])
   const cfg = (cfgRow?.data ?? {}) as Cfg
@@ -49,7 +50,7 @@ export async function amostrasDeMarkup(config: Configuracoes): Promise<AmostraMa
 }
 
 export async function listarPropostas() {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   return ((data?.data ?? {}) as Cfg).propostasProntas ?? []
 }
 

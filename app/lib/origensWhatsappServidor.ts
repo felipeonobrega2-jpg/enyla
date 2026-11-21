@@ -1,6 +1,7 @@
 // Classifica a origem das conversas do WhatsApp (anúncio + campanha, site) e preenche a origem dos clientes ligados.
 // Usado pelo botão da tela e pela verificação diária. Só roda no servidor.
 
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { ENTRADAS_PADRAO, entradaDaMensagem, campanhaDoDia, normalizar, OrigemConversa } from "./origemWhatsapp"
 import { clienteDaConversa, Vinculos } from "./vinculoWhatsapp"
@@ -15,7 +16,7 @@ async function meta<T>(url: string): Promise<T | null> {
 }
 
 export async function classificarOrigens() {
-  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfgRow } = await lerConfigLinha()
   const cfg = (cfgRow?.data ?? {}) as Record<string, any>
   const token = cfg.metaToken as string | undefined, conta = cfg.metaContaId as string | undefined
 

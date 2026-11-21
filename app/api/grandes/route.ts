@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { randomUUID } from "crypto"
 import { supabase } from "@/app/lib/supabase"
@@ -7,7 +8,7 @@ import { sugestoesGrandes, ordenarGrandes, GrandeNegocio, EtapaGrande, ETAPAS_GR
 
 // Grandes negócios (rota protegida pelo login): lista + sugestões (GET) e edição (POST)
 type Cfg = { grandesNegocios?: GrandeNegocio[]; grandesDispensados?: string[] }
-const ler = async () => ((await supabase.from("AppConfig").select("data").eq("id", 1).single()).data?.data ?? {}) as Cfg
+const ler = async () => ((await lerConfigLinha()).data?.data ?? {}) as Cfg
 
 export async function GET() {
   const cfg = await ler()

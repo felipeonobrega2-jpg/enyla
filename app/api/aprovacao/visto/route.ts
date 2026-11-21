@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { AprovacaoOnline } from "@/app/lib/aprovacao"
@@ -7,7 +8,7 @@ import { gravarCampos } from "@/app/lib/configAtomica"
 // volta para orçamento (rota protegida pelo login)
 export async function POST(req: NextRequest) {
   const { numeros, desfeita } = await req.json().catch(() => ({ numeros: [] })) as { numeros?: string[]; desfeita?: boolean }
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   const cfg = (data?.data ?? {}) as Record<string, unknown>
   const lista = ((cfg.aprovacoesOnline as AprovacaoOnline[] | undefined) ?? []).map(a => numeros?.includes(a.numero) ? { ...a, visto: true, ...(desfeita ? { desfeita: true } : {}) } : a)
   await gravarCampos({ aprovacoesOnline: lista })

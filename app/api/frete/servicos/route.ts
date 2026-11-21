@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../lib/configAtomica"
 import { NextResponse } from "next/server"
 import { cidades, lalamoveConfigurada, ambienteLalamove } from "@/app/lib/lalamove"
 import { infoVeiculo, nomeAdicional } from "@/app/lib/frete"
@@ -25,7 +26,7 @@ export async function GET() {
     }
   }).sort((a, b) => a.ordem - b.ordem)
   // Guarda a lista crua (chaves reais da Lalamove) para ajustar os nomes quando aparecer algo novo
-  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfgRow } = await lerConfigLinha()
   const cfg = (cfgRow?.data ?? {}) as Record<string, unknown>
   await gravarCampos({ lalamoveServicos: { em: new Date().toISOString(), cidade: sp?.name, servicos: sp?.services ?? [] } })
   return NextResponse.json({ configurada: true, ambiente: ambienteLalamove(), cidade: sp?.name ?? null, servicos })

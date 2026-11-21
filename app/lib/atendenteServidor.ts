@@ -2,6 +2,7 @@
 // no tom do Felipe, o que o cliente já contou do pedido e a avaliação do lead (ICP ou não).
 // A tela usa para sugerir; o modo automático usa para responder sozinho (com as travas de agenteLeads).
 
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { clienteClaude, FALLBACK, MODELO } from "./claude"
 import { clienteDaConversa, ligacaoForte, Vinculos } from "./vinculoWhatsapp"
@@ -128,7 +129,7 @@ async function arquivosDoCliente(mensagens: { id: string; from_me: boolean; tipo
 }
 
 export async function lerConfigAtendente(): Promise<Cfg> {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   return (data?.data ?? {}) as Cfg
 }
 

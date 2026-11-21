@@ -1,6 +1,7 @@
 // Gastos no servidor: registra o custo de cada chamada à IA, lê saldo e gasto diário da conta de anúncios da Meta,
 // monta a seção de gastos e avisa no seu WhatsApp quando IA ou anúncios estão para acabar.
 
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
 import { custoUsd, somarUso, diaSP, saldoDoTexto, montarGastos, ultimosDias, GastoDia, Recarga, UsoIA, Gastos, PedidoParaGasto } from "./gastos"
@@ -15,7 +16,7 @@ type Cfg = Record<string, unknown> & {
 type MetaCache = { em: string; saldo: number | null; dias: Record<string, number>; erro?: string | null }
 
 const COTACAO_PADRAO = 5.5
-const lerCfg = async () => ((await supabase.from("AppConfig").select("data").eq("id", 1).single()).data?.data ?? {}) as Cfg
+const lerCfg = async () => ((await lerConfigLinha()).data?.data ?? {}) as Cfg
 
 // Chamado depois de cada resposta da IA (em claude.ts). Erro aqui nunca derruba a chamada.
 export async function registrarUsoIA(modelo: string, uso: UsoIA | null | undefined) {

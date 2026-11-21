@@ -3,6 +3,7 @@
 // prazos, como você contorna objeções, o que você recusa. Sem dados pessoais de cliente.
 // A lista fica em Configurações → Agente de leads (você apaga o que estiver errado) e entra no prompt do atendente.
 
+import { lerConfigLinha } from "./configAtomica"
 import { lerRegistros, lerIdsAgente } from "./registroAgente"
 import { supabase } from "./supabase"
 import { clienteClaude, MODELO } from "./claude"
@@ -44,7 +45,7 @@ const linha = (m: { from_me: boolean; corpo: string | null; tipo: string }) => {
 
 export async function aprenderComConversas(desde: string, ate?: string): Promise<{ conversas: number; novos: number; erro?: string }> {
   const fim = ate ?? new Date(Date.now() + 60_000).toISOString()
-  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfgRow } = await lerConfigLinha()
   const cfg = (cfgRow?.data ?? {}) as { apiKey?: string; conhecimentoAgente?: Conhecimento[]; agenteLog?: { ids?: string[] }[]; agenteIds?: string[] }
   if (!cfg.apiKey) return { conversas: 0, novos: 0, erro: "Chave da IA não configurada." }
 
@@ -141,7 +142,7 @@ const ESQUEMA_JUNTAR = {
   properties: { itens: { type: "array", items: { type: "string" } } },
 } as const
 export async function juntarConhecimento(apiKey: string) {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   const atual = ((data?.data as { conhecimentoAgente?: Conhecimento[] })?.conhecimentoAgente ?? [])
   const temas = [...new Set(atual.filter(i => !fixo(i)).map(i => i.tema))]
   const cli = clienteClaude(apiKey)
@@ -182,7 +183,7 @@ const REVISAO_1 = ["pt3qpfus", "b89mm3cl", "wm0s5umr", "crvnwipp", "dkqf28eq", "
 // Como você escreve de verdade: mensagens digitadas no celular (não as do agente nem as da tela) para leads do
 // anúncio nos últimos 30 dias. Refeito uma vez por dia.
 async function medirEstiloFelipe() {
-  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfgRow } = await lerConfigLinha()
   const cfgD = cfgRow?.data as { estiloFelipe?: EstiloFelipe; agenteIds?: string[] } | undefined
   const atual = cfgD?.estiloFelipe
   if (atual && Date.now() - new Date(atual.em).getTime() < 20 * 3_600_000) return

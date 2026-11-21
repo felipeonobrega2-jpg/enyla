@@ -2,6 +2,7 @@
 //  1. Recuperação: quem ficou sem resposta (IA fora, cota cheia) é respondido assim que der, bons negócios primeiro.
 //  2. Rotina: checagem das 13h e fechamento das 18h no seu WhatsApp (a manhã já vai pelo resumo do marketing).
 //  3. WhatsApp desconectado há 5+ min: aviso no celular (pelo ntfy, já que o WhatsApp está fora).
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
 import { notificar, LINK_SISTEMA } from "./notificar"
@@ -12,7 +13,7 @@ type Cfg = Record<string, unknown> & {
   whatsappForaAvisadoEm?: string; agenteAuto?: { avisoNumero?: string; horario?: { dias?: number[] } }
 }
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
-const lerCfg = async () => ((await supabase.from("AppConfig").select("data").eq("id", 1).single()).data?.data ?? {}) as Cfg
+const lerCfg = async () => ((await lerConfigLinha()).data?.data ?? {}) as Cfg
 
 export async function vigiar(agora = new Date()): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {}

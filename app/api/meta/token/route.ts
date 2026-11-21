@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { verificarToken, gravarStatus, camposDoStatus } from "@/app/lib/metaToken"
@@ -9,7 +10,7 @@ const APP_SECRET = process.env.META_APP_SECRET
 // Token temporário é trocado pelo de 60 dias quando o app está configurado; o recomendado é o permanente.
 export async function POST(req: NextRequest) {
   const { token, conta } = await req.json().catch(() => ({})) as { token?: string; conta?: string }
-  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfgRow } = await lerConfigLinha()
   const cfg = (cfgRow?.data as Record<string, unknown>) ?? {}
   // Só escolhendo a conta de anúncios (token já salvo)
   const colado = token?.trim() || (conta ? cfg.metaToken as string | undefined : undefined)
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
 
 // Situação atual; reconfere na Meta se a última verificação tem mais de 6 horas
 export async function GET() {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   const cfg = (data?.data as Record<string, unknown>) ?? {}
   const token = cfg.metaToken as string | undefined
   if (!token) return NextResponse.json({ hasToken: false, valido: false, canAutoRefresh: !!(APP_ID && APP_SECRET) })

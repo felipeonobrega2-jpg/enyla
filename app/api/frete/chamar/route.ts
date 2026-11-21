@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { randomUUID } from "crypto"
 import { supabase } from "@/app/lib/supabase"
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
 
   // Endereço de entrega do cliente guardado para a próxima vez
   if (b.salvarCliente) {
-    const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+    const { data: cfgRow } = await lerConfigLinha()
     const cfg = (cfgRow?.data ?? {}) as Record<string, unknown>
     const s = b.salvarCliente
     const enderecos = { ...((cfg.enderecosClientes as Record<string, unknown>) ?? {}), [nomeChave(s.cliente)]: { ...s.endereco, recebedor: s.recebedor, telefone: s.telefone } }

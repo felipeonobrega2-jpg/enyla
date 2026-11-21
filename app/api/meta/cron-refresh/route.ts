@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../lib/configAtomica"
 import { NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { verificarToken, gravarStatus, camposDoStatus } from "@/app/lib/metaToken"
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
     : /^vercel-cron\//.test(request.headers.get("user-agent") ?? "")
   if (!autorizado) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   const cfg = (data?.data as Record<string, unknown>) ?? {}
   let token = cfg.metaToken as string | undefined
   if (!token) return NextResponse.json({ ok: true, semToken: true })

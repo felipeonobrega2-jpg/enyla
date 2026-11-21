@@ -1,5 +1,6 @@
 // Dados do relatório gerencial que não estão no navegador: digital, leads do WhatsApp, gasto em anúncios e a
 // confiança dos dados (Auditor). Para o período pedido e o anterior de mesmo tamanho.
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "@/app/lib/supabase"
 
 
@@ -39,7 +40,7 @@ export async function extrasDoRelatorio(de: string, ate: string, deAnt: string, 
   // Contato novo = primeira mensagem recebida dele cai no período (a data de criação da conversa é a da importação)
   const desde = `${deAnt}T00:00:00-03:00`, ateTs = `${ate}T23:59:59-03:00`
   const [{ data: c }, convs] = await Promise.all([
-    supabase.from("AppConfig").select("data").eq("id", 1).single(),
+    lerConfigLinha(),
     (async () => {
       const primeira = new Map<string, string>()
       for (let i = 0; i < 60; i++) {

@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { clienteClaude, erroClaude, FALLBACK, MODELO, MSG_RECUSA } from "@/app/lib/claude"
@@ -11,7 +12,7 @@ export const maxDuration = 60
 // Só sugere; quem manda é você. (Rota protegida pelo login.)
 export async function POST(req: NextRequest) {
   const { jid, cliente, motivo, texto } = await req.json().catch(() => ({})) as { jid?: string; cliente?: string; motivo?: string; texto?: string }
-  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfgRow } = await lerConfigLinha()
   const cfg = (cfgRow?.data ?? {}) as { apiKey?: string; guiaAtendimento?: string; vinculosWhatsapp?: Vinculos; licoesIA?: LicoesIA; conhecimentoAgente?: Conhecimento[] }
   if (!cfg.apiKey) return NextResponse.json({ erro: "Chave da IA não configurada (Configurações)." }, { status: 400 })
 

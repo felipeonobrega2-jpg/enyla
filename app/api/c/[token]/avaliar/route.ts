@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { carregarPortal } from "@/app/lib/portalCliente"
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
 
   const comentario = (body.comentario ?? "").toString().trim().slice(0, 600) || undefined
   const nova: Avaliacao = { key: pedido.key, numero: pedido.numero, nomeCliente: portal.nome, nota, comentario, em: new Date().toISOString() }
-  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfgRow } = await lerConfigLinha()
   const cfg = (cfgRow?.data ?? {}) as Record<string, unknown>
   const lista = [nova, ...((cfg.avaliacoes as Avaliacao[] | undefined) ?? []).filter(a => a.key !== pedido.key)].slice(0, 500)
   await gravarCampos({ avaliacoes: lista })

@@ -1,9 +1,10 @@
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
 import { AreaIA, LicaoIA, LicoesIA } from "./licoesIA"
 
 export async function lerLicoesIA(area: AreaIA): Promise<LicaoIA[]> {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   return ((data?.data as { licoesIA?: LicoesIA } | undefined)?.licoesIA?.[area]) ?? []
 }
 

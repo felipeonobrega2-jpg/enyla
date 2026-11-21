@@ -1,6 +1,7 @@
 // Braço digital no servidor: link assinado da página do pedido, leitura e gravação dos pedidos (AppConfig, campo do
 // servidor) e a conferência do sinal no extrato (Pluggy), que avisa o cliente e você.
 
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { notificar } from "./notificar"
 import { linkPedido, linkDesigner } from "./digitalLink"
@@ -24,7 +25,7 @@ export type ContatosDigital = { villa?: string; designer?: string; designerNome?
 type CfgDigital = Omit<CfgAgente, "pedidosDigitais"> & { pedidosDigitais?: PedidoComBriefing[]; digitalConferidoEm?: string; digitalBancoEm?: string; digitalAcertoSemana?: string; digitalContatos?: ContatosDigital; pluggy?: { itens?: { id: string }[] } }
 
 async function lerDados() {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   return (data?.data ?? {}) as Record<string, unknown> & CfgDigital
 }
 

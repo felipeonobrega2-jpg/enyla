@@ -4,6 +4,7 @@
 // sem resposta → F1, F2, F3 e Sem resposta. As etiquetas vão também para o WhatsApp Business, quando existem lá.
 // Tudo fica registrado (Configurações → Agente de leads) com o motivo de ter enviado ou segurado.
 
+import { lerConfigLinha } from "./configAtomica"
 import { cotarItens, montarPedidosDoGrupo, mudouOGrupo, trouxeDadosNovos, pedidosDoGrupo, textoLinkGrupo, registrarNegociacao, totalPedido } from "./digital"
 import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital, itensDoLembrete, lembreteDigitalAgora, ADIOU, prometeLinkSemLink, TEXTO_PEDE_MEDIDA } from "./digital"
 import { linkPedido } from "./digitalLink"
@@ -751,7 +752,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   // Orçamento digital enviado: o pedido fica esperando o sinal (o anterior desta conversa, se havia, é trocado)
   if (novoPedido && env.ids.length) {
     const novos = novoGrupo ?? [novoPedido]
-    await gravarCfg(d => ({ pedidosDigitais: [...novos, ...(d.pedidosDigitais ?? []).map(p => p.jid === jid && p.status === "aguardando_sinal" ? { ...p, status: "cancelado" as const } : p)].slice(0, 500) }))
+    await gravarCfg(d => ({ pedidosDigitais: [...novos, ...(d.pedidosDigitais ?? []).map(p => p.jid === jid && p.status === "aguardando_sinal" ? { ...p, status: "cancelado" as const } : p)] }))
   }
   return registrar({ ...base, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? r.lead.motivo, ...(levantando ? { passo: PASSO_LEVANTANDO } : {}) })
 }
@@ -1000,7 +1001,7 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
 let registroMovido = false
 export async function talvezMoverRegistroAntigo() {
   if (registroMovido || !await temTabelas()) return
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   const d = (data?.data ?? {}) as CfgAgente
   if (!d.agenteLog && !d.agenteIds && !d.agenteTratadas) { registroMovido = true; return }
   for (const r of d.agenteLog ?? []) await gravarRegistro(r)

@@ -1,5 +1,6 @@
 // Campanha digital (servidor): monta a fila, manda um de cada vez (pegando carona no webhook, como as outras rodadas)
 // e conta o resultado. Estado em AppConfig.campanhaDigital (campo do servidor).
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { lerRegistros } from "./registroAgente"
 import { mudarConfig } from "./configAtomica"
@@ -20,7 +21,7 @@ type Cfg = Record<string, unknown> & {
 }
 
 async function lerCfg() {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   return (data?.data ?? {}) as Cfg
 }
 
@@ -97,7 +98,7 @@ async function enviarPara(alvo: Candidato, cfg: Cfg) {
   const p = pedido
   await mudarConfig((d: Cfg) => ({
     campanhaDigital: { ...(d.campanhaDigital ?? {}), enviados: { ...(d.campanhaDigital?.enviados ?? {}), [alvo.jid]: { em: new Date().toISOString(), tipo: p ? "orcamento" as const : "pergunta" as const, ...(p ? { pedido: p.id } : {}) } } },
-    ...(p ? { pedidosDigitais: [p, ...(d.pedidosDigitais ?? [])].slice(0, 500) } : {}),
+    ...(p ? { pedidosDigitais: [p, ...(d.pedidosDigitais ?? [])] } : {}),
   }))
   // Etiqueta Digital (o agente atende quando responder); sai de Descartado
   await aplicar(conv, [...(conv.etiquetas ?? []).filter(x => x !== ETIQUETAS_AGENTE.descartado), ETIQUETAS_AGENTE.digital].filter((x, i, a) => a.indexOf(x) === i), null).catch(() => null)

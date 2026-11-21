@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { mudarConfig } from "@/app/lib/configAtomica"
@@ -14,7 +15,7 @@ import { ABERTURA_B_PADRAO, MINIMO_POR_VARIANTE, MedicaoAbertura, TesteAbertura,
 type Cfg = { aberturaTeste?: TesteAbertura; aberturaMedida?: MedicaoAbertura; filtroLeads?: string; agenteAuto?: { pequenoParceiro?: boolean } }
 
 async function ler() {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   return (data?.data ?? {}) as Cfg
 }
 const resposta = (cfg: Cfg) => NextResponse.json({ a: aberturaA(cfg), teste: cfg.aberturaTeste ?? null, medida: cfg.aberturaMedida ?? null, minimo: MINIMO_POR_VARIANTE })

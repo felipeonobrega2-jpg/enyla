@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     const novo = montarPedido(cfg.pedidosDigitais ?? [], jid, conv.nome, dados, cot)
     const env = await enviar(c, textoLinkPedido(novo, linkPedido(novo.id)), undefined, { proativo: true })
     if (!env.ids.length) return NextResponse.json({ erro: env.erro ?? "não enviou" }, { status: 502 })
-    await gravarCfg(d => ({ pedidosDigitais: [novo, ...(d.pedidosDigitais ?? [])].slice(0, 500) }))
+    await gravarCfg(d => ({ pedidosDigitais: [novo, ...(d.pedidosDigitais ?? [])] }))
     return NextResponse.json({ ok: true, pedido: novo.id, total: novo.total })
   }
 

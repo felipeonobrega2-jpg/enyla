@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { carregarPortal } from "@/app/lib/portalCliente"
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
   const origem = portal.pedidos.find(p => p.key === body.key && p.coluna >= COL_FECHADO)
   if (!origem) return NextResponse.json({ erro: "Pedido não encontrado." }, { status: 404 })
 
-  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfgRow } = await lerConfigLinha()
   const cfg = (cfgRow?.data ?? {}) as Record<string, unknown>
   const avisar = async (a: AprovacaoOnline) => {
     const lista = [a, ...((cfg.aprovacoesOnline as AprovacaoOnline[] | undefined) ?? [])].slice(0, 100)

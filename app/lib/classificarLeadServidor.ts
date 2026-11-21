@@ -1,6 +1,7 @@
 // Classifica os leads do WhatsApp em segundo plano (ver classificarLead.ts) e avisa MQL esperando resposta.
 // Roda nas tarefas periódicas do webhook; o agente também chama antes de decidir (uma fonte de verdade para as etiquetas).
 
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { clienteClaude, MODELO } from "./claude"
 import { mudarConfig } from "./configAtomica"
@@ -28,7 +29,7 @@ const MIN_MQL_ESPERANDO = 20         // MQL sem resposta sua há tanto tempo: av
 const NAO_MEXE = ["pedido", "perdido"]
 
 async function lerCfg(): Promise<Cfg> {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   return (data?.data ?? {}) as Cfg
 }
 

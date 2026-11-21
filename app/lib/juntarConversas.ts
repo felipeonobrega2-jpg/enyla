@@ -2,13 +2,14 @@
 // (…@lid). Junta tudo numa conversa só (a do número, quando houver: é a que envia direto) e guarda o apelido
 // para as próximas mensagens já caírem no lugar certo. Só roda no servidor.
 
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { gravarCampos } from "./configAtomica"
 
 export type Apelidos = Record<string, string>   // jid que some → jid que fica
 
 export async function lerApelidos(): Promise<Apelidos> {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   return ((data?.data as { apelidosWhatsapp?: Apelidos } | null)?.apelidosWhatsapp) ?? {}
 }
 
@@ -48,7 +49,7 @@ export async function juntarConversas(sai: string, fica: string) {
     await supabase.from("whatsapp_conversas").delete().eq("jid", sai)
   }
   // Apelido para as próximas mensagens e vínculo com o cliente
-  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfgRow } = await lerConfigLinha()
   const cfg = (cfgRow?.data ?? {}) as Record<string, unknown>
   const apelidos = { ...((cfg.apelidosWhatsapp as Apelidos) ?? {}), [sai]: fica }
   for (const [k, v] of Object.entries(apelidos)) if (v === sai) apelidos[k] = fica   // corrente: x → sai → fica

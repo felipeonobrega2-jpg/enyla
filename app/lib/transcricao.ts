@@ -1,11 +1,12 @@
 // Transcrição dos áudios do WhatsApp (Groq, Whisper large-v3-turbo). O texto vai para o corpo da mensagem de áudio,
 // então aparece embaixo do player, entra na busca e fica disponível para o agente. Só roda no servidor.
 
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { obterMidia } from "./midiaWhatsapp"
 
 async function chaveGroq(): Promise<string | null> {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   return ((data?.data as { groqKey?: string | null } | null)?.groqKey) ?? null
 }
 

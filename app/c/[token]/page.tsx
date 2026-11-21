@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../lib/configAtomica"
 import type { Metadata } from "next"
 import { carregarPortal } from "@/app/lib/portalCliente"
 import PortalClient from "./PortalClient"
@@ -13,7 +14,7 @@ export const metadata: Metadata = { title: "Seus pedidos — Enyla", robots: { i
 export default async function PaginaCliente({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   const portal = await carregarPortal(token)
-  const { data: cfgRow } = portal ? await supabase.from("AppConfig").select("data").eq("id", 1).single() : { data: null }
+  const { data: cfgRow } = portal ? await lerConfigLinha() : { data: null }
   const avaliacoes = ((cfgRow?.data as { avaliacoes?: Avaliacao[] } | null)?.avaliacoes ?? [])
   // Só o que o cliente precisa ver (sem custos, despesas ou anotações internas)
   const dados = portal && {

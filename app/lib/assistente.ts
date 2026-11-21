@@ -4,6 +4,7 @@
 // O que muda dado (mover lote, recebimento, despesa, digital pronto) vira proposta e só executa com "sim".
 // Só mensagem digitada no celular conta no chat "você mesmo" (id sem "3EB0": os avisos que o próprio sistema
 // manda ali têm esse prefixo, e assim o assistente nunca responde a si mesmo).
+import { lerConfigLinha } from "./configAtomica"
 import type Anthropic from "@anthropic-ai/sdk"
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
@@ -253,7 +254,7 @@ Hoje é ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo"
 - Etapas do quadro: ${ETAPAS.join(", ")}. Custos com forma "conta" são da conta corrente da Jerograf (pagos aos poucos ao tio), não são atraso.`
 
 export async function responderAoDono(texto: string): Promise<string> {
-  const cfg = (await supabase.from("AppConfig").select("data").eq("id", 1).single()).data?.data as Cfg
+  const cfg = (await lerConfigLinha()).data?.data as Cfg
   const agora = Date.now()
   const historico = (cfg.assistenteConversa ?? []).filter(f => agora - new Date(f.em).getTime() < 6 * 3_600_000).slice(-16)
   const lembrar = async (resp: string) => {

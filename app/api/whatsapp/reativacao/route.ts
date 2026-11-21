@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { lerCfg } from "@/app/lib/agenteAuto"
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(await enviarRetomada(b.enviar, b.texto.slice(0, 1500), "voce"))
   }
   if (b.pular) { await pular(b.pular); return NextResponse.json({ ok: true }) }
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   const d = (data?.data ?? {}) as Record<string, unknown> & CfgReativacao
   const auto = {
     ...(d.reativacaoAuto ?? { ligado: false }),

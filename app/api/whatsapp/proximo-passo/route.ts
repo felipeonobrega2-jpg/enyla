@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { DIAS_ESPERANDO, DIAS_ORCAR_MANUAL, Passos, ProximoPasso } from "@/app/lib/hoje"
@@ -12,7 +13,7 @@ import { gravarCampos } from "@/app/lib/configAtomica"
 const DIAS_GUARDAR = 60
 
 async function lerPassos() {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   const d = (data?.data ?? {}) as Record<string, unknown> & { proximosPassos?: Passos }
   return { d, passos: d.proximosPassos ?? {} }
 }

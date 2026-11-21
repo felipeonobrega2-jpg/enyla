@@ -1,5 +1,6 @@
 // Teste A/B da abertura no servidor: liga sozinho na primeira vez, mede (no máximo a cada 6 h, no webhook) e,
 // quando dá, fica com a melhor e avisa no seu WhatsApp.
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { mudarConfig, gravarCampos } from "./configAtomica"
 import { filtroDoAgente, saudacaoDoFiltro, ehMensagemAutomaticaDoWhatsapp } from "./agenteLeads"
@@ -12,7 +13,7 @@ type Cfg = { aberturaTeste?: TesteAbertura; aberturaMedida?: MedicaoAbertura; fi
 const HORAS_MEDIR = 6
 
 async function lerCfg(): Promise<Cfg> {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   return (data?.data ?? {}) as Cfg
 }
 

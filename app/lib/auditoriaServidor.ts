@@ -1,5 +1,6 @@
 // Auditor de dados no servidor: busca tudo (paginado, sem limite de 1.000 linhas) e roda as regras.
 // Guarda o resumo no AppConfig para o Escritório, o vigia e a rotina das 18h.
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
 import { auditar, type Auditoria, type TxAuditoria, type PedidoAuditoria, type ConversaAuditoria } from "./auditoria"
@@ -28,7 +29,7 @@ export async function rodarAuditoria(opts: { guardar?: boolean } = {}): Promise<
     todos<LancamentoFinanceiro>("LancamentoFinanceiro", "*"),
     todos<TxAuditoria>("banco_transacoes", "id, data, valor, tipo, estado, descricao, lancamento_ids").catch(() => [] as TxAuditoria[]),
     todos<ConversaAuditoria>("whatsapp_conversas", "jid, nome, kanban_card_id", q => q.not("kanban_card_id", "is", null)),
-    supabase.from("AppConfig").select("data").eq("id", 1).single(),
+    lerConfigLinha(),
   ])
   const cfg = (cfgRow.data?.data ?? {}) as Cfg
   const hoje = new Date(Date.now() - 3 * 3_600_000).toISOString().slice(0, 10)

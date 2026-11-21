@@ -1,6 +1,7 @@
 // Agente de marketing no servidor: junta Meta (gasto, cliques, conversas) com o sistema (leads, MQL, orçamentos,
 // pedidos) por campanha, pede a leitura à IA e guarda. Todo dia de manhã gera o de ontem e manda o resumo no seu WhatsApp.
 
+import { lerConfigLinha } from "./configAtomica"
 import { tempoAteFechar } from "./tempoAteFecharServidor"
 import { textoParaIA } from "./tempoAteFechar"
 import { supabase } from "./supabase"
@@ -29,7 +30,7 @@ type Cfg = {
 }
 
 async function lerCfg() {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   return (data?.data ?? {}) as Record<string, unknown> & Cfg
 }
 async function gravar(mudar: (d: Record<string, unknown> & Cfg) => Partial<Cfg>) {

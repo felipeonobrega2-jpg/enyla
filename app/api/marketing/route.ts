@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { gerarRelatorio } from "@/app/lib/marketingServidor"
@@ -11,7 +12,7 @@ export const maxDuration = 60
 // (Rota protegida pelo login.)
 
 export async function GET() {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   return NextResponse.json({ relatorios: ((data?.data ?? {}) as { marketingRelatorios?: Relatorio[] }).marketingRelatorios ?? [] })
 }
 

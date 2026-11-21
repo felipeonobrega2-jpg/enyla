@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { mudarConfig } from "@/app/lib/configAtomica"
@@ -6,7 +7,7 @@ import { MidiaAgente, tipoDaMidia } from "@/app/lib/midiaAgente"
 // Biblioteca de mídia do agente (rota protegida pelo login): listar, subir, descrever, pausar e tirar
 const MAX = 16 * 1024 * 1024   // limite do WhatsApp para vídeo
 type Dados = { midiaAgente?: MidiaAgente[] }
-const ler = async () => ((await supabase.from("AppConfig").select("data").eq("id", 1).single()).data?.data as Dados | undefined)?.midiaAgente ?? []
+const ler = async () => ((await lerConfigLinha()).data?.data as Dados | undefined)?.midiaAgente ?? []
 
 export async function GET() { return NextResponse.json({ midia: await ler() }) }
 

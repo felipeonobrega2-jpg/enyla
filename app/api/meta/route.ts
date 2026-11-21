@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../lib/configAtomica"
 import { NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { gravarStatus } from "@/app/lib/metaToken"
@@ -10,7 +11,7 @@ const BASE       = "https://graph.facebook.com/v20.0"
 
 async function getToken(): Promise<{ token: string; expiry: number | null; conta: string | null }> {
   // 1. Try Supabase (updated via UI without redeployment)
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   const cfg = (data?.data as Record<string, unknown>) ?? {}
   // Conta de anúncios: a que o token enxerga (escolhida ao salvar o token); senão a da Vercel
   const conta = (cfg.metaContaId as string | undefined) ?? (ACCOUNT ? (ACCOUNT.startsWith("act_") ? ACCOUNT : `act_${ACCOUNT}`) : null)

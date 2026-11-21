@@ -1,6 +1,7 @@
 // Contatos importantes no servidor: monta a lista (MQL, ICP, oportunidade, clientes) e descobre os telefones
 // que o WhatsApp esconde nas conversas novas (@lid): pelo cadastro de clientes e perguntando à Evolution.
 
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { evo } from "./evolution"
 import { clienteDaConversa, ligacaoForte, vinculosPorTelefone, Vinculos } from "./vinculoWhatsapp"
@@ -15,7 +16,7 @@ export async function contatosImportantes(): Promise<ContatoImportante[]> {
   const [{ data: convs }, { data: cards }, { data: cfg }] = await Promise.all([
     supabase.from("whatsapp_conversas").select("jid, nome, telefone, status_lead, etiquetas, ultima_at").not("jid", "like", "%@g.us"),
     supabase.from("KanbanCard").select("nomeCliente, coluna"),
-    supabase.from("AppConfig").select("data").eq("id", 1).single(),
+    lerConfigLinha(),
   ])
   const vinculos = ((cfg?.data ?? {}) as { vinculosWhatsapp?: Vinculos }).vinculosWhatsapp
   const nomes = [...new Set((cards ?? []).map(c => c.nomeCliente).filter(Boolean))] as string[]
@@ -79,7 +80,7 @@ export async function ligarPorTelefone(): Promise<number> {
   const [{ data: convs }, { data: clientes }, { data: cfg }] = await Promise.all([
     supabase.from("whatsapp_conversas").select("jid, telefone").not("jid", "like", "%@g.us"),
     supabase.from("Cliente").select("nome, telefone").not("telefone", "is", null),
-    supabase.from("AppConfig").select("data").eq("id", 1).single(),
+    lerConfigLinha(),
   ])
   const d = (cfg?.data ?? {}) as Record<string, unknown> & { vinculosWhatsapp?: Vinculos }
   const novos = vinculosPorTelefone(convs ?? [], clientes ?? [], d.vinculosWhatsapp)

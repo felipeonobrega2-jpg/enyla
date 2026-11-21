@@ -1,5 +1,6 @@
 // Pagamento do pedido inteiro pela página de aprovação (InfinitePay): registro, confirmação e baixa no financeiro.
 // Os dados do cartão nunca passam pelo sistema (ficam na página da InfinitePay).
+import { lerConfigLinha } from "./configAtomica"
 import type { KanbanCard } from "@/app/types"
 import { conferirInfinitePay, numeroDoOrderNsu } from "./infinitePay"
 
@@ -39,7 +40,7 @@ export async function confirmarPagamentoInfinitePay(a: { nsu: string; transacao:
   if (dig) { const { confirmarCartaoDigital } = await import("./digitalServidor"); return confirmarCartaoDigital(dig[1], dig[2] as "sinal" | "restante", a) }
   const { supabase } = await import("@/app/lib/supabase")
   const { gravarCampos } = await import("./configAtomica")
-  const { data: cfg } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfg } = await lerConfigLinha()
   const todos = ((cfg?.data as Record<string, unknown> | null)?.pagamentosCartao ?? {}) as Record<string, PagamentoCartao>
   const reg = todos[numero]
   if (!reg || reg.orderNsu !== a.nsu) return "invalido"

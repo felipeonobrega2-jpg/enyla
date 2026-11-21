@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../lib/configAtomica"
 import { NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { defaultConfig } from "@/app/config"
@@ -9,7 +10,7 @@ export async function GET() {
       supabase.from("KanbanCard").select("*").order("createdAt", { ascending: false }),
       supabase.from("Cliente").select("*").order("nome"),
       supabase.from("PropostaCustom").select("*").order("createdAt", { ascending: false }),
-      supabase.from("AppConfig").select("data").eq("id", 1).single(),
+      lerConfigLinha(),
       supabase.from("Contador").select("*"),
       supabase.from("Parceiro").select("*").order("nome"),
       supabase.from("NegocioParceiro").select("*").order("criadoEm", { ascending: false }),

@@ -1,6 +1,7 @@
 // Sincroniza o extrato da Pluggy, sugere o que fazer com cada transação (regras → conciliação → IA) e aplica as suas
 // decisões. Tudo reversível: cada passo fica no histórico da transação. Só roda no servidor.
 
+import { lerConfigLinha } from "./configAtomica"
 import { randomUUID } from "crypto"
 import { supabase } from "./supabase"
 import { contas as contasPluggy, item as itemPluggy, transacoes, pluggyConfigurada, atualizarItem, ContaPluggy } from "./pluggy"
@@ -20,7 +21,7 @@ const agora = () => new Date().toISOString()
 const hojeSP = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
 
 async function lerConfig() {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   return (data?.data ?? {}) as Configuracoes & { pluggy?: ConfigPluggy; pluggyStatus?: StatusPluggy; regrasBanco?: RegraBanco[]; licoesBanco?: Aprendizado["licoes"]; exemplosBanco?: Aprendizado["exemplos"]; contasDoBanco?: ContasDoBanco }
 }
 async function salvarCampos(campos: Record<string, unknown>) {

@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../lib/configAtomica"
 import { lerRegistros } from "@/app/lib/registroAgente"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ conhecimento })
   }
   if (b.tirarConhecimento) {
-    const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+    const { data } = await lerConfigLinha()
     const d = (data?.data ?? {}) as Record<string, unknown> & Cfg
     const conhecimento = (d.conhecimentoAgente ?? []).filter(i => i.id !== b.tirarConhecimento)
     await gravarCampos({ conhecimentoAgente: conhecimento })
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
   // Etiquetas do sistema → WhatsApp Business, uma página por chamada (a tela repete até acabar)
   if (typeof b.etiquetasWhatsapp === "number") return NextResponse.json(await enviarEtiquetasAoWhatsapp(b.etiquetasWhatsapp))
   if (!b.simular) {
-    const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+    const { data } = await lerConfigLinha()
     const d = (data?.data ?? {}) as Record<string, unknown> & Cfg
     const auto: AgenteAuto = { ...(d.agenteAuto ?? { ligado: false }), ...(typeof b.ligado === "boolean" ? { ligado: b.ligado } : {}), ...(b.esperaSeg ? { esperaSeg: b.esperaSeg } : {}), ...(b.maxPorDia ? { maxPorDia: b.maxPorDia } : {}), ...(typeof b.vitrine === "string" ? { vitrine: b.vitrine.trim().slice(0, 400) } : {}), ...(typeof b.pequenoParceiro === "boolean" ? { pequenoParceiro: b.pequenoParceiro } : {}), ...(typeof b.avisoNumero === "string" ? { avisoNumero: b.avisoNumero.replace(/\D/g, "").slice(0, 15) } : {}), ...(b.horario ? { horario: limparHorario(b.horario) } : {}) }
     await gravarCampos({ agenteAuto: auto })

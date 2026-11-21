@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { tokenValido } from "@/app/lib/aprovacao"
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ num
   const total = Math.round(Number(p.card.preco) * 100) / 100
   if (!(total > 0)) return NextResponse.json({ erro: "Pedido sem valor. Fale com a Enyla." }, { status: 400 })
 
-  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfgRow } = await lerConfigLinha()
   const pagamentos = ((cfgRow?.data as Record<string, unknown> | null)?.pagamentosCartao ?? {}) as Record<string, PagamentoCartao>
   const atual = pagamentos[numero]
   if (atual?.baixado) return NextResponse.json({ erro: "Este pedido já está pago.", jaPago: true }, { status: 409 })

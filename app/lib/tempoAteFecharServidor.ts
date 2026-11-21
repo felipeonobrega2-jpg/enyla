@@ -1,6 +1,7 @@
 // Tempo até fechar (servidor): primeiro pedido fechado de cada cliente (offset) e sinais pagos do digital, com a
 // primeira mensagem da conversa ligada ao cliente (mesma regra da tela: vínculo, telefone ou nome).
 // Guardado 15 min em memória (não grava nada no banco).
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { isGanho, parseData, nomeChave } from "./negocio"
 import { clienteDaConversa, chaveTelefone } from "./vinculoWhatsapp"
@@ -25,7 +26,7 @@ export async function tempoAteFechar(forcar = false): Promise<TempoAteFechar> {
     supabase.from("KanbanCard").select("id, numero, nomeCliente, coluna, dataFechamento, preco, materialNome").not("dataFechamento", "is", null).limit(3000),
     supabase.from("Cliente").select("nome, telefone"),
     supabase.from("whatsapp_conversas").select("jid, nome, telefone").limit(10000),
-    supabase.from("AppConfig").select("data").eq("id", 1).single(),
+    lerConfigLinha(),
   ])
   const cfg = (cfgRow?.data ?? {}) as { vinculosWhatsapp?: Record<string, string>; pedidosDigitais?: { jid: string; nome: string | null; sinalPagoEm?: string; total: number; teste?: boolean; status: string }[] }
   const vinc = cfg.vinculosWhatsapp ?? {}

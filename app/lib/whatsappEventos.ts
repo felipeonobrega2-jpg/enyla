@@ -1,6 +1,7 @@
 // Eventos do Evolution além das mensagens: conexão do número, confirmações de entrega/leitura e contatos.
 // Só roda no servidor.
 
+import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { telefoneNaResposta } from "./contatos"
 import { gravarCampos } from "./configAtomica"
@@ -9,7 +10,7 @@ import { gravarCampos } from "./configAtomica"
 // Aquecimento (o agente manda menos por um tempo) só depois de o WhatsApp REMOVER o aparelho (401: precisou ler o
 // QR de novo, aparelho novo para o WhatsApp). Oscilação, reinício e "conectando" de passagem não contam.
 export async function registrarConexao(estado: string, motivo: number | null = null) {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   const cfg = (data?.data as Record<string, unknown>) ?? {}
   const atual = cfg.whatsappConexao as { estado?: string; removido?: boolean; aquecerDesde?: string } | undefined
   if (atual?.estado === estado && !(motivo === 401 && !atual?.removido)) return

@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { pluggyConfigurada } from "@/app/lib/pluggy"
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
   // Para conferir: todas (a lista é o trabalho do dia); nas outras abas, as 400 mais recentes
   const { data, error } = await q.order("data", { ascending: false }).limit(estado === "pendente" ? 3000 : 400)
   const { count: pendentes } = await supabase.from("banco_transacoes").select("id", { count: "exact", head: true }).eq("estado", "pendente")
-  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfgRow } = await lerConfigLinha()
   return NextResponse.json({
     configurada: pluggyConfigurada(),
     tabela: !error || !/relation|does not exist/i.test(error.message),

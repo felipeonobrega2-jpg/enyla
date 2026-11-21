@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { evo } from "@/app/lib/evolution"
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
   let destino: string | null = tel ? (tel.length <= 11 ? "55" + tel : tel) : null
   let jid: string | null = null
   if (!destino) {
-    const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+    const { data: cfgRow } = await lerConfigLinha()
     const vinculos = ((cfgRow?.data as { vinculosWhatsapp?: Vinculos } | null)?.vinculosWhatsapp) ?? {}
     const { data: conversas } = await supabase.from("whatsapp_conversas").select("jid, nome, ultima_at").order("ultima_at", { ascending: false })
     jid = (conversas ?? []).find(c => clienteDaConversa(c, [cliente], vinculos)?.nome === cliente)?.jid ?? null

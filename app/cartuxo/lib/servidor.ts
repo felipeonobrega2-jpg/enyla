@@ -6,6 +6,7 @@
 //   cartuxo_facas          cadastro de facas (o site lê: medidas reais, lugares por chapa, à venda ou não)
 // SQL em supabase/migrations/20261108_cartuxo_chapas.sql.
 
+import { lerConfigLinha } from "../../lib/configAtomica"
 import { supabase } from "@/app/lib/supabase"
 import { SITE_CARTUXO, DOMINIO_CARTUXO } from "./site"
 import type { Recuperacao } from "./recuperacao"
@@ -277,7 +278,7 @@ export async function referenciasENYLA(): Promise<{ referencias: Referencia[]; a
   const rs = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   // 1) Configuração da ferramenta de orçamentos
-  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfgRow } = await lerConfigLinha()
   const cfg = (cfgRow?.data ?? {}) as {
     materiais?: { id: string; nome: string; precos: Record<string, number> }[]
     producao?: { fornecedores?: FornecedorENYLA[]; padroes?: Record<string, string>; perdaPct?: number; impostoPct?: number }

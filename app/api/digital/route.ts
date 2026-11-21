@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { marcarProntoDigital, lerPedido, gravarPedido, linkPedido, linkDesigner, mandarArte, mandarParaVilla, avisarDesigner, avisarDesignerMedidas, conversaDoPedido, ContatosDigital } from "@/app/lib/digitalServidor"
 import { seuNumero, enviar } from "@/app/lib/agenteAuto"
@@ -10,7 +11,7 @@ type Dados = { pedidosDigitais?: PedidoComBriefing[]; digitalContatos?: Contatos
 
 // Painel do braço digital (rota protegida pelo login): os pedidos dos últimos 45 dias com o link e o que o cliente fez
 export async function GET() {
-  const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data } = await lerConfigLinha()
   const d = (data?.data ?? {}) as Dados
   const todos = d.pedidosDigitais ?? []
   const desde = Date.now() - 45 * 86_400_000

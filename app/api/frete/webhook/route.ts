@@ -1,3 +1,4 @@
+import { lerConfigLinha } from "../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { atualizarFrete } from "@/app/lib/freteServidor"
 import { supabase } from "@/app/lib/supabase"
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   // Saldo da carteira e os últimos avisos (para conferir o formato que a Lalamove manda)
   const saldo = achar(corpo, (k, v) => /balance/i.test(k) && (typeof v === "number" || (typeof v === "string" && /^-?\d+(\.\d+)?$/.test(v))))
-  const { data: cfgRow } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
+  const { data: cfgRow } = await lerConfigLinha()
   const cfg = (cfgRow?.data ?? {}) as Record<string, unknown>
   const eventos = [{ tipo, em: new Date().toISOString(), dados: JSON.stringify(corpo ?? {}).slice(0, 1500) }, ...((cfg.lalamoveEventos as unknown[]) ?? [])].slice(0, 15)
   const novo: Record<string, unknown> = { lalamoveEventos: eventos }
