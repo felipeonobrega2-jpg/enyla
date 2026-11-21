@@ -399,6 +399,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
   if (u.startsWith("/api/hoje")) {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
     return new Response(JSON.stringify({
+      perfis: { "1@lid": "icp", "2@lid": "oportunidade", "3@lid": "medio", "9@lid": "medio", "10@lid": "icp", "5@lid": "digital", "6@lid": "digital", "8@lid": "digital" },
       gastos: { totalDia: 140, alertas: [{ tipo: "meta", nivel: "perigo", texto: "Anúncios da Meta: saldo para menos de 1 dia (R$ 0,49). Recarregue para a operação não parar." }] },
       resolver: [
         { tipo: "sistema", titulo: "IA da Enyla sem crédito", detalhe: "o agente não responde enquanto não recarregar (Anthropic)", valor: null, jid: null, numero: null, desde: h(30), nivel: "perigo" },

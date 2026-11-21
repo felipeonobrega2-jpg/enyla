@@ -22,6 +22,7 @@ import { ligarConversasAosOrcamentos, paraResolver } from "./resolverServidor"
 // O "momento" da última leitura da IA (de quem é a vez); conversa lida antes disso não tem
 const momentoDaConversa = (pa: string | null | undefined): Momento | null => { try { return (JSON.parse(pa ?? "") as { r?: { momento?: Momento } }).r?.momento ?? null } catch { return null } }
 import type { ItemMeta } from "./hoje"
+import type { PerfilCaixa } from "./caixaEntrada"
 
 export async function montarHoje(): Promise<Hoje> {
   const desde = new Date(Date.now() - DIAS_PERDIDO * 86_400_000).toISOString()
@@ -49,8 +50,9 @@ export async function montarHoje(): Promise<Hoje> {
     await ligarConversasAosOrcamentos().catch(e => console.error("[ligar]", e))
   }
   const resolver = await paraResolver(cfg as never).catch(e => { console.error("[resolver]", e); return undefined })
+  const perfis = await perfisDasConversas(convs, [...orcar, ...responder, ...retomar, ...(meta?.travados ?? []), ...(resolver ?? [])].map(x => x.jid))
   return {
-    gastos, meta, resolver,
+    gastos, meta, resolver, perfis, cards: await conversasDosCards(),
     orcar, responder: responder.filter(x => !devendo.has(x.jid)), retomar: retomar.filter(x => !devendo.has(x.jid)), outrosEsperando: outros, anuncio: doAnuncio(convs),
     marketing: rel?.leitura?.acao ? { dia: rel.dia, acao: rel.leitura.acao, custoMql: t ? custoPor(t.gasto, t.mql) : null } : null,
     reativacao: {
@@ -64,6 +66,30 @@ export async function montarHoje(): Promise<Hoje> {
         aguardandoSinal: ped.filter(p => p.status === "aguardando_sinal").length, pagos: ped.filter(p => p.status === "sinal_pago").length }
     })(),
   }
+}
+
+// Perfil (ICP, Oportunidade, médio, digital) de cada conversa que aparece na caixa; as que estão fora da janela
+// de leitura vêm do banco (só as colunas da etapa)
+async function perfisDasConversas(convs: ConvHoje[], jids: (string | null | undefined)[]): Promise<Record<string, PerfilCaixa>> {
+  const { perfilCaixa } = await import("./caixaEntrada")
+  const porJid = new Map(convs.map(c => [c.jid, c]))
+  const faltam = [...new Set(jids.filter((j): j is string => !!j && !porJid.has(j)))]
+  if (faltam.length) {
+    const { data } = await supabase.from("whatsapp_conversas").select("jid, status_lead, etiquetas").in("jid", faltam.slice(0, 300))
+    for (const c of data ?? []) porJid.set(c.jid as string, c as ConvHoje)
+  }
+  const out: Record<string, PerfilCaixa> = {}
+  for (const j of new Set(jids)) { const c = j ? porJid.get(j) : undefined; const p = c ? perfilCaixa(c) : undefined; if (j && p) out[j] = p }
+  return out
+}
+
+// Card do quadro → a conversa ligada a ele (para o orçamento entrar junto da pessoa e na ordem pelo perfil)
+async function conversasDosCards(): Promise<Record<string, { jid: string; perfil?: PerfilCaixa }>> {
+  const { perfilCaixa } = await import("./caixaEntrada")
+  const { data } = await supabase.from("whatsapp_conversas").select("jid, kanban_card_id, status_lead, etiquetas").not("kanban_card_id", "is", null).limit(3000)
+  const out: Record<string, { jid: string; perfil?: PerfilCaixa }> = {}
+  for (const c of data ?? []) out[c.kanban_card_id as string] = { jid: c.jid as string, perfil: perfilCaixa(c as { status_lead: string | null; etiquetas: string[] | null }) }
+  return out
 }
 
 // Quem passou tudo para cotar e ainda não recebeu: sem PDF/documento seu e sem orçamento no sistema depois da última dele

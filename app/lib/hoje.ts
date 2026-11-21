@@ -84,6 +84,8 @@ export type Hoje = {
   gastos?: { alertas: { tipo: "ia" | "meta"; nivel: "alerta" | "perigo"; texto: string }[]; totalDia: number }   // saldo de IA/anúncios acabando
   meta?: { resumo: ResumoMeta; travados: ItemMeta[] }   // meta de orçar todo MQL em 24 h (7 dias) e quem está travado
   digital?: { ligado: boolean; ativos: number; paraOrcar: number; esperando: number; aguardandoSinal?: number; pagos?: number }   // leads pequenos que você vende em digital (7 dias)
+  perfis?: Record<string, import("./caixaEntrada").PerfilCaixa>   // perfil de cada conversa citada (ordem e grupo da caixa de entrada)
+  cards?: Record<string, { jid: string; perfil?: import("./caixaEntrada").PerfilCaixa }>   // orçamento/pedido → a conversa dele
   resolver?: import("./resolverServidor").ItemResolver[]   // para resolver agora: sistema, sinal que não caiu, entrega atrasada, proposta sem retomada
 }
 

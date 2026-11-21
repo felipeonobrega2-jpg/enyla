@@ -7,8 +7,8 @@
 
 import React, { useEffect, useMemo, useState } from "react"
 import { Inbox, Check, AlarmClock, ShieldAlert, Wallet, Truck, FileText, MessageCircle, RotateCcw, CalendarClock, Handshake, FileCheck2, Flame, Gem, ChevronDown, CheckCircle2, ArrowRight } from "lucide-react"
-import { Cartao, Vazio, Esqueleto } from "./ds"
-import { ordenar, adiarAte, GRUPOS, type GrupoCaixa, type NivelCaixa } from "../lib/caixaEntrada"
+import { Cartao, Vazio, Esqueleto, Selo } from "./ds"
+import { ordenar, adiarAte, GRUPOS, type GrupoCaixa, type NivelCaixa, type PerfilCaixa } from "../lib/caixaEntrada"
 import type { Hoje, ItemHoje } from "../lib/hoje"
 import type { DadosPedido } from "../lib/atendente"
 import type { PropostaPronta } from "../lib/propostaPronta"
@@ -16,7 +16,7 @@ import { Proposta } from "./PropostasProntasCard"
 import { ItemNegociacao, type PedidoNegociacao } from "./NegociacoesDigitalCard"
 
 export type ItemExterno = {
-  chave: string; tipo: string; nivel?: NivelCaixa; numero?: string | null
+  chave: string; tipo: string; nivel?: NivelCaixa; numero?: string | null; cardId?: string; jid?: string | null; perfil?: PerfilCaixa
   titulo: string; sub?: string; valor?: number | null; valorTexto?: string; icone: React.ReactNode
   onClick?: () => void; acao?: React.ReactNode
 }
@@ -77,6 +77,7 @@ export function CaixaEntrada({ extras, onAbrirConversa, onOrcar, onNavegar, onPr
       const chave = `r:${x.tipo}:${x.numero ?? x.jid ?? x.titulo}:${x.desde ?? ""}`
       lista.push({
         chave, tipo: x.tipo, nivel: x.nivel === "perigo" ? "perigo" : x.nivel === "alerta" ? "alerta" : "info", numero: x.numero,
+        jid: x.jid ?? null, perfil: x.jid ? hoje.perfis?.[x.jid] : undefined,
         titulo: nome, sub: [numero, x.detalhe].filter(Boolean).join(" · "), valor: x.valor,
         icone: x.tipo === "sistema" ? <ShieldAlert className="w-4 h-4" /> : x.tipo === "pagamento" ? <Wallet className="w-4 h-4" /> : x.tipo === "atrasado" ? <Truck className="w-4 h-4" /> : x.tipo === "grande" ? <Gem className="w-4 h-4" /> : x.tipo === "esperando" ? <MessageCircle className="w-4 h-4" /> : <Flame className="w-4 h-4" />,
         onClick: x.jid ? () => onAbrirConversa(x.jid!, nome) : x.tipo === "sistema" ? () => onNavegar("config") : undefined,
@@ -85,7 +86,7 @@ export function CaixaEntrada({ extras, onAbrirConversa, onOrcar, onNavegar, onPr
     }
     // Hoje: orçar, MQL travado, responder, retomar
     const daConversa = (x: ItemHoje, tipo: string, nivel: NivelCaixa, sub: string): Item => ({
-      chave: `${tipo}:${x.jid}:${x.desde}`, tipo, nivel, titulo: x.nome || x.jid.split("@")[0], sub,
+      chave: `${tipo}:${x.jid}:${x.desde}`, tipo, nivel, titulo: x.nome || x.jid.split("@")[0], sub, jid: x.jid, perfil: hoje.perfis?.[x.jid],
       icone: tipo === "orcar" ? <FileText className="w-4 h-4" /> : tipo === "retomar" ? <CalendarClock className="w-4 h-4" /> : x.retomada ? <RotateCcw className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />,
       onClick: () => onAbrirConversa(x.jid, x.nome || undefined, x.dados ?? undefined),
       acao: onOrcar && (tipo === "orcar" || tipo === "travado") ? <BotaoTexto onClick={() => onOrcar(x.cliente || x.nome || x.jid.split("@")[0], x.jid, x.dados ?? undefined)} titulo="Novo orçamento com o que o cliente já contou">Orçar</BotaoTexto> : undefined,
@@ -93,11 +94,11 @@ export function CaixaEntrada({ extras, onAbrirConversa, onOrcar, onNavegar, onPr
     for (const x of hoje.orcar ?? []) lista.push(daConversa(x, "orcar", "alerta", `Esperando o seu orçamento ${haQuanto(x.desde)}${doPedido(x.dados) ? ` · ${doPedido(x.dados)}` : ""}`))
     // MQL ainda faltando dado é da IA (checklist antes de passar para você)
     for (const x of (hoje.meta?.travados ?? []).filter(x => !x.falta?.length)) lista.push(daConversa(x, "travado", "info", `MQL sem orçamento ${haQuanto(x.desde)}${x.falta?.length ? ` · falta ${x.falta.join(", ")}` : ""}`))
-    for (const x of hoje.responder) lista.push(daConversa(x, "responder", x.retomada ? "sucesso" : "info", `${x.rotulo} · ${haQuanto(x.desde)}${x.mensagem ? ` · “${x.mensagem}”` : ""}`))
+    for (const x of hoje.responder) lista.push(daConversa(x, "responder", x.retomada ? "sucesso" : "info", `${["ICP", "Oportunidade", "Lead médio"].includes(x.rotulo) ? "esperando" : x.rotulo} · ${haQuanto(x.desde)}${x.mensagem ? ` · “${x.mensagem}”` : ""}`))
     for (const x of hoje.retomar ?? []) lista.push(daConversa(x, "retomar", "info", x.nota ? `Lembrete: ${x.nota}` : `Sem resposta ${haQuanto(x.desde)}${doPedido(x.dados) ? ` · ${doPedido(x.dados)}` : ""}`))
     // Propostas prontas e negociações do digital: a decisão abre aqui mesmo
     for (const p of propostas) lista.push({
-      chave: `prop:${p.id}`, tipo: "propostaPronta", nivel: "alerta", valor: p.preco, titulo: `Proposta pronta · ${p.nome ?? "cliente"}`,
+      chave: `prop:${p.id}`, tipo: "propostaPronta", nivel: "alerta", valor: p.preco, jid: p.jid, perfil: hoje.perfis?.[p.jid], titulo: `Proposta pronta · ${p.nome ?? "cliente"}`,
       sub: `${p.quantidade.toLocaleString("pt-BR")} un · o agente montou, falta você aprovar e enviar`, icone: <FileCheck2 className="w-4 h-4" />,
       expande: fechar => onPropostaPronta ? <Proposta p={p} onAbrir={(pp, enviar) => { fechar(); setPropostas(l => l.filter(x => x.id !== pp.id)); onPropostaPronta(pp, enviar) }}
         onDescartar={() => { fechar(); setPropostas(l => l.filter(x => x.id !== p.id)); fetch("/api/proposta-pronta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id, acao: "descartar" }) }).catch(() => {}) }}
@@ -110,14 +111,17 @@ export function CaixaEntrada({ extras, onAbrirConversa, onOrcar, onNavegar, onPr
       expande: fechar => <ItemNegociacao p={p} onAbrirConversa={onAbrirConversa} onFeito={() => { fechar(); setNegociacoes(l => l.filter(x => x.id !== p.id)) }} />,
     })
     // Pendências do Painel (entregas, cobranças, aprovações online, propostas vencendo...)
-    lista.push(...extras)
+    lista.push(...extras.map(e => {
+      const c = e.cardId ? hoje.cards?.[e.cardId] : undefined
+      return c ? { ...e, jid: e.jid ?? c.jid, perfil: e.perfil ?? c.perfil } : e
+    }))
     return ordenar(lista, ocultos)
   }, [hoje, propostas, negociacoes, extras, ocultos])   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!hoje) return <Esqueleto linhas={5} />
   // Alertas do sistema (saldo, crédito, WhatsApp) viram uma faixa no topo; o resto é a lista de trabalho
   const alertas = itens.filter(i => i.grupo === "sistema")
-  const trabalho = juntarMesmoPedido(itens.filter(i => i.grupo !== "sistema"))
+  const trabalho = itens.filter(i => i.grupo !== "sistema")
   const doGrupo = (g: GrupoCaixa) => trabalho.filter(i => i.grupo === g)
   const valorDe = (l: typeof trabalho) => l.reduce((t, i) => t + (i.valor ?? 0), 0)
   const emJogo = valorDe(trabalho.filter(i => i.grupo === "dinheiro" || i.grupo === "vendas"))
@@ -189,12 +193,14 @@ export function CaixaEntrada({ extras, onAbrirConversa, onOrcar, onNavegar, onPr
                   <span className="text-[11px] text-[#aeadb5]">{g.itens.length}</span>
                   <span className="flex-1" />
                   {g.id === "vendas" && metaMql && <span className="text-[11px] text-[#898892] truncate">{metaMql}</span>}
+                  {g.id === "digital" && <span className="text-[11px] text-[#898892] truncate">a IA está cuidando; entre só se quiser</span>}
                   {g.id !== "vendas" && valorDe(g.itens) > 0 && <span className="text-[11.5px] font-semibold ds-num text-[#5e5c68]">{brl(valorDe(g.itens))}</span>}
                 </div>
-                {g.itens.slice(0, POR_GRUPO).map(linha)}
-                {g.itens.length > POR_GRUPO && (
+                {/* Digital fica recolhido no "Tudo": é da IA, você abre se quiser */}
+                {g.itens.slice(0, g.id === "digital" ? 0 : POR_GRUPO).map(linha)}
+                {g.itens.length > (g.id === "digital" ? 0 : POR_GRUPO) && (
                   <button onClick={() => setGrupo(g.id)} className="w-full text-left px-3 md:pl-14 py-2 text-[12px] font-medium text-[#8456e8] hover:bg-[#8456e8]/[0.04] rounded-lg transition-colors">
-                    Ver mais {g.itens.length - POR_GRUPO} em {g.nome.toLowerCase()}
+                    {g.id === "digital" ? `Ver os ${g.itens.length} do digital` : `Ver mais ${g.itens.length - POR_GRUPO} em ${g.nome.toLowerCase()}`}
                   </button>
                 )}
               </section>
@@ -222,25 +228,6 @@ export function CaixaEntrada({ extras, onAbrirConversa, onOrcar, onNavegar, onPr
   )
 }
 
-// O mesmo pedido em dois itens do mesmo grupo (ex.: cobrança vencida e saldo sem cobrança) vira uma linha só:
-// fica o mais importante, o valor soma (no dinheiro) e "resolvido" tira os dois
-function juntarMesmoPedido<T extends Item & { grupo: GrupoCaixa; peso: number }>(itens: T[]): (T & { chaves?: string[] })[] {
-  const saida: (T & { chaves?: string[] })[] = []
-  const porNumero = new Map<string, T & { chaves?: string[] }>()
-  for (const i of itens) {
-    const k = i.numero ? `${i.grupo}|${i.numero}` : null
-    const ja = k ? porNumero.get(k) : undefined
-    if (!ja) { const novo = { ...i, chaves: [i.chave] }; if (k) porNumero.set(k, novo); saida.push(novo); continue }
-    ja.chaves!.push(i.chave)
-    if (i.grupo !== "dinheiro" || !i.valor) continue
-    ja.valor = (ja.valor ?? 0) + i.valor; ja.valorTexto = undefined
-    // Junta a explicação só se ela já não estiver dita ("mais R$ 4.470,00 sem cobrança")
-    const inteiro = Math.round(i.valor).toLocaleString("pt-BR")
-    if (i.sub && !(ja.sub ?? "").includes(inteiro)) ja.sub = [ja.sub, i.sub].filter(Boolean).join(" · ")
-  }
-  return saida
-}
-
 // Linha: no computador, tudo numa linha (o que é · valor · ações); no celular, ações embaixo
 const COR: Record<NivelCaixa, string> = { perigo: "#d33a3c", alerta: "#c57800", info: "#8456e8", sucesso: "#009351" }
 function Linha({ i, aberto, onAbrir, onResolvido, onAmanha }: { i: Item; aberto: boolean; onAbrir?: () => void; onResolvido: () => void; onAmanha: () => void }) {
@@ -252,7 +239,9 @@ function Linha({ i, aberto, onAbrir, onResolvido, onAmanha }: { i: Item; aberto:
       <div className="flex-1 min-w-0 flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
         <button onClick={onAbrir} disabled={!onAbrir} className="flex-1 min-w-0 text-left disabled:cursor-default">
           <span className="flex items-baseline gap-2">
-            <span className="flex-1 min-w-0 text-[13.5px] font-semibold text-[#191625] truncate">{i.titulo}</span>
+            <span className="min-w-0 text-[13.5px] font-semibold text-[#191625] truncate">{i.titulo}</span>
+            {(i.perfil === "icp" || i.perfil === "oportunidade") && <Selo tom={i.perfil === "icp" ? "acento" : "neutro"} className="shrink-0 self-center">{i.perfil === "icp" ? "ICP" : <><span className="md:hidden">Oport.</span><span className="hidden md:inline">Oportunidade</span></>}</Selo>}
+            <span className="flex-1" />
             <span className="md:hidden">{valor}</span>
           </span>
           {i.sub && <span className="block text-[12px] text-[#5e5c68] leading-snug mt-0.5 line-clamp-2 md:line-clamp-1">{i.sub}</span>}

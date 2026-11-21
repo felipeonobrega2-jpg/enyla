@@ -30,7 +30,7 @@ export async function montarCaixaServidor() {
     todas<import("../types").Cliente>("Cliente"), lerConfigLinha(), ocultosDaCaixa(),
   ])
   const cfg = { ...CONFIG_PADRAO, ...((cfgRow.data?.data ?? {}) as object) } as import("../config").Configuracoes & {
-    propostasProntas?: { id: string; nome: string | null; quantidade: number; preco: number; status: string }[]
+    propostasProntas?: { id: string; nome: string | null; quantidade: number; preco: number; status: string; manual?: boolean; jid?: string }[]
     pedidosDigitais?: { id: string; nome: string | null; quantidade: number; total: number; status: string; negociacao?: { status: string; em: string; pedidoTotal: number | null } | null }[]
   }
   const kanban = kanbanBruto.map(unpackTerceirizado)
@@ -42,15 +42,15 @@ export async function montarCaixaServidor() {
   for (const x of hoje.resolver ?? []) {
     if (x.tipo === "digital" || (x.numero && numerosPend.has(x.numero))) continue
     const [nome, numero] = x.titulo.split(" · ")
-    itens.push({ chave: `r:${x.tipo}:${x.numero ?? x.jid ?? x.titulo}:${x.desde ?? ""}`, tipo: x.tipo, nivel: nivel(x.nivel), titulo: nome, sub: [numero, x.detalhe].filter(Boolean).join(" · "), valor: x.valor })
+    itens.push({ chave: `r:${x.tipo}:${x.numero ?? x.jid ?? x.titulo}:${x.desde ?? ""}`, jid: x.jid ?? null, perfil: x.jid ? hoje.perfis?.[x.jid] : undefined, tipo: x.tipo, nivel: nivel(x.nivel), titulo: nome, sub: [numero, x.detalhe].filter(Boolean).join(" · "), valor: x.valor })
   }
-  for (const x of hoje.orcar ?? []) itens.push({ chave: `orcar:${x.jid}:${x.desde}`, tipo: "orcar", nivel: "alerta", titulo: x.nome || x.jid.split("@")[0], sub: `esperando o seu orçamento ${haQuanto(x.desde)}` })
+  for (const x of hoje.orcar ?? []) itens.push({ chave: `orcar:${x.jid}:${x.desde}`, jid: x.jid, perfil: hoje.perfis?.[x.jid], tipo: "orcar", nivel: "alerta", titulo: x.nome || x.jid.split("@")[0], sub: `esperando o seu orçamento ${haQuanto(x.desde)}` })
   // MQL ainda faltando dado é da IA (checklist antes de passar para o Felipe): só entra quem não tem falta
-  for (const x of (hoje.meta?.travados ?? []).filter(x => !x.falta?.length)) itens.push({ chave: `travado:${x.jid}:${x.desde}`, tipo: "travado", nivel: "info", titulo: x.nome || x.jid.split("@")[0], sub: `MQL sem orçamento${x.falta?.length ? `, falta ${x.falta.join(", ")}` : ""}` })
-  for (const x of hoje.responder) itens.push({ chave: `responder:${x.jid}:${x.desde}`, tipo: "responder", nivel: "info", titulo: x.nome || x.jid.split("@")[0], sub: `${x.rotulo} esperando ${haQuanto(x.desde)}` })
-  for (const x of hoje.retomar ?? []) itens.push({ chave: `retomar:${x.jid}:${x.desde}`, tipo: "retomar", nivel: "info", titulo: x.nome || x.jid.split("@")[0], sub: x.nota ? `lembrete: ${x.nota}` : `sem resposta ${haQuanto(x.desde)}` })
-  for (const p of (cfg.propostasProntas ?? []).filter(p => p.status === "aguardando")) itens.push({ chave: `prop:${p.id}`, tipo: "propostaPronta", nivel: "alerta", titulo: `Proposta pronta · ${p.nome ?? "cliente"}`, sub: `${p.quantidade.toLocaleString("pt-BR")} un, falta aprovar e enviar`, valor: p.preco })
+  for (const x of (hoje.meta?.travados ?? []).filter(x => !x.falta?.length)) itens.push({ chave: `travado:${x.jid}:${x.desde}`, jid: x.jid, perfil: hoje.perfis?.[x.jid], tipo: "travado", nivel: "info", titulo: x.nome || x.jid.split("@")[0], sub: `MQL sem orçamento${x.falta?.length ? `, falta ${x.falta.join(", ")}` : ""}` })
+  for (const x of hoje.responder) itens.push({ chave: `responder:${x.jid}:${x.desde}`, jid: x.jid, perfil: hoje.perfis?.[x.jid], tipo: "responder", nivel: "info", titulo: x.nome || x.jid.split("@")[0], sub: `${x.rotulo} esperando ${haQuanto(x.desde)}` })
+  for (const x of hoje.retomar ?? []) itens.push({ chave: `retomar:${x.jid}:${x.desde}`, jid: x.jid, perfil: hoje.perfis?.[x.jid], tipo: "retomar", nivel: "info", titulo: x.nome || x.jid.split("@")[0], sub: x.nota ? `lembrete: ${x.nota}` : `sem resposta ${haQuanto(x.desde)}` })
+  for (const p of (cfg.propostasProntas ?? []).filter(p => p.status === "aguardando" && p.manual)) itens.push({ chave: `prop:${p.id}`, jid: p.jid ?? null, perfil: p.jid ? hoje.perfis?.[p.jid] : undefined, tipo: "propostaPronta", nivel: "alerta", titulo: `Proposta pronta · ${p.nome ?? "cliente"}`, sub: `${p.quantidade.toLocaleString("pt-BR")} un, falta aprovar e enviar`, valor: p.preco })
   for (const p of (cfg.pedidosDigitais ?? []).filter(p => p.status === "aguardando_sinal" && p.negociacao?.status === "aguardando")) itens.push({ chave: `neg:${p.id}:${p.negociacao?.em ?? ""}`, tipo: "negociacao", nivel: "alerta", titulo: `Negociação no digital · ${p.nome ?? "cliente"}`, sub: p.negociacao?.pedidoTotal ? `pediu ${p.negociacao.pedidoTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}` : "pediu desconto", valor: p.negociacao?.pedidoTotal ?? p.total })
-  for (const x of pend) itens.push({ chave: `p:${x.id}`, tipo: x.tipo, nivel: nivel(x.tom), titulo: x.titulo, sub: x.sub, valor: x.valor ?? null })
+  for (const x of pend) itens.push({ chave: `p:${x.id}`, numero: x.card?.numero ?? null, jid: x.card ? hoje.cards?.[x.card.id]?.jid ?? null : null, perfil: x.card ? hoje.cards?.[x.card.id]?.perfil : undefined, tipo: x.tipo, nivel: nivel(x.tom), titulo: x.titulo, sub: x.sub, valor: x.valor ?? null })
   return ordenar(itens, ocultos)
 }

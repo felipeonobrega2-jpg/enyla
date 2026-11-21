@@ -27,3 +27,25 @@ describe("caixa de entrada do Painel", () => {
     expect(grupoDoTipo("atrasado")).toBe("producao")
   })
 })
+
+describe("caixa de entrada: perfil e mesma pessoa", () => {
+  it("em vendas o ICP vem antes de qualquer coisa de um lead médio; digital vai para o grupo dele", () => {
+    const l = ordenar([
+      { chave: "pm", tipo: "propostaPronta", jid: "1", perfil: "medio" as const },
+      { chave: "ri", tipo: "responder", jid: "2", perfil: "icp" as const },
+      { chave: "ro", tipo: "responder", jid: "3", perfil: "oportunidade" as const },
+      { chave: "rd", tipo: "promessa", jid: "4", perfil: "digital" as const },
+    ])
+    expect(l.filter(x => x.grupo === "vendas").map(x => x.chave)).toEqual(["ri", "ro", "pm"])
+    expect(l.find(x => x.chave === "rd")?.grupo).toBe("digital")
+  })
+  it("a mesma pessoa em vários itens vira uma linha com os outros motivos", () => {
+    const l = ordenar([
+      { chave: "p", tipo: "promessa", jid: "9", sub: "você prometeu orçamento há 66 h" },
+      { chave: "r", tipo: "responder", jid: "9", sub: "Lead médio esperando há 2 d" },
+      { chave: "o", tipo: "orcar", jid: "8" },
+    ])
+    expect(l).toHaveLength(2)
+    expect(l[0]).toMatchObject({ chave: "p", chaves: ["p", "r"], sub: "você prometeu orçamento há 66 h · também: esperando resposta" })
+  })
+})

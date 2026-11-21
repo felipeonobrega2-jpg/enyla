@@ -112,8 +112,8 @@ export function PainelView({
     abriuProposta: <Eye className="w-4 h-4" />, comoFicou: <MessageCircleHeart className="w-4 h-4" />, avaliado: <Star className="w-4 h-4" />, reposicao: <RotateCcw className="w-4 h-4" />, meta: <Megaphone className="w-4 h-4" />, whatsapp: <MessageCircle className="w-4 h-4" />,
   }
   type Acao = { id: string; tom: Tom; icone: React.ReactNode; titulo: string; sub: string; valor?: string; ir: () => void; whatsapp?: string; envio?: Envio; cobrar?: Partial<LancamentoFinanceiro>; botao?: { rotulo: string; onClick: () => void } }
-  const acoes: (Acao & { tipo: string; numero?: string; valorNum?: number | null })[] = pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom, clientes, config, hoje }).map(x => ({
-    tipo: x.tipo, numero: (x as { card?: { numero?: string } }).card?.numero, valorNum: x.valor ?? null,
+  const acoes: (Acao & { tipo: string; numero?: string; cardId?: string; valorNum?: number | null })[] = pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom, clientes, config, hoje }).map(x => ({
+    tipo: x.tipo, numero: x.card?.numero, cardId: x.card?.id, valorNum: x.valor ?? null,
     id: x.id, tom: x.tom, icone: ICONE[x.tipo], titulo: x.titulo, sub: x.sub,
     valor: x.valor != null ? brl(x.valor) : undefined,
     ir: x.tipo === "fornecedor" ? () => onNavegar("fornecedores") : x.tipo === "meta" ? () => onNavegar("meta") : x.tipo === "whatsapp" ? () => onNavegar("whatsapp") : x.tipo === "conferir" ? () => abrirCaixa() : x.cliente ? () => onAbrirCliente(x.cliente!) : () => { if (x.card) onAbrirCard(x.card) },
@@ -145,7 +145,7 @@ export function PainelView({
     ) : undefined)
   const nivelDe = (t: Tom): "perigo" | "alerta" | "info" | "sucesso" => t === "perigo" ? "perigo" : t === "alerta" ? "alerta" : t === "sucesso" ? "sucesso" : "info"
   const extrasCaixa: ItemExterno[] = acoes.map(a => ({
-    chave: `p:${a.id}`, tipo: a.tipo, nivel: nivelDe(a.tom), numero: a.numero ?? null, titulo: a.titulo, sub: a.sub,
+    chave: `p:${a.id}`, cardId: a.cardId, tipo: a.tipo, nivel: nivelDe(a.tom), numero: a.numero ?? null, titulo: a.titulo, sub: a.sub,
     valor: a.valorNum ?? null, valorTexto: a.valor, icone: a.icone, onClick: a.ir, acao: acaoDe(a),
   }))
   // Números e acompanhamento recolhidos por padrão (lembra a sua escolha neste aparelho)
