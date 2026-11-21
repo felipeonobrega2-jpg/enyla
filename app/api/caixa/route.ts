@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
+import { lerCampos } from "@/app/lib/configAtomica"
 
 // Caixa de entrada do Painel: o que você marcou como resolvido ou mandou lembrar depois. Fica na tabela leve
 // (agente_tratadas, linhas "caixa|<até>|<chave>"), não no AppConfig. "sempre" = resolvido (a chave do item muda
@@ -18,7 +19,8 @@ export async function GET() {
     ocultos[chave] = ate
   }
   if (vencidos.length) await supabase.from("agente_tratadas").delete().in("id", vencidos.slice(0, 200))
-  return NextResponse.json({ ocultos })
+  const { regrasCaixa } = await lerCampos<{ regrasCaixa?: unknown[] }>(["regrasCaixa"]).catch(() => ({ regrasCaixa: [] as unknown[] }))
+  return NextResponse.json({ ocultos, regras: regrasCaixa ?? [] })
 }
 
 export async function POST(req: NextRequest) {

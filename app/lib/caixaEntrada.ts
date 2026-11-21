@@ -2,6 +2,7 @@
 // primeiro). Puro: grupos, peso de cada tipo, ordenação e o que está resolvido/adiado.
 
 import { etapaDoLead, perfilDoLead } from "./etapaLead"
+import { efeitoDasRegras, type RegraCaixa } from "./aprendiz"
 
 export type GrupoCaixa = "dinheiro" | "vendas" | "producao" | "sistema" | "relacionamento" | "digital"
 // Perfil do lead do item: ICP e Oportunidade sobem dentro do grupo; digital/pequeno vai para o grupo "Digital" (é da IA)
@@ -60,13 +61,16 @@ export const escondido = (chave: string, ocultos: Record<string, string>, agora 
   return !!ate && (ate === "sempre" || new Date(ate).getTime() > agora)
 }
 
-type Ordenavel = { chave: string; tipo: string; nivel?: NivelCaixa; valor?: number | null; perfil?: PerfilCaixa; jid?: string | null; numero?: string | null; sub?: string; valorTexto?: string }
-export function ordenar<T extends Ordenavel>(itens: T[], ocultos: Record<string, string> = {}, agora = Date.now()): (T & { grupo: GrupoCaixa; peso: number; chaves: string[] })[] {
+type Ordenavel = { chave: string; tipo: string; nivel?: NivelCaixa; valor?: number | null; perfil?: PerfilCaixa; jid?: string | null; numero?: string | null; titulo?: string; sub?: string; valorTexto?: string }
+// regras: o que o Felipe ensinou pelo Aprendiz (esconder, subir ou baixar o que bate)
+export function ordenar<T extends Ordenavel>(itens: T[], ocultos: Record<string, string> = {}, agora = Date.now(), regras?: RegraCaixa[]): (T & { grupo: GrupoCaixa; peso: number; chaves: string[] })[] {
   const vistos = new Set<string>()
   const ordenados = itens
     .filter(i => { if (vistos.has(i.chave) || escondido(i.chave, ocultos, agora)) return false; vistos.add(i.chave); return true })
-    .map(i => ({ ...i, grupo: grupoDoItem(i), peso: prioridade(i) }))
-    .sort((a, b) => b.peso - a.peso)
+    .map(i => { const grupo = grupoDoItem(i); return { ...i, grupo, peso: prioridade(i), efeito: efeitoDasRegras(regras, { ...i, grupo }, agora) } })
+    .filter(i => i.grupo === "sistema" || !i.efeito.esconder)      // alerta do sistema nunca some por regra
+    .map(({ efeito, ...i }) => ({ ...i, peso: i.peso + efeito.ajuste }))
+    .sort((a, b) => b.peso - a.peso) as (T & { grupo: GrupoCaixa; peso: number })[]
   return juntarMesmoAssunto(ordenados)
 }
 

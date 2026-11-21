@@ -379,6 +379,8 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       sugestoes: [{ numero: "ORC-2026-241", nome: "Aromas Exemplo", valor: 18140, motivo: "proposta ORC-2026-241 de R$ 18.140" }, { jid: "7@lid", nome: "Cosméticos Modelo", volume: 20000, motivo: "falou em 20.000 un · caixa 50ml" }],
     }))
   }
+  if (u.startsWith("/api/caixa/resumo")) return new Response(JSON.stringify({ assunto: "3 mil caixinhas de 50 ml com hot stamping dourado, arte pronta.", situacao: "Você mandou o orçamento de R$ 11.786 há 2 dias; ele abriu 3 vezes e perguntou do prazo.", proximo_passo: "Confirme o prazo de 12 dias úteis e ofereça o sinal por Pix para travar a produção." }))
+  if (u.startsWith("/api/aprendiz")) return new Response(JSON.stringify({ ok: true, ensinamento: { id: "en-1", texto: "", em: "", entendi: "Orçamento vencendo de lead médio não precisa aparecer na sua caixa.", feitos: [{ destino: "regra_caixa", ref: "rc-1", resumo: "Esconder 'orçamento vencendo' de lead médio" }, { destino: "agente", ref: "felipe-1", resumo: "Quando o orçamento de um lead médio estiver vencendo, o atendente retoma sozinho com uma mensagem curta." }] } }))
   if (u.startsWith("/api/perto")) {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
     const cv = (jid: string, nome: string, etiquetas: string[], msg: string, rec: number, env: number) => ({ jid, nome, status_lead: "mql", etiquetas, ultima_msg: msg, ultima_at: h(Math.min(rec, env)), ultima_recebida_at: h(rec), ultima_enviada_at: h(env) })
