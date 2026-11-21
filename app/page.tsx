@@ -173,6 +173,10 @@ function NavGroup({ label }: { label: string }) {
 }
 
 // ─── App ─────────────────────────────────────────────────────────────────────
+const urlDaAba = (v: string) => { const q = new URLSearchParams(window.location.search); q.set("aba", v); return `${window.location.pathname}?${q.toString()}${window.location.hash}` }
+// Telas do sistema (a aba fica na URL, ?aba=..., para o voltar/avançar do navegador andar entre elas)
+const VIEWS: string[] = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias","entregas","gastos","digital","cx-pedidos","cx-chapas","cx-facas","cx-custos","biblioteca","escritorio","dados"]
+
 export default function Home() {
   const [form, setForm]       = useState<FormData>(FORM_INICIAL)
   const [result, setResult]   = useState<Calculo | null>(null)
@@ -196,6 +200,7 @@ export default function Home() {
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
   const [contador, setContador] = useState<number>(0)
   const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias" | "entregas" | "gastos" | "digital" | "cx-pedidos" | "cx-chapas" | "cx-facas" | "cx-custos" | "biblioteca" | "escritorio" | "dados">("painel")
+  const viewRef = useRef(view)
   const [perfilClienteExterno, setPerfilClienteExterno] = useState<string | null>(null)
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
   definirFeriadosLocais(config.feriados)
@@ -358,10 +363,23 @@ export default function Home() {
     // Link direto (ex.: resumo de marketing no WhatsApp abre em Campanhas: /?aba=meta)
     const aba = new URLSearchParams(window.location.search).get("aba")
     const saved = aba ?? sessionStorage.getItem("app:view")
-    const valid = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias","entregas","gastos","digital","cx-pedidos","cx-chapas","cx-facas","cx-custos","biblioteca","escritorio","dados"]
+    const valid = VIEWS
     // Conquistas virou o cartão "Meta do mês" do Painel
-    if (saved === "conquistas") setView("painel")
-    else if (saved && valid.includes(saved)) setView(saved as typeof view)
+    const inicial = saved === "conquistas" ? "painel" : saved && valid.includes(saved) ? saved : viewRef.current
+    if (inicial !== viewRef.current) setView(inicial as typeof view)
+    viewRef.current = inicial as typeof view
+    // A primeira tela vira o começo do histórico deste sistema
+    window.history.replaceState({ ...(window.history.state ?? {}), view: inicial }, "", urlDaAba(inicial))
+    // Voltar/avançar do navegador: troca de tela sem sair do sistema
+    const voltar = (e: PopStateEvent) => {
+      const v = (e.state as { view?: string } | null)?.view ?? new URLSearchParams(window.location.search).get("aba")
+      if (!v || !VIEWS.includes(v)) return
+      viewRef.current = v as typeof view
+      setView(v as typeof view)
+      sessionStorage.setItem("app:view", v)
+    }
+    window.addEventListener("popstate", voltar)
+    return () => window.removeEventListener("popstate", voltar)
   }, [])
 
   // Orçamento novo já com o cliente (e o que ele contou na conversa); a conversa fica ligada a ele
@@ -408,6 +426,9 @@ export default function Home() {
   function navigate(v: typeof view) {
     setView(v)
     sessionStorage.setItem("app:view", v)
+    // Cada troca de tela entra no histórico do navegador (o voltar volta para a tela anterior do sistema)
+    if (viewRef.current !== v) window.history.pushState({ view: v }, "", urlDaAba(v))
+    viewRef.current = v
   }
 
   useEffect(() => {
@@ -1288,7 +1309,7 @@ export default function Home() {
   function replicar(item: { form: FormData; calculo: Calculo }) {
     comecarOrcamentoNovo(item.form)
     setResult(calcular(item.form, config))
-    setView("orcamento")
+    navigate("orcamento")
     showToast("Orçamento replicado na mesa atual.")
   }
 
@@ -1310,7 +1331,7 @@ export default function Home() {
     setForm({ ...item.form })
     setResult(recalc ?? item.calculo)
     setEditandoHistorico(item.numero)
-    setView("orcamento")
+    navigate("orcamento")
     setDetalheModal(null)
   }
 
@@ -1318,7 +1339,7 @@ export default function Home() {
     setEditandoHistorico(null)
     setForm(FORM_INICIAL)
     setResult(null)
-    setView("orcamentos")
+    navigate("orcamentos")
   }
 
   // Editando um orçamento, mas o cliente da mesa é outro: é um orçamento NOVO (nunca grava por cima do pedido de outro
@@ -1375,7 +1396,7 @@ export default function Home() {
     setEditandoHistorico(null)
     setForm(FORM_INICIAL)
     setResult(null)
-    setView("orcamentos")
+    navigate("orcamentos")
     showToast(`Orçamento ${numero} atualizado.`)
   }
 
@@ -2634,7 +2655,7 @@ export default function Home() {
                   setResult(calcular(next, config))
                   return next
                 })
-                setView("orcamento")
+                navigate("orcamento")
                 showToast("Layout da Forma aplicado ao orçamento.")
               }}
             />
