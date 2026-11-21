@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   const desde = new Date(Date.now() - 7 * 86_400_000).toISOString()
   const [{ data: daLista }, { data: recentes }] = await Promise.all([
     lista.length ? supabase.from("whatsapp_conversas").select(CAMPOS).in("jid", lista.map(m => m.jid)) : Promise.resolve({ data: [] as ConversaPerto[] }),
-    supabase.from("whatsapp_conversas").select(CAMPOS).gte("ultima_at", desde).not("status_lead", "in", "(pedido,perdido,descartado)").order("ultima_at", { ascending: false }).limit(1500),
+    supabase.from("whatsapp_conversas").select(CAMPOS).gte("ultima_at", desde).or("status_lead.is.null,status_lead.not.in.(pedido,perdido,descartado)").order("ultima_at", { ascending: false }).limit(1500),
   ])
   const porJid = new Map((daLista ?? []).map(c => [c.jid, c as ConversaPerto]))
   const itens = lista
