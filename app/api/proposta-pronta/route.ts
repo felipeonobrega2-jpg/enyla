@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   if (b.acao === "montar" && b.jid) {
     const a = await atender(b.jid, { automatico: true }).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
     if (!a.ok) return NextResponse.json({ ok: false, erro: a.erro }, { status: 502 })
-    const r = await prepararProposta(b.jid, a.r.dados, a.conversa.nome)
+    const r = await prepararProposta(b.jid, a.r.dados, a.conversa.nome, { manual: true })
     return NextResponse.json(r, { status: r.ok ? 200 : 422 })
   }
   return NextResponse.json({ ok: false, erro: "ação inválida" }, { status: 400 })

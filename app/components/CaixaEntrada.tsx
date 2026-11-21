@@ -44,7 +44,7 @@ export function CaixaEntrada({ extras, onAbrirConversa, onOrcar, onNavegar, onPr
 
   const carregar = () => {
     fetch("/api/hoje").then(r => r.ok ? r.json() : null).then(x => { if (x) setHoje(x) }).catch(() => {})
-    fetch("/api/proposta-pronta").then(r => r.json()).then(d => setPropostas((d.propostas ?? []).filter((p: PropostaPronta) => p.status === "aguardando"))).catch(() => {})
+    fetch("/api/proposta-pronta").then(r => r.json()).then(d => setPropostas((d.propostas ?? []).filter((p: PropostaPronta) => p.status === "aguardando" && p.manual))).catch(() => {})
     fetch("/api/digital").then(r => r.json()).then(d => setNegociacoes((d.pedidos ?? []).filter((p: PedidoNegociacao) => p.status === "aguardando_sinal" && p.negociacao?.status === "aguardando"))).catch(() => {})
     fetch("/api/caixa").then(r => r.json()).then(d => setOcultos(d.ocultos ?? {})).catch(() => {})
   }

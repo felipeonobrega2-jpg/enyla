@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const a = await atender(jid, { automatico: true }).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
     if (!a.ok) return NextResponse.json({ ok: false, erro: a.erro }, { status: 502 })
     if (a.conversa.clienteCadastrado) return NextResponse.json({ ok: false, motivo: "cliente da casa: o preço é seu" })
-    const r = await prepararProposta(jid, a.r.dados, a.conversa.nome).catch(e => ({ ok: false as const, motivo: String(e) }))
+    const r = await prepararProposta(jid, a.r.dados, a.conversa.nome, { manual: true }).catch(e => ({ ok: false as const, motivo: String(e) }))
     return NextResponse.json(r.ok ? { ok: true, proposta: r.proposta.id, nova: r.nova } : { ok: false, motivo: r.motivo })
   }
   if (acao === "responder") {

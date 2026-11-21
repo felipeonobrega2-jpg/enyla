@@ -16,6 +16,7 @@ export type AjusteProposta = { em: string; quantidade: number; sugerido: number;
 
 export type PropostaPronta = {
   id: string                         // PP-xxxxx
+  manual?: boolean                   // você pediu (botão na conversa); as automáticas estão desligadas
   jid: string; nome: string | null
   em: string
   dados: DadosPedido

@@ -55,7 +55,7 @@ export async function listarPropostas() {
 }
 
 // Monta (ou atualiza) a proposta de uma conversa. Já enviada para essa conversa nos últimos 7 dias: não refaz.
-export async function prepararProposta(jid: string, dados: DadosPedido, nome: string | null): Promise<{ ok: true; proposta: PropostaPronta; nova: boolean } | { ok: false; motivo: string }> {
+export async function prepararProposta(jid: string, dados: DadosPedido, nome: string | null, opts: { manual?: boolean } = {}): Promise<{ ok: true; proposta: PropostaPronta; nova: boolean } | { ok: false; motivo: string }> {
   const { cfg, config, historico } = await lerTudo()
   const lista = cfg.propostasProntas ?? []
   if (lista.some(p => p.jid === jid && p.status === "enviada" && Date.now() - new Date(p.enviadaEm ?? p.em).getTime() < 7 * 86_400_000))
@@ -65,7 +65,7 @@ export async function prepararProposta(jid: string, dados: DadosPedido, nome: st
   const m = montarProposta(dados, nome, config, baseDoHistorico(historico), mk.multiplicador)
   if (!m.ok) return m
   const nova: PropostaPronta = {
-    id: `PP-${Date.now().toString(36).toUpperCase()}`,
+    id: `PP-${Date.now().toString(36).toUpperCase()}`, ...(opts.manual ? { manual: true } : {}),
     jid, nome, em: new Date().toISOString(), dados, form: m.form,
     quantidade: m.quantidade, opcoes: m.opcoes, custo: m.custo, preco: m.preco,
     multiplicador: mk.multiplicador, origemMarkup: mk.origem, medidaPadrao: m.medidaPadrao, status: "aguardando",

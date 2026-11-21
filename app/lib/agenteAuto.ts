@@ -10,7 +10,6 @@ import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkP
 import { linkPedido } from "./digitalLink"
 import { faltaParaProposta, faltaParaOrcar } from "./propostaPronta"
 import { emCampanha, type EstadoCampanha } from "./campanhaDigital"
-import { prepararProposta, talvezPropostaDoMql } from "./propostaProntaServidor"
 import type { RegraDigital } from "./precoDigital"
 import { supabase } from "./supabase"
 import { evo } from "./evolution"
@@ -543,7 +542,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     // Teto: depois de muitas perguntas sem fechar, a conversa volta para você (não vira interrogatório).
     const falta = pediuMedida ? null : faltaParaOrcar(antes)
     if (!falta || perguntasLevantando(cfg, jid) >= MAX_PERGUNTAS_MQL) {
-      await talvezPropostaDoMql(jid).catch(() => null)
+      // Orçamento do Offset é do Felipe (proposta automática desligada até melhorar)
       if (!opts.atrasada) return   // esperando há 20+ min: o agente responde (sem preço) e a proposta segue com você
     } else coletandoMql = falta
   }
@@ -678,7 +677,6 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   // Proposta de rascunho assim que há quantidade e medida (vai se atualizando com acabamento e modelos);
   // quando chega o último dado, o aviso de "pronto para orçar" vai para o seu WhatsApp
   if (coletandoMql && !conversa.clienteCadastrado && !faltaParaProposta(r.dados)) {
-    await prepararProposta(jid, r.dados, conversa.nome).catch(() => null)
     if (!faltaParaOrcar(r.dados)) await avisarMql(cfg, c, r, true).catch(() => null)
   }
   const levantando = !conversa.clienteCadastrado && (!!coletandoMql || ehQualificado(r.lead.perfil)) && !!faltaParaOrcar(r.dados)
@@ -731,8 +729,6 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     await garantirTelefone(c.jid).catch(() => null)   // MQL fica com o telefone guardado no sistema
     await marcarNaoLida(c, msgId)
     await avisarMql(cfg, c, r)
-    // Já tem medida e quantidade: a proposta fica pronta para você aprovar no celular
-    if (!conversa.clienteCadastrado && !faltaParaProposta(r.dados)) await prepararProposta(jid, r.dados, conversa.nome).catch(() => null)
   }
   // Segurou para você: aviso na hora no seu WhatsApp (nada fica esquecido no registro)
   // Lead pequeno/digital não vira aviso para você: você fica só com o que vale a pena
