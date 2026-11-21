@@ -12,49 +12,93 @@ const pausa = (ms: number) => new Promise(r => setTimeout(r, ms))
 // Depois de migrada (o nome entra em _colecoes no AppConfig), a coleção mora na tabela dados_sistema, uma linha por
 // item, com versão e histórico automático. Quem lê a configuração recebe a lista como antes; quem grava devolve a
 // lista e aqui só os itens que mudaram são gravados (conferindo a versão de cada um). O resto do código não muda.
-type Colecao = { id: (x: Dados) => string; ordem: (a: Dados, b: Dados) => number }
+// Três formatos: lista de objetos (cada um com um id), mapa "chave → valor" (ex.: contato → memória do agente) e
+// conjunto de marcas (lista de textos, a mais nova primeiro: "já tentei esta mensagem").
+type Linhas = Map<string, unknown>
+type Colecao = { paraLinhas: (v: unknown) => Linhas; deLinhas: (l: { id: string; dados: unknown }[]) => unknown; soPresenca?: boolean }
+const lista = (id: (x: Dados) => string, ordem?: (a: Dados, b: Dados) => number): Colecao => ({
+  paraLinhas: v => new Map(((v as Dados[] | undefined) ?? []).filter(x => x && typeof x === "object").map(x => [id(x), x] as [string, unknown]).reverse()),   // id repetido: fica o primeiro (o mais novo)
+  deLinhas: l => { const xs = l.map(r => r.dados as Dados); return ordem ? xs.sort(ordem) : xs },
+})
+const mapa: Colecao = {
+  paraLinhas: v => new Map(Object.entries((v as Dados | undefined) ?? {})),
+  deLinhas: l => Object.fromEntries(l.map(r => [r.id, r.dados])),
+}
+// Conjunto: guarda a ordem de chegada (número decrescente = mais novo primeiro); item que já existe não é regravado
+const conjunto: Colecao = {
+  paraLinhas: v => { const xs = ((v as string[] | undefined) ?? []).filter(x => typeof x === "string"); const agora = Date.now(); return new Map(xs.map((x, i) => [x, agora - i] as [string, unknown]).reverse()) },
+  deLinhas: l => [...l].sort((a, b) => Number(b.dados) - Number(a.dados)).map(r => r.id),
+  soPresenca: true,
+}
+const porEm = (a: Dados, b: Dados) => String(b.em ?? b.criadaEm ?? b.dia ?? "").localeCompare(String(a.em ?? a.criadaEm ?? a.dia ?? ""))
 export const COLECOES: Record<string, Colecao> = {
-  pedidosDigitais: { id: x => String(x.id), ordem: (a, b) => String(b.em ?? "").localeCompare(String(a.em ?? "")) },
+  pedidosDigitais: lista(x => String(x.id), porEm),
+  conhecimentoAgente: lista(x => String(x.id)),
+  propostasProntas: lista(x => String(x.id), porEm),
+  ideias: lista(x => String(x.id), porEm),
+  marketingRelatorios: lista(x => String(x.dia ?? x.semana ?? JSON.stringify(x).slice(0, 60)), porEm),
+  fechadasPelaIA: lista(x => `${x.jid}|${x.em}`, porEm),
+  licoesBanco: lista(x => String(x.id)),
+  cadastrosParceiros: lista(x => String(x.id), porEm),
+  agenteMarcos: mapa, apelidosWhatsapp: mapa, esperaAvisada: mapa, agenteFollowupTentados: mapa, proximosPassos: mapa,
+  mqlEsperandoAvisado: mapa, visitasProposta: mapa, propostaLidaEm: mapa,
+  agenteRetomadas: conjunto, vigiaTentou: conjunto, vigiaTentouV2: conjunto, vigiaTentouV3: conjunto,
 }
 type Foto = Map<string, { v: number; json: string }>
 const migradas = (d: Dados) => ((d._colecoes as string[] | undefined) ?? []).filter(c => c in COLECOES)
 
-async function lerColecao(col: string): Promise<{ itens: Dados[]; foto: Foto }> {
-  const itens: Dados[] = [], foto: Foto = new Map()
+// Leitura guardada por 2 s na mesma execução (o agente lê a configuração várias vezes numa resposta). Seguro: a
+// gravação confere a versão de cada item e refaz se outra mexeu; e quem grava limpa o guardado daquela coleção.
+const guardado = new Map<string, { em: number; valor: unknown; foto: Foto }>()
+async function lerColecao(col: string, fresco = false): Promise<{ valor: unknown; foto: Foto }> {
+  const g = guardado.get(col)
+  if (!fresco && g && Date.now() - g.em < 2000) return { valor: structuredClone(g.valor), foto: g.foto }
+  const r = await lerColecaoDoBanco(col)
+  guardado.set(col, { em: Date.now(), valor: r.valor, foto: r.foto })
+  return { valor: structuredClone(r.valor), foto: r.foto }
+}
+async function lerColecaoDoBanco(col: string): Promise<{ valor: unknown; foto: Foto }> {
+  const linhas: { id: string; dados: unknown }[] = [], foto: Foto = new Map()
   for (let i = 0; ; i += 1000) {
     const { data, error } = await supabase.from("dados_sistema").select("id, dados, v").eq("colecao", col).range(i, i + 999)
     if (error) throw new Error(`config/${col}: ${error.message}`)
-    for (const r of data ?? []) { itens.push(r.dados as Dados); foto.set(r.id as string, { v: r.v as number, json: JSON.stringify(r.dados) }) }
+    for (const r of data ?? []) { linhas.push({ id: r.id as string, dados: r.dados }); foto.set(r.id as string, { v: r.v as number, json: JSON.stringify(r.dados) }) }
     if (!data || data.length < 1000) break
   }
-  return { itens: itens.sort(COLECOES[col].ordem), foto }
+  return { valor: COLECOES[col].deLinhas(linhas), foto }
 }
-async function hidratar(d: Dados): Promise<{ d: Dados; fotos: Record<string, Foto> }> {
+async function hidratar(d: Dados, fresco = false): Promise<{ d: Dados; fotos: Record<string, Foto> }> {
   const cols = migradas(d)
   if (!cols.length) return { d, fotos: {} }
-  const lidas = await Promise.all(cols.map(lerColecao))
+  const lidas = await Promise.all(cols.map(c => lerColecao(c, fresco)))
   const fotos: Record<string, Foto> = {}, h: Dados = { ...d }
-  cols.forEach((c, i) => { h[c] = lidas[i].itens; fotos[c] = lidas[i].foto })
+  cols.forEach((c, i) => { h[c] = lidas[i].valor; fotos[c] = lidas[i].foto })
   return { d: h, fotos }
 }
 // Grava só o que mudou; false = outra gravação mexeu num desses itens no meio (refazer)
-async function gravarColecao(col: string, novos: Dados[], foto: Foto): Promise<boolean> {
-  const porId = new Map<string, Dados>()
-  for (const x of novos ?? []) porId.set(COLECOES[col].id(x), x)
+async function gravarColecao(col: string, valor: unknown, foto: Foto): Promise<boolean> {
+  guardado.delete(col)
+  const def = COLECOES[col]
+  const porId = def.paraLinhas(valor)
+  const novos: { colecao: string; id: string; dados: unknown; v: number }[] = []
   for (const [id, x] of porId) {
-    const antes = foto.get(id), json = JSON.stringify(x)
-    if (!antes) {
-      const { data, error } = await supabase.from("dados_sistema").upsert({ colecao: col, id, dados: x, v: 1 }, { onConflict: "colecao,id", ignoreDuplicates: true }).select("id")
-      if (error) throw new Error(`config/${col}: ${error.message}`)
-      if (!data?.length) return false
-    } else if (antes.json !== json) {
+    const antes = foto.get(id)
+    if (!antes) { novos.push({ colecao: col, id, dados: x, v: 1 }); continue }
+    if (def.soPresenca) continue
+    if (antes.json !== JSON.stringify(x)) {
       const { data, error } = await supabase.from("dados_sistema").update({ dados: x, v: antes.v + 1, atualizado_em: new Date().toISOString() }).eq("colecao", col).eq("id", id).eq("v", antes.v).select("id")
       if (error) throw new Error(`config/${col}: ${error.message}`)
       if (!data?.length) return false
     }
   }
-  for (const [id, antes] of foto) if (!porId.has(id)) {
-    const { data, error } = await supabase.from("dados_sistema").delete().eq("colecao", col).eq("id", id).eq("v", antes.v).select("id")
+  if (novos.length) {
+    const { data, error } = await supabase.from("dados_sistema").upsert(novos, { onConflict: "colecao,id", ignoreDuplicates: true }).select("id")
+    if (error) throw new Error(`config/${col}: ${error.message}`)
+    if ((data?.length ?? 0) < novos.length) return false
+  }
+  const sair = [...foto.keys()].filter(id => !porId.has(id))
+  for (const id of sair) {
+    const { data, error } = await supabase.from("dados_sistema").delete().eq("colecao", col).eq("id", id).eq("v", foto.get(id)!.v).select("id")
     if (error) throw new Error(`config/${col}: ${error.message}`)
     if (!data?.length) return false
   }
@@ -76,7 +120,7 @@ export async function mudarConfig<T extends Dados = Dados>(mudar: (d: T) => Part
     const { data, error: erroLer } = await supabase.from("AppConfig").select("data").eq("id", 1).maybeSingle()
     if (erroLer) throw new Error(`config: ${erroLer.message}`)
     const bruto = (data?.data ?? {}) as Dados
-    const { d: hidratado, fotos } = await hidratar(bruto)
+    const { d: hidratado, fotos } = await hidratar(bruto, i > 0)   // tentativa de novo: lê fresco
     const d = hidratado as T
     const m = mudar(d) as Dados | null
     if (!m) return d
@@ -113,7 +157,7 @@ export async function lerCampos<T extends Dados = Dados>(campos: string[]): Prom
   if (error) throw new Error(`config: ${error.message}`)
   const d = Object.fromEntries(Object.entries((data ?? {}) as Record<string, unknown>).filter(([, v]) => v != null)) as Dados
   // Coleção migrada pedida: vem da tabela
-  for (const c of migradas(d).filter(c => campos.includes(c))) d[c] = (await lerColecao(c)).itens
+  for (const c of migradas(d).filter(c => campos.includes(c))) d[c] = (await lerColecao(c)).valor
   delete d._colecoes
   return d as T
 }
@@ -127,14 +171,13 @@ export async function migrarColecao(col: string): Promise<{ itens: number; ja?: 
     const { data } = await supabase.from("AppConfig").select("data").eq("id", 1).single()
     const bruto = (data!.data ?? {}) as Dados
     if (migradas(bruto).includes(col)) { ja = true; break }
-    const lista = (bruto[col] as Dados[] | undefined) ?? []
-    for (let k = 0; k < lista.length; k += 200) {
-      const lote = lista.slice(k, k + 200).map(x => ({ colecao: col, id: COLECOES[col].id(x), dados: x, v: 1 }))
-      const porId = new Map(lote.map(l => [l.id, l]))   // id repetido na lista antiga: fica o primeiro (o mais novo)
-      const { error } = await supabase.from("dados_sistema").upsert([...porId.values()], { onConflict: "colecao,id", ignoreDuplicates: true })
+    const linhas = [...COLECOES[col].paraLinhas(bruto[col]).entries()]
+    for (let k = 0; k < linhas.length; k += 200) {
+      const lote = linhas.slice(k, k + 200).map(([id, dados]) => ({ colecao: col, id, dados, v: 1 }))
+      const { error } = await supabase.from("dados_sistema").upsert(lote, { onConflict: "colecao,id", ignoreDuplicates: true })
       if (error) throw new Error(`migrar ${col}: ${error.message}`)
     }
-    itens = lista.length
+    itens = linhas.length
     const v = typeof bruto._v === "number" ? bruto._v : null
     const novo: Dados = { ...bruto, _colecoes: [...((bruto._colecoes as string[]) ?? []), col], _v: (v ?? 0) + 1 }
     delete novo[col]
