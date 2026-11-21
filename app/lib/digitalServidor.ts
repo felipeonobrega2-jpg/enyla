@@ -405,3 +405,24 @@ export async function marcarProntoDigital(id: string): Promise<{ ok?: true; erro
   }
   return { ok: true }
 }
+
+// Número do pedido reservado antes de o link sair (19/11: duas respostas ao mesmo tempo pegaram o mesmo DIG-0152 e
+// dois clientes ficaram com o mesmo pedido). Reserva atômica na tabela leve; se o número já foi usado, pega o próximo
+// livre. Renumera junto a referência do grupo (pedidos de mais de uma caixa).
+export async function reservarIdsDigitais<T extends { id: string; grupo?: string }>(novos: T[], existentes: { id: string }[]): Promise<T[]> {
+  const { reservarTratada } = await import("./registroAgente")
+  const num = (id: string) => Number(id.replace(/\D/g, "")) || 0
+  const usados = new Set(existentes.map(p => p.id))
+  let n = Math.max(0, ...existentes.map(p => num(p.id)))
+  const mapa = new Map<string, string>()
+  for (const p of novos) {
+    let cand = p.id
+    for (let i = 0; i < 50; i++) {
+      if (!usados.has(cand) && (await reservarTratada(`digid|${cand}`)) !== false) break
+      n = Math.max(n, num(cand)) + 1
+      cand = `DIG-${String(n).padStart(4, "0")}`
+    }
+    usados.add(cand); mapa.set(p.id, cand)
+  }
+  return novos.map(p => ({ ...p, id: mapa.get(p.id) ?? p.id, ...(p.grupo ? { grupo: mapa.get(p.grupo) ?? p.grupo } : {}) }))
+}

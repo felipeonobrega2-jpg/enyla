@@ -34,3 +34,18 @@ describe("digital: caixa maior que A3", () => {
     expect(precoMaiorQueA3(600)).toBeNull()
   })
 })
+
+describe("número do pedido digital nunca repete", () => {
+  it("dois pedidos ao mesmo tempo com o mesmo número: o segundo pega o próximo livre (grupo acompanha)", async () => {
+    const { vi } = await import("vitest")
+    const tomados = new Set<string>()
+    vi.doMock("@/app/lib/registroAgente", () => ({ reservarTratada: async (id: string) => { if (tomados.has(id)) return false; tomados.add(id); return true } }))
+    const { reservarIdsDigitais } = await import("@/app/lib/digitalServidor")
+    const existentes = [{ id: "DIG-0151" }]
+    const a = await reservarIdsDigitais([{ id: "DIG-0152" }], existentes)
+    const b = await reservarIdsDigitais([{ id: "DIG-0152", grupo: "DIG-0152" }, { id: "DIG-0153", grupo: "DIG-0152" }], existentes)
+    expect(a[0].id).toBe("DIG-0152")
+    expect(b.map(x => x.id)).toEqual(["DIG-0153", "DIG-0154"])
+    expect(b.map(x => x.grupo)).toEqual(["DIG-0153", "DIG-0153"])
+  })
+})

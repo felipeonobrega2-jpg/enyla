@@ -84,7 +84,7 @@ async function enviarPara(alvo: Candidato, cfg: Cfg) {
   if (alvo.cotavel && alvo.dados) {
     const cot = cotarDigital(alvo.dados, cfg.digital)
     if (cot.ok) {
-      pedido = montarPedido(cfg.pedidosDigitais ?? [], alvo.jid, alvo.nome, alvo.dados, cot)
+      pedido = (await import("./digitalServidor").then(m => m.reservarIdsDigitais([montarPedido(cfg.pedidosDigitais ?? [], alvo.jid, alvo.nome, alvo.dados, cot)], cfg.pedidosDigitais ?? [])))[0]
       texto = textoComOrcamento(alvo.nome, alvo.dados, pedido, linkPedido(pedido.id))
     }
   }

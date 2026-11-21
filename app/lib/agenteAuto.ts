@@ -613,8 +613,9 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     const anteriores = anterior ? pedidosDoGrupo(cfg.pedidosDigitais, anterior) : []
     if (grupo.ok && mandouArquivo && grupo.itens.some(i => i.cot.padrao)) segurouPelaFoto = true
     if (grupo.ok && !(mandouArquivo && grupo.itens.some(i => i.cot.padrao)) && (!anteriores.length || (trouxeDados && mudouOGrupo(anteriores, grupo.itens)))) {
-      novoGrupo = montarPedidosDoGrupo(cfg.pedidosDigitais ?? [], jid, conversa.nome, grupo.itens)
-      r.resposta = textoLinkGrupo(novoGrupo, novoGrupo.map(p => linkPedido(p.id)))
+      const reservados = await import("./digitalServidor").then(m => m.reservarIdsDigitais(montarPedidosDoGrupo(cfg.pedidosDigitais ?? [], jid, conversa.nome, grupo.itens), cfg.pedidosDigitais ?? []))
+      novoGrupo = reservados
+      r.resposta = textoLinkGrupo(reservados, reservados.map(p => linkPedido(p.id)))
       r.alerta = "nenhum"; r.pode_enviar_sozinho = true
     }
   } else if (digitalPequeno && !naoFazemos && !decisaoSua) {
@@ -624,7 +625,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     const emGrupo = !!anterior && pedidosDoGrupo(cfg.pedidosDigitais, anterior).length > 1
     if (cot.ok && !emGrupo && mandouArquivo && cot.padrao) segurouPelaFoto = true
     if (cot.ok && !emGrupo && !(mandouArquivo && cot.padrao) && (!anterior || (trouxeDados && mudouACotacao(anterior, cot)))) {
-      novoPedido = montarPedido(cfg.pedidosDigitais ?? [], jid, conversa.nome, r.dados, cot)
+      novoPedido = (await import("./digitalServidor").then(m => m.reservarIdsDigitais([montarPedido(cfg.pedidosDigitais ?? [], jid, conversa.nome, r.dados, cot)], cfg.pedidosDigitais ?? [])))[0]
       r.resposta = textoLinkPedido(novoPedido, linkPedido(novoPedido.id))
       r.alerta = "nenhum"; r.pode_enviar_sozinho = true
     }
