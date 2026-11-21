@@ -818,7 +818,7 @@ export async function talvezRetomarParados(origem: string) {
     // Tentativa nova de uma que não saiu: libera a mensagem para ser respondida de novo
     const liberou = naoSaiu.has(c.jid) && await liberarTratada(u.id)
     await gravarCfg(d => ({
-      agenteRetomadas: [u.id, ...(d.agenteRetomadas ?? []).filter(x => x !== u.id)].slice(0, 300),
+      agenteRetomadas: [u.id, ...(d.agenteRetomadas ?? []).filter(x => x !== u.id)].slice(0, 5000),
       ...(naoSaiu.has(c.jid) && !liberou ? { agenteTratadas: (d.agenteTratadas ?? []).filter(x => x !== u.id) } : {}),
     }))
     await fetch(`${origem}/api/whatsapp/webhook/responder?token=${encodeURIComponent(process.env.WHATSAPP_WEBHOOK_SECRET ?? "")}`, {

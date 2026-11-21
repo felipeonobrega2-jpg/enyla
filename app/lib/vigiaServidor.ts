@@ -91,7 +91,7 @@ async function fecharOObvio(agora: Date) {
   if (!fechar.length) return 0
   const em = agora.toISOString()
   await supabase.from("whatsapp_conversas").update({ fechada_em: em }).in("jid", fechar.map(f => f.jid))
-  await mudarConfig((d: Cfg & { fechadasPelaIA?: { jid: string; motivo: string; em: string }[] }) => ({ fechadasPelaIA: [...fechar.map(f => ({ ...f, em })), ...(d.fechadasPelaIA ?? [])].slice(0, 300) }))
+  await mudarConfig((d: Cfg & { fechadasPelaIA?: { jid: string; motivo: string; em: string }[] }) => ({ fechadasPelaIA: [...fechar.map(f => ({ ...f, em })), ...(d.fechadasPelaIA ?? [])].slice(0, 3000) }))
   return fechar.length
 }
 
@@ -253,7 +253,7 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
     novasTentativas.push(ult.id)
     if (await despachar(ult.id, ordem)) { despachadas.add(e.jid); vagas.n--; ordem++ }
   }
-  if (novasTentativas.length) await mudarConfig((d: typeof cfg & { vigiaTentouV3?: string[] }) => ({ vigiaTentouV3: [...novasTentativas, ...(d.vigiaTentouV3 ?? [])].slice(0, 600) }))
+  if (novasTentativas.length) await mudarConfig((d: typeof cfg & { vigiaTentouV3?: string[] }) => ({ vigiaTentouV3: [...novasTentativas, ...(d.vigiaTentouV3 ?? [])].slice(0, 5000) }))
   // O resto é seu: aviso no WhatsApp (no máximo uma mensagem a cada 30 min; cada conversa a cada 3 h)
   const avisadas = cfg.esperaAvisada ?? {}
   const paraAvisar = lista.filter(e => !respondidas.has(e.jid) && (!avisadas[e.jid] || agora.getTime() - new Date(avisadas[e.jid]).getTime() > 3 * 3600_000) && paraOFelipe(e))   // só bom negócio com o checklist completo vira aviso seu
