@@ -1069,11 +1069,13 @@ const PERIODO_LABEL: Record<Periodo, string> = {
   mes: "Este mês", trimestre: "Este trimestre", semestre: "Este semestre", ano: "Este ano", tudo: "Tudo"
 }
 
+const SEM_CARDS: KanbanCard[] = []
+
 // ─── Main View ───────────────────────────────────────────────────────────────
 
 export function FinanceiroView({
-  lancamentos,
-  kanban,
+  lancamentos: todosLancamentos,
+  kanban: kanbanTodo,
   negocios,
   lotes,
   config,
@@ -1105,6 +1107,12 @@ export function FinanceiroView({
   const catsRec  = config?.categoriasReceita ?? DEFAULT_CATS_REC
   const catsDesp = config?.categoriasDespesa ?? DEFAULT_CATS_DESP
 
+  // Linha de negócio: o digital tem caixa próprio para a margem do Offset não se misturar
+  const [linha, setLinha] = useState<"offset" | "digital" | "todas">("offset")
+  const lancamentos = useMemo(() => linha === "todas" ? todosLancamentos
+    : todosLancamentos.filter(l => (l.unidade ?? "offset") === linha), [todosLancamentos, linha])
+  const kanban = linha === "digital" ? SEM_CARDS : kanbanTodo
+  const temDigital = useMemo(() => todosLancamentos.some(l => l.unidade === "digital"), [todosLancamentos])
   const [tab, setTab] = useState<FinTab>("dash")
   const irAba = (t: FinTab) => { setTab(t); sessionStorage.setItem("fin:tab", t) }
   const [periodo, setPeriodo] = useState<Periodo>("mes")
@@ -1135,6 +1143,8 @@ export function FinanceiroView({
     const p = sessionStorage.getItem("fin:periodo")
     if (p && ["mes", "trimestre", "semestre", "ano", "tudo"].includes(p))
       setPeriodo(p as Periodo)
+    const li = sessionStorage.getItem("fin:linha")
+    if (li === "offset" || li === "digital" || li === "todas") setLinha(li)
   }, [])
 
   // Pedidos elegíveis (fechado, em produção, entregue — exceto perdido)
@@ -1367,6 +1377,9 @@ export function FinanceiroView({
           titulo="Financeiro"
           sub={`${brl(kpis.recebido)} recebido · ${brl(kpis.aReceber)} a receber · ${kpis.resultado >= 0 ? "" : "−"}${brl(Math.abs(kpis.resultado))} de geração de caixa (${PERIODO_LABEL[periodo].toLowerCase()})`}
           acoes={<>
+            {temDigital && <Segmentado<"offset" | "digital" | "todas"> valor={linha}
+              onChange={v => { setLinha(v); sessionStorage.setItem("fin:linha", v) }}
+              opcoes={[{ v: "offset", nome: "Offset" }, { v: "digital", nome: "Digital" }, { v: "todas", nome: "Juntas" }]} />}
             <Segmentado<Periodo> valor={periodo}
               onChange={v => { setPeriodo(v); setMesOffset(0); sessionStorage.setItem("fin:periodo", v) }}
               opcoes={(Object.entries(PERIODO_LABEL) as [Periodo, string][]).map(([v, l]) => ({ v, nome: l }))} />
@@ -2048,6 +2061,7 @@ export function FinanceiroView({
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="text-[12.5px] font-semibold truncate" style={{ color: "var(--text-main)" }}>{l.descricao}</span>
+                                    {l.unidade === "digital" && linha === "todas" && <span className="ds-chip shrink-0 text-[10px] px-1.5 py-0.5 rounded" style={{ background: "#EEF0FF", color: "#4B4FD8" }}>Digital</span>}
                                     {st !== "pago" && (
                                       <span className={`text-[9.5px] font-bold px-1.5 py-px rounded-full border shrink-0 ${STATUS_CLS[st]}`}>
                                         {STATUS_LABEL[st]}

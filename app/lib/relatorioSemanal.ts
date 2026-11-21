@@ -34,7 +34,7 @@ async function todas<T>(tabela: string): Promise<T[]> {
 export async function htmlRelatorioSemanal(per = semanaPassada()): Promise<{ html: string; nome: string }> {
   const ant = periodoAnterior(per)
   const [kanban, lancamentos, { data: c }, extras] = await Promise.all([
-    todas<KanbanCard>("KanbanCard"), todas<LancamentoFinanceiro>("LancamentoFinanceiro"),
+    todas<KanbanCard>("KanbanCard"), todas<LancamentoFinanceiro>("LancamentoFinanceiro").then(ls => ls.filter(l => (l.unidade ?? "offset") === "offset")),
     supabase.from("AppConfig").select("categoriasDespesa:data->categoriasDespesa, producao:data->producao").eq("id", 1).single(),
     extrasDoRelatorio(iso(per.de), iso(per.ate), iso(ant.de), iso(ant.ate)).catch(() => null),
   ])

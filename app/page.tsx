@@ -227,6 +227,8 @@ export default function Home() {
   const [parceiros, setParceiros] = useState<Parceiro[]>([])
   const [negocios, setNegocios]   = useState<NegocioParceiro[]>([])
   const [lancamentos, setLancamentos] = useState<LancamentoFinanceiro[]>([])
+  // Venda, margem, metas e pedidos olham só o Offset; o Financeiro e a busca veem todas as linhas (Digital à parte)
+  const lancamentosOffset = useMemo(() => lancamentos.filter(l => (l.unidade ?? "offset") === "offset"), [lancamentos])
   const [lotes, setLotes]         = useState<Lote[]>([])
   const [modalSinal, setModalSinal] = useState<{
     cardId: string; nomeCliente: string; cardNumero?: string
@@ -1896,7 +1898,7 @@ export default function Home() {
         <div className="px-0 pt-2 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
           <SidebarGamificacao
             kanban={kanban}
-            lancamentos={lancamentos}
+            lancamentos={lancamentosOffset}
             metaMensal={config.metaMensal}
             baselineFaturamento={config.baselineFaturamento}
             marcos={normalizarMetas(config.metas).marcos}
@@ -2571,7 +2573,7 @@ export default function Home() {
           {view === "painel" ? (
             <PainelView
               kanban={kanban}
-              lancamentos={lancamentos}
+              lancamentos={lancamentosOffset}
               historico={historico}
               propostasCustom={propostasCustom}
               clientes={clientes}
@@ -2589,7 +2591,7 @@ export default function Home() {
               vendasDigitais={vendasDigitais}
             />
           ) : view === "dashboard" ? (
-            <RelatoriosView kanban={kanban} lancamentos={lancamentos} clientes={clientes} origensClientes={config.origensClientes} historico={historico}
+            <RelatoriosView kanban={kanban} lancamentos={lancamentosOffset} clientes={clientes} origensClientes={config.origensClientes} historico={historico}
               nomeCategoria={id => { const c = (config.categoriasDespesa ?? DEFAULT_CATS_DESP).find(x => x.id === id); if (c) return c.nome; const t = id.replace(/[-_]+/g, " ").trim(); return t.charAt(0).toUpperCase() + t.slice(1) }}
               impostoPct={normalizarProducao(config.producao).impostoPct}
               fixosMes={(config.gastosFixos ?? []).filter(g => g.ativa !== false).reduce((t, g) => t + g.valor, 0)}
@@ -2641,7 +2643,7 @@ export default function Home() {
               historico={historico}
               kanban={kanban}
               propostasCustom={propostasCustom}
-              lancamentos={lancamentos}
+              lancamentos={lancamentosOffset}
               cadastro={clientes}
               onReplicar={replicar}
               onWhatsApp={(item) => enviarProposta(item.form, item.calculo, item.numero, item.data)}
@@ -2659,7 +2661,7 @@ export default function Home() {
               isDark={isDark}
               kanban={kanban}
               historico={historico}
-              lancamentos={lancamentos}
+              lancamentos={lancamentosOffset}
               onDetalhes={card => setDetalheModal({ tipo: "kanban", card })}
               onNovoLancamento={prefill => setModalLancPedidos(prefill)}
               onEditarLancamento={l => setModalLancPedidos(l)}
@@ -2935,7 +2937,7 @@ export default function Home() {
               parceiros={parceiros}
               negocios={negocios}
               kanban={kanban}
-              lancamentos={lancamentos}
+              lancamentos={lancamentosOffset}
               clientes={clientes}
               lotes={lotes}
               abaInicial={view === "terceirizados" ? "pedidos" : "vendas"}
@@ -3003,14 +3005,14 @@ export default function Home() {
                 margemPorCampanha={margemPorCampanha}
               />
           ) : view === "entregas" ? (
-            <EntregasView key={entregasPrefill ? JSON.stringify(entregasPrefill) : "entregas"} config={config} kanban={kanban} lancamentos={lancamentos} clientes={clientes} isDark={isDark}
+            <EntregasView key={entregasPrefill ? JSON.stringify(entregasPrefill) : "entregas"} config={config} kanban={kanban} lancamentos={lancamentosOffset} clientes={clientes} isDark={isDark}
               prefill={entregasPrefill}
               onLancamentos={ls => { setLancamentos(prev => [...ls, ...prev]); if (ls.length) showToast(`Lalamove chamada · ${ls[0].valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} lançado`) }}
               onRemoverLancamentos={ids => setLancamentos(prev => prev.filter(l => !ids.includes(l.id)))}
               onSalvarLocais={locaisRetirada => salvarConfigTudo({ ...config, locaisRetirada })} />
           ) : view === "whatsapp" ? (
             <WhatsAppView
-              kanban={kanban} lancamentos={lancamentos} vinculos={config.vinculosWhatsapp}
+              kanban={kanban} lancamentos={lancamentosOffset} vinculos={config.vinculosWhatsapp}
               etiquetasDef={config.etiquetasWhatsapp ?? []}
               avisos={config.avisosPedido} dispensados={config.filaDispensados}
               onAvisado={(k, a) => salvarConfigTudo({ ...config, avisosPedido: { ...(config.avisosPedido ?? {}), [k]: a } })}
@@ -3038,7 +3040,7 @@ export default function Home() {
                 showToast(`Faca de ${f.cavidades} cavidades registrada`)
               }} />
           ) : view === "fornecedores" ? (
-            <FornecedoresView config={config} kanban={kanban} lancamentos={lancamentos} historico={historico} onSave={salvarConfigTudo}
+            <FornecedoresView config={config} kanban={kanban} lancamentos={lancamentosOffset} historico={historico} onSave={salvarConfigTudo}
               onDividir={(l, partes) => {
                 // A primeira etapa fica no lançamento original; as outras viram lançamentos novos iguais a ele
                 const agora = Date.now()
@@ -3381,7 +3383,7 @@ export default function Home() {
             fetch(`/api/kanban/${cardId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ preco }) }).catch(() => {})
             showToast("Valor atualizado.")
           } : undefined}
-          lancamentos={lancamentos}
+          lancamentos={lancamentosOffset}
         />
       )}
 

@@ -47,7 +47,7 @@ async function calcular(cfg: Cfg, kanban: KanbanCard[], lancs: LancamentoFinance
 export async function linhaDeComemoracao(valor: number) {
   try {
     const cfg = await lerCfg() as Cfg
-    const [kanban, lancs] = await Promise.all([todos<KanbanCard>("KanbanCard"), todos<LancamentoFinanceiro>("LancamentoFinanceiro")])
+    const [kanban, lancs] = await Promise.all([todos<KanbanCard>("KanbanCard"), todos<LancamentoFinanceiro>("LancamentoFinanceiro").then(ls => ls.filter(l => (l.unidade ?? "offset") === "offset"))])
     return linhaRumo(valor, await calcular(cfg, kanban, lancs))
   } catch { return "" }
 }
@@ -63,7 +63,7 @@ export async function talvezResumoDoDia() {
   await mudarConfig((d: Cfg) => { if (d.resumoDiaEm === hoje) return null; minha = true; return { resumoDiaEm: hoje } })
   if (!minha) return
   const cfg = await lerCfg() as Cfg
-  const [kanban, lancs] = await Promise.all([todos<KanbanCard>("KanbanCard"), todos<LancamentoFinanceiro>("LancamentoFinanceiro")])
+  const [kanban, lancs] = await Promise.all([todos<KanbanCard>("KanbanCard"), todos<LancamentoFinanceiro>("LancamentoFinanceiro").then(ls => ls.filter(l => (l.unidade ?? "offset") === "offset"))])
   const pedidos = montarPedidos(kanban, lancs)
   const deHoje = pedidos.filter(p => p.dataFechamento === hoje)
   const dig = vendasDigitais(cfg)

@@ -372,6 +372,7 @@ export type LancamentoFinanceiro = {
   obs?: string
   revisarDepois?: boolean
   criadoEm: string
+  unidade?: "offset" | "digital" | "cartuxo"   // linha de negócio (margem e DRE separados; caixa junto)
 }
 
 export type StatusLoteParceiro = "aguardando" | "em_producao" | "pronto" | "entregue"

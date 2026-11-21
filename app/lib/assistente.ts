@@ -104,7 +104,7 @@ async function rodarFerramenta(nome: string, e: Record<string, unknown>, cfg: Cf
   if (nome === "vendas_do_periodo") {
     const { montarPedidos, vendasDoPeriodo } = await import("./negocio")
     const { unpackTerceirizado } = await import("./kanbanUnpack")
-    const [k, l] = await Promise.all([todas<KanbanCard>("KanbanCard"), todas<LancamentoFinanceiro>("LancamentoFinanceiro")])
+    const [k, l] = await Promise.all([todas<KanbanCard>("KanbanCard"), todas<LancamentoFinanceiro>("LancamentoFinanceiro").then(ls => ls.filter(l => (l.unidade ?? "offset") === "offset"))])
     const d = new Date(`${hoje()}T12:00:00-03:00`)
     const ant = e.mes === "anterior"
     const de = new Date(d.getFullYear(), d.getMonth() - (ant ? 1 : 0), 1), ate = ant ? new Date(d.getFullYear(), d.getMonth(), 0, 23, 59) : d

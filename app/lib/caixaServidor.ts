@@ -25,7 +25,7 @@ export async function montarCaixaServidor() {
   const { unpackTerceirizado } = await import("./kanbanUnpack")
   const { CONFIG_PADRAO } = await import("../config")
   const [hoje, kanbanBruto, lancamentos, historico, propostasCustom, clientes, cfgRow, ocultos] = await Promise.all([
-    montarHoje(), todas<import("../types").KanbanCard>("KanbanCard"), todas<import("../types").LancamentoFinanceiro>("LancamentoFinanceiro"),
+    montarHoje(), todas<import("../types").KanbanCard>("KanbanCard"), todas<import("../types").LancamentoFinanceiro>("LancamentoFinanceiro").then(ls => ls.filter(l => (l.unidade ?? "offset") === "offset")),
     todas<{ form: import("../types").FormData; numero?: string }>("HistoricoItem", "numero, form"), todas<import("../types").PropostaCustom>("PropostaCustom"),
     todas<import("../types").Cliente>("Cliente"), lerConfigLinha(), ocultosDaCaixa(),
   ])
