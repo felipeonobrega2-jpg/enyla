@@ -379,6 +379,23 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       sugestoes: [{ numero: "ORC-2026-241", nome: "Aromas Exemplo", valor: 18140, motivo: "proposta ORC-2026-241 de R$ 18.140" }, { jid: "7@lid", nome: "Cosméticos Modelo", volume: 20000, motivo: "falou em 20.000 un · caixa 50ml" }],
     }))
   }
+  if (u.startsWith("/api/perto")) {
+    const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
+    const cv = (jid: string, nome: string, etiquetas: string[], msg: string, rec: number, env: number) => ({ jid, nome, status_lead: "mql", etiquetas, ultima_msg: msg, ultima_at: h(Math.min(rec, env)), ultima_recebida_at: h(rec), ultima_enviada_at: h(env) })
+    if (u.includes("so=jids")) return new Response(JSON.stringify({ jids: ["11@lid"] }))
+    return new Response(JSON.stringify({
+      itens: [
+        { jid: "11@lid", nota: "quer fechar o ano com 20 mil caixas", em: h(3000), conversa: cv("11@lid", "Beth Perfumaria", ["ICP"], "Consegue me mandar com hot stamping?", 40, 300) },
+        { jid: "12@lid", nota: "", em: h(5000), conversa: cv("12@lid", "Douglas Cosméticos", ["ICP"], "Vou ver com meu sócio e te falo", 3000, 2900) },
+        { jid: "13@lid", nota: "", em: h(6000), conversa: cv("13@lid", "Gabriel", ["Oportunidade"], "Perfeito, aguardo", 4400, 4300) },
+      ],
+      sugestoes: [
+        cv("14@lid", "Martins", ["ICP"], "São 3 modelos, 5 mil de cada", 600, 500),
+        cv("15@lid", "WR Aromas", ["ICP"], "Pode ser kraft", 1500, 1600),
+        cv("16@lid", "Julio", ["Lead médio"], "Me manda o valor de 2 mil", 2000, 1900),
+      ], totalSugestoes: 3,
+    }))
+  }
   if (u.startsWith("/api/hoje")) {
     const h = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
     return new Response(JSON.stringify({

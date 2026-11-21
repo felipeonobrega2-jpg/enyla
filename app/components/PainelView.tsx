@@ -1,4 +1,5 @@
 "use client"
+import { PertoDeVoceCard } from "./PertoDeVoceCard"
 import { CaixaEntrada, type ItemExterno } from "./CaixaEntrada"
 import { FunilAgoraCard } from "./FunilAgoraCard"
 
@@ -311,6 +312,8 @@ export function PainelView({
 
       {/* Caixa de entrada: tudo o que pede você numa lista só, por prioridade */}
       {onAbrirConversa && <CaixaEntrada extras={extrasCaixa} onAbrirConversa={onAbrirConversa} onNavegar={onNavegar} onOrcar={onOrcarConversa} onPropostaPronta={onPropostaPronta} />}
+
+      {onAbrirConversa && <PertoDeVoceCard onAbrirConversa={(jid, nome) => onAbrirConversa(jid, nome)} />}
 
       <FunilAgoraCard onAbrirConversa={onAbrirConversa} onAbrirCardId={id => { const k = kanban.find(c => c.id === id); if (k) onAbrirCard(k) }} onNavegar={() => onNavegar("digital")} />
 

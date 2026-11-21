@@ -1,6 +1,6 @@
 "use client"
 
-import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag, ChevronRight, Reply, Keyboard, Sparkles, Laptop, Smartphone, Trash2, Square, Merge, Search } from "lucide-react"
+import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag, ChevronRight, Reply, Keyboard, Sparkles, Laptop, Smartphone, Trash2, Square, Merge, Search, Star } from "lucide-react"
 import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect, useSyncExternalStore } from "react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, nomeChave } from "../lib/negocio"
@@ -117,6 +117,14 @@ export default function WhatsAppView({
   const defDe = (nome: string): EtiquetaDef => etiquetasDef.find(e => e.nome === nome) ?? { nome, cor: "#7a7983" }
   const [conversas, setConversas] = useState<Conversa[]>([])
   const [ativa, setAtiva] = useState<Conversa | null>(null)
+  // "Perto de você": os leads que você quer à mão (estrela)
+  const [perto, setPerto] = useState<Set<string>>(new Set())
+  useEffect(() => { fetch("/api/perto?so=jids").then(r => r.ok ? r.json() : null).then(d => { if (d?.jids) setPerto(new Set(d.jids)) }).catch(() => {}) }, [])
+  const alternarPerto = (jid: string) => {
+    const tinha = perto.has(jid)
+    setPerto(p => { const n = new Set(p); if (tinha) n.delete(jid); else n.add(jid); return n })
+    fetch("/api/perto", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid, acao: tinha ? "tirar" : "por" }) }).catch(() => {})
+  }
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
   const [loadingConvs, setLoadingConvs] = useState(true)
   const [loadingMsgs, setLoadingMsgs] = useState(false)
@@ -454,6 +462,7 @@ export default function WhatsAppView({
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[13.5px] font-semibold truncate flex items-center gap-1.5 min-w-0" style={{ color: "var(--text-main)" }}>
                     <span className="truncate">{c.nome}</span>
+                    {perto.has(c.jid) && <Star className="w-3 h-3 shrink-0" fill="#c57800" style={{ color: "#c57800" }} aria-label="Perto de você" />}
                     {comprou(c)
                       ? <span className="shrink-0 text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-px rounded" style={{ background: "rgba(132,86,232,0.12)", color: "#8456e8" }}>cliente</span>
                       : clienteDe(c) && <span title="Recebeu orçamento, ainda não comprou" className="shrink-0 text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-px rounded" style={{ background: "rgba(31,122,224,0.1)", color: "#1f7ae0" }}>orçamento</span>}
@@ -534,6 +543,12 @@ export default function WhatsAppView({
               <EtiquetasDaConversa selecionadas={ativa.etiquetas ?? []} definicoes={etiquetasDef}
                 onMudar={lista => { alterar([ativa.jid], { etiquetas: lista }); setAtiva(a => a ? { ...a, etiquetas: lista } : a) }}
                 onCriar={onCriarEtiqueta} />
+              <button onClick={() => alternarPerto(ativa.jid)} title={perto.has(ativa.jid) ? "Tirar de Perto de você" : "Pôr em Perto de você (fica à mão no Painel)"}
+                aria-pressed={perto.has(ativa.jid)}
+                className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-2 rounded-xl transition-colors hover:bg-black/5"
+                style={{ color: perto.has(ativa.jid) ? "#c57800" : "var(--text-sub)", background: perto.has(ativa.jid) ? "rgba(197,120,0,0.10)" : undefined }}>
+                <Star className="w-4 h-4" fill={perto.has(ativa.jid) ? "currentColor" : "none"} />{perto.has(ativa.jid) ? "Perto" : "Pôr perto"}
+              </button>
               <ProximoPasso key={ativa.jid} jid={ativa.jid} rotulo="Próximo passo" />
               <button onClick={() => alterar([ativa.jid], { fechar: !estaFechada(ativa) })} title={estaFechada(ativa) ? "Reabrir conversa" : "Fechar conversa (volta sozinha se o cliente escrever)"}
                 className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-2 rounded-xl transition-colors hover:bg-black/5" style={{ color: "var(--text-sub)" }}>
