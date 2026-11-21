@@ -3,7 +3,6 @@
 import { etapasNoTexto, SUBCATEGORIA } from "../lib/calibragem"
 import { CampoCriavel } from "./CampoCriavel"
 import { CaixaView } from "./CaixaView"
-import { ConciliacaoView } from "./ConciliacaoView"
 import { previsaoDeCaixa } from "../lib/caixa"
 import { normalizarProducao } from "../lib/producao"
 import React, { useState, useMemo, useEffect, useRef } from "react"
@@ -1063,7 +1062,7 @@ function periodoRange(p: Periodo, mesOffset = 0): { from: Date | null; to: Date 
 
 const MESES_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]
 
-type FinTab = "dash" | "previsao" | "conciliacao" | "dre" | "receber" | "lancamentos" | "pix" | "contas" | "fixas" | "fornecedores" | "config" | "banco"
+type FinTab = "dash" | "previsao" | "dre" | "receber" | "lancamentos" | "pix" | "contas" | "fixas" | "fornecedores" | "config" | "banco"
 
 const PERIODO_LABEL: Record<Periodo, string> = {
   mes: "Este mês", trimestre: "Este trimestre", semestre: "Este semestre", ano: "Este ano", tudo: "Tudo"
@@ -1159,7 +1158,7 @@ export function FinanceiroView({
   // Restore on mount — write effects would corrupt sessionStorage during SSR hydration
   useEffect(() => {
     const t = sessionStorage.getItem("fin:tab")
-    if (t && ["dash", "previsao", "conciliacao", "dre", "receber", "lancamentos", "pix", "contas", "fixas", "fornecedores", "config", "banco"].includes(t))
+    if (t && ["dash", "previsao", "dre", "receber", "lancamentos", "pix", "contas", "fixas", "fornecedores", "config", "banco"].includes(t))
       setTab(t as FinTab)
     const p = sessionStorage.getItem("fin:periodo")
     if (p && ["mes", "trimestre", "semestre", "ano", "tudo"].includes(p))
@@ -1398,7 +1397,6 @@ export function FinanceiroView({
       { v: "receber", nome: "A receber", conta: vencidos.length },
       { v: "lancamentos", nome: "Lançamentos" },
       { v: "previsao", nome: "Previsão" },
-      { v: "conciliacao", nome: "Conciliação" },
       { v: "banco", nome: "Banco" },
       { v: "dre", nome: "DRE" },
       { v: "pix", nome: "Pix", conta: pixPendentes.length },
@@ -2303,10 +2301,6 @@ export function FinanceiroView({
               </div>
             )}
           </>
-        )}
-        {/* ── CONCILIAÇÃO ── */}
-        {tab === "conciliacao" && config && onUpdateConfig && (
-          <ConciliacaoView kanban={kanban} lancamentos={lancamentos} config={config} onAdd={onAdd} onUpdate={onUpdate} onUpdateConfig={cfg => onUpdateConfig(cfg)} />
         )}
 
         {/* ── PREVISÃO DE CAIXA ── */}
