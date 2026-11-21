@@ -1070,13 +1070,14 @@ const PERIODO_LABEL: Record<Periodo, string> = {
 }
 
 const SEM_CARDS: KanbanCard[] = []
+const SEM_NEGOCIOS: NegocioParceiro[] = []
 
 // ─── Main View ───────────────────────────────────────────────────────────────
 
 export function FinanceiroView({
   lancamentos: todosLancamentos,
   kanban: kanbanTodo,
-  negocios,
+  negocios: negociosTodos,
   lotes,
   config,
   onAdd,
@@ -1112,6 +1113,8 @@ export function FinanceiroView({
   const lancamentos = useMemo(() => linha === "todas" ? todosLancamentos
     : todosLancamentos.filter(l => (l.unidade ?? "offset") === linha), [todosLancamentos, linha])
   const kanban = linha === "digital" ? SEM_CARDS : kanbanTodo
+  // Parcerias (comissões) são do Offset
+  const negocios = linha === "digital" ? SEM_NEGOCIOS : negociosTodos
   const temDigital = useMemo(() => todosLancamentos.some(l => l.unidade === "digital"), [todosLancamentos])
   const [tab, setTab] = useState<FinTab>("dash")
   const irAba = (t: FinTab) => { setTab(t); sessionStorage.setItem("fin:tab", t) }
