@@ -3,7 +3,7 @@
 import React from "react"
 import { AlertTriangle, ArrowRight, Check, Printer, Scissors, Layers, Truck, Wrench, Info, Pencil, Plus, RotateCcw, X } from "lucide-react"
 import { Calculo, FormData } from "../types"
-import { ConfigProducao, OpcoesRota, Rota, ItemCusto, ColagemModo, EtapaCusto, CustoExtra, chaveCavidades } from "../lib/producao"
+import { ConfigProducao, OpcoesRota, Rota, ItemCusto, ColagemModo, EtapaCusto, CustoExtra, chaveCavidades, DIVISOES, type Divisao } from "../lib/producao"
 import { brl, num } from "../utils"
 import type { TipoCorrecao } from "../lib/aprendizado"
 import { Section } from "./ui"
@@ -412,8 +412,8 @@ export function RotasProducao({ calculo, form, producao, multiplicadorPadrao, co
                 opcoes={[{ v: "", nome: "Automático" }, ...formatosDisponiveis.map(([id, nome]) => ({ v: id, nome }))]}
                 onChange={v => set({ formatoId: v || null })} />
               <Seletor label="Divisão da folha" valor={opcoes.divisao ?? 0}
-                opcoes={[{ v: 0, nome: "Automático" }, { v: 1, nome: "Folha inteira" }, { v: 2, nome: "Meia folha" }, { v: 4, nome: "Quarto de folha" }]}
-                onChange={v => set({ divisao: (v || null) as 1 | 2 | 4 | null })} />
+                opcoes={[{ v: 0, nome: "Automático" }, ...DIVISOES.map(d => ({ v: d.d, nome: d.nome }))]}
+                onChange={v => set({ divisao: (v || null) as Divisao | null })} />
               <Seletor label="Faca" valor={opcoes.facaCavidades ?? 0}
                 opcoes={[{ v: 0, nome: "Automático" }, ...facasDisponiveis.map(k => ({ v: k, nome: `${k} ${k === 1 ? "cavidade" : "cavidades"}${k === kCheio ? " (cheia)" : ""}` }))]}
                 onChange={v => set({ facaCavidades: v || null })} />

@@ -241,7 +241,7 @@ export type CustoExtra = { id: string; descricao: string; valor: number; porUnid
 export type OpcoesRota = {
   impressorId?: string | null          // null = automático (mais barato)
   formatoId?: string | null            // papel escolhido à mão
-  divisao?: 1 | 2 | 4 | null           // divisão da folha escolhida à mão
+  divisao?: Divisao | null           // divisão da folha escolhida à mão
   facaCavidades?: number | null        // null = automático
   cavidades?: Record<string, number[]> // cavidades digitadas por passada, por rota ("impressor|papel|divisão")
   fornecedores?: Partial<Record<"acabamento" | "hotStamping" | "corteVinco" | "colagem", string>>
@@ -311,7 +311,7 @@ export type Rota = {
   maquinaNome: string
   formatoId: string
   formatoNome: string
-  divisao: 1 | 2 | 4
+  divisao: Divisao
   divisaoNome: string
   passadas: Passada[]
   pecasPorPeca: number
@@ -473,10 +473,15 @@ export function ferramentalDoCliente(
 
 // ── Cálculo ───────────────────────────────────────────────────────────────────
 
-const DIVISOES: { d: 1 | 2 | 4; nome: string; dims: (W: number, H: number) => [number, number] }[] = [
+// Em quantos pedaços a folha comprada é cortada antes de entrar na máquina. Sexto e oitavo servem às máquinas
+// pequenas (ex.: Jerograf 48×45): a meia folha com 2 caixas lado a lado vira 4 blocos que passam na máquina.
+export type Divisao = 1 | 2 | 4 | 6 | 8
+export const DIVISOES: { d: Divisao; nome: string; dims: (W: number, H: number) => [number, number] }[] = [
   { d: 1, nome: "Folha inteira", dims: (W, H) => [W, H] },
   { d: 2, nome: "Meia folha",    dims: (W, H) => [W, H / 2] },
   { d: 4, nome: "Quarto de folha", dims: (W, H) => [W / 2, H / 2] },
+  { d: 6, nome: "Sexto de folha", dims: (W, H) => [W / 2, H / 3] },
+  { d: 8, nome: "Oitavo de folha", dims: (W, H) => [W / 2, H / 4] },
 ]
 
 type RotaBase = {

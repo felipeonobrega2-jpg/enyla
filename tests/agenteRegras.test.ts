@@ -66,3 +66,13 @@ describe("base de conhecimento: só o que importa na conversa", () => {
     expect(ids).not.toContain("a3")
   })
 })
+
+describe("motor: folha cortada em 8 para máquina pequena", () => {
+  it("meia folha com 2 caixas lado a lado vira 4 blocos na Jerograf 48×45 (só pinça): 16 por folha", async () => {
+    const { passadasDaPeca, DIVISOES } = await import("../app/lib/producao")
+    expect(DIVISOES.map(d => d.d)).toEqual([1, 2, 4, 6, 8])
+    const [w, h] = DIVISOES.find(d => d.d === 8)!.dims(770, 1130)
+    const ps = passadasDaPeca(w, h, { largura: 282.5, altura: 179.75 }, { nome: "J", pinca: 10, margem: 0, largura: 480, altura: 450 } as never, 2)
+    expect(ps.reduce((s, p) => s + p.cavidades * p.porPeca, 0) * 8).toBe(16)
+  })
+})

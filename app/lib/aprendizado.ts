@@ -311,11 +311,27 @@ export function sugerirAjustes(comps: Comparacao[], cfg: Configuracoes, hoje = n
     doCorr(`servico|${componente}|${fornecedorId}`, `${cs.nome} · ${f.nome}`, { tipo: "servico", fornecedorId, servicos }, a, fator =>
       servicos.map(sv => ({ de: descreverRegra(f.servicos[sv]), para: descreverRegra(escalarRegra(f.servicos[sv]!, fator)) })))
   }
+  // Papel corrigido no orçamento quase sempre é QUANTIDADE de folhas (como a folha é cortada e quantas caixas cabem),
+  // não o preço do papel (21/11: o motor contava 8 por folha onde dava 16 e sugeriu baixar o papel 43%). Então não
+  // vira ajuste de preço: vira um aviso para conferir o corte e as cavidades da rota.
   for (const [materialId, a] of corrPapel) {
     const mat = cfg.materiais.find(m => m.id === materialId)
-    if (!mat) continue
-    doCorr(`papel|${materialId}`, `Papel · ${mat.nome}`, { tipo: "papel", materialId }, a, fator =>
-      FORMATOS_PAPEL.map(fmt => { const atual = mat.precos?.[fmt.id] ?? fmt.precoPor100; return { de: `${fmt.nome}: ${brl(atual)} / 100 fls`, para: `${brl(r2(atual * fator))} / 100 fls` } }))
+    if (!mat || a.pedidos.length < AMOSTRA_MINIMA || a.prev <= 0) continue
+    const chave = `papel|${materialId}|correcoes`
+    const ign = ignorados[chave]
+    if (ign && (hoje.getTime() - new Date(ign + "T12:00:00").getTime()) / 86_400_000 < 30) continue
+    const desvioPct = (a.real - a.prev) / a.prev * 100
+    if (Math.abs(desvioPct) < DESVIO_MINIMO) continue
+    const datas = a.razoes.map(r => r.data).filter(Boolean).sort() as string[]
+    out.push({
+      chave, titulo: `Papel · ${mat.nome} (suas correções)`, alvo: { tipo: "papel", materialId }, pedidos: a.pedidos, previsto: a.prev, real: a.real,
+      desvioPct, fator: 1, mudancas: [], periodo: { de: datas[0], ate: datas[datas.length - 1] }, origem: "correcoes",
+      motivos: [...new Set(motivosPor.get(`papel|${materialId}`) ?? [])].slice(0, 6),
+      inconsistente: {
+        motivo: `Você mudou o papel ${desvioPct < 0 ? "para menos" : "para mais"} em ${a.pedidos.length} orçamentos. Isso costuma ser a quantidade de folhas (em quantos pedaços a folha é cortada e quantas caixas cabem em cada um), não o preço do papel. Confira o corte e as cavidades na rota desses orçamentos; o preço do papel fica como está.`,
+        porPedido: a.razoes.map(r => ({ numero: r.numero, quantidade: r.quantidade, razao: r.razao, jogos: r.jogos })),
+      },
+    })
   }
   for (const [, a] of corrFaca) {
     const fp = prod.ferramentalPadrao
