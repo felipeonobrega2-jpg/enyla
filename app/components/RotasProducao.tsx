@@ -7,6 +7,7 @@ import { ConfigProducao, OpcoesRota, Rota, ItemCusto, ColagemModo, EtapaCusto, C
 import { brl, num } from "../utils"
 import type { TipoCorrecao } from "../lib/aprendizado"
 import { Section } from "./ui"
+import { CaminhoDaFolha } from "./CaminhoDaFolha"
 
 const border = { border: "1px solid rgba(60,60,67,0.08)" }
 
@@ -276,6 +277,11 @@ export function RotasProducao({ calculo, form, producao, multiplicadorPadrao, co
               <p className="text-[11px] text-[rgba(60,60,67,0.55)] ds-num mt-1">{brl(melhor.precoUnit)}/un</p>
             </div>
           </div>
+
+          <CaminhoDaFolha rota={melhor} alternativas={atual.alternativas} manual={rotaManual} perdaPct={producao.perdaPct} esp={producao.espacoEntrePecas}
+            maquina={producao.fornecedores.find(f => f.id === melhor.impressorId)?.maquina ?? null}
+            folha={(() => { const m = melhor.formatoId.match(/^(\d+)x(\d+)$/); return m ? { largura: Number(m[1]) * 10, altura: Number(m[2]) * 10 } : null })()}
+            blank={{ largura: calculo.dieline.largura, altura: calculo.dieline.altura }} />
 
           <Passadas rota={melhor} onCavidades={lista => {
             const chave = chaveCavidades(melhor.impressorId, melhor.formatoId, melhor.divisao)

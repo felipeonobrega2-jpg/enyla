@@ -76,3 +76,14 @@ describe("motor: folha cortada em 8 para máquina pequena", () => {
     expect(ps.reduce((s, p) => s + p.cavidades * p.porPeca, 0) * 8).toBe(16)
   })
 })
+
+describe("motor explica a conta", () => {
+  it("passos em português e desenho com pinça", async () => {
+    const { desenharPassada, gradeDoCorte } = await import("../app/lib/explicaRota")
+    expect(gradeDoCorte(8)).toEqual({ cols: 2, rows: 4 })
+    const d = desenharPassada(385, 282.5, 2, { largura: 282.5, altura: 179.75 }, { pinca: 10, margem: 0 }, 2)
+    expect(d.caixas).toHaveLength(2)
+    expect(d.pinca).not.toBeNull()
+    expect(desenharPassada(385, 282.5, 3, { largura: 282.5, altura: 179.75 }, { pinca: 10, margem: 0 }, 2).encaixadasAMais).toBe(1)
+  })
+})
