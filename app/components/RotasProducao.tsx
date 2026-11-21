@@ -38,17 +38,93 @@ const TIPOS_CORRECAO: { v: TipoCorrecao; nome: string; dica: string }[] = [
 ]
 
 // Valor de um custo: clique para digitar; vale para esta tiragem ou para todas. Diga o porquê e o motor aprende.
-function ValorEditavel({ item, onSalvar, onRestaurar }: {
+// Contexto do papel: a mesma diferença pode ser preço (R$ por 100 folhas) ou quantidade (quantas caixas cabem)
+type ContextoPapel = { folhas: number; quantidade: number; perdaPct: number; porFolha: number; pedacosPorFolha: number; cavidades: number[]; porPeca: number[]; onCavidades: (l: number[]) => void }
+
+function ValorEditavel({ item, onSalvar, onRestaurar, papel }: {
   item: ItemCusto
   onSalvar: (v: number, todas: boolean, porque: { tipo: TipoCorrecao; motivo: string }) => void
   onRestaurar: () => void
+  papel?: ContextoPapel
 }) {
   const [editando, setEditando] = React.useState(false)
   const [txt, setTxt] = React.useState("")
   const [tipo, setTipo] = React.useState<TipoCorrecao>("motor")
   const [motivo, setMotivo] = React.useState("")
-  const abrir = () => { setTxt(item.valor.toFixed(2).replace(".", ",")); setTipo("motor"); setMotivo(""); setEditando(true) }
-  const salvar = (todas: boolean) => { const v = lerNum(txt); if (v != null && v >= 0) onSalvar(v, todas, { tipo, motivo: motivo.trim() }); setEditando(false) }
+  const [modoPapel, setModoPapel] = React.useState<"cabem" | "preco" | "excecao">("cabem")
+  const [cavTxt, setCavTxt] = React.useState("")
+  const abrir = () => { setTxt(item.valor.toFixed(2).replace(".", ",")); setTipo("motor"); setMotivo(""); setModoPapel("cabem"); setCavTxt(String(papel?.cavidades[0] ?? "")); setEditando(true) }
+  const salvar = (todas: boolean) => {
+    // Papel com "cabem mais caixas": não grava valor; muda as caixas por pedaço e o motor refaz papel, impressão e corte
+    if (papel && modoPapel === "cabem") {
+      const n = Math.round(Number(cavTxt))
+      if (n >= 1) papel.onCavidades([n, ...papel.cavidades.slice(1)])
+      setEditando(false); return
+    }
+    const v = lerNum(txt)
+    if (v != null && v >= 0) onSalvar(v, todas, papel ? { tipo: modoPapel === "preco" ? "preco" : "excecao", motivo: motivo.trim() } : { tipo, motivo: motivo.trim() })
+    setEditando(false)
+  }
+  if (editando && papel) {
+    const tecla = (e: React.KeyboardEvent) => { if (e.key === "Enter") salvar(false); if (e.key === "Escape") setEditando(false) }
+    const v = lerNum(txt) ?? item.valor
+    const precoCadastro = papel.folhas > 0 ? (item.valorMotor ?? item.valor) / papel.folhas * 100 : 0
+    const precoDigitado = papel.folhas > 0 ? v / papel.folhas * 100 : 0
+    // Com o preço do cadastro, quantas folhas esse valor compra e quantas caixas por folha isso daria
+    const folhasPeloValor = precoCadastro > 0 ? v / precoCadastro * 100 : 0
+    const caixasPorFolha = folhasPeloValor > 0 ? papel.quantidade * (1 + papel.perdaPct / 100) / folhasPeloValor : 0
+    const n = Math.round(Number(cavTxt)) || 0
+    const MODOS = [
+      { v: "cabem" as const, nome: "Cabem mais caixas" },
+      { v: "preco" as const, nome: "Preço do papel" },
+      { v: "excecao" as const, nome: "Só neste pedido" },
+    ]
+    return (
+      <div className="flex flex-col items-end gap-1.5 shrink-0 py-1">
+        <div className="w-[380px] max-w-[78vw] rounded-lg bg-[#8456e8]/[0.04] border border-[#8456e8]/15 p-2.5 space-y-2">
+          <p className="text-[10.5px] font-semibold text-[#8456e8]">O que mudou no papel?</p>
+          <div className="flex flex-wrap gap-1">
+            {MODOS.map(m => (
+              <button key={m.v} type="button" onClick={() => setModoPapel(m.v)}
+                className={`h-6 px-2 rounded-full text-[10.5px] font-semibold transition-colors ${modoPapel === m.v ? "bg-[#8456e8] text-white" : "bg-white text-[#5e5c68] border border-[rgba(60,60,67,0.12)] hover:border-[#8456e8]/40"}`}>{m.nome}</button>
+            ))}
+          </div>
+          {modoPapel === "cabem" ? (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-[11.5px] text-[#3c3a45]">
+                Caixas em cada pedaço que entra na máquina:
+                <input autoFocus value={cavTxt} onChange={e => setCavTxt(e.target.value.replace(/\D/g, ""))} onKeyDown={tecla} inputMode="numeric"
+                  className={`${inputCls} w-14 text-right`} style={inputStyle} aria-label="Caixas por pedaço" />
+              </div>
+              <p className="text-[11px] text-[#5e5c68]">
+                Hoje: {papel.cavidades[0]} por pedaço · {papel.porFolha} por folha.{n >= 1 && n !== papel.cavidades[0] ? <> Com {n}: <strong className="text-[#191625]">{(n * (papel.porPeca[0] ?? 1) + papel.cavidades.slice(1).reduce((t, c, k) => t + c * (papel.porPeca[k + 1] ?? 1), 0)) * papel.pedacosPorFolha} por folha</strong>, e o motor refaz papel, impressão e corte.</> : null}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5">
+                <input autoFocus value={txt} onChange={e => setTxt(e.target.value)} inputMode="decimal" onKeyDown={tecla}
+                  className={`${inputCls} w-24 text-right`} style={inputStyle} aria-label="Novo valor do papel" />
+                <span className="text-[11px] text-[#5e5c68]">valor do papel</span>
+              </div>
+              {modoPapel === "preco" && precoDigitado > 0 && <p className="text-[11px] text-[#5e5c68]">Dá <strong className="text-[#191625]">{brl(precoDigitado)} por 100 folhas</strong> (o cadastro está {brl(precoCadastro)}).</p>}
+              {precoCadastro > 0 && Math.abs(v - (item.valorMotor ?? item.valor)) > 1 && caixasPorFolha > 0 && (
+                <p className="text-[11px] text-[#8a5400]">Se o preço do cadastro estiver certo, esse valor compra ~{num(Math.round(folhasPeloValor))} folhas, ou seja ~{num(Math.round(caixasPorFolha))} caixas por folha (hoje {papel.porFolha}). Se for isso, use "Cabem mais caixas".</p>
+              )}
+              <input value={motivo} onChange={e => setMotivo(e.target.value)} onKeyDown={tecla}
+                placeholder={modoPapel === "excecao" ? "Ex.: papel que já estava em estoque" : "Ex.: o fornecedor baixou o 77×113"}
+                className="w-full h-7 rounded-md px-2 text-[11.5px] bg-white border border-[rgba(60,60,67,0.12)] focus:outline-none focus:border-[#8456e8]/50" />
+            </div>
+          )}
+          <div className="flex items-center justify-end gap-1.5">
+            <button onClick={() => setEditando(false)} className="h-7 px-2 rounded-lg text-[11px] font-medium text-[#5e5c68] hover:bg-[rgba(116,116,128,0.08)]">Cancelar</button>
+            {modoPapel !== "cabem" && <button onClick={() => salvar(true)} className="h-7 px-2 rounded-lg text-[11px] font-medium text-[#5e5c68] hover:bg-[rgba(116,116,128,0.08)]" style={border}>Todas as tiragens</button>}
+            <button onClick={() => salvar(false)} className="h-7 px-2.5 rounded-lg text-[11px] font-semibold bg-[#0b0914] text-white">{modoPapel === "cabem" ? "Refazer a conta" : "Esta tiragem"}</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
   if (editando) {
     const tecla = (e: React.KeyboardEvent) => { if (e.key === "Enter") salvar(false); if (e.key === "Escape") setEditando(false) }
     return (
@@ -231,6 +307,21 @@ export function RotasProducao({ calculo, form, producao, multiplicadorPadrao, co
   const rotaManual = !!(opcoes.impressorId || opcoes.formatoId || opcoes.divisao || opcoes.facaCavidades)
   const formatosDisponiveis = Array.from(new Map(atual.alternativas.map(a => [a.formatoId, a.formatoNome])).entries())
   const qtdManuais = melhor.itens.filter(i => i.valorMotor != null).length
+  // Caixas por pedaço digitadas (encaixe, ou o que você sabe que cabe): fixa a rota e o motor refaz a conta
+  const salvarCavidades = (lista: number[] | null) => {
+    const chave = chaveCavidades(melhor.impressorId, melhor.formatoId, melhor.divisao)
+    const todas = { ...(opcoes.cavidades ?? {}) }
+    if (lista) todas[chave] = lista
+    else delete todas[chave]
+    // O valor do papel digitado à mão sai: com as caixas certas, a conta do motor passa a valer
+    const valores = lista ? Object.fromEntries(Object.entries(opcoes.valores ?? {}).map(([k, v]) => { const o = { ...v }; delete o.papel; return [k, o] }).filter(([, v]) => Object.keys(v as object).length)) : opcoes.valores
+    set({
+      cavidades: Object.keys(todas).length ? todas : undefined,
+      impressorId: melhor.impressorId, formatoId: melhor.formatoId, divisao: melhor.divisao,
+      facaCavidades: lista ? null : opcoes.facaCavidades,
+      valores: valores && Object.keys(valores).length ? valores : undefined,
+    })
+  }
 
   const temAcabamentoSemTabela = melhor.itens.some(i => (i.etapa === "laminacao" || i.etapa === "verniz") && i.estimado)
 
@@ -283,17 +374,7 @@ export function RotasProducao({ calculo, form, producao, multiplicadorPadrao, co
             folha={(() => { const m = melhor.formatoId.match(/^(\d+)x(\d+)$/); return m ? { largura: Number(m[1]) * 10, altura: Number(m[2]) * 10 } : null })()}
             blank={{ largura: calculo.dieline.largura, altura: calculo.dieline.altura }} />
 
-          <Passadas rota={melhor} onCavidades={lista => {
-            const chave = chaveCavidades(melhor.impressorId, melhor.formatoId, melhor.divisao)
-            const todas = { ...(opcoes.cavidades ?? {}) }
-            if (lista) todas[chave] = lista
-            else delete todas[chave]
-            set({
-              cavidades: Object.keys(todas).length ? todas : undefined,
-              impressorId: melhor.impressorId, formatoId: melhor.formatoId, divisao: melhor.divisao,
-              facaCavidades: lista ? null : opcoes.facaCavidades,
-            })
-          }} />
+          <Passadas rota={melhor} onCavidades={salvarCavidades} />
 
           <div className="grid grid-cols-3 gap-2 mt-4">
             {[
@@ -323,7 +404,9 @@ export function RotasProducao({ calculo, form, producao, multiplicadorPadrao, co
                   const motor = i.valorMotor ?? i.valor
                   if (Math.abs(v - motor) > 0.009) onCorrecao?.({ etapa: i.etapa, fornecedorId: i.fornecedorId, fornecedor: i.fornecedor, materialId: form.materialId, quantidade: atual.quantidade,
                     motor, manual: v, todas, tipo: porque.tipo, motivo: porque.motivo, cliente: form.nomeCliente.trim() })
-                }} onRestaurar={() => definirValor(i.etapa, null, false)} />
+                }} onRestaurar={() => definirValor(i.etapa, null, false)}
+                  papel={i.etapa === "papel" ? { folhas: melhor.folhasPapel, quantidade: atual.quantidade, perdaPct: producao.perdaPct, porFolha: melhor.pecasPorFolhaPapel,
+                    pedacosPorFolha: melhor.divisao, cavidades: melhor.passadas.map(p => p.cavidades), porPeca: melhor.passadas.map(p => p.porPeca), onCavidades: salvarCavidades } : undefined} />
               </div>
             ))}
 
