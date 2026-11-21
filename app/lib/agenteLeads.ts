@@ -315,6 +315,30 @@ export const ROTULO_TEMA: Record<string, string> = {
   venda: "Como vende", objecao: "Objeção", recusa: "O que recusa", outro: "Outro",
 }
 // Texto que vai no prompt do atendente
+// Só o que importa nesta conversa: as lições que o Felipe ensinou (id "felipe-…") vão sempre; das outras, as que têm
+// mais palavras em comum com o que está sendo falado, até o orçamento de texto. Assim a base pode crescer sem
+// virar ruído (antes ia tudo em toda resposta: ~77 mil caracteres, até para um "oi").
+const PARADAS = new Set("para pelo pela como mais muito você voce cliente quando onde aqui isso esse essa este esta então entao fazer pode porque sobre depois antes ainda também tambem nosso nossa minha meu seus suas cada quer queria gostaria seria sempre nunca tudo nada".split(" "))
+const palavras = (t: string) => new Set((t ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").match(/[a-z0-9]{4,}/g)?.filter(w => !PARADAS.has(w)) ?? [])
+export function conhecimentoRelevante(itens: Conhecimento[] | undefined, conversa: string, limiteChars = 30000): Conhecimento[] {
+  const todos = itens ?? []
+  const fixos = todos.filter(i => i.id.startsWith("felipe-"))
+  const doAssunto = palavras(conversa)
+  const outros = todos.filter(i => !i.id.startsWith("felipe-")).map(i => {
+    const p = palavras(i.texto)
+    let comum = 0; for (const w of p) if (doAssunto.has(w)) comum++
+    return { i, nota: comum / Math.sqrt(Math.max(4, p.size)) }
+  }).sort((a, b) => b.nota - a.nota || String(b.i.em ?? "").localeCompare(String(a.i.em ?? "")))
+  const sai = [...fixos]
+  let usado = fixos.reduce((t, i) => t + i.texto.length, 0)
+  for (const { i, nota } of outros) {
+    if (nota <= 0 && sai.length >= fixos.length + 40) break   // sem nada em comum: só um punhado das mais novas
+    if (usado + i.texto.length > limiteChars) continue
+    sai.push(i); usado += i.texto.length
+  }
+  return sai
+}
+
 export function conhecimentoNoPrompt(itens: Conhecimento[] | undefined) {
   if (!itens?.length) return ""
   const porTema = new Map<string, string[]>()

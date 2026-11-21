@@ -10,7 +10,7 @@ import { nomeChave } from "./negocio"
 import { COLUNAS_KANBAN, COL_PERDIDO, COL_FECHADO, COL_ENTREGUE } from "../types"
 import type { Atendimento } from "./atendente"
 import { agoraParaIA, corrigirCumprimento } from "./atendente"
-import { LeadAvaliado, filtroDoAgente, soAbertura, saudacaoDoFiltro } from "./agenteLeads"
+import { conhecimentoRelevante, LeadAvaliado, filtroDoAgente, soAbertura, saudacaoDoFiltro } from "./agenteLeads"
 import { aberturaPara, type TesteAbertura } from "./aberturaAB"
 import { transcreverPendentes } from "./transcricao"
 import { obterMidia } from "./midiaWhatsapp"
@@ -246,7 +246,7 @@ ${cfg.conhecimentoAgente?.length ? `
 O que você já aprendeu com os atendimentos do próprio Felipe (conversas e áudios dele). Use para responder como ele; se contradiz o filtro, vale o filtro. Valores daqui são histórico dele: não cite valor que não esteja no filtro.
 
 <aprendido>
-${conhecimentoNoPrompt(cfg.conhecimentoAgente)}
+${conhecimentoNoPrompt(conhecimentoRelevante(cfg.conhecimentoAgente, `${historicoAnterior}\n${historico}`))}
 </aprendido>
 ` : ""}
 Como decidir a resposta:

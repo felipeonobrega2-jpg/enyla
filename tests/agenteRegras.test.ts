@@ -49,3 +49,20 @@ describe("número do pedido digital nunca repete", () => {
     expect(b.map(x => x.grupo)).toEqual(["DIG-0153", "DIG-0153"])
   })
 })
+
+describe("base de conhecimento: só o que importa na conversa", () => {
+  it("as lições do Felipe vão sempre; das outras, as do assunto", async () => {
+    const { conhecimentoRelevante } = await import("@/app/lib/agenteLeads")
+    const kb = [
+      { id: "felipe-prazo", tema: "prazo", texto: "Prazo do digital de 7 a 10 dias úteis", em: "2026-11-19" },
+      { id: "a1", tema: "produto", texto: "Caixa cartonada rígida é outro produto, bem mais cara", em: "2026-11-10" },
+      { id: "a2", tema: "processo", texto: "Frete para o interior de São Paulo vai por transportadora", em: "2026-11-11" },
+      { id: "a3", tema: "recusa", texto: "Não fazemos embalagem de cigarro", em: "2026-11-12" },
+    ] as never[]
+    const sel = conhecimentoRelevante(kb, "cliente: quanto fica o frete para o interior? moro em Campinas", 120)
+    const ids = (sel as { id: string }[]).map(i => i.id)
+    expect(ids[0]).toBe("felipe-prazo")
+    expect(ids).toContain("a2")
+    expect(ids).not.toContain("a3")
+  })
+})

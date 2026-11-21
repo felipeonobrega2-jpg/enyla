@@ -15,8 +15,9 @@ export { conhecimentoNoPrompt, type Conhecimento } from "./agenteLeads"
 
 // Teto do conhecimento: passou de JUNTAR_ACIMA, a IA junta os repetidos (não apaga em silêncio). O que você
 // ensinou direto (id "felipe-…") nunca sai nem é reescrito.
-const JUNTAR_ACIMA = 300
-const MAX_ITENS = 500
+// A base mora em tabela (20/11) e a IA recebe só as lições da conversa: pode crescer sem ser espremida
+const JUNTAR_ACIMA = 1500
+const MAX_ITENS = 3000
 const MAX_CONVERSAS = 24
 const POR_LOTE = 3   // lotes pequenos em paralelo: cada chamada cabe folgada no minuto da Vercel
 
