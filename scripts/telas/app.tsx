@@ -80,7 +80,15 @@ const tela = new URLSearchParams(location.search).get("tela") ?? "caixa"
 const escuro = tela.endsWith("-escuro")
 if (escuro) document.documentElement.classList.add("dark")
 // Abas do Financeiro: "financeiro-receber" abre a aba "receber"
-if (tela.startsWith("financeiro-")) sessionStorage.setItem("fin:tab", tela.slice(11).replace(/-(conta|lista|dup)$/, ""))
+if (tela.startsWith("financeiro-")) sessionStorage.setItem("fin:tab", tela.slice(11).replace(/-(conta|lista|dup|dig|m)$/, "").replace(/-(dig)$/, ""))
+// "-dig": abre na linha Digital, com lançamentos do digital
+const digital = tela.includes("-dig")
+sessionStorage.setItem("fin:linha", digital ? "digital" : "offset")
+const lancsDigital = [
+  { id: "dig-DIG-0057-sinal", tipo: "receita", categoria: "sinal", descricao: "Sinal DIG-0057 — Thiago Nagano", nomeCliente: "Thiago Nagano", valor: 309.84, dataVencimento: "2026-11-18", dataPagamento: "2026-11-18", status: "pago", formaPagamento: "pix", unidade: "digital", criadoEm: "18/11/2026" },
+  { id: "dig-DIG-0052-sinal", tipo: "receita", categoria: "sinal", descricao: "Sinal DIG-0052 — Will Santos", nomeCliente: "Will Santos", valor: 500, dataVencimento: "2026-11-12", dataPagamento: "2026-11-12", status: "pago", formaPagamento: "pix", unidade: "digital", criadoEm: "12/11/2026" },
+  { id: "dig-DIG-0052-villa", tipo: "despesa", categoria: "fornecedor", descricao: "Villa · DIG-0052 — Will Santos", nomeCliente: "Will Santos", valor: 350, dataVencimento: "2026-11-14", status: "pendente", unidade: "digital", criadoEm: "14/11/2026" },
+]
 
 // Microfones: simula um Mac com o iPhone por perto (Continuidade)
 if (tela === "compositor-mic" && navigator.mediaDevices) navigator.mediaDevices.enumerateDevices = async () => [
@@ -511,7 +519,7 @@ function Telas() {
   const [cfg, setCfg] = React.useState(config)
   const [lancs, setLancs] = React.useState(tela === "financeiro-banco-dup"
     ? [...dados.lancamentos, { id: "dup1", tipo: "despesa", descricao: "Corte e vinco (lançado à mão)", categoria: "fornecedor", valor: 470, dataVencimento: "2026-11-03", dataPagamento: "2026-11-03", status: "pago", criadoEm: "03/11/2026, 18:05:12" } as never]
-    : dados.lancamentos)
+    : [...dados.lancamentos, ...lancsDigital] as typeof dados.lancamentos)
   const [form, setForm] = React.useState(dados.historico[0].form)
   const pagina = (filho: React.ReactNode) => <div style={{ padding: 24, background: "#f5f5f7", minHeight: "100vh" }}><div className="max-w-[1320px] mx-auto">{filho}</div></div>
   switch (tela) {

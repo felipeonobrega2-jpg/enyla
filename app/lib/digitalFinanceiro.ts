@@ -12,6 +12,11 @@ type Pedido = {
 export type LancamentoDigital = LancamentoFinanceiro & { unidade: "digital"; txBanco?: string | null }
 
 const dia = (iso?: string | null) => (iso ?? "").slice(0, 10)
+// Acerto com a Villa é toda segunda: o custo vence na segunda seguinte ao envio
+export const segundaDoAcerto = (iso: string) => {
+  const d = new Date(dia(iso) + "T12:00:00Z"); const falta = ((8 - d.getUTCDay()) % 7) || 7
+  d.setUTCDate(d.getUTCDate() + falta); return d.toISOString().slice(0, 10)
+}
 const forma = (txId?: string | null): LancamentoFinanceiro["formaPagamento"] => /^infinitepay:/.test(txId ?? "") ? "cartao_credito" : "pix"
 const doBanco = (txId?: string | null) => txId && !/^(infinitepay|asaas):/.test(txId) ? txId : null
 
@@ -27,7 +32,7 @@ export function lancamentosDoPedido(p: Pedido, criadoEm = new Date().toLocaleStr
     valor: p.pagamentoFinal?.valor ?? p.restante ?? Math.max(0, p.total - p.sinal), dataVencimento: dia(p.restantePagoEm), dataPagamento: dia(p.pagamentoFinal?.data ?? p.restantePagoEm), status: "pago",
     formaPagamento: forma(p.pagamentoFinal?.txId), obs: `digital:${p.id}:restante`, txBanco: doBanco(p.pagamentoFinal?.txId) })
   if (p.villaEnviadoEm && p.status !== "cancelado" && p.custo > 0) out.push({ ...base, id: `dig-${p.id}-villa`, tipo: "despesa", categoria: "fornecedor", descricao: `Villa · ${p.id} — ${nome}`,
-    valor: p.custo, dataVencimento: dia(p.villaEnviadoEm), ...(p.acertadoEm ? { dataPagamento: dia(p.acertadoEm) } : {}), status: p.acertadoEm ? "pago" : "pendente",
+    valor: p.custo, dataVencimento: segundaDoAcerto(p.villaEnviadoEm), ...(p.acertadoEm ? { dataPagamento: dia(p.acertadoEm) } : {}), status: p.acertadoEm ? "pago" : "pendente",
     obs: `digital:${p.id}:villa` })
   return out
 }

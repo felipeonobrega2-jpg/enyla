@@ -7,9 +7,9 @@ import { ConciliacaoView } from "./ConciliacaoView"
 import { previsaoDeCaixa } from "../lib/caixa"
 import { normalizarProducao } from "../lib/producao"
 import React, { useState, useMemo, useEffect, useRef } from "react"
-import { CheckCircle2, Factory, TrendingUp, TrendingDown, DollarSign, Clock, AlertTriangle, Landmark, Plus, ChevronLeft, ChevronRight, Search } from "lucide-react"
+import { CheckCircle2, Factory, TrendingUp, TrendingDown, DollarSign, Clock, AlertTriangle, Landmark, Plus, ChevronLeft, ChevronRight, ChevronDown, Search } from "lucide-react"
 import { montarPedidos, recebiveis, pixExpirado, Pedido } from "../lib/negocio"
-import { CabecalhoPagina, Segmentado, Botao, Cartao, TituloCartao, Kpi, GradeKpis, LinhaLista, Vazio, ColunasDuplas } from "./ds"
+import { CabecalhoPagina, Segmentado, Selo, Botao, Cartao, TituloCartao, Kpi, GradeKpis, LinhaLista, Vazio, ColunasDuplas } from "./ds"
 import {
   LancamentoFinanceiro, TipoLancamento, StatusLancamento,
   FormaPagamento, KanbanCard, COL_EXPEDICAO, COL_PERDIDO, NegocioParceiro, Lote,
@@ -1070,6 +1070,12 @@ const PERIODO_LABEL: Record<Periodo, string> = {
 }
 
 const SEM_CARDS: KanbanCard[] = []
+type Linha = "offset" | "digital" | "todas"
+const ABAS_DIGITAL: FinTab[] = ["dash", "lancamentos", "dre"]
+const CADASTROS: { v: FinTab; nome: string }[] = [
+  { v: "contas", nome: "Contas" }, { v: "fixas", nome: "Gastos fixos" }, { v: "fornecedores", nome: "Fornecedores" }, { v: "config", nome: "Categorias" },
+]
+const COR_ALERTA = "#c57800"
 const SEM_NEGOCIOS: NegocioParceiro[] = []
 
 // ─── Main View ───────────────────────────────────────────────────────────────
@@ -1109,7 +1115,7 @@ export function FinanceiroView({
   const catsDesp = config?.categoriasDespesa ?? DEFAULT_CATS_DESP
 
   // Linha de negócio: o digital tem caixa próprio para a margem do Offset não se misturar
-  const [linha, setLinha] = useState<"offset" | "digital" | "todas">("offset")
+  const [linha, setLinha] = useState<Linha>("offset")
   const lancamentos = useMemo(() => linha === "todas" ? todosLancamentos
     : todosLancamentos.filter(l => (l.unidade ?? "offset") === linha), [todosLancamentos, linha])
   const kanban = linha === "digital" ? SEM_CARDS : kanbanTodo
@@ -1118,6 +1124,18 @@ export function FinanceiroView({
   const temDigital = useMemo(() => todosLancamentos.some(l => l.unidade === "digital"), [todosLancamentos])
   const [tab, setTab] = useState<FinTab>("dash")
   const irAba = (t: FinTab) => { setTab(t); sessionStorage.setItem("fin:tab", t) }
+  const [menuCad, setMenuCad] = useState(false)
+  const menuCadRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!menuCad) return
+    const fora = (e: MouseEvent) => { if (!menuCadRef.current?.contains(e.target as Node)) setMenuCad(false) }
+    document.addEventListener("mousedown", fora); return () => document.removeEventListener("mousedown", fora)
+  }, [menuCad])
+  // Trocar de linha: se a aba atual não existe na nova linha, volta para a visão geral
+  const trocarLinha = (v: Linha) => {
+    setLinha(v); sessionStorage.setItem("fin:linha", v)
+    if (v !== "offset" && !ABAS_DIGITAL.includes(tab)) irAba("dash")
+  }
   const [periodo, setPeriodo] = useState<Periodo>("mes")
   const [mesOffset, setMesOffset] = useState(0)
   const [modalLanc, setModalLanc]         = useState<Partial<LancamentoFinanceiro> | true | null>(null)
@@ -1147,7 +1165,7 @@ export function FinanceiroView({
     if (p && ["mes", "trimestre", "semestre", "ano", "tudo"].includes(p))
       setPeriodo(p as Periodo)
     const li = sessionStorage.getItem("fin:linha")
-    if (li === "offset" || li === "digital" || li === "todas") setLinha(li)
+    if (li === "digital" || li === "todas") { setLinha(li); if (!ABAS_DIGITAL.includes((t ?? "dash") as FinTab)) setTab("dash") }
   }, [])
 
   // Pedidos elegíveis (fechado, em produção, entregue — exceto perdido)
@@ -1373,6 +1391,19 @@ export function FinanceiroView({
   })), [previsao])
 
 
+  const abas: { v: FinTab; nome: string; conta?: number }[] = linha !== "offset"
+    ? [{ v: "dash", nome: "Visão geral" }, { v: "lancamentos", nome: "Lançamentos" }, { v: "dre", nome: "DRE" }]
+    : [
+      { v: "dash", nome: "Visão geral" },
+      { v: "receber", nome: "A receber", conta: vencidos.length },
+      { v: "lancamentos", nome: "Lançamentos" },
+      { v: "previsao", nome: "Previsão" },
+      { v: "conciliacao", nome: "Conciliação" },
+      { v: "banco", nome: "Banco" },
+      { v: "dre", nome: "DRE" },
+      { v: "pix", nome: "Pix", conta: pixPendentes.length },
+    ]
+
   return (
     <div className="flex flex-col h-full overflow-hidden" style={{ background: "var(--bg-page)" }}>
       <div className="shrink-0 max-w-[1320px] w-full mx-auto px-6 pt-6 pb-4 space-y-4">
@@ -1380,35 +1411,52 @@ export function FinanceiroView({
           titulo="Financeiro"
           sub={`${brl(kpis.recebido)} recebido · ${brl(kpis.aReceber)} a receber · ${kpis.resultado >= 0 ? "" : "−"}${brl(Math.abs(kpis.resultado))} de geração de caixa (${PERIODO_LABEL[periodo].toLowerCase()})`}
           acoes={<>
-            {temDigital && <Segmentado<"offset" | "digital" | "todas"> valor={linha}
-              onChange={v => { setLinha(v); sessionStorage.setItem("fin:linha", v) }}
+            {temDigital && <Segmentado<Linha> valor={linha} onChange={trocarLinha}
               opcoes={[{ v: "offset", nome: "Offset" }, { v: "digital", nome: "Digital" }, { v: "todas", nome: "Juntas" }]} />}
-            <Segmentado<Periodo> valor={periodo}
-              onChange={v => { setPeriodo(v); setMesOffset(0); sessionStorage.setItem("fin:periodo", v) }}
-              opcoes={(Object.entries(PERIODO_LABEL) as [Periodo, string][]).map(([v, l]) => ({ v, nome: l }))} />
+            <div className="relative">
+            <select value={periodo} aria-label="Período"
+              onChange={e => { const v = e.target.value as Periodo; setPeriodo(v); setMesOffset(0); sessionStorage.setItem("fin:periodo", v) }}
+              className="h-9 appearance-none rounded-lg bg-white pl-3 pr-8 text-[12.5px] font-medium ds-borda cursor-pointer" style={{ color: "var(--text-main)" }}>
+              {(Object.entries(PERIODO_LABEL) as [Periodo, string][]).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#72707d]" />
+            </div>
             <Botao variante="primario" icone={<Plus className="w-4 h-4" />} onClick={() => setModalLanc(true)}>Novo lançamento</Botao>
           </>}
         />
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <Segmentado<FinTab> valor={tab} onChange={irAba} opcoes={[
-            { v: "dash", nome: "Visão geral" },
-            { v: "previsao", nome: "Previsão de caixa" },
-            { v: "conciliacao", nome: "Conciliação" },
-            { v: "receber", nome: vencidos.length ? `A receber · ${vencidos.length} vencidos` : "A receber" },
-            { v: "lancamentos", nome: "Lançamentos" },
-            { v: "banco", nome: "Banco" },
-            { v: "dre", nome: "DRE" },
-            { v: "pix", nome: pixPendentes.length ? `Pix · ${pixPendentes.length}` : "Pix" },
-          ]} />
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-[#898892] hidden md:inline">Cadastros</span>
-            <Segmentado<FinTab> valor={tab} onChange={irAba} opcoes={[
-              { v: "contas", nome: "Contas" },
-              { v: "fixas", nome: "Gastos fixos" },
-              { v: "fornecedores", nome: "Fornecedores" },
-              { v: "config", nome: "Categorias" },
-            ]} />
-          </div>
+        {/* Abas numa linha só; no Digital e em Juntas só o que faz sentido (sem banco, conciliação, cadastros) */}
+        <div className="flex items-end gap-1 border-b" style={{ borderColor: "rgba(60,60,67,0.12)" }}>
+          <nav className="flex-1 min-w-0 flex gap-5 pr-6 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-md:[mask-image:linear-gradient(to_right,#000_80%,transparent)]">
+            {abas.map(a => (
+              <button key={a.v} onClick={() => irAba(a.v)}
+                className="relative shrink-0 pb-2.5 pt-1 text-[13px] font-medium whitespace-nowrap transition-colors"
+                style={{ color: tab === a.v ? "var(--text-main)" : "#72707d" }}>
+                {a.nome}
+                {a.conta ? <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10.5px] font-semibold align-[1px]"
+                  style={{ color: COR_ALERTA, background: `${COR_ALERTA}1a` }}>{a.conta}</span> : null}
+                {tab === a.v && <span className="absolute left-0 right-0 -bottom-px h-[2px] rounded-full" style={{ background: "#8456e8" }} />}
+              </button>
+            ))}
+          </nav>
+          {linha === "offset" && (
+            <div className="relative shrink-0" ref={menuCadRef}>
+              <button onClick={() => setMenuCad(v => !v)}
+                className="relative flex items-center gap-1 pb-2.5 pt-1 pl-3 text-[13px] font-medium whitespace-nowrap"
+                style={{ color: CADASTROS.some(c => c.v === tab) ? "var(--text-main)" : "#72707d" }}>
+                {CADASTROS.find(c => c.v === tab)?.nome ?? "Cadastros"}<ChevronDown className="w-3.5 h-3.5" />
+                {CADASTROS.some(c => c.v === tab) && <span className="absolute left-3 right-0 -bottom-px h-[2px] rounded-full" style={{ background: "#8456e8" }} />}
+              </button>
+              {menuCad && (
+                <div className="absolute right-0 top-full mt-1 z-30 w-48 py-1 rounded-xl bg-white shadow-lg ds-borda ds-pop">
+                  {CADASTROS.map(c => (
+                    <button key={c.v} onClick={() => { irAba(c.v); setMenuCad(false) }}
+                      className="w-full text-left px-3 py-2 text-[13px] hover:bg-[rgba(116,116,128,0.08)]"
+                      style={{ color: tab === c.v ? "#8456e8" : "var(--text-main)", fontWeight: tab === c.v ? 600 : 400 }}>{c.nome}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1416,7 +1464,49 @@ export function FinanceiroView({
       <div key={tab} className="flex-1 overflow-y-auto"><div className="max-w-[1320px] mx-auto px-6 pb-10 ds-entrada">
 
         {/* ── DASHBOARD ── */}
-        {tab === "dash" && (() => {
+        {tab === "dash" && linha === "digital" && (() => {
+          // Digital: só o que é do digital (sinal e restante recebidos, custo da Villa); banco, cobranças e projeção são do Offset
+          const doPeriodo = lancamentos.filter(inPeriodo)
+          const recebido = doPeriodo.filter(l => l.tipo === "receita" && l.status === "pago").reduce((s, l) => s + l.valor, 0)
+          const villa = doPeriodo.filter(l => l.tipo === "despesa")
+          const custo = villa.reduce((s, l) => s + l.valor, 0)
+          const aPagar = lancamentos.filter(l => l.tipo === "despesa" && l.status !== "pago")
+          const totalAPagar = aPagar.reduce((s, l) => s + l.valor, 0)
+          const resultado = recebido - custo
+          const recentes = [...doPeriodo].sort((x, y) => (y.dataPagamento ?? y.dataVencimento).localeCompare(x.dataPagamento ?? x.dataVencimento)).slice(0, 8)
+          return (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 ds-escalonado">
+                <Kpi rotulo="Recebido" icone={<TrendingUp className="w-3.5 h-3.5" />} tom="sucesso" valor={recebido} formato={brl}
+                  sub="sinais e restantes pagos" onClick={() => { setFiltroTipo("receita"); setFiltroStatus("pago"); irAba("lancamentos") }} />
+                <Kpi rotulo="Custo da Villa" icone={<Factory className="w-3.5 h-3.5" />} valor={custo} formato={brl}
+                  sub={villa.length ? `${villa.length} ${villa.length === 1 ? "pedido enviado" : "pedidos enviados"}` : "nada enviado à Villa"} />
+                <Kpi rotulo="Resultado" icone={<DollarSign className="w-3.5 h-3.5" />} tom={resultado >= 0 ? "sucesso" : "perigo"} destaque
+                  valor={resultado} formato={brl} sub="recebido menos o custo da Villa" onClick={() => irAba("dre")} />
+                <Kpi rotulo="A pagar à Villa" icone={<Clock className="w-3.5 h-3.5" />} tom={totalAPagar > 0.5 ? "alerta" : "sucesso"} valor={totalAPagar} formato={brl}
+                  sub={aPagar.length ? "no acerto da semana" : "tudo acertado"} />
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4">
+                <Cartao>
+                  <TituloCartao titulo="Entradas e saídas por mês" icone={<TrendingUp className="w-4 h-4" />} sub="Só o digital" />
+                  <ColunasDuplas formato={v => brl(v)} nomes={["Recebido", "Villa"]}
+                    itens={monthlyData12m.map((m, i) => ({ rotulo: m.label, a: m.receita, b: m.despesas, destaque: i === 11 }))} />
+                </Cartao>
+                <Cartao padding={false}>
+                  <div className="px-5 pt-5"><TituloCartao titulo="Últimos movimentos" icone={<Clock className="w-4 h-4" />} /></div>
+                  <div className="px-2 pb-2 -mt-1">
+                    {recentes.length ? recentes.map(l => (
+                      <LinhaLista key={l.id} titulo={l.nomeCliente || l.descricao} sub={`${l.descricao.split(" — ")[0]} · ${fmtDate(l.dataPagamento ?? l.dataVencimento)}${l.status !== "pago" ? " · a pagar" : ""}`}
+                        valor={`${l.tipo === "receita" ? "+" : "−"}${brl(l.valor)}`} tom={l.tipo === "receita" ? "sucesso" : undefined} />
+                    )) : <Vazio icone={<Clock className="w-5 h-5" />} titulo="Nada no período" />}
+                  </div>
+                </Cartao>
+              </div>
+            </div>
+          )
+        })()}
+
+        {tab === "dash" && linha !== "digital" && (() => {
           const contasSaldo = (config?.contas ?? []).filter(c => c.ativa && c.tipo !== "credito" && c.saldo != null)
           const totalCaixa = contasSaldo.reduce((s, c) => s + (c.saldo ?? 0), 0)
           const pedidosVencidos = rec.comSaldo.filter(p => p.vencido > 0.5).length
@@ -1929,12 +2019,12 @@ export function FinanceiroView({
                 <option value="receita">Receitas</option>
                 <option value="despesa">Despesas</option>
               </select>
-              <select value={filtroForma} onChange={e => setFiltroForma(e.target.value as typeof filtroForma)} title="Custos lançados na conta do fornecedor não entram no caixa"
+{linha === "offset" && <select value={filtroForma} onChange={e => setFiltroForma(e.target.value as typeof filtroForma)} title="Custos lançados na conta do fornecedor não entram no caixa"
                 className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[#72707d] bg-white focus:outline-none">
                 <option value="caixa">Fluxo de caixa</option>
                 <option value="conta">Só conta de fornecedor</option>
                 <option value="tudo">Caixa + conta de fornecedor</option>
-              </select>
+              </select>}
               <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value as StatusLancamento | "")}
                 className="h-8 border border-[rgba(60,60,67,0.12)] rounded-lg px-3 text-[12px] text-[#72707d] bg-white focus:outline-none">
                 <option value="">Todos os status</option>
@@ -2064,7 +2154,7 @@ export function FinanceiroView({
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="text-[12.5px] font-semibold truncate" style={{ color: "var(--text-main)" }}>{l.descricao}</span>
-                                    {l.unidade === "digital" && linha === "todas" && <span className="ds-chip shrink-0 text-[10px] px-1.5 py-0.5 rounded" style={{ background: "#EEF0FF", color: "#4B4FD8" }}>Digital</span>}
+                                    {l.unidade === "digital" && linha === "todas" && <Selo tom="info" className="shrink-0">Digital</Selo>}
                                     {st !== "pago" && (
                                       <span className={`text-[9.5px] font-bold px-1.5 py-px rounded-full border shrink-0 ${STATUS_CLS[st]}`}>
                                         {STATUS_LABEL[st]}
