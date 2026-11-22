@@ -618,8 +618,11 @@ function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaEx
     const fp = p.ferramentalPadrao
     const cliche = ferramentalDoCliente(p.ferramentais, "cliche", e.cliente, e.blank)
     const fotolito = ferramentalDoCliente(p.ferramentais, "fotolito", e.cliente, e.blank)
-    itens.push({ etapa: "cliche", descricao: cliche ? "Clichê do cliente (já existe)" : "Clichê", valor: cliche ? 0 : fp.cliche, estimado: !cliche, ferramental: true })
-    itens.push({ etapa: "fotolito", descricao: fotolito ? "Fotolito do cliente (já existe)" : "Fotolito", valor: fotolito ? 0 : fp.fotolito, estimado: !fotolito, ferramental: true })
+    // Um clichê e um fotolito por arte (cada modelo tem o seu): 8 modelos = 8 clichês (21/11, Guilherme / Matrix)
+    const artes = Math.max(1, e.numArtes)
+    const porArte = artes > 1 ? ` × ${artes} artes` : ""
+    itens.push({ etapa: "cliche", descricao: cliche ? "Clichê do cliente (já existe)" : `Clichê${porArte}`, valor: cliche ? 0 : fp.cliche * artes, estimado: !cliche, ferramental: true })
+    itens.push({ etapa: "fotolito", descricao: fotolito ? "Fotolito do cliente (já existe)" : `Fotolito${porArte}`, valor: fotolito ? 0 : fp.fotolito * artes, estimado: !fotolito, ferramental: true })
   }
 
   // Corte e vinco: batidas = folhas impressas × golpes por folha (faca menor que a passada = mais golpes)
