@@ -82,3 +82,22 @@ export function desenharPassada(w: number, h: number, cavidades: number, blank: 
   else if (cavidades > melhor.caixas.length) melhor.encaixadasAMais = cavidades - melhor.caixas.length
   return melhor
 }
+
+// ── Avisos: o que é frágil ou é oportunidade nesta conta ─────────────────────
+export function avisosDaRota(r: Rota, opts: { perdaPct: number; blank: { largura: number; altura: number }; maquina: Pick<Maquina, "pinca" | "margem"> | null; esp: number }): string[] {
+  const out: string[] = []
+  const p0 = r.passadas[0]
+  if (p0 && opts.maquina) {
+    const d = desenharPassada(p0.largura, p0.altura, p0.cavidades, opts.blank, opts.maquina, opts.esp)
+    // Caixa encostando na borda não avisa: com só a pinça e o corte e vinco recortando por dentro, é o normal (21/11)
+    if (d.encaixadasAMais > 0) out.push(`Você disse que cabem ${p0.cavidades} por pedaço; em retângulo o motor só vê ${p0.cavidades - d.encaixadasAMais}. Vale conferir o encaixe na faca.`)
+  }
+  // Pacote de papel: folhas que sobram no último pacote viram caixas a mais quase de graça (só impressão e acabamento)
+  const necessarias = Math.ceil(Math.ceil(r.quantidade / r.pecasPorFolhaPapel) * (1 + opts.perdaPct / 100) - 1e-9)
+  const sobra = r.folhasPapel - necessarias
+  if (sobra >= 20 && r.pecasPorFolhaPapel > 0) {
+    const extra = Math.floor(sobra / (1 + opts.perdaPct / 100)) * r.pecasPorFolhaPapel
+    if (extra >= 100) out.push(`O último pacote sobra ${n(sobra)} folhas: dá para oferecer ~${n(Math.floor(extra / 100) * 100)} caixas a mais com o mesmo papel.`)
+  }
+  return out
+}

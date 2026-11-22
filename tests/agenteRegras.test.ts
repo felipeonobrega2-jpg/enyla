@@ -87,3 +87,11 @@ describe("motor explica a conta", () => {
     expect(desenharPassada(385, 282.5, 3, { largura: 282.5, altura: 179.75 }, { pinca: 10, margem: 0 }, 2).encaixadasAMais).toBe(1)
   })
 })
+
+describe("motor: avisos da rota", () => {
+  it("sobra do último pacote vira oferta de caixas a mais", async () => {
+    const { avisosDaRota } = await import("../app/lib/explicaRota")
+    const rota = { quantidade: 20000, pecasPorFolhaPapel: 24, folhasPapel: 1000, passadas: [], impressorNome: "J" } as never
+    expect(avisosDaRota(rota, { perdaPct: 10, blank: { largura: 100, altura: 100 }, maquina: null, esp: 2 })[0]).toMatch(/sobra 82 folhas.*1\.700 caixas a mais/)
+  })
+})

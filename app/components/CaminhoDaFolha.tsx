@@ -4,9 +4,9 @@
 // (a folha comprada cortada, e o pedaço que entra na máquina com a faixa da pinça e as caixas).
 
 import React from "react"
-import { Lightbulb } from "lucide-react"
+import { Lightbulb, AlertTriangle } from "lucide-react"
 import type { Rota, Maquina } from "../lib/producao"
-import { explicarRota, desenharPassada, gradeDoCorte } from "../lib/explicaRota"
+import { explicarRota, desenharPassada, gradeDoCorte, avisosDaRota } from "../lib/explicaRota"
 
 const ROXO = "#8456e8", AMBAR = "#c57800"
 
@@ -19,6 +19,7 @@ export function CaminhoDaFolha({ rota, alternativas, manual, perdaPct, esp, maqu
   const papel = rota.itens.filter(i => i.etapa === "papel").reduce((s, i) => s + i.valor, 0)
   const ex = explicarRota(rota, { perdaPct, alternativas, manual, precoPor100: rota.folhasPapel > 0 ? papel / rota.folhasPapel * 100 : undefined })
   const p0 = rota.passadas[0]
+  const avisos = avisosDaRota(rota, { perdaPct, blank, maquina, esp })
   const desenho = p0 && maquina ? desenharPassada(p0.largura, p0.altura, p0.cavidades, blank, maquina, esp) : null
   return (
     <div className="rounded-xl p-3.5 mb-4" style={{ background: "rgba(132,86,232,0.05)" }}>
@@ -27,6 +28,7 @@ export function CaminhoDaFolha({ rota, alternativas, manual, perdaPct, esp, maqu
         {ex.passos.map((s, i) => <React.Fragment key={i}>{i > 0 && <span className="text-[#aeadb5]"> → </span>}<span className={i === 2 ? "font-semibold text-[#191625]" : undefined}>{s}</span></React.Fragment>)}
       </p>
       {ex.porque && <p className="text-[12px] text-[#5e5c68] mt-1.5 italic">{ex.porque}</p>}
+      {avisos.map(a => <p key={a} className="text-[12px] mt-1.5 flex items-start gap-1.5" style={{ color: "#8a5400" }}><AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />{a}</p>)}
       {folha && desenho && (
         <div className="flex items-end gap-3 mt-3 overflow-x-auto">
           <Figura titulo={`Folha ${rota.formatoNome}`} sub={rota.divisao === 1 ? "inteira" : `cortada em ${rota.divisao}`}>
