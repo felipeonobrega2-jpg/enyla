@@ -95,3 +95,15 @@ describe("motor: avisos da rota", () => {
     expect(avisosDaRota(rota, { perdaPct: 10, blank: { largura: 100, altura: 100 }, maquina: null, esp: 2 })[0]).toMatch(/sobra 82 folhas.*1\.700 caixas a mais/)
   })
 })
+
+describe("arte prévia: SVG seguro e faces no tamanho certo", () => {
+  it("tira script, eventos e links externos; mantém o desenho", async () => {
+    const { limparSvg, tamanhoDasFaces, dimsDoFormulario } = await import("../app/lib/artePrevia")
+    const s = limparSvg(`texto <svg viewBox='0 0 60 120' onload="x()"><script>alert(1)</script><rect width='60' height='120' fill='url(#g)'/><image href='https://mal.com/a.png'/><foreignObject><div/></foreignObject></svg> fim`)!
+    expect(s).toContain("<rect"); expect(s).toContain("url(#g)"); expect(s).toContain("xmlns")
+    expect(s).not.toMatch(/script|onload|mal\.com|foreignObject/)
+    expect(limparSvg("sem svg")).toBeNull()
+    expect(tamanhoDasFaces({ largura: 60, profundidade: 40, altura: 120 }).lateral_esq).toEqual([40, 120])
+    expect(dimsDoFormulario({ frente: 6, lateral: 4, alturaBox: 12 })).toEqual({ largura: 60, profundidade: 40, altura: 120 })
+  })
+})

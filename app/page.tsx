@@ -42,6 +42,8 @@ function autoSetPrazos(card: KanbanCard, novaColuna: number): PrazoEtapas | null
 import { QUANTIDADES_PADRAO } from "./dados"
 import { calcular, compactarCalculo } from "./calculos"
 import { Configuracoes, CONFIG_PADRAO } from "./config"
+import { ArtePreviaCard } from "./components/ArtePreviaCard"
+import { dimsDoFormulario } from "./lib/artePrevia"
 import LayoutChapaVisual from "./LayoutChapaVisual"
 import { RotasProducao } from "./components/RotasProducao"
 import { registrarCorrecao, correcoesParecidas } from "./lib/aprendizado"
@@ -3146,6 +3148,13 @@ export default function Home() {
                   <p className="text-[12px] text-[#8E8E93]">Preencha as dimensões da caixa para ver o preview 3D e a dieline planificada.</p>
                 </div>
               ) : null}
+
+              {/* ── Arte prévia (IA) ── */}
+              <Section title="Arte prévia">
+                <ArtePreviaCard dims={dimsDoFormulario(form)} valor={form.artePrevia}
+                  acabamento={[form.materialNome, form.incluirVerniz ? `verniz ${form.vernizTipo || ""}`.trim() : "", form.laminacao ? `laminação ${form.laminacaoTipo}` : "", ...(form.outrosAcabamentos ?? [])].filter(Boolean).join(", ")}
+                  onChange={a => setForm(f => ({ ...f, artePrevia: a }))} />
+              </Section>
 
               {/* ── Dieline ── */}
               <Section title={`Faca aberta — ${

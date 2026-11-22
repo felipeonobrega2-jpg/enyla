@@ -4,7 +4,8 @@ import { supabase } from "./supabase"
 import { validaAte } from "./aprovacao"
 import { KanbanCard, KanbanOpcao, FormData } from "../types"
 
-export type CaixaProposta = { largura: number; altura: number; profundidade: number; material?: string; verniz?: boolean; laminacao?: string | null; arteUrl?: string | null }
+export type CaixaProposta = { largura: number; altura: number; profundidade: number; material?: string; verniz?: boolean; laminacao?: string | null; arteUrl?: string | null
+  artePrevia?: import("./artePrevia").FacesArte | null }   // arte ilustrativa da IA (o vendedor marcou "mostrar na proposta")
 
 export type PropostaPublica = {
   card: KanbanCard
@@ -68,6 +69,7 @@ export async function carregarProposta(numero: string): Promise<PropostaPublica 
   const caixa = dims.length === 3 && dims.every(n => n > 0) ? {
     largura: dims[0], altura: dims[1], profundidade: dims[2], material: form?.materialNome ?? card.materialNome,
     verniz: !!form?.incluirVerniz, laminacao: form?.laminacao ? form.laminacaoTipo : null, arteUrl: arte?.url ?? null,
+    artePrevia: form?.artePrevia?.naProposta ? form.artePrevia.faces : null,
   } : null
   const hoje = new Date().toLocaleDateString("sv-SE")
   return {

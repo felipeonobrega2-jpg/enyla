@@ -4,6 +4,7 @@ import { useState } from "react"
 import Image from "next/image"
 import { Check, CircleCheck, Clock, FileText, QrCode, Truck, AlertCircle, CalendarCheck } from "lucide-react"
 import { Caixa3D } from "@/app/components/Caixa3D"
+import { Caixa3DArte } from "@/app/components/Caixa3DArte"
 import { PosAprovacao } from "./PagamentoPedido"
 
 type Opcao = { quantidade: number; preco: number; unitario: number }
@@ -16,7 +17,7 @@ type Proposta = {
   vencida: boolean
   jaAprovado: boolean
   sinalPct: number
-  caixa?: { largura: number; altura: number; profundidade: number; material?: string; verniz?: boolean; laminacao?: string | null; arteUrl?: string | null } | null
+  caixa?: { largura: number; altura: number; profundidade: number; material?: string; verniz?: boolean; laminacao?: string | null; arteUrl?: string | null; artePrevia?: import("@/app/lib/artePrevia").FacesArte | null } | null
   entregaSeAprovarHoje?: string | null
   termos?: { titulo: string; itens: string[] }[]
   versaoTermos?: string
@@ -109,10 +110,12 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
 
             {proposta.caixa && (
               <div className="bg-white rounded-2xl pt-4 pb-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-                <Caixa3D {...proposta.caixa} tamanho={125} />
-                <p className="text-center text-[11px] text-[#8E8E93] -mt-2">
+                {proposta.caixa.artePrevia
+                  ? <Caixa3DArte faces={proposta.caixa.artePrevia} dims={{ largura: proposta.caixa.largura * 10, altura: proposta.caixa.altura * 10, profundidade: proposta.caixa.profundidade * 10 }} tamanho={240} />
+                  : <Caixa3D {...proposta.caixa} tamanho={125} />}
+                <p className={`text-center text-[11px] text-[#8E8E93] ${proposta.caixa.artePrevia ? "mt-1" : "-mt-2"}`}>
                   {[proposta.caixa.largura, proposta.caixa.altura, proposta.caixa.profundidade].map(n => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })).join(" × ")} cm · arraste para girar
-                  {!proposta.caixa.arteUrl && " · a arte entra depois da aprovação"}
+                  {!proposta.caixa.arteUrl && !proposta.caixa.artePrevia && " · a arte entra depois da aprovação"}
                 </p>
               </div>
             )}

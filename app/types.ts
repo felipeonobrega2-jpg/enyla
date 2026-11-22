@@ -14,6 +14,7 @@ export type FormatoPapel = {
 
 export type FormData = {
   nomeCliente: string
+  artePrevia?: import("./lib/artePrevia").ArtePrevia   // arte ilustrativa feita pela IA (vai na proposta se marcado)
   tipoCaixa: TipoCaixa
   frente: number // cm
   lateral: number // cm

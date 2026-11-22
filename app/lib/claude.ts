@@ -18,12 +18,17 @@ export function clienteClaude(apiKey: string) {
   const c = new Anthropic({ apiKey })
   for (const alvo of [c.messages, c.beta.messages] as unknown as { create: (...a: unknown[]) => Promise<unknown> }[]) {
     const original = alvo.create.bind(alvo)
-    alvo.create = async (...args: unknown[]) => {
-      const r = await original(...args)
-      if (r && typeof r === "object" && "usage" in r && "model" in r)
-        await registrarUsoIA(String((r as { model: string }).model), (r as { usage: UsoIA }).usage).catch(() => null)
-      return r
-    }
+    // Streaming (usado por .stream()) precisa da promessa original do SDK (.withResponse()): passa direto, e quem
+    // usa stream registra o gasto no final. O resto espera o registro, como sempre (na Vercel nada fica para depois).
+    alvo.create = ((...args: unknown[]) => {
+      if ((args[0] as { stream?: boolean } | undefined)?.stream) return original(...args)
+      return (async () => {
+        const r = await original(...args)
+        if (r && typeof r === "object" && "usage" in r && "model" in r)
+          await registrarUsoIA(String((r as { model: string }).model), (r as { usage: UsoIA }).usage).catch(() => null)
+        return r
+      })()
+    }) as typeof alvo.create
   }
   return c
 }
