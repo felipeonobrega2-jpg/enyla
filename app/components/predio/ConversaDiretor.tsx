@@ -2,8 +2,10 @@
 // Conversa 1:1 com um diretor: ele pensa, planeja e manda executar. Cada ação vira um cartão: mensagem a cliente
 // (editar, aprovar e enviar, ou descartar), vaga no RH (contratar), ferramenta (aprovar), plano e o que ele guardou.
 import { useEffect, useRef, useState } from "react"
-import { Mic, Square, Volume2, VolumeX } from "lucide-react"
-import { falar, ouvir, pararFala, type Aviso, type Escuta } from "./vozCliente"
+import { createPortal } from "react-dom"
+import { Mic, Square, Video, Volume2, VolumeX } from "lucide-react"
+import { falar, ouvir, pararFala, prepararAudio, type Aviso, type Escuta } from "./vozCliente"
+import ReuniaoChamada from "./ReuniaoChamada"
 import { DIRETORES, type IdDiretor } from "../../lib/diretoria"
 import type { MsgConversa, AcaoConversa, Ferramenta } from "../../lib/diretoriaServidor"
 import type { Funcionario } from "../../lib/rh"
@@ -17,7 +19,7 @@ const SUGESTOES: Record<IdDiretor, string[]> = {
 }
 const hhmm = (s: string) => new Date(s).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
 
-export default function ConversaDiretor({ diretor, onFechar, onFala, fixo }: { diretor: IdDiretor; onFechar: () => void; onFala?: (t: string | null) => void; fixo?: boolean }) {
+export default function ConversaDiretor({ diretor, onFechar, onFala, fixo, reuniaoInicial }: { diretor: IdDiretor; onFechar: () => void; onFala?: (t: string | null) => void; fixo?: boolean; reuniaoInicial?: boolean }) {
   const info = DIRETORES.find(d => d.id === diretor)!
   const primeiro = info.nome.split(" ")[0]
   const [msgs, setMsgs] = useState<MsgConversa[] | null>(null)
@@ -41,26 +43,48 @@ export default function ConversaDiretor({ diretor, onFechar, onFala, fixo }: { d
     if (!v) { pararFala(); setFalando(null); escuta?.cancelar() }
   }
   const escutaRef = useRef<Escuta | null>(null)
+  const enviarRef = useRef<(t: string) => void>(() => {})
   useEffect(() => () => { pararFala(); escutaRef.current?.cancelar() }, [])
+  // Reunião (chamada em tela cheia): mãos livres, com volume e legenda ao vivo do diretor
+  const [reuniao, setReuniao] = useState(!!reuniaoInicial)
+  const reuniaoRef = useRef(!!reuniaoInicial)
+  const [mudo, setMudo] = useState(false)
+  const [nivelDiretor, setNivelDiretor] = useState(0)
+  const [legenda, setLegenda] = useState("")
+  const [minhaFala, setMinhaFala] = useState<string | null>(null)
+  useEffect(() => { if (reuniaoInicial) prepararAudio() }, [reuniaoInicial])
   const tocar = async (m: MsgConversa, depois?: () => void) => {
     if (falando === m.id) { pararFala(); setFalando(null); return }
-    setFalando(m.id)
-    await falar(diretor, m.id, m.texto, { onAviso: setAviso })
-    setFalando(f => f === m.id ? null : f)
+    escutaRef.current?.cancelar()   // o microfone nunca fica aberto com o diretor falando (ouviria a própria voz dele)
+    setFalando(m.id); setMinhaFala(null)
+    const vivo = reuniaoRef.current ? { onNivel: setNivelDiretor, onLegenda: setLegenda } : {}
+    await falar(diretor, m.id, m.texto, { onAviso: setAviso, ...vivo })
+    setFalando(f => f === m.id ? null : f); setNivelDiretor(0); setLegenda("")
     depois?.()
   }
-  const microfone = async (enviarDireto: boolean) => {
+  const microfone = async (enviarDireto: boolean, semPressa = false) => {
     if (escuta) { escuta.parar(); return }
     pararFala(); setFalando(null); setErro(null)
     const e = await ouvir({
-      onNivel: setNivel,
-      onTexto: t => { if (enviarDireto) enviar(t); else setTexto(atual => (atual ? atual + " " : "") + t) },
-      onErro: setErro,
+      onNivel: setNivel, semPressa,
+      onTexto: t => { if (enviarDireto) { setMinhaFala(t); enviarRef.current(t) } else setTexto(atual => (atual ? atual + " " : "") + t) },
+      onErro: m => { setErro(m); if (reuniaoRef.current && m.startsWith("Sem acesso")) setMudo(true) },
       onEntendendo: () => setTranscrevendo(true),
       onFim: () => { setEscuta(null); escutaRef.current = null; setTranscrevendo(false) },
     })
     if (e) { setEscuta(e); escutaRef.current = e }
   }
+  const entrarNaReuniao = () => { prepararAudio(); escutaRef.current?.cancelar(); reuniaoRef.current = true; setReuniao(true); setMudo(false); setErro(null) }
+  const sairDaReuniao = () => { reuniaoRef.current = false; setReuniao(false); escutaRef.current?.cancelar(); pararFala(); setFalando(null); setNivelDiretor(0); setLegenda("") }
+  const interromper = () => { pararFala(); setFalando(null); setNivelDiretor(0); setLegenda("") }
+  const alternarMudo = () => { if (!mudo) escutaRef.current?.cancelar(); setErro(null); setMudo(!mudo) }
+  // Mãos livres: na reunião, com o microfone ligado, ouve sempre que o diretor não está falando nem pensando
+  const carregado = msgs !== null
+  useEffect(() => {
+    if (!reuniao || mudo || pensando || falando || escuta || transcrevendo || !carregado) return
+    const t = setTimeout(() => microfone(true, true), 350)
+    return () => clearTimeout(t)
+  }, [reuniao, mudo, pensando, falando, escuta, transcrevendo, carregado])   // eslint-disable-line react-hooks/exhaustive-deps
   const carregarLados = () => {
     fetch("/api/rh").then(r => r.ok ? r.json() : null).then(x => x?.quadro && setRh(x.quadro)).catch(() => {})
     fetch("/api/diretoria/ferramentas").then(r => r.ok ? r.json() : null).then(x => x?.ferramentas && setFerr(x.ferramentas)).catch(() => {})
@@ -87,8 +111,9 @@ export default function ConversaDiretor({ diretor, onFechar, onFala, fixo }: { d
     if (!r?.ok || !x?.mensagens) { setErro(x?.erro ?? `${primeiro} não conseguiu responder agora.`); setMsgs(atual => (atual ?? []).filter(y => y.id !== "tmp")); setTexto(m); return }
     setMsgs(x.mensagens); carregarLados()
     const resposta = (x.mensagens as MsgConversa[]).filter(y => y.de === "diretor").at(-1)
-    if (vozRef.current && resposta) tocar(resposta, () => { if (vozRef.current) microfone(true) })
+    if ((vozRef.current || reuniaoRef.current) && resposta) tocar(resposta, () => { if (vozRef.current && !reuniaoRef.current) microfone(true) })
   }
+  useEffect(() => { enviarRef.current = enviar })
   const responder = async (acao: string, resposta: "aprovo" | "descartar", textoEditado?: string) => {
     const r = await fetch("/api/diretoria/conversa", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ diretor, acao, resposta, texto: textoEditado }) }).catch(() => null)
     const x = r?.ok ? await r.json().catch(() => null) : null
@@ -110,25 +135,12 @@ export default function ConversaDiretor({ diretor, onFechar, onFala, fixo }: { d
     setMsgs([])
   }
 
-  return (
-    <div className={`${fixo ? "fixed" : "absolute"} top-4 right-4 bottom-4 w-[460px] max-w-[calc(100%-32px)] z-[120] flex flex-col rounded-2xl bg-white/97 backdrop-blur shadow-[0_20px_60px_rgba(20,10,50,0.28)] border border-black/5 overflow-hidden`}>
-      <div className="flex items-center gap-3 px-4 pt-3.5 pb-3 border-b border-black/5">
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold text-white shrink-0 transition-shadow ${falando ? "ring-4 ring-[#8456e8]/30 animate-pulse" : ""}`} style={{ background: "linear-gradient(135deg,#8456e8,#5b3bb8)" }}>{primeiro[0]}{info.nome.split(" ")[1]?.[0]}</div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[14.5px] font-semibold text-[#191625] leading-tight">{info.nome}</p>
-          <p className="text-[11.5px] text-[#6b6876] leading-tight">{falando ? "falando…" : escuta ? "ouvindo você…" : `${info.cargo} · ${info.area}`}</p>
-        </div>
-        <button onClick={() => mudarVoz(!voz)} title={voz ? "Reunião por voz ligada: ele responde falando e o microfone abre quando ele termina" : "Ligar a reunião por voz"}
-          className={`h-8 px-2 rounded-lg flex items-center gap-1 text-[11px] font-semibold ${voz ? "bg-[#8456e8] text-white" : "text-[#6b6876] hover:bg-black/5"}`}>
-          {voz ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}Voz
-        </button>
-        {!!msgs?.length && <button onClick={recomecar} className="text-[11px] font-medium text-[#6b6876] hover:text-[#191625] px-2 py-1 rounded-md hover:bg-black/5">Nova conversa</button>}
-        <button onClick={onFechar} aria-label="Fechar" className="w-8 h-8 rounded-lg text-[#6b6876] hover:bg-black/5 text-[18px] leading-none">×</button>
-      </div>
+  const pendentes = (msgs ?? []).flatMap(m => m.acoes ?? []).filter(a =>
+    (a.tipo === "mensagem" && (a.status === "aguardando" || a.status === "erro")) ||
+    (a.tipo === "vaga" && rh.find(f => f.id === a.vagaId)?.status === "solicitado") ||
+    (a.tipo === "ferramenta" && ferr.find(f => f.id === a.ferramentaId)?.status === "pedida")).length
 
-      {aviso && (falando || voz) && <p className="px-4 py-1.5 text-[10.5px] text-[#6b6876] bg-[#f6f5f9] border-b border-black/5 leading-snug">
-        {aviso === "limite" ? "A voz do Google chegou ao limite gratuito de hoje; por enquanto, voz do navegador." : "Voz do navegador. Para a voz real dos diretores, cole a chave gratuita do Gemini em Configurações."}
-      </p>}
+  const lista = (
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {msgs && msgs.length === 0 && !pensando && <div className="pt-6 text-center">
           <p className="text-[13px] text-[#3c3a45] font-medium">Reunião com {primeiro}</p>
@@ -158,25 +170,60 @@ export default function ConversaDiretor({ diretor, onFechar, onFala, fixo }: { d
         </div>}
         {erro && <p className="text-[11.5px] text-[#d33a3c]">{erro}</p>}
         <div ref={fim} />
-      </div>
+      </div>)
 
+  const caixa = (
       <div className="border-t border-black/5 p-3">
-        {(escuta || transcrevendo) && <div className="flex items-center gap-2 mb-2 px-1">
+        {!reuniao && (escuta || transcrevendo) && <div className="flex items-center gap-2 mb-2 px-1">
           <span className="flex items-end gap-0.5 h-4">{[0.5, 0.8, 1, 0.8, 0.5].map((k, i) => <span key={i} className="w-1 rounded-full bg-[#8456e8] transition-[height] duration-75" style={{ height: `${Math.max(3, Math.min(16, nivel * 16 * k + 3))}px` }} />)}</span>
           <span className="text-[11.5px] text-[#5b3bb8] font-medium">{transcrevendo ? "Entendendo o que você disse…" : `Pode falar. Quando você parar, ${voz ? `${primeiro} responde` : "o texto aparece aqui"}.`}</span>
           {escuta && !transcrevendo && <button onClick={() => escuta.cancelar()} className="ml-auto text-[11px] text-[#6b6876] hover:text-[#191625]">Cancelar</button>}
         </div>}
         <div className="flex items-end gap-2">
-          <button onClick={() => microfone(voz)} disabled={pensando || transcrevendo} aria-label={escuta ? "Terminar de falar" : "Falar"} title={escuta ? "Terminar de falar" : voz ? "Falar com o diretor" : "Ditar a mensagem"}
+          {!reuniao && <button onClick={() => microfone(voz)} disabled={pensando || transcrevendo} aria-label={escuta ? "Terminar de falar" : "Falar"} title={escuta ? "Terminar de falar" : voz ? "Falar com o diretor" : "Ditar a mensagem"}
             className={`h-9 w-9 shrink-0 rounded-xl flex items-center justify-center disabled:opacity-40 ${escuta ? "bg-[#d33a3c] text-white" : "bg-[#f6f5f9] text-[#5b3bb8] hover:bg-[#8456e8]/12 border border-black/5"}`}>
             {escuta ? <Square className="w-3.5 h-3.5 fill-current" /> : <Mic className="w-4 h-4" />}
-          </button>
+          </button>}
           <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={2} maxLength={4000}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar() } }}
             placeholder={`Fale com ${primeiro}…`} className="flex-1 resize-none rounded-xl bg-[#f6f5f9] px-3 py-2 text-[12.5px] border border-black/5 focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25 max-h-40" />
           <button onClick={() => enviar()} disabled={pensando || !texto.trim()} className="h-9 px-3.5 rounded-xl text-[12px] font-semibold text-white disabled:opacity-40" style={{ background: "#8456e8" }}>Enviar</button>
         </div>
+      </div>)
+
+  if (reuniao && typeof document !== "undefined") return createPortal(
+    <ReuniaoChamada diretor={diretor} nome={info.nome} cargo={info.cargo} area={info.area} onMudo={alternarMudo} onInterromper={interromper} onSair={sairDaReuniao}
+      estado={{ falando: !!falando, pensando, nivelDiretor, legenda, ouvindo: !!escuta, entendendo: transcrevendo, nivelFelipe: nivel, minhaFala, mudo, pendentes,
+        aviso: aviso === "limite" ? "A voz do Google chegou ao limite gratuito de hoje; por enquanto, voz do navegador." : aviso === "navegador" ? "Voz do navegador. Para a voz real dos diretores, cole a chave gratuita do Gemini em Configurações." : null,
+        erro: erro ?? (mudo ? "Microfone desligado: ligue para falar, ou escreva no chat." : null) }}
+      painel={<>{lista}{caixa}</>} />, document.body)
+
+  return (
+    <div className={`${fixo ? "fixed" : "absolute"} top-4 right-4 bottom-4 w-[460px] max-w-[calc(100%-32px)] z-[120] flex flex-col rounded-2xl bg-white/97 backdrop-blur shadow-[0_20px_60px_rgba(20,10,50,0.28)] border border-black/5 overflow-hidden`}>
+      <div className="flex items-center gap-3 px-4 pt-3.5 pb-3 border-b border-black/5">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold text-white shrink-0 transition-shadow ${falando ? "ring-4 ring-[#8456e8]/30 animate-pulse" : ""}`} style={{ background: "linear-gradient(135deg,#8456e8,#5b3bb8)" }}>{primeiro[0]}{info.nome.split(" ")[1]?.[0]}</div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[14.5px] font-semibold text-[#191625] leading-tight">{info.nome}</p>
+          <p className="text-[11.5px] text-[#6b6876] leading-tight">{falando ? "falando…" : escuta ? "ouvindo você…" : `${info.cargo} · ${info.area}`}</p>
+        </div>
+        <button onClick={entrarNaReuniao} title={`Entrar em reunião com ${primeiro} (tela cheia, por voz)`}
+          className="h-8 px-2 rounded-lg flex items-center gap-1 text-[11px] font-semibold text-white" style={{ background: "linear-gradient(135deg,#8456e8,#5b3bb8)" }}>
+          <Video className="w-3.5 h-3.5" />Reunião
+        </button>
+        <button onClick={() => mudarVoz(!voz)} title={voz ? "Reunião por voz ligada: ele responde falando e o microfone abre quando ele termina" : "Ligar a reunião por voz"}
+          className={`h-8 px-2 rounded-lg flex items-center gap-1 text-[11px] font-semibold ${voz ? "bg-[#8456e8] text-white" : "text-[#6b6876] hover:bg-black/5"}`}>
+          {voz ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}Voz
+        </button>
+        {!!msgs?.length && <button onClick={recomecar} className="text-[11px] font-medium text-[#6b6876] hover:text-[#191625] px-2 py-1 rounded-md hover:bg-black/5">Nova conversa</button>}
+        <button onClick={onFechar} aria-label="Fechar" className="w-8 h-8 rounded-lg text-[#6b6876] hover:bg-black/5 text-[18px] leading-none">×</button>
       </div>
+
+      {aviso && (falando || voz) && <p className="px-4 py-1.5 text-[10.5px] text-[#6b6876] bg-[#f6f5f9] border-b border-black/5 leading-snug">
+        {aviso === "limite" ? "A voz do Google chegou ao limite gratuito de hoje; por enquanto, voz do navegador." : "Voz do navegador. Para a voz real dos diretores, cole a chave gratuita do Gemini em Configurações."}
+      </p>}
+      {lista}
+
+      {caixa}
     </div>
   )
 }

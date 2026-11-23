@@ -33,12 +33,43 @@ function vozesProntas(): Promise<SpeechSynthesisVoice[]> {
   return new Promise(res => { const t = setTimeout(() => res(s.getVoices()), 1200); s.addEventListener("voiceschanged", () => { clearTimeout(t); res(s.getVoices()) }, { once: true }) })
 }
 
-async function falarNoNavegador(diretor: IdDiretor, texto: string, cancelado: () => boolean): Promise<void> {
+// Fala em andamento: o volume (0..1, para o quadro de quem fala acender) e a frase que está sendo dita (legenda)
+export type AoVivo = { onNivel?: (n: number) => void; onLegenda?: (t: string) => void }
+
+// Frase que está sendo dita agora, pela fração já tocada do áudio (as frases pesam pelo tamanho)
+function fraseNoPonto(texto: string, fracao: number): string {
+  const frases = texto.match(/[^.!?…]+[.!?…]*\s*/g)?.map(f => f.trim()).filter(Boolean) ?? [texto]
+  const total = frases.reduce((a, f) => a + f.length, 0)
+  let acc = 0
+  for (const f of frases) { acc += f.length; if (acc / total >= fracao) return f }
+  return frases.at(-1) ?? texto
+}
+
+// O contexto de áudio nasce num clique (entrar na reunião); se não estiver rodando, o áudio toca sem medidor
+// (ligar um áudio a um contexto parado deixaria o diretor mudo)
+let ctxAudio: AudioContext | null = null
+export function prepararAudio() {
+  try { ctxAudio ??= new AudioContext(); if (ctxAudio.state === "suspended") ctxAudio.resume().catch(() => {}) } catch { /* sem Web Audio */ }
+}
+function medidor(audio: HTMLAudioElement): AnalyserNode | null {
+  try {
+    if (!ctxAudio || ctxAudio.state !== "running") return null
+    const an = ctxAudio.createAnalyser(); an.fftSize = 512
+    const src = ctxAudio.createMediaElementSource(audio)
+    src.connect(an); an.connect(ctxAudio.destination)
+    return an
+  } catch { return null }
+}
+
+async function falarNoNavegador(diretor: IdDiretor, texto: string, cancelado: () => boolean, vivo: AoVivo = {}): Promise<void> {
   if (!("speechSynthesis" in window)) return
   const s = window.speechSynthesis
   const voz = vozDoNavegador(await vozesProntas(), diretor)
   for (const parte of partesDaFala(texto, 200, 220)) {   // frases curtas: o Chrome corta falas longas
     if (cancelado()) return
+    vivo.onLegenda?.(parte)
+    // A voz do navegador não dá o volume: o quadro pulsa a cada palavra
+    const pulso = setInterval(() => vivo.onNivel?.(0.25 + Math.random() * 0.5), 140)
     await new Promise<void>(res => {
       const u = new SpeechSynthesisUtterance(parte)
       u.lang = voz?.lang ?? "pt-BR"; if (voz) u.voice = voz
@@ -46,11 +77,12 @@ async function falarNoNavegador(diretor: IdDiretor, texto: string, cancelado: ()
       u.onend = () => res(); u.onerror = () => res()
       s.speak(u)
     })
+    clearInterval(pulso); vivo.onNivel?.(0)
   }
 }
 
 // Fala a mensagem inteira; resolve quando termina (ou é interrompida)
-export async function falar(diretor: IdDiretor, id: string, textoOriginal: string, op: { onAviso?: (a: Aviso) => void } = {}): Promise<void> {
+export async function falar(diretor: IdDiretor, id: string, textoOriginal: string, op: { onAviso?: (a: Aviso) => void } & AoVivo = {}): Promise<void> {
   pararFala()
   const texto = textoParaFala(textoOriginal)
   if (!texto) return
@@ -59,6 +91,9 @@ export async function falar(diretor: IdDiretor, id: string, textoOriginal: strin
   const minha = { parar: () => { cancelado = true; audio.pause(); audio.src = ""; if ("speechSynthesis" in window) window.speechSynthesis.cancel() } }
   tocando = minha
   const partes = partesDaFala(texto)
+  // Medidor de volume só quando alguém está olhando (a chamada); um por elemento de áudio
+  const an = op.onNivel ? medidor(audio) : null
+  const buf = an ? new Float32Array(an.fftSize) : null
   let proxima: Promise<Blob | { motivo: Aviso }> = buscar(diretor, partes[0], `${diretor}:${id}:0`)
   for (let k = 0; k < partes.length; k++) {
     const atual = await proxima
@@ -66,14 +101,30 @@ export async function falar(diretor: IdDiretor, id: string, textoOriginal: strin
     if (k + 1 < partes.length) proxima = buscar(diretor, partes[k + 1], `${diretor}:${id}:${k + 1}`)   // já pede a próxima enquanto toca
     if (!(atual instanceof Blob)) {
       op.onAviso?.(atual.motivo)
-      await falarNoNavegador(diretor, partes.slice(k).join(" "), () => cancelado)
+      await falarNoNavegador(diretor, partes.slice(k).join(" "), () => cancelado, op)
       break
     }
     op.onAviso?.(null)
     const url = URL.createObjectURL(atual)
-    await new Promise<void>(res => { audio.src = url; audio.onended = () => res(); audio.onerror = () => res(); audio.onpause = () => { if (cancelado) res() }; audio.play().catch(() => res()) })
+    const parte = partes[k]
+    let raf = 0
+    const acompanhar = () => {
+      if (an) {
+        an.getFloatTimeDomainData(buf!)
+        let soma = 0; for (const x of buf!) soma += x * x
+        op.onNivel?.(Math.min(1, Math.sqrt(soma / buf!.length) * 6))
+      }
+      if (audio.duration > 0) op.onLegenda?.(fraseNoPonto(parte, audio.currentTime / audio.duration))
+      raf = requestAnimationFrame(acompanhar)
+    }
+    await new Promise<void>(res => {
+      audio.src = url; audio.onended = () => res(); audio.onerror = () => res(); audio.onpause = () => { if (cancelado) res() }
+      audio.play().then(() => { if (op.onNivel || op.onLegenda) raf = requestAnimationFrame(acompanhar) }).catch(() => res())
+    })
+    cancelAnimationFrame(raf)
     URL.revokeObjectURL(url)
   }
+  op.onNivel?.(0); op.onLegenda?.("")
   if (tocando === minha) tocando = null
 }
 
@@ -83,7 +134,7 @@ const ALUCINACOES = /^(legendas? (pela|por)|obrigad[oa] por assistir|inscreva-se
 export type Escuta = { parar: () => void; cancelar: () => void }
 
 // Começa a ouvir. onNivel: 0..1 para o medidor; termina sozinho após ~1,6 s de silêncio depois de falar (ou 90 s)
-export async function ouvir(op: { onNivel?: (n: number) => void; onTexto: (t: string) => void; onErro: (e: string) => void; onEntendendo?: () => void; onFim?: () => void }): Promise<Escuta | null> {
+export async function ouvir(op: { onNivel?: (n: number) => void; onTexto: (t: string) => void; onErro: (e: string) => void; onEntendendo?: () => void; onFim?: () => void; semPressa?: boolean }): Promise<Escuta | null> {
   let stream: MediaStream
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }) }
   catch { op.onErro("Sem acesso ao microfone. Libere o microfone para o site no navegador."); op.onFim?.(); return null }
@@ -104,7 +155,7 @@ export async function ouvir(op: { onNivel?: (n: number) => void; onTexto: (t: st
     op.onNivel?.(nivel)
     const agora = Date.now()
     if (nivel > 0.12) { falou = true; silencioDesde = 0 } else if (falou && !silencioDesde) silencioDesde = agora
-    if ((falou && silencioDesde && agora - silencioDesde > 1600) || agora - inicio > 90_000 || (!falou && agora - inicio > 12_000)) { fechar(); return }
+    if ((falou && silencioDesde && agora - silencioDesde > 1600) || agora - inicio > 90_000 || (!op.semPressa && !falou && agora - inicio > 12_000)) { fechar(); return }
     raf = requestAnimationFrame(medir)
   }
   const fechar = () => { cancelAnimationFrame(raf); if (rec.state !== "inactive") rec.stop() }

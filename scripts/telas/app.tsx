@@ -801,7 +801,7 @@ function Telas() {
       const et = Array.from({ length: col }, (_, i) => ({ coluna: i + 1, dataHora: `1${i}/11/2026, 10:00:00` }))
       return <TrackingClient numero="ORC-2026-290" initialData={{ numero: "ORC-2026-290", nomeCliente: "Ana Exemplo", descricao: "Caixa cartucho 6×15×6", materialNome: "Cartão 300g", quantidade: 12000, preco: 9540, colunaAtual: col, etapas: et, criadoEm: "10/11/2026" } as never} />
     }
-    case "predio": case "predio-m": case "escritorio-voz": { try { localStorage.removeItem("escritorio:modo") } catch { /* */ } return <div style={{ minHeight: "100vh" }}><EscritorioView kanban={[...dados.kanban, { ...dados.kanban[0], id: "exp1", numero: "ORC-2026-300", nomeCliente: "Loja Exemplo", coluna: 8 }]} lancamentos={dados.lancamentos} saldoContas={5000} /></div> }
+    case "predio": case "predio-m": case "escritorio-voz": case "reuniao": case "reuniao-falando": case "reuniao-m": { try { localStorage.removeItem("escritorio:modo") } catch { /* */ } return <div style={{ minHeight: "100vh" }}><EscritorioView kanban={[...dados.kanban, { ...dados.kanban[0], id: "exp1", numero: "ORC-2026-300", nomeCliente: "Loja Exemplo", coluna: 8 }]} lancamentos={dados.lancamentos} saldoContas={5000} /></div> }
     case "escritorio": case "escritorio-m": case "escritorio-sel": { try { localStorage.setItem("escritorio:modo", "sala") } catch { /* */ } return <div style={{ height: "100vh" }}><EscritorioView kanban={dados.kanban} /></div> }
     case "ideias": return <div style={{ height: "100vh" }}><IdeiasView config={cfg} onSalvar={setCfg} /></div>
     case "precofecha": {

@@ -233,6 +233,7 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
   const [enviando, setEnviando] = useState<string | null>(null)
   // Conversa 1:1 com um diretor (o balão dele na mesa mostra o que está dizendo)
   const [conversa, setConversa] = useState<IdDiretor | null>(null)
+  const [emReuniao, setEmReuniao] = useState(false)
   const [falaConversa, setFalaConversa] = useState<string | null>(null)
   useEffect(() => { if (deBaixo[iSel]?.id !== "cobertura") setConversa(null) }, [iSel])   // eslint-disable-line react-hooks/exhaustive-deps
   // RH: quadro de funcionários e vagas (cobertura e 1º andar)
@@ -398,9 +399,13 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
             {lista.map(d => <div key={d.id}>
               <div className="flex items-center gap-2">
                 <p className="text-[12.5px] font-semibold flex items-center gap-1.5 flex-1 min-w-0"><span className="w-2 h-2 rounded-full shrink-0" style={{ background: cor[d.tom] }} />{DIRETORES.find(x => x.id === d.id)?.nome.split(" ")[0]} · {d.cargo} <span className="font-normal text-[#6b6876]">{d.area}</span></p>
-                {dentro && agente !== d.id && <button onClick={() => { setAgente(d.id); setConversa(d.id) }} className="text-[11px] font-semibold text-[#5b3bb8] hover:bg-[#8456e8]/10 px-1.5 py-0.5 rounded">Conversar</button>}
+                {dentro && agente !== d.id && <button onClick={() => { setAgente(d.id); setEmReuniao(true); setConversa(d.id) }} className="text-[11px] font-semibold text-white px-1.5 py-0.5 rounded" style={{ background: "linear-gradient(135deg,#8456e8,#5b3bb8)" }}>Reunião</button>}
+                {dentro && agente !== d.id && <button onClick={() => { setAgente(d.id); setEmReuniao(false); setConversa(d.id) }} className="text-[11px] font-semibold text-[#5b3bb8] hover:bg-[#8456e8]/10 px-1.5 py-0.5 rounded">Conversar</button>}
               </div>
-              {agente === d.id && <button onClick={() => setConversa(d.id)} className="mt-1.5 mb-1 w-full h-9 rounded-xl text-[12.5px] font-semibold text-white" style={{ background: "linear-gradient(135deg,#8456e8,#5b3bb8)" }}>Conversar com {DIRETORES.find(x => x.id === d.id)?.nome.split(" ")[0]}</button>}
+              {agente === d.id && <div className="mt-1.5 mb-1 flex gap-1.5">
+                <button onClick={() => { setEmReuniao(true); setConversa(d.id) }} className="flex-1 h-9 rounded-xl text-[12.5px] font-semibold text-white" style={{ background: "linear-gradient(135deg,#8456e8,#5b3bb8)" }}>Reunião com {DIRETORES.find(x => x.id === d.id)?.nome.split(" ")[0]}</button>
+                <button onClick={() => { setEmReuniao(false); setConversa(d.id) }} className="h-9 px-3 rounded-xl text-[12.5px] font-semibold text-[#5b3bb8] bg-[#8456e8]/10 hover:bg-[#8456e8]/15">Conversar</button>
+              </div>}
               {agente === d.id && d.placar.map(p => <div key={p.rotulo} className="flex justify-between text-[12px] py-0.5"><span className="text-[#5e5c68]">{p.rotulo}</span><span className="font-semibold" style={{ color: cor[p.tom] }}>{p.valor}</span></div>)}
               {d.decisoes.length ? <ul className="mt-1 space-y-1">{d.decisoes.map((x, k) => <li key={k} className="text-[11.5px] text-[#3c3a45] pl-3 relative"><span className="absolute left-0 top-[6px] w-1.5 h-1.5 rounded-full bg-[#8456e8]" />{x}</li>)}</ul>
                 : <p className="text-[11.5px] text-[#009351] mt-0.5">Nada para você decidir aqui.</p>}
@@ -433,7 +438,7 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
           </div>
         )}
       </div>
-      {conversa && a?.id === "cobertura" && <ConversaDiretor key={conversa} diretor={conversa} onFechar={() => { setConversa(null); setFalaConversa(null) }} onFala={setFalaConversa} />}
+      {conversa && a?.id === "cobertura" && <ConversaDiretor key={conversa + emReuniao} diretor={conversa} reuniaoInicial={emReuniao} onFechar={() => { setConversa(null); setFalaConversa(null) }} onFala={setFalaConversa} />}
       {!conversa && <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11.5px] text-white/90 bg-black/35 backdrop-blur px-3 py-1 rounded-full pointer-events-none">
         {dentro ? "Arraste para girar · role para aproximar · clique nas máquinas e nas pessoas" : "Clique num andar · arraste para girar · role para aproximar"}
       </p>}
