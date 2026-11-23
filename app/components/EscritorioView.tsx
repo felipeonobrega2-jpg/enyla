@@ -4,6 +4,9 @@
 // o que trava (WhatsApp, crédito da IA, cota da hora) e o feed de tudo que aconteceu hoje. Atualiza sozinho.
 
 import { useEffect, useMemo, useState } from "react"
+import { PredioView, type Andar } from "./predio/PredioView"
+import { GraficaVirtual, atrasado } from "./predio/GraficaVirtual"
+import type { KanbanCard } from "../types"
 import { AgendadorView } from "./AgendadorView"
 import { MessageCircle, ClipboardList, Repeat, RotateCcw, Printer, FileText, ShieldCheck, GraduationCap, Wifi, WifiOff, Sparkles, Clock, Power } from "lucide-react"
 import { Pagina, CabecalhoPagina, Cartao, TituloCartao, Esqueleto, Segmentado } from "./ds"
@@ -105,15 +108,15 @@ function Status({ icone, rotulo, valor, tom }: { icone: React.ReactNode; rotulo:
   )
 }
 
-export function EscritorioView() {
+export function EscritorioView({ kanban = [] }: { kanban?: KanbanCard[] }) {
   const [d, setD] = useState<Escritorio | null>(null)
   const [filtro, setFiltro] = useState<IdMesa | null>(null)
   const [agora, setAgora] = useState(() => Date.now())
   const [mostrar, setMostrar] = useState(12)
-  const [modo, setModo] = useState<"sala" | "detalhes" | "rotinas">("sala")
+  const [modo, setModo] = useState<"predio" | "sala" | "detalhes" | "rotinas">("predio")
   const [feedAberto, setFeedAberto] = useState(false)
-  useEffect(() => { try { const m = localStorage.getItem("escritorio:modo"); if (m === "detalhes" || m === "rotinas") setModo(m) } catch { /* sem storage */ } }, [])
-  const trocarModo = (v: "sala" | "detalhes" | "rotinas") => { setModo(v); try { localStorage.setItem("escritorio:modo", v) } catch { /* sem storage */ } }
+  useEffect(() => { try { const m = localStorage.getItem("escritorio:modo"); if (m === "detalhes" || m === "rotinas" || m === "sala") setModo(m) } catch { /* sem storage */ } }, [])
+  const trocarModo = (v: "predio" | "sala" | "detalhes" | "rotinas") => { setModo(v); try { localStorage.setItem("escritorio:modo", v) } catch { /* sem storage */ } }
   useEffect(() => {
     const carregar = () => fetch("/api/escritorio").then(r => r.ok ? r.json() : null).then(x => { if (x) { setD(x); setAgora(Date.now()) } }).catch(() => {})
     carregar()
@@ -132,7 +135,7 @@ export function EscritorioView() {
     : trabalhando ? `${trabalhando} ${trabalhando === 1 ? "agente trabalhando" : "agentes trabalhando"} agora · ${totalHoje} entregas hoje`
     : `Todos de plantão · ${totalHoje} entregas hoje`
 
-  const segmentado = <Segmentado valor={modo} onChange={trocarModo} opcoes={[{ v: "sala", nome: "Sala" }, { v: "detalhes", nome: "Detalhes" }, { v: "rotinas", nome: "Rotinas" }]} />
+  const segmentado = <Segmentado valor={modo} onChange={trocarModo} opcoes={[{ v: "predio", nome: "Prédio" }, { v: "sala", nome: "Sala" }, { v: "detalhes", nome: "Detalhes" }, { v: "rotinas", nome: "Rotinas" }]} />
   const licoes = Number((d.mesas.find(m => m.id === "aprendiz")?.extra ?? "").match(/\d+/)?.[0] ?? 0)
   const linhaFeed = (e: Escritorio["feed"][number], i: number) => {
     const { cor, Icone } = VISUAL[e.mesa]
@@ -150,6 +153,35 @@ export function EscritorioView() {
       <span style={{ color: ok === false ? "#d33a3c" : ok ? "#1f9d55" : "#898892" }}>{icone}</span>{texto}
     </span>
   )
+
+  if (modo === "predio") {
+    const hoje = new Date().toLocaleDateString("sv-SE")
+    const naProducao = kanban.filter(c => c.coluna >= 2 && c.coluna <= 8)
+    const atrasadosProd = naProducao.filter(c => atrasado(c, hoje)).length
+    const andares: Andar[] = [
+      { id: "cobertura", rotulo: "Cobertura", nome: "Diretoria", resumo: "", ativo: false,
+        obras: "COO, CFO e CTO: cada diretor com o placar da área dele e as decisões que precisam de você, já com a recomendação. As rotinas automáticas do sistema também vão morar aqui." },
+      { id: "3", rotulo: "3º andar", nome: "Marketing", resumo: "", ativo: false,
+        obras: "Anúncios da Meta ao vivo: quanto gastou hoje, leads que chegaram, custo por MQL e qual campanha está trazendo bom negócio." },
+      { id: "2", rotulo: "2º andar", nome: "Financeiro", resumo: "", ativo: false,
+        obras: "O caixa do dia, o que entra e o que sai na semana, sinal que não caiu, cobrança vencida e a margem do Offset e do Digital lado a lado." },
+      { id: "1", rotulo: "1º andar", nome: "Agentes", resumo: sub, ativo: trabalhando > 0,
+        conteudo: <div className="space-y-2">
+          <div className="relative rounded-xl overflow-hidden h-[460px]" style={{ background: "#7fb069" }}>
+            <EscritorioVirtual mesas={d.mesas} selecionada={filtro} cota={d.cota} licoes={licoes} noHorario={d.noHorario} onSelecionar={id => { setFiltro(id); setMostrar(12) }} />
+          </div>
+          <button onClick={() => trocarModo("sala")} className="text-[12.5px] font-semibold text-[#8456e8] hover:underline">Abrir a sala em tela cheia, com o que está acontecendo agora</button>
+        </div> },
+      { id: "terreo", rotulo: "Térreo", nome: "Gráfica", resumo: `${naProducao.length} ${naProducao.length === 1 ? "pedido" : "pedidos"} na produção${atrasadosProd ? ` · ${atrasadosProd} atrasado${atrasadosProd > 1 ? "s" : ""}` : ""}`,
+        ativo: naProducao.length > 0, conteudo: <GraficaVirtual kanban={kanban} noite={!d.noHorario} /> },
+    ]
+    return (
+      <Pagina>
+        <CabecalhoPagina titulo="Prédio ENYLA" sub="A empresa inteira funcionando: escolha o andar no elevador" acoes={segmentado} />
+        <PredioView andares={andares} inicial="terreo" />
+      </Pagina>
+    )
+  }
 
   if (modo === "rotinas") return (
     <Pagina>

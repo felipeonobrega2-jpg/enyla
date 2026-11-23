@@ -141,3 +141,13 @@ describe("agendador", () => {
     expect(lerExecucao("agenda|followup|fora%20do%20hor%C3%A1rio", "x")).toEqual({ rotina: "followup", em: "x", resultado: "fora do horário" })
   })
 })
+
+describe("prédio: gráfica virtual", () => {
+  it("estações cobrem as etapas de produção e o atraso vem da data de entrega", async () => {
+    const { ESTACOES, atrasado } = await import("../app/components/predio/GraficaVirtual")
+    expect(ESTACOES.map(e => e.coluna)).toEqual([2, 3, 4, 5, 6, 7, 8])
+    expect(atrasado({ dataEntregaPrevista: "2026-11-20" }, "2026-11-22")).toBe(true)
+    expect(atrasado({ dataEntregaPrevista: "2026-11-25" }, "2026-11-22")).toBe(false)
+    expect(atrasado({}, "2026-11-22")).toBe(false)
+  })
+})

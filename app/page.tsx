@@ -2636,7 +2636,7 @@ export default function Home() {
           ) : view === "dados" ? (
             <AuditoriaView onAbrirCard={id => { const c = kanban.find(k => k.id === id); if (c) abrirDetalheCard(c) }} onNavegar={v => navigate(v)} />
           ) : view === "escritorio" ? (
-            <EscritorioView />
+            <EscritorioView kanban={kanban} />
           ) : view === "ideias" ? (
             <IdeiasView config={config} onSalvar={salvarConfigTudo} />
           ) : view === "forma" ? (
