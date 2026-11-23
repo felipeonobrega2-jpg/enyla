@@ -30,7 +30,6 @@ export default function ConversaDiretor({ diretor, onFechar, onFala }: { diretor
     fetch("/api/diretoria/ferramentas").then(r => r.ok ? r.json() : null).then(x => x?.ferramentas && setFerr(x.ferramentas)).catch(() => {})
   }
   useEffect(() => {
-    setMsgs(null)
     fetch(`/api/diretoria/conversa?diretor=${diretor}`).then(r => r.ok ? r.json() : null).then(x => setMsgs(x?.mensagens ?? [])).catch(() => setMsgs([]))
     carregarLados()
   }, [diretor])

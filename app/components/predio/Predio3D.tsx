@@ -433,7 +433,7 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
           </div>
         )}
       </div>
-      {conversa && a?.id === "cobertura" && <ConversaDiretor diretor={conversa} onFechar={() => { setConversa(null); setFalaConversa(null) }} onFala={setFalaConversa} />}
+      {conversa && a?.id === "cobertura" && <ConversaDiretor key={conversa} diretor={conversa} onFechar={() => { setConversa(null); setFalaConversa(null) }} onFala={setFalaConversa} />}
       {!conversa && <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11.5px] text-white/90 bg-black/35 backdrop-blur px-3 py-1 rounded-full pointer-events-none">
         {dentro ? "Arraste para girar · role para aproximar · clique nas máquinas e nas pessoas" : "Clique num andar · arraste para girar · role para aproximar"}
       </p>}
