@@ -8,7 +8,7 @@ import { registrarUsoIA } from "./gastosServidor"
 import { DIRETORES, type IdDiretor, type LicaoDiretor, type IdBase } from "./diretoria"
 import { coletarContexto } from "./reuniaoDiretoria"
 import { lerConversa, gravarConversa, gravarPlano, pedirFerramenta, type AcaoConversa, type MsgConversa } from "./diretoriaServidor"
-import { mudarConfig } from "./configAtomica"
+import { lerCampos, mudarConfig } from "./configAtomica"
 import { COLUNAS_KANBAN } from "../types"
 
 const novoId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
@@ -52,15 +52,40 @@ function resumoAcao(a: AcaoConversa): string {
   return a.texto
 }
 
-// Os números da empresa levam ~5-10 s para juntar: ficam guardados 3 min (a conversa toda usa a mesma foto) e a
-// tela pede para aquecer quando abre a conversa/reunião. Uma busca só por vez, mesmo com pedidos simultâneos.
-let fotoCtx: { em: number; ctx: Promise<Ctx> } | null = null
-export function contextoRapido(): Promise<Ctx> {
-  if (fotoCtx && Date.now() - fotoCtx.em < 180_000) return fotoCtx.ctx
-  const ctx = coletarContexto()
-  fotoCtx = { em: Date.now(), ctx }
-  ctx.catch(() => { fotoCtx = null })
-  return ctx
+// Foto da empresa para as conversas: juntar os números leva ~15 s (a tela Hoje é a parte pesada). A foto pronta fica
+// guardada no banco (dados_sistema) e na memória; a conversa usa a que existe (até 12 h, com o horário dela no prompt)
+// e uma nova é montada em segundo plano ao abrir a conversa e depois de cada resposta, quando passa de 3 min.
+// Assim a resposta nunca espera a coleta; só sem foto nenhuma (ou muito velha) a primeira fala espera.
+const AREAS = ["comercial", "producao", "financeiro", "marketing", "sistema"] as const
+type Foto = { em: string; norte: string; resultados: string; equipe: string; bloco: string; ferramentasTxt: string; cultura: string[]; exec: Ctx["exec"]; detalhes: Record<string, string> }
+let memFoto: { lidaEm: number; foto: Promise<Foto> } | null = null
+let montando: Promise<Foto> | null = null
+async function montarFoto(salvar: boolean): Promise<Foto> {
+  const ctx = await coletarContexto()
+  const foto: Foto = { em: new Date().toISOString(), norte: ctx.norte, resultados: ctx.resultados, equipe: ctx.equipe, bloco: ctx.bloco, ferramentasTxt: ctx.ferramentasTxt,
+    cultura: ctx.cultura, exec: ctx.exec, detalhes: Object.fromEntries(AREAS.map(a => [a, detalhe(ctx, a)])) }
+  const { gravarFoto } = await import("./diretoriaServidor")
+  if (salvar) await gravarFoto(foto).catch(() => null)
+  return foto
+}
+export function renovarFoto(salvar = true): Promise<Foto> {
+  montando ??= montarFoto(salvar).finally(() => { montando = null })
+  const p = montando
+  p.then(() => { memFoto = { lidaEm: Date.now(), foto: p } }, () => null)
+  return p
+}
+const idade = (f: Foto) => Date.now() - Date.parse(f.em)
+export async function fotoRapida(salvar = true): Promise<Foto> {
+  if (memFoto && Date.now() - memFoto.lidaEm < 60_000) return memFoto.foto
+  const { lerFoto } = await import("./diretoriaServidor")
+  const salva = await lerFoto<Foto>().catch(() => null)
+  if (salva && idade(salva) < 12 * 3600_000) { memFoto = { lidaEm: Date.now(), foto: Promise.resolve(salva) }; return salva }
+  return renovarFoto(salvar)
+}
+// Chamado depois de responder (e ao abrir a conversa): se a foto passou de 3 min, monta outra para a próxima fala
+export async function aquecerFoto() {
+  const f = await fotoRapida().catch(() => null)
+  if (!f || idade(f) > 180_000) await renovarFoto().catch(() => null)
 }
 
 // A área de cada diretor já vai detalhada no prompt (evita uma volta extra só para "detalhar" a própria área)
@@ -71,8 +96,8 @@ const MINHA_AREA: Record<IdDiretor, string> = { coo: "producao", cco: "comercial
 export async function conversar(diretor: IdDiretor, textoFelipe: string, op: { simular?: boolean; historico?: MsgConversa[]; voz?: boolean; aoVivo?: (pedaco: string) => void } = {}): Promise<MsgConversa[]> {
   const grava = !op.simular
   const info = DIRETORES.find(d => d.id === diretor)!
-  const ctx = await contextoRapido()
-  if (!ctx.cfg.apiKey) throw new Error("Sem chave da IA nas Configurações.")
+  const [ctx, cfg] = await Promise.all([fotoRapida(grava), lerCampos<{ apiKey?: string }>(["apiKey"])])
+  if (!cfg.apiKey) throw new Error("Sem chave da IA nas Configurações.")
   const historico = op.historico ?? await lerConversa(diretor)
   const minha: MsgConversa = { id: novoId(), de: "felipe", texto: textoFelipe.slice(0, 4000), em: new Date().toISOString() }
   const colegas = DIRETORES.filter(d => d.id !== diretor).map(d => `${d.nome.split(" ")[0]} (${d.cargo}, ${d.area})`).join(", ")
@@ -89,7 +114,7 @@ Como você trabalha:
 - Nunca invente número: use os dados abaixo ou "detalhar". Orçar o Offset é do Felipe por decisão dele, até ele terminar de treinar o agente de orçamentos.
 Português do Brasil.
 
-Hoje: ${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", timeZone: "America/Sao_Paulo" })}.
+Hoje: ${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", timeZone: "America/Sao_Paulo" })}. Os números abaixo são de ${new Date(ctx.em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}${idade(ctx) > 30 * 60_000 ? " (foto de mais de meia hora atrás; se o Felipe perguntar de algo que pode ter mudado, avise o horário)" : ""}.
 
 ${ctx.norte}
 
@@ -103,7 +128,7 @@ ${ctx.ferramentasTxt}
 ${ctx.resultados}
 
 # Detalhes da sua área (dados de agora)
-${detalhe(ctx, MINHA_AREA[diretor])}
+${ctx.detalhes[MINHA_AREA[diretor]] ?? ""}
 
 # As outras áreas (para contexto)
 ${blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")).join("\n\n")}`
@@ -124,7 +149,7 @@ ${blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")).j
   else msgs.push({ role: "user", content: minha.texto })
 
   const acoes: AcaoConversa[] = []
-  const cli = clienteClaude(ctx.cfg.apiKey)
+  const cli = clienteClaude(cfg.apiKey)
   const execIds = ctx.exec.map(f => f.id)
   let textoFinal = ""
   for (let volta = 0; volta < 8; volta++) {
@@ -149,13 +174,13 @@ ${blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")).j
       const x = u.input as Record<string, unknown>
       let saida = ""
       try {
-        if (u.name === "detalhar") saida = detalhe(ctx, String(x.area))
+        if (u.name === "detalhar") saida = ctx.detalhes[String(x.area)] ?? "Área desconhecida."
         else if (u.name === "ordenar_funcionario") {
           const func = ctx.exec.find(f => f.id === x.funcionario)
           if (!func) saida = "Funcionário não encontrado no quadro."
           else {
             const { redigirComoFuncionario } = await import("./funcionariosServidor")
-            const r = await redigirComoFuncionario({ funcionario: func, cliente: String(x.cliente), ordem: String(x.ordem), apiKey: ctx.cfg.apiKey!, conhecimento: ctx.cfg.conhecimentoAgente, cultura: ctx.cultura })
+            const r = await redigirComoFuncionario({ funcionario: func, cliente: String(x.cliente), ordem: String(x.ordem), apiKey: cfg.apiKey!, conhecimento: (await lerCampos<{ conhecimentoAgente?: import("./agenteLeads").Conhecimento[] }>(["conhecimentoAgente"])).conhecimentoAgente, cultura: ctx.cultura })
             if (r.ok) { acoes.push({ id: novoId(), tipo: "mensagem", funcionario: func.nome, cliente: String(x.cliente), texto: r.texto, status: "aguardando" }); saida = `${func.nome} escreveu e a mensagem está esperando o Aprovo do Felipe: "${r.texto}"` }
             else { acoes.push({ id: novoId(), tipo: "falha", texto: r.erro }); saida = `Não deu: ${r.erro}` }
           }

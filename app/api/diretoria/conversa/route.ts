@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { DIRETORES, type IdDiretor } from "@/app/lib/diretoria"
 import { lerConversa, apagarConversa } from "@/app/lib/diretoriaServidor"
-import { contextoRapido, conversar, responderAcao } from "@/app/lib/conversaDiretor"
+import { aquecerFoto, conversar, responderAcao } from "@/app/lib/conversaDiretor"
 import { erroClaude } from "@/app/lib/claude"
 
 // Conversa 1:1 do Felipe com um diretor (rota protegida pelo login). GET ?diretor= ; POST { diretor, texto };
@@ -12,7 +12,7 @@ const ehDiretor = (x: unknown): x is IdDiretor => DIRETORES.some(d => d.id === x
 export async function GET(req: NextRequest) {
   const d = req.nextUrl.searchParams.get("diretor")
   if (!ehDiretor(d)) return NextResponse.json({ erro: "diretor" }, { status: 400 })
-  after(() => contextoRapido().then(() => undefined, () => undefined))   // a tela abriu a conversa: já junta os números (fica na mesma instância)
+  after(aquecerFoto)   // a tela abriu a conversa: se a foto da empresa está velha, monta outra antes da primeira pergunta
   return NextResponse.json({ mensagens: await lerConversa(d) })
 }
 
@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const { diretor, texto, voz, aoVivo } = await req.json().catch(() => ({})) as { diretor?: string; texto?: string; voz?: boolean; aoVivo?: boolean }
   if (!ehDiretor(diretor) || !texto?.trim()) return NextResponse.json({ erro: "Escreva a mensagem." }, { status: 400 })
+  after(aquecerFoto)   // depois de responder, deixa a foto da empresa fresca para a próxima fala
   if (!aoVivo) {
     try { return NextResponse.json({ mensagens: await conversar(diretor, texto.trim(), { voz: !!voz }) }) }
     catch (e) { const r = erroClaude(e); return NextResponse.json({ erro: r.error }, { status: r.status }) }

@@ -64,3 +64,7 @@ export async function lerConversa(diretor: IdDiretor): Promise<MsgConversa[]> {
 }
 export const gravarConversa = (diretor: IdDiretor, mensagens: MsgConversa[]) => gravar("diretoriaConversa", diretor, { mensagens: mensagens.slice(-60) })
 export const apagarConversa = (diretor: IdDiretor) => apagar("diretoriaConversa", diretor)
+
+// ── Foto da empresa para as conversas com os diretores (montada em segundo plano; ver conversaDiretor) ──────────
+export const lerFoto = <T>() => ler<T>("diretoriaFoto", "atual")
+export const gravarFoto = (foto: unknown) => gravar("diretoriaFoto", "atual", foto)
