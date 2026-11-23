@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
   if (!o) return NextResponse.json({
     voce: `${info.nome}, ${info.cargo} (${info.area})`,
-    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | "), "?o=conversa": "o que você e o Felipe conversaram" },
+    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | "), "?o=conversa": "o que você e o Felipe conversaram" },
     escrita: { "POST {acao:'relatar', texto}": "manda algo ao Felipe", ...Object.fromEntries(FERRAMENTAS.map(f => [`POST {acao:'${f}', ...}`, "ferramenta (ver instruções)"])) },
     limitePorHora: LIMITE_POR_HORA,
   })
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
   if (o === "dossie") {
     const { data } = await supabase.from("dados_sistema").select("id, dados->>titulo, dados->>em, atualizado_em").eq("colecao", "dossieNuvem").order("id")
     const lista = (data ?? []) as { id: string; titulo: string | null; em: string | null }[]
-    const ordem = (n: string) => n === "historia.md" ? 0 : n === "linha-do-tempo.md" ? 1 : 2
+    const ordem = (n: string) => n === "historia.md" ? 0 : n === "sistema.md" ? 1 : n === "linha-do-tempo.md" ? 2 : 3
     return NextResponse.json({ leiaNaOrdem: lista.sort((a, b) => ordem(a.id) - ordem(b.id) || a.id.localeCompare(b.id)).map(r => ({ nome: r.id, titulo: r.titulo, em: r.em })) })
   }
   if (o === "arquivo") {
