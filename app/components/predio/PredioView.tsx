@@ -5,6 +5,14 @@
 // (Financeiro, Marketing, Diretoria com COO/CFO/CTO) chegam nas próximas etapas e por enquanto estão em obras.
 
 import React, { useEffect, useState } from "react"
+import dynamic from "next/dynamic"
+
+// 3D só no computador com WebGL (carrega o three.js só quando vai usar)
+const Predio3D = dynamic(() => import("./Predio3D"), { ssr: false, loading: () => <div className="w-full h-full grid place-items-center text-[13px] text-[#898892]">Montando o prédio…</div> })
+function podeTer3D(): boolean {
+  if (typeof window === "undefined" || window.innerWidth < 1024) return false
+  try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")) } catch { return false }
+}
 import { ArrowUp, ArrowDown, HardHat } from "lucide-react"
 
 const T = "#2a2238"
@@ -80,6 +88,37 @@ export function PredioView({ andares, inicial }: { andares: Andar[]; inicial?: s
   useEffect(() => { try { const s = sessionStorage.getItem("predio:andar"); if (s && andares.some(a => a.id === s)) setSel(s) } catch { /* sem storage */ } }, [])   // eslint-disable-line react-hooks/exhaustive-deps
   const ir = (id: string) => { setSel(id); try { sessionStorage.setItem("predio:andar", id) } catch { /* sem storage */ } }
   const i = andares.findIndex(a => a.id === sel), a = andares[i] ?? andares[andares.length - 1]
+  const [tres, setTres] = useState(false)
+  useEffect(() => { setTres(podeTer3D()) }, [])
+  const cabecalho = (
+    <div className="flex items-center gap-2 mb-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#898892]">{a.rotulo}</p>
+      <p className="text-[16px] font-semibold text-[#191625]">{a.nome}</p>
+      <span className="flex-1" />
+      <button onClick={() => i > 0 && ir(andares[i - 1].id)} disabled={i <= 0} aria-label="Subir um andar" className="w-8 h-8 rounded-lg grid place-items-center text-[#5e5c68] hover:bg-[rgba(116,116,128,0.1)] disabled:opacity-30"><ArrowUp className="w-4 h-4" /></button>
+      <button onClick={() => i < andares.length - 1 && ir(andares[i + 1].id)} disabled={i >= andares.length - 1} aria-label="Descer um andar" className="w-8 h-8 rounded-lg grid place-items-center text-[#5e5c68] hover:bg-[rgba(116,116,128,0.1)] disabled:opacity-30"><ArrowDown className="w-4 h-4" /></button>
+    </div>
+  )
+  const conteudo = a.obras ? (
+    <div className="rounded-xl border border-dashed border-[#c57800]/40 bg-[#c57800]/[0.04] p-6 flex items-start gap-3">
+      <HardHat className="w-6 h-6 text-[#c57800] shrink-0" />
+      <div>
+        <p className="text-[14px] font-semibold text-[#191625]">Andar em obras</p>
+        <p className="text-[12.5px] text-[#5e5c68] mt-1 leading-relaxed">{a.obras}</p>
+      </div>
+    </div>
+  ) : a.conteudo
+  if (tres) return (
+    <div className="space-y-4">
+      <div className="relative w-full h-[min(68vh,640px)] rounded-2xl overflow-hidden border border-[rgba(60,60,67,0.10)]">
+        <Predio3D andares={andares} sel={a.id} onSel={ir} />
+        <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11.5px] text-white/90 bg-black/35 backdrop-blur px-3 py-1 rounded-full pointer-events-none">
+          Clique num andar para ir até ele · arraste para girar · role para aproximar
+        </p>
+      </div>
+      <div key={a.id} className="min-w-0 ds-entrada">{cabecalho}{conteudo}</div>
+    </div>
+  )
   return (
     <div className="grid gap-4 lg:grid-cols-[230px_1fr] items-start">
       <div className="lg:sticky lg:top-4 flex lg:block gap-3 items-start">
