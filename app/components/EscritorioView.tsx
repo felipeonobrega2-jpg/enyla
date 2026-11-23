@@ -8,6 +8,7 @@ import { PredioView, type Andar } from "./predio/PredioView"
 import { GraficaVirtual, atrasado } from "./predio/GraficaVirtual"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { financeiroDoAndar } from "../lib/financeiroAndar"
+import { montarDiretoria } from "../lib/diretoria"
 import { AgendadorView } from "./AgendadorView"
 import { MessageCircle, ClipboardList, Repeat, RotateCcw, Printer, FileText, ShieldCheck, GraduationCap, Wifi, WifiOff, Sparkles, Clock, Power } from "lucide-react"
 import { Pagina, CabecalhoPagina, Cartao, TituloCartao, Esqueleto, Segmentado } from "./ds"
@@ -125,6 +126,18 @@ export function EscritorioView({ kanban = [], lancamentos = [], saldoContas = nu
     return () => clearInterval(t)
   }, [])
   const feed = useMemo(() => (d?.feed ?? []).filter(e => !filtro || e.mesa === filtro), [d, filtro])
+  // Diretoria (cobertura do prédio): o resumo do dia e as rotinas, lidos só quando o prédio está aberto
+  const [hojeDir, setHojeDir] = useState<Parameters<typeof montarDiretoria>[0]["hoje"]>(null)
+  const [rotinasDir, setRotinasDir] = useState<Parameters<typeof montarDiretoria>[0]["rotinas"]>(null)
+  const [conhecimentoDir, setConhecimentoDir] = useState<Record<string, number>>({})
+  const carregarConhecimento = () => fetch("/api/diretoria").then(r => r.ok ? r.json() : null)
+    .then(x => { if (x?.conhecimento) setConhecimentoDir(Object.fromEntries(Object.entries(x.conhecimento as Record<string, unknown[]>).map(([k, v]) => [k, v.length]))) }).catch(() => {})
+  useEffect(() => {
+    if (modo !== "predio") return
+    fetch("/api/hoje").then(r => r.ok ? r.json() : null).then(x => { if (x) setHojeDir(x) }).catch(() => {})
+    fetch("/api/agendador").then(r => r.ok ? r.json() : null).then(x => { if (x?.rotinas) setRotinasDir(x.rotinas) }).catch(() => {})
+    carregarConhecimento()
+  }, [modo])   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!d) return <Pagina><CabecalhoPagina titulo="Escritório" sub="Seus agentes trabalhando agora" /><Esqueleto linhas={6} /></Pagina>
 
@@ -160,10 +173,17 @@ export function EscritorioView({ kanban = [], lancamentos = [], saldoContas = nu
     const naProducao = kanban.filter(c => c.coluna >= 2 && c.coluna <= 8)
     const atrasadosProd = naProducao.filter(c => atrasado(c, hoje)).length
     const fin = financeiroDoAndar(kanban, lancamentos, saldoContas)
+    const diretores = montarDiretoria({ hoje: hojeDir, fin, kanban, agentesTravados: d.mesas.filter(x => x.estado === "travado").map(x => x.nome),
+      rotinas: rotinasDir, whatsapp: d.whatsapp, semCredito: d.semCredito, cota: d.cota, conhecimento: conhecimentoDir })
+    const totalDecisoes = diretores.reduce((t, x) => t + x.decisoes.length, 0)
     const brlAndar = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
     const andares: Andar[] = [
-      { id: "cobertura", rotulo: "Cobertura", nome: "Diretoria", resumo: "", ativo: false,
-        obras: "COO, CFO e CTO: cada diretor com o placar da área dele e as decisões que precisam de você, já com a recomendação. As rotinas automáticas do sistema também vão morar aqui." },
+      { id: "cobertura", rotulo: "Cobertura", nome: "Diretoria", resumo: totalDecisoes ? `${totalDecisoes} ${totalDecisoes === 1 ? "decisão" : "decisões"} para você` : "nada esperando você", ativo: true,
+        conteudo: <div className="space-y-2">{diretores.map(x => (
+          <div key={x.id} className="bg-white rounded-xl border border-[rgba(60,60,67,0.08)] p-3">
+            <p className="text-[13px] font-semibold">{x.cargo} · {x.area}</p>
+            {x.decisoes.length ? <ul className="mt-1 space-y-0.5">{x.decisoes.map((t, k) => <li key={k} className="text-[12px] text-[#3c3a45]">• {t}</li>)}</ul> : <p className="text-[12px] text-[#009351] mt-0.5">Tudo em ordem.</p>}
+          </div>))}</div> },
       { id: "3", rotulo: "3º andar", nome: "Marketing", resumo: "", ativo: false,
         obras: "Anúncios da Meta ao vivo: quanto gastou hoje, leads que chegaram, custo por MQL e qual campanha está trazendo bom negócio." },
       { id: "2", rotulo: "2º andar", nome: "Financeiro", resumo: `${brlAndar(fin.recebidoMes)} recebido no mês${fin.vencido > 0.5 ? ` · ${brlAndar(fin.vencido)} vencido` : ""}`, ativo: true,
@@ -185,7 +205,7 @@ export function EscritorioView({ kanban = [], lancamentos = [], saldoContas = nu
     return (
       <Pagina>
         <CabecalhoPagina titulo="Prédio ENYLA" sub="A empresa inteira funcionando: escolha o andar no elevador" acoes={segmentado} />
-        <PredioView andares={andares} inicial="terreo" dados3d={{ kanban, mesas: d.mesas, feed: d.feed, financeiro: fin }} />
+        <PredioView andares={andares} inicial="terreo" dados3d={{ kanban, mesas: d.mesas, feed: d.feed, financeiro: fin, diretores, onConhecimento: carregarConhecimento }} />
       </Pagina>
     )
   }

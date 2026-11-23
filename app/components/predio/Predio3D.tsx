@@ -11,7 +11,8 @@ import { OrbitControls, Environment, Lightformer, ContactShadows, Html, Sky, Rou
 import { EffectComposer, N8AO, Bloom, SMAA } from "@react-three/postprocessing"
 import * as THREE from "three"
 import type { Andar } from "./PredioView"
-import { GraficaInterior, AgentesInterior, Canteiro, FinanceiroInterior } from "./Interiores3D"
+import { GraficaInterior, AgentesInterior, Canteiro, FinanceiroInterior, DiretoriaInterior } from "./Interiores3D"
+import type { Diretor } from "../../lib/diretoria"
 import type { FinanceiroAndar } from "../../lib/financeiroAndar"
 import { atrasado } from "./GraficaVirtual"
 import { COLUNAS_KANBAN, type KanbanCard } from "../../types"
@@ -183,7 +184,8 @@ function Camera({ alvo, dentro, controles }: { alvo: number; dentro: boolean; co
   const voando = useRef(true)
   useEffect(() => {
     const yA = baseDo(alvo) + alturaDo(alvo) / 2
-    if (dentro) { foco.current.set(0, baseDo(alvo) + 0.8, 0.5); destino.current.set(15, baseDo(alvo) + 13, 19) }
+    if (dentro && alvo === 4) { foco.current.set(0.8, baseDo(alvo) + 1, 0); destino.current.set(7.5, baseDo(alvo) + 8.5, 10.5) }   // mesa diretora de perto
+    else if (dentro) { foco.current.set(0, baseDo(alvo) + 0.8, 0.5); destino.current.set(15, baseDo(alvo) + 13, 19) }
     else { foco.current.set(0, Math.max(yA, 8), 0); destino.current.set(42, Math.max(yA, 8) + 15, 60) }
     voando.current = true
   }, [alvo, dentro])
@@ -207,7 +209,7 @@ function sol(): { pos: [number, number, number]; noite: boolean } {
   return { pos: [Math.cos(ang) * 80, Math.max(-10, Math.sin(ang) * 70), 40], noite }
 }
 
-export type Dados3D = { kanban: KanbanCard[]; mesas: MesaAgente[]; feed: EventoEscritorio[]; financeiro?: FinanceiroAndar }
+export type Dados3D = { kanban: KanbanCard[]; mesas: MesaAgente[]; feed: EventoEscritorio[]; financeiro?: FinanceiroAndar; diretores?: Diretor[]; onConhecimento?: () => void }
 
 export default function Predio3D({ andares, sel, onSel, dados }: { andares: Andar[]; sel: string; onSel: (id: string) => void; dados: Dados3D }) {
   // andares vem de cima para baixo; no 3D o índice 0 é o térreo
@@ -272,6 +274,20 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
               <ul>{f.vencidos.map(v => <li key={v.numero} className="flex justify-between text-[11.5px] py-0.5"><span className="truncate mr-2">{v.numero} · {v.cliente}</span><span className="text-[#d33a3c] font-semibold shrink-0">{b(v.valor)}</span></li>)}</ul></>}
           </div>
         })()}
+        {a?.id === "cobertura" && dados.diretores && (() => {
+          const ds = dados.diretores, cor = { ok: "#009351", atencao: "#c57800", problema: "#d33a3c" } as const
+          const lista = agente === "ceo" || !agente ? ds : ds.filter(d => d.id === agente)
+          return <div className="mt-3 space-y-3">
+            {!dentro && <p className="text-[12px] text-[#898892]">Entre no andar e clique num diretor.</p>}
+            {lista.map(d => <div key={d.id}>
+              <p className="text-[12.5px] font-semibold flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: cor[d.tom] }} />{d.cargo} · {d.area}</p>
+              {agente === d.id && d.placar.map(p => <div key={p.rotulo} className="flex justify-between text-[12px] py-0.5"><span className="text-[#5e5c68]">{p.rotulo}</span><span className="font-semibold" style={{ color: cor[p.tom] }}>{p.valor}</span></div>)}
+              {d.decisoes.length ? <ul className="mt-1 space-y-1">{d.decisoes.map((x, k) => <li key={k} className="text-[11.5px] text-[#3c3a45] pl-3 relative"><span className="absolute left-0 top-[6px] w-1.5 h-1.5 rounded-full bg-[#8456e8]" />{x}</li>)}</ul>
+                : <p className="text-[11.5px] text-[#009351] mt-0.5">Nada para você decidir aqui.</p>}
+              {agente === d.id && <ConhecimentoDiretor diretor={d.id} cargo={d.cargo} onMudou={dados.onConhecimento} />}
+            </div>)}
+          </div>
+        })()}
         {dentro && a?.id === "1" && (
           <div className="mt-3">
             {!ag ? <p className="text-[12px] text-[#898892]">Clique num agente para ver o que ele está fazendo.</p> : <>
@@ -287,6 +303,39 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
       <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11.5px] text-white/90 bg-black/35 backdrop-blur px-3 py-1 rounded-full pointer-events-none">
         {dentro ? "Arraste para girar · role para aproximar · clique nas máquinas e nas pessoas" : "Clique num andar · arraste para girar · role para aproximar"}
       </p>
+    </div>
+  )
+}
+
+// Base de conhecimento de um diretor: o que ele já sabe e um campo para ensinar mais (os agentes diretores leem isso)
+function ConhecimentoDiretor({ diretor, cargo, onMudou }: { diretor: string; cargo: string; onMudou?: () => void }) {
+  const [lista, setLista] = useState<{ id: string; texto: string; em: string }[] | null>(null)
+  const [texto, setTexto] = useState("")
+  const [salvando, setSalvando] = useState(false)
+  const carregar = () => fetch("/api/diretoria").then(r => r.ok ? r.json() : null).then(x => setLista(x?.conhecimento?.[diretor] ?? [])).catch(() => setLista([]))
+  useEffect(() => { carregar() }, [diretor])   // eslint-disable-line react-hooks/exhaustive-deps
+  const ensinar = async () => {
+    if (texto.trim().length < 3 || salvando) return
+    setSalvando(true)
+    const r = await fetch("/api/diretoria", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ diretor, texto }) }).catch(() => null)
+    setSalvando(false)
+    if (r?.ok) { setTexto(""); carregar(); onMudou?.() }
+  }
+  const tirar = async (id: string) => { await fetch(`/api/diretoria?diretor=${diretor}&id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => null); carregar(); onMudou?.() }
+  return (
+    <div className="mt-3 pt-3 border-t border-black/5">
+      <p className="text-[11.5px] font-semibold mb-1.5">O que o {cargo} sabe {lista ? `(${lista.length})` : ""}</p>
+      <div className="flex gap-1.5">
+        <input value={texto} onChange={e => setTexto(e.target.value)} onKeyDown={e => { if (e.key === "Enter") ensinar() }} maxLength={1500}
+          placeholder={`Ensinar o ${cargo}…`} className="flex-1 min-w-0 h-8 rounded-lg bg-white px-2.5 text-[12px] border border-black/10 focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25" />
+        <button onClick={ensinar} disabled={salvando || texto.trim().length < 3} className="h-8 px-2.5 rounded-lg text-[11.5px] font-semibold text-white disabled:opacity-50" style={{ background: "#8456e8" }}>Ensinar</button>
+      </div>
+      {lista && lista.length > 0 && <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+        {lista.map(l => <li key={l.id} className="group flex items-start gap-1.5 text-[11.5px] text-[#3c3a45]">
+          <span className="flex-1">{l.texto}</span>
+          <button onClick={() => tirar(l.id)} aria-label="Tirar" className="opacity-0 group-hover:opacity-100 text-[#898892] hover:text-[#d33a3c] shrink-0">×</button>
+        </li>)}
+      </ul>}
     </div>
   )
 }
@@ -323,6 +372,8 @@ function Cena({ andares, iSel, onSel, noite, sol: s, controles, dentro, setDentr
           const i = k + 1
           if (!visivel(i)) return null
           if (a.obras) return <Canteiro key={a.id} m={m} y={baseDo(i)} />
+          if (a.id === "cobertura" && dados.diretores) return <DiretoriaInterior key={a.id} m={m} y={baseDo(i)} diretores={dados.diretores} noite={noite} rotulos={dentro && iSel === i} sel={agente}
+            onSel={id => { setAgente(id); if (!dentro) { onSel(a.id); setDentro(true) } }} />
           if (a.id === "2" && dados.financeiro) return <FinanceiroInterior key={a.id} m={m} y={baseDo(i)} fin={dados.financeiro} noite={noite} rotulos={dentro && iSel === i} />
           if (a.id === "1") return <AgentesInterior key={a.id} m={m} y={baseDo(i)} mesas={dados.mesas} noite={noite} rotulos={dentro && iSel === i} sel={agente}
             onSel={id => { setAgente(id); if (!dentro) { onSel(a.id); setDentro(true) } }} />

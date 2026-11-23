@@ -16,6 +16,7 @@ import type { KanbanCard } from "../../types"
 import type { Mesa as MesaAgente } from "../../lib/escritorio"
 import { ESTACOES, atrasado } from "./GraficaVirtual"
 import type { FinanceiroAndar } from "../../lib/financeiroAndar"
+import type { Diretor } from "../../lib/diretoria"
 
 const PELES = ["#f1c9a5", "#d6a37c", "#8d5a3b", "#e8b896", "#a8704d"]
 
@@ -317,6 +318,111 @@ export function FinanceiroInterior({ m, y, fin, noite, rotulos }: { m: M; y: num
         </group>
       ))}
       {rotulos ? <pointLight position={[0, y + 3.2, 0]} intensity={noite ? 45 : 14} distance={26} color="#fff1dc" /> : <Luminarias y={y + 3.55} ativo noite={noite} />}
+    </group>
+  )
+}
+
+// ── Diretoria (cobertura): a mesa diretora ──────────────────────────────────
+const COR_TOM: Record<string, string> = { ok: "#20c07a", atencao: "#f0a91c", problema: "#ff4d4d" }
+
+function TelaPlacar({ diretores }: { diretores: Diretor[] }) {
+  const tex = React.useMemo(() => {
+    const n = diretores.length, col = 390, c = document.createElement("canvas"); c.width = 60 + n * (col + 20); c.height = 600
+    const g = c.getContext("2d")!
+    g.fillStyle = "#101018"; g.fillRect(0, 0, c.width, c.height)
+    g.fillStyle = "#a99be0"; g.font = "600 34px Helvetica, Arial"; g.fillText("Placar da diretoria", 40, 62)
+    diretores.forEach((d, k) => {
+      const x = 40 + k * (col + 20)
+      g.fillStyle = "rgba(255,255,255,0.05)"; g.beginPath(); g.roundRect(x, 90, col, 480, 20); g.fill()
+      g.fillStyle = COR_TOM[d.tom]; g.beginPath(); g.arc(x + 32, 136, 12, 0, Math.PI * 2); g.fill()
+      g.fillStyle = "#ffffff"; g.font = "700 34px Helvetica, Arial"; g.fillText(d.cargo, x + 56, 148)
+      g.fillStyle = "#b9b3cc"; g.font = "500 24px Helvetica, Arial"; g.fillText(d.area, x + 56 + g.measureText(d.cargo).width * 1.35, 148)
+      d.placar.slice(0, 5).forEach((p, j) => {
+        const y = 210 + j * 66
+        g.fillStyle = "#b9b3cc"; g.font = "500 23px Helvetica, Arial"; g.fillText(p.rotulo, x + 22, y)
+        g.fillStyle = COR_TOM[p.tom]; g.font = "700 27px Helvetica, Arial"; g.textAlign = "right"; g.fillText(p.valor, x + col - 20, y); g.textAlign = "left"
+      })
+      g.fillStyle = "#8f87a8"; g.font = "500 21px Helvetica, Arial"; g.fillText(`${d.decisoes.length} para decidir · ${d.conhecimento} conhecimentos`, x + 22, 548)
+    })
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t
+  }, [diretores])
+  const W = 9.6, H = W * 600 / (60 + diretores.length * 410)
+  return (
+    <group>
+      <mesh position={[0, 0, -0.06]}><boxGeometry args={[W + 0.3, H + 0.3, 0.1]} /><meshStandardMaterial color="#0c0c10" metalness={0.6} roughness={0.3} /></mesh>
+      <mesh><planeGeometry args={[W, H]} /><meshStandardMaterial map={tex} emissive="#ffffff" emissiveMap={tex} emissiveIntensity={0.9} toneMapped={false} /></mesh>
+    </group>
+  )
+}
+
+// Uma cadeira da mesa: a pessoa, a plaquinha de mesa e a luz da área
+function Assento({ p, rot, cor, pele, titulo, sub, tom, rotulos, ativa, onClick, ceo, alturaPlaca = 2.05 }: {
+  p: [number, number, number]; rot: number; cor: string; pele: number; titulo: string; sub: string; tom: string; rotulos: boolean; ativa: boolean; onClick: () => void; ceo?: boolean; alturaPlaca?: number
+}) {
+  return (
+    <group position={p} onClick={ev => { ev.stopPropagation(); onClick() }}>
+      <group rotation={[0, rot, 0]}>
+        {/* cadeira: assento e encosto atrás de quem senta (não esconde a pessoa) */}
+        <RoundedBox args={[ceo ? 0.7 : 0.58, 0.1, 0.55]} radius={0.04} position={[0, 0.44, 0.66]} castShadow><meshStandardMaterial color={ceo ? "#3b2a20" : "#1d1f24"} roughness={0.55} /></RoundedBox>
+        <RoundedBox args={[ceo ? 0.72 : 0.58, ceo ? 1.05 : 0.8, 0.1]} radius={0.05} position={[0, ceo ? 1.0 : 0.88, 0.96]} castShadow><meshStandardMaterial color={ceo ? "#3b2a20" : "#1d1f24"} roughness={0.55} /></RoundedBox>
+        <mesh material={undefined} position={[0, 0.22, 0.66]}><cylinderGeometry args={[0.04, 0.04, 0.44, 10]} /><meshStandardMaterial color="#6b737d" metalness={0.7} roughness={0.3} /></mesh>
+        <Pessoa p={[0, 0, 0.62]} rot={Math.PI} cor={cor} sentado pele={pele} trabalhando />
+        <mesh position={[0, 0.83, -0.25]} rotation={[-0.35, 0, 0]}><boxGeometry args={[0.5, 0.14, 0.02]} /><meshStandardMaterial color="#f2efe8" /></mesh>
+        <mesh position={[0.4, 0.82, -0.25]}><sphereGeometry args={[0.06, 14, 10]} /><meshStandardMaterial color={COR_TOM[tom]} emissive={COR_TOM[tom]} emissiveIntensity={2.6} toneMapped={false} /></mesh>
+      </group>
+      <Placa visivel={rotulos} p={[0, alturaPlaca, l0(rot)]} titulo={titulo} sub={sub} cor={COR_TOM[tom]} ativa={ativa} onClick={onClick} />
+    </group>
+  )
+}
+// placa um pouco para fora da mesa, do lado de cada um (não se empilham no meio)
+const l0 = (rot: number) => Math.abs(rot) < 0.1 ? -0.9 : Math.abs(rot - Math.PI) < 0.1 ? 0.9 : 0
+
+export function DiretoriaInterior({ m, y, diretores, noite, rotulos, sel, onSel }: {
+  m: M; y: number; diretores: Diretor[]; noite: boolean; rotulos: boolean; sel: string | null; onSel: (id: string | null) => void
+}) {
+  const base = y + LAJE
+  const total = diretores.reduce((t, d) => t + d.decisoes.length, 0)
+  // Mesa diretora: CEO na cabeceira (x−), três diretores de um lado, dois do outro
+  const lugares: { x: number; z: number; rot: number }[] = [
+    { x: -1.6, z: -1.45, rot: 0 }, { x: 0.6, z: -1.45, rot: 0 }, { x: 2.8, z: -1.45, rot: 0 },
+    { x: -0.5, z: 1.45, rot: Math.PI }, { x: 1.7, z: 1.45, rot: Math.PI },
+  ]
+  const cores = ["#1f2937", "#7a1f3d", "#0f5c4d", "#2d2a4a", "#0f3b52"]
+  return (
+    <group>
+      <mesh position={[0, y + LAJE / 2, 0]} receiveShadow castShadow><boxGeometry args={[LARG - 0.2, LAJE, PROF - 0.2]} /><meshStandardMaterial color="#d8d2c8" roughness={0.35} /></mesh>
+      <mesh position={[0.4, base + 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow><planeGeometry args={[12, 7]} /><meshStandardMaterial color="#4a3f3a" roughness={1} /></mesh>
+      {/* a mesa */}
+      <group position={[0.6, base, 0]}>
+        <RoundedBox args={[7.6, 0.1, 2.4]} radius={0.05} position={[0, 0.76, 0]} castShadow receiveShadow><meshStandardMaterial color="#2b211b" roughness={0.22} metalness={0.15} /></RoundedBox>
+        {[-2.6, 2.6].map(x => <mesh key={x} material={m.aluminio} position={[x, 0.38, 0]}><boxGeometry args={[0.12, 0.76, 1.6]} /></mesh>)}
+        {Array.from({ length: 6 }, (_, k) => <mesh key={k} position={[-2.8 + k * 1.1, 0.82, 0]}><boxGeometry args={[0.32, 0.01, 0.22]} /><meshStandardMaterial color="#f5f3ee" /></mesh>)}
+      </group>
+      <group position={[0.6, base, 0]}>
+        {diretores.map((d, k) => {
+          const l = lugares[k] ?? lugares[0]
+          return <Assento key={d.id} p={[l.x, 0, l.z]} rot={l.rot} cor={cores[k % cores.length]} pele={k + 1} titulo={`${d.cargo} · ${d.area}`}
+            sub={`${d.decisoes.length ? `${d.decisoes.length} para decidir` : "tudo em ordem"} · ${d.conhecimento} ${d.conhecimento === 1 ? "lição" : "lições"}`} tom={d.tom} rotulos={rotulos}
+            alturaPlaca={l.rot === 0 ? 2.5 : 1.75}
+            ativa={sel === d.id} onClick={() => onSel(sel === d.id ? null : d.id)} />
+        })}
+        <Assento p={[-4.4, 0, 0]} rot={-Math.PI / 2} cor="#8456e8" pele={0} titulo="CEO · Felipe" sub={total ? `${total} ${total === 1 ? "decisão esperando" : "decisões esperando"}` : "nada esperando você"}
+          tom={total ? "atencao" : "ok"} rotulos={rotulos} ativa={sel === "ceo"} onClick={() => onSel(sel === "ceo" ? null : "ceo")} ceo />
+      </group>
+      {/* placar na parede do fundo */}
+      <mesh material={m.branco} position={[0.6, base + 1.75, -PROF / 2 + 0.6]} castShadow><boxGeometry args={[11, 3.4, 0.2]} /></mesh>
+      <group position={[0.6, base + 1.85, -PROF / 2 + 0.76]}><TelaPlacar diretores={diretores} /></group>
+      {/* lounge e plantas */}
+      <RoundedBox args={[3.2, 0.5, 1]} radius={0.15} position={[9, base + 0.32, 4.8]} castShadow><meshStandardMaterial color="#5c4b3f" roughness={0.8} /></RoundedBox>
+      <RoundedBox args={[1, 0.5, 2.6]} radius={0.15} position={[10.8, base + 0.32, 3.2]} castShadow><meshStandardMaterial color="#5c4b3f" roughness={0.8} /></RoundedBox>
+      <mesh position={[9, base + 0.25, 3.2]} castShadow><cylinderGeometry args={[0.6, 0.6, 0.5, 24]} /><meshStandardMaterial color="#1d1f24" roughness={0.3} /></mesh>
+      {[[-11.8, -6.5], [-11.8, 6.5], [11.8, -6.5], [6.5, 6.5]].map(([x, z], k) => (
+        <group key={k} position={[x, base, z]}>
+          <mesh material={m.branco} position={[0, 0.35, 0]} castShadow><cylinderGeometry args={[0.35, 0.3, 0.7, 16]} /></mesh>
+          <mesh material={m.folha} position={[0, 1.2, 0]} castShadow><icosahedronGeometry args={[0.62, 1]} /></mesh>
+        </group>
+      ))}
+      {rotulos ? <pointLight position={[0.6, y + 3.2, 0]} intensity={noite ? 45 : 14} distance={28} color="#fff1dc" /> : <Luminarias y={y + 3.55} ativo noite={noite} />}
     </group>
   )
 }

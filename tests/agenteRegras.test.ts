@@ -165,3 +165,21 @@ describe("prédio: números do Financeiro", () => {
     expect(f.porMes.map(x => x.receita).slice(-2)).toEqual([999, 1000])
   })
 })
+
+describe("diretoria: cinco diretores com placar e decisões", () => {
+  it("COO, CCO, CMO, CFO e CTO; decisões vêm dos dados", async () => {
+    const { montarDiretoria } = await import("../app/lib/diretoria")
+    const ds = montarDiretoria({
+      hoje: { responder: [1, 2, 3, 4, 5], orcar: [{}], resolver: [{ tipo: "promessa", titulo: "Martins · ORC-1", detalhe: "", valor: null }], anuncio: { leads: 12, mql: 3, semClassificar: 0, descartados: 1 },
+        gastos: { alertas: [{ tipo: "meta", nivel: "perigo", texto: "" }] } },
+      fin: null, kanban: [], agentesTravados: ["Atendente"], whatsapp: "desconectado", semCredito: false, conhecimento: { cco: 2 },
+    })
+    expect(ds.map(d => d.cargo)).toEqual(["COO", "CCO", "CMO", "CFO", "CTO"])
+    const [coo, cco, cmo, , cto] = ds
+    expect(coo.decisoes[0]).toMatch(/Destravar: Atendente/)
+    expect(cco).toMatchObject({ tom: "problema", conhecimento: 2 })
+    expect(cco.decisoes[0]).toMatch(/orçamento prometido para Martins/)
+    expect(cmo.decisoes[0]).toMatch(/Recarregar a Meta/)
+    expect(cto.decisoes[0]).toMatch(/QR do WhatsApp/)
+  })
+})
