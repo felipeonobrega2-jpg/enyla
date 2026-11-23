@@ -6,7 +6,7 @@
 import React, { useRef, useState } from "react"
 import { Sparkles, Upload, X, Loader2, FileText, RotateCcw, Wand2, Trash2 } from "lucide-react"
 import { Caixa3DArte } from "./Caixa3DArte"
-import type { ArtePrevia, DimsCaixa } from "../lib/artePrevia"
+import type { ArtePrevia, DimsCaixa, EfeitosCaixa } from "../lib/artePrevia"
 
 type Material = { nome: string; tipo: string; dados: string; previa?: string }
 const LIMITE_BYTES = 3_600_000   // o corpo da requisição na Vercel vai até ~4,5 MB
@@ -30,8 +30,9 @@ async function prepararArquivo(f: File): Promise<Material | null> {
   } catch { return null } finally { URL.revokeObjectURL(url) }
 }
 
-export function ArtePreviaCard({ dims, acabamento, valor, onChange }: {
+export function ArtePreviaCard({ dims, acabamento, valor, onChange, efeitos }: {
   dims: DimsCaixa | null
+  efeitos?: EfeitosCaixa
   acabamento: string
   valor: ArtePrevia | undefined
   onChange: (a: ArtePrevia | undefined) => void
@@ -137,7 +138,7 @@ export function ArtePreviaCard({ dims, acabamento, valor, onChange }: {
         </div>
         {valor && dims && (
           <div className="flex flex-col items-center justify-center">
-            <Caixa3DArte faces={valor.faces} dims={dims} tamanho={280} palco />
+            <Caixa3DArte faces={valor.faces} dims={dims} tamanho={280} palco efeitos={efeitos} />
             <button onClick={() => gerar(false)} disabled={!!gerando} className="mt-2 text-[11.5px] text-[#898892] hover:text-[#8456e8] flex items-center gap-1"><RotateCcw className="w-3 h-3" /> outra versão</button>
           </div>
         )}

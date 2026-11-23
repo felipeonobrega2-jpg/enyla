@@ -11,6 +11,19 @@ export type DimsCaixa = { largura: number; profundidade: number; altura: number 
 export const NOME_FACE: Record<Face, string> = {
   frente: "Frente", verso: "Verso", lateral_esq: "Lateral esquerda", lateral_dir: "Lateral direita", tampa: "Tampa", fundo: "Fundo",
 }
+// Efeitos que a caixa 3D mostra, de acordo com o que o orçamento tem (o cliente só vê o que vai pagar)
+export type EfeitosCaixa = { brilho: "total" | "fosco" | "natural"; metal: boolean; holografico: boolean }
+export function efeitosDoFormulario(f: { vernizTipo?: string; incluirVerniz?: boolean; laminacao?: boolean; laminacaoTipo?: string; outrosAcabamentos?: string[] }): EfeitosCaixa {
+  const verniz = f.incluirVerniz ? (f.vernizTipo ?? "") : "", lam = f.laminacao ? (f.laminacaoTipo ?? "") : ""
+  const fosco = /fosc|soft/i.test(lam)
+  const total = !fosco && (/brilh/i.test(lam) || /UV Total|Resinado/i.test(verniz))
+  return {
+    brilho: fosco ? "fosco" : total ? "total" : "natural",
+    metal: (f.outrosAcabamentos ?? []).some(a => /hot/i.test(a)),
+    holografico: /hol/i.test(lam) || /hol/i.test(verniz),
+  }
+}
+
 export const AVISO_PREVIA = "Arte prévia ilustrativa · a arte final é feita pelo designer"
 
 // Tamanho de cada face (mm), para o viewBox do SVG
@@ -55,6 +68,7 @@ Como desenhar:
 - Um SVG completo por face, com xmlns e viewBox EXATO em milímetros (largura altura da face). Sem imagens externas, sem fontes externas (font-family genérica: serif, sans-serif), sem scripts.
 - Reproduza o que vier no material (logotipo, nome, padrões, faixas, cores) desenhando com path/text/circle/rect, o mais fiel que der. Se o cliente só descreveu, crie algo bonito e coerente com o ramo (perfumaria: elegante, limpo, premium).
 - Hierarquia de embalagem: frente com a marca e o nome do produto em destaque; verso com nome menor e espaço de informações (pode simular linhas de texto e código de barras); laterais com marca ou padrão contínuo; tampa com o logo.
+- Siga os acabamentos do orçamento: dourado/prata METÁLICO só se tiver hot stamping (sem hot stamping, use cor chapada de tinta, ex.: dourado como ocre #b8902f sem gradiente).
 - Acabamentos: hot stamping dourado = gradiente linear (#8a6a1f → #f4d98a → #b8902f); prata = (#7d7d7d → #f2f2f2 → #a6a6a6); preto fosco #141414; fosco = cores sem brilho; verniz/brilho pode ter um leve reflexo.
 - Margem de segurança de 3 mm nas bordas; elementos que atravessam faces (faixas) devem continuar na mesma altura em todas as faces.
 "nota": uma frase, em português, do que você interpretou e escolheu.

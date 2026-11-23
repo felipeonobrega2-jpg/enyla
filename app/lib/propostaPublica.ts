@@ -1,11 +1,12 @@
 // Dados da proposta mostrados ao cliente na página pública de aprovação (só leitura no servidor).
 
 import { supabase } from "./supabase"
+import { efeitosDoFormulario } from "./artePrevia"
 import { validaAte } from "./aprovacao"
 import { KanbanCard, KanbanOpcao, FormData } from "../types"
 
 export type CaixaProposta = { largura: number; altura: number; profundidade: number; material?: string; verniz?: boolean; laminacao?: string | null; arteUrl?: string | null
-  artePrevia?: import("./artePrevia").FacesArte | null }   // arte ilustrativa da IA (o vendedor marcou "mostrar na proposta")
+  artePrevia?: import("./artePrevia").FacesArte | null; efeitos?: import("./artePrevia").EfeitosCaixa }   // arte ilustrativa da IA (o vendedor marcou "mostrar na proposta")
 
 export type PropostaPublica = {
   card: KanbanCard
@@ -70,6 +71,7 @@ export async function carregarProposta(numero: string): Promise<PropostaPublica 
     largura: dims[0], altura: dims[1], profundidade: dims[2], material: form?.materialNome ?? card.materialNome,
     verniz: !!form?.incluirVerniz, laminacao: form?.laminacao ? form.laminacaoTipo : null, arteUrl: arte?.url ?? null,
     artePrevia: form?.artePrevia?.naProposta ? form.artePrevia.faces : null,
+    efeitos: form ? efeitosDoFormulario(form) : undefined,
   } : null
   const hoje = new Date().toLocaleDateString("sv-SE")
   return {

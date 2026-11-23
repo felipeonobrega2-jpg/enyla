@@ -117,3 +117,13 @@ describe("caixa 3D: luz e brilho", () => {
     expect(brilhoDaFace(70)).toBeLessThan(0.01)
   })
 })
+
+describe("caixa 3D: efeitos pelos acabamentos do orçamento", () => {
+  it("só mostra o que o orçamento tem", async () => {
+    const { efeitosDoFormulario } = await import("../app/lib/artePrevia")
+    expect(efeitosDoFormulario({ incluirVerniz: true, vernizTipo: "UV Total", outrosAcabamentos: ["Hot Stamping"] })).toEqual({ brilho: "total", metal: true, holografico: false })
+    expect(efeitosDoFormulario({ laminacao: true, laminacaoTipo: "Soft Touch", incluirVerniz: true, vernizTipo: "UV Localizado" })).toEqual({ brilho: "fosco", metal: false, holografico: false })
+    expect(efeitosDoFormulario({ laminacao: true, laminacaoTipo: "Holográfica" }).holografico).toBe(true)
+    expect(efeitosDoFormulario({})).toEqual({ brilho: "natural", metal: false, holografico: false })
+  })
+})

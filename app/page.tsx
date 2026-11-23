@@ -44,7 +44,7 @@ import { calcular, compactarCalculo } from "./calculos"
 import { Configuracoes, CONFIG_PADRAO } from "./config"
 import { ArtePreviaCard } from "./components/ArtePreviaCard"
 import { Caixa3DArte } from "./components/Caixa3DArte"
-import { dimsDoFormulario } from "./lib/artePrevia"
+import { dimsDoFormulario, efeitosDoFormulario } from "./lib/artePrevia"
 import LayoutChapaVisual from "./LayoutChapaVisual"
 import { RotasProducao } from "./components/RotasProducao"
 import { registrarCorrecao, correcoesParecidas } from "./lib/aprendizado"
@@ -3136,7 +3136,7 @@ export default function Home() {
                   <div className="bg-white rounded-xl border border-[rgba(60,60,67,0.08)] p-4">
                     {form.artePrevia
                       ? <div className="flex justify-center">
-                          <Caixa3DArte faces={form.artePrevia.faces} dims={{ largura: form.frente * 10, profundidade: form.lateral * 10, altura: form.alturaBox * 10 }} tamanho={320} aviso={false} palco />
+                          <Caixa3DArte faces={form.artePrevia.faces} dims={{ largura: form.frente * 10, profundidade: form.lateral * 10, altura: form.alturaBox * 10 }} tamanho={320} aviso={false} palco efeitos={efeitosDoFormulario(form)} />
                         </div>
                       : <BoxPreview3D
                       largura={form.frente}
@@ -3156,7 +3156,7 @@ export default function Home() {
 
               {/* ── Arte prévia (IA) ── */}
               <Section title="Arte prévia">
-                <ArtePreviaCard dims={dimsDoFormulario(form)} valor={form.artePrevia}
+                <ArtePreviaCard dims={dimsDoFormulario(form)} valor={form.artePrevia} efeitos={efeitosDoFormulario(form)}
                   acabamento={[form.materialNome, form.incluirVerniz ? `verniz ${form.vernizTipo || ""}`.trim() : "", form.laminacao ? `laminação ${form.laminacaoTipo}` : "", ...(form.outrosAcabamentos ?? [])].filter(Boolean).join(", ")}
                   onChange={a => setForm(f => ({ ...f, artePrevia: a }))} />
               </Section>
