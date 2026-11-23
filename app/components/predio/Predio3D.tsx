@@ -20,7 +20,8 @@ import ConversaDiretor from "./ConversaDiretor"
 import type { Funcionario } from "../../lib/rh"
 import type { FinanceiroAndar } from "../../lib/financeiroAndar"
 import { atrasado } from "./GraficaVirtual"
-import { COLUNAS_KANBAN, type KanbanCard } from "../../types"
+import { COLUNAS_KANBAN, COL_EXPEDICAO, type KanbanCard } from "../../types"
+import { RuaViva, VAGA_CAMINHAO } from "./Rua3D"
 import type { Mesa as MesaAgente, EventoEscritorio } from "../../lib/escritorio"
 import { LARG, PROF, H_TERREO, H_ANDAR, LAJE, VAO, baseDo, alturaDo, useMateriais, Luminarias, Mesa, type M } from "./base3d"
 
@@ -175,8 +176,7 @@ function Entorno({ m, noite }: { m: M; noite: boolean }) {
         </group>
       ))}
       {[[-15, 0, 11], [-9, 0, 11], [9, 0, 11], [15, 0, 11], [-16, 0, -10], [16, 0, -10]].map((p, k) => <Arvore key={k} p={p as [number, number, number]} m={m} />)}
-      {[[-22, "#c8ccd2", 0], [-14, "#1f2a44", 0], [12, "#8b1e2b", 0], [24, "#f2f2f2", 0]].map(([x, cor], k) => <Carro key={k} p={[x as number, 0, PROF / 2 + 10.6]} cor={cor as string} m={m} />)}
-      <Carro p={[-6, 0, PROF / 2 + 16.8]} cor="#2d2f34" rot={Math.PI} m={m} />
+      {[[-22, "#c8ccd2", 0], [-14, "#1f2a44", 0], [24, "#f2f2f2", 0]].map(([x, cor], k) => <Carro key={k} p={[x as number, 0, PROF / 2 + 10.6]} cor={cor as string} m={m} />)}
       {[-24, -8, 8, 24].map(x => <Poste key={x} p={[x, 0, PROF / 2 + 8.8]} m={m} noite={noite} />)}
     </group>
   )
@@ -609,6 +609,8 @@ function Cena({ andares, iSel, onSel, noite, sol: s, controles, dentro, setDentr
       </Environment>
 
       <Entorno m={m} noite={noite} />
+      <RuaViva m={m} noite={noite} expedicao={dados.kanban.filter(c => c.coluna === COL_EXPEDICAO).length}
+        onExpedicao={() => { setEstacao(COL_EXPEDICAO); onSel(andares[0].id); setDentro(true) }} />
       <group>
         <GraficaInterior m={m} kanban={dados.kanban} noite={noite} rotulos={dentro && iSel === 0} estacao={estacao} onEstacao={c => { setEstacao(c); if (!dentro) { onSel(andares[0].id); setDentro(true) } }} />
         {andares.slice(1).map((a, k) => {
@@ -643,6 +645,18 @@ function Cena({ andares, iSel, onSel, noite, sol: s, controles, dentro, setDentr
             </Html>
           </group>
         ))}
+        {/* caminhão da expedição (de fora): clicar abre os pedidos da expedição */}
+        {(() => {
+          const n = dados.kanban.filter(c => c.coluna === COL_EXPEDICAO).length
+          return <Html position={VAGA_CAMINHAO} center zIndexRange={[20, 0]} style={{ visibility: dentro ? "hidden" : "visible", pointerEvents: dentro ? "none" : "auto" }}>
+            <button onClick={() => { setEstacao(COL_EXPEDICAO); onSel(andares[0].id); setDentro(true) }}
+              style={{ cursor: "pointer", border: "none", whiteSpace: "nowrap", borderRadius: 10, padding: "5px 9px", textAlign: "left", background: "rgba(255,255,255,0.94)", color: "#191625",
+                boxShadow: "0 6px 20px rgba(0,0,0,.22)", fontFamily: "-apple-system, system-ui, sans-serif", borderLeft: `4px solid ${n ? "#8456e8" : "#9a9aa5"}` }}>
+              <span style={{ display: "block", fontSize: 12, fontWeight: 700 }}>Expedição · {n}</span>
+              <span style={{ display: "block", fontSize: 10.5, opacity: 0.75 }}>{n ? `${n === 1 ? "pedido saindo" : "pedidos saindo"} para entrega` : "sem entrega agora"}</span>
+            </button>
+          </Html>
+        })()}
       </group>
       <ContactShadows position={[0, 0.03, 0]} opacity={0.45} scale={70} blur={2.4} far={20} />
       <EffectComposer multisampling={0} enableNormalPass={false}>

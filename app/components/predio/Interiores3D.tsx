@@ -44,7 +44,7 @@ export function Pessoa({ p, rot = 0, cor, sentado = false, pele = 0, trabalhando
 
 // Plaquinha flutuante (HTML)
 // (sempre montada; "visivel" só esconde: desmontar o HTML do drei no meio da transição quebrava a tela)
-function Placa({ p, titulo, sub, cor, ativa, onClick, visivel = true }: { p: [number, number, number]; titulo: string; sub?: string; cor: string; ativa?: boolean; onClick?: () => void; visivel?: boolean }) {
+export function Placa({ p, titulo, sub, cor, ativa, onClick, visivel = true }: { p: [number, number, number]; titulo: string; sub?: string; cor: string; ativa?: boolean; onClick?: () => void; visivel?: boolean }) {
   return (
     <Html position={p} center zIndexRange={[30, 0]} style={{ visibility: visivel ? "visible" : "hidden", pointerEvents: visivel ? "auto" : "none" }}>
       <button onClick={onClick} style={{ cursor: "pointer", border: "none", whiteSpace: "nowrap", borderRadius: 10, padding: "5px 9px", textAlign: "left",
