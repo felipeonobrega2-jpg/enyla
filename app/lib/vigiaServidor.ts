@@ -53,6 +53,8 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
       return { rotinaEnviada: { ...r, [`${dia}-${slot}`]: agora.toISOString() } }
     })
     if (marcou) out.rotina = await mandarRotina(slot, cfg).catch(e => String(e))
+    // 8h: reunião de diretoria (cada diretor lê a área e o que você ensinou) e a ata no seu WhatsApp
+    if (marcou && slot === "8") out.reuniao = await reuniaoDaManha(cfg).catch(e => `erro: ${String(e).slice(0, 140)}`)
   }
 
   // 3. WhatsApp fora há 5+ min: avisa uma vez por queda
@@ -84,6 +86,7 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
     ["emails", typeof em === "string" ? em : em?.erros?.length ? `erro: ${em.erros[0]}` : em?.enviados ? `${em.enviados} enviados` : "nada para enviar"]]
   if (out.auditoria != null) marcar.push(["auditoria", out.auditoria])
   if (out.rotina !== undefined) marcar.push(["resumo", out.rotina ?? "enviado"])
+  if (out.reuniao !== undefined) marcar.push(["reuniao", out.reuniao])
   // follow-up e retomada já marcam quando rodam; aqui só o motivo de não ter rodado (fora do horário, erro…)
   for (const k of ["followup", "retomada"] as const) if (typeof out[k] === "string" && out[k] !== "ok" && !/^\d+ retomad|ninguém para retomar|rodada já feita|rodada recente/.test(out[k] as string)) marcar.push([k, out[k]])
   await Promise.all(marcar.map(([r, v]) => marcarRotina(r, texto(v)).catch(() => null)))
@@ -305,6 +308,17 @@ export async function textoDaRotina(slot: "8" | "13" | "18"): Promise<string> {
   const itens = await montarCaixaServidor()
   const texto = textoResumo(itens, slot, `${LINK_SISTEMA}/?aba=painel`)
   return slot === "18" ? `${texto}${await linhaDosDados()}` : texto
+}
+
+async function reuniaoDaManha(cfg: Cfg) {
+  const { convocarReuniao, textoDaAta } = await import("./reuniaoDiretoria")
+  const r = await convocarReuniao()
+  const { evo } = await import("./evolution")
+  const { seuNumero } = await import("./agenteAuto")
+  const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
+  if (!destino) return "reunião feita, sem número para a ata"
+  await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: textoDaAta(r, `${LINK_SISTEMA}/?aba=escritorio`) }) })
+  return `reunião feita, ata enviada (${r.falas.reduce((t, f) => t + f.recomendacoes.length, 0)} recomendações)`
 }
 
 async function mandarRotina(slot: "8" | "13" | "18", cfg: Cfg) {

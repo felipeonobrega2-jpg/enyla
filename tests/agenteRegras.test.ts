@@ -183,3 +183,15 @@ describe("diretoria: cinco diretores com placar e decisões", () => {
     expect(cto.decisoes[0]).toMatch(/QR do WhatsApp/)
   })
 })
+
+describe("ata da reunião no WhatsApp", () => {
+  it("uma linha por diretor, só o de hoje, sem repetir 'prioridade'", async () => {
+    const { textoDaAta } = await import("../app/lib/reuniaoDiretoria")
+    const t = textoDaAta({ id: "r", em: "2026-11-23T11:00:00Z", abertura: "Dia corrido.", fechamento: "Prioridade número 1: recarregar a Meta.",
+      falas: [{ diretor: "cco", cargo: "CCO", tom: "problema", fala: "19 leads esperando.", recomendacoes: [{ id: "a", texto: "Orçar 4 leads", urgencia: "hoje" }, { id: "b", texto: "Revisar tabela", urgencia: "semana" }] }] }, "L")
+    expect(t).toContain("*CCO*: 19 leads esperando.")
+    expect(t).toContain("→ Orçar 4 leads")
+    expect(t).not.toContain("Revisar tabela")
+    expect(t).toContain("*Prioridade 1:* Recarregar a Meta.")
+  })
+})

@@ -90,3 +90,16 @@ export async function responderRecomendacao(reuniaoId: string, recId: string, re
     return { ultimaReuniao: { ...r, falas: r.falas.map(f => ({ ...f, recomendacoes: f.recomendacoes.map(x => x.id === recId ? { ...x, resposta } : x) })) } }
   })
 }
+
+// Ata para o WhatsApp do Felipe (curta: uma linha por diretor, só o que é para hoje)
+export function textoDaAta(r: Reuniao, link: string): string {
+  const dia = new Date(r.em).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })
+  const linhas = [`🏛️ *Reunião de diretoria · ${dia}*`, "", r.abertura, ""]
+  for (const f of r.falas) {
+    const hoje = f.recomendacoes.filter(x => x.urgencia === "hoje")
+    linhas.push(`*${f.cargo}*: ${f.fala}`)
+    for (const x of (hoje.length ? hoje : f.recomendacoes).slice(0, 2)) linhas.push(`   → ${x.texto}`)
+  }
+  linhas.push("", `*Prioridade 1:* ${r.fechamento.replace(/^\s*(a\s+)?prioridade (número|n[ºo°.]?)\s*1\s*(do dia)?\s*(é|:)?\s*/i, "").replace(/^./, c => c.toUpperCase())}`, "", `Aprovar ou adiar: ${link}`)
+  return linhas.join("\n")
+}

@@ -18,6 +18,7 @@ export const ROTINAS: Rotina[] = [
   { id: "esperando", nome: "Ninguém sem resposta", faz: "Quem escreveu há 20+ min recebe resposta (bons negócios primeiro)", onde: "vigia", quando: "a cada 5 min", esperadoMin: 5, horarioDoAgente: true },
   { id: "promessas", nome: "Cobrador de promessas", faz: "Orçamento prometido e não enviado vai para a sua caixa", onde: "vigia", quando: "a cada 5 min", esperadoMin: 5 },
   { id: "resumo", nome: "Resumo no seu WhatsApp", faz: "Caixa de entrada às 8h, 13h e 18h", onde: "vigia", quando: "8h, 13h e 18h (seg a sáb)", esperadoMin: null },
+  { id: "reuniao", nome: "Reunião de diretoria", faz: "Os 5 diretores leem a área e o que você ensinou; a ata vai para o seu WhatsApp", onde: "vigia", quando: "8h (seg a sáb)", esperadoMin: null },
   { id: "auditoria", nome: "Auditor de dados", faz: "Confere se os números do Financeiro e dos pedidos batem", onde: "vigia", quando: "1 vez por dia, de madrugada", esperadoMin: 26 * 60 },
   { id: "digitalFinanceiro", nome: "Digital no Financeiro", faz: "Sinal, restante e custo da Villa viram lançamentos da linha Digital", onde: "vigia", quando: "a cada 5 min", esperadoMin: 5 },
   { id: "emails", nome: "E-mails do cliente", faz: "Pedido aprovado, sinal, arte, enviado", onde: "vigia", quando: "a cada 5 min", esperadoMin: 5 },
