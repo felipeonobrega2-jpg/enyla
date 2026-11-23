@@ -356,11 +356,22 @@ function TelaPlacar({ diretores }: { diretores: Diretor[] }) {
 }
 
 // Uma cadeira da mesa: a pessoa, a plaquinha de mesa e a luz da área
-function Assento({ p, rot, cor, pele, titulo, sub, tom, rotulos, ativa, onClick, ceo, alturaPlaca = 2.05 }: {
+function Assento({ p, rot, cor, pele, titulo, sub, tom, rotulos, ativa, onClick, ceo, alturaPlaca = 2.05, fala }: {
   p: [number, number, number]; rot: number; cor: string; pele: number; titulo: string; sub: string; tom: string; rotulos: boolean; ativa: boolean; onClick: () => void; ceo?: boolean; alturaPlaca?: number
+  fala?: string | null
 }) {
   return (
     <group position={p} onClick={ev => { ev.stopPropagation(); onClick() }}>
+      {/* quem está falando: foco de luz e balão */}
+      {fala && <spotLight position={[0, 4.2, 0]} angle={0.35} penumbra={0.6} intensity={60} distance={8} color="#fff4dc" castShadow={false} target-position={[0, 0, 0]} />}
+      <Html position={[0, 2.9, 0]} center zIndexRange={[40, 0]} style={{ visibility: fala ? "visible" : "hidden", pointerEvents: "none" }}>
+        <div style={{ width: 300, background: "#ffffff", color: "#191625", borderRadius: 14, padding: "10px 12px", boxShadow: "0 12px 34px rgba(0,0,0,.28)",
+          fontFamily: "-apple-system, system-ui, sans-serif", fontSize: 12.5, lineHeight: 1.4, position: "relative", borderTop: `4px solid ${COR_TOM[tom]}` }}>
+          <b style={{ display: "block", fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", color: "#6b6876", marginBottom: 3 }}>{titulo}</b>
+          {fala ?? ""}
+          <span style={{ position: "absolute", left: "50%", bottom: -8, marginLeft: -8, width: 0, height: 0, borderLeft: "8px solid transparent", borderRight: "8px solid transparent", borderTop: "8px solid #ffffff" }} />
+        </div>
+      </Html>
       <group rotation={[0, rot, 0]}>
         {/* cadeira: assento e encosto atrás de quem senta (não esconde a pessoa) */}
         <RoundedBox args={[ceo ? 0.7 : 0.58, 0.1, 0.55]} radius={0.04} position={[0, 0.44, 0.66]} castShadow><meshStandardMaterial color={ceo ? "#3b2a20" : "#1d1f24"} roughness={0.55} /></RoundedBox>
@@ -377,8 +388,9 @@ function Assento({ p, rot, cor, pele, titulo, sub, tom, rotulos, ativa, onClick,
 // placa um pouco para fora da mesa, do lado de cada um (não se empilham no meio)
 const l0 = (rot: number) => Math.abs(rot) < 0.1 ? -0.9 : Math.abs(rot - Math.PI) < 0.1 ? 0.9 : 0
 
-export function DiretoriaInterior({ m, y, diretores, noite, rotulos, sel, onSel }: {
+export function DiretoriaInterior({ m, y, diretores, noite, rotulos, sel, onSel, falando }: {
   m: M; y: number; diretores: Diretor[]; noite: boolean; rotulos: boolean; sel: string | null; onSel: (id: string | null) => void
+  falando?: { quem: string; texto: string } | null       // reunião em andamento: quem fala agora ("ceo" na abertura)
 }) {
   const base = y + LAJE
   const total = diretores.reduce((t, d) => t + d.decisoes.length, 0)
@@ -402,12 +414,12 @@ export function DiretoriaInterior({ m, y, diretores, noite, rotulos, sel, onSel 
         {diretores.map((d, k) => {
           const l = lugares[k] ?? lugares[0]
           return <Assento key={d.id} p={[l.x, 0, l.z]} rot={l.rot} cor={cores[k % cores.length]} pele={k + 1} titulo={`${d.cargo} · ${d.area}`}
-            sub={`${d.decisoes.length ? `${d.decisoes.length} para decidir` : "tudo em ordem"} · ${d.conhecimento} ${d.conhecimento === 1 ? "lição" : "lições"}`} tom={d.tom} rotulos={rotulos}
-            alturaPlaca={l.rot === 0 ? 2.5 : 1.75}
+            sub={`${d.decisoes.length ? `${d.decisoes.length} para decidir` : "tudo em ordem"} · ${d.conhecimento} ${d.conhecimento === 1 ? "lição" : "lições"}`} tom={d.tom} rotulos={rotulos && !falando}
+            alturaPlaca={l.rot === 0 ? 2.5 : 1.75} fala={falando?.quem === d.id ? falando.texto : null}
             ativa={sel === d.id} onClick={() => onSel(sel === d.id ? null : d.id)} />
         })}
         <Assento p={[-4.4, 0, 0]} rot={-Math.PI / 2} cor="#8456e8" pele={0} titulo="CEO · Felipe" sub={total ? `${total} ${total === 1 ? "decisão esperando" : "decisões esperando"}` : "nada esperando você"}
-          tom={total ? "atencao" : "ok"} rotulos={rotulos} ativa={sel === "ceo"} onClick={() => onSel(sel === "ceo" ? null : "ceo")} ceo />
+          tom={total ? "atencao" : "ok"} rotulos={rotulos && !falando} ativa={sel === "ceo"} onClick={() => onSel(sel === "ceo" ? null : "ceo")} ceo fala={falando?.quem === "ceo" ? falando.texto : null} />
       </group>
       {/* placar na parede do fundo */}
       <mesh material={m.branco} position={[0.6, base + 1.75, -PROF / 2 + 0.6]} castShadow><boxGeometry args={[11, 3.4, 0.2]} /></mesh>

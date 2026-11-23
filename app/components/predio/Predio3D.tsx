@@ -13,6 +13,7 @@ import * as THREE from "three"
 import type { Andar } from "./PredioView"
 import { GraficaInterior, AgentesInterior, Canteiro, FinanceiroInterior, DiretoriaInterior } from "./Interiores3D"
 import type { Diretor } from "../../lib/diretoria"
+import type { Reuniao } from "../../lib/reuniaoDiretoria"
 import type { FinanceiroAndar } from "../../lib/financeiroAndar"
 import { atrasado } from "./GraficaVirtual"
 import { COLUNAS_KANBAN, type KanbanCard } from "../../types"
@@ -184,7 +185,7 @@ function Camera({ alvo, dentro, controles }: { alvo: number; dentro: boolean; co
   const voando = useRef(true)
   useEffect(() => {
     const yA = baseDo(alvo) + alturaDo(alvo) / 2
-    if (dentro && alvo === 4) { foco.current.set(0.8, baseDo(alvo) + 1, 0); destino.current.set(7.5, baseDo(alvo) + 8.5, 10.5) }   // mesa diretora de perto
+    if (dentro && alvo === 4) { foco.current.set(3.4, baseDo(alvo) + 1, 0.4); destino.current.set(10.5, baseDo(alvo) + 8.5, 11.5) }   // mesa diretora de perto (à esquerda do painel)
     else if (dentro) { foco.current.set(0, baseDo(alvo) + 0.8, 0.5); destino.current.set(15, baseDo(alvo) + 13, 19) }
     else { foco.current.set(0, Math.max(yA, 8), 0); destino.current.set(42, Math.max(yA, 8) + 15, 60) }
     voando.current = true
@@ -221,6 +222,38 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
   const [estacao, setEstacao] = useState<number | null>(null)
   const [agente, setAgente] = useState<string | null>(null)
   useEffect(() => { setEstacao(null); setAgente(null) }, [sel])
+  // Reunião de diretoria: a última ata, convocar e assistir (cada um fala por alguns segundos)
+  const [reuniao, setReuniao] = useState<Reuniao | null>(null)
+  const [reunindo, setReunindo] = useState(false)
+  const [erroReuniao, setErroReuniao] = useState<string | null>(null)
+  const [vez, setVez] = useState<number | null>(null)      // -1 = abertura, 0..n-1 = falas, n = fechamento
+  useEffect(() => { fetch("/api/diretoria/reuniao").then(r => r.ok ? r.json() : null).then(x => { if (x?.reuniao) setReuniao(x.reuniao) }).catch(() => {}) }, [])
+  useEffect(() => {
+    if (vez == null || !reuniao) return
+    const fim = reuniao.falas.length
+    const texto = vez < 0 ? reuniao.abertura : vez < fim ? reuniao.falas[vez].fala : reuniao.fechamento
+    const t = setTimeout(() => setVez(v => v == null ? null : v >= fim ? null : v + 1), Math.min(11000, 2600 + texto.length * 45))
+    return () => clearTimeout(t)
+  }, [vez, reuniao])
+  const convocar = async () => {
+    setReunindo(true); setErroReuniao(null)
+    const r = await fetch("/api/diretoria/reuniao", { method: "POST" }).catch(() => null)
+    const x = r ? await r.json().catch(() => ({})) : {}
+    setReunindo(false)
+    if (!r?.ok || !x.reuniao) { setErroReuniao(x.erro ?? "A diretoria não conseguiu se reunir agora."); return }
+    setReuniao(x.reuniao); setVez(-1)
+  }
+  const responder = (recId: string, resposta: "aprovo" | "depois") => {
+    if (!reuniao) return
+    const atual = reuniao.falas.flatMap(f => f.recomendacoes).find(r => r.id === recId)?.resposta
+    const nova = atual === resposta ? null : resposta
+    setReuniao({ ...reuniao, falas: reuniao.falas.map(f => ({ ...f, recomendacoes: f.recomendacoes.map(r => r.id === recId ? { ...r, resposta: nova } : r) })) })
+    fetch("/api/diretoria/reuniao", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reuniao: reuniao.id, rec: recId, resposta: nova }) }).catch(() => {})
+  }
+  const falando = vez == null || !reuniao ? null
+    : vez < 0 ? { quem: "ceo", texto: reuniao.abertura }
+    : vez < reuniao.falas.length ? { quem: reuniao.falas[vez].diretor, texto: reuniao.falas[vez].fala }
+    : { quem: "ceo", texto: reuniao.fechamento }
   const a = deBaixo[iSel]
   const hoje = new Date().toLocaleDateString("sv-SE")
   const pedidosEst = estacao != null ? dados.kanban.filter(c => c.coluna === estacao) : []
@@ -232,7 +265,7 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
       <Canvas shadows dpr={[1, 2]} camera={{ position: [60, 34, 80], fov: 36, near: 0.3, far: 600 }} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
         style={{ background: noite ? "#0f1426" : "#bcd9ee" }}>
         <Cena andares={deBaixo} iSel={iSel} onSel={id => { onSel(id); }} noite={noite} sol={pos} controles={controles} dentro={dentro} setDentro={setDentro}
-          dados={dados} estacao={estacao} setEstacao={setEstacao} agente={agente} setAgente={setAgente} />
+          dados={dados} estacao={estacao} setEstacao={setEstacao} agente={agente} setAgente={setAgente} falando={a?.id === "cobertura" ? falando : null} />
       </Canvas>
 
       {/* painel do andar (flutuante) */}
@@ -274,6 +307,41 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
               <ul>{f.vencidos.map(v => <li key={v.numero} className="flex justify-between text-[11.5px] py-0.5"><span className="truncate mr-2">{v.numero} · {v.cliente}</span><span className="text-[#d33a3c] font-semibold shrink-0">{b(v.valor)}</span></li>)}</ul></>}
           </div>
         })()}
+        {a?.id === "cobertura" && (
+          <div className="mt-3 rounded-xl p-3" style={{ background: "rgba(132,86,232,0.08)" }}>
+            <button onClick={() => { if (!dentro) setDentro(true); convocar() }} disabled={reunindo}
+              className="w-full h-9 rounded-lg text-[13px] font-semibold text-white disabled:opacity-60" style={{ background: "#8456e8" }}>
+              {reunindo ? "A diretoria está se reunindo…" : reuniao ? "Convocar nova reunião" : "Convocar reunião de diretoria"}
+            </button>
+            {reunindo && <p className="text-[11.5px] text-[#5e5c68] mt-1.5">Cada diretor está lendo os números da área e o que você ensinou a ele (uns 30 segundos).</p>}
+            {erroReuniao && <p className="text-[11.5px] text-[#d33a3c] mt-1.5">{erroReuniao}</p>}
+            {reuniao && !reunindo && <>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6b6876]">Ata · {new Date(reuniao.em).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                <button onClick={() => { if (!dentro) setDentro(true); setVez(-1) }} className="text-[11.5px] font-semibold text-[#8456e8]">{vez != null ? "assistindo…" : "assistir"}</button>
+              </div>
+              <p className="text-[12px] text-[#191625] mt-1 leading-snug">{reuniao.abertura}</p>
+              <div className="mt-2 space-y-2.5">
+                {reuniao.falas.map((f, k) => (
+                  <div key={f.diretor} className={`rounded-lg p-2 transition-colors ${vez === k ? "bg-white shadow-sm" : ""}`}>
+                    <p className="text-[12px] font-semibold">{f.cargo}</p>
+                    <p className="text-[11.5px] text-[#3c3a45] leading-snug">{f.fala}</p>
+                    {f.recomendacoes.map(r => (
+                      <div key={r.id} className="mt-1.5">
+                        <p className="text-[11.5px] text-[#191625] leading-snug"><span className={`mr-1 text-[9.5px] font-bold uppercase px-1 rounded align-[1px] ${r.urgencia === "hoje" ? "bg-[#d33a3c]/10 text-[#d33a3c]" : "bg-black/5 text-[#6b6876]"}`}>{r.urgencia}</span>{r.texto}</p>
+                        <div className="flex gap-1 mt-0.5">
+                        <button onClick={() => responder(r.id, "aprovo")} className={`text-[10.5px] font-semibold px-1.5 py-0.5 rounded ${r.resposta === "aprovo" ? "bg-[#009351] text-white" : "text-[#009351] hover:bg-[#009351]/10"}`}>Aprovo</button>
+                        <button onClick={() => responder(r.id, "depois")} className={`text-[10.5px] font-semibold px-1.5 py-0.5 rounded ${r.resposta === "depois" ? "bg-[#6b6876] text-white" : "text-[#6b6876] hover:bg-black/5"}`}>Depois</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <p className="text-[12px] font-semibold text-[#191625] mt-2 leading-snug">{reuniao.fechamento}</p>
+            </>}
+          </div>
+        )}
         {a?.id === "cobertura" && dados.diretores && (() => {
           const ds = dados.diretores, cor = { ok: "#009351", atencao: "#c57800", problema: "#d33a3c" } as const
           const lista = agente === "ceo" || !agente ? ds : ds.filter(d => d.id === agente)
@@ -340,10 +408,11 @@ function ConhecimentoDiretor({ diretor, cargo, onMudou }: { diretor: string; car
   )
 }
 
-function Cena({ andares, iSel, onSel, noite, sol: s, controles, dentro, setDentro, dados, estacao, setEstacao, agente, setAgente }: {
+function Cena({ andares, iSel, onSel, noite, sol: s, controles, dentro, setDentro, dados, estacao, setEstacao, agente, setAgente, falando }: {
   andares: Andar[]; iSel: number; onSel: (id: string) => void; noite: boolean; sol: [number, number, number]
   controles: React.RefObject<{ target: THREE.Vector3; update: () => void } | null>; dentro: boolean; setDentro: (v: boolean) => void
   dados: Dados3D; estacao: number | null; setEstacao: (c: number | null) => void; agente: string | null; setAgente: (id: string | null) => void
+  falando: { quem: string; texto: string } | null
 }) {
   const m = useMateriais()
   const [hover, setHover] = useState<number | null>(null)
@@ -372,7 +441,7 @@ function Cena({ andares, iSel, onSel, noite, sol: s, controles, dentro, setDentr
           const i = k + 1
           if (!visivel(i)) return null
           if (a.obras) return <Canteiro key={a.id} m={m} y={baseDo(i)} />
-          if (a.id === "cobertura" && dados.diretores) return <DiretoriaInterior key={a.id} m={m} y={baseDo(i)} diretores={dados.diretores} noite={noite} rotulos={dentro && iSel === i} sel={agente}
+          if (a.id === "cobertura" && dados.diretores) return <DiretoriaInterior key={a.id} m={m} y={baseDo(i)} diretores={dados.diretores} noite={noite} rotulos={dentro && iSel === i} sel={agente} falando={dentro && iSel === i ? falando : null}
             onSel={id => { setAgente(id); if (!dentro) { onSel(a.id); setDentro(true) } }} />
           if (a.id === "2" && dados.financeiro) return <FinanceiroInterior key={a.id} m={m} y={baseDo(i)} fin={dados.financeiro} noite={noite} rotulos={dentro && iSel === i} />
           if (a.id === "1") return <AgentesInterior key={a.id} m={m} y={baseDo(i)} mesas={dados.mesas} noite={noite} rotulos={dentro && iSel === i} sel={agente}

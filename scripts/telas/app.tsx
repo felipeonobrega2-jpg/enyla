@@ -379,6 +379,15 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
       sugestoes: [{ numero: "ORC-2026-241", nome: "Aromas Exemplo", valor: 18140, motivo: "proposta ORC-2026-241 de R$ 18.140" }, { jid: "7@lid", nome: "Cosméticos Modelo", volume: 20000, motivo: "falou em 20.000 un · caixa 50ml" }],
     }))
   }
+  if (u.startsWith("/api/diretoria/reuniao")) return new Response(JSON.stringify({ reuniao: { id: "r1", em: new Date().toISOString(),
+    abertura: "Felipe, dia com o comercial represado: 19 leads esperando e o saldo da Meta acabando.",
+    falas: [
+      { diretor: "cco", cargo: "CCO", tom: "problema", fala: "Tenho 19 leads esperando e 4 orçamentos prontos para fazer. Só orcei 7 de 15 MQLs em 24 h.", recomendacoes: [{ id: "cco-0", texto: "Mandar hoje o orçamento prometido à Loja Exemplo", urgencia: "hoje", resposta: null }, { id: "cco-1", texto: "Orçar os 4 leads que já passaram tudo", urgencia: "hoje", resposta: "aprovo" }] },
+      { diretor: "cmo", cargo: "CMO", tom: "problema", fala: "Zero leads do anúncio nas últimas 24 h: a campanha parou e o saldo da Meta está no fim.", recomendacoes: [{ id: "cmo-0", texto: "Recarregar a Meta", urgencia: "hoje", resposta: null }] },
+      { diretor: "coo", cargo: "COO", tom: "problema", fala: "6 pedidos na produção, 2 entregas atrasadas.", recomendacoes: [{ id: "coo-0", texto: "Avisar a Marca Fictícia do atraso e ajustar a data", urgencia: "hoje", resposta: null }] },
+      { diretor: "cfo", cargo: "CFO", tom: "atencao", fala: "R$ 32.702 recebidos no mês, R$ 900 vencidos.", recomendacoes: [{ id: "cfo-0", texto: "Cobrar os R$ 900 vencidos", urgencia: "semana", resposta: null }] },
+      { diretor: "cto", cargo: "CTO", tom: "ok", fala: "Sistema em ordem: WhatsApp conectado, IA com crédito.", recomendacoes: [] },
+    ], fechamento: "Prioridade número 1: recarregar a Meta e religar a campanha." } }))
   if (u.startsWith("/api/diretoria")) return new Response(JSON.stringify({ conhecimento: { cco: [{ id: "cco-1", texto: "Lead ICP sempre recebe o orçamento no mesmo dia; lead médio em até 24 h.", em: "" }, { id: "cco-2", texto: "Nunca dar desconto acima de 5% sem falar com o Felipe.", em: "" }], cfo: [{ id: "cfo-1", texto: "Sinal mínimo de 50% para pedido novo.", em: "" }] } }))
   if (u.startsWith("/api/agendador")) return new Response(JSON.stringify({ noHorario: true, rotinas: [{ nome: "Follow-up do agente", situacao: { tom: "ok", texto: "ok" } }] }))
   if (u.startsWith("/api/caixa/resumo")) return new Response(JSON.stringify({ assunto: "3 mil caixinhas de 50 ml com hot stamping dourado, arte pronta.", situacao: "Você mandou o orçamento de R$ 11.786 há 2 dias; ele abriu 3 vezes e perguntou do prazo.", proximo_passo: "Confirme o prazo de 12 dias úteis e ofereça o sinal por Pix para travar a produção." }))
