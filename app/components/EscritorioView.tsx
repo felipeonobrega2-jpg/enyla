@@ -178,7 +178,7 @@ export function EscritorioView({ kanban = [] }: { kanban?: KanbanCard[] }) {
     return (
       <Pagina>
         <CabecalhoPagina titulo="Prédio ENYLA" sub="A empresa inteira funcionando: escolha o andar no elevador" acoes={segmentado} />
-        <PredioView andares={andares} inicial="terreo" />
+        <PredioView andares={andares} inicial="terreo" dados3d={{ kanban, mesas: d.mesas, feed: d.feed }} />
       </Pagina>
     )
   }

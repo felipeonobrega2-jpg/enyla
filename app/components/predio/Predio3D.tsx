@@ -11,75 +11,11 @@ import { OrbitControls, Environment, Lightformer, ContactShadows, Html, Sky, Rou
 import { EffectComposer, N8AO, Bloom, SMAA } from "@react-three/postprocessing"
 import * as THREE from "three"
 import type { Andar } from "./PredioView"
-
-// ── Medidas (metros) ─────────────────────────────────────────────────────────
-const LARG = 26, PROF = 16           // planta do prédio
-const H_TERREO = 5.4, H_ANDAR = 3.7, LAJE = 0.35
-const VAO = 1.6                       // distância entre montantes da fachada
-
-// altura da base de cada andar (de baixo para cima: térreo, 1º, 2º, 3º, cobertura)
-const baseDo = (i: number) => i === 0 ? 0 : H_TERREO + (i - 1) * H_ANDAR
-const alturaDo = (i: number) => i === 0 ? H_TERREO : H_ANDAR
-
-// ── Materiais ────────────────────────────────────────────────────────────────
-function useMateriais() {
-  return useMemo(() => ({
-    vidro: new THREE.MeshPhysicalMaterial({ color: "#cfe2ee", metalness: 0.25, roughness: 0.03, transparent: true, opacity: 0.26, envMapIntensity: 2.6, clearcoat: 1, clearcoatRoughness: 0.03, side: THREE.DoubleSide }),
-    pedra: new THREE.MeshStandardMaterial({ color: "#3a3d42", roughness: 0.55, metalness: 0.15 }),
-    carroVidro: new THREE.MeshPhysicalMaterial({ color: "#1c2530", metalness: 0.4, roughness: 0.08, envMapIntensity: 2 }),
-    pneu: new THREE.MeshStandardMaterial({ color: "#141518", roughness: 0.9 }),
-    vidroEscuro: new THREE.MeshPhysicalMaterial({ color: "#41586b", metalness: 0.3, roughness: 0.08, transparent: true, opacity: 0.55, envMapIntensity: 1.8, clearcoat: 1 }),
-    aluminio: new THREE.MeshStandardMaterial({ color: "#b4bac2", metalness: 0.55, roughness: 0.32, envMapIntensity: 1.4 }),
-    aletas: new THREE.MeshStandardMaterial({ color: "#d9dde2", metalness: 0.3, roughness: 0.4 }),
-    concreto: new THREE.MeshStandardMaterial({ color: "#d9d6cf", roughness: 0.85 }),
-    piso: new THREE.MeshStandardMaterial({ color: "#c9c4ba", roughness: 0.6 }),
-    pisoGrafica: new THREE.MeshStandardMaterial({ color: "#8f969c", roughness: 0.75 }),
-    madeira: new THREE.MeshStandardMaterial({ color: "#a47b55", roughness: 0.55 }),
-    branco: new THREE.MeshStandardMaterial({ color: "#f2f2f0", roughness: 0.4 }),
-    preto: new THREE.MeshStandardMaterial({ color: "#1d1f24", roughness: 0.45 }),
-    roxo: new THREE.MeshStandardMaterial({ color: "#8456e8", roughness: 0.4, metalness: 0.1 }),
-    maquina: new THREE.MeshStandardMaterial({ color: "#3e4a5c", metalness: 0.55, roughness: 0.35 }),
-    papelao: new THREE.MeshStandardMaterial({ color: "#c69a63", roughness: 0.9 }),
-    asfalto: new THREE.MeshStandardMaterial({ color: "#3b3d42", roughness: 0.95 }),
-    calcada: new THREE.MeshStandardMaterial({ color: "#b7b3ab", roughness: 0.9 }),
-    grama: new THREE.MeshStandardMaterial({ color: "#6f9a52", roughness: 1 }),
-    folha: new THREE.MeshStandardMaterial({ color: "#4f7f3a", roughness: 0.9 }),
-    tronco: new THREE.MeshStandardMaterial({ color: "#5b4330", roughness: 1 }),
-    vizinho: new THREE.MeshStandardMaterial({ color: "#c8ccd2", roughness: 0.7 }),
-    vizinhoVidro: new THREE.MeshPhysicalMaterial({ color: "#5d7486", metalness: 0.4, roughness: 0.15, envMapIntensity: 1.2 }),
-  }), [])
-}
-type M = ReturnType<typeof useMateriais>
-
-// Luz de teto: acende onde tem trabalho (e à noite brilha mais)
-function Luminarias({ y, ativo, noite }: { y: number; ativo: boolean; noite: boolean }) {
-  const cor = ativo ? "#fff3d6" : "#9aa3ad", intens = ativo ? (noite ? 3.2 : 1.4) : (noite ? 0.25 : 0.1)
-  return (
-    <group>
-      {Array.from({ length: 5 }, (_, i) => Array.from({ length: 3 }, (_, j) => (
-        <mesh key={`${i}-${j}`} position={[-LARG / 2 + 3 + i * 5, y, -PROF / 2 + 3 + j * 5]}>
-          <boxGeometry args={[2.4, 0.04, 0.5]} />
-          <meshStandardMaterial color={cor} emissive={cor} emissiveIntensity={intens} toneMapped={false} />
-        </mesh>
-      )))}
-      {ativo && <pointLight position={[0, y - 0.4, 0]} intensity={noite ? 40 : 12} distance={22} color="#ffe9c4" />}
-    </group>
-  )
-}
-
-// Mesa de escritório com monitor e cadeira
-function Mesa({ p, m, tela }: { p: [number, number, number]; m: M; tela: boolean }) {
-  return (
-    <group position={p}>
-      <mesh material={m.madeira} position={[0, 0.74, 0]} castShadow receiveShadow><boxGeometry args={[1.6, 0.05, 0.8]} /></mesh>
-      {[[-0.75, -0.35], [0.75, -0.35], [-0.75, 0.35], [0.75, 0.35]].map(([x, z], i) => <mesh key={i} material={m.aluminio} position={[x, 0.37, z]}><boxGeometry args={[0.04, 0.74, 0.04]} /></mesh>)}
-      <mesh material={m.preto} position={[0, 1.05, -0.25]} castShadow><boxGeometry args={[0.62, 0.38, 0.03]} /></mesh>
-      <mesh position={[0, 1.05, -0.234]}><planeGeometry args={[0.58, 0.34]} /><meshStandardMaterial color={tela ? "#7fc3ff" : "#1b2733"} emissive={tela ? "#5aa9ff" : "#000"} emissiveIntensity={tela ? 0.9 : 0} toneMapped={false} /></mesh>
-      <mesh material={m.preto} position={[0, 0.48, 0.62]} castShadow><boxGeometry args={[0.5, 0.08, 0.5]} /></mesh>
-      <mesh material={m.preto} position={[0, 0.8, 0.85]}><boxGeometry args={[0.5, 0.55, 0.06]} /></mesh>
-    </group>
-  )
-}
+import { GraficaInterior, AgentesInterior, Canteiro } from "./Interiores3D"
+import { atrasado } from "./GraficaVirtual"
+import { COLUNAS_KANBAN, type KanbanCard } from "../../types"
+import type { Mesa as MesaAgente, EventoEscritorio } from "../../lib/escritorio"
+import { LARG, PROF, H_TERREO, H_ANDAR, LAJE, VAO, baseDo, alturaDo, useMateriais, Luminarias, Mesa, type M } from "./base3d"
 
 // Andar de escritório: piso, mesas, luz e a parede de vidro
 function AndarEscritorio({ i, m, ativo, noite, mesas, marcado }: { i: number; m: M; ativo: boolean; noite: boolean; mesas: number; marcado: boolean }) {
@@ -98,64 +34,11 @@ function AndarEscritorio({ i, m, ativo, noite, mesas, marcado }: { i: number; m:
   )
 }
 
-// Térreo: a gráfica à mostra (impressora offset, UV, corte e vinco, esteira, paletes de caixas)
-function Grafica({ m, ativos, noite }: { m: M; ativos: { impressao: boolean; verniz: boolean; corte: boolean; expedicao: boolean }; noite: boolean }) {
-  const rolos = useRef<THREE.Group>(null), prensa = useRef<THREE.Mesh>(null), uv = useRef<THREE.MeshStandardMaterial>(null)
-  useFrame((_, dt) => {
-    if (rolos.current && ativos.impressao) rolos.current.children.forEach(c => { c.rotation.x += dt * 6 })
-    if (prensa.current && ativos.corte) prensa.current.position.y = 2.05 + Math.abs(Math.sin(performance.now() / 300)) * -0.35
-    if (uv.current) uv.current.emissiveIntensity = ativos.verniz ? 1.5 + Math.sin(performance.now() / 260) * 0.8 : 0.1
-  })
-  return (
-    <group>
-      <mesh material={m.pisoGrafica} position={[0, 0.05, 0]} receiveShadow><boxGeometry args={[LARG - 0.2, 0.1, PROF - 0.2]} /></mesh>
-      {/* faixas amarelas de segurança */}
-      {[-3.2, 3.2].map(z => <mesh key={z} position={[0, 0.11, z]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[LARG - 2, 0.12]} /><meshStandardMaterial color="#e8b520" /></mesh>)}
-      {/* impressora offset (4 cores) */}
-      <group position={[-7, 0.1, -2.5]}>
-        <RoundedBox args={[6.5, 2.1, 2.2]} radius={0.12} position={[0, 1.05, 0]} material={m.maquina} castShadow receiveShadow />
-        <group ref={rolos}>
-          {["#00aeef", "#ec008c", "#fff200", "#222222"].map((c, k) => (
-            <mesh key={k} position={[-2.3 + k * 1.5, 2.25, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-              <cylinderGeometry args={[0.32, 0.32, 2.3, 24]} /><meshStandardMaterial color={c} metalness={0.3} roughness={0.35} />
-            </mesh>
-          ))}
-        </group>
-        <mesh position={[3.6, 1.0, 0]} material={m.branco} castShadow><boxGeometry args={[1, 0.6, 1.4]} /></mesh>
-        <mesh position={[2.6, 1.6, 1.12]}><planeGeometry args={[0.8, 0.45]} /><meshStandardMaterial color="#3fe08a" emissive="#3fe08a" emissiveIntensity={ativos.impressao ? 1.4 : 0.05} toneMapped={false} /></mesh>
-      </group>
-      {/* túnel de verniz UV */}
-      <group position={[0.5, 0.1, -2.5]}>
-        <RoundedBox args={[3.2, 1.6, 1.8]} radius={0.1} position={[0, 0.8, 0]} material={m.maquina} castShadow />
-        <mesh position={[0, 0.85, 0.91]}><planeGeometry args={[2.4, 0.5]} /><meshStandardMaterial ref={uv} color="#b78cff" emissive="#a36bff" emissiveIntensity={1} toneMapped={false} /></mesh>
-      </group>
-      {/* corte e vinco (prensa) */}
-      <group position={[5.5, 0.1, -2.5]}>
-        <mesh material={m.maquina} position={[0, 0.6, 0]} castShadow><boxGeometry args={[2.2, 1.2, 1.8]} /></mesh>
-        {[-0.9, 0.9].map(x => <mesh key={x} material={m.aluminio} position={[x, 1.8, 0]}><boxGeometry args={[0.18, 1.6, 0.18]} /></mesh>)}
-        <mesh material={m.maquina} position={[0, 2.75, 0]} castShadow><boxGeometry args={[2.2, 0.35, 1.8]} /></mesh>
-        <mesh ref={prensa} material={m.aluminio} position={[0, 2.05, 0]} castShadow><boxGeometry args={[1.7, 0.25, 1.5]} /></mesh>
-      </group>
-      {/* esteira com caixas */}
-      <mesh material={m.preto} position={[1, 0.55, 1.2]} castShadow receiveShadow><boxGeometry args={[16, 0.12, 0.9]} /></mesh>
-      {Array.from({ length: 9 }, (_, k) => <mesh key={k} material={m.papelao} position={[-6 + k * 1.8, 0.78, 1.2]} castShadow><boxGeometry args={[0.45, 0.35, 0.45]} /></mesh>)}
-      {/* paletes de expedição */}
-      {[0, 1, 2].map(k => (
-        <group key={k} position={[8.5 + (k % 2) * 1.6, 0.1, 3.8 + Math.floor(k / 2) * 1.5]}>
-          <mesh material={m.madeira} position={[0, 0.08, 0]} castShadow><boxGeometry args={[1.2, 0.16, 1]} /></mesh>
-          {Array.from({ length: ativos.expedicao ? 6 : 2 }, (_, j) => <mesh key={j} material={m.papelao} position={[-0.3 + (j % 2) * 0.6, 0.38 + Math.floor(j / 2) * 0.42, 0]} castShadow><boxGeometry args={[0.55, 0.4, 0.9]} /></mesh>)}
-        </group>
-      ))}
-      {/* pilha de folhas esperando impressão */}
-      <group position={[-11, 0.1, 2.8]}>{Array.from({ length: 6 }, (_, k) => <mesh key={k} material={m.branco} position={[0, 0.12 + k * 0.14, 0]} castShadow><boxGeometry args={[1.1, 0.12, 0.8]} /></mesh>)}</group>
-      <Luminarias y={H_TERREO - 0.15} ativo={ativos.impressao || ativos.verniz || ativos.corte || ativos.expedicao} noite={noite} />
-    </group>
-  )
-}
-
 // Fachada de vidro com montantes e as faixas das lajes
-function Fachada({ m }: { m: M }) {
-  const H = baseDo(4) + alturaDo(4)
+// corte: com um andar aberto, a fachada vai só até a base dele (os de cima somem, o andar fica à mostra)
+function Fachada({ m, corte = null }: { m: M; corte?: number | null }) {
+  const TOPO_REAL = baseDo(4) + alturaDo(4)
+  const H = corte == null ? TOPO_REAL : Math.max(0.01, baseDo(corte))
   const montantes = (comp: number) => Array.from({ length: Math.floor(comp / VAO) + 1 }, (_, k) => -comp / 2 + k * (comp / Math.floor(comp / VAO)))
   return (
     <group>
@@ -165,12 +48,14 @@ function Fachada({ m }: { m: M }) {
           <mesh material={m.vidro} position={[0, H / 2, 0]}><planeGeometry args={[comp, H]} /></mesh>
           {montantes(comp).map((mx, j) => <mesh key={j} material={m.aluminio} position={[mx, H / 2, 0.04]} castShadow><boxGeometry args={[0.045, H, 0.1]} /></mesh>)}
           {/* faixas de laje (spandrel) */}
-          {[1, 2, 3, 4].map(a => <mesh key={a} material={m.vidroEscuro} position={[0, baseDo(a) + LAJE / 2, 0.06]}><boxGeometry args={[comp, LAJE + 0.4, 0.08]} /></mesh>)}
+          {[1, 2, 3, 4].filter(a => corte == null || a <= corte).map(a => <mesh key={a} material={m.vidroEscuro} position={[0, baseDo(a) + LAJE / 2, 0.06]}><boxGeometry args={[comp, LAJE + 0.4, 0.08]} /></mesh>)}
           <mesh material={m.aluminio} position={[0, H + 0.2, 0.05]}><boxGeometry args={[comp + 0.3, 0.4, 0.2]} /></mesh>
         </group>
       ))}
+      {corte == null && <>
       {/* aletas verticais na fachada da frente (sombra e ritmo) */}
       {Array.from({ length: 7 }, (_, k) => <mesh key={k} material={m.aletas} position={[-LARG / 2 + 1.6 + k * ((LARG - 3.2) / 6), H_TERREO + (H - H_TERREO) / 2, PROF / 2 + 0.28]} castShadow><boxGeometry args={[0.1, H - H_TERREO, 0.5]} /></mesh>)}
+      </>}
       {/* embasamento revestido de pedra nos fundos e na lateral esquerda do térreo */}
       <mesh material={m.pedra} position={[0, H_TERREO / 2, -PROF / 2 - 0.08]} castShadow receiveShadow><boxGeometry args={[LARG + 0.2, H_TERREO, 0.16]} /></mesh>
       <mesh material={m.pedra} position={[-LARG / 2 - 0.08, H_TERREO / 2, -PROF / 4]} castShadow receiveShadow><boxGeometry args={[0.16, H_TERREO, PROF / 2]} /></mesh>
@@ -180,29 +65,36 @@ function Fachada({ m }: { m: M }) {
         <mesh material={m.vidroEscuro} position={[0, 1.4, 0.07]}><planeGeometry args={[3.1, 2.7]} /></mesh>
         <mesh material={m.aluminio} position={[0, 1.4, 0.09]}><boxGeometry args={[0.05, 2.7, 0.04]} /></mesh>
       </group>
+      {corte == null && <>
       {/* marquise da entrada */}
       <mesh material={m.aluminio} position={[0, H_TERREO - 0.6, PROF / 2 + 1.6]} castShadow><boxGeometry args={[8, 0.18, 3.2]} /></mesh>
+      </>}
+      {corte == null && <>
       {/* cobertura: laje, casa de máquinas, letreiro */}
       <mesh material={m.concreto} position={[0, H + 0.12, 0]} castShadow receiveShadow><boxGeometry args={[LARG + 0.3, 0.25, PROF + 0.3]} /></mesh>
       <mesh material={m.concreto} position={[LARG / 2 - 4, H + 1.4, -PROF / 2 + 3]} castShadow><boxGeometry args={[6, 2.6, 4]} /></mesh>
+      </>}
     </group>
   )
 }
 
-// Letreiro ENYLA aceso no topo (textura desenhada aqui, sem fonte externa)
+// Letreiro aceso no topo com a logo oficial (a versão clara: branco e verde brilham sobre o painel escuro).
+// Caminho relativo: no sistema vira /brand/…; nas telas de conferência, a pasta brand copiada ao lado.
 function Letreiro({ y }: { y: number }) {
-  const tex = useMemo(() => {
-    const c = document.createElement("canvas"); c.width = 1024; c.height = 256
-    const g = c.getContext("2d")!
-    g.fillStyle = "rgba(0,0,0,0)"; g.fillRect(0, 0, c.width, c.height)
-    g.font = "800 190px Helvetica, Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"
-    g.fillStyle = "#ffffff"; g.fillText("ENYLA", c.width / 2, c.height / 2 + 8)
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t
+  const [tex, setTex] = useState<THREE.Texture | null>(null)
+  useEffect(() => {
+    let vivo = true
+    new THREE.TextureLoader().load("brand/enyla-wordmark-light.png", t => { if (!vivo) return; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; setTex(t) }, undefined, () => null)
+    return () => { vivo = false }
   }, [])
+  const L = 11, A = L * 328 / 1335
   return (
     <group position={[0, y, PROF / 2 - 0.4]}>
-      <mesh position={[0, 0, -0.06]}><boxGeometry args={[11, 2.6, 0.1]} /><meshStandardMaterial color="#1d1f24" metalness={0.6} roughness={0.3} /></mesh>
-      <mesh><planeGeometry args={[10, 2.5]} /><meshStandardMaterial map={tex} transparent emissive="#c7b2ff" emissiveMap={tex} emissiveIntensity={2.2} toneMapped={false} /></mesh>
+      <mesh position={[0, 0, -0.08]} castShadow><boxGeometry args={[L + 1.2, A + 0.9, 0.14]} /><meshStandardMaterial color="#121318" metalness={0.6} roughness={0.35} /></mesh>
+      {[-1, 1].map(sx => <mesh key={sx} position={[sx * (L / 2 + 0.2), -A / 2 - 0.9, -0.2]}><boxGeometry args={[0.12, 1.4, 0.12]} /><meshStandardMaterial color="#2b2f36" metalness={0.7} roughness={0.3} /></mesh>)}
+      {tex && <mesh position={[0, 0, 0.001]}><planeGeometry args={[L, A]} />
+        <meshStandardMaterial map={tex} transparent alphaTest={0.02} emissive="#ffffff" emissiveMap={tex} emissiveIntensity={1.8} toneMapped={false} /></mesh>}
+      {tex && <pointLight position={[0, 0, 1.2]} intensity={6} distance={8} color="#7ff0b8" />}
     </group>
   )
 }
@@ -283,17 +175,17 @@ function Entorno({ m, noite }: { m: M; noite: boolean }) {
   )
 }
 
-// Câmera: voa até o andar escolhido (o alvo do OrbitControls acompanha)
-function Camera({ alvo, controles }: { alvo: number; controles: React.RefObject<{ target: THREE.Vector3; update: () => void } | null> }) {
+// Câmera: voa até o andar escolhido; "dentro" desce até ele (o andar aberto, visto de cima, como maquete)
+function Camera({ alvo, dentro, controles }: { alvo: number; dentro: boolean; controles: React.RefObject<{ target: THREE.Vector3; update: () => void } | null> }) {
   const { camera } = useThree()
   const destino = useRef(new THREE.Vector3()), foco = useRef(new THREE.Vector3())
   const voando = useRef(true)
   useEffect(() => {
     const yA = baseDo(alvo) + alturaDo(alvo) / 2
-    foco.current.set(0, yA, 0)
-    destino.current.set(38, yA + 13, 54)
+    if (dentro) { foco.current.set(0, baseDo(alvo) + 0.8, 0.5); destino.current.set(15, baseDo(alvo) + 13, 19) }
+    else { foco.current.set(0, Math.max(yA, 8), 0); destino.current.set(42, Math.max(yA, 8) + 15, 60) }
     voando.current = true
-  }, [alvo])
+  }, [alvo, dentro])
   useFrame((_, dt) => {
     const c = controles.current
     if (!c || !voando.current) return
@@ -314,37 +206,96 @@ function sol(): { pos: [number, number, number]; noite: boolean } {
   return { pos: [Math.cos(ang) * 80, Math.max(-10, Math.sin(ang) * 70), 40], noite }
 }
 
-export default function Predio3D({ andares, sel, onSel }: { andares: Andar[]; sel: string; onSel: (id: string) => void }) {
+export type Dados3D = { kanban: KanbanCard[]; mesas: MesaAgente[]; feed: EventoEscritorio[] }
+
+export default function Predio3D({ andares, sel, onSel, dados }: { andares: Andar[]; sel: string; onSel: (id: string) => void; dados: Dados3D }) {
   // andares vem de cima para baixo; no 3D o índice 0 é o térreo
   const deBaixo = [...andares].reverse()
   const iSel = Math.max(0, deBaixo.findIndex(a => a.id === sel))
   const controles = useRef<{ target: THREE.Vector3; update: () => void } | null>(null)
   const [{ pos, noite }] = useState(sol)
-  const terreo = deBaixo[0]
+  const [dentro, setDentro] = useState(false)
+  const [estacao, setEstacao] = useState<number | null>(null)
+  const [agente, setAgente] = useState<string | null>(null)
+  useEffect(() => { setEstacao(null); setAgente(null) }, [sel])
+  const a = deBaixo[iSel]
+  const hoje = new Date().toLocaleDateString("sv-SE")
+  const pedidosEst = estacao != null ? dados.kanban.filter(c => c.coluna === estacao) : []
+  const ag = agente ? dados.mesas.find(x => x.id === agente) : null
+  const feedAg = ag ? dados.feed.filter(e => e.mesa === ag.id).slice(0, 6) : []
+  const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
   return (
-    <Canvas shadows dpr={[1, 2]} camera={{ position: [60, 34, 80], fov: 36, near: 0.5, far: 600 }} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
-      style={{ background: noite ? "#0f1426" : "#bcd9ee" }}>
-      <Cena andares={deBaixo} iSel={iSel} onSel={onSel} noite={noite} sol={pos} controles={controles} terreoAtivo={terreo?.ativo ?? false} />
-    </Canvas>
+    <div className="relative w-full h-full">
+      <Canvas shadows dpr={[1, 2]} camera={{ position: [60, 34, 80], fov: 36, near: 0.3, far: 600 }} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
+        style={{ background: noite ? "#0f1426" : "#bcd9ee" }}>
+        <Cena andares={deBaixo} iSel={iSel} onSel={id => { onSel(id); }} noite={noite} sol={pos} controles={controles} dentro={dentro} setDentro={setDentro}
+          dados={dados} estacao={estacao} setEstacao={setEstacao} agente={agente} setAgente={setAgente} />
+      </Canvas>
+
+      {/* painel do andar (flutuante) */}
+      <div className="absolute top-3 right-3 w-[300px] max-h-[calc(100%-24px)] overflow-y-auto rounded-2xl p-4 text-[#191625]"
+        style={{ background: "rgba(255,255,255,0.9)", backdropFilter: "blur(14px)", boxShadow: "0 10px 40px rgba(0,0,0,.18)" }}>
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[#898892]">{a?.rotulo}</p>
+        <p className="text-[18px] font-semibold leading-tight">{a?.nome}</p>
+        <p className="text-[12px] text-[#5e5c68] mt-0.5">{a?.obras ? "em obras" : a?.resumo}</p>
+        <button onClick={() => setDentro(d => !d)}
+          className="mt-3 w-full h-9 rounded-xl text-[13px] font-semibold text-white" style={{ background: dentro ? "#191625" : "#8456e8" }}>
+          {dentro ? "Sair para a rua" : "Entrar no andar"}
+        </button>
+        {a?.obras && <p className="text-[12px] text-[#5e5c68] mt-3 leading-relaxed">{a.obras}</p>}
+        {dentro && a?.id === "terreo" && (
+          <div className="mt-3">
+            {estacao == null ? <p className="text-[12px] text-[#898892]">Clique numa máquina para ver os pedidos dela.</p> : <>
+              <p className="text-[12.5px] font-semibold mb-1">{COLUNAS_KANBAN[estacao]} · {pedidosEst.length}</p>
+              {pedidosEst.length === 0 ? <p className="text-[12px] text-[#898892]">Nenhum pedido nesta etapa.</p> : (
+                <ul className="divide-y divide-black/5">
+                  {pedidosEst.map(c => <li key={c.id} className="py-1.5 text-[12px]">
+                    <span className="font-semibold">{c.numero}</span> <span className="text-[#5e5c68]">{c.nomeCliente}</span>
+                    {c.dataEntregaPrevista && <span className={`block text-[11px] ${atrasado(c, hoje) ? "text-[#d33a3c] font-semibold" : "text-[#898892]"}`}>
+                      {atrasado(c, hoje) ? "atrasado · " : "entrega "}{new Date(c.dataEntregaPrevista.slice(0, 10) + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span>}
+                  </li>)}
+                </ul>
+              )}
+            </>}
+          </div>
+        )}
+        {dentro && a?.id === "1" && (
+          <div className="mt-3">
+            {!ag ? <p className="text-[12px] text-[#898892]">Clique num agente para ver o que ele está fazendo.</p> : <>
+              <p className="text-[13px] font-semibold">{ag.nome}</p>
+              <p className="text-[11.5px] text-[#898892]">{ag.papel}</p>
+              <p className="text-[12px] mt-1.5"><span className="font-semibold">Agora:</span> {ag.agora}</p>
+              <p className="text-[12px] text-[#5e5c68]">{ag.hoje} {ag.hojeRotulo} hoje</p>
+              {feedAg.length > 0 && <ul className="mt-2 space-y-1">{feedAg.map((e, k) => <li key={k} className="text-[11.5px] text-[#3c3a45]"><span className="text-[#898892] mr-1.5">{hhmm(e.em)}</span>{e.texto}</li>)}</ul>}
+            </>}
+          </div>
+        )}
+      </div>
+      <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11.5px] text-white/90 bg-black/35 backdrop-blur px-3 py-1 rounded-full pointer-events-none">
+        {dentro ? "Arraste para girar · role para aproximar · clique nas máquinas e nas pessoas" : "Clique num andar · arraste para girar · role para aproximar"}
+      </p>
+    </div>
   )
 }
 
-function Cena({ andares, iSel, onSel, noite, sol: s, controles, terreoAtivo }: {
+function Cena({ andares, iSel, onSel, noite, sol: s, controles, dentro, setDentro, dados, estacao, setEstacao, agente, setAgente }: {
   andares: Andar[]; iSel: number; onSel: (id: string) => void; noite: boolean; sol: [number, number, number]
-  controles: React.RefObject<{ target: THREE.Vector3; update: () => void } | null>; terreoAtivo: boolean
+  controles: React.RefObject<{ target: THREE.Vector3; update: () => void } | null>; dentro: boolean; setDentro: (v: boolean) => void
+  dados: Dados3D; estacao: number | null; setEstacao: (c: number | null) => void; agente: string | null; setAgente: (id: string | null) => void
 }) {
   const m = useMateriais()
   const [hover, setHover] = useState<number | null>(null)
   const H = baseDo(4) + alturaDo(4)
+  const corte = dentro ? iSel : null
+  const visivel = (k: number) => !dentro || k <= iSel
   useEffect(() => { document.body.style.cursor = hover != null ? "pointer" : "auto"; return () => { document.body.style.cursor = "auto" } }, [hover])
   return (
     <>
       {noite ? <color attach="background" args={["#0f1426"]} /> : <Sky sunPosition={s} turbidity={6} rayleigh={1.2} mieCoefficient={0.005} mieDirectionalG={0.85} />}
       <fog attach="fog" args={[noite ? "#0f1426" : "#cfe3f1", 90, 260]} />
-      <ambientLight intensity={noite ? 0.15 : 0.45} />
+      <ambientLight intensity={noite ? 0.18 : 0.5} />
       <directionalLight position={noite ? [-40, 60, 30] : s} intensity={noite ? 0.25 : 2.6} color={noite ? "#9fb3ff" : "#fff4e0"} castShadow
         shadow-mapSize={[2048, 2048]} shadow-camera-left={-45} shadow-camera-right={45} shadow-camera-top={45} shadow-camera-bottom={-45} shadow-bias={-0.0004} />
-      {/* ambiente de reflexo do vidro, montado aqui (sem baixar nada) */}
       <Environment resolution={256} frames={1}>
         <Lightformer intensity={noite ? 0.6 : 2.2} position={[0, 30, -20]} scale={[60, 20, 1]} color={noite ? "#2b3566" : "#ffffff"} />
         <Lightformer intensity={noite ? 0.4 : 1.2} position={[-40, 10, 20]} rotation-y={Math.PI / 2} scale={[40, 10, 1]} color={noite ? "#3a2f66" : "#dbe9ff"} />
@@ -354,24 +305,28 @@ function Cena({ andares, iSel, onSel, noite, sol: s, controles, terreoAtivo }: {
 
       <Entorno m={m} noite={noite} />
       <group>
-        {/* núcleo de concreto + lajes + interiores */}
-        <Grafica m={m} noite={noite} ativos={{ impressao: terreoAtivo, verniz: terreoAtivo, corte: terreoAtivo, expedicao: terreoAtivo }} />
-        {andares.slice(1).map((a, k) => (
-          <AndarEscritorio key={a.id} i={k + 1} m={m} ativo={a.ativo || (k + 1 === iSel)} noite={noite} mesas={a.obras ? 0 : 12} marcado={k + 1 === iSel} />
-        ))}
-        <Fachada m={m} />
-        <Letreiro y={H + 1.9} />
+        <GraficaInterior m={m} kanban={dados.kanban} noite={noite} rotulos={dentro && iSel === 0} estacao={estacao} onEstacao={c => { setEstacao(c); if (!dentro) { onSel(andares[0].id); setDentro(true) } }} />
+        {andares.slice(1).map((a, k) => {
+          const i = k + 1
+          if (!visivel(i)) return null
+          if (a.obras) return <Canteiro key={a.id} m={m} y={baseDo(i)} />
+          if (a.id === "1") return <AgentesInterior key={a.id} m={m} y={baseDo(i)} mesas={dados.mesas} noite={noite} rotulos={dentro && iSel === i} sel={agente}
+            onSel={id => { setAgente(id); if (!dentro) { onSel(a.id); setDentro(true) } }} />
+          return <AndarEscritorio key={a.id} i={i} m={m} ativo={a.ativo} noite={noite} mesas={12} marcado={i === iSel} />
+        })}
+        <Fachada m={m} corte={corte} />
+        {!dentro && <Letreiro y={H + 1.9} />}
         <Elevador alvo={iSel} m={m} />
-        {/* zonas clicáveis de cada andar (invisíveis) + etiqueta */}
+        {/* zonas clicáveis de cada andar + etiqueta (de fora) */}
         {andares.map((a, k) => (
           <group key={a.id}>
-            <mesh position={[0, baseDo(k) + alturaDo(k) / 2, 0]} onClick={e => { e.stopPropagation(); onSel(a.id) }}
+            <mesh visible={!dentro} position={[0, baseDo(k) + alturaDo(k) / 2, 0]} onClick={e => { if (dentro) return; e.stopPropagation(); if (k === iSel) setDentro(true); else onSel(a.id) }}
               onPointerOver={e => { e.stopPropagation(); setHover(k) }} onPointerOut={() => setHover(h => h === k ? null : h)}>
               <boxGeometry args={[LARG + 0.6, alturaDo(k) - 0.1, PROF + 0.6]} />
-              <meshBasicMaterial color="#8456e8" transparent opacity={hover === k && k !== iSel ? 0.08 : 0} depthWrite={false} />
+              <meshBasicMaterial color="#8456e8" transparent opacity={hover === k ? 0.08 : 0} depthWrite={false} />
             </mesh>
-            <Html position={[-LARG / 2 - 0.8, baseDo(k) + alturaDo(k) / 2, PROF / 2]} zIndexRange={[20, 0]}>
-              <button onClick={() => onSel(a.id)}
+            <Html position={[-LARG / 2 - 0.8, baseDo(k) + alturaDo(k) / 2, PROF / 2]} zIndexRange={[20, 0]} style={{ visibility: dentro ? "hidden" : "visible", pointerEvents: dentro ? "none" : "auto" }}>
+              <button onClick={() => { if (k === iSel) setDentro(true); else onSel(a.id) }}
                 style={{ whiteSpace: "nowrap", transform: "translate(-100%, -50%)", padding: "4px 10px", borderRadius: 999, border: "none", cursor: "pointer",
                   fontFamily: "-apple-system, system-ui, sans-serif", fontSize: 12, fontWeight: 600,
                   background: k === iSel ? "#8456e8" : "rgba(255,255,255,0.92)", color: k === iSel ? "#fff" : "#191625", boxShadow: "0 4px 18px rgba(0,0,0,.18)" }}>
@@ -383,12 +338,12 @@ function Cena({ andares, iSel, onSel, noite, sol: s, controles, terreoAtivo }: {
       </group>
       <ContactShadows position={[0, 0.03, 0]} opacity={0.45} scale={70} blur={2.4} far={20} />
       <EffectComposer multisampling={0} enableNormalPass={false}>
-        <N8AO aoRadius={2.2} intensity={2.4} distanceFalloff={1.2} quality="medium" halfRes />
+        <N8AO aoRadius={dentro ? 1.2 : 2.2} intensity={2.2} distanceFalloff={1.2} quality="medium" halfRes />
         <Bloom intensity={noite ? 0.9 : 0.25} luminanceThreshold={0.85} luminanceSmoothing={0.2} mipmapBlur />
         <SMAA />
       </EffectComposer>
-      <Camera alvo={iSel} controles={controles} />
-      <OrbitControls ref={controles as never} enableDamping dampingFactor={0.08} minDistance={14} maxDistance={110} maxPolarAngle={Math.PI / 2.08} target={[0, 6, 0]} />
+      <Camera alvo={iSel} dentro={dentro} controles={controles} />
+      <OrbitControls ref={controles as never} enableDamping dampingFactor={0.08} minDistance={dentro ? 6 : 14} maxDistance={dentro ? 45 : 110} maxPolarAngle={Math.PI / 2.08} target={[0, 6, 0]} />
     </>
   )
 }

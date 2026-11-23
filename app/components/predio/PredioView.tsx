@@ -81,7 +81,7 @@ function Fachada({ andares, sel, onSel, noite }: { andares: Andar[]; sel: string
   )
 }
 
-export function PredioView({ andares, inicial }: { andares: Andar[]; inicial?: string }) {
+export function PredioView({ andares, inicial, dados3d }: { andares: Andar[]; inicial?: string; dados3d?: import("./Predio3D").Dados3D }) {
   const [sel, setSel] = useState(inicial ?? andares[andares.length - 1]?.id)
   const [noite, setNoite] = useState(false)
   useEffect(() => { const h = new Date().getHours(); setNoite(h < 6 || h >= 19) }, [])
@@ -108,15 +108,10 @@ export function PredioView({ andares, inicial }: { andares: Andar[]; inicial?: s
       </div>
     </div>
   ) : a.conteudo
-  if (tres) return (
-    <div className="space-y-4">
-      <div className="relative w-full h-[min(68vh,640px)] rounded-2xl overflow-hidden border border-[rgba(60,60,67,0.10)]">
-        <Predio3D andares={andares} sel={a.id} onSel={ir} />
-        <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11.5px] text-white/90 bg-black/35 backdrop-blur px-3 py-1 rounded-full pointer-events-none">
-          Clique num andar para ir até ele · arraste para girar · role para aproximar
-        </p>
-      </div>
-      <div key={a.id} className="min-w-0 ds-entrada">{cabecalho}{conteudo}</div>
+  // Computador: a empresa em 3D, com tudo dentro da cena (entrar no andar, máquinas, agentes)
+  if (tres && dados3d) return (
+    <div className="relative w-full h-[calc(100vh-150px)] min-h-[560px] rounded-2xl overflow-hidden border border-[rgba(60,60,67,0.10)]">
+      <Predio3D andares={andares} sel={a.id} onSel={ir} dados={dados3d} />
     </div>
   )
   return (

@@ -2,7 +2,7 @@
 // Usa o CSS do último `next build` (rode npm run build antes, se mudou classes).
 import { build } from "esbuild"
 import { chromium } from "playwright"
-import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "fs"
+import { readdirSync, readFileSync, writeFileSync, mkdirSync, cpSync } from "fs"
 import path from "path"
 
 const raiz = process.cwd(), dir = path.join(raiz, "scripts/telas"), saida = path.join(dir, "saida")
@@ -11,6 +11,8 @@ const css = []
 const procurar = d => { for (const f of readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); if (f.isDirectory()) procurar(p); else if (p.endsWith(".css")) css.push(readFileSync(p, "utf8")) } }
 procurar(path.join(raiz, ".next/static"))
 writeFileSync(path.join(saida, "next.css"), css.join("\n"))
+// logos da marca ao lado das telas (o prédio 3D carrega brand/… pelo caminho relativo)
+cpSync(path.join(raiz, "public/brand"), path.join(saida, "brand"), { recursive: true })
 await build({
   entryPoints: [path.join(dir, "app.tsx")], bundle: true, outfile: path.join(saida, "app.js"), jsx: "automatic", logLevel: "error",
   alias: { "@": raiz, "next/image": path.join(dir, "imagem.tsx"), "next/dynamic": path.join(dir, "dinamico.tsx") }, define: { "process.env.NODE_ENV": '"production"', "process.env.NEXT_PUBLIC_CARTUXO_SITE_URL": "undefined" }, loader: { ".png": "dataurl" },
