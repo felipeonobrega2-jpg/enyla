@@ -117,7 +117,7 @@ async function leitura(cfg: Cfg, r: Pick<Relatorio, "dia" | "dia1" | "semana" | 
   const filtro = filtroEfetivo(cfg.filtroLeads)
   // Ciclo de venda real (tempo até fechar): a IA não julga campanha antes de dar tempo de fechar
   const ciclo = await tempoAteFechar().then(textoParaIA).catch(() => "")
-  const resp = await clienteClaude(cfg.apiKey).beta.messages.create({
+  const resp = await clienteClaude(cfg.apiKey, "marketing").beta.messages.create({
     model: MODELO, max_tokens: 2000, ...FALLBACK,
     output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
     system: `Você é o analista de marketing do Felipe, de uma gráfica de embalagens (caixinhas de papel cartão, muito para perfumes). Ele anuncia na Meta e os leads chegam pelo WhatsApp. O objetivo do anúncio não é volume de leads: é bom negócio. MQL = lead bom (caixas em volume, 1.000+, ou outros produtos do ramo como frasco e essência). Cerca de 90% dos leads querem poucas caixas e são descartados. Por isso o número que mais importa é o custo por MQL, depois orçamentos e pedidos; custo por lead sozinho engana.

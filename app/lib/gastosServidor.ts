@@ -19,11 +19,11 @@ const COTACAO_PADRAO = 5.5
 const lerCfg = async () => ((await lerConfigLinha()).data?.data ?? {}) as Cfg
 
 // Chamado depois de cada resposta da IA (em claude.ts). Erro aqui nunca derruba a chamada.
-export async function registrarUsoIA(modelo: string, uso: UsoIA | null | undefined) {
+export async function registrarUsoIA(modelo: string, uso: UsoIA | null | undefined, origem = "outros") {
   if (!uso) return
   const usd = custoUsd(modelo, uso)
   if (!(usd > 0)) return
-  await mudarConfig((d: Cfg) => ({ gastosIA: somarUso(d.gastosIA ?? {}, diaSP(), usd) })).catch(() => null)
+  await mudarConfig((d: Cfg) => ({ gastosIA: somarUso(d.gastosIA ?? {}, diaSP(), usd, 90, origem) })).catch(() => null)
 }
 
 // Cotação do dólar (uma vez por dia, AwesomeAPI pública); se falhar, a última ou a que você definiu

@@ -149,7 +149,7 @@ ${blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")).j
   else msgs.push({ role: "user", content: minha.texto })
 
   const acoes: AcaoConversa[] = []
-  const cli = clienteClaude(cfg.apiKey)
+  const cli = clienteClaude(cfg.apiKey, "diretoria")
   const execIds = ctx.exec.map(f => f.id)
   let textoFinal = ""
   for (let volta = 0; volta < 8; volta++) {
@@ -163,7 +163,7 @@ ${blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")).j
     let jaFalou = false
     if (op.aoVivo) fluxo.on("text", t => { if (!jaFalou && textoFinal) { op.aoVivo!("\n\n"); } jaFalou = true; op.aoVivo!(t) })
     const resp = await fluxo.finalMessage()
-    await registrarUsoIA(resp.model, resp.usage as Parameters<typeof registrarUsoIA>[1]).catch(() => null)
+    await registrarUsoIA(resp.model, resp.usage as Parameters<typeof registrarUsoIA>[1], "diretoria").catch(() => null)
     const texto = resp.content.flatMap(c => c.type === "text" ? [c.text] : []).join("\n").trim()
     if (texto) textoFinal = textoFinal ? `${textoFinal}\n\n${texto}` : texto
     const usos = resp.content.filter((c): c is Anthropic.Beta.BetaToolUseBlock => c.type === "tool_use")

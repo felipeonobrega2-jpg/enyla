@@ -46,7 +46,7 @@ async function jaComprou(conv: Conv, cfg: Cfg, cache: { cards?: { nomeCliente: s
 export async function perguntarIA(cfg: Cfg, nome: string | null, texto: string): Promise<Classificacao | null> {
   if (!cfg.apiKey) return null
   const ensinado = conhecimentoNoPrompt((cfg.conhecimentoAgente ?? []).filter(i => i.id.startsWith("felipe-")))
-  const resp = await clienteClaude(cfg.apiKey).beta.messages.create({
+  const resp = await clienteClaude(cfg.apiKey, "classificador").beta.messages.create({
     model: MODELO, max_tokens: 1500,
     output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA_CLASSIFICAR } },
     system: `Você classifica leads do WhatsApp de uma gráfica de embalagens (caixinhas de papel cartão, muito para perfume). Só classifica, não responde.

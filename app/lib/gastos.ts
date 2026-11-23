@@ -28,14 +28,19 @@ export function custoUsd(modelo: string, u: UsoIA): number {
 }
 
 // Gasto da IA por dia (São Paulo): { "2026-11-06": { usd, chamadas } }
-export type GastoDia = { usd: number; chamadas: number }
+export type GastoDia = { usd: number; chamadas: number; por?: Record<string, { usd: number; chamadas: number }> }
 export const diaSP = (d = new Date()) => d.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
 
-export function somarUso(dias: Record<string, GastoDia>, dia: string, usd: number, manterDias = 90): Record<string, GastoDia> {
+// "origem": quem gastou (atendente, classificador, aprendizado...), para saber onde está o custo. O detalhe por origem
+// fica só nos últimos 14 dias (o AppConfig não cresce); o total do dia fica 90 dias.
+export function somarUso(dias: Record<string, GastoDia>, dia: string, usd: number, manterDias = 90, origem?: string): Record<string, GastoDia> {
   const atual = dias[dia] ?? { usd: 0, chamadas: 0 }
-  const novo = { ...dias, [dia]: { usd: atual.usd + usd, chamadas: atual.chamadas + 1 } }
-  const corte = Object.keys(novo).sort().slice(0, Math.max(0, Object.keys(novo).length - manterDias))
-  for (const k of corte) delete novo[k]
+  const por = { ...(atual.por ?? {}) }
+  if (origem) { const o = por[origem] ?? { usd: 0, chamadas: 0 }; por[origem] = { usd: o.usd + usd, chamadas: o.chamadas + 1 } }
+  const novo: Record<string, GastoDia> = { ...dias, [dia]: { usd: atual.usd + usd, chamadas: atual.chamadas + 1, ...(Object.keys(por).length ? { por } : {}) } }
+  const ordem = Object.keys(novo).sort()
+  for (const k of ordem.slice(0, Math.max(0, ordem.length - manterDias))) delete novo[k]
+  for (const k of ordem.slice(0, Math.max(0, ordem.length - 14))) if (novo[k]?.por) { const resto = { ...novo[k] }; delete resto.por; novo[k] = resto }
   return novo
 }
 

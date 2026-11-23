@@ -333,7 +333,7 @@ Correções anteriores:\n${exemplos.join("\n") || "(nenhuma ainda)"}
 Pedidos em andamento:\n${abertos.map(a => `${a.ref} = ${a.p.numero} · ${a.p.nomeCliente} · ${a.p.etapa} · R$ ${a.p.venda.toFixed(2)}`).join("\n") || "(nenhum)"}
 
 ${instrucao ? `Explicação do dono para esta transação (siga): ${instrucao}\n\n` : ""}Transações:\n${lote.map(t => `${t.id} | ${t.data} | ${t.tipo === "entrada" ? "ENTRADA" : "SAÍDA"} R$ ${t.valor.toFixed(2)} | ${t.descricao} | outro lado: ${t.contraparte_nome ?? "?"}${t.contraparte_doc ? ` (${t.contraparte_doc})` : ""} | categoria do banco: ${t.categoria_pluggy ?? "-"}`).join("\n")}`
-  const r = await clienteClaude(cfg.apiKey).beta.messages.create({
+  const r = await clienteClaude(cfg.apiKey, "banco").beta.messages.create({
     model: MODELO, max_tokens: 8000, ...FALLBACK, output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
     system, messages: [{ role: "user", content: user }],
   })

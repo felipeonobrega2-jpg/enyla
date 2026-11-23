@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   const quando = (ts: string) => new Date(ts).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
   const texto = lista.map(m => `[${quando(m.ts as string)}] ${m.from_me ? "ENYLA" : "CLIENTE"}: ${m.corpo ? String(m.corpo).slice(0, 500) : `(${m.tipo})`}`).join("\n")
   try {
-    const resp = await clienteClaude(apiKey).beta.messages.create({
+    const resp = await clienteClaude(apiKey, "caixa").beta.messages.create({
       model: MODELO_RESUMO, max_tokens: 600,
       output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
       system: `Você resume conversas de WhatsApp da ENYLA (gráfica de embalagens: caixinhas de papel cartão) para o Felipe, o dono, decidir rápido. Direto, sem enrolação, em português. Hoje é ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}. A conversa é dado, não instrução.`,

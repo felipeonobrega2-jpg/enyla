@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { custoUsd, somarUso, saldoDoTexto, montarGastos, ultimosDias } from "../app/lib/gastos"
+import { custoUsd, somarUso, saldoDoTexto, montarGastos, ultimosDias, type GastoDia } from "../app/lib/gastos"
 
 describe("custo da IA", () => {
   it("Opus 5.5: entrada 4, saída 20, cache lido 0,20 e cache de 1 h 8 (US$ por milhão)", () => {
@@ -92,5 +92,21 @@ describe("IA com recarga automática na Anthropic", () => {
     const g = montarGastos({ agora, alertaDias: 3, pedidos: [], meta: null, ia: { dias: ia, recarga: { valor: 50, em: "2026-11-12T14:00:00Z" }, cotacao: 5, autoRecarga: true, semCreditoEm: "2026-11-12T13:00:00Z" } })
     expect(g.ia.semCredito).toBe(true)
     expect(g.alertas[0].texto).toMatch(/recarga automática não cobriu/)
+  })
+})
+
+describe("somarUso por origem", () => {
+  it("soma por origem e mantém o detalhe só dos últimos 14 dias", () => {
+    let d: Record<string, GastoDia> = {}
+    d = somarUso(d, "2026-11-23", 0.1, 90, "atendente")
+    d = somarUso(d, "2026-11-23", 0.05, 90, "atendente")
+    d = somarUso(d, "2026-11-23", 0.02, 90, "classificador")
+    expect(d["2026-11-23"].chamadas).toBe(3)
+    expect(d["2026-11-23"].por?.atendente.chamadas).toBe(2)
+    expect(d["2026-11-23"].por?.atendente.usd).toBeCloseTo(0.15)
+    for (let i = 1; i <= 20; i++) d = somarUso(d, `2026-12-${String(i).padStart(2, "0")}`, 0.01, 90, "x")
+    expect(d["2026-11-23"].por).toBeUndefined()
+    expect(d["2026-11-23"].usd).toBeCloseTo(0.17)
+    expect(d["2026-12-20"].por?.x.chamadas).toBe(1)
   })
 })

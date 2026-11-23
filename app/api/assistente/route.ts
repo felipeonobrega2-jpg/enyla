@@ -317,7 +317,7 @@ export async function POST(request: Request) {
   }
 
   const convo: Anthropic.Beta.BetaMessageParam[] = messages.map(m => ({ role: m.role, content: m.content }))
-  const claude = clienteClaude(apiKey)
+  const claude = clienteClaude(apiKey, "assistente")
   const system = buildSystemPrompt() + licoesNoPrompt(await lerLicoesIA("assistente").catch(() => [])) + `
 
 ## APRENDER

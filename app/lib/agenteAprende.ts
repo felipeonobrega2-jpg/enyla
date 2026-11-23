@@ -7,6 +7,7 @@ import { lerConfigLinha } from "./configAtomica"
 import { lerRegistros, lerIdsAgente } from "./registroAgente"
 import { supabase } from "./supabase"
 import { clienteClaude, MODELO } from "./claude"
+import { registrarUsoIA } from "./gastosServidor"
 import { Conhecimento, TEMAS } from "./agenteLeads"
 import { gravarCampos, mudarConfig } from "./configAtomica"
 import { transcreverPendentes } from "./transcricao"
@@ -94,21 +95,33 @@ Regras:
 ${atual.map(i => `- ${i.texto}`).join("\n") || "(vazio)"}
 </conhecimento_atual>`
 
-  const cli = clienteClaude(cfg.apiKey)
+  const cli = clienteClaude(cfg.apiKey, "aprendizado")
   const lotes: string[][] = []
   for (let i = 0; i < validos.length; i += POR_LOTE) lotes.push(validos.slice(i, i + POR_LOTE))
-  const resultados = await Promise.all(lotes.map(async lote => {
+  // O primeiro lote vai sozinho e grava o conhecimento atual no cache; os outros saem quando ele começa a responder e
+  // leem do cache (5% do preço). Antes saíam todos juntos e cada um pagava o conhecimento inteiro (~25 mil tokens).
+  const pedir = (lote: string[]) => cli.beta.messages.stream({
+    model: MODELO, max_tokens: 4000,
+    output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
+    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+    messages: [{ role: "user", content: lote.join("\n\n") }],
+  } as never)
+  const ler = async (fluxo: ReturnType<typeof pedir>) => {
     try {
-      const r = await cli.beta.messages.create({
-        model: MODELO, max_tokens: 4000,
-        output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
-        system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-        messages: [{ role: "user", content: lote.join("\n\n") }],
-      })
+      const r = await fluxo.finalMessage()
+      await registrarUsoIA(r.model, r.usage as never, "aprendizado").catch(() => null)
       const texto = r.content.flatMap(b => b.type === "text" ? [b.text] : []).join("")
       return (JSON.parse(texto) as { itens: { tema: string; texto: string }[] }).itens
     } catch { return [] }
-  }))
+  }
+  const primeiro = pedir(lotes[0])
+  await new Promise<void>(ok => {
+    const t = setTimeout(ok, 20_000)
+    const pronto = () => { clearTimeout(t); ok() }
+    primeiro.on("streamEvent", ev => { if (ev.type === "content_block_start") pronto() })
+    primeiro.on("error", pronto); primeiro.on("end", pronto)
+  })
+  const resultados = await Promise.all([ler(primeiro), ...lotes.slice(1).map(l => ler(pedir(l)))])
 
   const em = new Date().toISOString()
   const vistos = new Set(atual.map(i => i.texto.trim().toLowerCase()))
@@ -146,7 +159,7 @@ export async function juntarConhecimento(apiKey: string) {
   const { data } = await lerConfigLinha()
   const atual = ((data?.data as { conhecimentoAgente?: Conhecimento[] })?.conhecimentoAgente ?? [])
   const temas = [...new Set(atual.filter(i => !fixo(i)).map(i => i.tema))]
-  const cli = clienteClaude(apiKey)
+  const cli = clienteClaude(apiKey, "aprendizado")
   const juntos = await Promise.all(temas.map(async tema => {
     const do_tema = atual.filter(i => !fixo(i) && i.tema === tema)
     if (do_tema.length < 8) return { tema, ids: do_tema.map(i => i.id), itens: null as string[] | null }

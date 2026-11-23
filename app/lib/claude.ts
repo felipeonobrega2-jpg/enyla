@@ -14,7 +14,8 @@ export const FALLBACK = {
 }
 
 // Cliente da IA. Toda resposta registra o custo do dia (seção Gastos): o uso vem na própria resposta da API.
-export function clienteClaude(apiKey: string) {
+// "origem" diz quem gastou (vai para a seção Gastos, por função).
+export function clienteClaude(apiKey: string, origem = "outros") {
   const c = new Anthropic({ apiKey })
   for (const alvo of [c.messages, c.beta.messages] as unknown as { create: (...a: unknown[]) => Promise<unknown> }[]) {
     const original = alvo.create.bind(alvo)
@@ -25,7 +26,7 @@ export function clienteClaude(apiKey: string) {
       return (async () => {
         const r = await original(...args)
         if (r && typeof r === "object" && "usage" in r && "model" in r)
-          await registrarUsoIA(String((r as { model: string }).model), (r as { usage: UsoIA }).usage).catch(() => null)
+          await registrarUsoIA(String((r as { model: string }).model), (r as { usage: UsoIA }).usage, origem).catch(() => null)
         return r
       })()
     }) as typeof alvo.create

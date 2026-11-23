@@ -122,7 +122,7 @@ export async function convocarReuniao(op: { salvar?: boolean } = {}): Promise<Re
   const { cfg, diretores, exec, norte, resultados, equipe, bloco, cultura, ferramentasTxt } = await coletarContexto()
   if (!cfg.apiKey) throw new Error("Sem chave da IA nas Configurações.")
 
-  const resp = await clienteClaude(cfg.apiKey).beta.messages.create({
+  const resp = await clienteClaude(cfg.apiKey, "diretoria").beta.messages.create({
     model: MODELO, max_tokens: 4000,
     output_config: { effort: "low", format: { type: "json_schema", schema: esquema(exec.map(f => f.id)) } },
     system: `Você conduz a reunião de diretoria da ENYLA. Cada diretor tem nome (use o primeiro nome dele quando um citar o outro) (gráfica de embalagens; Offset com o Felipe, Digital 100% IA). O Felipe é o CEO. Cada diretor é um agente que gere os resultados da área dele pensando nas metas e na cultura da companhia: fala em primeira pessoa, direto, com números do placar, diz se a área está ajudando ou atrapalhando a meta do mês, e decide as próximas ações.

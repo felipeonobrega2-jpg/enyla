@@ -63,7 +63,7 @@ ${historico}
 </conversa>`
 
   try {
-    const r = await clienteClaude(cfg.apiKey).beta.messages.create({
+    const r = await clienteClaude(cfg.apiKey, "sugerir").beta.messages.create({
       model: MODELO, max_tokens: 2000, ...FALLBACK,
       output_config: { effort: "low" },
       system, messages: [{ role: "user", content: pedido }],

@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const resposta = await clienteClaude(apiKey).beta.messages.create({
+    const resposta = await clienteClaude(apiKey, "forma").beta.messages.create({
       model: MODELO,
       max_tokens: 16000,
       ...FALLBACK,

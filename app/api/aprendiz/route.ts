@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   let r: RespostaAprendiz
   try {
-    const resp = await clienteClaude(cfg.apiKey).beta.messages.create({
+    const resp = await clienteClaude(cfg.apiKey, "aprendiz").beta.messages.create({
       model: MODELO, max_tokens: 2000,
       output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA_APRENDIZ } },
       system: `Você é o aprendiz do sistema da ENYLA (gráfica de embalagens: Offset com o Felipe; Digital, pedidos pequenos, 100% da IA). O Felipe ensina uma vez, em linguagem solta, e você organiza para o lugar certo. Pode ser mais de um destino.

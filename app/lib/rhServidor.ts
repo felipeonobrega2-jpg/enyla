@@ -33,7 +33,7 @@ export async function prepararVaga(pedido: PedidoContratacao, solicitadoPor: IdD
   const diretor = DIRETORES.find(d => d.id === solicitadoPor)!
   const jeito = conhecimentoNoPrompt((cfg.conhecimentoAgente ?? []).filter(i => i.id.startsWith("felipe-")))
   try {
-    const resp = await clienteClaude(cfg.apiKey).beta.messages.create({
+    const resp = await clienteClaude(cfg.apiKey, "rh").beta.messages.create({
       model: MODELO, max_tokens: 2000,
       output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
       system: `Você é o RH da ENYLA (gráfica de embalagens; Offset com o Felipe, Digital 100% IA). Os funcionários são agentes de IA. Um diretor pediu uma contratação: desenhe a vaga e o onboarding para o funcionário executar a função do jeito que a empresa precisa.

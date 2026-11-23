@@ -37,13 +37,13 @@ export async function POST(req: NextRequest) {
   conteudo.push({ type: "text", text: pedido })
 
   try {
-    const msg = await clienteClaude(apiKey).beta.messages.stream({
+    const msg = await clienteClaude(apiKey, "arte").beta.messages.stream({
       model: MODELO, max_tokens: 32000,
       output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA_ARTE } },
       system: sistemaArte(),
       messages: [{ role: "user", content: conteudo as never }],
     }).finalMessage()
-    await registrarUsoIA(msg.model, msg.usage as never).catch(() => null)
+    await registrarUsoIA(msg.model, msg.usage as never, "arte").catch(() => null)
     const r = JSON.parse(msg.content.flatMap(c => c.type === "text" ? [c.text] : []).join("")) as FacesArte & { nota: string }
     const faces = {} as FacesArte
     for (const f of FACES) {

@@ -269,7 +269,7 @@ export async function responderAoDono(texto: string): Promise<string> {
     if (ehCancelamento(texto)) { await mudarConfig(() => ({ assistentePendente: null })); return lembrar("Ok, cancelado.") }
   }
   if (!cfg.apiKey) return "A chave da IA não está configurada."
-  const cli = clienteClaude(cfg.apiKey)
+  const cli = clienteClaude(cfg.apiKey, "assistente")
   // Conversa contínua: as últimas falas (alternando) + a mensagem nova
   const msgs: Anthropic.MessageParam[] = []
   for (const f of historico) {

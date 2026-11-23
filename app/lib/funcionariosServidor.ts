@@ -39,7 +39,7 @@ export async function redigirComoFuncionario(a: {
   const conversa = await historico(destino, jid).catch(() => "")
   const jeito = conhecimentoNoPrompt((a.conhecimento ?? []).filter(i => i.id.startsWith("felipe-")))
   try {
-    const resp = await clienteClaude(a.apiKey).beta.messages.create({
+    const resp = await clienteClaude(a.apiKey, "funcionarios").beta.messages.create({
       model: MODELO, max_tokens: 800,
       output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
       system: `Você é o funcionário de ${f.nome} da ENYLA (gráfica de embalagens). Sua qualificação: ${f.qualificacao}.
