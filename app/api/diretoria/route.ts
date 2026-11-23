@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { lerCampos, mudarConfig } from "@/app/lib/configAtomica"
-import { DIRETORES, type IdDiretor, type LicaoDiretor } from "@/app/lib/diretoria"
+import { DIRETORES, type IdBase, type LicaoDiretor } from "@/app/lib/diretoria"
 
 // Conhecimento de cada diretor (rota protegida pelo login): o Felipe vai abastecendo; os agentes diretores leem
-// isso antes de decidir. GET lista; POST { diretor, texto } ensina; DELETE ?diretor=&id= tira.
-type Base = Partial<Record<IdDiretor, LicaoDiretor[]>>
-const ehDiretor = (x: unknown): x is IdDiretor => DIRETORES.some(d => d.id === x)
+// isso antes de decidir. "metas" e "cultura" são da companhia (todos leem). GET lista; POST { diretor, texto } ensina;
+// DELETE ?diretor=&id= tira.
+type Base = Partial<Record<IdBase, LicaoDiretor[]>>
+const ehDiretor = (x: unknown): x is IdBase => x === "metas" || x === "cultura" || DIRETORES.some(d => d.id === x)
 
 export async function GET() {
   const { conhecimentoDiretoria } = await lerCampos<{ conhecimentoDiretoria?: Base }>(["conhecimentoDiretoria"])

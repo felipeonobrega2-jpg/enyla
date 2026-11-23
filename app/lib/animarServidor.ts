@@ -44,6 +44,15 @@ async function calcular(cfg: Cfg, kanban: KanbanCard[], lancs: LancamentoFinance
 }
 
 // Linha de comemoração para os avisos de venda ("+R$ X rumo ao Meio Milhão · faltam …"); "" se falhar
+// Progresso para a diretoria (meta do mês e próximo marco), com o quadro e os lançamentos já carregados
+export async function progressoDaEmpresa(kanban: KanbanCard[], lancamentos: LancamentoFinanceiro[]): Promise<Progresso | null> {
+  try {
+    const { lerCampos } = await import("./configAtomica")
+    const cfg = await lerCampos<Cfg>(["baselineFaturamento", "metaMensal", "metas", "pedidosDigitais"])
+    return await calcular(cfg, kanban, lancamentos.filter(l => (l.unidade ?? "offset") === "offset"))
+  } catch { return null }
+}
+
 export async function linhaDeComemoracao(valor: number) {
   try {
     const cfg = await lerCfg() as Cfg

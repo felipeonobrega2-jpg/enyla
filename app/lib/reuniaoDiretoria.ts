@@ -1,16 +1,19 @@
 // Reunião de diretoria: cada diretor (COO, CCO, CMO, CFO, CTO) vira um agente que lê os números reais da área e o
 // que o Felipe ensinou a ele (conhecimentoDiretoria), e fala na mesa: o que viu, o que preocupa, o que recomenda.
-// O Felipe responde "aprovo" ou "depois" em cada recomendação. Quando a recomendação é falar com um cliente, o diretor
-// já deixa a mensagem escrita e o "Aprovo" envia pelo sistema (fica no histórico). Nada vai a cliente sem o Aprovo. Só roda no servidor.
+// Diretor gere resultado e decide pensando nas metas e na cultura da companhia; não executa. Cada ação vai para um
+// funcionário qualificado (lib/diretoria FUNCIONARIOS), que redige com o histórico do cliente; o "Aprovo" do Felipe
+// envia pelo sistema (fica no histórico). Nada vai a cliente sem o Aprovo. O que nenhum funcionário sabe fazer fica com
+// o Felipe. A reunião seguinte cobra o resultado do que foi aprovado na anterior. Só roda no servidor.
 import { lerCampos, mudarConfig } from "./configAtomica"
 import { clienteClaude, MODELO } from "./claude"
-import { montarDiretoria, DIRETORES, type IdDiretor, type LicaoDiretor, type Diretor } from "./diretoria"
+import { montarDiretoria, DIRETORES, FUNCIONARIOS, EQUIPE, type IdDiretor, type IdBase, type IdFuncionario, type LicaoDiretor, type Diretor } from "./diretoria"
 
-// mensagem: quando a recomendação é falar com um cliente, o diretor já escreve o texto; o "Aprovo" do Felipe envia
-// pelo sistema (fica no histórico). Sem mensagem, a recomendação é só um lembrete do que o Felipe precisa fazer.
+// executor: o funcionário que executa (ou o Felipe). mensagem: o texto que o funcionário escreveu; o "Aprovo" envia.
 export type Recomendacao = {
   id: string; texto: string; urgencia: "hoje" | "semana"; resposta?: "aprovo" | "depois" | null
+  executor?: IdFuncionario | "felipe"
   mensagem?: { cliente: string; texto: string } | null
+  pendencia?: string | null                                   // o funcionário não conseguiu preparar (ex.: sem WhatsApp do cliente)
   enviado?: { em: string; ok: boolean; erro?: string } | null
 }
 export type Fala = { diretor: IdDiretor; cargo: string; fala: string; recomendacoes: Recomendacao[]; tom: Diretor["tom"] }
@@ -23,13 +26,11 @@ const ESQUEMA = {
     falas: { type: "array", items: { type: "object", additionalProperties: false, required: ["diretor", "fala", "recomendacoes"], properties: {
       diretor: { type: "string", enum: ["coo", "cco", "cmo", "cfo", "cto"] },
       fala: { type: "string", description: "2 a 3 frases, primeira pessoa, direto ao ponto, com números." },
-      recomendacoes: { type: "array", items: { type: "object", additionalProperties: false, required: ["texto", "urgencia", "mensagem"], properties: {
-        texto: { type: "string", description: "Uma ação concreta que o Felipe aprova ou não. Imperativo, curta." },
+      recomendacoes: { type: "array", items: { type: "object", additionalProperties: false, required: ["texto", "urgencia", "executor", "cliente"], properties: {
+        texto: { type: "string", description: "A ordem: uma ação concreta que o Felipe aprova ou não. Imperativo, curta, com os fatos (pedido, valor) que o executor precisa." },
         urgencia: { type: "string", enum: ["hoje", "semana"] },
-        mensagem: { anyOf: [{ type: "null" }, { type: "object", additionalProperties: false, required: ["cliente", "texto"], properties: {
-          cliente: { type: "string", description: "Nome do cliente EXATAMENTE como aparece nas pendências" },
-          texto: { type: "string", description: "A mensagem de WhatsApp pronta para o cliente, no tom da ENYLA" },
-        } }] },
+        executor: { type: "string", enum: [...FUNCIONARIOS.map(f => f.id), "felipe"], description: "Quem executa" },
+        cliente: { anyOf: [{ type: "null" }, { type: "string" }], description: "Nome do cliente EXATAMENTE como aparece nas pendências, quando a ordem é falar com um cliente; senão null" },
       } } },
     } } },
     fechamento: { type: "string", description: "Uma frase fechando: a prioridade número 1 do dia." },
@@ -50,7 +51,8 @@ export async function convocarReuniao(op: { salvar?: boolean } = {}): Promise<Re
   ])
   const [hoje, kanbanBruto, lancamentos, cfg, rot, esc] = await Promise.all([
     montarHoje().catch(() => null), todas<import("../types").KanbanCard>("KanbanCard"), todas<import("../types").LancamentoFinanceiro>("LancamentoFinanceiro"),
-    lerCampos<{ apiKey?: string; conhecimentoDiretoria?: Partial<Record<IdDiretor, LicaoDiretor[]>>; contas?: { ativa?: boolean; tipo?: string; saldo?: number | null }[] }>(["apiKey", "conhecimentoDiretoria", "contas"]),
+    lerCampos<{ apiKey?: string; conhecimentoDiretoria?: Partial<Record<IdBase, LicaoDiretor[]>>; contas?: { ativa?: boolean; tipo?: string; saldo?: number | null }[]
+      ultimaReuniao?: Reuniao; conhecimentoAgente?: import("./agenteLeads").Conhecimento[] }>(["apiKey", "conhecimentoDiretoria", "contas", "ultimaReuniao", "conhecimentoAgente"]),
     agendador.GET().then(r => r.json()).catch(() => null), escritorio.GET().then(r => r.json()).catch(() => null),
   ])
   if (!cfg.apiKey) throw new Error("Sem chave da IA nas Configurações.")
@@ -63,10 +65,30 @@ export async function convocarReuniao(op: { salvar?: boolean } = {}): Promise<Re
     rotinas: rot?.rotinas ?? null, whatsapp: esc?.whatsapp ?? null, semCredito: !!esc?.semCredito, cota: esc?.cota,
     conhecimento: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, v?.length ?? 0])),
   })
+  const { progressoDaEmpresa } = await import("./animarServidor")
+  const prog = await progressoDaEmpresa(kanban, lancamentos)
+  const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
+  const diaDoMes = Number(new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }).slice(8, 10))
+  const metas = (base.metas ?? []).map(l => `- ${l.texto}`)
+  const cultura = (base.cultura ?? []).map(l => l.texto)
+  const norte = `# Norte da companhia
+Meta do mês: ${prog && prog.metaMes > 0 ? `${brl(prog.metaMes)}; vendido até agora ${brl(prog.vendidoMes)} (${Math.round(prog.vendidoMes / prog.metaMes * 100)}%, dia ${diaDoMes} do mês)` : `sem meta definida; vendido no mês ${brl(prog?.vendidoMes ?? 0)}`}
+${prog?.proximo ? `Próximo marco: ${prog.proximo.nome} (faltam ${brl(prog.falta)})` : ""}
+Metas do Felipe:
+${metas.join("\n") || "- (ainda não definidas)"}
+Cultura:
+${cultura.map(c => `- ${c}`).join("\n") || "- (ainda não definida)"}`
+  const ant = cfg.ultimaReuniao
+  const resultados = ant ? `# O que foi decidido na reunião anterior (${new Date(ant.em).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}) — cobre o resultado
+${ant.falas.flatMap(f => f.recomendacoes.map(x => `- ${f.cargo}: ${x.texto} → ${x.resposta === "aprovo" ? (x.enviado?.ok ? "aprovado e executado (mensagem enviada)" : x.enviado ? `aprovado, mas falhou: ${x.enviado.erro}` : "aprovado") : x.resposta === "depois" ? "adiado pelo Felipe" : "sem resposta do Felipe"}`)).join("\n") || "- nada"}` : ""
+  const equipe = `# Funcionários que executam ordens da diretoria
+${FUNCIONARIOS.map(f => `- ${f.id} (${f.nome}, equipe do ${f.chefe.toUpperCase()}): ${f.qualificacao}`).join("\n")}
+- felipe: o que nenhum funcionário sabe fazer (orçar, decidir preço, recarregar a Meta, negociar)`
   const bloco = diretores.map(d => {
     const info = DIRETORES.find(x => x.id === d.id)!
     const licoes = (base[d.id] ?? []).slice(0, 40).map(l => `- ${l.texto}`).join("\n")
     return `## ${d.cargo} (${info.area}): ${info.faz}
+Equipe que trabalha sozinha sob ele: ${EQUIPE[d.id].join(", ") || "nenhuma ainda"}
 Placar: ${d.placar.map(p => `${p.rotulo}: ${p.valor}${p.tom !== "ok" ? ` [${p.tom}]` : ""}`).join("; ")}
 Pendências que o sistema já viu: ${d.decisoes.length ? d.decisoes.join(" | ") : "nenhuma"}
 O que o Felipe ensinou a este diretor:
@@ -76,21 +98,34 @@ ${licoes || "- (ainda nada)"}`
   const resp = await clienteClaude(cfg.apiKey).beta.messages.create({
     model: MODELO, max_tokens: 4000,
     output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
-    system: `Você conduz a reunião de diretoria da ENYLA (gráfica de embalagens; Offset com o Felipe, Digital 100% IA). O Felipe é o CEO. Cada diretor é um agente: fala em primeira pessoa, direto, com números do placar dele, e recomenda ações concretas que o Felipe aprova ou não.
-Mensagem para cliente: só quando a recomendação é avisar ou cobrar um cliente que aparece nas pendências (COO: atraso de entrega; CFO: cobrança vencida). Escreva a mensagem pronta em "mensagem" (cliente com o nome exato das pendências). Tom da ENYLA: empresa falando ("nós"), cordial, curta, sem pressão, sem inventar data ou valor que não está nos dados; no atraso, peça desculpa e diga que vamos confirmar a nova data hoje; na cobrança, lembre o valor e o pedido e ofereça o Pix. Nas outras recomendações, "mensagem" é null.
+    system: `Você conduz a reunião de diretoria da ENYLA (gráfica de embalagens; Offset com o Felipe, Digital 100% IA). O Felipe é o CEO. Cada diretor é um agente que gere os resultados da área dele pensando nas metas e na cultura da companhia: fala em primeira pessoa, direto, com números do placar, diz se a área está ajudando ou atrapalhando a meta do mês, e decide as próximas ações.
+Diretor não executa. Cada ação vai para um executor: um funcionário qualificado da lista (só se a ordem for exatamente o que ele sabe fazer) ou "felipe". Quando a ordem é falar com um cliente, preencha "cliente" com o nome exato das pendências e ponha na ordem os fatos que o funcionário precisa (pedido, valor). Se a área precisa de um funcionário que ainda não existe, o diretor pode dizer isso na fala.
+Cobre o resultado da reunião anterior: o que foi aprovado andou? o que foi adiado continua pendente? Não repita uma ordem já executada se o problema sumiu do placar. Use exatamente o status de cada ordem anterior: "sem resposta" não é "aprovado".
 Regras: cada diretor só fala da área dele e segue o que o Felipe ensinou a ele (isso vale mais que qualquer outra coisa). Sem enrolação, sem elogio, sem inventar número que não está no placar. Se está tudo em ordem, diga isso em uma frase e não invente recomendação. No máximo 3 recomendações por diretor. Ordem das falas: CCO, CMO, COO, CFO, CTO. Português do Brasil.`,
-    messages: [{ role: "user", content: `Hoje: ${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", timeZone: "America/Sao_Paulo" })}.\n\n${bloco}` }],
+    messages: [{ role: "user", content: `Hoje: ${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", timeZone: "America/Sao_Paulo" })}.\n\n${norte}\n\n${resultados}\n\n${equipe}\n\n${bloco}` }],
   })
-  const r = JSON.parse(resp.content.flatMap(c => c.type === "text" ? [c.text] : []).join("")) as { abertura: string; fechamento: string; falas: { diretor: IdDiretor; fala: string; recomendacoes: { texto: string; urgencia: "hoje" | "semana"; mensagem: { cliente: string; texto: string } | null }[] }[] }
+  const r = JSON.parse(resp.content.flatMap(c => c.type === "text" ? [c.text] : []).join("")) as { abertura: string; fechamento: string; falas: { diretor: IdDiretor; fala: string; recomendacoes: { texto: string; urgencia: "hoje" | "semana"; executor: IdFuncionario | "felipe"; cliente: string | null }[] }[] }
   const id = `reuniao-${Date.now().toString(36)}`
   const reuniao: Reuniao = {
     id, em: new Date().toISOString(), abertura: r.abertura, fechamento: r.fechamento,
     falas: r.falas.filter(f => diretores.some(d => d.id === f.diretor)).map(f => {
       const d = diretores.find(x => x.id === f.diretor)!
-      return { diretor: f.diretor, cargo: d.cargo, tom: d.tom, fala: f.fala, recomendacoes: f.recomendacoes.slice(0, 3).map((x, k) => ({ id: `${f.diretor}-${k}`, texto: x.texto, urgencia: x.urgencia, resposta: null,
-        mensagem: x.mensagem && x.mensagem.cliente && x.mensagem.texto?.trim() ? { cliente: x.mensagem.cliente.trim(), texto: x.mensagem.texto.trim() } : null })) }
+      return { diretor: f.diretor, cargo: d.cargo, tom: d.tom, fala: f.fala, recomendacoes: f.recomendacoes.slice(0, 3).map((x, k): Recomendacao => ({
+        id: `${f.diretor}-${k}`, texto: x.texto, urgencia: x.urgencia, resposta: null, executor: x.executor,
+        mensagem: null, pendencia: null, ...(x.cliente?.trim() ? { _cliente: x.cliente.trim() } : {}),
+      })) }
     }),
   }
+  // Os funcionários preparam as mensagens das ordens com cliente (em paralelo); o envio só depois do Aprovo
+  const { redigirComoFuncionario } = await import("./funcionariosServidor")
+  await Promise.all(reuniao.falas.flatMap(f => f.recomendacoes).map(async rec => {
+    const x = rec as Recomendacao & { _cliente?: string }
+    const cliente = x._cliente; delete x._cliente
+    if (!cliente || !x.executor || x.executor === "felipe") return
+    const r = await redigirComoFuncionario({ funcionario: x.executor, cliente, ordem: x.texto, apiKey: cfg.apiKey!, conhecimento: cfg.conhecimentoAgente, cultura })
+    if (r.ok) x.mensagem = { cliente, texto: r.texto }
+    else x.pendencia = r.erro
+  }))
   if (op.salvar !== false) await mudarConfig(() => ({ ultimaReuniao: reuniao }))
   return reuniao
 }
@@ -123,7 +158,10 @@ export function textoDaAta(r: Reuniao, link: string): string {
   for (const f of r.falas) {
     const hoje = f.recomendacoes.filter(x => x.urgencia === "hoje")
     linhas.push(`*${f.cargo}*: ${f.fala}`)
-    for (const x of (hoje.length ? hoje : f.recomendacoes).slice(0, 2)) linhas.push(`   → ${x.texto}${x.mensagem ? ` _(mensagem para ${x.mensagem.cliente} pronta: é só aprovar)_` : ""}`)
+    for (const x of (hoje.length ? hoje : f.recomendacoes).slice(0, 2)) {
+      const quem = FUNCIONARIOS.find(y => y.id === x.executor)?.nome
+      linhas.push(`   → ${x.texto}${x.mensagem && quem ? ` _(${quem} já escreveu a mensagem para ${x.mensagem.cliente}: é só aprovar)_` : ""}`)
+    }
   }
   linhas.push("", `*Prioridade 1:* ${r.fechamento.replace(/^\s*(a\s+)?prioridade (número|n[ºo°.]?)\s*1\s*(do dia)?\s*(é|:)?\s*/i, "").replace(/^./, c => c.toUpperCase())}`, "", `Aprovar ou adiar: ${link}`)
   return linhas.join("\n")

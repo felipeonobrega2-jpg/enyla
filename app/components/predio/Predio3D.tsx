@@ -14,6 +14,8 @@ import type { Andar } from "./PredioView"
 import { GraficaInterior, AgentesInterior, Canteiro, FinanceiroInterior, DiretoriaInterior } from "./Interiores3D"
 import type { Diretor } from "../../lib/diretoria"
 import type { Reuniao, Recomendacao } from "../../lib/reuniaoDiretoria"
+import { EQUIPE, FUNCIONARIOS } from "../../lib/diretoria"
+const NOME_FUNC: Record<string, string> = Object.fromEntries(FUNCIONARIOS.map(f => [f.id, f.nome]))
 import type { FinanceiroAndar } from "../../lib/financeiroAndar"
 import { atrasado } from "./GraficaVirtual"
 import { COLUNAS_KANBAN, type KanbanCard } from "../../types"
@@ -338,9 +340,11 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
                     {f.recomendacoes.map(r => (
                       <div key={r.id} className="mt-1.5">
                         <p className="text-[11.5px] text-[#191625] leading-snug"><span className={`mr-1 text-[9.5px] font-bold uppercase px-1 rounded align-[1px] ${r.urgencia === "hoje" ? "bg-[#d33a3c]/10 text-[#d33a3c]" : "bg-black/5 text-[#6b6876]"}`}>{r.urgencia}</span>{r.texto}</p>
+                        {r.executor && <p className="text-[10px] text-[#6b6876] mt-0.5">Executa: <span className="font-semibold">{r.executor === "felipe" ? "você" : NOME_FUNC[r.executor] ?? r.executor}</span></p>}
+                        {r.pendencia && <p className="text-[10.5px] text-[#c57800] mt-0.5 leading-snug">{r.pendencia}</p>}
                         {r.mensagem && (
                           <div className="mt-1 rounded-md border-l-2 border-[#009351] bg-white/70 px-2 py-1">
-                            <p className="text-[9.5px] font-semibold uppercase text-[#6b6876]">Mensagem para {r.mensagem.cliente}</p>
+                            <p className="text-[9.5px] font-semibold uppercase text-[#6b6876]">{r.executor && r.executor !== "felipe" ? `${NOME_FUNC[r.executor]} vai enviar para` : "Mensagem para"} {r.mensagem.cliente}</p>
                             <p className="text-[11px] text-[#3c3a45] leading-snug whitespace-pre-line">{r.mensagem.texto}</p>
                           </div>
                         )}
@@ -367,11 +371,18 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
           const lista = agente === "ceo" || !agente ? ds : ds.filter(d => d.id === agente)
           return <div className="mt-3 space-y-3">
             {!dentro && <p className="text-[12px] text-[#898892]">Entre no andar e clique num diretor.</p>}
+            {(agente === "ceo" || !agente) && dentro && <div className="rounded-lg bg-[#f6f4fb] p-2.5">
+              <p className="text-[12.5px] font-semibold">Norte da companhia</p>
+              <p className="text-[11px] text-[#6b6876] leading-snug">Os diretores decidem pensando nisso; os funcionários escrevem aos clientes seguindo a cultura.</p>
+              <ConhecimentoDiretor diretor="metas" cargo="Metas" titulo="Metas" placeholder="Ex.: fechar R$ 80 mil no mês com margem acima de 35%" onMudou={dados.onConhecimento} />
+              <ConhecimentoDiretor diretor="cultura" cargo="Cultura" titulo="Cultura" placeholder="Ex.: o lead nunca espera; prometeu, cumpriu" onMudou={dados.onConhecimento} />
+            </div>}
             {lista.map(d => <div key={d.id}>
               <p className="text-[12.5px] font-semibold flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: cor[d.tom] }} />{d.cargo} · {d.area}</p>
               {agente === d.id && d.placar.map(p => <div key={p.rotulo} className="flex justify-between text-[12px] py-0.5"><span className="text-[#5e5c68]">{p.rotulo}</span><span className="font-semibold" style={{ color: cor[p.tom] }}>{p.valor}</span></div>)}
               {d.decisoes.length ? <ul className="mt-1 space-y-1">{d.decisoes.map((x, k) => <li key={k} className="text-[11.5px] text-[#3c3a45] pl-3 relative"><span className="absolute left-0 top-[6px] w-1.5 h-1.5 rounded-full bg-[#8456e8]" />{x}</li>)}</ul>
                 : <p className="text-[11.5px] text-[#009351] mt-0.5">Nada para você decidir aqui.</p>}
+              {agente === d.id && <p className="text-[11px] text-[#6b6876] mt-1.5"><span className="font-semibold text-[#3c3a45]">Equipe:</span> {EQUIPE[d.id].length ? EQUIPE[d.id].join(", ") : "nenhum funcionário ainda (vaga aberta)"}</p>}
               {agente === d.id && <ConhecimentoDiretor diretor={d.id} cargo={d.cargo} onMudou={dados.onConhecimento} />}
             </div>)}
           </div>
@@ -396,7 +407,7 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
 }
 
 // Base de conhecimento de um diretor: o que ele já sabe e um campo para ensinar mais (os agentes diretores leem isso)
-function ConhecimentoDiretor({ diretor, cargo, onMudou }: { diretor: string; cargo: string; onMudou?: () => void }) {
+function ConhecimentoDiretor({ diretor, cargo, onMudou, titulo, placeholder }: { diretor: string; cargo: string; onMudou?: () => void; titulo?: string; placeholder?: string }) {
   const [lista, setLista] = useState<{ id: string; texto: string; em: string }[] | null>(null)
   const [texto, setTexto] = useState("")
   const [salvando, setSalvando] = useState(false)
@@ -412,11 +423,11 @@ function ConhecimentoDiretor({ diretor, cargo, onMudou }: { diretor: string; car
   const tirar = async (id: string) => { await fetch(`/api/diretoria?diretor=${diretor}&id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => null); carregar(); onMudou?.() }
   return (
     <div className="mt-3 pt-3 border-t border-black/5">
-      <p className="text-[11.5px] font-semibold mb-1.5">O que o {cargo} sabe {lista ? `(${lista.length})` : ""}</p>
+      <p className="text-[11.5px] font-semibold mb-1.5">{titulo ?? `O que o ${cargo} sabe`} {lista ? `(${lista.length})` : ""}</p>
       <div className="flex gap-1.5">
         <input value={texto} onChange={e => setTexto(e.target.value)} onKeyDown={e => { if (e.key === "Enter") ensinar() }} maxLength={1500}
-          placeholder={`Ensinar o ${cargo}…`} className="flex-1 min-w-0 h-8 rounded-lg bg-white px-2.5 text-[12px] border border-black/10 focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25" />
-        <button onClick={ensinar} disabled={salvando || texto.trim().length < 3} className="h-8 px-2.5 rounded-lg text-[11.5px] font-semibold text-white disabled:opacity-50" style={{ background: "#8456e8" }}>Ensinar</button>
+          placeholder={placeholder ?? `Ensinar o ${cargo}…`} className="flex-1 min-w-0 h-8 rounded-lg bg-white px-2.5 text-[12px] border border-black/10 focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25" />
+        <button onClick={ensinar} disabled={salvando || texto.trim().length < 3} className="h-8 px-2.5 rounded-lg text-[11.5px] font-semibold text-white disabled:opacity-50" style={{ background: "#8456e8" }}>{titulo ? "Adicionar" : "Ensinar"}</button>
       </div>
       {lista && lista.length > 0 && <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto">
         {lista.map(l => <li key={l.id} className="group flex items-start gap-1.5 text-[11.5px] text-[#3c3a45]">
