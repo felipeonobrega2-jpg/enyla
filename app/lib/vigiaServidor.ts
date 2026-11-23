@@ -77,7 +77,11 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
   // Agendador: cada tarefa deixa quando rodou e o que aconteceu (o que não rodou nesta volta não marca)
   const { marcarRotina } = await import("./agendador")
   const texto = (v: unknown) => typeof v === "string" ? (/^(Error|TypeError|AbortError)/.test(v) ? `erro: ${v.slice(0, 140)}` : v) : v == null ? "ok" : JSON.stringify(v).slice(0, 140)
-  const marcar: [string, unknown][] = [["vigia", "ok"], ["esperando", out.esperando], ["promessas", out.promessas], ["digitalFinanceiro", out.digitalFinanceiro], ["emails", out.emailsCliente]]
+  const df = out.digitalFinanceiro as { criados?: number; atualizados?: number; conciliados?: number } | string
+  const em = out.emailsCliente as { enviados?: number; erros?: string[] } | string
+  const marcar: [string, unknown][] = [["vigia", "ok"], ["esperando", out.esperando ?? "ok"], ["promessas", out.promessas ?? "ok"],
+    ["digitalFinanceiro", typeof df === "string" ? df : df?.criados || df?.atualizados ? `${df.criados ?? 0} lançados, ${df.atualizados ?? 0} atualizados` : "nada novo"],
+    ["emails", typeof em === "string" ? em : em?.erros?.length ? `erro: ${em.erros[0]}` : em?.enviados ? `${em.enviados} enviados` : "nada para enviar"]]
   if (out.auditoria != null) marcar.push(["auditoria", out.auditoria])
   if (out.rotina !== undefined) marcar.push(["resumo", out.rotina ?? "enviado"])
   // follow-up e retomada já marcam quando rodam; aqui só o motivo de não ter rodado (fora do horário, erro…)
