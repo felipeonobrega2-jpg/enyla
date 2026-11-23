@@ -6,7 +6,7 @@ import { clienteClaude, MODELO } from "./claude"
 import { destinoDoCliente } from "./enviarCliente"
 import { chaveTelefone } from "./vinculoWhatsapp"
 import { conhecimentoNoPrompt, type Conhecimento } from "./agenteLeads"
-import { FUNCIONARIOS, type IdFuncionario } from "./diretoria"
+import { treinamento, type Funcionario } from "./rh"
 
 const ESQUEMA = {
   type: "object", additionalProperties: false, required: ["texto"],
@@ -29,11 +29,11 @@ async function historico(destino: string, jid: string | null): Promise<string> {
 }
 
 export async function redigirComoFuncionario(a: {
-  funcionario: IdFuncionario; cliente: string; ordem: string; apiKey: string
+  funcionario: Funcionario; cliente: string; ordem: string; apiKey: string
   conhecimento?: Conhecimento[]; cultura?: string[]
 }): Promise<{ ok: true; texto: string } | { ok: false; erro: string }> {
-  const f = FUNCIONARIOS.find(x => x.id === a.funcionario)
-  if (!f) return { ok: false, erro: "Funcionário desconhecido" }
+  const f = a.funcionario
+  if (f.status !== "contratado" || f.capacidade !== "mensagem_cliente") return { ok: false, erro: `${f.nome} não está contratado para falar com cliente` }
   const { destino, jid } = await destinoDoCliente(a.cliente)
   if (!destino) return { ok: false, erro: `${f.nome} não achou o WhatsApp de ${a.cliente} (sem telefone no cadastro e sem conversa ligada)` }
   const conversa = await historico(destino, jid).catch(() => "")
@@ -45,7 +45,7 @@ export async function redigirComoFuncionario(a: {
       system: `Você é o funcionário de ${f.nome} da ENYLA (gráfica de embalagens). Sua qualificação: ${f.qualificacao}.
 A diretoria decidiu uma ação e você executa: escreva a mensagem de WhatsApp para o cliente. O Felipe (CEO) lê antes de enviar.
 Como escrever: empresa falando ("nós"), cordial, curta (2 a 4 frases), sem pressão. Use a conversa para acertar o tratamento (como o cliente é chamado, o assunto do pedido) e não repetir o que já foi dito. Nunca invente data, valor ou número de pedido que não esteja na ordem ou na conversa. Sem emoji em excesso (no máximo um). Português do Brasil.
-${jeito ? `\nO jeito da ENYLA (ensinado pelo Felipe):\n${jeito}\n` : ""}${a.cultura?.length ? `\nCultura da companhia:\n${a.cultura.map(c => `- ${c}`).join("\n")}\n` : ""}`,
+\nSeu treinamento (onboarding do RH):\n${treinamento(f)}\n${jeito ? `\nO jeito da ENYLA (ensinado pelo Felipe):\n${jeito}\n` : ""}${a.cultura?.length ? `\nCultura da companhia:\n${a.cultura.map(c => `- ${c}`).join("\n")}\n` : ""}`,
       messages: [{ role: "user", content: `Ordem da diretoria: ${a.ordem}\nCliente: ${a.cliente}\n\nConversa recente:\n${conversa || "(sem conversa registrada com este cliente)"}` }],
     })
     const texto = (JSON.parse(resp.content.flatMap(c => c.type === "text" ? [c.text] : []).join("")) as { texto: string }).texto?.trim()

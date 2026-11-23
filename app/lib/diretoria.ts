@@ -16,18 +16,13 @@ export const DIRETORES: { id: IdDiretor; cargo: string; area: string; faz: strin
   { id: "cto", cargo: "CTO", area: "Sistema", faz: "Sistema no ar, WhatsApp, IA e as rotinas automáticas" },
 ]
 
-// Diretor gere resultado e decide; quem executa é sempre um funcionário (agente) qualificado. Estes executam ordens da
-// reunião (depois do Aprovo do Felipe). Os outros agentes do Escritório trabalham sozinhos, cada um sob um diretor.
-export type IdFuncionario = "posvenda" | "cobranca"
-export const FUNCIONARIOS: { id: IdFuncionario; nome: string; chefe: IdDiretor; qualificacao: string }[] = [
-  { id: "posvenda", nome: "Pós-venda", chefe: "coo", qualificacao: "Fala com o cliente sobre o pedido dele: atraso, nova data, pedido pronto, entrega" },
-  { id: "cobranca", nome: "Cobrança", chefe: "cfo", qualificacao: "Lembra o cliente de um pagamento vencido ou de um sinal que não caiu, com cordialidade, oferecendo o Pix" },
-]
+// Diretor gere resultado e decide; quem executa é sempre um funcionário qualificado (quadro do RH, lib/rh). Aqui ficam
+// só os agentes do Escritório que trabalham sozinhos, cada um sob um diretor.
 export const EQUIPE: Record<IdDiretor, string[]> = {
-  coo: ["Pós-venda", "Vigia"],
+  coo: ["Vigia"],
   cco: ["Atendente", "Levantador de MQL", "Follow-up", "Reativação", "Propostas", "Orçamentista digital"],
   cmo: [],
-  cfo: ["Cobrança", "Auditor de dados"],
+  cfo: ["Auditor de dados"],
   cto: ["Aprendiz"],
 }
 // Metas e cultura da companhia: base que todo diretor (e todo funcionário que fala com cliente) lê

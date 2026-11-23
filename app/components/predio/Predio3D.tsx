@@ -14,8 +14,8 @@ import type { Andar } from "./PredioView"
 import { GraficaInterior, AgentesInterior, Canteiro, FinanceiroInterior, DiretoriaInterior } from "./Interiores3D"
 import type { Diretor } from "../../lib/diretoria"
 import type { Reuniao, Recomendacao } from "../../lib/reuniaoDiretoria"
-import { EQUIPE, FUNCIONARIOS } from "../../lib/diretoria"
-const NOME_FUNC: Record<string, string> = Object.fromEntries(FUNCIONARIOS.map(f => [f.id, f.nome]))
+import { EQUIPE } from "../../lib/diretoria"
+import type { Funcionario } from "../../lib/rh"
 import type { FinanceiroAndar } from "../../lib/financeiroAndar"
 import { atrasado } from "./GraficaVirtual"
 import { COLUNAS_KANBAN, type KanbanCard } from "../../types"
@@ -229,6 +229,16 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
   const [reunindo, setReunindo] = useState(false)
   const [erroReuniao, setErroReuniao] = useState<string | null>(null)
   const [enviando, setEnviando] = useState<string | null>(null)
+  // RH: quadro de funcionários e vagas (cobertura e 1º andar)
+  const [rh, setRh] = useState<Funcionario[] | null>(null)
+  const carregarRh = () => fetch("/api/rh").then(r => r.ok ? r.json() : null).then(x => { if (x?.quadro) setRh(x.quadro) }).catch(() => {})
+  const idAndar = deBaixo[iSel]?.id
+  useEffect(() => { if (idAndar === "cobertura" || idAndar === "1") carregarRh() }, [idAndar])   // eslint-disable-line react-hooks/exhaustive-deps
+  const decidirVaga = async (id: string, acao: "contratar" | "recusar") => {
+    const r = await fetch("/api/rh", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, acao }) }).catch(() => null)
+    const x = r?.ok ? await r.json().catch(() => null) : null
+    if (x?.quadro) setRh(x.quadro)
+  }
   const [vez, setVez] = useState<number | null>(null)      // -1 = abertura, 0..n-1 = falas, n = fechamento
   useEffect(() => { fetch("/api/diretoria/reuniao").then(r => r.ok ? r.json() : null).then(x => { if (x?.reuniao) setReuniao(x.reuniao) }).catch(() => {}) }, [])
   useEffect(() => {
@@ -337,14 +347,15 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
                   <div key={f.diretor} className={`rounded-lg p-2 transition-colors ${vez === k ? "bg-white shadow-sm" : ""}`}>
                     <p className="text-[12px] font-semibold">{f.cargo}</p>
                     <p className="text-[11.5px] text-[#3c3a45] leading-snug">{f.fala}</p>
+                    {f.contratacao && <PedidoRH c={f.contratacao} vaga={rh?.find(v => v.id === f.contratacao?.vagaId)} onDecidir={decidirVaga} />}
                     {f.recomendacoes.map(r => (
                       <div key={r.id} className="mt-1.5">
                         <p className="text-[11.5px] text-[#191625] leading-snug"><span className={`mr-1 text-[9.5px] font-bold uppercase px-1 rounded align-[1px] ${r.urgencia === "hoje" ? "bg-[#d33a3c]/10 text-[#d33a3c]" : "bg-black/5 text-[#6b6876]"}`}>{r.urgencia}</span>{r.texto}</p>
-                        {r.executor && <p className="text-[10px] text-[#6b6876] mt-0.5">Executa: <span className="font-semibold">{r.executor === "felipe" ? "você" : NOME_FUNC[r.executor] ?? r.executor}</span></p>}
+                        {r.executorNome && <p className="text-[10px] text-[#6b6876] mt-0.5">Executa: <span className="font-semibold">{r.executorNome}</span></p>}
                         {r.pendencia && <p className="text-[10.5px] text-[#c57800] mt-0.5 leading-snug">{r.pendencia}</p>}
                         {r.mensagem && (
                           <div className="mt-1 rounded-md border-l-2 border-[#009351] bg-white/70 px-2 py-1">
-                            <p className="text-[9.5px] font-semibold uppercase text-[#6b6876]">{r.executor && r.executor !== "felipe" ? `${NOME_FUNC[r.executor]} vai enviar para` : "Mensagem para"} {r.mensagem.cliente}</p>
+                            <p className="text-[9.5px] font-semibold uppercase text-[#6b6876]">{r.executorNome && r.executor !== "felipe" ? `${r.executorNome} vai enviar para` : "Mensagem para"} {r.mensagem.cliente}</p>
                             <p className="text-[11px] text-[#3c3a45] leading-snug whitespace-pre-line">{r.mensagem.texto}</p>
                           </div>
                         )}
@@ -382,14 +393,25 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
               {agente === d.id && d.placar.map(p => <div key={p.rotulo} className="flex justify-between text-[12px] py-0.5"><span className="text-[#5e5c68]">{p.rotulo}</span><span className="font-semibold" style={{ color: cor[p.tom] }}>{p.valor}</span></div>)}
               {d.decisoes.length ? <ul className="mt-1 space-y-1">{d.decisoes.map((x, k) => <li key={k} className="text-[11.5px] text-[#3c3a45] pl-3 relative"><span className="absolute left-0 top-[6px] w-1.5 h-1.5 rounded-full bg-[#8456e8]" />{x}</li>)}</ul>
                 : <p className="text-[11.5px] text-[#009351] mt-0.5">Nada para você decidir aqui.</p>}
-              {agente === d.id && <p className="text-[11px] text-[#6b6876] mt-1.5"><span className="font-semibold text-[#3c3a45]">Equipe:</span> {EQUIPE[d.id].length ? EQUIPE[d.id].join(", ") : "nenhum funcionário ainda (vaga aberta)"}</p>}
+              {agente === d.id && (() => {
+                const deles = (rh ?? []).filter(f => f.setor === d.id && f.status === "contratado").map(f => f.nome)
+                const vagas = (rh ?? []).filter(f => f.setor === d.id && f.status === "solicitado")
+                const todos = [...deles, ...EQUIPE[d.id]]
+                return <>
+                  <p className="text-[11px] text-[#6b6876] mt-1.5"><span className="font-semibold text-[#3c3a45]">Equipe:</span> {todos.length ? todos.join(", ") : "nenhum funcionário ainda"}</p>
+                  {vagas.map(v => <p key={v.id} className="text-[11px] text-[#8456e8] mt-0.5">Pediu ao RH: {v.nome} (no 1º andar, esperando você)</p>)}
+                </>
+              })()}
               {agente === d.id && <ConhecimentoDiretor diretor={d.id} cargo={d.cargo} onMudou={dados.onConhecimento} />}
             </div>)}
           </div>
         })()}
         {dentro && a?.id === "1" && (
           <div className="mt-3">
-            {!ag ? <p className="text-[12px] text-[#898892]">Clique num agente para ver o que ele está fazendo.</p> : <>
+            {!ag ? <>
+              <p className="text-[12px] text-[#898892]">Clique num agente para ver o que ele está fazendo.</p>
+              <PainelRH quadro={rh} onDecidir={decidirVaga} onMudou={setRh} />
+            </> : <>
               <p className="text-[13px] font-semibold">{ag.nome}</p>
               <p className="text-[11.5px] text-[#898892]">{ag.papel}</p>
               <p className="text-[12px] mt-1.5"><span className="font-semibold">Agora:</span> {ag.agora}</p>
@@ -402,6 +424,85 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
       <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11.5px] text-white/90 bg-black/35 backdrop-blur px-3 py-1 rounded-full pointer-events-none">
         {dentro ? "Arraste para girar · role para aproximar · clique nas máquinas e nas pessoas" : "Clique num andar · arraste para girar · role para aproximar"}
       </p>
+    </div>
+  )
+}
+
+// Pedido de contratação na ata: a vaga que o RH preparou, com Contratar / Não agora
+function PedidoRH({ c, vaga, onDecidir }: { c: NonNullable<Reuniao["falas"][number]["contratacao"]>; vaga?: Funcionario; onDecidir: (id: string, a: "contratar" | "recusar") => void }) {
+  return (
+    <div className="mt-1.5 rounded-md border border-[#8456e8]/25 bg-[#8456e8]/5 px-2 py-1.5">
+      <p className="text-[9.5px] font-semibold uppercase text-[#8456e8]">Pedido ao RH</p>
+      <p className="text-[11.5px] text-[#191625] font-semibold leading-snug">{vaga?.nome ?? c.cargo}</p>
+      <p className="text-[11px] text-[#3c3a45] leading-snug">{c.motivo}</p>
+      {c.erro ? <p className="text-[10.5px] text-[#c57800] mt-0.5">{c.erro}</p>
+        : vaga ? <>
+          <p className="text-[11px] text-[#3c3a45] mt-0.5 leading-snug">{vaga.qualificacao}</p>
+          {vaga.capacidade === "sem_ferramenta" && <p className="text-[10.5px] text-[#c57800] mt-0.5 leading-snug">Ainda não consegue executar: falta {vaga.ferramentaQueFalta ?? "uma ferramenta no sistema"}.</p>}
+          {vaga.status === "solicitado" ? <div className="flex gap-1 mt-1">
+            <button onClick={() => onDecidir(vaga.id, "contratar")} className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded bg-[#8456e8] text-white">Contratar</button>
+            <button onClick={() => onDecidir(vaga.id, "recusar")} className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded text-[#6b6876] hover:bg-black/5">Não agora</button>
+          </div> : <p className={`text-[10.5px] font-semibold mt-0.5 ${vaga.status === "contratado" ? "text-[#009351]" : "text-[#6b6876]"}`}>{vaga.status === "contratado" ? "Contratado" : "Não contratado"}</p>}
+        </> : <p className="text-[10.5px] text-[#6b6876] mt-0.5">Vaga no RH (1º andar)</p>}
+    </div>
+  )
+}
+
+// RH no 1º andar: vagas pedidas pelos diretores (contratar ou não) e o quadro, com o onboarding e o que cada um aprendeu
+function PainelRH({ quadro, onDecidir, onMudou }: { quadro: Funcionario[] | null; onDecidir: (id: string, a: "contratar" | "recusar") => void; onMudou: (q: Funcionario[]) => void }) {
+  const [aberto, setAberto] = useState<string | null>(null)
+  const [texto, setTexto] = useState("")
+  if (!quadro) return null
+  const vagas = quadro.filter(f => f.status === "solicitado"), equipe = quadro.filter(f => f.status === "contratado")
+  const ensinar = async (id: string) => {
+    if (texto.trim().length < 3) return
+    const r = await fetch("/api/rh", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, texto }) }).catch(() => null)
+    const x = r?.ok ? await r.json().catch(() => null) : null
+    if (x?.quadro) { onMudou(x.quadro); setTexto("") }
+  }
+  const tirar = async (id: string, licao: string) => {
+    const r = await fetch(`/api/rh?id=${encodeURIComponent(id)}&licao=${encodeURIComponent(licao)}`, { method: "DELETE" }).catch(() => null)
+    const x = r?.ok ? await r.json().catch(() => null) : null
+    if (x?.quadro) onMudou(x.quadro)
+  }
+  const Lista = ({ t, l }: { t: string; l: string[] }) => l.length ? <div className="mt-1"><p className="text-[10px] font-semibold uppercase text-[#6b6876]">{t}</p><ul className="space-y-0.5">{l.map((x, k) => <li key={k} className="text-[11px] text-[#3c3a45] leading-snug pl-2.5 relative"><span className="absolute left-0 top-[6px] w-1 h-1 rounded-full bg-[#8456e8]" />{x}</li>)}</ul></div> : null
+  return (
+    <div className="mt-3 pt-3 border-t border-black/5">
+      <p className="text-[13px] font-semibold">RH</p>
+      <p className="text-[11px] text-[#6b6876] leading-snug">Os diretores pedem contratações; o RH desenha a vaga e o onboarding, e você decide.</p>
+      {vagas.length > 0 && <div className="mt-2 space-y-2">
+        <p className="text-[11.5px] font-semibold text-[#8456e8]">Vagas esperando você ({vagas.length})</p>
+        {vagas.map(v => <div key={v.id} className="rounded-lg bg-[#8456e8]/5 border border-[#8456e8]/20 p-2">
+          <p className="text-[12px] font-semibold">{v.nome} <span className="font-normal text-[#6b6876]">· pedido do {v.solicitadoPor.toUpperCase()}</span></p>
+          <p className="text-[11px] text-[#3c3a45] leading-snug">{v.qualificacao}</p>
+          <p className="text-[11px] text-[#6b6876] leading-snug mt-0.5">Por quê: {v.motivo}</p>
+          {v.capacidade === "sem_ferramenta" && <p className="text-[10.5px] text-[#c57800] mt-0.5 leading-snug">Ainda não consegue executar: falta {v.ferramentaQueFalta ?? "uma ferramenta no sistema"}.</p>}
+          <Lista t="Onboarding" l={v.onboarding.conceitos} /><Lista t="Pode" l={v.onboarding.pode} /><Lista t="Não pode" l={v.onboarding.naoPode} />
+          <div className="flex gap-1 mt-1.5">
+            <button onClick={() => onDecidir(v.id, "contratar")} className="text-[11px] font-semibold px-2 py-1 rounded-md bg-[#8456e8] text-white">Contratar</button>
+            <button onClick={() => onDecidir(v.id, "recusar")} className="text-[11px] font-semibold px-2 py-1 rounded-md text-[#6b6876] hover:bg-black/5">Não agora</button>
+          </div>
+        </div>)}
+      </div>}
+      <p className="text-[11.5px] font-semibold mt-2">Quadro ({equipe.length})</p>
+      <ul className="mt-1 space-y-1">
+        {equipe.map(f => <li key={f.id} className="rounded-md bg-white/70 px-2 py-1">
+          <button onClick={() => { setAberto(aberto === f.id ? null : f.id); setTexto("") }} className="w-full text-left">
+            <p className="text-[12px] font-semibold">{f.nome} <span className="font-normal text-[#6b6876]">· {f.setor.toUpperCase()}{f.capacidade === "sem_ferramenta" ? " · sem ferramenta" : ""}</span></p>
+            <p className="text-[11px] text-[#3c3a45] leading-snug">{f.qualificacao}</p>
+          </button>
+          {aberto === f.id && <div className="mt-1">
+            <Lista t="Onboarding" l={f.onboarding.conceitos} /><Lista t="Pode" l={f.onboarding.pode} /><Lista t="Não pode" l={f.onboarding.naoPode} />
+            <p className="text-[10px] font-semibold uppercase text-[#6b6876] mt-1">Aprendeu no trabalho ({f.aprendizados.length})</p>
+            <div className="flex gap-1.5 mt-0.5">
+              <input value={texto} onChange={e => setTexto(e.target.value)} onKeyDown={e => { if (e.key === "Enter") ensinar(f.id) }} maxLength={1500} placeholder={`Ensinar o ${f.nome}…`}
+                className="flex-1 min-w-0 h-7 rounded-md bg-white px-2 text-[11.5px] border border-black/10 focus:outline-none focus:ring-2 focus:ring-[#8456e8]/25" />
+              <button onClick={() => ensinar(f.id)} disabled={texto.trim().length < 3} className="h-7 px-2 rounded-md text-[11px] font-semibold text-white disabled:opacity-50" style={{ background: "#8456e8" }}>Ensinar</button>
+            </div>
+            {f.aprendizados.length > 0 && <ul className="mt-1 space-y-0.5">{f.aprendizados.map(l => <li key={l.id} className="group flex gap-1.5 text-[11px] text-[#3c3a45]"><span className="flex-1">{l.texto}</span><button onClick={() => tirar(f.id, l.id)} aria-label="Tirar" className="opacity-0 group-hover:opacity-100 text-[#898892] hover:text-[#d33a3c]">×</button></li>)}</ul>}
+          </div>}
+        </li>)}
+      </ul>
     </div>
   )
 }
