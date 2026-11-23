@@ -6,7 +6,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { PredioView, type Andar } from "./predio/PredioView"
 import { GraficaVirtual, atrasado } from "./predio/GraficaVirtual"
-import type { KanbanCard } from "../types"
+import type { KanbanCard, LancamentoFinanceiro } from "../types"
+import { financeiroDoAndar } from "../lib/financeiroAndar"
 import { AgendadorView } from "./AgendadorView"
 import { MessageCircle, ClipboardList, Repeat, RotateCcw, Printer, FileText, ShieldCheck, GraduationCap, Wifi, WifiOff, Sparkles, Clock, Power } from "lucide-react"
 import { Pagina, CabecalhoPagina, Cartao, TituloCartao, Esqueleto, Segmentado } from "./ds"
@@ -108,7 +109,7 @@ function Status({ icone, rotulo, valor, tom }: { icone: React.ReactNode; rotulo:
   )
 }
 
-export function EscritorioView({ kanban = [] }: { kanban?: KanbanCard[] }) {
+export function EscritorioView({ kanban = [], lancamentos = [], saldoContas = null }: { kanban?: KanbanCard[]; lancamentos?: LancamentoFinanceiro[]; saldoContas?: number | null }) {
   const [d, setD] = useState<Escritorio | null>(null)
   const [filtro, setFiltro] = useState<IdMesa | null>(null)
   const [agora, setAgora] = useState(() => Date.now())
@@ -158,13 +159,19 @@ export function EscritorioView({ kanban = [] }: { kanban?: KanbanCard[] }) {
     const hoje = new Date().toLocaleDateString("sv-SE")
     const naProducao = kanban.filter(c => c.coluna >= 2 && c.coluna <= 8)
     const atrasadosProd = naProducao.filter(c => atrasado(c, hoje)).length
+    const fin = financeiroDoAndar(kanban, lancamentos, saldoContas)
+    const brlAndar = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
     const andares: Andar[] = [
       { id: "cobertura", rotulo: "Cobertura", nome: "Diretoria", resumo: "", ativo: false,
         obras: "COO, CFO e CTO: cada diretor com o placar da área dele e as decisões que precisam de você, já com a recomendação. As rotinas automáticas do sistema também vão morar aqui." },
       { id: "3", rotulo: "3º andar", nome: "Marketing", resumo: "", ativo: false,
         obras: "Anúncios da Meta ao vivo: quanto gastou hoje, leads que chegaram, custo por MQL e qual campanha está trazendo bom negócio." },
-      { id: "2", rotulo: "2º andar", nome: "Financeiro", resumo: "", ativo: false,
-        obras: "O caixa do dia, o que entra e o que sai na semana, sinal que não caiu, cobrança vencida e a margem do Offset e do Digital lado a lado." },
+      { id: "2", rotulo: "2º andar", nome: "Financeiro", resumo: `${brlAndar(fin.recebidoMes)} recebido no mês${fin.vencido > 0.5 ? ` · ${brlAndar(fin.vencido)} vencido` : ""}`, ativo: true,
+        conteudo: <div className="grid grid-cols-2 gap-2">
+          {[["Recebido no mês", fin.recebidoMes, "#009351"], ["Saiu no mês", fin.pagoMes, "#d33a3c"], ["A receber", fin.aReceber, "#c57800"], ["Cobrança vencida", fin.vencido, fin.vencido > 0.5 ? "#d33a3c" : "#009351"]].map(([r, v, c]) => (
+            <div key={r as string} className="bg-white rounded-xl border border-[rgba(60,60,67,0.08)] p-3"><p className="text-[11px] text-[#898892]">{r}</p><p className="text-[17px] font-semibold ds-num" style={{ color: c as string }}>{brlAndar(v as number)}</p></div>
+          ))}
+        </div> },
       { id: "1", rotulo: "1º andar", nome: "Agentes", resumo: sub, ativo: trabalhando > 0,
         conteudo: <div className="space-y-2">
           <div className="relative rounded-xl overflow-hidden h-[460px]" style={{ background: "#7fb069" }}>
@@ -178,7 +185,7 @@ export function EscritorioView({ kanban = [] }: { kanban?: KanbanCard[] }) {
     return (
       <Pagina>
         <CabecalhoPagina titulo="Prédio ENYLA" sub="A empresa inteira funcionando: escolha o andar no elevador" acoes={segmentado} />
-        <PredioView andares={andares} inicial="terreo" dados3d={{ kanban, mesas: d.mesas, feed: d.feed }} />
+        <PredioView andares={andares} inicial="terreo" dados3d={{ kanban, mesas: d.mesas, feed: d.feed, financeiro: fin }} />
       </Pagina>
     )
   }

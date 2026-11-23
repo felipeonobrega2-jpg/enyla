@@ -15,6 +15,7 @@ import { LARG, PROF, LAJE, Luminarias, Mesa, type M } from "./base3d"
 import type { KanbanCard } from "../../types"
 import type { Mesa as MesaAgente } from "../../lib/escritorio"
 import { ESTACOES, atrasado } from "./GraficaVirtual"
+import type { FinanceiroAndar } from "../../lib/financeiroAndar"
 
 const PELES = ["#f1c9a5", "#d6a37c", "#8d5a3b", "#e8b896", "#a8704d"]
 
@@ -231,6 +232,91 @@ export function Canteiro({ m, y }: { m: M; y: number }) {
       {Array.from({ length: 5 }, (_, k) => <mesh key={k} material={m.aletas} position={[8, base + 0.1 + k * 0.12, -4]} castShadow><boxGeometry args={[3, 0.1, 1.2]} /></mesh>)}
       {Array.from({ length: 6 }, (_, k) => <mesh key={k} position={[-9 + (k % 3) * 0.7, base + 0.18 + Math.floor(k / 3) * 0.3, 4]} castShadow><boxGeometry args={[0.6, 0.28, 0.45]} /><meshStandardMaterial color="#cfc6b4" roughness={1} /></mesh>)}
       <pointLight position={[0, base + 2.8, 0]} intensity={6} distance={14} color="#ffe2b0" />
+    </group>
+  )
+}
+
+// ── Financeiro (2º andar) ────────────────────────────────────────────────────
+const brl0 = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
+
+// Painel de TV na parede, desenhado com os números reais
+function TelaFinanceiro({ fin }: { fin: FinanceiroAndar }) {
+  const tex = React.useMemo(() => {
+    const c = document.createElement("canvas"); c.width = 1400; c.height = 680
+    const g = c.getContext("2d")!
+    const fundo = g.createLinearGradient(0, 0, 0, c.height); fundo.addColorStop(0, "#14121f"); fundo.addColorStop(1, "#1d1830")
+    g.fillStyle = fundo; g.fillRect(0, 0, c.width, c.height)
+    g.fillStyle = "#a99be0"; g.font = "600 34px Helvetica, Arial"; g.fillText(`Financeiro · ${new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}`, 60, 80)
+    const cartao = (x: number, y: number, rot: string, valor: string, cor: string) => {
+      g.fillStyle = "rgba(255,255,255,0.06)"; g.beginPath(); g.roundRect(x, y, 400, 210, 24); g.fill()
+      g.fillStyle = "#b9b3cc"; g.font = "500 28px Helvetica, Arial"; g.fillText(rot, x + 30, y + 58)
+      g.fillStyle = cor; g.font = "700 64px Helvetica, Arial"; g.fillText(valor, x + 30, y + 150)
+    }
+    cartao(60, 120, "Recebido no mês", brl0(fin.recebidoMes), "#3fe08a")
+    cartao(500, 120, "Saiu no mês", brl0(fin.pagoMes), "#ff8a8a")
+    cartao(940, 120, "Resultado", brl0(fin.resultadoMes), fin.resultadoMes >= 0 ? "#3fe08a" : "#ff8a8a")
+    cartao(60, 380, "A receber", brl0(fin.aReceber), "#ffd36b")
+    cartao(500, 380, "Cobrança vencida", brl0(fin.vencido), fin.vencido > 0 ? "#ff8a8a" : "#3fe08a")
+    cartao(940, 380, "Digital no mês", brl0(fin.digital.recebidoMes - fin.digital.custoVillaMes), "#8fd3ff")
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t
+  }, [fin])
+  return (
+    <group>
+      <mesh position={[0, 0, -0.06]} castShadow><boxGeometry args={[7.4, 3.7, 0.1]} /><meshStandardMaterial color="#0c0c10" metalness={0.6} roughness={0.3} /></mesh>
+      <mesh><planeGeometry args={[7.1, 3.45]} /><meshStandardMaterial map={tex} emissive="#ffffff" emissiveMap={tex} emissiveIntensity={0.9} toneMapped={false} /></mesh>
+    </group>
+  )
+}
+
+export function FinanceiroInterior({ m, y, fin, noite, rotulos }: { m: M; y: number; fin: FinanceiroAndar; noite: boolean; rotulos: boolean }) {
+  const base = y + LAJE
+  const maior = Math.max(1, ...fin.porMes.flatMap(x => [x.receita, x.despesa]))
+  const alt = (v: number) => Math.max(0.04, v / maior * 2.4)
+  return (
+    <group>
+      <mesh material={m.piso} position={[0, y + LAJE / 2, 0]} receiveShadow castShadow><boxGeometry args={[LARG - 0.2, LAJE, PROF - 0.2]} /></mesh>
+      <mesh position={[-1, base + 0.01, -0.5]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow><planeGeometry args={[16, 10]} /><meshStandardMaterial color="#3f4a46" roughness={1} /></mesh>
+      {/* parede do painel */}
+      <mesh material={m.branco} position={[-2, base + 1.7, -PROF / 2 + 0.6]} castShadow><boxGeometry args={[11, 3.4, 0.2]} /></mesh>
+      <group position={[-2, base + 1.85, -PROF / 2 + 0.78]}><TelaFinanceiro fin={fin} /></group>
+      {/* gráfico físico: barras dos últimos 6 meses (verde entrou, vermelho saiu) */}
+      <group position={[-6.5, base, 1.5]}>
+        <mesh material={m.preto} position={[0, 0.06, 0]} castShadow receiveShadow><boxGeometry args={[7.2, 0.12, 2.2]} /></mesh>
+        {fin.porMes.map((x, k) => (
+          <group key={k} position={[-3 + k * 1.2, 0.12, 0]}>
+            <mesh position={[-0.2, alt(x.receita) / 2, 0]} castShadow><boxGeometry args={[0.34, alt(x.receita), 0.5]} /><meshStandardMaterial color="#20b26b" metalness={0.2} roughness={0.35} emissive="#0d5c36" emissiveIntensity={k === 5 ? 0.6 : 0.15} /></mesh>
+            <mesh position={[0.2, alt(x.despesa) / 2, 0]} castShadow><boxGeometry args={[0.34, alt(x.despesa), 0.5]} /><meshStandardMaterial color="#d9534f" metalness={0.2} roughness={0.35} /></mesh>
+            <Placa visivel={rotulos} p={[0, alt(Math.max(x.receita, x.despesa)) + 0.45, 0]} titulo={x.rotulo} sub={brl0(x.receita)} cor="#20b26b" />
+          </group>
+        ))}
+      </group>
+      {/* cofre com o saldo das contas */}
+      <group position={[9.5, base, -4.8]}>
+        <RoundedBox args={[1.6, 1.9, 1.3]} radius={0.06} position={[0, 0.95, 0]} castShadow><meshStandardMaterial color="#4a4f58" metalness={0.75} roughness={0.28} /></RoundedBox>
+        <mesh position={[0, 1.05, 0.67]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.26, 0.26, 0.06, 32]} /><meshStandardMaterial color="#c8a24a" metalness={0.9} roughness={0.2} /></mesh>
+        <mesh position={[0.45, 1.05, 0.68]}><boxGeometry args={[0.06, 0.5, 0.06]} /><meshStandardMaterial color="#c8a24a" metalness={0.9} roughness={0.2} /></mesh>
+        <Placa visivel={rotulos} p={[0, 2.5, 0]} titulo={fin.saldoContas != null ? `Saldo ${brl0(fin.saldoContas)}` : "Cofre"} sub="nas contas" cor="#c8a24a" />
+      </group>
+      {/* quadro de cobranças vencidas */}
+      <group position={[9.2, base, 1.8]} rotation={[0, -Math.PI / 2, 0]}>
+        <mesh material={m.branco} position={[0, 1.5, 0]} castShadow><boxGeometry args={[3.2, 1.8, 0.06]} /></mesh>
+        {fin.vencidos.slice(0, 5).map((_, k) => <mesh key={k} position={[-0.3, 2.1 - k * 0.28, 0.035]}><planeGeometry args={[2.2, 0.08]} /><meshStandardMaterial color="#d9534f" /></mesh>)}
+        {[-1.3, 1.3].map(x => <mesh key={x} material={m.aluminio} position={[x, 0.6, 0]}><boxGeometry args={[0.06, 1.2, 0.06]} /></mesh>)}
+        <Placa visivel={rotulos} p={[0, 2.8, 0]} titulo={`Vencido ${brl0(fin.vencido)}`} sub={`${fin.vencidos.length} ${fin.vencidos.length === 1 ? "cliente" : "clientes"}`} cor={fin.vencido > 0 ? "#d33a3c" : "#009351"} />
+      </group>
+      {/* CFO e analista */}
+      <Mesa p={[2.5, base, 2]} m={m} tela />
+      <Pessoa p={[2.5, base, 2.62]} rot={Math.PI} cor="#2d2a4a" sentado pele={1} trabalhando />
+      <Mesa p={[5.6, base, 2]} m={m} tela />
+      <Pessoa p={[5.6, base, 2.62]} rot={Math.PI} cor="#5b6b7f" sentado pele={3} trabalhando />
+      <Placa visivel={rotulos} p={[4, base + 2.3, 2]} titulo="CFO e analista" sub={`${brl0(fin.recebidoMes)} recebido no mês`} cor="#8456e8" />
+      {[[-12, -6.5], [-12, 6.5], [11.8, 6.5]].map(([x, z], k) => (
+        <group key={k} position={[x, base, z]}>
+          <mesh material={m.branco} position={[0, 0.3, 0]} castShadow><cylinderGeometry args={[0.32, 0.26, 0.6, 16]} /></mesh>
+          <mesh material={m.folha} position={[0, 1.05, 0]} castShadow><icosahedronGeometry args={[0.55, 1]} /></mesh>
+        </group>
+      ))}
+      {rotulos ? <pointLight position={[0, y + 3.2, 0]} intensity={noite ? 45 : 14} distance={26} color="#fff1dc" /> : <Luminarias y={y + 3.55} ativo noite={noite} />}
     </group>
   )
 }

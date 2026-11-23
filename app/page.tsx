@@ -2636,7 +2636,8 @@ export default function Home() {
           ) : view === "dados" ? (
             <AuditoriaView onAbrirCard={id => { const c = kanban.find(k => k.id === id); if (c) abrirDetalheCard(c) }} onNavegar={v => navigate(v)} />
           ) : view === "escritorio" ? (
-            <EscritorioView kanban={kanban} />
+            <EscritorioView kanban={kanban} lancamentos={lancamentos}
+              saldoContas={(() => { const cs = (config.contas ?? []).filter(c => c.ativa && c.tipo !== "credito" && c.saldo != null); return cs.length ? cs.reduce((t, c) => t + (c.saldo ?? 0), 0) : null })()} />
           ) : view === "ideias" ? (
             <IdeiasView config={config} onSalvar={salvarConfigTudo} />
           ) : view === "forma" ? (

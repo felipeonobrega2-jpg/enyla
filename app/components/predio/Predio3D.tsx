@@ -11,7 +11,8 @@ import { OrbitControls, Environment, Lightformer, ContactShadows, Html, Sky, Rou
 import { EffectComposer, N8AO, Bloom, SMAA } from "@react-three/postprocessing"
 import * as THREE from "three"
 import type { Andar } from "./PredioView"
-import { GraficaInterior, AgentesInterior, Canteiro } from "./Interiores3D"
+import { GraficaInterior, AgentesInterior, Canteiro, FinanceiroInterior } from "./Interiores3D"
+import type { FinanceiroAndar } from "../../lib/financeiroAndar"
 import { atrasado } from "./GraficaVirtual"
 import { COLUNAS_KANBAN, type KanbanCard } from "../../types"
 import type { Mesa as MesaAgente, EventoEscritorio } from "../../lib/escritorio"
@@ -206,7 +207,7 @@ function sol(): { pos: [number, number, number]; noite: boolean } {
   return { pos: [Math.cos(ang) * 80, Math.max(-10, Math.sin(ang) * 70), 40], noite }
 }
 
-export type Dados3D = { kanban: KanbanCard[]; mesas: MesaAgente[]; feed: EventoEscritorio[] }
+export type Dados3D = { kanban: KanbanCard[]; mesas: MesaAgente[]; feed: EventoEscritorio[]; financeiro?: FinanceiroAndar }
 
 export default function Predio3D({ andares, sel, onSel, dados }: { andares: Andar[]; sel: string; onSel: (id: string) => void; dados: Dados3D }) {
   // andares vem de cima para baixo; no 3D o índice 0 é o térreo
@@ -234,7 +235,7 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
 
       {/* painel do andar (flutuante) */}
       <div className="absolute top-3 right-3 w-[300px] max-h-[calc(100%-24px)] overflow-y-auto rounded-2xl p-4 text-[#191625]"
-        style={{ background: "rgba(255,255,255,0.9)", backdropFilter: "blur(14px)", boxShadow: "0 10px 40px rgba(0,0,0,.18)" }}>
+        style={{ background: "rgba(255,255,255,0.9)", backdropFilter: "blur(14px)", boxShadow: "0 10px 40px rgba(0,0,0,.18)", zIndex: 100 }}>
         <p className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[#898892]">{a?.rotulo}</p>
         <p className="text-[18px] font-semibold leading-tight">{a?.nome}</p>
         <p className="text-[12px] text-[#5e5c68] mt-0.5">{a?.obras ? "em obras" : a?.resumo}</p>
@@ -259,6 +260,18 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
             </>}
           </div>
         )}
+        {a?.id === "2" && dados.financeiro && (() => {
+          const f = dados.financeiro, b = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
+          const linha = (r: string, v: string, cor?: string) => <div className="flex items-baseline justify-between py-1 text-[12.5px]"><span className="text-[#5e5c68]">{r}</span><span className="font-semibold ds-num" style={{ color: cor }}>{v}</span></div>
+          return <div className="mt-3">
+            {linha("Recebido no mês", b(f.recebidoMes), "#009351")}{linha("Saiu no mês", b(f.pagoMes), "#d33a3c")}{linha("Resultado", b(f.resultadoMes), f.resultadoMes >= 0 ? "#009351" : "#d33a3c")}
+            {linha("A receber", b(f.aReceber))}{linha("Cobrança vencida", b(f.vencido), f.vencido > 0 ? "#d33a3c" : undefined)}
+            {f.saldoContas != null && linha("Saldo nas contas", b(f.saldoContas))}
+            {linha("Digital no mês", b(f.digital.recebidoMes - f.digital.custoVillaMes), "#2f6fdf")}
+            {f.vencidos.length > 0 && <><p className="text-[11.5px] font-semibold mt-3 mb-1">Quem está devendo</p>
+              <ul>{f.vencidos.map(v => <li key={v.numero} className="flex justify-between text-[11.5px] py-0.5"><span className="truncate mr-2">{v.numero} · {v.cliente}</span><span className="text-[#d33a3c] font-semibold shrink-0">{b(v.valor)}</span></li>)}</ul></>}
+          </div>
+        })()}
         {dentro && a?.id === "1" && (
           <div className="mt-3">
             {!ag ? <p className="text-[12px] text-[#898892]">Clique num agente para ver o que ele está fazendo.</p> : <>
@@ -310,6 +323,7 @@ function Cena({ andares, iSel, onSel, noite, sol: s, controles, dentro, setDentr
           const i = k + 1
           if (!visivel(i)) return null
           if (a.obras) return <Canteiro key={a.id} m={m} y={baseDo(i)} />
+          if (a.id === "2" && dados.financeiro) return <FinanceiroInterior key={a.id} m={m} y={baseDo(i)} fin={dados.financeiro} noite={noite} rotulos={dentro && iSel === i} />
           if (a.id === "1") return <AgentesInterior key={a.id} m={m} y={baseDo(i)} mesas={dados.mesas} noite={noite} rotulos={dentro && iSel === i} sel={agente}
             onSel={id => { setAgente(id); if (!dentro) { onSel(a.id); setDentro(true) } }} />
           return <AndarEscritorio key={a.id} i={i} m={m} ativo={a.ativo} noite={noite} mesas={12} marcado={i === iSel} />

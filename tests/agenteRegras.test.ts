@@ -151,3 +151,17 @@ describe("prédio: gráfica virtual", () => {
     expect(atrasado({}, "2026-11-22")).toBe(false)
   })
 })
+
+describe("prédio: números do Financeiro", () => {
+  it("separa Offset e Digital e soma o mês", async () => {
+    const { financeiroDoAndar } = await import("../app/lib/financeiroAndar")
+    const l = (x: object) => ({ id: Math.random().toString(), descricao: "", categoria: "", dataVencimento: "2026-11-10", status: "pago", criadoEm: "", ...x }) as never
+    const f = financeiroDoAndar([], [
+      l({ tipo: "receita", valor: 1000, dataPagamento: "2026-11-10" }), l({ tipo: "despesa", valor: 300, dataPagamento: "2026-11-11" }),
+      l({ tipo: "receita", valor: 500, dataPagamento: "2026-11-12", unidade: "digital" }), l({ tipo: "despesa", valor: 200, dataVencimento: "2026-11-16", status: "pendente", unidade: "digital" }),
+      l({ tipo: "receita", valor: 999, dataPagamento: "2026-10-05" }),
+    ], 5000, new Date("2026-11-22T12:00:00"))
+    expect(f).toMatchObject({ recebidoMes: 1000, pagoMes: 300, resultadoMes: 700, saldoContas: 5000, digital: { recebidoMes: 500, custoVillaMes: 200 } })
+    expect(f.porMes.map(x => x.receita).slice(-2)).toEqual([999, 1000])
+  })
+})
