@@ -15,7 +15,7 @@ const SUGESTOES: Record<IdDiretor, string[]> = {
 }
 const hhmm = (s: string) => new Date(s).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
 
-export default function ConversaDiretor({ diretor, onFechar, onFala }: { diretor: IdDiretor; onFechar: () => void; onFala?: (t: string | null) => void }) {
+export default function ConversaDiretor({ diretor, onFechar, onFala, fixo }: { diretor: IdDiretor; onFechar: () => void; onFala?: (t: string | null) => void; fixo?: boolean }) {
   const info = DIRETORES.find(d => d.id === diretor)!
   const primeiro = info.nome.split(" ")[0]
   const [msgs, setMsgs] = useState<MsgConversa[] | null>(null)
@@ -73,7 +73,7 @@ export default function ConversaDiretor({ diretor, onFechar, onFala }: { diretor
   }
 
   return (
-    <div className="absolute top-4 right-4 bottom-4 w-[460px] max-w-[calc(100%-32px)] z-[120] flex flex-col rounded-2xl bg-white/97 backdrop-blur shadow-[0_20px_60px_rgba(20,10,50,0.28)] border border-black/5 overflow-hidden">
+    <div className={`${fixo ? "fixed" : "absolute"} top-4 right-4 bottom-4 w-[460px] max-w-[calc(100%-32px)] z-[120] flex flex-col rounded-2xl bg-white/97 backdrop-blur shadow-[0_20px_60px_rgba(20,10,50,0.28)] border border-black/5 overflow-hidden`}>
       <div className="flex items-center gap-3 px-4 pt-3.5 pb-3 border-b border-black/5">
         <div className="w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold text-white shrink-0" style={{ background: "linear-gradient(135deg,#8456e8,#5b3bb8)" }}>{primeiro[0]}{info.nome.split(" ")[1]?.[0]}</div>
         <div className="flex-1 min-w-0">

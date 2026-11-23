@@ -7,11 +7,15 @@
 import React, { useEffect, useState } from "react"
 import dynamic from "next/dynamic"
 
-// 3D só no computador com WebGL (carrega o three.js só quando vai usar)
+// 3D sempre que o navegador tem WebGL (carrega o three.js só quando vai usar); o Felipe pode trocar 3D/2D e a escolha fica
+// guardada. Sem WebGL, avisa o motivo em vez de cair no 2D calado.
 const Predio3D = dynamic(() => import("./Predio3D"), { ssr: false, loading: () => <div className="w-full h-full grid place-items-center text-[13px] text-[#898892]">Montando o prédio…</div> })
-function podeTer3D(): boolean {
-  if (typeof window === "undefined" || window.innerWidth < 1024) return false
+function temWebGL(): boolean {
+  if (typeof window === "undefined") return false
   try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")) } catch { return false }
+}
+function preferencia(): "3d" | "2d" | null {
+  try { const v = localStorage.getItem("predio:modo"); return v === "3d" || v === "2d" ? v : null } catch { return null }
 }
 import { ArrowUp, ArrowDown, HardHat } from "lucide-react"
 
@@ -88,13 +92,26 @@ export function PredioView({ andares, inicial, dados3d }: { andares: Andar[]; in
   useEffect(() => { try { const s = sessionStorage.getItem("predio:andar"); if (s && andares.some(a => a.id === s)) setSel(s) } catch { /* sem storage */ } }, [])   // eslint-disable-line react-hooks/exhaustive-deps
   const ir = (id: string) => { setSel(id); try { sessionStorage.setItem("predio:andar", id) } catch { /* sem storage */ } }
   const i = andares.findIndex(a => a.id === sel), a = andares[i] ?? andares[andares.length - 1]
+  const [webgl, setWebgl] = useState<boolean | null>(null)
   const [tres, setTres] = useState(false)
-  useEffect(() => { setTres(podeTer3D()) }, [])
+  useEffect(() => {
+    const g = temWebGL(); setWebgl(g)
+    const p = preferencia()
+    setTres(g && (p ? p === "3d" : window.innerWidth >= 768))
+  }, [])
+  const trocar = (v: boolean) => { setTres(v); try { localStorage.setItem("predio:modo", v ? "3d" : "2d") } catch { /* sem storage */ } }
+  const chave = webgl && dados3d ? (
+    <div className="flex items-center gap-0.5 rounded-lg bg-[rgba(116,116,128,0.1)] p-0.5 text-[12px] font-semibold">
+      <button onClick={() => trocar(true)} className={`px-2.5 py-1 rounded-md ${tres ? "bg-white shadow-sm text-[#191625]" : "text-[#6b6876]"}`}>3D</button>
+      <button onClick={() => trocar(false)} className={`px-2.5 py-1 rounded-md ${!tres ? "bg-white shadow-sm text-[#191625]" : "text-[#6b6876]"}`}>2D</button>
+    </div>
+  ) : null
   const cabecalho = (
     <div className="flex items-center gap-2 mb-3">
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#898892]">{a.rotulo}</p>
       <p className="text-[16px] font-semibold text-[#191625]">{a.nome}</p>
       <span className="flex-1" />
+      {chave}
       <button onClick={() => i > 0 && ir(andares[i - 1].id)} disabled={i <= 0} aria-label="Subir um andar" className="w-8 h-8 rounded-lg grid place-items-center text-[#5e5c68] hover:bg-[rgba(116,116,128,0.1)] disabled:opacity-30"><ArrowUp className="w-4 h-4" /></button>
       <button onClick={() => i < andares.length - 1 && ir(andares[i + 1].id)} disabled={i >= andares.length - 1} aria-label="Descer um andar" className="w-8 h-8 rounded-lg grid place-items-center text-[#5e5c68] hover:bg-[rgba(116,116,128,0.1)] disabled:opacity-30"><ArrowDown className="w-4 h-4" /></button>
     </div>
@@ -110,11 +127,17 @@ export function PredioView({ andares, inicial, dados3d }: { andares: Andar[]; in
   ) : a.conteudo
   // Computador: a empresa em 3D, com tudo dentro da cena (entrar no andar, máquinas, agentes)
   if (tres && dados3d) return (
-    <div className="relative w-full h-[calc(100vh-150px)] min-h-[560px] rounded-2xl overflow-hidden border border-[rgba(60,60,67,0.10)]">
-      <Predio3D andares={andares} sel={a.id} onSel={ir} dados={dados3d} />
+    <div>
+      <div className="flex justify-end mb-2">{chave}</div>
+      <div className="relative w-full h-[calc(100vh-190px)] min-h-[560px] rounded-2xl overflow-hidden border border-[rgba(60,60,67,0.10)]">
+        <Predio3D andares={andares} sel={a.id} onSel={ir} dados={dados3d} />
+      </div>
     </div>
   )
-  return (
+  return (<>
+    {webgl === false && dados3d && <div className="mb-3 rounded-xl border border-[#c57800]/30 bg-[#c57800]/[0.05] px-3.5 py-2.5 text-[12.5px] text-[#5e5c68] leading-snug">
+      <span className="font-semibold text-[#191625]">O prédio em 3D não abriu neste navegador:</span> o WebGL (aceleração gráfica) está desligado. No Chrome: Configurações → Sistema → ativar "Usar aceleração de hardware" e reabrir o navegador. A diretoria, o RH e a reunião completos ficam no 3D.
+    </div>}
     <div className="grid gap-4 lg:grid-cols-[230px_1fr] items-start">
       <div className="lg:sticky lg:top-4 flex lg:block gap-3 items-start">
         <div className="w-[118px] lg:w-auto lg:max-w-[230px] lg:mx-auto shrink-0 rounded-2xl overflow-hidden border border-[rgba(60,60,67,0.10)] bg-white">
@@ -140,6 +163,7 @@ export function PredioView({ andares, inicial, dados3d }: { andares: Andar[]; in
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#898892]">{a.rotulo}</p>
           <p className="text-[16px] font-semibold text-[#191625]">{a.nome}</p>
           <span className="flex-1" />
+          {chave}
           <button onClick={() => i > 0 && ir(andares[i - 1].id)} disabled={i <= 0} aria-label="Subir um andar" className="w-8 h-8 rounded-lg grid place-items-center text-[#5e5c68] hover:bg-[rgba(116,116,128,0.1)] disabled:opacity-30"><ArrowUp className="w-4 h-4" /></button>
           <button onClick={() => i < andares.length - 1 && ir(andares[i + 1].id)} disabled={i >= andares.length - 1} aria-label="Descer um andar" className="w-8 h-8 rounded-lg grid place-items-center text-[#5e5c68] hover:bg-[rgba(116,116,128,0.1)] disabled:opacity-30"><ArrowDown className="w-4 h-4" /></button>
         </div>
@@ -154,5 +178,5 @@ export function PredioView({ andares, inicial, dados3d }: { andares: Andar[]; in
         ) : a.conteudo}
       </div>
     </div>
-  )
+  </>)
 }

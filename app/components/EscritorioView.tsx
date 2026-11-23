@@ -8,7 +8,8 @@ import { PredioView, type Andar } from "./predio/PredioView"
 import { GraficaVirtual, atrasado } from "./predio/GraficaVirtual"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { financeiroDoAndar } from "../lib/financeiroAndar"
-import { montarDiretoria } from "../lib/diretoria"
+import { montarDiretoria, DIRETORES, type IdDiretor } from "../lib/diretoria"
+import ConversaDiretor from "./predio/ConversaDiretor"
 import { AgendadorView } from "./AgendadorView"
 import { MessageCircle, ClipboardList, Repeat, RotateCcw, Printer, FileText, ShieldCheck, GraduationCap, Wifi, WifiOff, Sparkles, Clock, Power } from "lucide-react"
 import { Pagina, CabecalhoPagina, Cartao, TituloCartao, Esqueleto, Segmentado } from "./ds"
@@ -117,6 +118,7 @@ export function EscritorioView({ kanban = [], lancamentos = [], saldoContas = nu
   const [mostrar, setMostrar] = useState(12)
   const [modo, setModo] = useState<"predio" | "sala" | "detalhes" | "rotinas">("predio")
   const [feedAberto, setFeedAberto] = useState(false)
+  const [conversa, setConversa] = useState<IdDiretor | null>(null)   // conversa com um diretor aberta pela versão 2D
   useEffect(() => { try { const m = localStorage.getItem("escritorio:modo"); if (m === "detalhes" || m === "rotinas" || m === "sala") setModo(m) } catch { /* sem storage */ } }, [])
   const trocarModo = (v: "predio" | "sala" | "detalhes" | "rotinas") => { setModo(v); try { localStorage.setItem("escritorio:modo", v) } catch { /* sem storage */ } }
   useEffect(() => {
@@ -181,7 +183,10 @@ export function EscritorioView({ kanban = [], lancamentos = [], saldoContas = nu
       { id: "cobertura", rotulo: "Cobertura", nome: "Diretoria", resumo: totalDecisoes ? `${totalDecisoes} ${totalDecisoes === 1 ? "decisão" : "decisões"} para você` : "nada esperando você", ativo: true,
         conteudo: <div className="space-y-2">{diretores.map(x => (
           <div key={x.id} className="bg-white rounded-xl border border-[rgba(60,60,67,0.08)] p-3">
-            <p className="text-[13px] font-semibold">{x.cargo} · {x.area}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-[13px] font-semibold flex-1">{DIRETORES.find(y => y.id === x.id)?.nome} · {x.cargo} <span className="font-normal text-[#898892]">{x.area}</span></p>
+              <button onClick={() => setConversa(x.id)} className="text-[12px] font-semibold text-[#5b3bb8] hover:bg-[#8456e8]/10 px-2 py-1 rounded-lg">Conversar</button>
+            </div>
             {x.decisoes.length ? <ul className="mt-1 space-y-0.5">{x.decisoes.map((t, k) => <li key={k} className="text-[12px] text-[#3c3a45]">• {t}</li>)}</ul> : <p className="text-[12px] text-[#009351] mt-0.5">Tudo em ordem.</p>}
           </div>))}</div> },
       { id: "3", rotulo: "3º andar", nome: "Marketing", resumo: "", ativo: false,
@@ -206,6 +211,7 @@ export function EscritorioView({ kanban = [], lancamentos = [], saldoContas = nu
       <Pagina>
         <CabecalhoPagina titulo="Prédio ENYLA" sub="A empresa inteira funcionando: escolha o andar no elevador" acoes={segmentado} />
         <PredioView andares={andares} inicial="terreo" dados3d={{ kanban, mesas: d.mesas, feed: d.feed, financeiro: fin, diretores, onConhecimento: carregarConhecimento }} />
+        {conversa && <ConversaDiretor key={conversa} diretor={conversa} fixo onFechar={() => setConversa(null)} />}
       </Pagina>
     )
   }
