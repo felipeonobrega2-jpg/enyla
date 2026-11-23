@@ -2,7 +2,8 @@
 
 import { VARIAVEIS, Rapida } from "../lib/mensagensRapidas"
 import React, { useState, useRef } from "react"
-import { Percent, Layers, Target, Palette, Sparkles, Database, Download, Upload, Plus, X, Check, Save, RotateCcw, Info, KeyRound, CalendarOff, Handshake, Mic, Zap, BookOpen, Volume2 } from "lucide-react"
+import { Percent, Layers, Target, Palette, Sparkles, Database, Download, Upload, Plus, X, Check, Save, RotateCcw, Info, KeyRound, CalendarOff, Handshake, Mic, Zap, BookOpen, Volume2, Cloud, Copy } from "lucide-react"
+import { DIRETORES, type IdDiretor } from "../lib/diretoria"
 import { Configuracoes, Material, CONFIG_PADRAO } from "../config"
 import { FERIADOS_SP } from "../lib/diasUteis"
 import { nomeChave } from "../lib/negocio"
@@ -262,6 +263,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
         <div className="space-y-4">
           <ChaveGroq configurada={!!draft.groqConfigurado} />
           <ChaveGemini configurada={!!draft.geminiConfigurado} />
+          <DiretoresNaNuvem />
 
           {/* Backup */}
           <Cartao className="ds-entrada">
@@ -494,6 +496,71 @@ function ChaveGemini({ configurada }: { configurada: boolean }) {
       </div>
       {!ok && <p className="text-[11.5px] text-[#6b6876] mt-2 leading-snug">Pegue em aistudio.google.com/apikey (entrar com a conta Google, Create API key). Não pede cartão.</p>}
       {msg && <p className="text-[12px] mt-2" style={{ color: msg.ok ? "#009351" : "#d33a3c" }}>{msg.texto}</p>}
+    </Cartao>
+  )
+}
+
+// Diretores na nuvem (ex.: Grok Bot, um computador próprio para cada diretor): chave de acesso ao sistema + instruções
+// prontas para colar. A chave aparece uma vez só; gerar de novo invalida a anterior.
+type SituacaoAcesso = { ativa: boolean; fim: string | null; criadoEm: string | null; usadoEm: string | null }
+function DiretoresNaNuvem() {
+  const [sit, setSit] = useState<Partial<Record<IdDiretor, SituacaoAcesso>>>({})
+  const [aberta, setAberta] = useState<{ diretor: IdDiretor; instrucoes: string } | null>(null)
+  const [copiado, setCopiado] = useState(false)
+  const [ocupado, setOcupado] = useState<IdDiretor | null>(null)
+  const carregar = () => fetch("/api/config/acesso-externo").then(r => r.json()).then(setSit).catch(() => {})
+  React.useEffect(() => { carregar() }, [])
+  async function gerar(d: IdDiretor) {
+    if (sit[d]?.ativa && !confirm("Gerar uma chave nova? A atual para de funcionar no computador desse diretor.")) return
+    setOcupado(d); setCopiado(false)
+    const r = await fetch("/api/config/acesso-externo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ diretor: d }) }).catch(() => null)
+    const j = r?.ok ? await r.json().catch(() => null) : null
+    if (j?.instrucoes) setAberta({ diretor: d, instrucoes: j.instrucoes })
+    setOcupado(null); carregar()
+  }
+  async function revogar(d: IdDiretor) {
+    if (!confirm("Revogar a chave? O diretor na nuvem perde o acesso ao sistema na hora.")) return
+    setOcupado(d)
+    await fetch(`/api/config/acesso-externo?diretor=${d}`, { method: "DELETE" }).catch(() => null)
+    if (aberta?.diretor === d) setAberta(null)
+    setOcupado(null); carregar()
+  }
+  async function copiar() {
+    if (!aberta) return
+    await navigator.clipboard.writeText(aberta.instrucoes).catch(() => null)
+    setCopiado(true)
+  }
+  const quando = (iso: string | null) => iso ? new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "nunca"
+  return (
+    <Cartao className="ds-entrada">
+      <TituloCartao titulo="Diretores na nuvem" icone={<Cloud className="w-4 h-4" />}
+        sub="Cada diretor trabalha 24 h no próprio computador na nuvem (ex.: Grok Bot). Gere a chave, copie as instruções e cole no computador dele. Mensagem a cliente continua passando pelo seu Aprovo." />
+      <div className="divide-y divide-[rgba(0,0,0,0.06)]">
+        {DIRETORES.map(d => {
+          const a = sit[d.id]
+          return (
+            <div key={d.id} className="flex items-center gap-3 py-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-medium truncate">{d.nome} <span className="text-[#898892] font-normal">· {d.cargo}</span></p>
+                <p className="text-[11.5px]" style={{ color: a?.ativa ? "#009351" : "#898892" }}>
+                  {a?.ativa ? `Chave ativa (…${a.fim}) · último acesso: ${quando(a.usadoEm)}` : "Sem chave"}
+                </p>
+              </div>
+              {a?.ativa && <Botao onClick={() => revogar(d.id)} disabled={ocupado === d.id}>Revogar</Botao>}
+              <Botao onClick={() => gerar(d.id)} disabled={ocupado === d.id}>{ocupado === d.id ? "Gerando…" : a?.ativa ? "Chave nova" : "Gerar chave"}</Botao>
+            </div>
+          )
+        })}
+      </div>
+      {aberta && (
+        <div className="mt-3">
+          <div className="flex items-center gap-2 mb-1.5">
+            <p className="text-[12.5px] font-medium flex-1">Instruções de {DIRETORES.find(d => d.id === aberta.diretor)?.nome} (a chave já está dentro; ela só aparece agora)</p>
+            <Botao icone={copiado ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} onClick={copiar}>{copiado ? "Copiado" : "Copiar"}</Botao>
+          </div>
+          <textarea readOnly value={aberta.instrucoes} className={`${inputCls} w-full h-56 font-mono text-[11.5px] leading-snug`} />
+        </div>
+      )}
     </Cartao>
   )
 }

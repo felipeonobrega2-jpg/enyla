@@ -58,7 +58,7 @@ export type AcaoConversa =
   | { id: string; tipo: "plano"; objetivo: string; passos: string[]; indicador: string }
   | { id: string; tipo: "aprendi"; texto: string }
   | { id: string; tipo: "falha"; texto: string }
-export type MsgConversa = { id: string; de: "felipe" | "diretor"; texto: string; em: string; acoes?: AcaoConversa[] }
+export type MsgConversa = { id: string; de: "felipe" | "diretor"; texto: string; em: string; acoes?: AcaoConversa[]; nuvem?: boolean }   // nuvem: veio do computador do diretor (api/externo)
 export async function lerConversa(diretor: IdDiretor): Promise<MsgConversa[]> {
   return (await ler<{ mensagens: MsgConversa[] }>("diretoriaConversa", diretor))?.mensagens ?? []
 }

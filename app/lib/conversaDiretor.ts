@@ -52,12 +52,52 @@ function resumoAcao(a: AcaoConversa): string {
   return a.texto
 }
 
+// As ferramentas de um diretor: usadas na conversa com o Felipe e pela porta de acesso dos diretores na nuvem
+// (api/externo). Mensagem a cliente nunca sai daqui: fica esperando o Aprovo do Felipe.
+export async function executarFerramenta(diretor: IdDiretor, nome: string, x: Record<string, unknown>, op: { ctx: Foto; apiKey: string; grava: boolean }): Promise<{ saida: string; acao?: AcaoConversa }> {
+  const { ctx, grava } = op
+  try {
+    if (nome === "detalhar") return { saida: ctx.detalhes[String(x.area)] ?? "Área desconhecida." }
+    if (nome === "ordenar_funcionario") {
+      const func = ctx.exec.find(f => f.id === x.funcionario)
+      if (!func) return { saida: "Funcionário não encontrado no quadro." }
+      const { redigirComoFuncionario } = await import("./funcionariosServidor")
+      const r = await redigirComoFuncionario({ funcionario: func, cliente: String(x.cliente), ordem: String(x.ordem), apiKey: op.apiKey, conhecimento: (await lerCampos<{ conhecimentoAgente?: import("./agenteLeads").Conhecimento[] }>(["conhecimentoAgente"])).conhecimentoAgente, cultura: ctx.cultura })
+      if (r.ok) return { acao: { id: novoId(), tipo: "mensagem", funcionario: func.nome, cliente: String(x.cliente), texto: r.texto, status: "aguardando" }, saida: `${func.nome} escreveu e a mensagem está esperando o Aprovo do Felipe: "${r.texto}"` }
+      return { acao: { id: novoId(), tipo: "falha", texto: r.erro }, saida: `Não deu: ${r.erro}` }
+    }
+    if (nome === "pedir_contratacao") {
+      const { prepararVaga } = await import("./rhServidor")
+      const r = await prepararVaga({ cargo: String(x.cargo), funcao: String(x.funcao), motivo: String(x.motivo) }, diretor, { salvar: grava })
+      if (!r.ok) return { saida: r.erro }
+      return { acao: { id: novoId(), tipo: "vaga", vagaId: r.vaga.id, nome: r.vaga.nome, resumo: r.vaga.qualificacao }, saida: `O RH preparou a vaga "${r.vaga.nome}" (${r.vaga.capacidade === "sem_ferramenta" ? `ainda sem ferramenta: ${r.vaga.ferramentaQueFalta}` : "pode trabalhar assim que contratado"}). Está esperando o Felipe contratar.` }
+    }
+    if (nome === "pedir_ferramenta") {
+      const p = { nome: String(x.nome), paraQue: String(x.paraQue), motivo: String(x.motivo), pedidoPor: diretor }
+      const f = grava ? await pedirFerramenta(p) : { ...p, id: "simulada", em: "", status: "pedida" as const }
+      return { acao: { id: novoId(), tipo: "ferramenta", ferramentaId: f.id, nome: f.nome, resumo: f.paraQue }, saida: f.status === "pedida" ? "Pedido registrado na lista do CTO, esperando o Felipe aprovar." : `Já existia esse pedido (${f.status}).` }
+    }
+    if (nome === "registrar_plano") {
+      const passos = (x.passos as string[] ?? []).slice(0, 10).map(String)
+      if (grava) await gravarPlano(diretor, { objetivo: String(x.objetivo), indicador: String(x.indicador), passos })
+      return { acao: { id: novoId(), tipo: "plano", objetivo: String(x.objetivo), indicador: String(x.indicador), passos }, saida: "Plano registrado. Ele aparece nas próximas reuniões." }
+    }
+    if (nome === "guardar_conhecimento") {
+      const t = String(x.texto).slice(0, 1500)
+      const licao: LicaoDiretor = { id: `${diretor}-${Date.now().toString(36)}`, texto: t, em: new Date().toISOString() }
+      if (grava) await mudarConfig((d: { conhecimentoDiretoria?: Partial<Record<IdBase, LicaoDiretor[]>> }) => ({ conhecimentoDiretoria: { ...(d.conhecimentoDiretoria ?? {}), [diretor]: [licao, ...((d.conhecimentoDiretoria ?? {})[diretor] ?? [])].slice(0, 300) } }))
+      return { acao: { id: novoId(), tipo: "aprendi", texto: t }, saida: "Guardado." }
+    }
+    return { saida: "Ferramenta desconhecida." }
+  } catch (e) { return { saida: `Erro: ${String(e).slice(0, 200)}` } }
+}
+
 // Foto da empresa para as conversas: juntar os números leva ~15 s (a tela Hoje é a parte pesada). A foto pronta fica
 // guardada no banco (dados_sistema) e na memória; a conversa usa a que existe (até 12 h, com o horário dela no prompt)
 // e uma nova é montada em segundo plano ao abrir a conversa e depois de cada resposta, quando passa de 3 min.
 // Assim a resposta nunca espera a coleta; só sem foto nenhuma (ou muito velha) a primeira fala espera.
 const AREAS = ["comercial", "producao", "financeiro", "marketing", "sistema"] as const
-type Foto = { em: string; norte: string; resultados: string; equipe: string; bloco: string; ferramentasTxt: string; cultura: string[]; exec: Ctx["exec"]; detalhes: Record<string, string> }
+export type Foto = { em: string; norte: string; resultados: string; equipe: string; bloco: string; ferramentasTxt: string; cultura: string[]; exec: Ctx["exec"]; detalhes: Record<string, string> }
 let memFoto: { lidaEm: number; foto: Promise<Foto> } | null = null
 let montando: Promise<Foto> | null = null
 async function montarFoto(salvar: boolean): Promise<Foto> {
@@ -171,42 +211,9 @@ ${blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")).j
     msgs.push({ role: "assistant", content: resp.content })
     const resultados: Anthropic.Beta.BetaToolResultBlockParam[] = []
     for (const u of usos) {
-      const x = u.input as Record<string, unknown>
-      let saida = ""
-      try {
-        if (u.name === "detalhar") saida = ctx.detalhes[String(x.area)] ?? "Área desconhecida."
-        else if (u.name === "ordenar_funcionario") {
-          const func = ctx.exec.find(f => f.id === x.funcionario)
-          if (!func) saida = "Funcionário não encontrado no quadro."
-          else {
-            const { redigirComoFuncionario } = await import("./funcionariosServidor")
-            const r = await redigirComoFuncionario({ funcionario: func, cliente: String(x.cliente), ordem: String(x.ordem), apiKey: cfg.apiKey!, conhecimento: (await lerCampos<{ conhecimentoAgente?: import("./agenteLeads").Conhecimento[] }>(["conhecimentoAgente"])).conhecimentoAgente, cultura: ctx.cultura })
-            if (r.ok) { acoes.push({ id: novoId(), tipo: "mensagem", funcionario: func.nome, cliente: String(x.cliente), texto: r.texto, status: "aguardando" }); saida = `${func.nome} escreveu e a mensagem está esperando o Aprovo do Felipe: "${r.texto}"` }
-            else { acoes.push({ id: novoId(), tipo: "falha", texto: r.erro }); saida = `Não deu: ${r.erro}` }
-          }
-        } else if (u.name === "pedir_contratacao") {
-          const { prepararVaga } = await import("./rhServidor")
-          const r = await prepararVaga({ cargo: String(x.cargo), funcao: String(x.funcao), motivo: String(x.motivo) }, diretor, { salvar: grava })
-          if (r.ok) { acoes.push({ id: novoId(), tipo: "vaga", vagaId: r.vaga.id, nome: r.vaga.nome, resumo: r.vaga.qualificacao }); saida = `O RH preparou a vaga "${r.vaga.nome}" (${r.vaga.capacidade === "sem_ferramenta" ? `ainda sem ferramenta: ${r.vaga.ferramentaQueFalta}` : "pode trabalhar assim que contratado"}). Está esperando o Felipe contratar.` }
-          else saida = r.erro
-        } else if (u.name === "pedir_ferramenta") {
-          const p = { nome: String(x.nome), paraQue: String(x.paraQue), motivo: String(x.motivo), pedidoPor: diretor }
-          const f = grava ? await pedirFerramenta(p) : { ...p, id: "simulada", em: "", status: "pedida" as const }
-          acoes.push({ id: novoId(), tipo: "ferramenta", ferramentaId: f.id, nome: f.nome, resumo: f.paraQue })
-          saida = f.status === "pedida" ? "Pedido registrado na lista do CTO, esperando o Felipe aprovar." : `Já existia esse pedido (${f.status}).`
-        } else if (u.name === "registrar_plano") {
-          const passos = (x.passos as string[] ?? []).slice(0, 10)
-          if (grava) await gravarPlano(diretor, { objetivo: String(x.objetivo), indicador: String(x.indicador), passos })
-          acoes.push({ id: novoId(), tipo: "plano", objetivo: String(x.objetivo), indicador: String(x.indicador), passos })
-          saida = "Plano registrado. Ele aparece nas próximas reuniões."
-        } else if (u.name === "guardar_conhecimento") {
-          const t = String(x.texto).slice(0, 1500)
-          const licao: LicaoDiretor = { id: `${diretor}-${Date.now().toString(36)}`, texto: t, em: new Date().toISOString() }
-          if (grava) await mudarConfig((d: { conhecimentoDiretoria?: Partial<Record<IdBase, LicaoDiretor[]>> }) => ({ conhecimentoDiretoria: { ...(d.conhecimentoDiretoria ?? {}), [diretor]: [licao, ...((d.conhecimentoDiretoria ?? {})[diretor] ?? [])].slice(0, 300) } }))
-          acoes.push({ id: novoId(), tipo: "aprendi", texto: t })
-          saida = "Guardado."
-        } else saida = "Ferramenta desconhecida."
-      } catch (e) { saida = `Erro: ${String(e).slice(0, 200)}` }
+      const r = await executarFerramenta(diretor, u.name, u.input as Record<string, unknown>, { ctx, apiKey: cfg.apiKey!, grava })
+      if (r.acao) acoes.push(r.acao)
+      const saida = r.saida
       resultados.push({ type: "tool_result", tool_use_id: u.id, content: saida })
     }
     msgs.push({ role: "user", content: resultados })

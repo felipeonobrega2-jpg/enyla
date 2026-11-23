@@ -390,6 +390,8 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     { id: "fe-2", nome: "Rastreio de entrega", paraQue: "Ver onde está cada entrega da Lalamove", motivo: "2 atrasos", pedidoPor: "coo", em: "2026-11-23T09:00:00Z", status: "aprovada" },
   ] }))
   // Conversa ao vivo: a resposta chega aos pedaços (linhas JSON), como na produção
+  if (u.startsWith("/api/config/acesso-externo") && o?.method === "POST") return new Response(JSON.stringify({ chave: "enyla_cmo_x", instrucoes: "Você é Lívia Andrade, CMO da ENYLA...\n\n# Primeiro dia: o contexto inteiro, de cabo a rabo\n1. Crie no seu computador a pasta ~/enyla/dossie..." }))
+  if (u.startsWith("/api/config/acesso-externo")) return new Response(JSON.stringify({ cmo: { ativa: true, fim: "Q7xk", criadoEm: "2026-11-23T20:00:00Z", usadoEm: "2026-11-23T20:41:00Z" }, cco: { ativa: false }, coo: { ativa: false }, cfo: { ativa: false }, cto: { ativa: false } }))
   if (u.startsWith("/api/diretoria/conversa") && o?.method === "POST" && String(o.body).includes('"aoVivo":true')) {
     const pedido = JSON.parse(String(o.body)) as { texto: string }
     const resposta = "Operação em ordem. São seis pedidos na produção e nenhum agente travado. Os dois atrasos são do Arthur e do Raniere, segurados porque o saldo não caiu. Eles saem da impressão a tempo?"
@@ -586,7 +588,7 @@ function Telas() {
   const pagina = (filho: React.ReactNode) => <div style={{ padding: 24, background: "#f5f5f7", minHeight: "100vh" }}><div className="max-w-[1320px] mx-auto">{filho}</div></div>
   switch (tela) {
     case "caixa": return pagina(<CaixaView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onUpdateConfig={setCfg} onAddLancamento={l => setLancs(p => [l, ...p])} />)
-    case "config-agentes": case "config-sistema": case "config-voz": case "abertura": try { sessionStorage.setItem("config:aba", tela === "abertura" ? "agentes" : tela === "config-voz" ? "sistema" : tela.slice(7)) } catch {} // falls through
+    case "config-agentes": case "config-sistema": case "config-voz": case "config-nuvem": case "abertura": try { sessionStorage.setItem("config:aba", tela === "abertura" ? "agentes" : tela === "config-voz" || tela === "config-nuvem" ? "sistema" : tela.slice(7)) } catch {} // falls through
     case "config": return <ThemeProvider><div style={{ height: "100vh" }}><ConfigView config={cfg} onSave={setCfg} onExportar={() => {}} onImportar={() => {}} clientes={["Cliente Relacionamento", "Outro Cliente"]} /></div></ThemeProvider>
     case "lancamento": return <ModalLancamento inicial={{ tipo: "despesa", descricao: "Impressão + Papel", valor: 3100 }} kanban={dados.kanban} onSave={() => {}} onClose={() => {}} />
     case "lancamento-criar": case "lancamento-sub": return <ModalLancamento inicial={{ tipo: "despesa", descricao: "Pix Papelaria", valor: 350, categoria: tela === "lancamento-sub" ? "materiais" : undefined }} kanban={dados.kanban} categoriasDespesa={[{ id: "materiais", nome: "Materiais", subcategorias: ["Papel", "Tinta"] }, { id: "transporte", nome: "Transporte", subcategorias: ["Lalamove"] }, { id: "marketing", nome: "Marketing" }]} onSave={() => {}} onClose={() => {}} />
