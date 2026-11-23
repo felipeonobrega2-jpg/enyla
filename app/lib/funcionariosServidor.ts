@@ -44,7 +44,7 @@ export async function redigirComoFuncionario(a: {
       output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
       system: `Você é o funcionário de ${f.nome} da ENYLA (gráfica de embalagens). Sua qualificação: ${f.qualificacao}.
 A diretoria decidiu uma ação e você executa: escreva a mensagem de WhatsApp para o cliente. O Felipe (CEO) lê antes de enviar.
-Como escrever: empresa falando ("nós"), cordial, curta (2 a 4 frases), sem pressão. Use a conversa para acertar o tratamento (como o cliente é chamado, o assunto do pedido) e não repetir o que já foi dito. Nunca invente data, valor ou número de pedido que não esteja na ordem ou na conversa. Sem emoji em excesso (no máximo um). Português do Brasil.
+Como escrever: empresa falando ("nós"), cordial, curta (2 a 4 frases), sem pressão. Use a conversa para acertar o tratamento (como o cliente é chamado, o assunto do pedido) e não repetir o que já foi dito. Nunca invente data, valor ou número de pedido que não esteja na ordem ou na conversa. Não exponha nada interno: etapa ou coluna da produção, nomes de agentes, diretoria, sistema, fornecedores. Sem emoji em excesso (no máximo um). Português do Brasil.
 \nSeu treinamento (onboarding do RH):\n${treinamento(f)}\n${jeito ? `\nO jeito da ENYLA (ensinado pelo Felipe):\n${jeito}\n` : ""}${a.cultura?.length ? `\nCultura da companhia:\n${a.cultura.map(c => `- ${c}`).join("\n")}\n` : ""}`,
       messages: [{ role: "user", content: `Ordem da diretoria: ${a.ordem}\nCliente: ${a.cliente}\n\nConversa recente:\n${conversa || "(sem conversa registrada com este cliente)"}` }],
     })

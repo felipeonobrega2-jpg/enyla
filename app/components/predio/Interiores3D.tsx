@@ -16,7 +16,7 @@ import type { KanbanCard } from "../../types"
 import type { Mesa as MesaAgente } from "../../lib/escritorio"
 import { ESTACOES, atrasado } from "./GraficaVirtual"
 import type { FinanceiroAndar } from "../../lib/financeiroAndar"
-import type { Diretor } from "../../lib/diretoria"
+import { DIRETORES, type Diretor } from "../../lib/diretoria"
 
 const PELES = ["#f1c9a5", "#d6a37c", "#8d5a3b", "#e8b896", "#a8704d"]
 
@@ -413,8 +413,8 @@ export function DiretoriaInterior({ m, y, diretores, noite, rotulos, sel, onSel,
       <group position={[0.6, base, 0]}>
         {diretores.map((d, k) => {
           const l = lugares[k] ?? lugares[0]
-          return <Assento key={d.id} p={[l.x, 0, l.z]} rot={l.rot} cor={cores[k % cores.length]} pele={k + 1} titulo={`${d.cargo} · ${d.area}`}
-            sub={`${d.decisoes.length ? `${d.decisoes.length} para decidir` : "tudo em ordem"} · ${d.conhecimento} ${d.conhecimento === 1 ? "lição" : "lições"}`} tom={d.tom} rotulos={rotulos && !falando}
+          return <Assento key={d.id} p={[l.x, 0, l.z]} rot={l.rot} cor={cores[k % cores.length]} pele={k + 1} titulo={`${DIRETORES.find(x => x.id === d.id)?.nome.split(" ")[0] ?? d.cargo} · ${d.cargo}`}
+            sub={`${d.area} · ${d.decisoes.length ? `${d.decisoes.length} para decidir` : "tudo em ordem"}`} tom={d.tom} rotulos={rotulos && !falando}
             alturaPlaca={l.rot === 0 ? 2.5 : 1.75} fala={falando?.quem === d.id ? falando.texto : null}
             ativa={sel === d.id} onClick={() => onSel(sel === d.id ? null : d.id)} />
         })}

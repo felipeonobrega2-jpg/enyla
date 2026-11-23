@@ -66,6 +66,10 @@ ${jeito ? `\nJeito da ENYLA com cliente:\n${jeito}` : ""}` }],
       status: "solicitado", solicitadoPor, motivo: pedido.motivo, em: new Date().toISOString(), aprendizados: [],
     }
     if (op.salvar !== false) await mudarConfig((d: { funcionarios?: Funcionario[] }) => ({ funcionarios: [...(d.funcionarios ?? []), vaga] }))
+    if (op.salvar !== false && vaga.capacidade === "sem_ferramenta" && vaga.ferramentaQueFalta) {
+      const { pedirFerramenta } = await import("./diretoriaServidor")
+      await pedirFerramenta({ nome: `Para a vaga ${vaga.nome}`, paraQue: vaga.ferramentaQueFalta, motivo: `O ${solicitadoPor.toUpperCase()} pediu a vaga ${vaga.nome}: ${pedido.motivo}`, pedidoPor: solicitadoPor }).catch(() => null)
+    }
     return { ok: true, vaga }
   } catch (e) {
     return { ok: false, erro: `O RH não conseguiu preparar a vaga (${String(e).slice(0, 120)})` }

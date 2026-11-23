@@ -8,12 +8,13 @@ export type Tom = "ok" | "atencao" | "problema"
 export type IdDiretor = "coo" | "cco" | "cmo" | "cfo" | "cto"
 export type Diretor = { id: IdDiretor; cargo: string; area: string; placar: { rotulo: string; valor: string; tom: Tom }[]; decisoes: string[]; tom: Tom; conhecimento: number }
 export type LicaoDiretor = { id: string; texto: string; em: string }
-export const DIRETORES: { id: IdDiretor; cargo: string; area: string; faz: string }[] = [
-  { id: "coo", cargo: "COO", area: "Operação", faz: "Produção, entregas, fornecedores e os agentes funcionando" },
-  { id: "cco", cargo: "CCO", area: "Comercial", faz: "Leads, orçamentos, propostas e fechamento" },
-  { id: "cmo", cargo: "CMO", area: "Marketing", faz: "Anúncios, campanhas, custo por lead e posicionamento" },
-  { id: "cfo", cargo: "CFO", area: "Dinheiro", faz: "Caixa, cobranças, margem do Offset e do Digital" },
-  { id: "cto", cargo: "CTO", area: "Sistema", faz: "Sistema no ar, WhatsApp, IA e as rotinas automáticas" },
+// Nomes fictícios: os diretores são agentes de IA com personalidade própria (o Felipe conversa com cada um)
+export const DIRETORES: { id: IdDiretor; nome: string; cargo: string; area: string; faz: string; jeito: string }[] = [
+  { id: "coo", nome: "Rafael Moura", jeito: "Pragmático, pensa em processo e prazo; fala de gargalo e fluxo; desconfia de promessa sem data.", cargo: "COO", area: "Operação", faz: "Produção, entregas, fornecedores e os agentes funcionando" },
+  { id: "cco", nome: "Bianca Torres", jeito: "Energia de vendas, pensa em funil e fechamento; obcecada por resposta rápida ao lead; fala de conversão.", cargo: "CCO", area: "Comercial", faz: "Leads, orçamentos, propostas e fechamento" },
+  { id: "cmo", nome: "Lívia Andrade", jeito: "Analítica e criativa; pensa em custo por MQL, posicionamento e teste; propõe experimentos com prazo e métrica.", cargo: "CMO", area: "Marketing", faz: "Anúncios, campanhas, custo por lead e posicionamento" },
+  { id: "cfo", nome: "Otávio Brandão", jeito: "Conservador e preciso; pensa em caixa, margem e risco; sempre pergunta quanto custa e quando volta.", cargo: "CFO", area: "Dinheiro", faz: "Caixa, cobranças, margem do Offset e do Digital" },
+  { id: "cto", nome: "Diego Sato", jeito: "Calmo e sistemático; pensa em automação, confiabilidade e o que conectar; separa o que já existe do que precisa construir.", cargo: "CTO", area: "Sistema", faz: "Sistema no ar, WhatsApp, IA e as rotinas automáticas" },
 ]
 
 // Diretor gere resultado e decide; quem executa é sempre um funcionário qualificado (quadro do RH, lib/rh). Aqui ficam
@@ -133,7 +134,7 @@ export function montarDiretoria(e: {
       { rotulo: "WhatsApp", valor: e.whatsapp === "desconectado" ? "fora do ar" : e.whatsapp ? "conectado" : "sem sinal", tom: e.whatsapp === "desconectado" ? "problema" : "ok" },
       { rotulo: "Crédito da IA", valor: e.semCredito ? "acabou" : "ok", tom: e.semCredito ? "problema" : "ok" },
       { rotulo: "Rotinas com problema", valor: String(problemas.length), tom: problemas.length ? "problema" : "ok" },
-      ...(e.cota ? [{ rotulo: "Cota de envios usada na última hora (só preocupa perto do limite)", valor: `${e.cota.usados} de ${e.cota.limite}`, tom: (cota >= 1 ? "problema" : cota >= 0.8 ? "atencao" : "ok") as Tom }] : []),
+      ...(e.cota ? [{ rotulo: "Envios usados na última hora", valor: `${e.cota.usados} de ${e.cota.limite} permitidos`, tom: (cota >= 1 ? "problema" : cota >= 0.8 ? "atencao" : "ok") as Tom }] : []),
     ],
     decisoes: [
       ...(e.whatsapp === "desconectado" ? ["Ler o QR do WhatsApp: os leads estão sem resposta"] : []),

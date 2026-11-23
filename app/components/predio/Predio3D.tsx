@@ -14,7 +14,9 @@ import type { Andar } from "./PredioView"
 import { GraficaInterior, AgentesInterior, Canteiro, FinanceiroInterior, DiretoriaInterior } from "./Interiores3D"
 import type { Diretor } from "../../lib/diretoria"
 import type { Reuniao, Recomendacao } from "../../lib/reuniaoDiretoria"
-import { EQUIPE } from "../../lib/diretoria"
+import { EQUIPE, DIRETORES, type IdDiretor } from "../../lib/diretoria"
+import type { Ferramenta } from "../../lib/diretoriaServidor"
+import ConversaDiretor from "./ConversaDiretor"
 import type { Funcionario } from "../../lib/rh"
 import type { FinanceiroAndar } from "../../lib/financeiroAndar"
 import { atrasado } from "./GraficaVirtual"
@@ -229,6 +231,10 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
   const [reunindo, setReunindo] = useState(false)
   const [erroReuniao, setErroReuniao] = useState<string | null>(null)
   const [enviando, setEnviando] = useState<string | null>(null)
+  // Conversa 1:1 com um diretor (o balão dele na mesa mostra o que está dizendo)
+  const [conversa, setConversa] = useState<IdDiretor | null>(null)
+  const [falaConversa, setFalaConversa] = useState<string | null>(null)
+  useEffect(() => { if (deBaixo[iSel]?.id !== "cobertura") setConversa(null) }, [iSel])   // eslint-disable-line react-hooks/exhaustive-deps
   // RH: quadro de funcionários e vagas (cobertura e 1º andar)
   const [rh, setRh] = useState<Funcionario[] | null>(null)
   const carregarRh = () => fetch("/api/rh").then(r => r.ok ? r.json() : null).then(x => { if (x?.quadro) setRh(x.quadro) }).catch(() => {})
@@ -286,7 +292,7 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
       <Canvas shadows dpr={[1, 2]} camera={{ position: [60, 34, 80], fov: 36, near: 0.3, far: 600 }} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
         style={{ background: noite ? "#0f1426" : "#bcd9ee" }}>
         <Cena andares={deBaixo} iSel={iSel} onSel={id => { onSel(id); }} noite={noite} sol={pos} controles={controles} dentro={dentro} setDentro={setDentro}
-          dados={dados} estacao={estacao} setEstacao={setEstacao} agente={agente} setAgente={setAgente} falando={a?.id === "cobertura" ? falando : null} />
+          dados={dados} estacao={estacao} setEstacao={setEstacao} agente={agente} setAgente={setAgente} falando={a?.id === "cobertura" ? (conversa && falaConversa ? { quem: conversa, texto: falaConversa } : falando) : null} />
       </Canvas>
 
       {/* painel do andar (flutuante) */}
@@ -345,8 +351,9 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
               <div className="mt-2 space-y-2.5">
                 {reuniao.falas.map((f, k) => (
                   <div key={f.diretor} className={`rounded-lg p-2 transition-colors ${vez === k ? "bg-white shadow-sm" : ""}`}>
-                    <p className="text-[12px] font-semibold">{f.cargo}</p>
+                    <p className="text-[12px] font-semibold">{f.nome ? `${f.nome.split(" ")[0]} · ${f.cargo}` : f.cargo}</p>
                     <p className="text-[11.5px] text-[#3c3a45] leading-snug">{f.fala}</p>
+                    {f.ferramenta && <p className="mt-1 text-[11px] text-[#2459ad] leading-snug"><span className="font-semibold">Pediu ferramenta:</span> {f.ferramenta.nome}</p>}
                     {f.contratacao && <PedidoRH c={f.contratacao} vaga={rh?.find(v => v.id === f.contratacao?.vagaId)} onDecidir={decidirVaga} />}
                     {f.recomendacoes.map(r => (
                       <div key={r.id} className="mt-1.5">
@@ -389,7 +396,11 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
               <ConhecimentoDiretor diretor="cultura" cargo="Cultura" titulo="Cultura" placeholder="Ex.: o lead nunca espera; prometeu, cumpriu" onMudou={dados.onConhecimento} />
             </div>}
             {lista.map(d => <div key={d.id}>
-              <p className="text-[12.5px] font-semibold flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: cor[d.tom] }} />{d.cargo} · {d.area}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-[12.5px] font-semibold flex items-center gap-1.5 flex-1 min-w-0"><span className="w-2 h-2 rounded-full shrink-0" style={{ background: cor[d.tom] }} />{DIRETORES.find(x => x.id === d.id)?.nome.split(" ")[0]} · {d.cargo} <span className="font-normal text-[#6b6876]">{d.area}</span></p>
+                {dentro && agente !== d.id && <button onClick={() => { setAgente(d.id); setConversa(d.id) }} className="text-[11px] font-semibold text-[#5b3bb8] hover:bg-[#8456e8]/10 px-1.5 py-0.5 rounded">Conversar</button>}
+              </div>
+              {agente === d.id && <button onClick={() => setConversa(d.id)} className="mt-1.5 mb-1 w-full h-9 rounded-xl text-[12.5px] font-semibold text-white" style={{ background: "linear-gradient(135deg,#8456e8,#5b3bb8)" }}>Conversar com {DIRETORES.find(x => x.id === d.id)?.nome.split(" ")[0]}</button>}
               {agente === d.id && d.placar.map(p => <div key={p.rotulo} className="flex justify-between text-[12px] py-0.5"><span className="text-[#5e5c68]">{p.rotulo}</span><span className="font-semibold" style={{ color: cor[p.tom] }}>{p.valor}</span></div>)}
               {d.decisoes.length ? <ul className="mt-1 space-y-1">{d.decisoes.map((x, k) => <li key={k} className="text-[11.5px] text-[#3c3a45] pl-3 relative"><span className="absolute left-0 top-[6px] w-1.5 h-1.5 rounded-full bg-[#8456e8]" />{x}</li>)}</ul>
                 : <p className="text-[11.5px] text-[#009351] mt-0.5">Nada para você decidir aqui.</p>}
@@ -402,6 +413,7 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
                   {vagas.map(v => <p key={v.id} className="text-[11px] text-[#8456e8] mt-0.5">Pediu ao RH: {v.nome} (no 1º andar, esperando você)</p>)}
                 </>
               })()}
+              {agente === d.id && d.id === "cto" && <FerramentasPedidas />}
               {agente === d.id && <ConhecimentoDiretor diretor={d.id} cargo={d.cargo} onMudou={dados.onConhecimento} />}
             </div>)}
           </div>
@@ -421,9 +433,39 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
           </div>
         )}
       </div>
-      <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11.5px] text-white/90 bg-black/35 backdrop-blur px-3 py-1 rounded-full pointer-events-none">
+      {conversa && a?.id === "cobertura" && <ConversaDiretor diretor={conversa} onFechar={() => { setConversa(null); setFalaConversa(null) }} onFala={setFalaConversa} />}
+      {!conversa && <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11.5px] text-white/90 bg-black/35 backdrop-blur px-3 py-1 rounded-full pointer-events-none">
         {dentro ? "Arraste para girar · role para aproximar · clique nas máquinas e nas pessoas" : "Clique num andar · arraste para girar · role para aproximar"}
-      </p>
+      </p>}
+    </div>
+  )
+}
+
+// Ferramentas que os diretores pediram ao sistema (painel do CTO): aprovar, recusar, marcar pronta
+function FerramentasPedidas() {
+  const [lista, setLista] = useState<Ferramenta[] | null>(null)
+  useEffect(() => { fetch("/api/diretoria/ferramentas").then(r => r.ok ? r.json() : null).then(x => setLista(x?.ferramentas ?? [])).catch(() => setLista([])) }, [])
+  const mudar = async (id: string, status: Ferramenta["status"]) => {
+    const r = await fetch("/api/diretoria/ferramentas", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) }).catch(() => null)
+    const x = r?.ok ? await r.json().catch(() => null) : null
+    if (x?.ferramentas) setLista(x.ferramentas)
+  }
+  if (!lista) return null
+  const ativas = lista.filter(f => f.status !== "recusada")
+  const rot = { pedida: "esperando você", aprovada: "aprovada, falta construir", pronta: "pronta", recusada: "" } as const
+  return (
+    <div className="mt-3 pt-3 border-t border-black/5">
+      <p className="text-[11.5px] font-semibold mb-1">Ferramentas pedidas pelos diretores ({ativas.length})</p>
+      {!ativas.length && <p className="text-[11px] text-[#898892]">Nenhuma por enquanto.</p>}
+      <ul className="space-y-1.5">{ativas.map(f => <li key={f.id} className="rounded-lg bg-white/70 px-2 py-1.5">
+        <p className="text-[12px] font-semibold leading-snug">{f.nome} <span className="font-normal text-[#6b6876]">· {f.pedidoPor.toUpperCase()} · {rot[f.status]}</span></p>
+        <p className="text-[11px] text-[#3c3a45] leading-snug">{f.paraQue}</p>
+        <div className="flex gap-1 mt-1">
+          {f.status === "pedida" && <><button onClick={() => mudar(f.id, "aprovada")} className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded bg-[#2f6fd6] text-white">Aprovar</button>
+            <button onClick={() => mudar(f.id, "recusada")} className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded text-[#6b6876] hover:bg-black/5">Não agora</button></>}
+          {f.status === "aprovada" && <button onClick={() => mudar(f.id, "pronta")} className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded text-[#009351] hover:bg-[#009351]/10">Marcar pronta</button>}
+        </div>
+      </li>)}</ul>
     </div>
   )
 }

@@ -20,7 +20,7 @@ export type Recomendacao = {
 }
 // contratacao: o diretor pediu um funcionário ao RH; vagaId é a vaga que o RH preparou (o Felipe contrata ou não)
 export type Contratacao = { cargo: string; motivo: string; vagaId?: string | null; erro?: string | null }
-export type Fala = { diretor: IdDiretor; cargo: string; fala: string; recomendacoes: Recomendacao[]; tom: Diretor["tom"]; contratacao?: Contratacao | null }
+export type Fala = { diretor: IdDiretor; cargo: string; nome?: string; ferramenta?: { nome: string; paraQue: string } | null; fala: string; recomendacoes: Recomendacao[]; tom: Diretor["tom"]; contratacao?: Contratacao | null }
 export type Reuniao = { id: string; em: string; abertura: string; falas: Fala[]; fechamento: string }
 
 const esquema = (ids: string[]) => ({
@@ -39,6 +39,9 @@ const esquema = (ids: string[]) => ({
       contratacao: { anyOf: [{ type: "null" }, { type: "object", additionalProperties: false, required: ["cargo", "funcao", "motivo"], properties: {
         cargo: { type: "string" }, funcao: { type: "string", description: "O que o funcionário vai fazer, concreto" }, motivo: { type: "string", description: "Por que a área precisa, com número do placar" },
       } }], description: "Pedido de contratação ao RH, ou null" },
+      ferramenta: { anyOf: [{ type: "null" }, { type: "object", additionalProperties: false, required: ["nome", "paraQue", "motivo"], properties: {
+        nome: { type: "string" }, paraQue: { type: "string", description: "O que a ferramenta conecta ou permite fazer" }, motivo: { type: "string", description: "Por que a área precisa, com número" },
+      } }], description: "Pedido de ferramenta de conexão com a empresa (para o CTO construir), ou null" },
     } } },
     fechamento: { type: "string", description: "Uma frase fechando: a prioridade número 1 do dia." },
   },
@@ -51,16 +54,20 @@ async function todas<T>(tabela: string, sel = "*"): Promise<T[]> {
   return out
 }
 
-export async function convocarReuniao(op: { salvar?: boolean } = {}): Promise<Reuniao> {
+// Tudo que um diretor precisa saber para decidir: números de cada área, norte (metas, cultura), resultado da reunião
+// anterior, quadro de funcionários, planos de cada diretor e ferramentas pedidas. Usado na reunião e nas conversas.
+export async function coletarContexto() {
   const [{ montarHoje }, { financeiroDoAndar }, { unpackTerceirizado }, agendador, escritorio] = await Promise.all([
     import("./hojeServidor"), import("./financeiroAndar"), import("./kanbanUnpack"),
     import("../api/agendador/route"), import("../api/escritorio/route"),
   ])
-  const [hoje, kanbanBruto, lancamentos, cfg, rot, esc] = await Promise.all([
+  const { lerPlanos, listarFerramentas } = await import("./diretoriaServidor")
+  const [hoje, kanbanBruto, lancamentos, cfg, rot, esc, planos, ferramentas] = await Promise.all([
     montarHoje().catch(() => null), todas<import("../types").KanbanCard>("KanbanCard"), todas<import("../types").LancamentoFinanceiro>("LancamentoFinanceiro"),
     lerCampos<{ apiKey?: string; conhecimentoDiretoria?: Partial<Record<IdBase, LicaoDiretor[]>>; contas?: { ativa?: boolean; tipo?: string; saldo?: number | null }[]
       ultimaReuniao?: Reuniao; conhecimentoAgente?: import("./agenteLeads").Conhecimento[]; funcionarios?: Funcionario[] }>(["apiKey", "conhecimentoDiretoria", "contas", "ultimaReuniao", "conhecimentoAgente", "funcionarios"]),
     agendador.GET().then(r => r.json()).catch(() => null), escritorio.GET().then(r => r.json()).catch(() => null),
+    lerPlanos().catch(() => ({} as Awaited<ReturnType<typeof lerPlanos>>)), listarFerramentas().catch(() => [] as Awaited<ReturnType<typeof listarFerramentas>>),
   ])
   if (!cfg.apiKey) throw new Error("Sem chave da IA nas Configurações.")
   const kanban = kanbanBruto.map(unpackTerceirizado)
@@ -97,31 +104,42 @@ ${outros.length ? `Já no RH (não executam ordens ainda): ${outros.map(f => `${
   const bloco = diretores.map(d => {
     const info = DIRETORES.find(x => x.id === d.id)!
     const licoes = (base[d.id] ?? []).slice(0, 40).map(l => `- ${l.texto}`).join("\n")
-    return `## ${d.cargo} (${info.area}): ${info.faz}
+    const plano = planos[d.id]
+    return `## ${info.nome}, ${d.cargo} (${info.area}): ${info.faz}
 Equipe que trabalha sozinha sob ele: ${EQUIPE[d.id].join(", ") || "nenhuma ainda"}
 Placar: ${d.placar.map(p => `${p.rotulo}: ${p.valor}${p.tom !== "ok" ? ` [${p.tom}]` : ""}`).join("; ")}
 Pendências que o sistema já viu: ${d.decisoes.length ? d.decisoes.join(" | ") : "nenhuma"}
 O que o Felipe ensinou a este diretor:
-${licoes || "- (ainda nada)"}`
+${licoes || "- (ainda nada)"}${plano ? `\nPlano em andamento (combinado com o Felipe em ${new Date(plano.em).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}): ${plano.objetivo} | Indicador: ${plano.indicador} | Passos: ${plano.passos.map((p, k) => `${k + 1}. ${p}`).join(" ")}` : ""}`
   }).join("\n\n")
+  const ferr = ferramentas.filter(f => f.status !== "recusada")
+  const ferramentasTxt = `# Ferramentas que os diretores pediram para o sistema (o CTO acompanha)
+${ferr.map(f => `- ${f.nome} (pedido do ${f.pedidoPor.toUpperCase()}, ${f.status === "pedida" ? "esperando o Felipe" : f.status === "aprovada" ? "aprovada, falta construir" : "pronta"}): ${f.paraQue}`).join("\n") || "- nenhuma"}`
+  return { cfg, hoje, kanban, lancamentos, fin, rot, esc, base, diretores, prog, norte, resultados, q, exec, equipe, bloco, cultura, planos, ferramentas: ferr, ferramentasTxt }
+}
+
+export async function convocarReuniao(op: { salvar?: boolean } = {}): Promise<Reuniao> {
+  const { cfg, diretores, exec, norte, resultados, equipe, bloco, cultura, ferramentasTxt } = await coletarContexto()
+  if (!cfg.apiKey) throw new Error("Sem chave da IA nas Configurações.")
 
   const resp = await clienteClaude(cfg.apiKey).beta.messages.create({
     model: MODELO, max_tokens: 4000,
     output_config: { effort: "low", format: { type: "json_schema", schema: esquema(exec.map(f => f.id)) } },
-    system: `Você conduz a reunião de diretoria da ENYLA (gráfica de embalagens; Offset com o Felipe, Digital 100% IA). O Felipe é o CEO. Cada diretor é um agente que gere os resultados da área dele pensando nas metas e na cultura da companhia: fala em primeira pessoa, direto, com números do placar, diz se a área está ajudando ou atrapalhando a meta do mês, e decide as próximas ações.
+    system: `Você conduz a reunião de diretoria da ENYLA. Cada diretor tem nome (use o primeiro nome dele quando um citar o outro) (gráfica de embalagens; Offset com o Felipe, Digital 100% IA). O Felipe é o CEO. Cada diretor é um agente que gere os resultados da área dele pensando nas metas e na cultura da companhia: fala em primeira pessoa, direto, com números do placar, diz se a área está ajudando ou atrapalhando a meta do mês, e decide as próximas ações.
 Diretor não executa. Cada ação vai para um executor: um funcionário qualificado da lista (só se a ordem for exatamente o que ele sabe fazer) ou "felipe". Quando a ordem é falar com um cliente, preencha "cliente" com o nome exato das pendências e ponha na ordem os fatos que o funcionário precisa (pedido, valor).
 Contratação: se a área tem um trabalho recorrente que hoje cai no Felipe ou não é feito, e nenhum funcionário (nem vaga no RH) cobre, o diretor pede a contratação ao RH em "contratacao" (cargo, função concreta, motivo com número). No máximo uma por diretor e só quando faz diferença de verdade; nos outros casos, null. O RH desenha a vaga e o onboarding e o Felipe decide.
+Ferramenta: se a área precisa que o sistema se conecte a algo ou ganhe uma capacidade nova (ex.: mexer na campanha da Meta, ler o extrato do banco, rastrear entrega), o diretor pede em "ferramenta". No máximo uma por diretor, só se não está na lista de ferramentas pedidas; senão null.
 Cobre o resultado da reunião anterior: o que foi aprovado andou? o que foi adiado continua pendente? Não repita uma ordem já executada se o problema sumiu do placar. Use exatamente o status de cada ordem anterior: "sem resposta" não é "aprovado".
 Regras: cada diretor só fala da área dele e segue o que o Felipe ensinou a ele (isso vale mais que qualquer outra coisa). Sem enrolação, sem elogio, sem inventar número que não está no placar. Se está tudo em ordem, diga isso em uma frase e não invente recomendação. No máximo 3 recomendações por diretor. Ordem das falas: CCO, CMO, COO, CFO, CTO. Português do Brasil.`,
-    messages: [{ role: "user", content: `Hoje: ${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", timeZone: "America/Sao_Paulo" })}.\n\n${norte}\n\n${resultados}\n\n${equipe}\n\n${bloco}` }],
+    messages: [{ role: "user", content: `Hoje: ${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", timeZone: "America/Sao_Paulo" })}.\n\n${norte}\n\n${resultados}\n\n${equipe}\n\n${ferramentasTxt}\n\n${bloco}` }],
   })
-  const r = JSON.parse(resp.content.flatMap(c => c.type === "text" ? [c.text] : []).join("")) as { abertura: string; fechamento: string; falas: { diretor: IdDiretor; fala: string; recomendacoes: { texto: string; urgencia: "hoje" | "semana"; executor: string; cliente: string | null }[]; contratacao: { cargo: string; funcao: string; motivo: string } | null }[] }
+  const r = JSON.parse(resp.content.flatMap(c => c.type === "text" ? [c.text] : []).join("")) as { abertura: string; fechamento: string; falas: { diretor: IdDiretor; fala: string; recomendacoes: { texto: string; urgencia: "hoje" | "semana"; executor: string; cliente: string | null }[]; contratacao: { cargo: string; funcao: string; motivo: string } | null; ferramenta: { nome: string; paraQue: string; motivo: string } | null }[] }
   const id = `reuniao-${Date.now().toString(36)}`
   const reuniao: Reuniao = {
     id, em: new Date().toISOString(), abertura: r.abertura, fechamento: r.fechamento,
     falas: r.falas.filter(f => diretores.some(d => d.id === f.diretor)).map(f => {
       const d = diretores.find(x => x.id === f.diretor)!
-      return { diretor: f.diretor, cargo: d.cargo, tom: d.tom, fala: f.fala, contratacao: f.contratacao ? { cargo: f.contratacao.cargo, motivo: f.contratacao.motivo, vagaId: null, erro: null } : null, recomendacoes: f.recomendacoes.slice(0, 3).map((x, k): Recomendacao => ({
+      return { diretor: f.diretor, cargo: d.cargo, nome: DIRETORES.find(x => x.id === f.diretor)?.nome, ferramenta: f.ferramenta ? { nome: f.ferramenta.nome, paraQue: f.ferramenta.paraQue } : null, tom: d.tom, fala: f.fala, contratacao: f.contratacao ? { cargo: f.contratacao.cargo, motivo: f.contratacao.motivo, vagaId: null, erro: null } : null, recomendacoes: f.recomendacoes.slice(0, 3).map((x, k): Recomendacao => ({
         id: `${f.diretor}-${k}`, texto: x.texto, urgencia: x.urgencia, resposta: null, executor: x.executor, executorNome: x.executor === "felipe" ? "você" : exec.find(e => e.id === x.executor)?.nome ?? null,
         mensagem: null, pendencia: null, ...(x.cliente?.trim() ? { _cliente: x.cliente.trim() } : {}),
       })) }
@@ -138,6 +156,11 @@ Regras: cada diretor só fala da área dele e segue o que o Felipe ensinou a ele
     if (r.ok) x.mensagem = { cliente, texto: r.texto }
     else x.pendencia = r.erro
   }))
+  // Pedidos de ferramenta vão para a lista do CTO (o Felipe aprova)
+  if (op.salvar !== false) {
+    const { pedirFerramenta } = await import("./diretoriaServidor")
+    for (const f of r.falas) if (f.ferramenta) await pedirFerramenta({ ...f.ferramenta, pedidoPor: f.diretor }).catch(() => null)
+  }
   // Pedidos de contratação vão para o RH, que prepara a vaga e o onboarding (o Felipe contrata ou não)
   const { prepararVaga } = await import("./rhServidor")
   await Promise.all(reuniao.falas.map(async f => {
@@ -177,11 +200,12 @@ export function textoDaAta(r: Reuniao, link: string): string {
   const linhas = [`🏛️ *Reunião de diretoria · ${dia}*`, "", r.abertura, ""]
   for (const f of r.falas) {
     const hoje = f.recomendacoes.filter(x => x.urgencia === "hoje")
-    linhas.push(`*${f.cargo}*: ${f.fala}`)
+    linhas.push(`*${f.nome ? `${f.nome.split(" ")[0]} (${f.cargo})` : f.cargo}*: ${f.fala}`)
     for (const x of (hoje.length ? hoje : f.recomendacoes).slice(0, 2)) {
       const quem = x.executor !== "felipe" ? x.executorNome : null
       linhas.push(`   → ${x.texto}${x.mensagem && quem ? ` _(${quem} já escreveu a mensagem para ${x.mensagem.cliente}: é só aprovar)_` : ""}`)
     }
+    if (f.ferramenta) linhas.push(`   → Pediu ferramenta: *${f.ferramenta.nome}*`)
     if (f.contratacao?.vagaId) linhas.push(`   → Pediu ao RH: *${f.contratacao.cargo}* (vaga pronta para você contratar)`)
   }
   linhas.push("", `*Prioridade 1:* ${r.fechamento.replace(/^\s*(a\s+)?prioridade (número|n[ºo°.]?)\s*1\s*(do dia)?\s*(é|:)?\s*/i, "").replace(/^./, c => c.toUpperCase())}`, "", `Aprovar ou adiar: ${link}`)

@@ -385,6 +385,18 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     { id: "f-1", nome: "Reativação de clientes", setor: "cco", capacidade: "mensagem_cliente", status: "solicitado", solicitadoPor: "cco", motivo: "Topo do funil secou: 0 leads do anúncio em 24 h", em: "", qualificacao: "Manda mensagem individual a clientes que compraram há mais de 3 meses, oferecendo repetir o pedido.", onboarding: { conceitos: ["Cliente antigo é a fonte mais rápida de pedido agora.", "Mensagem curta e pessoal, citando o pedido anterior."], pode: ["Oferecer repetir o último pedido"], naoPode: ["Passar preço", "Mandar para vários de uma vez"] }, aprendizados: [] },
     { id: "f-2", nome: "Analista de campanhas", setor: "cmo", capacidade: "sem_ferramenta", ferramentaQueFalta: "acesso para pausar, religar e mudar a verba das campanhas na Meta", status: "solicitado", solicitadoPor: "cmo", motivo: "Campanha parada desde 21/11", em: "", qualificacao: "Acompanha as campanhas e religa o que parou.", onboarding: { conceitos: [], pode: [], naoPode: [] }, aprendizados: [] },
   ] }))
+  if (u.startsWith("/api/diretoria/ferramentas")) return new Response(JSON.stringify({ ferramentas: [
+    { id: "fe-1", nome: "Leitura da Meta Ads (campanhas e histórico)", paraQue: "Ler todo dia status, gasto e custo por lead de cada campanha", motivo: "Campanha parou dia 21 sem ninguém ver", pedidoPor: "cmo", em: "2026-11-23T10:00:00Z", status: "pedida" },
+    { id: "fe-2", nome: "Rastreio de entrega", paraQue: "Ver onde está cada entrega da Lalamove", motivo: "2 atrasos", pedidoPor: "coo", em: "2026-11-23T09:00:00Z", status: "aprovada" },
+  ] }))
+  if (u.startsWith("/api/diretoria/conversa")) return new Response(JSON.stringify({ mensagens: [
+    { id: "m1", de: "felipe", texto: "Rafael, como estão os atrasos? Pode mandar o Pós-venda avisar o Raniere.", em: "2026-11-23T10:02:00Z" },
+    { id: "m2", de: "diretor", em: "2026-11-23T10:02:40Z", texto: "Mandei o Pós-venda escrever. A mensagem já está na sua tela esperando o Aprovo.\n\nO ORC-2026-233 está 5 dias atrasado: a entrega era 18/11 e ele ainda está na Impressão. Prefiro não inventar prazo.\n\nPreciso de duas coisas suas:\n- A data real de saída do 233.\n- O pedido do Arthur está pronto na Expedição há dias. Posso avisar ele também?",
+      acoes: [{ id: "a1", tipo: "mensagem", funcionario: "Pós-venda", cliente: "Raniere Pericles", status: "aguardando", texto: "Oi, Raniere, tudo bem? Passando pra te avisar que o pedido ORC-2026-233, que tinha entrega prevista para 18/11, atrasou, e pedimos desculpas por isso. Vamos confirmar a nova data com você até amanhã." },
+        { id: "a2", tipo: "plano", objetivo: "Zerar os atrasos até sexta", indicador: "0 pedidos com entrega vencida em 27/11", passos: ["Data real de saída de cada pedido atrasado hoje", "Pós-venda avisa os clientes com a data", "Revisão diária da etapa Impressão"] },
+        { id: "a3", tipo: "ferramenta", ferramentaId: "fe-2", nome: "Rastreio de entrega", resumo: "Ver onde está cada entrega da Lalamove" }] },
+    { id: "m3", de: "felipe", texto: "O 233 sai quinta. Pode avisar o Arthur também.", em: "2026-11-23T10:05:00Z" },
+  ] }))
   if (u.startsWith("/api/diretoria/reuniao")) return new Response(JSON.stringify({ reuniao: { id: "r1", em: new Date().toISOString(),
     abertura: "Felipe, dia com o comercial represado: 19 leads esperando e o saldo da Meta acabando.",
     falas: [
