@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import { DIRETORES, type IdDiretor } from "@/app/lib/diretoria"
 import { lerConversa, apagarConversa } from "@/app/lib/diretoriaServidor"
-import { conversar, responderAcao } from "@/app/lib/conversaDiretor"
+import { contextoRapido, conversar, responderAcao } from "@/app/lib/conversaDiretor"
 import { erroClaude } from "@/app/lib/claude"
 
 // Conversa 1:1 do Felipe com um diretor (rota protegida pelo login). GET ?diretor= ; POST { diretor, texto };
@@ -12,14 +12,29 @@ const ehDiretor = (x: unknown): x is IdDiretor => DIRETORES.some(d => d.id === x
 export async function GET(req: NextRequest) {
   const d = req.nextUrl.searchParams.get("diretor")
   if (!ehDiretor(d)) return NextResponse.json({ erro: "diretor" }, { status: 400 })
+  after(() => contextoRapido().then(() => undefined, () => undefined))   // a tela abriu a conversa: já junta os números (fica na mesma instância)
   return NextResponse.json({ mensagens: await lerConversa(d) })
 }
 
+// POST { diretor, texto, voz?, aoVivo? }. aoVivo: responde em linhas JSON enquanto o diretor escreve
+// ({ d: pedaço do texto } ... e no fim { mensagens } ou { erro }), para a tela mostrar e falar desde a primeira frase.
 export async function POST(req: NextRequest) {
-  const { diretor, texto } = await req.json().catch(() => ({})) as { diretor?: string; texto?: string }
+  const { diretor, texto, voz, aoVivo } = await req.json().catch(() => ({})) as { diretor?: string; texto?: string; voz?: boolean; aoVivo?: boolean }
   if (!ehDiretor(diretor) || !texto?.trim()) return NextResponse.json({ erro: "Escreva a mensagem." }, { status: 400 })
-  try { return NextResponse.json({ mensagens: await conversar(diretor, texto.trim()) }) }
-  catch (e) { const r = erroClaude(e); return NextResponse.json({ erro: r.error }, { status: r.status }) }
+  if (!aoVivo) {
+    try { return NextResponse.json({ mensagens: await conversar(diretor, texto.trim(), { voz: !!voz }) }) }
+    catch (e) { const r = erroClaude(e); return NextResponse.json({ erro: r.error }, { status: r.status }) }
+  }
+  const cod = new TextEncoder()
+  const corpo = new ReadableStream<Uint8Array>({
+    async start(ctrl) {
+      const linha = (x: unknown) => ctrl.enqueue(cod.encode(JSON.stringify(x) + "\n"))
+      try { linha({ mensagens: await conversar(diretor, texto.trim(), { voz: !!voz, aoVivo: d => linha({ d }) }) }) }
+      catch (e) { linha({ erro: erroClaude(e).error }) }
+      ctrl.close()
+    },
+  })
+  return new Response(corpo, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" } })
 }
 
 export async function PATCH(req: NextRequest) {

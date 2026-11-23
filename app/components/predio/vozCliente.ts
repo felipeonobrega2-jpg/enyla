@@ -81,38 +81,50 @@ async function falarNoNavegador(diretor: IdDiretor, texto: string, cancelado: ()
   }
 }
 
-// Fala a mensagem inteira; resolve quando termina (ou é interrompida)
-export async function falar(diretor: IdDiretor, id: string, textoOriginal: string, op: { onAviso?: (a: Aviso) => void } & AoVivo = {}): Promise<void> {
+// Fala ao vivo: o texto chega aos pedaços (enquanto o diretor escreve) e a voz começa na primeira frase completa.
+// A primeira frase vai sozinha (começa logo); o resto vai junto no fim (o limite gratuito do Gemini conta pedidos).
+// Sem a voz do Gemini, cai para a voz do navegador e segue nela até o fim da fala.
+export type FalaAoVivo = { empurrar: (t: string) => void; terminar: () => void; parar: () => void; pronto: Promise<void> }
+export function falaAoVivo(diretor: IdDiretor, id: string, op: { onAviso?: (a: Aviso) => void } & AoVivo = {}): FalaAoVivo {
   pararFala()
-  const texto = textoParaFala(textoOriginal)
-  if (!texto) return
-  let cancelado = false
+  let cancelado = false, terminou = false, primeira = false, bruto = ""
+  const fila: string[] = []
+  let acordar: (() => void) | null = null
+  const avisar = () => { const a = acordar; acordar = null; a?.() }
   const audio = new Audio()
-  const minha = { parar: () => { cancelado = true; audio.pause(); audio.src = ""; if ("speechSynthesis" in window) window.speechSynthesis.cancel() } }
+  const minha = { parar: () => { cancelado = true; audio.pause(); audio.src = ""; if ("speechSynthesis" in window) window.speechSynthesis.cancel(); avisar() } }
   tocando = minha
-  const partes = partesDaFala(texto)
-  // Medidor de volume só quando alguém está olhando (a chamada); um por elemento de áudio
   const an = op.onNivel ? medidor(audio) : null
   const buf = an ? new Float32Array(an.fftSize) : null
-  let proxima: Promise<Blob | { motivo: Aviso }> = buscar(diretor, partes[0], `${diretor}:${id}:0`)
-  for (let k = 0; k < partes.length; k++) {
-    const atual = await proxima
-    if (cancelado) return
-    if (k + 1 < partes.length) proxima = buscar(diretor, partes[k + 1], `${diretor}:${id}:${k + 1}`)   // já pede a próxima enquanto toca
-    if (!(atual instanceof Blob)) {
-      op.onAviso?.(atual.motivo)
-      await falarNoNavegador(diretor, partes.slice(k).join(" "), () => cancelado, op)
-      break
-    }
-    op.onAviso?.(null)
-    const url = URL.createObjectURL(atual)
-    const parte = partes[k]
+
+  const empurrar = (t: string) => {
+    bruto += t
+    if (primeira) return
+    const m = /^[\s\S]{20,}?[.!?…](?=\s)/.exec(bruto)
+    if (!m) return
+    primeira = true
+    const p = textoParaFala(m[0]); bruto = bruto.slice(m[0].length)
+    if (p) { fila.push(p); avisar() }
+  }
+  const terminar = () => {
+    if (terminou) return
+    terminou = true
+    const resto = textoParaFala(bruto); bruto = ""
+    if (resto) fila.push(...partesDaFala(resto))
+    avisar()
+  }
+  const proxima = async (): Promise<string | null> => {
+    while (!fila.length && !terminou && !cancelado) await new Promise<void>(r => { acordar = r })
+    return cancelado ? null : fila.shift() ?? null
+  }
+  const tocarAudio = async (b: Blob, parte: string) => {
+    const url = URL.createObjectURL(b)
     let raf = 0
     const acompanhar = () => {
-      if (an) {
-        an.getFloatTimeDomainData(buf!)
-        let soma = 0; for (const x of buf!) soma += x * x
-        op.onNivel?.(Math.min(1, Math.sqrt(soma / buf!.length) * 6))
+      if (an && buf) {
+        an.getFloatTimeDomainData(buf)
+        let soma = 0; for (const x of buf) soma += x * x
+        op.onNivel?.(Math.min(1, Math.sqrt(soma / buf.length) * 6))
       }
       if (audio.duration > 0) op.onLegenda?.(fraseNoPonto(parte, audio.currentTime / audio.duration))
       raf = requestAnimationFrame(acompanhar)
@@ -124,8 +136,36 @@ export async function falar(diretor: IdDiretor, id: string, textoOriginal: strin
     cancelAnimationFrame(raf)
     URL.revokeObjectURL(url)
   }
-  op.onNivel?.(0); op.onLegenda?.("")
-  if (tocando === minha) tocando = null
+
+  const pronto = (async () => {
+    let k = 0
+    let navegador: Aviso = null
+    let adiantada: Promise<Blob | { motivo: Aviso }> | null = null
+    for (;;) {
+      const parte = await proxima()
+      if (parte == null) break
+      const atual: Blob | { motivo: Aviso } = navegador ? { motivo: navegador } : await (adiantada ?? buscar(diretor, parte, `${diretor}:${id}:${k}`))
+      adiantada = null
+      if (cancelado) break
+      if (!navegador && fila.length) adiantada = buscar(diretor, fila[0], `${diretor}:${id}:${k + 1}`)   // pede a próxima enquanto toca
+      if (!(atual instanceof Blob)) {
+        navegador = atual.motivo ?? "navegador"
+        op.onAviso?.(navegador)
+        await falarNoNavegador(diretor, parte, () => cancelado, op)
+      } else { op.onAviso?.(null); await tocarAudio(atual, parte) }
+      k++
+    }
+    op.onNivel?.(0); op.onLegenda?.("")
+    if (tocando === minha) tocando = null
+  })()
+  return { empurrar, terminar, parar: minha.parar, pronto }
+}
+
+// Fala uma mensagem pronta (botão "ouvir"); resolve quando termina (ou é interrompida)
+export async function falar(diretor: IdDiretor, id: string, texto: string, op: { onAviso?: (a: Aviso) => void } & AoVivo = {}): Promise<void> {
+  const f = falaAoVivo(diretor, id, op)
+  f.empurrar(texto); f.terminar()
+  await f.pronto
 }
 
 // ── Microfone ──────────────────────────────────────────────────────────────────────
@@ -155,7 +195,7 @@ export async function ouvir(op: { onNivel?: (n: number) => void; onTexto: (t: st
     op.onNivel?.(nivel)
     const agora = Date.now()
     if (nivel > 0.12) { falou = true; silencioDesde = 0 } else if (falou && !silencioDesde) silencioDesde = agora
-    if ((falou && silencioDesde && agora - silencioDesde > 1600) || agora - inicio > 90_000 || (!op.semPressa && !falou && agora - inicio > 12_000)) { fechar(); return }
+    if ((falou && silencioDesde && agora - silencioDesde > 1000) || agora - inicio > 90_000 || (!op.semPressa && !falou && agora - inicio > 12_000)) { fechar(); return }
     raf = requestAnimationFrame(medir)
   }
   const fechar = () => { cancelAnimationFrame(raf); if (rec.state !== "inactive") rec.stop() }

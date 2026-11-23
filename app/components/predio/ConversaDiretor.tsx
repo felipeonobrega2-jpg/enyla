@@ -3,8 +3,8 @@
 // (editar, aprovar e enviar, ou descartar), vaga no RH (contratar), ferramenta (aprovar), plano e o que ele guardou.
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { Mic, Square, Video, Volume2, VolumeX } from "lucide-react"
-import { falar, ouvir, pararFala, prepararAudio, type Aviso, type Escuta } from "./vozCliente"
+import { Mic, RotateCcw, Square, Video, Volume2, VolumeX } from "lucide-react"
+import { falar, falaAoVivo, ouvir, pararFala, prepararAudio, type Aviso, type Escuta, type FalaAoVivo } from "./vozCliente"
 import ReuniaoChamada from "./ReuniaoChamada"
 import { DIRETORES, type IdDiretor } from "../../lib/diretoria"
 import type { MsgConversa, AcaoConversa, Ferramenta } from "../../lib/diretoriaServidor"
@@ -100,18 +100,62 @@ export default function ConversaDiretor({ diretor, onFechar, onFala, fixo, reuni
   }, [msgs, pensando])   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => onFala?.(null), [])   // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Envia e recebe a resposta ao vivo (linhas JSON): o texto aparece enquanto o diretor escreve e, com voz/reunião,
+  // a fala começa na primeira frase
   const enviar = async (t = texto) => {
     const m = t.trim()
     if (!m || pensando) return
     setTexto(""); setErro(null); setPensando(true)
     setMsgs(atual => [...(atual ?? []), { id: "tmp", de: "felipe", texto: m, em: new Date().toISOString() }])
-    const r = await fetch("/api/diretoria/conversa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ diretor, texto: m }) }).catch(() => null)
-    const x = r ? await r.json().catch(() => null) : null
+    const falarAgora = vozRef.current || reuniaoRef.current
+    const vivoId = `vivo-${Date.now().toString(36)}`
+    let fala: FalaAoVivo | null = null
+    let acc = "", final: MsgConversa[] | null = null, erroSrv: string | null = null
+    const r = await fetch("/api/diretoria/conversa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ diretor, texto: m, voz: reuniaoRef.current, aoVivo: true }) }).catch(() => null)
+    if (r?.ok && r.body) {
+      const leitor = r.body.getReader(), dec = new TextDecoder()
+      let resto = ""
+      for (let fim = false; !fim;) {
+        const { value, done } = await leitor.read().catch(() => ({ value: undefined, done: true }))
+        if (done) { fim = true; resto += "\n" } else resto += dec.decode(value, { stream: true })
+        let k: number
+        while ((k = resto.indexOf("\n")) >= 0) {
+          const l = resto.slice(0, k); resto = resto.slice(k + 1)
+          if (!l.trim()) continue
+          let x: { d?: string; mensagens?: MsgConversa[]; erro?: string }
+          try { x = JSON.parse(l) } catch { continue }
+          if (typeof x.d === "string") {
+            if (!acc) {
+              setPensando(false)
+              if (falarAgora) {
+                escutaRef.current?.cancelar()   // o microfone nunca fica aberto com o diretor falando
+                fala = falaAoVivo(diretor, vivoId, { onAviso: setAviso, ...(reuniaoRef.current ? { onNivel: setNivelDiretor, onLegenda: setLegenda } : {}) })
+                setFalando(vivoId); setMinhaFala(null)
+              }
+            }
+            acc += x.d
+            fala?.empurrar(x.d)
+            const agora = acc
+            setMsgs(atual => [...(atual ?? []).filter(y => y.id !== vivoId), { id: vivoId, de: "diretor", texto: agora, em: new Date().toISOString() }])
+          } else if (x.mensagens) final = x.mensagens
+          else if (x.erro) erroSrv = x.erro
+        }
+      }
+    } else if (r) erroSrv = (await r.json().catch(() => null) as { erro?: string } | null)?.erro ?? null
     setPensando(false)
-    if (!r?.ok || !x?.mensagens) { setErro(x?.erro ?? `${primeiro} não conseguiu responder agora.`); setMsgs(atual => (atual ?? []).filter(y => y.id !== "tmp")); setTexto(m); return }
-    setMsgs(x.mensagens); carregarLados()
-    const resposta = (x.mensagens as MsgConversa[]).filter(y => y.de === "diretor").at(-1)
-    if ((vozRef.current || reuniaoRef.current) && resposta) tocar(resposta, () => { if (vozRef.current && !reuniaoRef.current) microfone(true) })
+    const f = fala as FalaAoVivo | null
+    if (!final) {
+      f?.parar(); setFalando(null)
+      setErro(erroSrv ?? `${primeiro} não conseguiu responder agora.`)
+      setMsgs(atual => (atual ?? []).filter(y => y.id !== "tmp" && y.id !== vivoId)); setTexto(m)
+      return
+    }
+    setMsgs(final); carregarLados()
+    if (!f) return
+    f.terminar()
+    await f.pronto
+    setFalando(x => x === vivoId ? null : x); setNivelDiretor(0); setLegenda("")
+    if (vozRef.current && !reuniaoRef.current) microfone(true)
   }
   useEffect(() => { enviarRef.current = enviar })
   const responder = async (acao: string, resposta: "aprovo" | "descartar", textoEditado?: string) => {
@@ -203,18 +247,18 @@ export default function ConversaDiretor({ diretor, onFechar, onFala, fixo, reuni
       <div className="flex items-center gap-3 px-4 pt-3.5 pb-3 border-b border-black/5">
         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold text-white shrink-0 transition-shadow ${falando ? "ring-4 ring-[#8456e8]/30 animate-pulse" : ""}`} style={{ background: "linear-gradient(135deg,#8456e8,#5b3bb8)" }}>{primeiro[0]}{info.nome.split(" ")[1]?.[0]}</div>
         <div className="flex-1 min-w-0">
-          <p className="text-[14.5px] font-semibold text-[#191625] leading-tight">{info.nome}</p>
-          <p className="text-[11.5px] text-[#6b6876] leading-tight">{falando ? "falando…" : escuta ? "ouvindo você…" : `${info.cargo} · ${info.area}`}</p>
+          <p className="text-[14.5px] font-semibold text-[#191625] leading-tight truncate">{info.nome}</p>
+          <p className="text-[11.5px] text-[#6b6876] leading-tight truncate">{falando ? "falando…" : escuta ? "ouvindo você…" : `${info.cargo} · ${info.area}`}</p>
         </div>
         <button onClick={entrarNaReuniao} title={`Entrar em reunião com ${primeiro} (tela cheia, por voz)`}
-          className="h-8 px-2 rounded-lg flex items-center gap-1 text-[11px] font-semibold text-white" style={{ background: "linear-gradient(135deg,#8456e8,#5b3bb8)" }}>
+          className="h-8 px-2 shrink-0 rounded-lg flex items-center gap-1 text-[11px] font-semibold text-white" style={{ background: "linear-gradient(135deg,#8456e8,#5b3bb8)" }}>
           <Video className="w-3.5 h-3.5" />Reunião
         </button>
         <button onClick={() => mudarVoz(!voz)} title={voz ? "Reunião por voz ligada: ele responde falando e o microfone abre quando ele termina" : "Ligar a reunião por voz"}
-          className={`h-8 px-2 rounded-lg flex items-center gap-1 text-[11px] font-semibold ${voz ? "bg-[#8456e8] text-white" : "text-[#6b6876] hover:bg-black/5"}`}>
+          className={`h-8 px-2 shrink-0 rounded-lg flex items-center gap-1 text-[11px] font-semibold ${voz ? "bg-[#8456e8] text-white" : "text-[#6b6876] hover:bg-black/5"}`}>
           {voz ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}Voz
         </button>
-        {!!msgs?.length && <button onClick={recomecar} className="text-[11px] font-medium text-[#6b6876] hover:text-[#191625] px-2 py-1 rounded-md hover:bg-black/5">Nova conversa</button>}
+        {!!msgs?.length && <button onClick={recomecar} aria-label="Nova conversa" title="Nova conversa" className="w-8 h-8 shrink-0 rounded-lg grid place-items-center text-[#6b6876] hover:text-[#191625] hover:bg-black/5"><RotateCcw className="w-3.5 h-3.5" /></button>}
         <button onClick={onFechar} aria-label="Fechar" className="w-8 h-8 rounded-lg text-[#6b6876] hover:bg-black/5 text-[18px] leading-none">×</button>
       </div>
 

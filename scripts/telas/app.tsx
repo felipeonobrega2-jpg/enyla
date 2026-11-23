@@ -389,6 +389,19 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     { id: "fe-1", nome: "Leitura da Meta Ads (campanhas e histórico)", paraQue: "Ler todo dia status, gasto e custo por lead de cada campanha", motivo: "Campanha parou dia 21 sem ninguém ver", pedidoPor: "cmo", em: "2026-11-23T10:00:00Z", status: "pedida" },
     { id: "fe-2", nome: "Rastreio de entrega", paraQue: "Ver onde está cada entrega da Lalamove", motivo: "2 atrasos", pedidoPor: "coo", em: "2026-11-23T09:00:00Z", status: "aprovada" },
   ] }))
+  // Conversa ao vivo: a resposta chega aos pedaços (linhas JSON), como na produção
+  if (u.startsWith("/api/diretoria/conversa") && o?.method === "POST" && String(o.body).includes('"aoVivo":true')) {
+    const pedido = JSON.parse(String(o.body)) as { texto: string }
+    const resposta = "Operação em ordem. São seis pedidos na produção e nenhum agente travado. Os dois atrasos são do Arthur e do Raniere, segurados porque o saldo não caiu. Eles saem da impressão a tempo?"
+    const pedacos = resposta.match(/.{1,14}/g) ?? []
+    const cod = new TextEncoder()
+    return new Response(new ReadableStream({ async start(c) {
+      await new Promise(r => setTimeout(r, 700))
+      for (const d of pedacos) { c.enqueue(cod.encode(JSON.stringify({ d }) + "\n")); await new Promise(r => setTimeout(r, 90)) }
+      c.enqueue(cod.encode(JSON.stringify({ mensagens: [{ id: "u1", de: "felipe", texto: pedido.texto, em: "2026-11-23T10:00:00Z" }, { id: "r1", de: "diretor", texto: resposta, em: "2026-11-23T10:00:05Z" }] })))
+      c.close()
+    } }), { headers: { "Content-Type": "application/x-ndjson" } })
+  }
   if (u.startsWith("/api/diretoria/conversa")) return new Response(JSON.stringify({ mensagens: [
     { id: "m1", de: "felipe", texto: "Rafael, como estão os atrasos? Pode mandar o Pós-venda avisar o Raniere.", em: "2026-11-23T10:02:00Z" },
     { id: "m2", de: "diretor", em: "2026-11-23T10:02:40Z", texto: "Mandei o Pós-venda escrever. A mensagem já está na sua tela esperando o Aprovo.\n\nO ORC-2026-233 está 5 dias atrasado: a entrega era 18/11 e ele ainda está na Impressão. Prefiro não inventar prazo.\n\nPreciso de duas coisas suas:\n- A data real de saída do 233.\n- O pedido do Arthur está pronto na Expedição há dias. Posso avisar ele também?",
@@ -801,7 +814,7 @@ function Telas() {
       const et = Array.from({ length: col }, (_, i) => ({ coluna: i + 1, dataHora: `1${i}/11/2026, 10:00:00` }))
       return <TrackingClient numero="ORC-2026-290" initialData={{ numero: "ORC-2026-290", nomeCliente: "Ana Exemplo", descricao: "Caixa cartucho 6×15×6", materialNome: "Cartão 300g", quantidade: 12000, preco: 9540, colunaAtual: col, etapas: et, criadoEm: "10/11/2026" } as never} />
     }
-    case "predio": case "predio-m": case "escritorio-voz": case "reuniao": case "reuniao-falando": case "reuniao-m": { try { localStorage.removeItem("escritorio:modo") } catch { /* */ } return <div style={{ minHeight: "100vh" }}><EscritorioView kanban={[...dados.kanban, { ...dados.kanban[0], id: "exp1", numero: "ORC-2026-300", nomeCliente: "Loja Exemplo", coluna: 8 }]} lancamentos={dados.lancamentos} saldoContas={5000} /></div> }
+    case "predio": case "predio-m": case "escritorio-voz": case "reuniao": case "reuniao-falando": case "reuniao-m": case "conversa-vivo": { try { localStorage.removeItem("escritorio:modo") } catch { /* */ } return <div style={{ minHeight: "100vh" }}><EscritorioView kanban={[...dados.kanban, { ...dados.kanban[0], id: "exp1", numero: "ORC-2026-300", nomeCliente: "Loja Exemplo", coluna: 8 }]} lancamentos={dados.lancamentos} saldoContas={5000} /></div> }
     case "escritorio": case "escritorio-m": case "escritorio-sel": { try { localStorage.setItem("escritorio:modo", "sala") } catch { /* */ } return <div style={{ height: "100vh" }}><EscritorioView kanban={dados.kanban} /></div> }
     case "ideias": return <div style={{ height: "100vh" }}><IdeiasView config={cfg} onSalvar={setCfg} /></div>
     case "precofecha": {

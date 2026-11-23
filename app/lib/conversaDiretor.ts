@@ -4,6 +4,7 @@
 // Ele não executa nada sozinho nem fala com cliente. Só roda no servidor.
 import type Anthropic from "@anthropic-ai/sdk"
 import { clienteClaude, MODELO } from "./claude"
+import { registrarUsoIA } from "./gastosServidor"
 import { DIRETORES, type IdDiretor, type LicaoDiretor, type IdBase } from "./diretoria"
 import { coletarContexto } from "./reuniaoDiretoria"
 import { lerConversa, gravarConversa, gravarPlano, pedirFerramenta, type AcaoConversa, type MsgConversa } from "./diretoriaServidor"
@@ -51,11 +52,26 @@ function resumoAcao(a: AcaoConversa): string {
   return a.texto
 }
 
+// Os números da empresa levam ~5-10 s para juntar: ficam guardados 3 min (a conversa toda usa a mesma foto) e a
+// tela pede para aquecer quando abre a conversa/reunião. Uma busca só por vez, mesmo com pedidos simultâneos.
+let fotoCtx: { em: number; ctx: Promise<Ctx> } | null = null
+export function contextoRapido(): Promise<Ctx> {
+  if (fotoCtx && Date.now() - fotoCtx.em < 180_000) return fotoCtx.ctx
+  const ctx = coletarContexto()
+  fotoCtx = { em: Date.now(), ctx }
+  ctx.catch(() => { fotoCtx = null })
+  return ctx
+}
+
+// A área de cada diretor já vai detalhada no prompt (evita uma volta extra só para "detalhar" a própria área)
+const MINHA_AREA: Record<IdDiretor, string> = { coo: "producao", cco: "comercial", cmo: "marketing", cfo: "financeiro", cto: "sistema" }
+
 // simular: não grava nada (conversa, vaga, ferramenta, plano, lição); serve para testar com os dados reais
-export async function conversar(diretor: IdDiretor, textoFelipe: string, op: { simular?: boolean; historico?: MsgConversa[] } = {}): Promise<MsgConversa[]> {
+// voz: reunião por voz (resposta curta, falada). aoVivo: recebe o texto da resposta enquanto ela é escrita
+export async function conversar(diretor: IdDiretor, textoFelipe: string, op: { simular?: boolean; historico?: MsgConversa[]; voz?: boolean; aoVivo?: (pedaco: string) => void } = {}): Promise<MsgConversa[]> {
   const grava = !op.simular
   const info = DIRETORES.find(d => d.id === diretor)!
-  const ctx = await coletarContexto()
+  const ctx = await contextoRapido()
   if (!ctx.cfg.apiKey) throw new Error("Sem chave da IA nas Configurações.")
   const historico = op.historico ?? await lerConversa(diretor)
   const minha: MsgConversa = { id: novoId(), de: "felipe", texto: textoFelipe.slice(0, 4000), em: new Date().toISOString() }
@@ -86,8 +102,15 @@ ${ctx.ferramentasTxt}
 
 ${ctx.resultados}
 
+# Detalhes da sua área (dados de agora)
+${detalhe(ctx, MINHA_AREA[diretor])}
+
 # As outras áreas (para contexto)
 ${blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")).join("\n\n")}`
+  // Reunião por voz: fala de verdade, curta. Vem depois do trecho guardado em cache (o cache vale para os dois modos)
+  const modo = op.voz
+    ? `Agora vocês estão numa reunião por voz: sua resposta vai ser falada em voz alta. Responda como numa conversa: 1 a 3 frases curtas (até 60 palavras), sem listas, sem markdown, sem códigos longos (diga "o pedido do Raniere", não "ORC-2026-233"), números arredondados. Se o assunto pedir detalhe, dê o essencial e ofereça mandar o detalhe no chat. Faça uma pergunta de volta quando fizer sentido.`
+    : "Conversa por escrito, no chat."
 
   const msgs: Anthropic.Beta.BetaMessageParam[] = []
   for (const m of historico.slice(-30)) {
@@ -105,10 +128,17 @@ ${blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")).j
   const execIds = ctx.exec.map(f => f.id)
   let textoFinal = ""
   for (let volta = 0; volta < 8; volta++) {
-    const resp = await cli.beta.messages.create({
-      model: MODELO, max_tokens: 3000, thinking: { type: "adaptive" }, output_config: { effort: "medium" },
-      system, tools: ferramentas(execIds), messages: msgs,
+    // Streaming: o texto sai enquanto é escrito (a tela mostra e a voz começa na primeira frase). Esforço baixo na voz
+    // (resposta curta de conversa) e médio no chat. O começo fixo do prompt (ferramentas + contexto) fica em cache.
+    const fluxo = cli.beta.messages.stream({
+      model: MODELO, max_tokens: op.voz ? 1500 : 3000, thinking: { type: "adaptive" }, output_config: { effort: op.voz ? "low" : "medium" },
+      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }, { type: "text", text: modo }],
+      tools: ferramentas(execIds), messages: msgs,
     })
+    let jaFalou = false
+    if (op.aoVivo) fluxo.on("text", t => { if (!jaFalou && textoFinal) { op.aoVivo!("\n\n"); } jaFalou = true; op.aoVivo!(t) })
+    const resp = await fluxo.finalMessage()
+    await registrarUsoIA(resp.model, resp.usage as Parameters<typeof registrarUsoIA>[1]).catch(() => null)
     const texto = resp.content.flatMap(c => c.type === "text" ? [c.text] : []).join("\n").trim()
     if (texto) textoFinal = textoFinal ? `${textoFinal}\n\n${texto}` : texto
     const usos = resp.content.filter((c): c is Anthropic.Beta.BetaToolUseBlock => c.type === "tool_use")
