@@ -136,8 +136,8 @@ export function ArtePreviaCard({ dims, acabamento, valor, onChange }: {
           )}
         </div>
         {valor && dims && (
-          <div className="flex flex-col items-center justify-center rounded-xl py-2" style={{ background: "linear-gradient(#f7f6fa,#eceaf2)" }}>
-            <Caixa3DArte faces={valor.faces} dims={dims} tamanho={260} />
+          <div className="flex flex-col items-center justify-center">
+            <Caixa3DArte faces={valor.faces} dims={dims} tamanho={280} palco />
             <button onClick={() => gerar(false)} disabled={!!gerando} className="mt-2 text-[11.5px] text-[#898892] hover:text-[#8456e8] flex items-center gap-1"><RotateCcw className="w-3 h-3" /> outra versão</button>
           </div>
         )}

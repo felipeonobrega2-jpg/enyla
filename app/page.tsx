@@ -3135,8 +3135,8 @@ export default function Home() {
                 <Section title="Preview 3D — caixa">
                   <div className="bg-white rounded-xl border border-[rgba(60,60,67,0.08)] p-4">
                     {form.artePrevia
-                      ? <div className="flex justify-center py-2" style={{ background: "linear-gradient(#f7f6fa,#eceaf2)", borderRadius: 12 }}>
-                          <Caixa3DArte faces={form.artePrevia.faces} dims={{ largura: form.frente * 10, profundidade: form.lateral * 10, altura: form.alturaBox * 10 }} tamanho={300} aviso={false} />
+                      ? <div className="flex justify-center">
+                          <Caixa3DArte faces={form.artePrevia.faces} dims={{ largura: form.frente * 10, profundidade: form.lateral * 10, altura: form.alturaBox * 10 }} tamanho={320} aviso={false} palco />
                         </div>
                       : <BoxPreview3D
                       largura={form.frente}

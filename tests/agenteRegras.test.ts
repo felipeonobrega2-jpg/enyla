@@ -107,3 +107,13 @@ describe("arte prévia: SVG seguro e faces no tamanho certo", () => {
     expect(dimsDoFormulario({ frente: 6, lateral: 4, alturaBox: 12 })).toEqual({ largura: 60, profundidade: 40, altura: 120 })
   })
 })
+
+describe("caixa 3D: luz e brilho", () => {
+  it("a face virada para a luz fica clara e a de costas escura; o brilho só aparece perto da luz", async () => {
+    const { sombraDaFace, brilhoDaFace } = await import("../app/components/Caixa3DArte")
+    expect(sombraDaFace(-38)).toBe(0)
+    expect(sombraDaFace(142)).toBeCloseTo(0.62)
+    expect(brilhoDaFace(-19)).toBe(1)
+    expect(brilhoDaFace(70)).toBeLessThan(0.01)
+  })
+})
