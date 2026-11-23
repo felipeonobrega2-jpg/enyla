@@ -1,6 +1,8 @@
 "use client"
 
 import { FormData, Calculo, PropostaCustom, KanbanCard, COL_HOT } from "../types"
+import { Caixa3DArte } from "./Caixa3DArte"
+import { dimsDoFormulario } from "../lib/artePrevia"
 import { brl, num } from "../utils"
 import { isGanho, isPerdido, isExpirado, parseData } from "../lib/negocio"
 import { Copy, Sparkles, MessageCircle, FileDown, FileText, Trash2, PencilLine, Search } from "lucide-react"
@@ -111,6 +113,12 @@ export function HistoricoView({
             <div key={entry.tipo === "hist" ? `h-${entry.originalIndex}` : `p-${entry.item.id}`}
               className="group bg-white rounded-xl ds-cartao hover:shadow-[0_4px_14px_rgba(25,22,37,0.06)]">
               <div className="flex items-center gap-4 px-5 py-3.5">
+                {entry.tipo === "hist" && entry.item.form.artePrevia && (() => {
+                  const d = dimsDoFormulario(entry.item.form)
+                  return d ? <button onClick={() => onDetalhes?.(entry.item)} title="Arte prévia" className="shrink-0 -my-1 rounded-lg" style={{ background: "linear-gradient(#f7f6fa,#eceaf2)" }}>
+                    <Caixa3DArte faces={entry.item.form.artePrevia.faces} dims={d} tamanho={56} aviso={false} interativo={false} volta={14} />
+                  </button> : null
+                })()}
                 <button onClick={() => onDetalhes?.(entry.item)} className="flex-1 min-w-0 text-left">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-semibold text-[13.5px] text-[#191625] leading-snug">{entry.nome || "Sem nome"}</span>
