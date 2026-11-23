@@ -25,8 +25,8 @@ export async function GET() {
       propostasCustom: propostas.data ?? [],
       contador:        (contadores.data ?? []).find((c: { chave: string; valor: number }) => c.chave === "orc")?.valor ?? 0,
       contadorProp:    (contadores.data ?? []).find((c: { chave: string; valor: number }) => c.chave === "prop")?.valor ?? 0,
-      // Chave do Groq não sai do servidor: a tela recebe só se está configurada
-      config:          (({ groqKey, ...c }) => ({ ...c, groqConfigurado: !!groqKey }))((config.data?.data ?? defaultConfig) as Record<string, unknown>),
+      // Chaves do Groq e do Gemini não saem do servidor: a tela recebe só se estão configuradas
+      config:          (({ groqKey, geminiKey, ...c }) => ({ ...c, groqConfigurado: !!groqKey, geminiConfigurado: !!geminiKey }))((config.data?.data ?? defaultConfig) as Record<string, unknown>),
       parceiros:       parceiros.data ?? [],
       negocios:        negocios.data ?? [],
       lancamentos:     lancamentos.data ?? [],

@@ -89,6 +89,7 @@ export type Configuracoes = {
   feriados?: import("./lib/diasUteis").ConfigFeriados      // feriados locais nos prazos
   clientesRelacionamento?: ClienteRelacionamento[]         // pagam depois da entrega
   whatsappConexao?: { estado: string; em: string }            // último estado da conexão do número (gravado pelo servidor)
+  geminiConfigurado?: boolean                              // voz dos diretores (a chave fica só no servidor)
   groqConfigurado?: boolean                                // transcrição de áudios (a chave fica só no servidor)
   etiquetasWhatsapp?: { nome: string; cor: string }[]          // etiquetas das conversas do WhatsApp
   vinculosWhatsapp?: import("./lib/vinculoWhatsapp").Vinculos   // conversa (jid) → cliente, escolhido na tela do WhatsApp

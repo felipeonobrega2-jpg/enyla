@@ -5,13 +5,13 @@ import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { obterMidia } from "./midiaWhatsapp"
 
-async function chaveGroq(): Promise<string | null> {
+export async function chaveGroq(): Promise<string | null> {
   const { data } = await lerConfigLinha()
   return ((data?.data as { groqKey?: string | null } | null)?.groqKey) ?? null
 }
 
-async function transcrever(bytes: Buffer, tipo: string, chave: string): Promise<string | null> {
-  const ext = tipo.includes("mp4") || tipo.includes("m4a") ? "m4a" : tipo.includes("ogg") ? "ogg" : tipo.includes("mpeg") ? "mp3" : "m4a"
+export async function transcrever(bytes: Buffer, tipo: string, chave: string): Promise<string | null> {
+  const ext = tipo.includes("webm") ? "webm" : tipo.includes("mp4") || tipo.includes("m4a") ? "m4a" : tipo.includes("ogg") ? "ogg" : tipo.includes("mpeg") ? "mp3" : "m4a"
   const form = new FormData()
   form.set("file", new Blob([new Uint8Array(bytes)], { type: tipo }), `audio.${ext}`)
   form.set("model", "whisper-large-v3-turbo")

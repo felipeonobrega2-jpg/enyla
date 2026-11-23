@@ -2,7 +2,7 @@
 
 import { VARIAVEIS, Rapida } from "../lib/mensagensRapidas"
 import React, { useState, useRef } from "react"
-import { Percent, Layers, Target, Palette, Sparkles, Database, Download, Upload, Plus, X, Check, Save, RotateCcw, Info, KeyRound, CalendarOff, Handshake, Mic, Zap, BookOpen } from "lucide-react"
+import { Percent, Layers, Target, Palette, Sparkles, Database, Download, Upload, Plus, X, Check, Save, RotateCcw, Info, KeyRound, CalendarOff, Handshake, Mic, Zap, BookOpen, Volume2 } from "lucide-react"
 import { Configuracoes, Material, CONFIG_PADRAO } from "../config"
 import { FERIADOS_SP } from "../lib/diasUteis"
 import { nomeChave } from "../lib/negocio"
@@ -261,6 +261,7 @@ export function ConfigView({ config, onSave, onExportar, onImportar, clientes = 
         </div>
         <div className="space-y-4">
           <ChaveGroq configurada={!!draft.groqConfigurado} />
+          <ChaveGemini configurada={!!draft.geminiConfigurado} />
 
           {/* Backup */}
           <Cartao className="ds-entrada">
@@ -461,6 +462,38 @@ function ChaveGroq({ configurada }: { configurada: boolean }) {
         <Botao onClick={salvar} disabled={salvando || !chave.trim()}>{salvando ? "Conferindo…" : "Salvar"}</Botao>
       </div>
       {msg && <p className="text-[12px] mt-2" style={{ color: msg.startsWith("Chave conferida") ? "#009351" : "#d33a3c" }}>{msg}</p>}
+    </Cartao>
+  )
+}
+
+// Chave do Gemini (voz dos diretores): o servidor confere gerando uma fala curta e guarda; nunca volta para a tela
+function ChaveGemini({ configurada }: { configurada: boolean }) {
+  const [ok, setOk] = useState(configurada)
+  const [chave, setChave] = useState("")
+  const [msg, setMsg] = useState<{ ok: boolean; texto: string } | null>(null)
+  const [salvando, setSalvando] = useState(false)
+  async function salvar() {
+    setSalvando(true); setMsg(null)
+    const r = await fetch("/api/config/gemini", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chave }) }).catch(() => null)
+    const d = r ? await r.json().catch(() => null) : null
+    if (r?.ok) { setOk(true); setChave(""); setMsg({ ok: true, texto: "Chave conferida e guardada. Os diretores já falam com a voz deles." }) } else setMsg({ ok: false, texto: `${d?.erro ?? "Sem conexão."}${d?.detalhe ? ` Detalhe: ${d.detalhe}` : ""}` })
+    setSalvando(false)
+  }
+  return (
+    <Cartao className="ds-entrada">
+      <TituloCartao titulo="Voz dos diretores" icone={<Volume2 className="w-4 h-4" />}
+        sub="Chave gratuita do Gemini (Google AI Studio): cada diretor fala com uma voz própria. Sem ela, usamos a voz do navegador." />
+      <p className="text-[12.5px] mb-2 font-medium" style={{ color: ok ? "#009351" : "#c57800" }}>{ok ? "Configurada" : "Não configurada"}</p>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <KeyRound className="w-3.5 h-3.5 text-[#898892] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input type="password" value={chave} autoComplete="off" placeholder={ok ? "Colar uma chave nova para trocar" : "AIza…"}
+            onChange={e => setChave(e.target.value)} className={`${inputCls} w-full pl-8 font-mono`} />
+        </div>
+        <Botao onClick={salvar} disabled={salvando || !chave.trim()}>{salvando ? "Conferindo…" : "Salvar"}</Botao>
+      </div>
+      {!ok && <p className="text-[11.5px] text-[#6b6876] mt-2 leading-snug">Pegue em aistudio.google.com/apikey (entrar com a conta Google, Create API key). Não pede cartão.</p>}
+      {msg && <p className="text-[12px] mt-2" style={{ color: msg.ok ? "#009351" : "#d33a3c" }}>{msg.texto}</p>}
     </Cartao>
   )
 }
