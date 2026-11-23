@@ -13,7 +13,7 @@ import * as THREE from "three"
 import type { Andar } from "./PredioView"
 import { GraficaInterior, AgentesInterior, Canteiro, FinanceiroInterior, DiretoriaInterior } from "./Interiores3D"
 import type { Diretor } from "../../lib/diretoria"
-import type { Reuniao } from "../../lib/reuniaoDiretoria"
+import type { Reuniao, Recomendacao } from "../../lib/reuniaoDiretoria"
 import type { FinanceiroAndar } from "../../lib/financeiroAndar"
 import { atrasado } from "./GraficaVirtual"
 import { COLUNAS_KANBAN, type KanbanCard } from "../../types"
@@ -226,6 +226,7 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
   const [reuniao, setReuniao] = useState<Reuniao | null>(null)
   const [reunindo, setReunindo] = useState(false)
   const [erroReuniao, setErroReuniao] = useState<string | null>(null)
+  const [enviando, setEnviando] = useState<string | null>(null)
   const [vez, setVez] = useState<number | null>(null)      // -1 = abertura, 0..n-1 = falas, n = fechamento
   useEffect(() => { fetch("/api/diretoria/reuniao").then(r => r.ok ? r.json() : null).then(x => { if (x?.reuniao) setReuniao(x.reuniao) }).catch(() => {}) }, [])
   useEffect(() => {
@@ -247,8 +248,16 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
     if (!reuniao) return
     const atual = reuniao.falas.flatMap(f => f.recomendacoes).find(r => r.id === recId)?.resposta
     const nova = atual === resposta ? null : resposta
-    setReuniao({ ...reuniao, falas: reuniao.falas.map(f => ({ ...f, recomendacoes: f.recomendacoes.map(r => r.id === recId ? { ...r, resposta: nova } : r) })) })
-    fetch("/api/diretoria/reuniao", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reuniao: reuniao.id, rec: recId, resposta: nova }) }).catch(() => {})
+    const rec = reuniao.falas.flatMap(f => f.recomendacoes).find(r => r.id === recId)
+    if (rec?.enviado?.ok) return                       // mensagem já foi ao cliente: não tem volta
+    const vaiEnviar = nova === "aprovo" && !!rec?.mensagem
+    const trocar = (m: (r: Recomendacao) => Recomendacao) => setReuniao(atual => atual && ({ ...atual, falas: atual.falas.map(f => ({ ...f, recomendacoes: f.recomendacoes.map(r => r.id === recId ? m(r) : r) })) }))
+    trocar(r => ({ ...r, resposta: nova }))
+    if (vaiEnviar) setEnviando(recId)
+    fetch("/api/diretoria/reuniao", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reuniao: reuniao.id, rec: recId, resposta: nova }) })
+      .then(r => r.json()).then(x => { if (x?.recomendacao) trocar(() => x.recomendacao) })
+      .catch(() => { if (vaiEnviar) trocar(r => ({ ...r, enviado: { em: new Date().toISOString(), ok: false, erro: "Sem conexão com o sistema" } })) })
+      .finally(() => { if (vaiEnviar) setEnviando(null) })
   }
   const falando = vez == null || !reuniao ? null
     : vez < 0 ? { quem: "ceo", texto: reuniao.abertura }
@@ -329,10 +338,21 @@ export default function Predio3D({ andares, sel, onSel, dados }: { andares: Anda
                     {f.recomendacoes.map(r => (
                       <div key={r.id} className="mt-1.5">
                         <p className="text-[11.5px] text-[#191625] leading-snug"><span className={`mr-1 text-[9.5px] font-bold uppercase px-1 rounded align-[1px] ${r.urgencia === "hoje" ? "bg-[#d33a3c]/10 text-[#d33a3c]" : "bg-black/5 text-[#6b6876]"}`}>{r.urgencia}</span>{r.texto}</p>
-                        <div className="flex gap-1 mt-0.5">
-                        <button onClick={() => responder(r.id, "aprovo")} className={`text-[10.5px] font-semibold px-1.5 py-0.5 rounded ${r.resposta === "aprovo" ? "bg-[#009351] text-white" : "text-[#009351] hover:bg-[#009351]/10"}`}>Aprovo</button>
-                        <button onClick={() => responder(r.id, "depois")} className={`text-[10.5px] font-semibold px-1.5 py-0.5 rounded ${r.resposta === "depois" ? "bg-[#6b6876] text-white" : "text-[#6b6876] hover:bg-black/5"}`}>Depois</button>
+                        {r.mensagem && (
+                          <div className="mt-1 rounded-md border-l-2 border-[#009351] bg-white/70 px-2 py-1">
+                            <p className="text-[9.5px] font-semibold uppercase text-[#6b6876]">Mensagem para {r.mensagem.cliente}</p>
+                            <p className="text-[11px] text-[#3c3a45] leading-snug whitespace-pre-line">{r.mensagem.texto}</p>
+                          </div>
+                        )}
+                        {r.enviado?.ok ? (
+                          <p className="mt-0.5 text-[10.5px] font-semibold text-[#009351]">Enviado para {r.mensagem?.cliente} às {new Date(r.enviado.em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
+                        ) : (
+                        <div className="flex gap-1 mt-0.5 items-center">
+                        <button disabled={enviando === r.id} onClick={() => responder(r.id, "aprovo")} className={`text-[10.5px] font-semibold px-1.5 py-0.5 rounded ${r.resposta === "aprovo" ? "bg-[#009351] text-white" : "text-[#009351] hover:bg-[#009351]/10"}`}>{enviando === r.id ? "Enviando…" : r.mensagem ? (r.enviado && !r.enviado.ok ? "Tentar enviar de novo" : "Aprovo e envio") : "Aprovo"}</button>
+                        <button disabled={enviando === r.id} onClick={() => responder(r.id, "depois")} className={`text-[10.5px] font-semibold px-1.5 py-0.5 rounded ${r.resposta === "depois" ? "bg-[#6b6876] text-white" : "text-[#6b6876] hover:bg-black/5"}`}>Depois</button>
+                        {r.enviado && !r.enviado.ok && <span className="text-[10px] text-[#d33a3c] leading-tight">Não enviou: {r.enviado.erro}</span>}
                         </div>
+                        )}
                       </div>
                     ))}
                   </div>

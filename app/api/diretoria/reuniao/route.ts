@@ -18,6 +18,6 @@ export async function POST() {
 export async function PATCH(req: NextRequest) {
   const { reuniao, rec, resposta } = await req.json().catch(() => ({})) as { reuniao?: string; rec?: string; resposta?: "aprovo" | "depois" | null }
   if (!reuniao || !rec) return NextResponse.json({ erro: "reuniao/rec" }, { status: 400 })
-  await responderRecomendacao(reuniao, rec, resposta ?? null)
-  return NextResponse.json({ ok: true })
+  const r = await responderRecomendacao(reuniao, rec, resposta ?? null)
+  return NextResponse.json({ ok: true, recomendacao: r })
 }

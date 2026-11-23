@@ -121,7 +121,7 @@ export function montarDiretoria(e: {
       { rotulo: "WhatsApp", valor: e.whatsapp === "desconectado" ? "fora do ar" : e.whatsapp ? "conectado" : "sem sinal", tom: e.whatsapp === "desconectado" ? "problema" : "ok" },
       { rotulo: "Crédito da IA", valor: e.semCredito ? "acabou" : "ok", tom: e.semCredito ? "problema" : "ok" },
       { rotulo: "Rotinas com problema", valor: String(problemas.length), tom: problemas.length ? "problema" : "ok" },
-      ...(e.cota ? [{ rotulo: "Envios na hora", valor: `${e.cota.usados}/${e.cota.limite}`, tom: (cota >= 1 ? "problema" : cota >= 0.8 ? "atencao" : "ok") as Tom }] : []),
+      ...(e.cota ? [{ rotulo: "Cota de envios usada na última hora (só preocupa perto do limite)", valor: `${e.cota.usados} de ${e.cota.limite}`, tom: (cota >= 1 ? "problema" : cota >= 0.8 ? "atencao" : "ok") as Tom }] : []),
     ],
     decisoes: [
       ...(e.whatsapp === "desconectado" ? ["Ler o QR do WhatsApp: os leads estão sem resposta"] : []),
