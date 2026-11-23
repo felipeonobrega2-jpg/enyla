@@ -66,9 +66,23 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
   // Auditor de dados: conferência completa no máximo uma vez por hora
   const { talvezAuditar } = await import("./auditoriaServidor")
   out.auditoria = await talvezAuditar(cfg as never).catch(e => String(e))
+  // Follow-up e retomada do agente também saem daqui (antes só pegavam carona nas mensagens do webhook e, de 20/11
+  // em diante, morriam lá sem ninguém ver). A trava de cada uma (rodada na tabela leve) impede rodar em dobro.
+  const agente = await import("./agenteAuto")
+  out.followup = await agente.talvezFollowUps().catch(e => `erro: ${String(e).slice(0, 140)}`)
+  out.retomada = await agente.talvezRetomarParados(LINK_SISTEMA).catch(e => `erro: ${String(e).slice(0, 140)}`)
   // Captador de parceiros: convites aprovados por você saem aos poucos
   // Carimbo da ronda: o Escritório mostra se o vigia está de pé
   await mudarConfig(() => ({ vigiaRodouEm: agora.toISOString() })).catch(() => null)
+  // Agendador: cada tarefa deixa quando rodou e o que aconteceu (o que não rodou nesta volta não marca)
+  const { marcarRotina } = await import("./agendador")
+  const texto = (v: unknown) => typeof v === "string" ? (/^(Error|TypeError|AbortError)/.test(v) ? `erro: ${v.slice(0, 140)}` : v) : v == null ? "ok" : JSON.stringify(v).slice(0, 140)
+  const marcar: [string, unknown][] = [["vigia", "ok"], ["esperando", out.esperando], ["promessas", out.promessas], ["digitalFinanceiro", out.digitalFinanceiro], ["emails", out.emailsCliente]]
+  if (out.auditoria != null) marcar.push(["auditoria", out.auditoria])
+  if (out.rotina !== undefined) marcar.push(["resumo", out.rotina ?? "enviado"])
+  // follow-up e retomada já marcam quando rodam; aqui só o motivo de não ter rodado (fora do horário, erro…)
+  for (const k of ["followup", "retomada"] as const) if (typeof out[k] === "string" && out[k] !== "ok" && !/^\d+ retomad|ninguém para retomar|rodada já feita|rodada recente/.test(out[k] as string)) marcar.push([k, out[k]])
+  await Promise.all(marcar.map(([r, v]) => marcarRotina(r, texto(v)).catch(() => null)))
   return out
 }
 

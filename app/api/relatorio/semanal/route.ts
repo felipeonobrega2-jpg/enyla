@@ -31,5 +31,6 @@ export async function POST(req: NextRequest) {
       assinatura: `<b style="color:#1d1a29;">Sistema ENYLA</b><br>Toda segunda às 8h`, rodapeExtra: "E-mail automático do sistema da ENYLA." }),
     texto: `Relatório gerencial da ${per.nome} em anexo (PDF).`,
   }, [{ nome: `relatorio-enyla-${per.de.toISOString().slice(0, 10)}.pdf`, base64: pdf.toString("base64") }])
+  await import("@/app/lib/agendador").then(m => m.marcarRotina("relatorioSemanal", r.ok ? `enviado para ${para}` : `erro: ${r.erro}`)).catch(() => null)
   return NextResponse.json(r.ok ? { ok: true, id: r.id, para } : { erro: r.erro }, { status: r.ok ? 200 : 502 })
 }

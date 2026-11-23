@@ -777,10 +777,11 @@ async function pegarRodada(campo: "agenteRetomadaEm" | "agenteFollowupEm", minut
   return minha
 }
 
-export async function talvezRetomarParados(origem: string) {
+export async function talvezRetomarParados(origem: string): Promise<string> {
   const cfg = await lerCfg()
-  if (!cfg.agenteAuto?.ligado || !dentroDoHorario(cfg.agenteAuto.horario)) return
-  if (!await pegarRodada("agenteRetomadaEm", 3)) return
+  if (!cfg.agenteAuto?.ligado) return "agente desligado"
+  if (!dentroDoHorario(cfg.agenteAuto.horario)) return "fora do horário"
+  if (!await pegarRodada("agenteRetomadaEm", 3)) return "rodada já feita"
   const agora = Date.now()
   const { data: convs } = await supabase.from("whatsapp_conversas").select("jid, etiquetas, status_lead, ultima_recebida_at, ultima_enviada_at")
     .gte("ultima_recebida_at", new Date(agora - HORAS_RETOMAR * 3_600_000).toISOString()).order("ultima_recebida_at", { ascending: false }).limit(300)
@@ -824,6 +825,10 @@ export async function talvezRetomarParados(origem: string) {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ msgId: u.id }), signal: AbortSignal.timeout(8000),
     }).catch(() => null)
   }
+  const { marcarRotina } = await import("./agendador")
+  const r = disparadas ? `${disparadas} ${disparadas === 1 ? "retomada" : "retomadas"}` : "ok (ninguém para retomar)"
+  await marcarRotina("retomada", r).catch(() => null)
+  return r
 }
 
 // Respondeu a uma retomada (reativação): volta para MQL, fica não lida no seu celular e você recebe o aviso (uma vez)
@@ -849,13 +854,18 @@ async function respondeuRetomada(cfg: CfgAgente, c: Conversa, msgId: string) {
 let ultimaRodadaLocal = 0
 
 // Chamado a cada evento do webhook (e pelo cron diário): roda no máximo a cada 10 min
-export async function talvezFollowUps() {
-  if (Date.now() - ultimaRodadaLocal < MIN_ENTRE_RODADAS * 60_000) return
+// Devolve o que aconteceu (o vigia e o agendador mostram): a rotina nunca mais para em silêncio
+export async function talvezFollowUps(): Promise<string> {
+  if (Date.now() - ultimaRodadaLocal < MIN_ENTRE_RODADAS * 60_000) return "rodada recente nesta instância"
   ultimaRodadaLocal = Date.now()
   const cfg = await lerCfg()
-  if (!cfg.agenteAuto?.ligado || !horarioDeFollowUp() || !dentroDoHorario(cfg.agenteAuto.horario)) return
-  if (!await pegarRodada("agenteFollowupEm", MIN_ENTRE_RODADAS)) return
+  if (!cfg.agenteAuto?.ligado) return "agente desligado"
+  if (!horarioDeFollowUp() || !dentroDoHorario(cfg.agenteAuto.horario)) return "fora do horário"
+  if (!await pegarRodada("agenteFollowupEm", MIN_ENTRE_RODADAS)) return "rodada já feita"
   await followUps(cfg)
+  const { marcarRotina } = await import("./agendador")
+  await marcarRotina("followup", "ok").catch(() => null)
+  return "ok"
 }
 
 export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {

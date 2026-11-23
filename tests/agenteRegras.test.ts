@@ -127,3 +127,17 @@ describe("caixa 3D: efeitos pelos acabamentos do orçamento", () => {
     expect(efeitosDoFormulario({})).toEqual({ brilho: "natural", metal: false, holografico: false })
   })
 })
+
+describe("agendador", () => {
+  it("em dia, atrasada (3× o intervalo), erro e fora do horário", async () => {
+    const { situacaoRotina, lerExecucao, ROTINAS } = await import("../app/lib/agendador")
+    const fu = ROTINAS.find(r => r.id === "followup")!
+    const agora = new Date("2026-11-23T15:00:00Z").getTime()
+    const ex = (min: number, resultado = "ok") => ({ rotina: "followup", em: new Date(agora - min * 60_000).toISOString(), resultado })
+    expect(situacaoRotina(fu, ex(5), agora).tom).toBe("ok")
+    expect(situacaoRotina(fu, ex(45), agora)).toMatchObject({ tom: "atrasada", texto: "parada há 45 min" })
+    expect(situacaoRotina(fu, ex(45), agora, false).tom).toBe("ok")   // fora do horário do agente, parar é normal
+    expect(situacaoRotina(fu, ex(2, "erro: timeout"), agora).tom).toBe("erro")
+    expect(lerExecucao("agenda|followup|fora%20do%20hor%C3%A1rio", "x")).toEqual({ rotina: "followup", em: "x", resultado: "fora do horário" })
+  })
+})

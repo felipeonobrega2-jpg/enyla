@@ -50,7 +50,7 @@ export default function GastosView() {
 
   if (!g) return (
     <Pagina>
-      <CabecalhoPagina titulo="Gastos" sub="IA, anúncios e quanto o braço digital paga" />
+      <CabecalhoPagina titulo="Custos de IA e anúncios" sub="Quanto a IA e a Meta gastam por dia, quantos dias o saldo aguenta e quanto o digital cobre" />
       {erro ? <Vazio icone={<AlertTriangle className="w-5 h-5" />} titulo="Não deu para carregar" sub={erro} /> : <Cartao><p className="text-[12.5px] text-[#898892]">Carregando…</p></Cartao>}
     </Pagina>
   )
@@ -58,7 +58,7 @@ export default function GastosView() {
   const { ia, meta, digital } = g
   return (
     <Pagina>
-      <CabecalhoPagina titulo="Gastos" sub="IA, anúncios e quanto o braço digital paga"
+      <CabecalhoPagina titulo="Custos de IA e anúncios" sub="Quanto a IA e a Meta gastam por dia, quantos dias o saldo aguenta e quanto o digital cobre"
         acoes={<Botao icone={<RefreshCw className={`w-3.5 h-3.5 ${carregando ? "animate-spin" : ""}`} />} onClick={() => void carregar(true)} disabled={carregando}>Atualizar</Botao>} />
 
       {g.alertas.length > 0 && (

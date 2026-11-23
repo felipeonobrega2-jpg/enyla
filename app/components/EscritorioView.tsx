@@ -4,6 +4,7 @@
 // o que trava (WhatsApp, crédito da IA, cota da hora) e o feed de tudo que aconteceu hoje. Atualiza sozinho.
 
 import { useEffect, useMemo, useState } from "react"
+import { AgendadorView } from "./AgendadorView"
 import { MessageCircle, ClipboardList, Repeat, RotateCcw, Printer, FileText, ShieldCheck, GraduationCap, Wifi, WifiOff, Sparkles, Clock, Power } from "lucide-react"
 import { Pagina, CabecalhoPagina, Cartao, TituloCartao, Esqueleto, Segmentado } from "./ds"
 import { EscritorioVirtual } from "./EscritorioVirtual"
@@ -109,10 +110,10 @@ export function EscritorioView() {
   const [filtro, setFiltro] = useState<IdMesa | null>(null)
   const [agora, setAgora] = useState(() => Date.now())
   const [mostrar, setMostrar] = useState(12)
-  const [modo, setModo] = useState<"sala" | "detalhes">("sala")
+  const [modo, setModo] = useState<"sala" | "detalhes" | "rotinas">("sala")
   const [feedAberto, setFeedAberto] = useState(false)
-  useEffect(() => { try { if (localStorage.getItem("escritorio:modo") === "detalhes") setModo("detalhes") } catch { /* sem storage */ } }, [])
-  const trocarModo = (v: "sala" | "detalhes") => { setModo(v); try { localStorage.setItem("escritorio:modo", v) } catch { /* sem storage */ } }
+  useEffect(() => { try { const m = localStorage.getItem("escritorio:modo"); if (m === "detalhes" || m === "rotinas") setModo(m) } catch { /* sem storage */ } }, [])
+  const trocarModo = (v: "sala" | "detalhes" | "rotinas") => { setModo(v); try { localStorage.setItem("escritorio:modo", v) } catch { /* sem storage */ } }
   useEffect(() => {
     const carregar = () => fetch("/api/escritorio").then(r => r.ok ? r.json() : null).then(x => { if (x) { setD(x); setAgora(Date.now()) } }).catch(() => {})
     carregar()
@@ -131,7 +132,7 @@ export function EscritorioView() {
     : trabalhando ? `${trabalhando} ${trabalhando === 1 ? "agente trabalhando" : "agentes trabalhando"} agora · ${totalHoje} entregas hoje`
     : `Todos de plantão · ${totalHoje} entregas hoje`
 
-  const segmentado = <Segmentado valor={modo} onChange={trocarModo} opcoes={[{ v: "sala", nome: "Sala" }, { v: "detalhes", nome: "Detalhes" }]} />
+  const segmentado = <Segmentado valor={modo} onChange={trocarModo} opcoes={[{ v: "sala", nome: "Sala" }, { v: "detalhes", nome: "Detalhes" }, { v: "rotinas", nome: "Rotinas" }]} />
   const licoes = Number((d.mesas.find(m => m.id === "aprendiz")?.extra ?? "").match(/\d+/)?.[0] ?? 0)
   const linhaFeed = (e: Escritorio["feed"][number], i: number) => {
     const { cor, Icone } = VISUAL[e.mesa]
@@ -148,6 +149,13 @@ export function EscritorioView() {
     <span className="flex items-center gap-1.5 rounded-full px-2.5 h-8 text-[12px] font-semibold whitespace-nowrap" style={{ ...vidro, color: ok === false ? "#d33a3c" : "#2a2430" }}>
       <span style={{ color: ok === false ? "#d33a3c" : ok ? "#1f9d55" : "#898892" }}>{icone}</span>{texto}
     </span>
+  )
+
+  if (modo === "rotinas") return (
+    <Pagina>
+      <CabecalhoPagina titulo="Escritório" sub="Tudo o que roda sozinho, e se está rodando" acoes={segmentado} />
+      <AgendadorView />
+    </Pagina>
   )
 
   if (modo === "sala") return (

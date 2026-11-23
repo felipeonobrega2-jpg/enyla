@@ -1890,7 +1890,7 @@ export default function Home() {
           <NavGroup label="Gestão" />
           <NavItem active={view === "financeiro"} onClick={() => navigate("financeiro")} label="Financeiro"
             icon={<Wallet className="w-4 h-4" strokeWidth={1.8} />} />
-          <NavItem active={view === "gastos"} onClick={() => navigate("gastos")} label="Gastos"
+          <NavItem active={view === "gastos"} onClick={() => navigate("gastos")} label="IA e anúncios"
             icon={<Gauge className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "dashboard"} onClick={() => navigate("dashboard")} label="Relatórios"
             icon={<BarChart3 className="w-4 h-4" strokeWidth={1.8} />} />

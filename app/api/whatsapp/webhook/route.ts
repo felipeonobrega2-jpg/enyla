@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
     if ((event === "messages.upsert" || event === "connection.update") && Date.now() - ultimaRodada > 60_000
       && (ultimaRodada = Date.now()) && await reservarTratada(`carona:${Math.floor(Date.now() / 300_000)}`).catch(() => false) !== false) {
       // Follow-ups do agente de leads pegam carona nos eventos (no máximo uma rodada a cada 10 min)
+      after(() => import("@/app/lib/agendador").then(m => m.marcarRotina("carona", "ok")).catch(() => null))
       after(() => talvezFollowUps().catch(e => console.error("[agente follow-up]", e)))
       // Lead que respondeu enquanto você estava na conversa e ficou sem resposta: o agente retoma
       after(() => talvezRetomarParados(req.nextUrl.origin).catch(e => console.error("[agente retoma]", e)))
