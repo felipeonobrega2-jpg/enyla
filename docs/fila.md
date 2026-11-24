@@ -30,6 +30,12 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 12 | Porta externa: CMO liga, pausa e ajusta verba diária de campanha existente (`acao=meta_ads`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 (7h33–7h34) | (PR da issue #29) |
 | 13 | Prospector: envio automático (primeiro contato e lembrete) | operação | esta leva | — | Diego | sim (o Felipe aprova o merge; chave `prospector_envio_ativo` nasce desligada) | (PR da issue #11) |
 | 14 | Porta externa: leitura financeira (`?o=financeiro`) para o CFO | CFO | — | — | Claude Code | não | (PR da issue #24) |
+| 16 | Medidor de IA por tipo de token e origem | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/21 (na main) |
+| 17 | Follow-up confere a cota da hora antes de chamar a IA | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/22 (na main) |
+| 18 | WhatsApp: sugestão só ao clicar em "Gerar sugestão" | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/23 (na main) |
+| 19 | Classificação inline só com mensagem nova do cliente (migração aditiva `classificacao_guardada` aplicada em produção em 24/11/2026) | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/28 (na main) |
+| 20 | Script de comparação do classificador Opus × Sonnet × Haiku (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/30 (na main) |
+| 21 | Script de comparação do follow-up Opus × Sonnet (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/37 (na main) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -196,3 +202,9 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 **Status:** Claude Code. **Aprovo:** o Felipe liberou ligar, pausar e ajustar verba de campanha existente em 24/11/2026; as mesmas regras valem por conjunto. **PR:** o PR da issue #32. Não junta sozinho.
 
 Os `conjuntos` de `GET ?o=meta_ads` passam a trazer `verbaDiaria` e `verbaTotal` em reais (ou `null`, em CBO). `POST acao=meta_ads` aceita `conjuntoId` no lugar de `campanhaId` (nunca os dois) para ligar, pausar e ajustar a verba diária do conjunto: no máximo 20% e teto de R$ 200 por conjunto (recusa, não corta). Conjunto CBO em `ajustar_verba`: 400, a verba está na campanha, use `campanhaId`. Registro em `metaAdsAcoes` com `conjuntoId` e `conjuntoNome`. Não cria nada e não entrega o aviso de campanha parada (item 1).
+
+## Custo de IA (24/11/2026)
+
+Objetivo: reduzir os tokens gastos com IA sem perder eficácia. Os itens 16 a 21 registram os PRs dessa frente.
+Os dois scripts de comparação (classificador e follow-up) só rodam com autorização do Felipe, porque gastam tokens.
+Nenhuma troca de modelo entra sem o Diego revisar o resultado da comparação.
