@@ -24,10 +24,10 @@ const PARALELO = 5
 
 export type Cursor = { mes: string; arquivo: number; offset: number; concluido?: boolean }
 export type Resultado = {
-  ok: boolean; ja?: boolean; erro?: string; lidos: number; inseridos: number; atualizados: number; ignorados: number; semCadastro: number
+  ok: boolean; ja?: boolean; erro?: string; lidos: number; inseridos: number; atualizados: number; ignorados: number; semCadastro: number; falhasCadastro: number
   cursor: Cursor | null
 }
-type Deps = { fetch?: typeof fetch; agora?: () => Date; orcamentoMs?: number; maxCnpjs?: number }
+type Deps = { fetch?: typeof fetch; agora?: () => Date; orcamentoMs?: number; maxCnpjs?: number; pausaMs?: number }
 
 const mesDe = (d: Date, delta = 0) => { const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + delta, 1)); return x.toISOString().slice(0, 7) }
 
@@ -109,21 +109,32 @@ async function abrirArquivo(f: typeof fetch, mes: string, arquivo: number) {
   return f(urlArquivo(mes, arquivo), { headers: { "user-agent": "enyla-prospector-importador", authorization: AUTH_RECEITA } })
 }
 
-type Busca = { ok: true; cad: CadastroBrasilApi } | { ok: false; semCadastro: boolean }
-async function buscarCadastro(f: typeof fetch, cnpj: string): Promise<Busca> {
-  try {
-    const r = await f(`${BASE_BRASILAPI}/${cnpj}`, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) })
-    if (r.status === 404) return { ok: false, semCadastro: true }
-    if (!r.ok) return { ok: false, semCadastro: false }   // 429 ou 5xx: para a execução e tenta de novo na próxima
-    return { ok: true, cad: (await r.json()) as CadastroBrasilApi }
-  } catch { return { ok: false, semCadastro: false } }
+type Busca = { ok: true; cad: CadastroBrasilApi } | { ok: false; semCadastro: boolean; falha?: string }
+const TENTATIVAS = 3
+const dormir = (ms: number) => ms > 0 ? new Promise<void>(r => setTimeout(r, ms)) : Promise.resolve()
+/** 404 = CNPJ sem cadastro. 429/5xx/erro de rede repetem com pausa curta; qualquer outra falha (ex.: 403) não repete. Guarda a primeira falha. */
+async function buscarCadastro(f: typeof fetch, cnpj: string, pausaMs: number): Promise<Busca> {
+  let falha: string | undefined
+  for (let t = 1; t <= TENTATIVAS; t++) {
+    let repetir = true
+    try {
+      const r = await f(`${BASE_BRASILAPI}/${cnpj}`, { headers: { accept: "application/json", "user-agent": "enyla-prospector-importador" }, signal: AbortSignal.timeout(15_000) })
+      if (r.status === 404) return { ok: false, semCadastro: true }
+      if (r.ok) return { ok: true, cad: (await r.json()) as CadastroBrasilApi }
+      falha ??= `BrasilAPI respondeu ${r.status}`
+      repetir = r.status === 429 || r.status >= 500
+    } catch (e) { falha ??= `BrasilAPI falhou: ${e instanceof Error ? e.message : String(e)}` }
+    if (!repetir) break
+    if (t < TENTATIVAS) await dormir(pausaMs * t)
+  }
+  return { ok: false, semCadastro: false, falha }
 }
 
 export async function importar(deps: Deps = {}): Promise<Resultado> {
   const f = deps.fetch ?? fetch
   const agora = deps.agora ?? (() => new Date())
   const limite = Date.now() + (deps.orcamentoMs ?? ORCAMENTO_MS)
-  const zero = { lidos: 0, inseridos: 0, atualizados: 0, ignorados: 0, semCadastro: 0 }
+  const zero = { lidos: 0, inseridos: 0, atualizados: 0, ignorados: 0, semCadastro: 0, falhasCadastro: 0 }
   const salvo = (await lerCampos<Record<string, unknown>>([CAMPO]))[CAMPO] as Cursor | undefined
   const mesAtual = mesDe(agora())
   if (salvo?.concluido && salvo.mes >= mesAtual) return { ok: true, ja: true, ...zero, cursor: salvo }
@@ -141,16 +152,21 @@ export async function importar(deps: Deps = {}): Promise<Resultado> {
   const r = { ...zero, lidos: lote.lidos }
 
   // Razão social e porte ficam em Empresas*.zip, outro conjunto de arquivos. Só para quem passou no filtro, a BrasilAPI (gratuita, sem chave) completa.
+  // Se ela falha (não 404), grava com os dados do arquivo da Receita e conta em falhasCadastro; a importação não depende dela.
   let parou: number | null = null
+  let primeiraFalha: string | undefined
   const linhas: NonNullable<ReturnType<typeof montarProspecto>>[] = []
   for (let i = 0; i < lote.candidatos.length && parou == null; i += PARALELO) {
     const grupo = lote.candidatos.slice(i, i + PARALELO)
-    const buscas = await Promise.all(grupo.map(g => buscarCadastro(f, g.c.cnpj)))
+    const buscas = await Promise.all(grupo.map(g => buscarCadastro(f, g.c.cnpj, deps.pausaMs ?? 500)))
     for (let k = 0; k < grupo.length; k++) {
       const b = buscas[k]
       if (b.ok) { const l = montarProspecto(grupo[k].c, b.cad, agora()); if (l) linhas.push(l); else r.semCadastro++ }
       else if (b.semCadastro) r.semCadastro++
-      else if (parou == null) parou = grupo[k].inicio
+      else {
+        r.falhasCadastro++; primeiraFalha ??= b.falha
+        const l = montarProspecto(grupo[k].c, {}, agora(), true); if (l) linhas.push(l)
+      }
     }
     if (Date.now() > limite) { const prox = lote.candidatos[i + PARALELO]; if (prox && parou == null) parou = prox.inicio; break }
   }
@@ -162,6 +178,7 @@ export async function importar(deps: Deps = {}): Promise<Resultado> {
     : cursor.arquivo + 1 < ARQUIVOS ? { mes: cursor.mes, arquivo: cursor.arquivo + 1, offset: 0 }
     : { ...cursor, offset: lote.offsetFinal, concluido: true }
   await gravarCampos({ [CAMPO]: proximo })
+  if (r.falhasCadastro > 0 && r.inseridos + r.atualizados + r.ignorados === 0) return { ok: false, erro: primeiraFalha ?? "BrasilAPI falhou", ...r, cursor: proximo }
   return { ok: true, ...r, cursor: proximo }
 }
 
@@ -178,6 +195,8 @@ async function gravar(linhas: NonNullable<ReturnType<typeof montarProspecto>>[],
     // Só dados cadastrais e nota. Etapa, histórico e opt_out não entram no update; a trava no opt_out cobre corrida com o "não quero receber".
     const cadastro: Partial<typeof g.campos> = { ...g.campos }
     delete cadastro.cnpj
+    // Linha parcial (BrasilAPI falhou): não apaga o que já está gravado com vazio.
+    if (!cadastro.razao_social) for (const k of Object.keys(cadastro) as (keyof typeof cadastro)[]) if (k === "razao_social" || cadastro[k] == null) delete cadastro[k]
     const { data: ok, error: e } = await supabase.from(TABELA).update({ ...cadastro, atualizado_em: agora().toISOString() }).eq("id", g.id).eq("opt_out", false).neq("etapa", "descartado").select("id")
     if (e) throw new Error(e.message)
     if (ok?.length) r.atualizados++; else r.ignorados++
