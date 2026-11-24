@@ -12,11 +12,12 @@ export const TETO_VERBA_DIARIA = 200
 export const COLECAO_ACOES = "metaAdsAcoes"
 const OPERACOES = ["ligar", "pausar", "ajustar_verba"] as const
 type Operacao = (typeof OPERACOES)[number]
-const CHAVES_ACEITAS = ["acao", "operacao", "campanhaId", "verbaDiaria"]
+const CHAVES_ACEITAS = ["acao", "operacao", "campanhaId", "conjuntoId", "verbaDiaria"]
 
 type Estado = { status?: string | null; verbaDiaria?: number | null }
 export type RegistroAcao = {
-  id: string; diretor: string; operacao: string; campanhaId: string; campanhaNome: string | null
+  id: string; diretor: string; operacao: string; campanhaId?: string; campanhaNome?: string | null
+  conjuntoId?: string; conjuntoNome?: string | null
   antes: Estado; depois: Estado | null; em: string; aceita: boolean; motivo?: string
 }
 export type Saida = { status: number; corpo: Record<string, unknown> }
@@ -24,37 +25,37 @@ export type Saida = { status: number; corpo: Record<string, unknown> }
 const reais = (c: unknown) => c == null || c === "" || !Number.isFinite(Number(c)) ? null : Number(c) / 100
 const brl = (n: number) => `R$ ${n.toFixed(2).replace(".", ",")}`
 
-type Campanha = { id?: string; name?: string; status?: string; daily_budget?: string; lifetime_budget?: string; account_id?: string }
+type Campanha = { id?: string; name?: string; status?: string; daily_budget?: string; lifetime_budget?: string; account_id?: string; campaign_id?: string }
 type Erro = { error?: { code?: number; type?: string } }
 
-function erroGraph(j: Erro, escrita: boolean): ErroMeta {
+function erroGraph(j: Erro, escrita: boolean, conjunto = false): ErroMeta {
   const cod = j.error?.code
   if (cod === 190) return new ErroMeta(401, "TOKEN_EXPIRED", "A Meta recusou o token (venceu ou foi derrubado).")
-  if (cod === 100) return new ErroMeta(404, "CAMPANHA_NAO_ENCONTRADA", "A Meta não achou essa campanha.")
+  if (cod === 100) return new ErroMeta(404, "CAMPANHA_NAO_ENCONTRADA", conjunto ? "A Meta não achou esse conjunto." : "A Meta não achou essa campanha.")
   if (escrita && (cod === 200 || cod === 10 || j.error?.type === "OAuthException"))
     return new ErroMeta(403, "SEM_ADS_MANAGEMENT", "A Meta recusou a escrita: o token provavelmente não tem a permissão ads_management para esta conta.")
-  if (j.error?.type === "OAuthException") return new ErroMeta(403, "SEM_ACESSO_CONTA", "O token não tem acesso a esta campanha.")
-  return new ErroMeta(502, "META_ERRO", escrita ? "A Meta devolveu um erro ao gravar a mudança." : "A Meta devolveu um erro ao ler a campanha.")
+  if (j.error?.type === "OAuthException") return new ErroMeta(403, "SEM_ACESSO_CONTA", conjunto ? "O token não tem acesso a este conjunto." : "O token não tem acesso a esta campanha.")
+  return new ErroMeta(502, "META_ERRO", escrita ? "A Meta devolveu um erro ao gravar a mudança." : conjunto ? "A Meta devolveu um erro ao ler o conjunto." : "A Meta devolveu um erro ao ler a campanha.")
 }
 
-async function lerCampanha(id: string, token: string): Promise<Campanha> {
-  const qs = new URLSearchParams({ fields: "id,name,status,daily_budget,lifetime_budget,account_id", access_token: token })
+async function lerCampanha(id: string, token: string, conjunto = false): Promise<Campanha> {
+  const qs = new URLSearchParams({ fields: conjunto ? "id,name,status,daily_budget,lifetime_budget,account_id,campaign_id" : "id,name,status,daily_budget,lifetime_budget,account_id", access_token: token })
   let r: Response
   try { r = await fetch(`${BASE}/${id}?${qs}`, { signal: AbortSignal.timeout(15000) }) }
   catch { throw new ErroMeta(502, "META_INDISPONIVEL", "Não consegui falar com a Meta.") }
   const j = await r.json().catch(() => ({})) as Campanha & Erro
-  if (j.error) throw erroGraph(j, false)
+  if (j.error) throw erroGraph(j, false, conjunto)
   return j
 }
 
 // Única escrita possível: status ou daily_budget (centavos) da campanha existente. O token vai no corpo, não na URL.
-async function escreverCampanha(id: string, campos: { status: string } | { daily_budget: string }, token: string) {
+async function escreverCampanha(id: string, campos: { status: string } | { daily_budget: string }, token: string, conjunto = false) {
   const corpo = new URLSearchParams({ ...campos, access_token: token })
   let r: Response
   try { r = await fetch(`${BASE}/${id}`, { method: "POST", body: corpo, signal: AbortSignal.timeout(15000) }) }
   catch { throw new ErroMeta(502, "META_INDISPONIVEL", "Não consegui falar com a Meta.") }
   const j = await r.json().catch(() => ({})) as Erro & { success?: boolean }
-  if (j.error) throw erroGraph(j, true)
+  if (j.error) throw erroGraph(j, true, conjunto)
 }
 
 async function registrar(r: RegistroAcao): Promise<boolean> {
@@ -74,8 +75,11 @@ export async function acaoMetaAds(diretor: string, b: Record<string, unknown>): 
   if (extra.length) return falha(400, `Campo não aceito: ${extra.join(", ")}. Só é possível ligar, pausar ou ajustar a verba diária de campanha existente.`)
   const operacao = b.operacao as Operacao
   if (!OPERACOES.includes(operacao)) return falha(400, `operacao: ${OPERACOES.join(" | ")}. Criar campanha, conjunto ou anúncio e publicar continuam com o Felipe.`)
-  const campanhaId = typeof b.campanhaId === "string" ? b.campanhaId.trim() : typeof b.campanhaId === "number" ? String(b.campanhaId) : ""
-  if (!/^\d{1,30}$/.test(campanhaId)) return falha(400, "campanhaId: o id numérico de uma campanha que já existe.")
+  const idDe = (v: unknown) => typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : ""
+  if (b.campanhaId !== undefined && b.conjuntoId !== undefined) return falha(400, "Mande campanhaId ou conjuntoId, nunca os dois.")
+  const conjunto = b.conjuntoId !== undefined
+  const campanhaId = idDe(conjunto ? b.conjuntoId : b.campanhaId)   // id do alvo (campanha ou conjunto)
+  if (!/^\d{1,30}$/.test(campanhaId)) return falha(400, conjunto ? "conjuntoId: o id numérico de um conjunto que já existe." : "campanhaId: o id numérico de uma campanha que já existe.")
   let pedida: number | null = null
   if (operacao === "ajustar_verba") {
     const v = b.verbaDiaria
@@ -88,11 +92,14 @@ export async function acaoMetaAds(diretor: string, b: Record<string, unknown>): 
   catch (e) { return e instanceof ErroMeta ? falha(e.status, e.message, { codigo: e.codigo }) : falha(500, "Falha ao ler a configuração da Meta.") }
 
   try {
-    const c = await lerCampanha(campanhaId, token)
+    const c = await lerCampanha(campanhaId, token, conjunto)
     if (String(c.id) !== campanhaId || !c.account_id || `act_${c.account_id}` !== conta)
-      return falha(404, "Essa campanha não existe ou não pertence à conta de anúncios configurada.")
+      return falha(404, `${conjunto ? "Esse conjunto" : "Essa campanha"} não existe ou não pertence à conta de anúncios configurada.`)
     const antes: Estado = { status: c.status ?? null, verbaDiaria: reais(c.daily_budget) }
-    const base = { id: novoId(), diretor, operacao, campanhaId, campanhaNome: c.name ?? null, antes }
+    const alvo = conjunto
+      ? { conjuntoId: campanhaId, conjuntoNome: c.name ?? null, ...(c.campaign_id ? { campanhaId: String(c.campaign_id) } : {}) }
+      : { campanhaId, campanhaNome: c.name ?? null }
+    const base = { id: novoId(), diretor, operacao, ...alvo, antes }
 
     const recusar = async (motivo: string): Promise<Saida> => {
       const reg: RegistroAcao = { ...base, depois: null, em: new Date().toISOString(), aceita: false, motivo }
@@ -105,7 +112,12 @@ export async function acaoMetaAds(diretor: string, b: Record<string, unknown>): 
     if (operacao === "ajustar_verba") {
       const atual = antes.verbaDiaria
       const novoC = Math.round(pedida! * 100)
-      if (novoC > TETO_VERBA_DIARIA * 100) return recusar(`Verba diária pedida (${brl(pedida!)}) passa do teto de ${brl(TETO_VERBA_DIARIA)} por campanha. Nada foi alterado.`)
+      if (conjunto && (!atual || atual <= 0)) {
+        if (c.lifetime_budget) return recusar("O conjunto tem só verba total (lifetime), sem verba diária: não há base para o limite de 20%. Nada foi alterado.")
+        return recusar("A verba deste conjunto está na campanha (CBO): use campanhaId para ajustar. Nada foi alterado.")
+      }
+      const unidade = conjunto ? "conjunto" : "campanha"
+      if (novoC > TETO_VERBA_DIARIA * 100) return recusar(`Verba diária pedida (${brl(pedida!)}) passa do teto de ${brl(TETO_VERBA_DIARIA)} por ${unidade}. Nada foi alterado.`)
       if (!atual || atual <= 0) return recusar("A campanha não tem verba diária atual (zero ou só verba total): não há base para o limite de 20%. Nada foi alterado.")
       const atualC = Math.round(atual * 100)
       if (Math.abs(novoC - atualC) > atualC * LIMITE_MUDANCA)
@@ -118,7 +130,7 @@ export async function acaoMetaAds(diretor: string, b: Record<string, unknown>): 
       depois = { status, verbaDiaria: antes.verbaDiaria }
     }
 
-    try { await escreverCampanha(campanhaId, campos, token) }
+    try { await escreverCampanha(campanhaId, campos, token, conjunto) }
     catch (e) {
       if (!(e instanceof ErroMeta)) throw e
       const reg: RegistroAcao = { ...base, depois: null, em: new Date().toISOString(), aceita: false, motivo: `${e.message} (${e.codigo})` }

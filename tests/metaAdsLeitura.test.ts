@@ -32,7 +32,7 @@ function graphFalsa(url: string) {
     return { data: [{ ...id, spend: preset === "today" ? "0" : "10.5", ctr: "4.1", frequency: "1.4", impressions: "100", clicks: "4", reach: "70", actions: acoes }] }
   }
   if (p.endsWith("/campaigns")) return { data: [{ id: "1", name: "Camp", status: "ACTIVE", effective_status: "ACTIVE", daily_budget: "8000" }] }
-  if (p.endsWith("/adsets")) return { data: [{ id: "2", name: "Conj", status: "ACTIVE", campaign_id: "1" }] }
+  if (p.endsWith("/adsets")) return { data: [{ id: "2", name: "Conj", status: "ACTIVE", campaign_id: "1", daily_budget: "5000" }, { id: "4", name: "Conj CBO", status: "ACTIVE", campaign_id: "1" }] }
   if (p.endsWith("/ads")) return { data: [{ id: "3", name: "Anun", status: "ACTIVE", adset_id: "2", campaign_id: "1" }] }
   return { account_status: 1, is_prepay_account: true, currency: "BRL", amount_spent: "160600", spend_cap: "0", funding_source_details: { display_string: "Saldo disponível (R$4,82 BRL)" } }
 }
@@ -64,7 +64,8 @@ describe("GET /api/externo?o=meta_ads", () => {
     const j = await r.json()
     expect(j.conta).toMatchObject({ id: "act_9", prePaga: true, moeda: "BRL", saldo: 4.82, gastoAcumulado: 1606 })
     expect(j.campanhas[0]).toMatchObject({ id: "1", status: "ACTIVE", verbaDiaria: 80, gasto: { hoje: 0, d7: 10.5, d30: 10.5 }, conversas: { hoje: 5, d7: 5, d30: 5 }, ctr: { d7: 4.1 }, frequencia: { d7: 1.4 } })
-    expect(j.conjuntos[0]).toMatchObject({ id: "2", campanhaId: "1" })
+    expect(j.conjuntos[0]).toMatchObject({ id: "2", campanhaId: "1", verbaDiaria: 50, verbaTotal: null })
+    expect(j.conjuntos[1]).toMatchObject({ id: "4", verbaDiaria: null, verbaTotal: null })
     expect(j.anuncios[0]).toMatchObject({ id: "3", conjuntoId: "2", campanhaId: "1" })
     expect(j.cacheAte).toBeTruthy()
     expect(JSON.stringify(j)).not.toContain(TOKEN)

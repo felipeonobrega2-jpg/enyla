@@ -190,3 +190,9 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 **Status:** Claude Code. **PR:** o PR da issue #24. Não junta sozinho.
 
 `GET /api/externo?o=financeiro`, só com a chave do CFO (as outras recebem 403). Só leitura: receber, pagar, banco, saldos, gastos, margem e depende. Sem `contraparte_doc` nem `bruto`, e sem dados pessoais de cliente além de nome e valor. Não escreve nada financeiro; a ação `gasto_fixo` segue como está.
+
+## 15. Porta externa: verba do conjunto (ABO) na leitura e no ajuste
+
+**Status:** Claude Code. **Aprovo:** o Felipe liberou ligar, pausar e ajustar verba de campanha existente em 24/11/2026; as mesmas regras valem por conjunto. **PR:** o PR da issue #32. Não junta sozinho.
+
+Os `conjuntos` de `GET ?o=meta_ads` passam a trazer `verbaDiaria` e `verbaTotal` em reais (ou `null`, em CBO). `POST acao=meta_ads` aceita `conjuntoId` no lugar de `campanhaId` (nunca os dois) para ligar, pausar e ajustar a verba diária do conjunto: no máximo 20% e teto de R$ 200 por conjunto (recusa, não corta). Conjunto CBO em `ajustar_verba`: 400, a verba está na campanha, use `campanhaId`. Registro em `metaAdsAcoes` com `conjuntoId` e `conjuntoNome`. Não cria nada e não entrega o aviso de campanha parada (item 1).

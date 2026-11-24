@@ -59,7 +59,7 @@ export function montarItens(nivel: Nivel, itens: Item[], insights: Record<Recort
       id, nome: i.name ?? null, status: i.status ?? null, statusEfetivo: i.effective_status ?? null,
       ...(nivel !== "campaign" ? { campanhaId: i.campaign_id ?? null } : {}),
       ...(nivel === "ad" ? { conjuntoId: i.adset_id ?? null } : {}),
-      ...(nivel === "campaign" ? { verbaDiaria: reais(i.daily_budget), verbaTotal: reais(i.lifetime_budget) } : {}),
+      ...(nivel !== "ad" ? { verbaDiaria: reais(i.daily_budget), verbaTotal: reais(i.lifetime_budget) } : {}),
       gasto: por("gasto"), ctr: por("ctr"), frequencia: por("frequencia"), conversas: por("conversas"),
       impressoes: por("impressoes"), cliques: por("cliques"), alcance: por("alcance"),
     }
@@ -96,7 +96,7 @@ async function graph(caminho: string, params: Record<string, string>, token: str
 const CAMPOS_INSIGHT = "spend,ctr,frequency,impressions,clicks,reach,actions"
 const CAMPOS_ITEM: Record<Nivel, string> = {
   campaign: "id,name,status,effective_status,daily_budget,lifetime_budget",
-  adset: "id,name,status,effective_status,campaign_id",
+  adset: "id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget",
   ad: "id,name,status,effective_status,adset_id,campaign_id",
 }
 const PLURAL: Record<Nivel, string> = { campaign: "campaigns", adset: "adsets", ad: "ads" }
