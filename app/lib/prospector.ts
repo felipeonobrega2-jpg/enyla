@@ -20,7 +20,7 @@ export type ServicoProspect = (typeof SERVICOS_PROSPECTO)[number]
 export const ETAPAS_FUNIL = ["encontrado", "qualificado", "abordado", "abriu", "cadastrou"] as const
 export type EtapaFunil = (typeof ETAPAS_FUNIL)[number] | "descartado"
 
-export type MudancaEtapa = { etapa: EtapaFunil; em: string; motivo?: string }
+export type MudancaEtapa = { etapa: EtapaFunil; em: string; motivo?: string; cadastroId?: string }
 export type EstadoFunil = { etapa: EtapaFunil; optOut: boolean; historico: MudancaEtapa[] }
 
 /** Tudo que muda a nota está aqui. Os quatro tetos somam 100. */
@@ -262,7 +262,22 @@ export function aplicarOptOut(estado: EstadoFunil, em: string): EstadoFunil & { 
   }
 }
 
-/** Cadastro em /parceiros com o mesmo CNPJ. Não muda o cadastro; só avança o funil quando a regra deixa. */
-export function aoCadastrarComCnpj(estado: EstadoFunil, em: string): EstadoFunil | null {
-  return transicionar(estado, "cadastrou", em, "cadastro em /parceiros")
+export const MOTIVO_CADASTRO_RECEBIDO = "cadastro recebido (aguardando aprovação do Felipe)"
+export const MOTIVO_CADASTRO_APROVADO = "cadastro aprovado pelo Felipe"
+
+/** Cadastro público em /parceiros com o mesmo CNPJ: só registra no histórico, a etapa não muda.
+ *  Descartado, opt-out ou o mesmo cadastro já registrado: nada a fazer. */
+export function registrarCadastroRecebido(estado: EstadoFunil, em: string, cadastroId: string): EstadoFunil | null {
+  if (estado.optOut || estado.etapa === "descartado" || !cadastroId) return null
+  if (estado.historico.some(h => h.cadastroId === cadastroId)) return null
+  return { ...estado, historico: [...estado.historico, { etapa: estado.etapa, em, motivo: MOTIVO_CADASTRO_RECEBIDO, cadastroId }] }
+}
+
+/** O Felipe aprovou o cadastro do parceiro com o mesmo CNPJ: o funil vai para "cadastrou" quando a regra deixa. */
+export function aoCadastrarComCnpj(estado: EstadoFunil, em: string, cadastroId?: string): EstadoFunil | null {
+  const foi = transicionar(estado, "cadastrou", em, MOTIVO_CADASTRO_APROVADO)
+  if (!foi || !cadastroId) return foi
+  const historico = [...foi.historico]
+  historico[historico.length - 1] = { ...historico[historico.length - 1], cadastroId }
+  return { ...foi, historico }
 }

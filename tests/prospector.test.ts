@@ -3,8 +3,9 @@ import { readFileSync } from "node:fs"
 import path from "node:path"
 import {
   BASE_BARUERI, CNAES_PROSPECTO, PESOS_NOTA,
+  MOTIVO_CADASTRO_APROVADO, MOTIVO_CADASTRO_RECEBIDO,
   aoCadastrarComCnpj, aplicarOptOut, cnaeDeInteresse, distanciaAteBarueri,
-  notaDoProspect, podeTransicionar, servicosDosCnaes, transicionar, type EstadoFunil,
+  notaDoProspect, podeTransicionar, registrarCadastroRecebido, servicosDosCnaes, transicionar, type EstadoFunil,
 } from "@/app/lib/prospector"
 import { MUNICIPIOS_SP } from "@/app/lib/municipiosSp"
 
@@ -159,12 +160,23 @@ describe("funil", () => {
     expect(aplicarOptOut(opt, "2026-11-26T12:00:00Z").historico).toHaveLength(1)
   })
 
-  it("o mesmo CNPJ no cadastro avança para cadastrou e guarda a data", () => {
+  it("o cadastro aprovado com o mesmo CNPJ avança para cadastrou e guarda a data e o id", () => {
     const em = "2026-11-24T18:00:00Z"
-    const foi = aoCadastrarComCnpj(estado("qualificado"), em)
+    const foi = aoCadastrarComCnpj(estado("qualificado"), em, "PAR-1")
     expect(foi?.etapa).toBe("cadastrou")
-    expect(foi?.historico).toEqual([{ etapa: "cadastrou", em, motivo: "cadastro em /parceiros" }])
+    expect(foi?.historico).toEqual([{ etapa: "cadastrou", em, motivo: MOTIVO_CADASTRO_APROVADO, cadastroId: "PAR-1" }])
     expect(aoCadastrarComCnpj(foi!, "2026-11-25T12:00:00Z")).toBeNull()
+  })
+
+  it("o cadastro recebido só entra no histórico, sem mudar a etapa", () => {
+    const em = "2026-11-24T18:00:00Z"
+    const r = registrarCadastroRecebido(estado("abordado"), em, "PAR-1")
+    expect(r?.etapa).toBe("abordado")
+    expect(r?.historico).toEqual([{ etapa: "abordado", em, motivo: MOTIVO_CADASTRO_RECEBIDO, cadastroId: "PAR-1" }])
+    expect(MOTIVO_CADASTRO_RECEBIDO).toBe("cadastro recebido (aguardando aprovação do Felipe)")
+    expect(registrarCadastroRecebido(r!, "2026-11-25T12:00:00Z", "PAR-1")).toBeNull()
+    expect(registrarCadastroRecebido(estado("descartado"), em, "PAR-1")).toBeNull()
+    expect(registrarCadastroRecebido(aplicarOptOut(estado("qualificado"), em), em, "PAR-1")).toBeNull()
   })
 })
 

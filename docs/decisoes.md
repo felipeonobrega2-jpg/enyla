@@ -1,6 +1,6 @@
 # Decisões do Felipe
 
-O que o Felipe decidiu, com data e porquê. Quando duas decisões discordam, vale a de data mais recente. No mesmo dia, vale a que está mais acima: a lista é de cima para baixo, da última escrita para a primeira. As oito abaixo são de 23/11/2026 e foram tomadas juntas.
+O que o Felipe decidiu, com data e porquê. Quando duas decisões discordam, vale a de data mais recente. No mesmo dia, vale a que está mais acima: a lista é de cima para baixo, da última escrita para a primeira. As dez abaixo são de 23/11/2026. As duas do topo têm hora (America/Sao_Paulo); as oito de baixo foram tomadas juntas, antes delas.
 
 Diretores propõem. Estas decisões é que mandam no que se constrói.
 
@@ -11,6 +11,18 @@ Diretores propõem. Estas decisões é que mandam no que se constrói.
 3. Diga o que ficou decidido e o **porquê**. Sem porquê, não entra.
 4. Se a decisão mudar um item da fila, atualize [docs/fila.md](fila.md) no mesmo pull request.
 5. Não apague decisão antiga. Ela fica embaixo, para se saber o que valeu antes.
+
+## 23/11/2026 22:40 — envio automático do Prospector e código do Diego pelo Claude Code
+
+**Decisão.** Horário: 23/11/2026 22:40 (America/Sao_Paulo). O envio do Prospector de Parceiros será automático, dentro dos limites aprovados às 22:27 (até 10 abordagens por dia, de segunda a sexta, um lembrete após 4 dias, opt-out e link `/parceiros`). Todo código do Diego passa a ser construído pelo Claude Code via GitHub Action (`@claude`), não mais por agentes de nuvem.
+
+**Porquê.** Dentro de limites fixos e com opt-out, a abordagem não precisa de um clique do Felipe por mensagem. Construir pelo Claude Code no próprio repositório deixa cada mudança num pull request visível, com o CI, no mesmo caminho do trabalho do Felipe.
+
+## 23/11/2026 22:27 — Prospector de Parceiros aprovado
+
+**Decisão.** Horário: 23/11/2026 22:27 (America/Sao_Paulo). O Felipe aprovou o Prospector de Parceiros: raio no estado de SP inteiro, com nota pela distância de Barueri; todos os serviços; dados gratuitos da Receita por CNAE; até 10 abordagens por dia, de segunda a sexta; um lembrete após 4 dias; opt-out e link `/parceiros`; funil na tela Fornecedores; aprovação de parceiro com o Felipe. Isso responde à pergunta de processo da revisão: o item 8 da [fila](fila.md) está aprovado.
+
+**Porquê.** A rede de parceiros precisa crescer perto de Barueri, onde o frete é menor, sem depender de busca manual. A aprovação de quem entra na rede continua com o Felipe.
 
 ## 23/11/2026 — orçar Offset é do Felipe
 
@@ -26,7 +38,7 @@ Diretores propõem. Estas decisões é que mandam no que se constrói.
 
 ## 23/11/2026 — coordenação entre o Diego e o Claude Code
 
-**Decisão.** A coordenação do Diego (CTO, agentes na nuvem) com o Claude Code do Felipe é pelo repositório: [docs/fila.md](fila.md), este arquivo e `CLAUDE.md`. Em conflito, o trabalho do Felipe com o Claude Code tem prioridade.
+**Decisão.** A coordenação do Diego (CTO, código pelo Claude Code via GitHub Action `@claude`) com o Claude Code do Felipe é pelo repositório: [docs/fila.md](fila.md), este arquivo e `CLAUDE.md`. Em conflito, o trabalho do Felipe com o Claude Code tem prioridade.
 
 **Porquê.** Os dois constroem o mesmo código. Sem uma fila no repositório, um desfaz o que o outro fez. O Felipe está na frente quando os dois pegam a mesma coisa.
 
@@ -44,7 +56,7 @@ Diretores propõem. Estas decisões é que mandam no que se constrói.
 
 ## 23/11/2026 — código entra por pull request pequeno
 
-**Decisão.** O código é construído por agentes de código na nuvem. Pull request pequeno, aprovado por build e testes, é juntado na main sem esperar o Felipe. Um pull request por mudança, para poder desfazer. No máximo 3 pull requests juntados por vez.
+**Decisão.** O código do Diego é construído pelo Claude Code via GitHub Action (`@claude`), conforme a decisão de 23/11/2026 22:40 (antes, por agentes de código na nuvem). Pull request pequeno, aprovado por build e testes, é juntado na main sem esperar o Felipe. Um pull request por mudança, para poder desfazer. No máximo 3 pull requests juntados por vez.
 
 **Porquê.** Esperar o Felipe para juntar o que já passou no build e nos testes segura a main. Um pull request por mudança deixa desfazer uma coisa sem levar as outras. Três por vez evita juntar um bolo que ninguém consegue separar.
 

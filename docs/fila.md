@@ -1,6 +1,6 @@
 # Fila de construção
 
-Fila única, compartilhada entre o Diego (CTO, agentes na nuvem) e o Felipe com o Claude Code. O trabalho entra por aqui. Quem não está nesta fila não começa.
+Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude Code via GitHub Action `@claude`) e o Felipe com o Claude Code. O trabalho entra por aqui. Quem não está nesta fila não começa.
 
 ## Regras
 
@@ -23,13 +23,13 @@ Fila única, compartilhada entre o Diego (CTO, agentes na nuvem) e o Felipe com 
 | 5 | Dispensar pendência com motivo | COO (aprovada) | 4 (junto com o 4) | 11/12/2026 | livre | não | |
 | 6 | Enviar pedido de ferramenta ao Claude Code | CTO | depois das 5 | depois do item 5 | livre | sim | |
 | 7 | Integração com o Claude Code / vaga Desenvolvedor de ferramentas | CTO | depois das 5 | depois do item 5 | livre | sim | |
-| 8 | Prospector de Parceiros (base, nota e funil) | operação | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/2 |
+| 8 | Prospector de Parceiros (base, nota e funil) | operação | esta leva | — | Diego | aprovado 23/11/2026 22:27 | https://github.com/felipeonobrega2-jpg/enyla/pull/2 |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
 ## 0. CI e coordenação
 
-**Status:** Diego. **Aprovo:** não. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/1
+**Status:** Diego. **Aprovo:** aprovado pelo Felipe em 23/11/2026 22:27 (ver `docs/decisoes.md`). **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/1
 
 **O que já existe.** O `package.json` tem `lint` (`eslint`), `test` (`vitest run`) e `build` (`vitest run && next build`). Há 98 arquivos em `tests/`. Não há script de typecheck. O build não depende de variável de ambiente: o cliente do Supabase em `app/lib/supabase.ts` só é criado no primeiro uso.
 
@@ -135,12 +135,12 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 
 ## 8. Prospector de Parceiros (base, nota e funil)
 
-**Status:** Diego. **Aprovo:** não. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/2. Pedido da operação. Esta leva. Não entra na frente dos itens 1 a 7: é outra frente, e não manda mensagem, não mexe em cobrança, não apaga dado e não cria chave.
+**Status:** Diego. **Aprovo:** aprovado pelo Felipe em 23/11/2026 22:27 (ver `docs/decisoes.md`). **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/2. Pedido da operação. Esta leva. Não entra na frente dos itens 1 a 7: é outra frente, e não manda mensagem, não mexe em cobrança, não apaga dado e não cria chave.
 
 **O que já existe.** O cadastro público em `/parceiros` e a aprovação na tela Fornecedores (`CadastrosParceirosCard`). A aprovação continua com o Felipe, do jeito que está.
 
 **O que falta neste item.** A tabela `prospectos_parceiros`, a nota de 0 a 100, o mapeamento de CNAE e o bloco só leitura na tela Fornecedores. O desenho completo, inclusive o que fica para depois, está em `docs/prospector.md`. A coleta dos dados abertos da Receita e a abordagem (e-mail e WhatsApp) não são este item. A abordagem precisa de Aprovo do Felipe e não se constrói aqui.
 
-**Critério de aceite.** A migração só cria a tabela nova. A nota, o CNAE, a distância e o funil têm teste. A tela mostra a contagem e as qualificadas, sem botão de envio. Cadastro em `/parceiros` com o mesmo CNPJ avança o prospecto para `cadastrou` quando a regra deixa, sem mudar o resto do cadastro. Quem marcou "não quero receber" não volta.
+**Critério de aceite.** A migração só cria a tabela nova. A nota, o CNAE, a distância e o funil têm teste. A tela mostra a contagem e as qualificadas, sem botão de envio. Cadastro em `/parceiros` com o mesmo CNPJ só registra no histórico do prospecto (`cadastro recebido (aguardando aprovação do Felipe)`); a etapa vai para `cadastrou` quando o Felipe aprova o cadastro, sem mudar o resto do cadastro. Quem marcou "não quero receber" não volta.
 
 **Como testar.** `npm test` cobre `tests/prospector.test.ts`. Na tela Fornecedores, o bloco aparece embaixo dos cadastros. Sem a tabela no Supabase, o bloco pede para rodar o SQL e a aprovação de parceiro segue igual.

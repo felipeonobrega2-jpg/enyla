@@ -49,10 +49,11 @@ export async function receberCadastro(form: FormData): Promise<{ ok: true; id: s
   const cadastro: CadastroParceiro = { ...dados, id, em: new Date().toISOString(), status: "novo", gerente: GERENTE_PADRAO, arquivos, base }
   await mudarConfig((d: Cfg) => ({ cadastrosParceiros: [cadastro, ...(d.cadastrosParceiros ?? [])].slice(0, 500) }))
 
-  // Mesmo CNPJ de um prospecto: a etapa do funil vai para "cadastrou". Não mexe no cadastro e não envia mensagem.
+  // Mesmo CNPJ de um prospecto: só registra no histórico do prospecto (a etapa muda na aprovação do Felipe).
+  // Não mexe no cadastro e não envia mensagem.
   try {
-    const { marcarProspectCadastrou } = await import("./prospectorServidor")
-    await marcarProspectCadastrou(cadastro.documento, cadastro.tipoDocumento)
+    const { registrarCadastroRecebido } = await import("./prospectorServidor")
+    await registrarCadastroRecebido(cadastro.documento, cadastro.tipoDocumento, cadastro.id)
   } catch { /* o cadastro já está salvo; o funil não pode desfazer isso */ }
 
   // E-mail "Cadastro recebido" para o parceiro (se a Resend estiver configurada)
@@ -89,6 +90,13 @@ export async function mudarStatus(id: string, status: CadastroParceiro["status"]
     antes = (d.cadastrosParceiros ?? []).find(x => x.id === id)
     return { cadastrosParceiros: (d.cadastrosParceiros ?? []).map(x => x.id === id ? { ...x, status, ...(fornecedorId ? { fornecedorId } : {}) } : x) }
   })
+  // Aprovado agora: o prospecto com o mesmo CNPJ vai para "cadastrou" (não envia nada; falha quieta)
+  if (status === "aprovado" && antes && antes.status !== "aprovado") {
+    try {
+      const { marcarProspectCadastrou } = await import("./prospectorServidor")
+      await marcarProspectCadastrou(antes.documento, antes.tipoDocumento, antes.id)
+    } catch { /* a aprovação já está salva; o funil não pode desfazer isso */ }
+  }
   // Aprovado agora: e-mail de boas-vindas à rede
   if (status === "aprovado" && antes && antes.status !== "aprovado") {
     try {

@@ -1,8 +1,8 @@
 // Leitura do funil e o gancho do cadastro. Não envia mensagem e não altera o cadastro do parceiro.
 import { supabase } from "./supabase"
 import {
-  aoCadastrarComCnpj, etapaConhecida, notaDoProspect, ETAPAS_FUNIL,
-  type EtapaFunil, type MudancaEtapa,
+  aoCadastrarComCnpj, etapaConhecida, notaDoProspect, registrarCadastroRecebido as registrarNoHistorico, ETAPAS_FUNIL,
+  type EstadoFunil, type EtapaFunil, type MudancaEtapa,
 } from "./prospector"
 
 const TABELA = "prospectos_parceiros"
@@ -60,6 +60,7 @@ export async function lerFunil(): Promise<FunilProspector> {
       .select("cnpj, razao_social, nome_fantasia, municipio, uf, latitude, longitude, servicos, situacao, abertura, porte")
       .eq("etapa", "qualificado")
       .eq("opt_out", false)
+      .order("nota", { ascending: false, nullsFirst: false })
       .limit(LIMITE_LEITURA),
   ])
   if (lista.error) throw new Error(lista.error.message)
@@ -75,26 +76,47 @@ export async function lerFunil(): Promise<FunilProspector> {
   return { contagem: Object.fromEntries(contagens) as FunilProspector["contagem"], qualificados }
 }
 
-// Mesmo CNPJ no formulário /parceiros: a etapa vai para "cadastrou" quando a regra deixa.
-// Falha quieta. O cadastro público já está salvo e não pode depender desta tabela.
-export async function marcarProspectCadastrou(documento: string, tipo: "cnpj" | "cpf"): Promise<void> {
-  if (tipo !== "cnpj") return
+function cnpjDe(documento: string, tipo: "cnpj" | "cpf"): string | null {
+  if (tipo !== "cnpj") return null
   const cnpj = (documento ?? "").replace(/\D/g, "")
-  if (cnpj.length !== 14) return
+  return cnpj.length === 14 ? cnpj : null
+}
+
+// Lê o prospecto, calcula o próximo estado e grava com trava otimista: o update só vale se a etapa
+// ainda é a que foi lida. Se mudou no meio, não grava (quem mudou ganha). Falha quieta.
+async function mudarProspecto(cnpj: string, proximo: (estado: EstadoFunil, em: string) => EstadoFunil | null): Promise<boolean> {
   try {
     const { data, error } = await supabase.from(TABELA).select("id, etapa, opt_out, historico_etapas").eq("cnpj", cnpj).maybeSingle()
-    if (error || !data || !etapaConhecida(data.etapa)) return
+    if (error || !data || !etapaConhecida(data.etapa)) return false
     const em = new Date().toISOString()
-    const proximo = aoCadastrarComCnpj({
+    const novo = proximo({
       etapa: data.etapa as EtapaFunil,
       optOut: data.opt_out === true,
       historico: historicoValido(data.historico_etapas),
     }, em)
-    if (!proximo) return
-    await supabase.from(TABELA).update({
-      etapa: proximo.etapa,
-      historico_etapas: proximo.historico,
+    if (!novo) return false
+    const { data: gravado, error: erroGravar } = await supabase.from(TABELA).update({
+      etapa: novo.etapa,
+      historico_etapas: novo.historico,
       atualizado_em: em,
-    }).eq("id", data.id).eq("opt_out", false).neq("etapa", "descartado")
-  } catch { /* tabela ainda não criada, ou a leitura falhou */ }
+    }).eq("id", data.id).eq("etapa", data.etapa).eq("opt_out", false).select("id")
+    return !erroGravar && Array.isArray(gravado) && gravado.length > 0
+  } catch { return false /* tabela ainda não criada, ou a leitura falhou */ }
+}
+
+// Cadastro público em /parceiros com o mesmo CNPJ: só registra no histórico o id do cadastro.
+// A etapa não muda aqui. Ela vai para "cadastrou" quando o Felipe aprova (marcarProspectCadastrou).
+// O cadastro já está salvo e não pode depender desta tabela.
+export async function registrarCadastroRecebido(documento: string, tipo: "cnpj" | "cpf", cadastroId: string): Promise<boolean> {
+  const cnpj = cnpjDe(documento, tipo)
+  if (!cnpj) return false
+  return mudarProspecto(cnpj, (estado, em) => registrarNoHistorico(estado, em, cadastroId))
+}
+
+// O Felipe aprovou o cadastro do parceiro (tela Fornecedores): a etapa vai para "cadastrou" quando a regra deixa.
+// Trava otimista: só grava se a etapa ainda é a lida no select. Falha quieta; a aprovação não depende disto.
+export async function marcarProspectCadastrou(documento: string, tipo: "cnpj" | "cpf", cadastroId?: string): Promise<boolean> {
+  const cnpj = cnpjDe(documento, tipo)
+  if (!cnpj) return false
+  return mudarProspecto(cnpj, (estado, em) => aoCadastrarComCnpj(estado, em, cadastroId))
 }

@@ -42,7 +42,14 @@ Na CNAE 2.2, "impressão de material para outros usos" era 1813-0/02. Na 2.3 o c
 
 A etapa anda para frente: encontrado → qualificado → abordado → abriu → cadastrou. Pode pular, porque o cadastro pode chegar antes da abordagem. Descartado sai de qualquer etapa e não volta. "Não quero receber" marca descartado, grava a data e trava: nenhuma transição devolve à fila.
 
-**Ligação com o cadastro.** Quando alguém se cadastra em `/parceiros` com o mesmo CNPJ, a etapa do prospecto vai para `cadastrou` e o histórico ganha a data. O cadastro em si não muda. Se o prospecto está descartado ou marcou que não quer receber, nada acontece. Se a tabela ainda não existe, o cadastro segue e o gancho falha em silêncio.
+**Ligação com o cadastro.** São dois momentos, e só o segundo muda a etapa.
+
+1. Cadastro público em `/parceiros` (`/api/parceiros/cadastro`) com o mesmo CNPJ: o prospecto **não muda de etapa**. O histórico ganha uma linha com a etapa atual, a data, o id do cadastro (`cadastroId`) e o texto `cadastro recebido (aguardando aprovação do Felipe)`. O mesmo cadastro não é registrado duas vezes.
+2. O Felipe aprova o cadastro na tela Fornecedores (`mudarStatus` em `app/lib/parceirosServidor.ts`, status `aprovado`): a etapa vai para `cadastrou`, com a data, o id do cadastro e o texto `cadastro aprovado pelo Felipe`. Recusar não mexe no prospecto.
+
+A gravação usa trava otimista: o update só vale se a etapa ainda é a lida no select. Se mudou no meio, não grava. O cadastro em si não muda. Se o prospecto está descartado ou marcou que não quer receber, nada acontece. Se a tabela ainda não existe, o cadastro e a aprovação seguem e o gancho falha em silêncio (há teste de servidor para isso em `tests/prospectorServidor.test.ts`).
+
+A lista das qualificadas vem do banco já ordenada por `nota desc` antes do limite, e a tela reordena pela nota recalculada com os pesos atuais.
 
 ## Próxima parte — importador
 
