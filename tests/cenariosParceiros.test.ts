@@ -49,7 +49,7 @@ describe("estrutura dos cenários", () => {
   it("referências internas combinadas, e nada inventado", () => {
     const ref = (id: string) => cenario(id).referencias.map(r => [r.fornecedorNome, r.preco])
     expect(ref("verniz")).toEqual([["Ronaldo Osasco", 450]])
-    expect(ref("laminacao-fosca")).toEqual([["Ronaldo Osasco", 450]])
+    expect(ref("laminacao-fosca")).toEqual([["Ronaldo Osasco", 765.28]])
     for (const id of ["laminacao-brilho", "laminacao-soft", "laminacao-dois-lados", "relevo", "faca", "fechamento", "transporte"]) expect(ref(id)).toEqual([])
     expect(ref("hotStamping")).toEqual([["Guilherme", 1387.5]])
     expect(ref("corteVinco")).toEqual([["Rodrigo", 200], ["Fabiano", 280], ["Jacuna", 280]])
@@ -176,7 +176,7 @@ describe("config editável", () => {
     const m = mesclarCenarios(estado.cfg.cenariosParceiros)
     expect(m).toHaveLength(CENARIOS_PADRAO.length)
     expect(m.find(c => c.id === "laminacao-soft")).toMatchObject({ enunciado: "Novo texto", versao: 2, referencias: [{ preco: 100, fornecedorNome: "Fulano" }] })
-    expect(m.find(c => c.id === "laminacao-fosca")!.referencias[0].preco).toBe(450)
+    expect(m.find(c => c.id === "laminacao-fosca")!.referencias[0].preco).toBe(765.28)
     expect(JSON.stringify(await lerCenariosPublicos())).not.toContain("Fulano")
   })
 })
