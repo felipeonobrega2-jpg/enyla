@@ -6,11 +6,26 @@
 import React from "react"
 import { ChevronDown, Plus, X } from "lucide-react"
 import { SERVICOS_PARCEIRO } from "../lib/parceiros"
-import type { CenarioParceiro } from "../lib/cenariosParceiros"
+import type { CadastroParceiro } from "../lib/parceiros"
+import { estatisticaCenario, type CenarioParceiro } from "../lib/cenariosParceiros"
 
 const campo = "h-9 rounded-lg px-2.5 text-[12.5px] bg-[rgba(116,116,128,0.08)] text-[#191625] outline-none"
 
-export function CenariosParceirosEditor({ cenarios, onSalvo }: { cenarios: CenarioParceiro[]; onSalvo: (c: CenarioParceiro[]) => void }) {
+const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+
+// Só da equipe: referência de fornecedor e média, mínimo e máximo dos preços que os parceiros já informaram
+export function LinhaMercado({ cenario, cadastros }: { cenario: CenarioParceiro; cadastros: Pick<CadastroParceiro, "servicos">[] }) {
+  const est = estatisticaCenario(cadastros, cenario.id)
+  const refs = cenario.referencias.filter(r => r.preco != null && r.preco > 0)
+  return (
+    <div className="text-[12px] text-[#5e5c68] space-y-0.5">
+      <p>{refs.length ? <>Referência: {refs.map(r => `${r.fornecedorNome ? `${r.fornecedorNome} ` : ""}${brl(r.preco as number)}`).join(" · ")}</> : "sem referência"}</p>
+      <p>{est ? <>Parceiros ({est.n}): média <b>{brl(est.media)}</b> · mínimo <b>{brl(est.min)}</b> · máximo <b>{brl(est.max)}</b></> : "ainda não há preço de parceiro"}</p>
+    </div>
+  )
+}
+
+export function CenariosParceirosEditor({ cenarios, cadastros = [], onSalvo }: { cenarios: CenarioParceiro[]; cadastros?: Pick<CadastroParceiro, "servicos">[]; onSalvo: (c: CenarioParceiro[]) => void }) {
   const [aberto, setAberto] = React.useState(false)
   const [rascunho, setRascunho] = React.useState<CenarioParceiro[]>([])
   const [msg, setMsg] = React.useState<string | null>(null)
@@ -35,8 +50,9 @@ export function CenariosParceirosEditor({ cenarios, onSalvo }: { cenarios: Cenar
       {aberto && (
         <div className="px-4 pb-4 space-y-3">
           {rascunho.map((c, i) => (
-            <div key={c.servicoId} className="rounded-lg bg-[rgba(116,116,128,0.05)] p-3 space-y-2">
-              <p className="text-[12.5px] font-semibold text-[#191625]">{SERVICOS_PARCEIRO.find(s => s.id === c.servicoId)?.nome ?? c.servicoId} <span className="font-normal text-[#898892]">· versão {c.versao}</span></p>
+            <div key={c.id} className="rounded-lg bg-[rgba(116,116,128,0.05)] p-3 space-y-2">
+              <p className="text-[12.5px] font-semibold text-[#191625]">{SERVICOS_PARCEIRO.find(s => s.id === c.servicoId)?.nome ?? c.servicoId} <span className="font-normal text-[#898892]">· {c.unidade ?? c.id} · versão {c.versao}</span></p>
+              <LinhaMercado cenario={c} cadastros={cadastros} />
               <label className="block text-[11.5px] text-[#898892]">Enunciado (o parceiro vê)
                 <textarea className={`${campo} w-full h-16 py-2 resize-none mt-1`} value={c.enunciado} onChange={e => mudar(i, { enunciado: e.target.value })} />
               </label>

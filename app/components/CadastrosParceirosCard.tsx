@@ -5,7 +5,7 @@
 
 import React from "react"
 import { Handshake, Copy, Check, ChevronDown, Paperclip, MessageCircle, Mail, X } from "lucide-react"
-import { nomeServico, textoCobranca, textoPrazo, textoTecnico, textoEndereco, paraFornecedor, type CadastroParceiro } from "../lib/parceiros"
+import { nomeServico, textoCobranca, textoPrazo, textoTecnico, textoEndereco, paraFornecedor, type CadastroParceiro, type ServicoCadastrado } from "../lib/parceiros"
 import type { FornecedorProducao } from "../lib/producao"
 import { compararExemplo, type CenarioParceiro } from "../lib/cenariosParceiros"
 import { CenariosParceirosEditor } from "./CenariosParceirosEditor"
@@ -13,16 +13,25 @@ import { CenariosParceirosEditor } from "./CenariosParceirosEditor"
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 const sinal = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${brl(Math.abs(v))}`
 
-// Só da equipe: o preço que o parceiro deu no exemplo contra a nossa referência (ou "sem referência")
-export function LinhaExemplo({ precoExemplo, cenario }: { precoExemplo?: number | null; cenario?: CenarioParceiro }) {
-  if (!precoExemplo) return <p className="text-[#898892] mt-0.5">Exemplo: sem preço informado</p>
-  const comp = compararExemplo(precoExemplo, cenario?.referencias)
+// Só da equipe: o preço que o parceiro deu em cada exemplo do serviço contra a nossa referência (ou "sem referência")
+export function LinhaExemplo({ servico, cenarios }: { servico: ServicoCadastrado; cenarios: CenarioParceiro[] }) {
+  const doServico = cenarios.filter(x => x.servicoId === servico.id)
+  if (!doServico.length) return null
   return (
-    <div className="mt-0.5">
-      <p className="text-[#191625]">Exemplo ({cenario?.unidade ?? "cenário"}): <b>{brl(precoExemplo)}</b></p>
-      {comp.length === 0
-        ? <p className="text-[#898892]">sem referência</p>
-        : comp.map((k, i) => <p key={i} className="text-[#5e5c68]">Referência{k.fornecedorNome ? ` (${k.fornecedorNome})` : ""}: {brl(k.referencia)} · diferença <b className={k.diferenca > 0 ? "text-[#c26a0a]" : "text-[#009351]"}>{sinal(k.diferenca)} ({k.percentual > 0 ? "+" : ""}{String(k.percentual).replace(".", ",")}%)</b></p>)}
+    <div className="mt-0.5 space-y-1">
+      {doServico.map(cenario => {
+        const preco = servico.precosExemplo?.[cenario.id]
+        if (!preco) return <p key={cenario.id} className="text-[#898892]">Exemplo ({cenario.unidade ?? cenario.id}): sem preço informado</p>
+        const comp = compararExemplo(preco, cenario.referencias)
+        return (
+          <div key={cenario.id}>
+            <p className="text-[#191625]">Exemplo ({cenario.unidade ?? cenario.id}): <b>{brl(preco)}</b></p>
+            {comp.length === 0
+              ? <p className="text-[#898892]">sem referência</p>
+              : comp.map((k, i) => <p key={i} className="text-[#5e5c68]">Referência{k.fornecedorNome ? ` (${k.fornecedorNome})` : ""}: {brl(k.referencia)} · diferença <b className={k.diferenca > 0 ? "text-[#c26a0a]" : "text-[#009351]"}>{sinal(k.diferenca)} ({k.percentual > 0 ? "+" : ""}{String(k.percentual).replace(".", ",")}%)</b></p>)}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -68,7 +77,7 @@ export function CadastrosParceirosCard({ onAprovar }: { onAprovar: (f: Fornecedo
         </button>
       </div>
 
-      <CenariosParceirosEditor cenarios={cenarios} onSalvo={setCenarios} />
+      <CenariosParceirosEditor cenarios={cenarios} cadastros={lista ?? []} onSalvo={setCenarios} />
 
       {lista && lista.length > 0 && (
         <div className="mt-4 space-y-2">
@@ -103,7 +112,7 @@ export function CadastrosParceirosCard({ onAprovar }: { onAprovar: (f: Fornecedo
                         <div key={s.id} className="px-3 py-2 text-[12.5px]">
                           <p className="font-semibold text-[#191625]">{nomeServico(s)}</p>
                           <p className="text-[#5e5c68]">{textoCobranca(s)} · {textoPrazo(s)}{s.minimo ? ` · mínimo ${s.minimo}` : ""}</p>
-                          <LinhaExemplo precoExemplo={s.precoExemplo} cenario={cenarios.find(x => x.servicoId === s.id)} />
+                          <LinhaExemplo servico={s} cenarios={cenarios} />
                           {textoTecnico(s) && <p className="text-[#5e5c68] mt-0.5">{textoTecnico(s)}</p>}
                           {s.obs && <p className="text-[#898892] mt-0.5">{s.obs}</p>}
                         </div>

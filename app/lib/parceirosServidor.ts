@@ -4,10 +4,10 @@ import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
 import { notificar, LINK_SISTEMA } from "./notificar"
-import { limparCadastro, errosDoCadastro, nomeServico, textoPrazo, textoEndereco, GERENTE_PADRAO, SERVICOS_PARCEIRO, type CadastroParceiro } from "./parceiros"
+import { limparCadastro, errosDoCadastro, nomeServico, textoPrazo, textoEndereco, GERENTE_PADRAO, type CadastroParceiro } from "./parceiros"
 import { textoEndereco as textoParaMotorista, type Endereco } from "./frete"
 
-import { mesclarCenarios, limparCenario, cenariosPublicos, type CenarioParceiro, type CenarioPublico } from "./cenariosParceiros"
+import { CENARIOS_PADRAO, mesclarCenarios, limparCenario, cenariosPublicos, type CenarioParceiro, type CenarioPublico } from "./cenariosParceiros"
 
 type Cfg = Record<string, unknown> & { cadastrosParceiros?: CadastroParceiro[]; cenariosParceiros?: CenarioParceiro[]; agenteAuto?: { avisoNumero?: string } }
 const TIPOS = /^(application\/pdf|image\/(png|jpe?g|webp|heic|heif)|application\/vnd\.(ms-excel|openxmlformats-officedocument\.(spreadsheetml\.sheet|wordprocessingml\.document))|text\/csv)$/
@@ -25,7 +25,10 @@ export async function receberCadastro(form: FormData): Promise<{ ok: true; id: s
   const cfg = (c?.data ?? {}) as Cfg
   // Versão do cenário: a que o parceiro viu (se ainda existe) ou a atual
   const cenarios = mesclarCenarios(cfg.cenariosParceiros)
-  for (const s of dados.servicos) if (s.precoExemplo) s.cenarioVersao = s.cenarioVersao ?? cenarios.find(x => x.servicoId === s.id)?.versao
+  for (const s of dados.servicos) for (const cid of Object.keys(s.precosExemplo ?? {})) {
+    const versao = s.cenarioVersoes?.[cid] ?? cenarios.find(x => x.id === cid)?.versao
+    if (versao) s.cenarioVersoes = { ...s.cenarioVersoes, [cid]: versao }
+  }
   const ultimaHora = (cfg.cadastrosParceiros ?? []).filter(x => Date.now() - new Date(x.em).getTime() < 3_600_000)
   if (ultimaHora.length >= 30) return { ok: false, erro: "Muitos cadastros agora. Tente de novo em alguns minutos." }
   if (ultimaHora.some(x => x.documento === dados.documento)) return { ok: false, erro: "Já recebemos o seu cadastro agora há pouco. Obrigado!" }
@@ -123,13 +126,13 @@ export async function lerCenariosPublicos(): Promise<CenarioPublico[]> {
   try { return cenariosPublicos(await lerCenarios()) } catch { return cenariosPublicos(mesclarCenarios(undefined)) }
 }
 export async function salvarCenarios(entrada: unknown): Promise<CenarioParceiro[]> {
-  const ids = new Set(SERVICOS_PARCEIRO.map(s => s.id))
-  const lista = (Array.isArray(entrada) ? entrada : []).filter(x => x && ids.has(x.servicoId)).map(x => limparCenario(x)).filter(x => x.enunciado)
+  const ids = new Set(CENARIOS_PADRAO.map(c => c.id))
+  const lista = (Array.isArray(entrada) ? entrada : []).filter(x => x && ids.has(x.id)).map(x => limparCenario({ ...x, servicoId: CENARIOS_PADRAO.find(c => c.id === x.id)!.servicoId })).filter(x => x.enunciado)
   let final: CenarioParceiro[] = []
   await mudarConfig((d: Cfg) => {
     const atuais = mesclarCenarios(d.cenariosParceiros)
     final = atuais.map(a => {
-      const novo = lista.find(x => x.servicoId === a.servicoId)
+      const novo = lista.find(x => x.id === a.id)
       if (!novo) return a
       return { ...novo, versao: novo.enunciado === a.enunciado ? a.versao : a.versao + 1 }
     })
