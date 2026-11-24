@@ -32,6 +32,11 @@ export type EstadoMql = "orcado" | "pronto" | "padrao" | "falta"
 const DOC = /document/i
 const PRECO = /R\$\s?\d/
 
+// Mensagem sua que é orçamento: documento (PDF) ou preço no texto (R$ com valor)
+export const ehMsgDeOrcamento = (m: { tipo: string | null; corpo: string | null }) => DOC.test(m.tipo ?? "") || PRECO.test(m.corpo ?? "")
+// Botões/modelo sem texto que o WhatsApp Business dispara sozinho: não é sua
+export const ehMsgAutomatica = (m: { from_me: boolean; tipo: string | null; corpo: string | null }) => m.from_me && !m.corpo?.trim() && /interactive|template|buttons|list/i.test(m.tipo ?? "")
+
 export function medidasDe(d: DadosPedido | null | undefined) {
   const c = d?.caixa_cm
   return !!c && c.altura > 0 && c.frente > 0 && c.lateral > 0
@@ -66,10 +71,10 @@ export function comMedidaPadrao(d: DadosPedido): DadosPedido {
 // null = não é lead novo da janela (já falava antes), ainda não escreveu ou é produto que não fazemos.
 export function estadoDoMql(msgs: MsgMeta[], dados: DadosPedido | null, orcamentoNoSistemaEm: string[] = [], agora = Date.now(), ia?: Momento | null) {
   // Mensagem com botões sem texto que o WhatsApp Business dispara sozinho não é sua (nem conta como orçamento)
-  const ord = [...msgs].filter(m => !(m.from_me && !m.corpo?.trim() && /interactive|template|buttons|list/i.test(m.tipo ?? ""))).sort((a, b) => a.ts.localeCompare(b.ts))
+  const ord = [...msgs].filter(m => !ehMsgAutomatica(m)).sort((a, b) => a.ts.localeCompare(b.ts))
   const primeira = ord.find(m => !m.from_me)?.ts
   if (!primeira || agora - new Date(primeira).getTime() > DIAS_META * 86_400_000) return null
-  const porMsg = ord.find(m => m.from_me && m.ts > primeira && (DOC.test(m.tipo ?? "") || PRECO.test(m.corpo ?? "")))?.ts
+  const porMsg = ord.find(m => m.from_me && m.ts > primeira && ehMsgDeOrcamento(m))?.ts
   const noSistema = orcamentoNoSistemaEm.filter(t => t > primeira).sort()[0]
   const orcadoEm = [porMsg, noSistema].filter(Boolean).sort()[0] ?? null
   const horas = ((orcadoEm ? new Date(orcadoEm).getTime() : agora) - new Date(primeira).getTime()) / 3_600_000
