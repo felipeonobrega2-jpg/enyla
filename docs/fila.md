@@ -32,6 +32,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 14 | Porta externa: leitura financeira (`?o=financeiro`) para o CFO | CFO | — | — | Claude Code | não | (PR da issue #24) |
 | 15 | Porta externa: verba do conjunto (ABO) na leitura e no ajuste (`acao=meta_ads`, `conjuntoId`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 (mesmas regras por conjunto) | (PR da issue #32) |
 | 16 | Porta externa: escrita financeira do CFO (`acao=lancamento`, `conciliacao`, `categoria`) | CFO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026, 7h31 ("Libera para o Otávio") | (PR da issue #35) |
+| 17 | Porta externa: leitura financeira ignora lançamentos estornados (`incluirEstornados`) | CFO | — | — | Claude Code | pedido do Felipe na issue #41 | (PR da issue #41) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -208,3 +209,9 @@ Os `conjuntos` de `GET ?o=meta_ads` passam a trazer `verbaDiaria` e `verbaTotal`
 **Não faz.** Não paga nem cobra, não muda preço, não mexe em chaves, não apaga nada de vez: desativar/estornar marcam `estornadoEm`/`estornadoPor`, e o `desfazer` da conciliação estorna os lançamentos criados em vez de apagá-los (o `desfazer` de `aplicar()` não é exposto). Sem `contraparte_doc` nem `bruto` na resposta.
 
 **Migração (só depois do merge, aditiva).** `supabase/migrations/20261126_lancamento_estorno.sql` acrescenta `estornadoEm` e `estornadoPor` em `LancamentoFinanceiro`. Enquanto não rodar, o estorno grava só a marca em `obs`. A leitura financeira ainda não filtra lançamentos estornados: item a combinar.
+
+## 17. Porta externa: leitura financeira ignora lançamentos estornados
+
+**Status:** Claude Code. **PR:** o PR da issue #41. Não junta sozinho. Sem migração nova (a `20261126_lancamento_estorno.sql` já rodou em 24/11/2026, 8h37).
+
+`GET ?o=financeiro` passa a excluir lançamentos com `estornadoEm` preenchido (desativados e estornados) de resumo, `receber`, `pagar`, `gastos` e `margem`. `&incluirEstornados=1|true|sim` traz todos de volta; outro valor dá 400. A resposta traz `incluirEstornados`. `banco`, `saldos` e `depende` não mudam. A escrita (`estornarLogico`) já grava `estornadoEm`/`estornadoPor` e `obs`, com fallback só em `obs`; `LancamentoFinanceiro` ganhou os dois campos opcionais. Não mexe em chaves nem em pagamento/cobrança.
