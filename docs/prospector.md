@@ -65,6 +65,16 @@ A lista das qualificadas vem do banco já ordenada por `nota desc` antes do limi
 
 **Agendamento e acesso.** Entrada em `vercel.json` (uma vez por dia, 13h UTC) e rota liberada em `proxy.ts`. Autenticação igual a `/api/whatsapp/verificar`: com `CRON_SECRET` exige `Authorization: Bearer`; sem ele, só o `User-Agent` `vercel-cron/`. O `CRON_SECRET` é o que a Vercel já usa nos crons do projeto; não há secret novo. Para andar mais rápido que um lote por dia, chame a rota à mão com o Bearer ou aumente a frequência do cron (planos Pro).
 
+**Rodar o importador à mão (uma vez, em produção).** Não espera o cron e não envia nada. A rota é a mesma do cron, com o mesmo Bearer:
+
+```
+curl -sS -m 300 -H "Authorization: Bearer $CRON_SECRET" https://<dominio-de-producao>/api/prospector/importar
+```
+
+`$CRON_SECRET` é o valor da variável de ambiente do projeto na Vercel. Resposta esperada: `{"ok":true,"lidos":...,"inseridos":N,"cursor":{...}}` (HTTP 200). Cada chamada trata até 400 CNPJs e avança o cursor; repita até `inseridos` aparecer em `prospectos_parceiros`. Leituras do resultado: 401 = segredo errado; 502 com `Receita respondeu NNN` = a fonte recusou ou o mês ainda não existe (nada é gravado, o cursor não anda); 500 = erro de banco, ver `erro`. Não liga `prospector_envio_ativo`.
+
+**Diagnóstico de 24/11/2026.** O cron das 10h (13h UTC) não gravou nada porque a rota e a entrada do `vercel.json` só entraram na `main` às 10h38 (BRT), depois do horário; o primeiro disparo agendado é o de 25/11. A rota, o `vercel.json` (`0 13 * * *`) e a liberação em `proxy.ts` estão corretos na `main`. Se a chamada manual falhar, o `erro` devolvido indica a causa.
+
 ## Envio automático (primeiro contato e lembrete)
 
 Código: `app/lib/prospectorEnvio.ts` (textos, horário, canais e recusa, tudo puro), `app/lib/prospectorEnvioServidor.ts` (Supabase, Evolution, Resend) e a rota `GET /api/prospector/enviar`. O texto está aprovado. **A chave `prospector_envio_ativo` (AppConfig) começa desligada** e nenhuma migração, seed ou teste a liga. Desligada, a rota devolve `{ ativo: false }` e não lê a base nem envia. Quem liga é o Felipe.
