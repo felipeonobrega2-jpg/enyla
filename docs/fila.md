@@ -15,7 +15,7 @@ Fila única, compartilhada entre o Diego (CTO, agentes na nuvem) e o Felipe com 
 
 | # | Item | Quem pediu | Prioridade | Prazo | Status | Aprovo | PR |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | CI e coordenação | CTO | — | — | Diego | não | este pull request |
+| 0 | CI e coordenação | CTO | — | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/1 |
 | 1 | Conexão com a Meta Ads | CMO | 1 | 30/11/2026 | livre | sim | |
 | 2 | Detectar orçamento já enviado e lead perdido | CCO (aprovada) | 2 | 30/11/2026 | livre | não | |
 | 3 | Diretor aciona Atendente e Follow-up por lead | CCO (aprovada) | 3 | 11/12/2026 | livre | sim | |
@@ -28,7 +28,7 @@ Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramenta
 
 ## 0. CI e coordenação
 
-**Status:** Diego. **Aprovo:** não. Este pull request.
+**Status:** Diego. **Aprovo:** não. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/1
 
 **O que já existe.** O `package.json` tem `lint` (`eslint`), `test` (`vitest run`) e `build` (`vitest run && next build`). Há 98 arquivos em `tests/`. Não há script de typecheck. O build não depende de variável de ambiente: o cliente do Supabase em `app/lib/supabase.ts` só é criado no primeiro uso.
 
