@@ -12,7 +12,9 @@ import { conciliacao } from "@/app/lib/conciliacaoExterna"
 import { categoria } from "@/app/lib/categoriaExterna"
 import { leituraFinanceira, AJUDA_FINANCEIRO } from "@/app/lib/financeiroExterno"
 import { leituraMetaAds, ErroMeta } from "@/app/lib/metaAdsLeitura"
+import { paradasParaLeitura } from "@/app/lib/metaCampanhaParada"
 import { acaoMetaAds } from "@/app/lib/metaAdsAcoes"
+import { acaoPendencia, lerPendenciasDaArea, renovarFotoDepois } from "@/app/lib/pendenciaExterna"
 import { pedidoExterno } from "@/app/lib/pedidoExterno"
 
 // Porta de acesso dos diretores na nuvem (ex.: Grok Bot). Pública no proxy, mas cada chamada exige a chave do diretor
@@ -42,6 +44,8 @@ export async function GET(req: NextRequest) {
     voce: `${info.nome}, ${info.cargo} (${info.area})`,
     leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | "), "?o=conversa": "o que você e o Felipe conversaram", ...(diretor === "cfo" ? AJUDA_FINANCEIRO : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa" }), ...(diretor === "cmo" ? { "?o=meta_ads": "Meta Ads ao vivo (só leitura): conta, campanhas, conjuntos e anúncios; hoje, 7 e 30 dias; cache de 3 min" } : {}) },
     escrita: { "POST {acao:'relatar', texto}": "manda algo ao Felipe",
+      "POST {acao:'dispensar_pendencia', chave, motivo, ate?}": "QUALQUER DIRETOR. Dispensa uma pendência (a chave vem em ?o=empresa, campo pendencias) com motivo obrigatório (sem motivo: 400); ate (AAAA-MM-DD) opcional: depois dessa data ela volta. Não apaga nada",
+      "POST {acao:'reabrir_pendencia', chave}": "QUALQUER DIRETOR. Tira a dispensa e a pendência volta na hora (?o=empresa lista as dispensadas à parte)",
       ...(diretor === "cmo" ? { "POST {acao:'meta_ads', operacao:'ligar'|'pausar'|'ajustar_verba', campanhaId | conjuntoId, verbaDiaria}": "SÓ A CHAVE DA CMO. Só em campanha ou conjunto que já existe (conjuntoId substitui campanhaId, nunca os dois; campanha ABO tem a verba no conjunto, campanha CBO se ajusta na campanha: conjunto CBO recebe 400): ligar (ACTIVE), pausar (PAUSED) ou ajustar a verba diária (verbaDiaria em reais, só em ajustar_verba). Mudança de verba de no máximo 20% sobre a atual e nunca acima de R$ 200 por campanha ou por conjunto: fora disso, 400 e nada é alterado (não corta). Criar campanha, conjunto ou anúncio e publicar são do Felipe. Resposta: { ok, registro } com antes e depois; cada ação e recusa fica registrada" } : {}),
       "POST {acao:'gasto_fixo', operacao:'criar'|'editar'|'desativar', id, nome, valor, diaVencimento, categoriaId, contaId, obs}": "SÓ A CHAVE DO CFO (as outras recebem 403). Cadastra, edita ou desativa um gasto fixo (Financeiro → Cadastros → Gastos fixos). criar exige nome e valor (reais, > 0); editar e desativar exigem id; diaVencimento 1 a 31; a conta de pagamento é contaId e anotações como 'cartão 7150' vão em obs. Desativar só põe ativa:false, nunca apaga. Resposta: { ok, resultado, gasto } com o item gravado",
       ...(diretor === "cfo" ? {
@@ -61,7 +65,7 @@ export async function GET(req: NextRequest) {
 
   if (o === "meta_ads") {
     if (diretor !== "cmo") return NextResponse.json({ erro: "A leitura da Meta Ads é só da CMO." }, { status: 403 })
-    try { return NextResponse.json(await leituraMetaAds()) }
+    try { const l = await leituraMetaAds(); return NextResponse.json({ ...l, campanhasParadas: await paradasParaLeitura(l.conta) }) }
     catch (e) {
       if (e instanceof ErroMeta) return NextResponse.json({ erro: e.message, codigo: e.codigo }, { status: e.status })
       return NextResponse.json({ erro: "Falha ao ler a Meta Ads." }, { status: 500 })
@@ -104,7 +108,7 @@ export async function GET(req: NextRequest) {
   if (o === "detalhe") {
     const area = req.nextUrl.searchParams.get("area") ?? ""
     if (!AREAS.includes(area)) return NextResponse.json({ erro: `Área: ${AREAS.join(", ")}` }, { status: 400 })
-    return NextResponse.json({ area, em: hora(foto.em), dados: foto.detalhes[area] })
+    return NextResponse.json({ area, em: hora(foto.em), dados: foto.detalhes[area], ...(area === "marketing" ? { campanhasParadas: await paradasParaLeitura() } : {}) })
   }
   if (o === "empresa") {
     const [planos, cfg] = await Promise.all([lerPlanos(), lerCampos<{ conhecimentoDiretoria?: Partial<Record<string, LicaoDiretor[]>> }>(["conhecimentoDiretoria"])])
@@ -115,6 +119,7 @@ export async function GET(req: NextRequest) {
       numerosDe: hora(foto.em), norte: foto.norte, suaArea: meu, detalheDaSuaArea: foto.detalhes[MINHA_AREA[diretor]] ?? "",
       seuPlano: planos[diretor] ?? null, oQueOFelipeEnsinou: licoes, equipe: foto.equipe, ferramentasDoSistema: foto.ferramentasTxt,
       resultados: foto.resultados, cultura: foto.cultura, funcionarios: foto.exec.map(f => ({ id: f.id, nome: f.nome })),
+      ...await lerPendenciasDaArea(foto, diretor),   // pendencias (com chave) e dispensadas à parte
       outrasAreas: blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")),
     })
   }
@@ -150,6 +155,10 @@ export async function POST(req: NextRequest) {
     const { ok: _ok, resultado, ...resto } = r
     void _ok
     return NextResponse.json({ ok: true, resultado, ...resto })
+  } else if (b.acao === "dispensar_pendencia" || b.acao === "reabrir_pendencia") {
+    const r = await acaoPendencia(diretor, b)
+    if (r.status === 200) after(renovarFotoDepois)
+    return NextResponse.json(r.corpo, { status: r.status })
   } else if (b.acao === "pedido") {
     const r = await pedidoExterno(diretor, b)
     if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
@@ -167,7 +176,7 @@ export async function POST(req: NextRequest) {
     saida = r.saida
     if (!r.acao) return NextResponse.json({ ok: false, resultado: saida }, { status: 400 })
     msg = { id: novoId(), de: "diretor", texto: texto || saida, em: new Date().toISOString(), acoes: [r.acao], nuvem: true }
-  } else return NextResponse.json({ erro: `acao: relatar, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
+  } else return NextResponse.json({ erro: `acao: relatar, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
   await gravarConversa(diretor, [...await lerConversa(diretor), msg])
   return NextResponse.json({ ok: true, resultado: saida })
 }

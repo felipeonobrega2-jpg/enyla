@@ -2,6 +2,7 @@
 // Grava em lote: o histórico chega com milhares de mensagens de uma vez e, uma a uma, estourava o tempo da Vercel.
 
 import { supabase } from "./supabase"
+import { ehSaudacaoAutomaticaDoLead } from "./agenteLeads"
 import { lerApelidos, juntarConversas, juntarGemeas } from "./juntarConversas"
 
 // ── Tipos Evolution API ────────────────────────────────────────────────────
@@ -106,9 +107,10 @@ export async function gravarLote(msgs: WaMessage[], opts: { contarNaoLidas?: boo
     const nome = !m.key.fromMe && m.pushName ? m.pushName : undefined
     if (!atual || ts > atual.ts) porJid.set(m.key.remoteJid, { ts, corpo: corpo ?? `[${tipo}]`, nome: nome ?? atual?.nome, telefone: telefoneDe(m.key) ?? atual?.telefone, recebida: atual?.recebida, enviada: atual?.enviada })
     else if (nome && !atual.nome) atual.nome = nome
-    // Última recebida e última enviada (funil: quem espera resposta, quem esfriou)
+    // Última recebida e última enviada (funil: quem espera resposta, quem esfriou).
+    // A saudação automática do WhatsApp Business do lead é gravada, mas não conta como "o lead respondeu"
     const r = porJid.get(m.key.remoteJid)!
-    if (m.key.fromMe) { if (!r.enviada || ts > r.enviada) r.enviada = ts } else if (!r.recebida || ts > r.recebida) r.recebida = ts
+    if (m.key.fromMe) { if (!r.enviada || ts > r.enviada) r.enviada = ts } else if (!ehSaudacaoAutomaticaDoLead(corpo) && (!r.recebida || ts > r.recebida)) r.recebida = ts
   }
   const jids = [...porJid.keys()]
   const existentes = new Map<string, { ultima_at: string | null; ultima_msg: string | null; nome: string | null; telefone: string | null; ultima_recebida_at: string | null; ultima_enviada_at: string | null }>()

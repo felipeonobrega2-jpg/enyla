@@ -108,14 +108,14 @@ export async function executarFerramenta(diretor: IdDiretor, nome: string, x: Re
 // e uma nova é montada em segundo plano ao abrir a conversa e depois de cada resposta, quando passa de 3 min.
 // Assim a resposta nunca espera a coleta; só sem foto nenhuma (ou muito velha) a primeira fala espera.
 const AREAS = ["comercial", "producao", "financeiro", "marketing", "sistema"] as const
-export type Foto = { em: string; norte: string; resultados: string; equipe: string; bloco: string; ferramentasTxt: string; cultura: string[]; exec: Ctx["exec"]; detalhes: Record<string, string> }
+export type Foto = { em: string; norte: string; resultados: string; equipe: string; bloco: string; ferramentasTxt: string; cultura: string[]; exec: Ctx["exec"]; detalhes: Record<string, string>; decisoes?: Record<string, { texto: string; chave: string }[]> }
 let memFoto: { lidaEm: number; foto: Promise<Foto> } | null = null
 let montando: Promise<Foto> | null = null
 async function montarFoto(salvar: boolean): Promise<Foto> {
   const ctx = await coletarContexto()
   const rastreios = await lerRastreios()
   const foto: Foto = { em: new Date().toISOString(), norte: ctx.norte, resultados: ctx.resultados, equipe: ctx.equipe, bloco: ctx.bloco, ferramentasTxt: ctx.ferramentasTxt,
-    cultura: ctx.cultura, exec: ctx.exec, detalhes: Object.fromEntries(AREAS.map(a => [a, detalhe(ctx, a, rastreios)])) }
+    cultura: ctx.cultura, exec: ctx.exec, decisoes: ctx.decisoesTodas, detalhes: Object.fromEntries(AREAS.map(a => [a, detalhe(ctx, a, rastreios)])) }
   const { gravarFoto } = await import("./diretoriaServidor")
   if (salvar) await gravarFoto(foto).catch(() => null)
   return foto
