@@ -26,14 +26,31 @@ const reais = (c: unknown) => c == null || c === "" || !Number.isFinite(Number(c
 const brl = (n: number) => `R$ ${n.toFixed(2).replace(".", ",")}`
 
 type Campanha = { id?: string; name?: string; status?: string; daily_budget?: string; lifetime_budget?: string; account_id?: string; campaign_id?: string }
-type Erro = { error?: { code?: number; type?: string } }
+type Erro = { error?: { code?: number; type?: string; message?: string; error_subcode?: number } }
 
-function erroGraph(j: Erro, escrita: boolean, conjunto = false): ErroMeta {
+// Message da Meta sem o token (o literal, access_token=... e qualquer EAA...), curta, para ir ao erro e ao registro.
+function limparMensagem(m: unknown, token: string): string {
+  let t = typeof m === "string" ? m : ""
+  if (token) t = t.split(token).join("[token removido]")
+  t = t.replace(/access_token=[^\s&"']+/gi, "access_token=[removido]").replace(/\bEAA[A-Za-z0-9]{10,}/g, "[token removido]")
+  return t.replace(/\s+/g, " ").trim().slice(0, 300)
+}
+
+function erroGraph(j: Erro, escrita: boolean, conjunto = false, token = ""): ErroMeta {
   const cod = j.error?.code
+  const sub = j.error?.error_subcode
+  const msgMeta = limparMensagem(j.error?.message, token)
+  const detalhe = msgMeta || sub != null ? ` Meta: ${msgMeta || "sem mensagem"}${sub != null ? ` (subcode ${sub})` : ""}.` : ""
   if (cod === 190) return new ErroMeta(401, "TOKEN_EXPIRED", "A Meta recusou o token (venceu ou foi derrubado).")
-  if (cod === 100) return new ErroMeta(404, "CAMPANHA_NAO_ENCONTRADA", conjunto ? "A Meta não achou esse conjunto." : "A Meta não achou essa campanha.")
+  if (cod === 100 && !escrita) return new ErroMeta(404, "CAMPANHA_NAO_ENCONTRADA", `${conjunto ? "A Meta não achou esse conjunto." : "A Meta não achou essa campanha."}${detalhe}`)
+  if (cod === 100) {
+    // Escrita: o GET do mesmo id já achou o objeto, então não é "não encontrado".
+    if (sub === 33 || /unsupported post request|permiss|ads_management/i.test(msgMeta))
+      return new ErroMeta(403, "SEM_ADS_MANAGEMENT", `A Meta recusou a escrita (o id existe): o token provavelmente não tem a permissão ads_management para esta conta, ou não pode editar este objeto.${detalhe}`)
+    return new ErroMeta(400, "PARAMETRO_INVALIDO", `A Meta recusou a escrita por parâmetro inválido (o id existe e foi lido).${detalhe}`)
+  }
   if (escrita && (cod === 200 || cod === 10 || j.error?.type === "OAuthException"))
-    return new ErroMeta(403, "SEM_ADS_MANAGEMENT", "A Meta recusou a escrita: o token provavelmente não tem a permissão ads_management para esta conta.")
+    return new ErroMeta(403, "SEM_ADS_MANAGEMENT", `A Meta recusou a escrita: o token provavelmente não tem a permissão ads_management para esta conta.${detalhe}`)
   if (j.error?.type === "OAuthException") return new ErroMeta(403, "SEM_ACESSO_CONTA", conjunto ? "O token não tem acesso a este conjunto." : "O token não tem acesso a esta campanha.")
   return new ErroMeta(502, "META_ERRO", escrita ? "A Meta devolveu um erro ao gravar a mudança." : conjunto ? "A Meta devolveu um erro ao ler o conjunto." : "A Meta devolveu um erro ao ler a campanha.")
 }
@@ -44,7 +61,7 @@ async function lerCampanha(id: string, token: string, conjunto = false): Promise
   try { r = await fetch(`${BASE}/${id}?${qs}`, { signal: AbortSignal.timeout(15000) }) }
   catch { throw new ErroMeta(502, "META_INDISPONIVEL", "Não consegui falar com a Meta.") }
   const j = await r.json().catch(() => ({})) as Campanha & Erro
-  if (j.error) throw erroGraph(j, false, conjunto)
+  if (j.error) throw erroGraph(j, false, conjunto, token)
   return j
 }
 
@@ -55,7 +72,7 @@ async function escreverCampanha(id: string, campos: { status: string } | { daily
   try { r = await fetch(`${BASE}/${id}`, { method: "POST", body: corpo, signal: AbortSignal.timeout(15000) }) }
   catch { throw new ErroMeta(502, "META_INDISPONIVEL", "Não consegui falar com a Meta.") }
   const j = await r.json().catch(() => ({})) as Erro & { success?: boolean }
-  if (j.error) throw erroGraph(j, true, conjunto)
+  if (j.error) throw erroGraph(j, true, conjunto, token)
 }
 
 async function registrar(r: RegistroAcao): Promise<boolean> {

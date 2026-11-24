@@ -3,6 +3,7 @@
 // Enyla no celular: os mesmos números do computador (lib/negocio), pensados para o polegar.
 
 import React, { useEffect, useMemo, useRef, useState } from "react"
+import { useSegurados } from "../lib/useSegurados"
 import { enviarFotoProducao } from "../lib/imagem"
 import Image from "next/image"
 import {
@@ -191,10 +192,11 @@ export default function MobilePage() {
 
   const abrir = (c?: KanbanCard) => { if (!c) return; setAberto(c); setFolhaAberta(true) }
 
+  const { segurados } = useSegurados()
   const [dispensadas, setDispensadas] = useState<Set<string>>(new Set())   // dispensadas com motivo (reabrir é no computador)
   useEffect(() => { fetch("/api/pendencias/dispensadas").then(r => r.json()).then(d => setDispensadas(new Set((d.dispensadas ?? []).map((x: { chave: string }) => x.chave)))).catch(() => {}) }, [])
-  const pend = useMemo(() => pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom: propostas, clientes, config, hoje }).filter(x => !dispensadas.has(chaveSistema(x.id))),
-    [pedidos, kanban, lancamentos, historico, propostas, clientes, config, hoje, dispensadas])
+  const pend = useMemo(() => pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom: propostas, clientes, config, hoje, segurados }).filter(x => !dispensadas.has(chaveSistema(x.id))),
+    [pedidos, kanban, lancamentos, historico, propostas, clientes, config, hoje, dispensadas, segurados])
   const rec = useMemo(() => recebiveis(pedidos, lancamentos), [pedidos, lancamentos])
   const urgentes = pend.filter(p => p.tom === "perigo").length
 
@@ -422,7 +424,8 @@ function Cobrancas({ rec, telefoneDe, onAbrir }: {
 // ── Produção ──────────────────────────────────────────────────────────────────
 
 function Producao({ pedidos, config, hoje, onAbrir }: { pedidos: Pedido[]; config: Configuracoes; hoje: Date; onAbrir: (c?: KanbanCard) => void }) {
-  const prod = producao(pedidos, hoje)
+  const { segurados } = useSegurados()
+  const prod = producao(pedidos, hoje, segurados)
   const prodCfg = normalizarProducao(config.producao)
   const hojeIso = hoje.toLocaleDateString("sv-SE")
   const noFornecedor = prodCfg.movimentos.filter(m => !m.recebidoEm).sort((a, b) => (a.prazoPrevisto ?? "9").localeCompare(b.prazoPrevisto ?? "9"))

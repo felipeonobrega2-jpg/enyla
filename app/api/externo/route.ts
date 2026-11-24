@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { conferirChave, LIMITE_POR_HORA } from "@/app/lib/acessoExterno"
 import { DIRETORES, type IdDiretor, type LicaoDiretor } from "@/app/lib/diretoria"
-import { aquecerFoto, executarFerramenta, fotoRapida } from "@/app/lib/conversaDiretor"
+import { aquecerFoto, executarFerramenta, fotoRapida, renovarFoto } from "@/app/lib/conversaDiretor"
 import { lerConversa, gravarConversa, lerPlanos, type MsgConversa } from "@/app/lib/diretoriaServidor"
 import { lerCampos } from "@/app/lib/configAtomica"
 import { supabase } from "@/app/lib/supabase"
@@ -14,6 +14,7 @@ import { leituraFinanceira, AJUDA_FINANCEIRO } from "@/app/lib/financeiroExterno
 import { leituraMetaAds, ErroMeta } from "@/app/lib/metaAdsLeitura"
 import { acaoMetaAds } from "@/app/lib/metaAdsAcoes"
 import { acaoPendencia, lerPendenciasDaArea, renovarFotoDepois } from "@/app/lib/pendenciaExterna"
+import { pedidoExterno } from "@/app/lib/pedidoExterno"
 
 // Porta de acesso dos diretores na nuvem (ex.: Grok Bot). Pública no proxy, mas cada chamada exige a chave do diretor
 // (Authorization: Bearer enyla_<diretor>_...). Leitura da empresa e as mesmas ferramentas da conversa com o Felipe;
@@ -157,6 +158,13 @@ export async function POST(req: NextRequest) {
     const r = await acaoPendencia(diretor, b)
     if (r.status === 200) after(renovarFotoDepois)
     return NextResponse.json(r.corpo, { status: r.status })
+  } else if (b.acao === "pedido") {
+    const r = await pedidoExterno(diretor, b)
+    if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
+    msg = { id: novoId(), de: "diretor", texto: r.resultado, em: new Date().toISOString(), nuvem: true }
+    await gravarConversa(diretor, [...await lerConversa(diretor), msg])
+    after(() => { renovarFoto().catch(() => null) })   // o detalhe da produção já mostra a marca nova
+    return NextResponse.json({ ok: true, resultado: r.resultado, aguardandoPagamento: r.aguardandoPagamento })
   } else if (b.acao === "meta_ads") {
     const r = await acaoMetaAds(diretor, b)
     return NextResponse.json(r.corpo, { status: r.status })

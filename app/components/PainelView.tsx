@@ -4,6 +4,7 @@ import { CaixaEntrada, type ItemExterno } from "./CaixaEntrada"
 import { FunilAgoraCard } from "./FunilAgoraCard"
 
 import React from "react"
+import { useSegurados } from "../lib/useSegurados"
 import {
   AlertTriangle, CircleCheck, CalendarClock, CalendarX2, CircleDollarSign, Clock, Factory, FileText, Hourglass,
   MessageCircle, Percent, Plus, Receipt, TrendingUp, Truck, Users, Wallet, CheckCircle2, ArrowRight, Target, Trophy, Eye, MessageCircleHeart, Star, RotateCcw, Megaphone, ChevronDown,
@@ -101,7 +102,8 @@ export function PainelView({
   const conv = conversao(orcs)
   const pipe = pipelineComercial(kanban)
   const margem = margemContribuicao(vendas.pedidos)
-  const prod = producao(pedidos, hoje)
+  const { segurados } = useSegurados()
+  const prod = producao(pedidos, hoje, segurados)
   const rec = recebiveis(pedidos, lancamentos)
 
 
@@ -115,7 +117,7 @@ export function PainelView({
   }
   type Acao = { id: string; tom: Tom; icone: React.ReactNode; titulo: string; sub: string; valor?: string; ir: () => void; whatsapp?: string; envio?: Envio; cobrar?: Partial<LancamentoFinanceiro>; botao?: { rotulo: string; onClick: () => void } }
   const disp = useDispensadas()
-  const acoes: (Acao & { tipo: string; numero?: string; cardId?: string; valorNum?: number | null })[] = pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom, clientes, config, hoje }).filter(x => !disp.chaves.has(chaveSistema(x.id))).map(x => ({
+  const acoes: (Acao & { tipo: string; numero?: string; cardId?: string; valorNum?: number | null })[] = pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom, clientes, config, hoje, segurados }).filter(x => !disp.chaves.has(chaveSistema(x.id))).map(x => ({
     tipo: x.tipo, numero: x.card?.numero, cardId: x.card?.id, valorNum: x.valor ?? null,
     id: x.id, tom: x.tom, icone: ICONE[x.tipo], titulo: x.titulo, sub: x.sub,
     valor: x.valor != null ? brl(x.valor) : undefined,
