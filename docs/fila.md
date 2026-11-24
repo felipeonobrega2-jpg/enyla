@@ -28,6 +28,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 10 | Porta externa: ação gasto_fixo para o CFO | CFO | — | — | Claude Code | não | (PR da issue #10) |
 | 11 | Porta externa: leitura ao vivo da Meta Ads para a CMO (`?o=meta_ads`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/25 |
 | 12 | Porta externa: CMO liga, pausa e ajusta verba diária de campanha existente (`acao=meta_ads`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 (7h33–7h34) | (PR da issue #29) |
+| 13 | Prospector: envio automático (primeiro contato e lembrete) | operação | esta leva | — | Diego | sim (o Felipe aprova o merge; chave `prospector_envio_ativo` nasce desligada) | (PR da issue #11) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -172,3 +173,13 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 **Status:** Claude Code. **Aprovo:** o Felipe liberou a Lívia (CMO) em 24/11/2026, 7h33–7h34. **PR:** o PR da issue #29. Não junta sozinho.
 
 `POST /api/externo` com `{ acao: "meta_ads", operacao: "ligar" | "pausar" | "ajustar_verba", campanhaId, verbaDiaria }`, só com a chave da CMO (as outras recebem 403). Só campanha que já existe na conta configurada. Mudança de verba de no máximo 20% sobre a atual e nunca acima de R$ 200 por campanha: fora disso, 400 e nada muda (não corta). Cada ação e cada recusa fica em `dados_sistema` (coleção `metaAdsAcoes`) com diretor, hora, antes e depois. Criar campanha, conjunto ou anúncio e publicar continuam com o Felipe. Não entrega o aviso de campanha parada (item 1).
+
+## 13. Prospector: envio automático (primeiro contato e lembrete)
+
+**Status:** Diego (no mesmo PR da issue #11). **Aprovo:** o Felipe aprova o merge; o texto já está aprovado. **PR:** (PR da issue #11)
+
+**O que entra.** Qualificação, primeiro contato e um lembrete por WhatsApp (Evolution) e e-mail (Resend), rota `/api/prospector/enviar`, cron `0 12-20 * * 1-5`, migração aditiva das etapas `respondeu` e `encerrado_sem_resposta`. Detalhes e textos finais em [docs/prospector.md](prospector.md).
+
+**Regras.** Até 10 primeiros contatos por dia, segunda a sexta, 9h–17h America/Sao_Paulo (a rota recusa fora disso). Lembrete único 3 dias depois; depois encerra. Resposta para a cadência; recusa vira `opt_out`. Nenhuma resposta automática nova.
+
+**Chave.** `prospector_envio_ativo` nasce desligada e este PR não a liga. Antes de ligar: rodar a migração no Supabase e conferir o Gmail do Felipe (resposta de e-mail não é lida pelo sistema).
