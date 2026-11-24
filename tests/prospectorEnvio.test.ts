@@ -265,6 +265,15 @@ describe("resposta e opt-out", () => {
     await rodar(dias(SEG_10H, 10))
     expect(envios.evo).toHaveBeenCalledTimes(1)
   })
+  it("recusa no mesmo dia em que o lembrete ficaria devido não dispara o lembrete", async () => {
+    const a = await abordar()
+    mundo.mensagens.push({ id: "m1", jid: `55${a.telefone}@s.whatsapp.net`, from_me: false, corpo: "Não quero receber", ts: dias(SEG_10H, 2).toISOString() })
+    const r = await rodar(dias(SEG_10H, 3))   // 3 dias: lembrete devido neste mesmo ciclo
+    expect(r.optOuts).toBe(1)
+    expect(r.lembretes).toBe(0)
+    expect(envios.evo).toHaveBeenCalledTimes(1)
+    expect(doBanco(a)).toMatchObject({ etapa: "descartado", opt_out: true })
+  })
   it("resposta casa o telefone mesmo com o número sem o 9 antigo; mensagem nossa ou de outro número não conta", async () => {
     const a = await abordar()
     mundo.mensagens.push({ id: "m0", jid: `55${a.telefone}@s.whatsapp.net`, from_me: true, corpo: "x", ts: dias(SEG_10H, 1).toISOString() })

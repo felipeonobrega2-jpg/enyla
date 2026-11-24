@@ -58,17 +58,18 @@ function marcarOptOut(l: Linha, em: string): Record<string, unknown> {
   return { etapa: "descartado", opt_out: true, opt_out_em: em, historico_etapas: novo.historico }
 }
 
-async function gravarOptOut(l: Linha, em: string, motivo: string): Promise<boolean> {
+async function gravarOptOut(l: Linha, em: string, motivo: string): Promise<Linha | null> {
   for (let i = 0; i < 3; i++) {
     const atual = i === 0 ? l : await reler(l.id)
-    if (!atual || atual.opt_out) return false
+    if (!atual || atual.opt_out) return null
     const campos = marcarOptOut(atual, em)
     const h = campos.historico_etapas as MudancaEtapa[]
     h[h.length - 1] = { ...h[h.length - 1], motivo }
     // opt-out não pode perder para a trava de "sem opt-out": a trava só exige opt_out = false, que é o caso aqui
-    if (await gravar(atual, campos)) return true
+    const g = await gravar(atual, campos)
+    if (g) return g
   }
-  return false
+  return null
 }
 
 type Estado = {
@@ -174,7 +175,8 @@ async function detectarRespostas(linhas: Linha[], agora: Date, res: ResultadoEnv
     if (!dele.length) continue
     const em = agora.toISOString()
     if (dele.some(m => ehRecusa(m.corpo))) {
-      if (await gravarOptOut(l, em, "recusa por WhatsApp (não quero receber)")) res.optOuts++
+      const g = await gravarOptOut(l, em, "recusa por WhatsApp (não quero receber)")
+      if (g) { l.etapa = "descartado"; l.opt_out = true; l.historico_etapas = g.historico_etapas; l.atualizado_em = g.atualizado_em; res.optOuts++ }
     } else if (l.etapa === "abordado") {
       const g = await gravar(l, { etapa: "respondeu", historico_etapas: [...historicoDe(l), { etapa: "respondeu", em, motivo: "respondeu no WhatsApp" }] })
       if (g) { l.etapa = "respondeu"; l.historico_etapas = g.historico_etapas; l.atualizado_em = g.atualizado_em; res.responderam++ }
