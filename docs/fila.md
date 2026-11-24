@@ -32,9 +32,9 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 14 | Porta externa: leitura financeira (`?o=financeiro`) para o CFO | CFO | — | — | Claude Code | não | (PR da issue #24) |
 | 16 | Medidor de IA por tipo de token e origem | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/21 (na main) |
 | 17 | Follow-up confere a cota da hora antes de chamar a IA | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/22 (na main) |
-| 18 | WhatsApp: sugestão só ao clicar em "Gerar sugestão" | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/23 (na main) |
+| 18 | WhatsApp: sugestão só ao clicar em "Gerar sugestão" | CTO (custo de IA) | esta leva | — | Diego | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/23 (na main) |
 | 19 | Classificação inline só com mensagem nova do cliente (migração aditiva `classificacao_guardada` aplicada em produção em 24/11/2026) | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/28 (na main) |
-| 20 | Script de comparação do classificador Opus × Sonnet × Haiku (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/30 (na main) |
+| 20 | Script de comparação do classificador Opus × Sonnet × Haiku (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/30 (na main) |
 | 21 | Script de comparação do follow-up Opus × Sonnet (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/37 (na main) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
@@ -208,3 +208,4 @@ Os `conjuntos` de `GET ?o=meta_ads` passam a trazer `verbaDiaria` e `verbaTotal`
 Objetivo: reduzir os tokens gastos com IA sem perder eficácia. Os itens 16 a 21 registram os PRs dessa frente.
 Os dois scripts de comparação (classificador e follow-up) só rodam com autorização do Felipe, porque gastam tokens.
 Nenhuma troca de modelo entra sem o Diego revisar o resultado da comparação.
+O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
