@@ -80,3 +80,20 @@ export function podeFecharSozinha(c: ConvFechar, agora = Date.now()): string | n
   if (!respondemos || /\?\s*$/.test((c.penultimaNossa ?? "").trim())) return null
   return "o cliente encerrou a conversa"
 }
+
+// ── Espera longa (24 h+) ────────────────────────────────────────────────────
+// Aviso INTERNO (nunca mensagem ao cliente): quem escreveu por último há mais de 24 h e a Enyla não respondeu.
+// Usa a mesma regra de quemEspera (fornecedora, grupos, descartados, fechadas, "ok/obrigado" e quem disse que volta
+// continuam fora), mas sem o teto de 7 dias: a espera que mais importa é a que ficou esquecida.
+export const HORAS_ESPERA_LONGA = 24
+export type EsperaLonga = { jid: string; nome: string; pedido: string | null; desde: string; horas: number }
+
+export function esperaLonga(convs: ConvEspera[], pedidosAtivos: Record<string, string>, agora = Date.now()): EsperaLonga[] {
+  return quemEspera(convs, agora, HORAS_ESPERA_LONGA * 60, 3650)
+    .map(e => ({ jid: e.jid, nome: e.nome, pedido: pedidosAtivos[e.jid] ?? null, desde: new Date(agora - e.minutos * 60_000).toISOString(), horas: Math.floor(e.minutos / 60) }))
+    .sort((a, b) => Number(!!b.pedido) - Number(!!a.pedido) || b.horas - a.horas)
+}
+
+// No máximo um aviso por dia por conversa; quando a Enyla responde a conversa sai da lista e o aviso para
+export const deveAvisarEsperaLonga = (jid: string, avisadas: Record<string, string>, agora = Date.now()) =>
+  !avisadas[jid] || agora - new Date(avisadas[jid]).getTime() >= 24 * 3600_000
