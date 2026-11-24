@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { custoUsd, somarUso, saldoDoTexto, montarGastos, ultimosDias, type GastoDia } from "../app/lib/gastos"
+import { custoUsd, somarUso, tokensDoUso, saldoDoTexto, montarGastos, ultimosDias, type GastoDia } from "../app/lib/gastos"
 
 describe("custo da IA", () => {
   it("Opus 5.5: entrada 4, saída 20, cache lido 0,20 e cache de 1 h 8 (US$ por milhão)", () => {
@@ -96,7 +96,7 @@ describe("IA com recarga automática na Anthropic", () => {
 })
 
 describe("somarUso por origem", () => {
-  it("soma por origem e mantém o detalhe só dos últimos 14 dias", () => {
+  it("soma por origem e mantém o detalhe só dos últimos 30 dias", () => {
     let d: Record<string, GastoDia> = {}
     d = somarUso(d, "2026-11-23", 0.1, 90, "atendente")
     d = somarUso(d, "2026-11-23", 0.05, 90, "atendente")
@@ -104,9 +104,38 @@ describe("somarUso por origem", () => {
     expect(d["2026-11-23"].chamadas).toBe(3)
     expect(d["2026-11-23"].por?.atendente.chamadas).toBe(2)
     expect(d["2026-11-23"].por?.atendente.usd).toBeCloseTo(0.15)
-    for (let i = 1; i <= 20; i++) d = somarUso(d, `2026-12-${String(i).padStart(2, "0")}`, 0.01, 90, "x")
+    for (let i = 1; i <= 31; i++) d = somarUso(d, `2026-12-${String(i).padStart(2, "0")}`, 0.01, 90, "x")
     expect(d["2026-11-23"].por).toBeUndefined()
     expect(d["2026-11-23"].usd).toBeCloseTo(0.17)
-    expect(d["2026-12-20"].por?.x.chamadas).toBe(1)
+    expect(d["2026-12-31"].por?.x.chamadas).toBe(1)
+  })
+
+  it("soma os quatro tipos de token por origem", () => {
+    const uso = { input_tokens: 100, output_tokens: 50, cache_read_input_tokens: 1000, cache_creation_input_tokens: 300, cache_creation: { ephemeral_5m_input_tokens: 100, ephemeral_1h_input_tokens: 200 } }
+    let d: Record<string, GastoDia> = {}
+    d = somarUso(d, "2026-11-24", 0.1, 90, "atendente", tokensDoUso(uso))
+    d = somarUso(d, "2026-11-24", 0.1, 90, "atendente", tokensDoUso(uso))
+    expect(d["2026-11-24"].por?.atendente).toMatchObject({ chamadas: 2, entrada: 200, cacheLido: 2000, cacheGravado: 600, saida: 100 })
+  })
+
+  it("lê dia antigo sem os campos de token e segue somando", () => {
+    let d: Record<string, GastoDia> = { "2026-11-23": { usd: 1, chamadas: 2, por: { atendente: { usd: 1, chamadas: 2 } } } }
+    d = somarUso(d, "2026-11-23", 0.5, 90, "atendente", { entrada: 10, saida: 5 })
+    expect(d["2026-11-23"].por?.atendente).toMatchObject({ usd: 1.5, chamadas: 3, entrada: 10, cacheLido: 0, cacheGravado: 0, saida: 5 })
+  })
+
+  it("as origens do classificador (inline e fundo) ficam separadas", () => {
+    let d: Record<string, GastoDia> = {}
+    d = somarUso(d, "2026-11-24", 0.01, 90, "classificador-fundo", { entrada: 1 })
+    d = somarUso(d, "2026-11-24", 0.02, 90, "classificador-inline", { entrada: 2 })
+    expect(d["2026-11-24"].por?.["classificador-fundo"].entrada).toBe(1)
+    expect(d["2026-11-24"].por?.["classificador-inline"].entrada).toBe(2)
+  })
+
+  it("mantém o detalhe de 30 dias e corta o 31º", () => {
+    let d: Record<string, GastoDia> = {}
+    for (let i = 1; i <= 31; i++) d = somarUso(d, `2026-10-${String(i).padStart(2, "0")}`, 0.01, 90, "x")
+    expect(d["2026-10-01"].por).toBeUndefined()
+    expect(d["2026-10-02"].por).toBeDefined()
   })
 })
