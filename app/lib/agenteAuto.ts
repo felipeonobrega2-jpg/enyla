@@ -16,7 +16,7 @@ import { evo } from "./evolution"
 import { gravarLote, WaMessage, deveIgnorar } from "./whatsappDados"
 import { atender, lerConfigAtendente } from "./atendenteServidor"
 import { etapaDoLead } from "./etapaLead"
-import { leadsDoFollowUp } from "./leadsDoFollowUp"
+import { leadsDoFollowUp, jidsDoFollowUp } from "./leadsDoFollowUp"
 import { lerEstadosLead } from "./leadEstadoServidor"
 import { perdidoAtivo, orcadoManualAtivo } from "./leadEstado"
 import { lerRegistros, gravarRegistro, lerIdsAgente, guardarIdAgente, reservarTratada, liberarTratada, temTabelas } from "./registroAgente"
@@ -918,9 +918,10 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
   // Quem recebeu retomada fica fora: é contato antigo (o agente não responde) e quem cobra é você
   const marcos = cfg.agenteMarcos ?? marcosDoRegistro(cfg.agenteLog ?? [])
   const doAgente = Object.entries(marcos).filter(([, m]) => !m.passos?.["Reativação"]).sort((a, b) => b[1].em.localeCompare(a[1].em)).map(([j]) => j)
-  // Orçado pelo Felipe entra (a conta parte da data do orçamento); perdido com motivo sai
+  // Follow-up manda sozinho: não ganha lead novo. Só quem já é do agente; perdido com motivo sai.
+  // Orçado pelo Felipe (já do agente) só troca a data de partida da contagem
   const { perdidos, orcados } = await leadsDoFollowUp(DIAS_FOLLOW_UP, new Set(doAgente), (cfg as { agenteIds?: string[] }).agenteIds).catch(() => ({ perdidos: new Set<string>(), orcados: new Map<string, string>() }))
-  const jidsDoAgente = [...new Set([...doAgente.filter(j => !perdidos.has(j)), ...orcados.keys()])]
+  const jidsDoAgente = jidsDoFollowUp(doAgente, perdidos)
   if (!jidsDoAgente.length) return
   const { data } = await supabase.from("whatsapp_conversas")
     .select("jid, nome, telefone, etiquetas, status_lead, ultima_recebida_at, ultima_enviada_at, fechada_em")

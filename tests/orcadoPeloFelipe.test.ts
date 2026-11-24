@@ -52,3 +52,14 @@ describe("estado do lead", () => {
     expect(orcadoManualAtivo(r.estado, "2026-11-22T00:00:00Z")).toBeNull()
   })
 })
+
+import { jidsDoFollowUp } from "@/app/lib/leadsDoFollowUp"
+describe("jidsDoFollowUp", () => {
+  it("orçado fora do registro não entra; do agente entra; perdido sai", () => {
+    const orcados = new Map([["fora@s", "2026-11-20T11:00:00Z"], ["dentro@s", "2026-11-20T12:00:00Z"]])
+    const r = jidsDoFollowUp(["dentro@s", "perdido@s"], new Set(["perdido@s"]))
+    expect(r).toEqual(["dentro@s"])
+    expect(r).not.toContain("fora@s")
+    expect(orcados.get("dentro@s")).toBe("2026-11-20T12:00:00Z")
+  })
+})

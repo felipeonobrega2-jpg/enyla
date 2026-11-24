@@ -1,11 +1,15 @@
-// Quem o Follow-up que já existe enxerga a mais por causa do estado do lead: os orçados pelo Felipe (detectados nas
-// mensagens ou marcados à mão), contando a partir da data do orçamento, e quem está perdido (fora). Não envia nada:
-// o Follow-up segue as regras, a cota e o horário dele.
+// Estado do lead para o Follow-up que já existe: perdidos saem; orçados pelo Felipe (detectados ou marcados à mão)
+// trocam a data de partida da contagem, mas só para quem já é do agente (não entram leads novos). Não envia nada.
 import { supabase } from "./supabase"
 import { lerEstadosLead } from "./leadEstadoServidor"
 import { lerIdsAgente } from "./registroAgente"
 import { orcadoPeloFelipe } from "./orcadoPeloFelipe"
 import { perdidoAtivo, orcadoManualAtivo } from "./leadEstado"
+
+// Quem o Follow-up pode tratar: só o que já é do agente, menos os perdidos. Orçados de fora do registro não entram.
+export function jidsDoFollowUp(doAgente: string[], perdidos: Set<string>): string[] {
+  return [...new Set(doAgente.filter(j => !perdidos.has(j)))]
+}
 
 const cache = new Map<string, { chave: string; em: string | null }>()
 const POR_RODADA = 25
