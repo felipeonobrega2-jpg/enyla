@@ -4,6 +4,7 @@ import { supabase } from "@/app/lib/supabase"
 import { mudarConfig } from "@/app/lib/configAtomica"
 import { gastosAtuais } from "@/app/lib/gastosServidor"
 import { pendencias } from "@/app/lib/pendenciasDono"
+import { dispensadasVigentes, chaveDono, separar } from "@/app/lib/pendenciaDispensada"
 
 // "Depende de você" (rota protegida pelo login): o que está parado esperando conta, chave, arquivo ou decisão sua
 type Dados = {
@@ -26,7 +27,9 @@ export async function GET() {
     videos: (d.midiaAgente ?? []).filter(m => m.tipo === "video" && m.ativo !== false).length,
     feitos: d.pendenciasDono ?? {},
   })
-  return NextResponse.json({ pendencias: lista })
+  // Dispensadas com motivo saem da lista (nada é apagado; ver /api/pendencias/dispensadas)
+  const { visiveis } = separar(lista, p => chaveDono(p.id), await dispensadasVigentes())
+  return NextResponse.json({ pendencias: visiveis.map(p => ({ ...p, chave: chaveDono(p.id) })) })
 }
 
 // POST { id, feito } marca (ou desmarca) um item manual
