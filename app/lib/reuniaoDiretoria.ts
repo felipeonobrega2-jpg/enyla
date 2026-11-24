@@ -62,12 +62,14 @@ export async function coletarContexto() {
     import("../api/agendador/route"), import("../api/escritorio/route"),
   ])
   const { lerPlanos, listarFerramentas } = await import("./diretoriaServidor")
-  const [hoje, kanbanBruto, lancamentos, cfg, rot, esc, planos, ferramentas] = await Promise.all([
+  const { lerSegurados } = await import("./pedidoSeguradoServidor")
+  const [hoje, kanbanBruto, lancamentos, cfg, rot, esc, planos, ferramentas, segurados] = await Promise.all([
     montarHoje().catch(() => null), todas<import("../types").KanbanCard>("KanbanCard"), todas<import("../types").LancamentoFinanceiro>("LancamentoFinanceiro"),
     lerCampos<{ apiKey?: string; conhecimentoDiretoria?: Partial<Record<IdBase, LicaoDiretor[]>>; contas?: { ativa?: boolean; tipo?: string; saldo?: number | null }[]
       ultimaReuniao?: Reuniao; conhecimentoAgente?: import("./agenteLeads").Conhecimento[]; funcionarios?: Funcionario[] }>(["apiKey", "conhecimentoDiretoria", "contas", "ultimaReuniao", "conhecimentoAgente", "funcionarios"]),
     agendador.GET().then(r => r.json()).catch(() => null), escritorio.GET().then(r => r.json()).catch(() => null),
     lerPlanos().catch(() => ({} as Awaited<ReturnType<typeof lerPlanos>>)), listarFerramentas().catch(() => [] as Awaited<ReturnType<typeof listarFerramentas>>),
+    lerSegurados().catch(() => ({} as import("./pedidoSegurado").MapaSegurados)),
   ])
   if (!cfg.apiKey) throw new Error("Sem chave da IA nas Configurações.")
   const kanban = kanbanBruto.map(unpackTerceirizado)
@@ -77,7 +79,7 @@ export async function coletarContexto() {
   const diretores = montarDiretoria({
     hoje: hoje as never, fin, kanban, agentesTravados: (esc?.mesas ?? []).filter((m: { estado: string }) => m.estado === "travado").map((m: { nome: string }) => m.nome),
     rotinas: rot?.rotinas ?? null, whatsapp: esc?.whatsapp ?? null, semCredito: !!esc?.semCredito, cota: esc?.cota,
-    conhecimento: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, v?.length ?? 0])),
+    conhecimento: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, v?.length ?? 0])), segurados,
   })
   const { progressoDaEmpresa } = await import("./animarServidor")
   const prog = await progressoDaEmpresa(kanban, lancamentos)
@@ -115,7 +117,7 @@ ${licoes || "- (ainda nada)"}${plano ? `\nPlano em andamento (combinado com o Fe
   const ferr = ferramentas.filter(f => f.status !== "recusada")
   const ferramentasTxt = `# Ferramentas que os diretores pediram para o sistema (o CTO acompanha)
 ${ferr.map(f => `- ${f.nome} (pedido do ${f.pedidoPor.toUpperCase()}, ${f.status === "pedida" ? "esperando o Felipe" : f.status === "aprovada" ? "aprovada, falta construir" : "pronta"}): ${f.paraQue}`).join("\n") || "- nenhuma"}`
-  return { cfg, hoje, kanban, lancamentos, fin, rot, esc, base, diretores, prog, norte, resultados, q, exec, equipe, bloco, cultura, planos, ferramentas: ferr, ferramentasTxt }
+  return { segurados, cfg, hoje, kanban, lancamentos, fin, rot, esc, base, diretores, prog, norte, resultados, q, exec, equipe, bloco, cultura, planos, ferramentas: ferr, ferramentasTxt }
 }
 
 export async function convocarReuniao(op: { salvar?: boolean } = {}): Promise<Reuniao> {
