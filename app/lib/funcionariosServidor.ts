@@ -31,10 +31,11 @@ async function historico(destino: string, jid: string | null): Promise<string> {
 export async function redigirComoFuncionario(a: {
   funcionario: Funcionario; cliente: string; ordem: string; apiKey: string
   conhecimento?: Conhecimento[]; cultura?: string[]
+  jid?: string; guia?: string   // lead que ainda não é cliente cadastrado: a conversa do WhatsApp (jid) e o guia de atendimento do Felipe
 }): Promise<{ ok: true; texto: string } | { ok: false; erro: string }> {
   const f = a.funcionario
   if (f.status !== "contratado" || f.capacidade !== "mensagem_cliente") return { ok: false, erro: `${f.nome} não está contratado para falar com cliente` }
-  const { destino, jid } = await destinoDoCliente(a.cliente)
+  const { destino, jid } = a.jid ? { destino: a.jid, jid: a.jid } : await destinoDoCliente(a.cliente)
   if (!destino) return { ok: false, erro: `${f.nome} não achou o WhatsApp de ${a.cliente} (sem telefone no cadastro e sem conversa ligada)` }
   const conversa = await historico(destino, jid).catch(() => "")
   const jeito = conhecimentoNoPrompt((a.conhecimento ?? []).filter(i => i.id.startsWith("felipe-")))
@@ -45,7 +46,7 @@ export async function redigirComoFuncionario(a: {
       system: `Você é o funcionário de ${f.nome} da ENYLA (gráfica de embalagens). Sua qualificação: ${f.qualificacao}.
 A diretoria decidiu uma ação e você executa: escreva a mensagem de WhatsApp para o cliente. O Felipe (CEO) lê antes de enviar.
 Como escrever: empresa falando ("nós"), cordial, curta (2 a 4 frases), sem pressão. Use a conversa para acertar o tratamento (como o cliente é chamado, o assunto do pedido) e não repetir o que já foi dito. Nunca invente data, valor ou número de pedido que não esteja na ordem ou na conversa. Não exponha nada interno: etapa ou coluna da produção, nomes de agentes, diretoria, sistema, fornecedores. Sem emoji em excesso (no máximo um). Português do Brasil.
-\nSeu treinamento (onboarding do RH):\n${treinamento(f)}\n${jeito ? `\nO jeito da ENYLA (ensinado pelo Felipe):\n${jeito}\n` : ""}${a.cultura?.length ? `\nCultura da companhia:\n${a.cultura.map(c => `- ${c}`).join("\n")}\n` : ""}`,
+\nSeu treinamento (onboarding do RH):\n${treinamento(f)}\n${jeito ? `\nO jeito da ENYLA (ensinado pelo Felipe):\n${jeito}\n` : ""}${a.guia ? `\nGuia de atendimento do Felipe (a voz e o método dele; vale sobre o resto):\n${a.guia}\n` : ""}${a.cultura?.length ? `\nCultura da companhia:\n${a.cultura.map(c => `- ${c}`).join("\n")}\n` : ""}`,
       messages: [{ role: "user", content: `Ordem da diretoria: ${a.ordem}\nCliente: ${a.cliente}\n\nConversa recente:\n${conversa || "(sem conversa registrada com este cliente)"}` }],
     })
     const texto = (JSON.parse(resp.content.flatMap(c => c.type === "text" ? [c.text] : []).join("")) as { texto: string }).texto?.trim()
