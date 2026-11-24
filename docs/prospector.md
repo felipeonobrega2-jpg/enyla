@@ -1,6 +1,6 @@
 # Prospector de Parceiros
 
-A ENYLA fica em Barueri-SP. O prospector acha gráficas paulistas, dá uma nota e acompanha o funil até o cadastro em [/parceiros](https://app.enyla.com.br/parceiros). Esta nota não manda mensagem.
+A ENYLA fica em Barueri-SP. O prospector acha gráficas paulistas, dá uma nota e acompanha o funil até o cadastro em [/parceiros](https://app.enyla.com.br/parceiros). A base, a nota e o importador não mandam mensagem; o envio automático é a última seção e começa desligado.
 
 ## Esta parte — base, nota e funil
 
@@ -65,14 +65,59 @@ A lista das qualificadas vem do banco já ordenada por `nota desc` antes do limi
 
 **Agendamento e acesso.** Entrada em `vercel.json` (uma vez por dia, 13h UTC) e rota liberada em `proxy.ts`. Autenticação igual a `/api/whatsapp/verificar`: com `CRON_SECRET` exige `Authorization: Bearer`; sem ele, só o `User-Agent` `vercel-cron/`. O `CRON_SECRET` é o que a Vercel já usa nos crons do projeto; não há secret novo. Para andar mais rápido que um lote por dia, chame a rota à mão com o Bearer ou aumente a frequência do cron (planos Pro).
 
-## Parte final — abordagem
+## Envio automático (primeiro contato e lembrete)
 
-Fica desligada até o Felipe aprovar o texto e ligar o disparo. Não há envio, modelo de mensagem nem chave neste pull request.
+Código: `app/lib/prospectorEnvio.ts` (textos, horário, canais e recusa, tudo puro), `app/lib/prospectorEnvioServidor.ts` (Supabase, Evolution, Resend) e a rota `GET /api/prospector/enviar`. O texto está aprovado. **A chave `prospector_envio_ativo` (AppConfig) começa desligada** e nenhuma migração, seed ou teste a liga. Desligada, a rota devolve `{ ativo: false }` e não lê a base nem envia. Quem liga é o Felipe.
 
-Quando existir, a regra é esta:
+**Agendamento e acesso.** `vercel.json`: `0 12-20 * * 1-5` (12h–20h UTC). A rota confere o horário de verdade: só segunda a sexta, das 9h às 17h America/Sao_Paulo, e recusa fora disso mesmo que o cron dispare. Autenticação igual às outras rotas de cron (`CRON_SECRET` em Bearer, ou só o `User-Agent` `vercel-cron/`); liberada em `proxy.ts`. Sem secret novo.
 
-- E-mail pela Resend e WhatsApp só pelo número institucional. Nunca pelo número pessoal.
-- No máximo 10 abordagens por dia, de segunda a sexta.
-- Primeiro contato, um lembrete 4 dias depois, e encerra.
-- Toda mensagem leva "não quero receber" e o link do cadastro `/parceiros`.
-- Quem recusa fica com `opt_out` e sai da fila para sempre.
+**Canais.** E-mail pela Resend (`enviarEmail`), de `ENYLA Embalagens <parceiros@enyla.com.br>` e com Reply-To `felipeonobrega2@gmail.com`. O Reply-To vale só para o Prospector (parâmetro opcional `opcoes` de `enviarEmail`); as outras mensagens seguem com `EMAIL_RESPONDER_PARA`. WhatsApp pela instância Evolution que já existe (o número do atendimento), só para celular brasileiro com 9 dígitos depois do DDD. Quem tem os dois canais recebe os dois no mesmo dia, com o mesmo passo.
+
+**Qualificação.** `encontrado` com nota maior ou igual a `prospector_nota_minima` (AppConfig, padrão 1) e celular ou e-mail válido vira `qualificado`, com linha no histórico. `descartado` e `opt_out` nunca são reabertos. A cada execução olha os 1000 de maior nota que têm telefone ou e-mail preenchido.
+
+**Fila.** `qualificado`, em ordem de nota decrescente. No máximo 10 *primeiros* contatos por dia (conta pelo dia de São Paulo em que o primeiro envio começou). Lembretes não entram nessa cota, mas só saem no mesmo horário.
+
+**Cadência.**
+
+1. Primeiro contato. Pelo menos um canal com sucesso: etapa `abordado`, e o histórico guarda passo, canal, data e o texto.
+2. Lembrete, 3 dias depois do primeiro contato, só se não houve resposta e só nos canais em que o primeiro contato saiu. Um só.
+3. 3 dias depois do lembrete, sem resposta: etapa `encerrado_sem_resposta`. Nunca mais sai nada para aquele CNPJ. Não existe terceira mensagem.
+
+**Idempotência.** Antes de enviar, a execução grava no histórico uma linha `reservado` (passo + canal), com trava otimista em `atualizado_em`. Só envia quem conseguiu gravar; um segundo disparo (retry, duas instâncias) enxerga a reserva. Depois do envio a linha vira `enviado` ou `falhou`. `reservado` sem desfecho (processo morreu no meio) conta como enviado: prefere-se perder um envio a mandar duas vezes. Só `falhou` libera nova tentativa, e só do canal que faltou, como o mesmo passo (até 3 falhas por canal). O mesmo telefone ou e-mail não recebe o mesmo passo por dois CNPJs, e contato de quem pediu para sair (`opt_out`) nunca recebe, por nenhum CNPJ.
+
+**Resposta.** O que chega pela Evolution fica em `whatsapp_mensagens`. A cada execução (dentro do horário), mensagem recebida (`from_me = false`) depois do primeiro contato, de um `jid` `...@s.whatsapp.net` cujo número casa com o telefone do prospecto (com ou sem o 9 extra), marca `respondeu` e para a cadência. Se o texto é recusa clara ("não quero receber", "pare de enviar", "sem interesse", "não"...), marca `opt_out` (`descartado` + `opt_out_em`) e nunca mais envia. A resposta segue para o atendimento que já existe. **Este envio não cria resposta automática nova e não manda a frase de despedida.**
+
+**Limitações.**
+
+- Resposta de e-mail cai no Gmail do Felipe (Reply-To). Não há leitor de Gmail: um "sim" ou "não" por e-mail **não para a cadência sozinho**. Quem responde por e-mail ainda pode receber o lembrete. O Felipe precisa olhar o Gmail e marcar o prospecto à mão (`respondeu` ou `opt_out`) enquanto não existir o leitor.
+- Resposta por WhatsApp de um contato que chega com `jid` `@lid` (sem o número) não é casada com o prospecto.
+- A tela do funil conta só as etapas antigas; `respondeu` e `encerrado_sem_resposta` ainda não aparecem nela.
+- O agente de atendimento que já existe continua tratando as conversas que entram. Este PR não muda isso.
+
+**Migração.** `supabase/migrations/20261125_prospectos_envio_etapas.sql`: solta e recria a constraint de etapa com `respondeu` e `encerrado_sem_resposta`. Só aditiva, sem apagar nem alterar dado. O Felipe roda uma vez no SQL Editor **antes** de ligar a chave.
+
+### Textos finais
+
+Primeiro contato, até 12h (America/Sao_Paulo):
+
+```
+Bom dia, tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?
+```
+
+Depois das 12h: o mesmo texto com "Boa tarde". Assunto do e-mail: `ENYLA, gráfica de embalagens em Barueri`. Sem link, sem preço, sem volume, sem linha de saída.
+
+Lembrete único, 3 dias depois, sem resposta:
+
+```
+Oi, tudo bem? Aqui é da ENYLA, de Barueri, de novo. Só para saber se vocês fazem serviços de terceirização para outras gráficas.
+```
+
+### Textos de referência (só para o atendimento humano; nada disto sai sozinho)
+
+Sim, Como funciona, Tipo de serviço, Quanto paga, Qual volume, Quem são vocês, Como pegaram meu contato, Tem contrato, resposta ao "não" e a passagem para o Felipe estão no texto do pedido (issue #11). Regras: pagamento é 50% na entrada e 50% na retirada, valor e forma combinados antes de cada pedido; não afirmar Pix nem transferência; não prometer volume, ganho fixo nem citar os valores ilustrativos da página; não citar Jerograf nem Villa.
+
+Resposta ao "não" (não é enviada automaticamente; o Prospector só marca o opt-out):
+
+```
+Obrigado pelo retorno. Não vamos voltar a escrever. Um abraço, ENYLA.
+```

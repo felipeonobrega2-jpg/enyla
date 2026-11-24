@@ -11,6 +11,10 @@
     {
       "path": "/api/prospector/importar",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/prospector/enviar",
+      "schedule": "0 12-20 * * 1-5"
     }
   ]
 }

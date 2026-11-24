@@ -25,6 +25,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 7 | Integração com o Claude Code / vaga Desenvolvedor de ferramentas | CTO | depois das 5 | depois do item 5 | livre | sim | |
 | 8 | Prospector de Parceiros (base, nota e funil) | operação | esta leva | — | Diego | aprovado 23/11/2026 22:27 | https://github.com/felipeonobrega2-jpg/enyla/pull/2 (na main) |
 | 9 | Prospector: importador gratuito dos dados abertos de CNPJ | operação | esta leva | — | Diego | não | (PR do importador, issue #6) |
+| 10 | Prospector: envio automático (primeiro contato e lembrete) | operação | esta leva | — | Diego | sim (o Felipe aprova o merge; chave `prospector_envio_ativo` nasce desligada) | (PR da issue #11) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -157,3 +158,13 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 **Critério de aceite.** Idempotente por CNPJ. Não reabre `descartado` nem `opt_out`, não volta etapa, não apaga. Nenhuma mensagem sai. Sem secret novo. A importação não é disparada em produção por este PR.
 
 **Como testar.** `npm test` cobre `tests/prospectorImportador.test.ts`. Depois do merge, chamar a rota uma vez com o Bearer do `CRON_SECRET` e conferir as linhas em `prospectos_parceiros`.
+
+## 10. Prospector: envio automático (primeiro contato e lembrete)
+
+**Status:** Diego (no mesmo PR da issue #11). **Aprovo:** o Felipe aprova o merge; o texto já está aprovado. **PR:** (PR da issue #11)
+
+**O que entra.** Qualificação, primeiro contato e um lembrete por WhatsApp (Evolution) e e-mail (Resend), rota `/api/prospector/enviar`, cron `0 12-20 * * 1-5`, migração aditiva das etapas `respondeu` e `encerrado_sem_resposta`. Detalhes e textos finais em [docs/prospector.md](prospector.md).
+
+**Regras.** Até 10 primeiros contatos por dia, segunda a sexta, 9h–17h America/Sao_Paulo (a rota recusa fora disso). Lembrete único 3 dias depois; depois encerra. Resposta para a cadência; recusa vira `opt_out`. Nenhuma resposta automática nova.
+
+**Chave.** `prospector_envio_ativo` nasce desligada e este PR não a liga. Antes de ligar: rodar a migração no Supabase e conferir o Gmail do Felipe (resposta de e-mail não é lida pelo sistema).
