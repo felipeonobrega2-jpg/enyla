@@ -11,6 +11,17 @@ import { lerConversa, gravarConversa, gravarPlano, pedirFerramenta, type AcaoCon
 import { lerCampos, mudarConfig } from "./configAtomica"
 import { COLUNAS_KANBAN } from "../types"
 import { ehComercial, ordenarComercial, comerciaisDoDiretor } from "./ordemComercial"
+import { detalheProducao } from "./etapasProducao"
+import type { Rastreio } from "./prazoProducao"
+
+// Só leitura do histórico de etapas; se falhar, o detalhe sai sem as datas
+async function lerRastreios(): Promise<Rastreio[]> {
+  try {
+    const { supabase } = await import("./supabase")
+    const { data } = await supabase.from("Tracking").select("numero, etapas")
+    return (data ?? []).map(t => ({ numero: t.numero as string, etapas: (t.etapas ?? []) as Rastreio["etapas"] }))
+  } catch { return [] }
+}
 
 const novoId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 
@@ -35,11 +46,11 @@ function ferramentas(execIds: string[]): Anthropic.Beta.BetaTool[] {
 }
 
 type Ctx = Awaited<ReturnType<typeof coletarContexto>>
-function detalhe(ctx: Ctx, area: string): string {
+function detalhe(ctx: Ctx, area: string, rastreios: Rastreio[] = []): string {
   const h = (ctx.hoje ?? {}) as Record<string, unknown>
   const corta = (x: unknown) => JSON.stringify(x).slice(0, 7000)
   if (area === "comercial") return corta({ responder: h.responder, orcar: h.orcar, resolver: h.resolver, meta: h.meta })
-  if (area === "producao") return corta(ctx.kanban.filter(c => c.coluna >= 2 && c.coluna <= 8).map(c => ({ numero: c.numero, cliente: c.nomeCliente, etapa: COLUNAS_KANBAN[c.coluna] ?? c.coluna, entregaPrevista: c.dataEntregaPrevista ?? null, aguardandoPagamento: ctx.segurados[c.numero] ?? null })))
+  if (area === "producao") return detalheProducao(ctx.kanban.filter(c => c.coluna >= 2 && c.coluna <= 8).map(c => ({ ...c, aguardandoPagamento: ctx.segurados[c.numero] ?? null })), rastreios, COLUNAS_KANBAN as unknown as string[])
   if (area === "financeiro") return corta(ctx.fin)
   if (area === "marketing") return corta({ anuncio: h.anuncio, marketing: h.marketing, gastos: h.gastos })
   return corta({ rotinas: ctx.rot?.rotinas, whatsapp: ctx.esc?.whatsapp, semCredito: ctx.esc?.semCredito, cota: ctx.esc?.cota, agentes: (ctx.esc?.mesas ?? []).map((m: { nome: string; estado: string }) => ({ nome: m.nome, estado: m.estado })) })
@@ -103,13 +114,14 @@ export async function executarFerramenta(diretor: IdDiretor, nome: string, x: Re
 // e uma nova é montada em segundo plano ao abrir a conversa e depois de cada resposta, quando passa de 3 min.
 // Assim a resposta nunca espera a coleta; só sem foto nenhuma (ou muito velha) a primeira fala espera.
 const AREAS = ["comercial", "producao", "financeiro", "marketing", "sistema"] as const
-export type Foto = { em: string; norte: string; resultados: string; equipe: string; bloco: string; ferramentasTxt: string; cultura: string[]; exec: Ctx["exec"]; detalhes: Record<string, string> }
+export type Foto = { em: string; norte: string; resultados: string; equipe: string; bloco: string; ferramentasTxt: string; cultura: string[]; exec: Ctx["exec"]; detalhes: Record<string, string>; decisoes?: Record<string, { texto: string; chave: string }[]> }
 let memFoto: { lidaEm: number; foto: Promise<Foto> } | null = null
 let montando: Promise<Foto> | null = null
 async function montarFoto(salvar: boolean): Promise<Foto> {
   const ctx = await coletarContexto()
+  const rastreios = await lerRastreios()
   const foto: Foto = { em: new Date().toISOString(), norte: ctx.norte, resultados: ctx.resultados, equipe: ctx.equipe, bloco: ctx.bloco, ferramentasTxt: ctx.ferramentasTxt,
-    cultura: ctx.cultura, exec: ctx.exec, detalhes: Object.fromEntries(AREAS.map(a => [a, detalhe(ctx, a)])) }
+    cultura: ctx.cultura, exec: ctx.exec, decisoes: ctx.decisoesTodas, detalhes: Object.fromEntries(AREAS.map(a => [a, detalhe(ctx, a, rastreios)])) }
   const { gravarFoto } = await import("./diretoriaServidor")
   if (salvar) await gravarFoto(foto).catch(() => null)
   return foto

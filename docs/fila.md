@@ -36,6 +36,8 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 18 | Cadastro de parceiros: cenário-exemplo e preço de referência por serviço | Felipe | — | — | Claude Code | pedido pelo Felipe em 24/11/2026 | (PR da issue #36) |
 | 19 | Porta externa: code 100 da Meta na escrita não vira "não achou" (`erroGraph`) | CMO | — | — | Claude Code | não (correção de erro) | (PR da issue #43) |
 | 20 | Agente: segurar saudação automática do WhatsApp Business do lead e não contar como resposta | COO | — | — | Claude Code | aprovado pelo Felipe em 24/11/2026, 8:38 ("Aprovo as mudanças do Rafael") | https://github.com/felipeonobrega2-jpg/enyla/pull/54 |
+| 21 | Referência interna da laminação fosca: R$ 450,00 | Felipe | — | — | Claude Code | não (o Felipe já confirmou o valor) | #63 (issue #62) |
+| 22 | Correção: R$ 450 é do verniz UV total; laminação fosca volta a R$ 765,28 (regra do sistema) | Felipe | — | — | Claude Code | não (o Felipe corrigiu o destino do R$ 450; a fosca veio do cadastro e do motor) | (PR da issue #66) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -238,3 +240,15 @@ Em `erroGraph`, code 100 na escrita (`POST /{id}`) não vira mais 404 `CAMPANHA_
 **O que muda.** Quando a última mensagem do lead é saudação automática do WhatsApp Business ("agradecemos seu contato", "em breve retornaremos"), o agente não chama a IA, não envia nada ao lead e avisa só o Felipe no formato "Segurei a resposta". Essa mensagem não avança `ultima_recebida_at` e não limpa F1/F2/F3, então o follow-up segue no tempo certo.
 
 **Limite duro.** Só segura ou reduz envios a cliente. Nada novo é enviado. Sem agente, rotina, fila, migração ou mudança de cobrança/chave.
+
+## 21. Referência interna da laminação fosca: R$ 450,00
+
+**Status:** Claude Code. **Aprovo:** não (o Felipe já confirmou o valor em 24/11/2026). **PR:** #63 (issue #62). Não junta sozinho.
+
+Em `CENARIOS_PADRAO`, a referência interna de `laminacao-fosca` (Ronaldo Osasco) passa de R$ 765,28 (calculado, não confirmado) para R$ 450,00, o mesmo do verniz. Nada muda no que o parceiro vê em `/parceiros`. Sem migração.
+
+## 22. Correção: R$ 450 é do verniz UV total; laminação fosca volta a R$ 765,28
+
+**Status:** Claude Code. **Aprovo:** não (o Felipe corrigiu o destino do R$ 450; a fosca veio do cadastro e do motor). **PR:** o PR da issue #66. Não junta sozinho.
+
+O R$ 450,00 confirmado pelo Felipe é do verniz UV total (3.000 folhas 48 × 44 cm), não da fosca; o #63 aplicou na fosca por engano. Verniz segue R$ 450,00. A fosca volta a R$ 765,28, com origem no sistema: `AppConfig.producao.fornecedores`, Ronaldo Osasco, laminação `por_m2`, acerto 100 + Fosca 1,05/m²; `cobrar` (`app/lib/producao.ts`) dá 100 + 1,05 × 633,6 m² = 765,28. Nada muda em `/parceiros`. Sem migração.

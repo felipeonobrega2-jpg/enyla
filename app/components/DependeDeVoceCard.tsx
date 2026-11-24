@@ -7,6 +7,7 @@ import { useEffect, useState } from "react"
 import { CircleAlert, CheckCircle2, Circle, ChevronDown, ListChecks } from "lucide-react"
 import { Cartao, TituloCartao, Selo, type Tom } from "./ds"
 import type { Pendencia } from "../lib/pendenciasDono"
+import { useDispensadas, DispensarBotao, SecaoDispensadas } from "./Dispensar"
 
 const TOM: Record<Pendencia["nivel"], Tom> = { urgente: "perigo", importante: "alerta", "quando der": "neutro" }
 
@@ -14,6 +15,8 @@ export default function DependeDeVoceCard({ onIr }: { onIr?: (aba: string) => vo
   const [lista, setLista] = useState<Pendencia[] | null>(null)
   const [aberto, setAberto] = useState<string | null>(null)
   const [verFeitos, setVerFeitos] = useState(false)
+  const disp = useDispensadas()
+  const recarregar = () => fetch("/api/pendencias").then(r => r.json()).then(d => setLista(d.pendencias ?? [])).catch(() => {})
 
   useEffect(() => {
     let vivo = true
@@ -52,6 +55,7 @@ export default function DependeDeVoceCard({ onIr }: { onIr?: (aba: string) => vo
                 <div className="flex gap-3 pt-0.5">
                   {p.onde && onIr && <button onClick={() => onIr(p.onde!)} className="text-[#8456e8] font-semibold hover:underline">Abrir</button>}
                   {p.manual && <button onClick={() => void marcar(p.id, !p.feito)} className="text-[#8456e8] font-semibold hover:underline">{p.feito ? "Desmarcar" : "Já fiz"}</button>}
+                  {!p.feito && <DispensarBotao chave={`dono:${p.id}`} titulo={p.titulo} onDispensar={async (...a) => { const e = await disp.dispensar(...a); if (!e) await recarregar(); return e }} />}
                   {!p.manual && !p.feito && <span className="text-[#898892]">Some daqui sozinho quando estiver feito.</span>}
                 </div>
               </div>
@@ -59,6 +63,7 @@ export default function DependeDeVoceCard({ onIr }: { onIr?: (aba: string) => vo
           </div>
         ))}
       </div>
+      <SecaoDispensadas lista={disp.lista} onReabrir={async c => { const e = await disp.reabrir(c); if (!e) await recarregar(); return e }} />
       {feitas.length > 0 && <button onClick={() => setVerFeitos(!verFeitos)} className="mt-2 text-[11.5px] text-[#8456e8] hover:underline">{verFeitos ? "Esconder as feitas" : `Ver as ${feitas.length} feitas`}</button>}
     </Cartao>
   )
