@@ -54,6 +54,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 36 | Script de comparação do follow-up Opus × Sonnet (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/37 (na main) |
 | 37 | Prospector: importador não trava quando a BrasilAPI falha (grava com os dados do arquivo, `falhasCadastro`) | operação | — | — | Claude Code | não (correção de erro) | (PR da issue #88) |
 | 38 | Atendente não responde sozinha a gráficas do Prospector | operação | — | — | Claude Code | não | (PR da issue #34) |
+| 39 | Prospector: janela de envio 8h–20h (seg-sex), cron `0 11-22 * * 1-5` | Felipe (decisão 24/11/2026, 17:56) | — | — | Claude Code | não | (PR da issue #99) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -203,9 +204,9 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 
 **Status:** Diego (no mesmo PR da issue #11). **Aprovo:** o Felipe aprova o merge; o texto já está aprovado. **PR:** (PR da issue #11)
 
-**O que entra.** Qualificação, primeiro contato e um lembrete por WhatsApp (Evolution) e e-mail (Resend), rota `/api/prospector/enviar`, cron `0 12-20 * * 1-5`, migração aditiva das etapas `respondeu` e `encerrado_sem_resposta`. Detalhes e textos finais em [docs/prospector.md](prospector.md).
+**O que entra.** Qualificação, primeiro contato e um lembrete por WhatsApp (Evolution) e e-mail (Resend), rota `/api/prospector/enviar`, cron `0 11-22 * * 1-5`, migração aditiva das etapas `respondeu` e `encerrado_sem_resposta`. Detalhes e textos finais em [docs/prospector.md](prospector.md).
 
-**Regras.** Até 10 primeiros contatos por dia, segunda a sexta, 9h–17h America/Sao_Paulo (a rota recusa fora disso). Lembrete único 3 dias depois; depois encerra. Resposta para a cadência; recusa vira `opt_out`. Nenhuma resposta automática nova.
+**Regras.** Até 10 primeiros contatos por dia, segunda a sexta, 8h–20h America (decisão de 24/11/2026)/Sao_Paulo (a rota recusa fora disso). Lembrete único 3 dias depois; depois encerra. Resposta para a cadência; recusa vira `opt_out`. Nenhuma resposta automática nova.
 
 **Chave.** `prospector_envio_ativo` nasce desligada e este PR não a liga. Antes de ligar: rodar a migração no Supabase e conferir o Gmail do Felipe (resposta de e-mail não é lida pelo sistema).
 
