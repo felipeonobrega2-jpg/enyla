@@ -4,7 +4,7 @@
 import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
-import { custoUsd, somarUso, diaSP, saldoDoTexto, montarGastos, ultimosDias, GastoDia, Recarga, UsoIA, Gastos, PedidoParaGasto } from "./gastos"
+import { custoUsd, somarUso, tokensDoUso, diaSP, saldoDoTexto, montarGastos, ultimosDias, GastoDia, Recarga, UsoIA, Gastos, PedidoParaGasto } from "./gastos"
 import { evo } from "./evolution"
 
 export type CfgGastos = { alertaDias?: number; recargaIA?: Recarga | null; cotacao?: number | null; autoRecargaIA?: boolean }
@@ -23,7 +23,7 @@ export async function registrarUsoIA(modelo: string, uso: UsoIA | null | undefin
   if (!uso) return
   const usd = custoUsd(modelo, uso)
   if (!(usd > 0)) return
-  await mudarConfig((d: Cfg) => ({ gastosIA: somarUso(d.gastosIA ?? {}, diaSP(), usd, 90, origem) })).catch(() => null)
+  await mudarConfig((d: Cfg) => ({ gastosIA: somarUso(d.gastosIA ?? {}, diaSP(), usd, 90, origem, tokensDoUso(uso)) })).catch(() => null)
 }
 
 // Cotação do dólar (uma vez por dia, AwesomeAPI pública); se falhar, a última ou a que você definiu
