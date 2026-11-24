@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { cnpjValido, cpfValido, errosDaEtapa, errosDoCadastro, limparCadastro, paraFornecedor, textoCobranca, mascaraDocumento, mascaraTelefone } from "@/app/lib/parceiros"
 
 const ok = { nomeFantasia: "Gráfica Exemplo", tipoDocumento: "cnpj" as const, documento: "11222333000181", cep: "01310100", rua: "Avenida Paulista", numero: "1000", bairro: "Bela Vista", cidade: "São Paulo", uf: "SP", responsavel: "Marcos", whatsapp: "11988887777", email: "a@b.com.br",
-  servicos: [{ id: "corteVinco" as const, cobranca: "milheiro" as const, valor: 38, prazoDias: 3, prazoVaria: false }, { id: "colagem" as const, cobranca: "varia" as const, prazoDias: null, prazoVaria: true }], aceite: true }
+  servicos: [{ id: "corteVinco" as const, cobranca: "milheiro" as const, valor: 38, prazoDias: 3, prazoVaria: false, precosExemplo: { corteVinco: 250 } as Record<string, number> }, { id: "colagem" as const, cobranca: "varia" as const, prazoDias: null, prazoVaria: true, precosExemplo: { colagem: 300 } as Record<string, number> }], aceite: true }
 
 describe("Parceiros ENYLA", () => {
   it("valida CNPJ e CPF", () => {
@@ -13,7 +13,7 @@ describe("Parceiros ENYLA", () => {
   })
   it("cadastro completo passa; prazo vazio só passa marcando que varia", () => {
     expect(errosDoCadastro(ok)).toEqual({})
-    const semPrazo = { ...ok, servicos: [{ id: "colagem" as const, cobranca: "folha" as const, prazoDias: null, prazoVaria: false }] }
+    const semPrazo = { ...ok, servicos: [{ id: "colagem" as const, cobranca: "folha" as const, prazoDias: null, prazoVaria: false, precosExemplo: { colagem: 300 } as Record<string, number> }] }
     expect(errosDaEtapa(semPrazo, "detalhes")["colagem.prazo"]).toBeTruthy()
   })
   it("limpa o que veio do formulário", () => {
