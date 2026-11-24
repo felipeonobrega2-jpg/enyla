@@ -4,6 +4,8 @@
 // o que trava (WhatsApp, crédito da IA, cota da hora) e o feed de tudo que aconteceu hoje. Atualiza sozinho.
 
 import { useEffect, useMemo, useState } from "react"
+import { useSegurados } from "../lib/useSegurados"
+import { estaSegurado } from "../lib/pedidoSegurado"
 import { PredioView, type Andar } from "./predio/PredioView"
 import { GraficaVirtual, atrasado } from "./predio/GraficaVirtual"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
@@ -112,6 +114,7 @@ function Status({ icone, rotulo, valor, tom }: { icone: React.ReactNode; rotulo:
 }
 
 export function EscritorioView({ kanban = [], lancamentos = [], saldoContas = null }: { kanban?: KanbanCard[]; lancamentos?: LancamentoFinanceiro[]; saldoContas?: number | null }) {
+  const { segurados } = useSegurados()
   const [d, setD] = useState<Escritorio | null>(null)
   const [filtro, setFiltro] = useState<IdMesa | null>(null)
   const [agora, setAgora] = useState(() => Date.now())
@@ -174,10 +177,10 @@ export function EscritorioView({ kanban = [], lancamentos = [], saldoContas = nu
   if (modo === "predio") {
     const hoje = new Date().toLocaleDateString("sv-SE")
     const naProducao = kanban.filter(c => c.coluna >= 2 && c.coluna <= 8)
-    const atrasadosProd = naProducao.filter(c => atrasado(c, hoje)).length
+    const atrasadosProd = naProducao.filter(c => atrasado(c, hoje) && !estaSegurado(segurados, c.numero)).length
     const fin = financeiroDoAndar(kanban, lancamentos, saldoContas)
     const diretores = montarDiretoria({ hoje: hojeDir, fin, kanban, agentesTravados: d.mesas.filter(x => x.estado === "travado").map(x => x.nome),
-      rotinas: rotinasDir, whatsapp: d.whatsapp, semCredito: d.semCredito, cota: d.cota, conhecimento: conhecimentoDir })
+      rotinas: rotinasDir, whatsapp: d.whatsapp, semCredito: d.semCredito, cota: d.cota, conhecimento: conhecimentoDir, segurados })
     const totalDecisoes = diretores.reduce((t, x) => t + x.decisoes.length, 0)
     const brlAndar = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
     const andares: Andar[] = [
