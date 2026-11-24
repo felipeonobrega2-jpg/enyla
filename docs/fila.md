@@ -25,6 +25,8 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 7 | Integração com o Claude Code / vaga Desenvolvedor de ferramentas | CTO | depois das 5 | depois do item 5 | livre | sim | |
 | 8 | Prospector de Parceiros (base, nota e funil) | operação | esta leva | — | Diego | aprovado 23/11/2026 22:27 | https://github.com/felipeonobrega2-jpg/enyla/pull/2 (na main) |
 | 9 | Prospector: importador gratuito dos dados abertos de CNPJ | operação | esta leva | — | Diego | não | (PR do importador, issue #6) |
+| 10 | Termos de parceria aceitos no cadastro /parceiros | Felipe | depois do Prospector (itens 8 e 9) | — | livre | sim | |
+| 11 | Score do parceiro (prazo, qualidade, rapidez) em Fornecedores | Felipe | depois do Prospector (itens 8 e 9) | — | livre | não | |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -157,3 +159,27 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 **Critério de aceite.** Idempotente por CNPJ. Não reabre `descartado` nem `opt_out`, não volta etapa, não apaga. Nenhuma mensagem sai. Sem secret novo. A importação não é disparada em produção por este PR.
 
 **Como testar.** `npm test` cobre `tests/prospectorImportador.test.ts`. Depois do merge, chamar a rota uma vez com o Bearer do `CRON_SECRET` e conferir as linhas em `prospectos_parceiros`.
+
+## 10. Termos de parceria aceitos no cadastro /parceiros
+
+**Status:** livre. **Aprovo:** sim (o texto dos termos precisa do ok do Felipe antes de ir para a página pública). **PR:** vazio. Pedido do Felipe, decidido em 24/11/2026 às 7:21 (America/Sao_Paulo). Prioridade: depois do Prospector (itens 8 e 9).
+
+**O que já existe.** O cadastro público em `/parceiros` tem um aceite de que a ENYLA registra tempo e qualidade e de que as informações estão corretas. Não há contrato além do cadastro.
+
+**O que falta.** Criar termos de parceria dentro da própria plataforma e pedi-los no cadastro de `/parceiros`, junto com o aceite. O Felipe disse que não haverá contrato à parte; os termos ficam no sistema.
+
+**Critério de aceite.** O parceiro só envia o cadastro se aceitar os termos. O texto é o que o Felipe aprovou. Dá para ler os termos na própria página.
+
+**Como testar.** A definir quando o item for construído, depois do Aprovo do texto.
+
+## 11. Score do parceiro (prazo, qualidade, rapidez) em Fornecedores
+
+**Status:** livre. **Aprovo:** não (tela interna da equipe; não manda mensagem a cliente nem mexe em cobrança). **PR:** vazio. Pedido do Felipe, decidido em 24/11/2026 às 7:21 (America/Sao_Paulo). Prioridade: depois do Prospector (itens 8 e 9).
+
+**O que já existe.** A página `/parceiros` e o cadastro prometem que o sistema registra tempo e qualidade, e que quem entrega bem ganha prioridade. Ainda não há um score.
+
+**O que falta.** Um score do parceiro na tela Fornecedores, com base em prazo, qualidade e rapidez das entregas. O Felipe decidiu que há pedidos frequentes, mas o parceiro precisa construir um bom score; quem tem score melhor recebe mais pedidos.
+
+**Critério de aceite.** A equipe vê o score na ficha do fornecedor/parceiro. O cálculo usa prazo, qualidade e rapidez, com teste.
+
+**Como testar.** A definir quando o item for construído.
