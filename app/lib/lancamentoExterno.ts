@@ -40,7 +40,7 @@ export function campos(b: Pedido): { ok: true; v: Record<string, unknown> } | { 
   return { ok: true, v }
 }
 
-// Estorno lógico: a linha fica. Se a migração ainda não rodou, grava só a marca em obs.
+// Estorno lógico: a linha fica. Grava estornadoEm/estornadoPor e a marca em obs; se o update das colunas falhar, grava só a marca em obs.
 export async function estornarLogico(id: string, por: string, motivo: string): Promise<{ ok: boolean; erro?: string }> {
   const { data: atual } = await supabase.from("LancamentoFinanceiro").select("obs").eq("id", id).maybeSingle()
   if (!atual) return { ok: false, erro: "não encontrado" }

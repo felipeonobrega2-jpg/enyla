@@ -32,7 +32,9 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 14 | Porta externa: leitura financeira (`?o=financeiro`) para o CFO | CFO | — | — | Claude Code | não | (PR da issue #24) |
 | 15 | Porta externa: verba do conjunto (ABO) na leitura e no ajuste (`acao=meta_ads`, `conjuntoId`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 (mesmas regras por conjunto) | (PR da issue #32) |
 | 16 | Porta externa: escrita financeira do CFO (`acao=lancamento`, `conciliacao`, `categoria`) | CFO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026, 7h31 ("Libera para o Otávio") | (PR da issue #35) |
-| 17 | Agente: segurar saudação automática do WhatsApp Business do lead e não contar como resposta | COO | — | — | Claude Code | aprovado pelo Felipe em 24/11/2026, 8:38 ("Aprovo as mudanças do Rafael") | (PR da issue #45) |
+| 17 | Porta externa: leitura financeira ignora lançamentos estornados (`incluirEstornados`) | CFO | — | — | Claude Code | pedido do Felipe na issue #41 | (PR da issue #41) |
+| 18 | Cadastro de parceiros: cenário-exemplo e preço de referência por serviço | Felipe | — | — | Claude Code | pedido pelo Felipe em 24/11/2026 | (PR da issue #36) |
+| 19 | Agente: segurar saudação automática do WhatsApp Business do lead e não contar como resposta | COO | — | — | Claude Code | aprovado pelo Felipe em 24/11/2026, 8:38 ("Aprovo as mudanças do Rafael") | https://github.com/felipeonobrega2-jpg/enyla/pull/54 |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -210,9 +212,21 @@ Os `conjuntos` de `GET ?o=meta_ads` passam a trazer `verbaDiaria` e `verbaTotal`
 
 **Migração (só depois do merge, aditiva).** `supabase/migrations/20261126_lancamento_estorno.sql` acrescenta `estornadoEm` e `estornadoPor` em `LancamentoFinanceiro`. Enquanto não rodar, o estorno grava só a marca em `obs`. A leitura financeira ainda não filtra lançamentos estornados: item a combinar.
 
-## 17. Agente: segurar saudação automática do WhatsApp Business do lead
+## 17. Porta externa: leitura financeira ignora lançamentos estornados
 
-**Status:** Claude Code. **Aprovo:** aprovado pelo Felipe em 24/11/2026, 8:38. **PR:** o da issue #45. Pedido do COO.
+**Status:** Claude Code. **PR:** o PR da issue #41. Não junta sozinho. Sem migração nova (a `20261126_lancamento_estorno.sql` já rodou em 24/11/2026, 8h37).
+
+`GET ?o=financeiro` passa a excluir lançamentos com `estornadoEm` preenchido (desativados e estornados) de resumo, `receber`, `pagar`, `gastos` e `margem`. `&incluirEstornados=1|true|sim` traz todos de volta; outro valor dá 400. A resposta traz `incluirEstornados`. `banco`, `saldos` e `depende` não mudam. A escrita (`estornarLogico`) já grava `estornadoEm`/`estornadoPor` e `obs`, com fallback só em `obs`; `LancamentoFinanceiro` ganhou os dois campos opcionais. Não mexe em chaves nem em pagamento/cobrança.
+
+## 18. Cadastro de parceiros: cenário-exemplo e preço de referência por serviço
+
+**Status:** Claude Code. **Pedido:** o Felipe, em 24/11/2026. **PR:** o PR da issue #36 (#39). Não junta sozinho.
+
+Config editável `cenariosParceiros` no AppConfig (padrão no código; a equipe edita na tela Fornecedores). `/parceiros` mostra o enunciado e pede o preço de cada exemplo; impressão (offset e digital) não tem cenário e pede formato da máquina, acerto e milheiro; laminação tem quatro cenários e arte pede preço por arte e pacote de 3. A tela Fornecedores compara com a referência interna e mostra média, mínimo e máximo dos parceiros por cenário. A referência e esses números nunca vão ao parceiro. Sem migração SQL (tudo no JSON da config). Pendente: o Felipe confirmar a referência da laminação fosca (R$ 765,28) e o preço do Ronaldo para brilho, soft touch e dois lados.
+
+## 19. Agente: segurar saudação automática do WhatsApp Business do lead
+
+**Status:** Claude Code. **Aprovo:** aprovado pelo Felipe em 24/11/2026, 8:38. **PR:** #54 (issue #45). Pedido do COO.
 
 **O que muda.** Quando a última mensagem do lead é saudação automática do WhatsApp Business ("agradecemos seu contato", "em breve retornaremos"), o agente não chama a IA, não envia nada ao lead e avisa só o Felipe no formato "Segurei a resposta". Essa mensagem não avança `ultima_recebida_at` e não limpa F1/F2/F3, então o follow-up segue no tempo certo.
 
