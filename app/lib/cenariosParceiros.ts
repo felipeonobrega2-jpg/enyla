@@ -30,7 +30,7 @@ const UN_LAM = "3.000 folhas 48×44 cm (633,6 m²)"
 // Valor inicial; o que estiver salvo na config (AppConfig.cenariosParceiros) sobrescreve.
 // Impressão (offset e digital) não tem cenário: cobra acerto + milheiro.
 export const CENARIOS_PADRAO: CenarioParceiro[] = [
-  c("laminacao-fosca", "laminacao", `${FOLHAS}, laminação fosca só na frente (um lado).`, UN_LAM, [{ preco: 765.28, fornecedorNome: "Ronaldo Osasco" }]), // regra do Ronaldo: R$ 100 + R$ 1,05 × 633,6 m²
+  c("laminacao-fosca", "laminacao", `${FOLHAS}, laminação fosca só na frente (um lado).`, UN_LAM, [{ preco: 450, fornecedorNome: "Ronaldo Osasco" }]),
   c("laminacao-brilho", "laminacao", `${FOLHAS}, laminação brilho só na frente (um lado).`, UN_LAM),
   c("laminacao-soft", "laminacao", `${FOLHAS}, laminação soft touch só na frente (um lado).`, UN_LAM),
   c("laminacao-dois-lados", "laminacao", `${FOLHAS}, laminação nos dois lados.`, UN_LAM),

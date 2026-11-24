@@ -49,8 +49,7 @@ describe("estrutura dos cenários", () => {
   it("referências internas combinadas, e nada inventado", () => {
     const ref = (id: string) => cenario(id).referencias.map(r => [r.fornecedorNome, r.preco])
     expect(ref("verniz")).toEqual([["Ronaldo Osasco", 450]])
-    expect(ref("laminacao-fosca")).toEqual([["Ronaldo Osasco", 765.28]])
-    expect(100 + 1.05 * (3000 * 0.48 * 0.44)).toBeCloseTo(765.28, 2)
+    expect(ref("laminacao-fosca")).toEqual([["Ronaldo Osasco", 450]])
     for (const id of ["laminacao-brilho", "laminacao-soft", "laminacao-dois-lados", "relevo", "faca", "fechamento", "transporte"]) expect(ref(id)).toEqual([])
     expect(ref("hotStamping")).toEqual([["Guilherme", 1387.5]])
     expect(ref("corteVinco")).toEqual([["Rodrigo", 200], ["Fabiano", 280], ["Jacuna", 280]])
@@ -125,13 +124,13 @@ describe("nada interno vaza para o parceiro", () => {
   it("a parte pública tem só id, serviço, enunciado e versão", async () => {
     const pub = JSON.stringify(cenariosPublicos(mesclarCenarios(undefined)))
     for (const n of NOMES) expect(pub).not.toContain(n)
-    expect(pub).not.toMatch(/765|1387|4500|referencias|unidade|preco/)
+    expect(pub).not.toMatch(/765|450|1387|4500|referencias|unidade|preco/)
     expect(JSON.stringify(await lerCenariosPublicos())).toBe(pub)
   })
   it("o formulário (página /parceiros) mostra enunciado e campo, sem preço, média, faixa nem fornecedor", () => {
     estado.cfg = { cenariosParceiros: [{ ...cenario("verniz"), referencias: [{ preco: 7777, fornecedorNome: "Zé Secreto" }] }] }
     const html = renderToStaticMarkup(React.createElement(ParceirosForm, { whatsappGerente: null, cenarios: cenariosPublicos(mesclarCenarios(estado.cfg.cenariosParceiros)) }))
-    for (const n of [...NOMES, "Zé Secreto", "7777", "765,28", "média", "mínimo"]) expect(html).not.toContain(n)
+    for (const n of [...NOMES, "Zé Secreto", "7777", "765,28", "450", "média", "mínimo"]) expect(html).not.toContain(n)
   })
   it("o cadastro gravado não carrega referência nossa", async () => {
     const f = new FormData(); f.set("dados", JSON.stringify({ ...base, servicos: [serv({ precosExemplo: { verniz: 1200 } })] }))
@@ -177,7 +176,7 @@ describe("config editável", () => {
     const m = mesclarCenarios(estado.cfg.cenariosParceiros)
     expect(m).toHaveLength(CENARIOS_PADRAO.length)
     expect(m.find(c => c.id === "laminacao-soft")).toMatchObject({ enunciado: "Novo texto", versao: 2, referencias: [{ preco: 100, fornecedorNome: "Fulano" }] })
-    expect(m.find(c => c.id === "laminacao-fosca")!.referencias[0].preco).toBe(765.28)
+    expect(m.find(c => c.id === "laminacao-fosca")!.referencias[0].preco).toBe(450)
     expect(JSON.stringify(await lerCenariosPublicos())).not.toContain("Fulano")
   })
 })
