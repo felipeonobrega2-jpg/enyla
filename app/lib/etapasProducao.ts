@@ -4,7 +4,7 @@
 import { diasUteisEntre } from "./diasUteis"
 import { estatistica, type EtapaRastreio, type Rastreio } from "./prazoProducao"
 
-export type CardProducao = { numero: string; nomeCliente?: string; coluna: number; dataEntregaPrevista?: string | null }
+export type CardProducao = { numero: string; nomeCliente?: string; coluna: number; dataEntregaPrevista?: string | null; aguardandoPagamento?: unknown }
 export type Passagem = { etapa: string; entrou: string; saiu: string | null; diasUteis: number }
 
 const LIMITE = 7000
@@ -62,7 +62,7 @@ export function detalheProducao(cards: CardProducao[], rastreios: Rastreio[], no
     const dias = atual ? diasDe(atual, hoje) : null
     const mediana = medio[etapa]
     return {
-      numero: c.numero, cliente: c.nomeCliente, etapa, entregaPrevista: c.dataEntregaPrevista ?? null,
+      numero: c.numero, cliente: c.nomeCliente, etapa, entregaPrevista: c.dataEntregaPrevista ?? null, aguardandoPagamento: c.aguardandoPagamento ?? null,
       naEtapaDesde: atual?.entrou ?? null, diasUteisNaEtapa: dias,
       acimaDoNormal: dias != null && mediana != null && dias > mediana * ACIMA,
       etapas: es.map<Passagem>(e => ({ etapa: nomes[e.coluna] ?? String(e.coluna), entrou: e.entrou, saiu: e.saiu, diasUteis: diasDe(e, hoje) })),

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import { useSegurados } from "../lib/useSegurados"
 import {
   Package, TrendingUp, CheckCircle2,
   DollarSign, BarChart3, Factory, User, Users, Home, Building2, Megaphone, Wrench, ClipboardList,
@@ -114,6 +115,7 @@ const pedidoFreteDe = (entry: OrderEntry): PedidoFrete => {
 }
 
 export function PedidosUnificadoView(props: Props) {
+  const { segurados, mudar: mudarSegurado } = useSegurados()
   const {
     kanban, historico, lancamentos, isDark,
     onDetalhes, onNovoLancamento, onSalvarData, onSavePrazos, onSalvarPrazoRecebimentoInterno,
@@ -361,6 +363,8 @@ export function PedidosUnificadoView(props: Props) {
               onAddLancamento={onAddLancamento}
               selectedCardIds={selectedCardIds}
               onSelectCard={toggleSelectCard}
+              segurados={segurados}
+              onSegurar={mudarSegurado}
             />
           </div>
         )}

@@ -18,5 +18,8 @@ export default async function Page() {
     const { seuNumero } = await import("../lib/agenteAuto")
     w = await Promise.race([seuNumero().catch(() => null), new Promise<null>(r => setTimeout(() => r(null), 2500))])
   }
-  return <ParceirosForm whatsappGerente={w} />
+  // Só enunciado e versão: preço e fornecedor de referência nunca chegam ao parceiro
+  const { lerCenariosPublicos } = await import("../lib/parceirosServidor")
+  const cenarios = await lerCenariosPublicos()
+  return <ParceirosForm whatsappGerente={w} cenarios={cenarios} />
 }

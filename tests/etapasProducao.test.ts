@@ -17,12 +17,13 @@ describe("etapasProducao", () => {
   })
   it("acimaDoNormal e etapa atual", () => {
     const vivo = { numero: "X", etapas: [e(1, "03/11/2026, 09:00:00"), e(2, "04/11/2026, 10:00:00")] }
-    const p = JSON.parse(detalheProducao([{ numero: "X", nomeCliente: "Cli", coluna: 2 }], [...hist, vivo], nomes, "2026-11-24"))
+    const p = JSON.parse(detalheProducao([{ numero: "X", nomeCliente: "Cli", coluna: 2, aguardandoPagamento: { valor: 10 } }], [...hist, vivo], nomes, "2026-11-24"))
     const x = p.pedidos[0]
     expect(x.naEtapaDesde).toBe("04/11/2026, 10:00:00")
     expect(x.diasUteisNaEtapa).toBe(13)
     expect(x.acimaDoNormal).toBe(true)
     expect(x.etapas).toHaveLength(2)
+    expect(x.aguardandoPagamento).toEqual({ valor: 10 })
   })
   it("respeita 7000 caracteres", () => {
     const cards = Array.from({ length: 200 }, (_, i) => ({ numero: `P${i}`, nomeCliente: "Cliente", coluna: 2 }))
