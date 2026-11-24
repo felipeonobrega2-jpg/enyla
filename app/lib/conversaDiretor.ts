@@ -39,7 +39,7 @@ function detalhe(ctx: Ctx, area: string): string {
   const h = (ctx.hoje ?? {}) as Record<string, unknown>
   const corta = (x: unknown) => JSON.stringify(x).slice(0, 7000)
   if (area === "comercial") return corta({ responder: h.responder, orcar: h.orcar, resolver: h.resolver, meta: h.meta })
-  if (area === "producao") return corta(ctx.kanban.filter(c => c.coluna >= 2 && c.coluna <= 8).map(c => ({ numero: c.numero, cliente: c.nomeCliente, etapa: COLUNAS_KANBAN[c.coluna] ?? c.coluna, entregaPrevista: c.dataEntregaPrevista ?? null })))
+  if (area === "producao") return corta(ctx.kanban.filter(c => c.coluna >= 2 && c.coluna <= 8).map(c => ({ numero: c.numero, cliente: c.nomeCliente, etapa: COLUNAS_KANBAN[c.coluna] ?? c.coluna, entregaPrevista: c.dataEntregaPrevista ?? null, aguardandoPagamento: ctx.segurados[c.numero] ?? null })))
   if (area === "financeiro") return corta(ctx.fin)
   if (area === "marketing") return corta({ anuncio: h.anuncio, marketing: h.marketing, gastos: h.gastos })
   return corta({ rotinas: ctx.rot?.rotinas, whatsapp: ctx.esc?.whatsapp, semCredito: ctx.esc?.semCredito, cota: ctx.esc?.cota, agentes: (ctx.esc?.mesas ?? []).map((m: { nome: string; estado: string }) => ({ nome: m.nome, estado: m.estado })) })
