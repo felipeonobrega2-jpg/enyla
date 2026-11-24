@@ -23,23 +23,23 @@ const c = (servicoId: IdServicoParceiro, enunciado: string, unidade?: string, re
   ({ servicoId, enunciado, versao: 1, unidade, referencias })
 
 // Valor inicial; o que estiver salvo na config (AppConfig.cenariosParceiros) sobrescreve.
-// Enunciados de impressaoOffset, relevo, faca, arte, fechamento e transporte são provisórios: sem referência interna.
+// Enunciados iguais aos combinados na issue #36.
 export const CENARIOS_PADRAO: CenarioParceiro[] = [
-  c("impressaoOffset", "3.000 folhas de cartão 300 g, formato 66 × 96 cm, impressão em 4 cores na frente.", "3.000 folhas 66×96 cm"),
-  c("impressaoDigital", "100 caixas em formato A4, em triplex 300 g, com laminação fosca e arte inclusa.", "100 caixas A4", [{ preco: 350, fornecedorNome: "Villa" }]),
-  c("laminacao", "3.000 folhas 66 × 96 cm, laminação fosca só na frente.", "3.000 folhas 66×96 cm (1.900,8 m²)", [{ preco: 2095.84, fornecedorNome: "Ronaldo Osasco" }]),
-  c("verniz", "3.000 folhas 66 × 96 cm, verniz UV total na frente.", "3.000 folhas 66×96 cm (1.900,8 m²)", [{ preco: 1145.44, fornecedorNome: "Ronaldo Osasco" }]),
-  c("hotStamping", "3.000 folhas, hot stamping sem clichê (a ENYLA já entrega o clichê pronto ou não precisa dele).", "3.000 folhas", [{ preco: 1387.5, fornecedorNome: "Guilherme" }]),
-  c("relevo", "3.000 folhas, relevo seco em uma área da frente.", "3.000 folhas"),
-  c("corteVinco", "3.000 folhas, com a faca fornecida pela ENYLA, uma batida por folha.", "3.000 folhas, 1 batida/folha", [
+  c("impressaoOffset", "3.000 folhas de 66 × 96 cm, cartão 300 g, 4 cores (CMYK), só frente, chapas inclusas.", "3.000 folhas 66×96 cm"),
+  c("impressaoDigital", "100 caixas cujo aberto (faca) cabe em uma A4 (área útil 20 × 28,7 cm), cartão triplex 300 g, com laminação fosca, arte inclusa.", "100 caixas A4", [{ preco: 350, fornecedorNome: "Villa" }]),
+  c("laminacao", "3.000 folhas de 66 × 96 cm, cartão 300 g, laminação fosca só na frente (um lado).", "3.000 folhas 66×96 cm (1.900,8 m²)", [{ preco: 2095.84, fornecedorNome: "Ronaldo Osasco" }]),
+  c("verniz", "3.000 folhas de 66 × 96 cm, cartão 300 g, verniz UV total só na frente.", "3.000 folhas 66×96 cm (1.900,8 m²)", [{ preco: 1145.44, fornecedorNome: "Ronaldo Osasco" }]),
+  c("hotStamping", "3.000 folhas de 66 × 96 cm, cartão 300 g, hot stamping dourado, uma área de gravação, clichê fornecido pela ENYLA (informe só o preço da estampagem).", "3.000 folhas", [{ preco: 1387.5, fornecedorNome: "Guilherme" }]),
+  c("relevo", "3.000 folhas de 66 × 96 cm, cartão 300 g, relevo seco, uma área, clichê fornecido pela ENYLA.", "3.000 folhas"),
+  c("corteVinco", "3.000 folhas de 66 × 96 cm, cartão 300 g, corte e vinco, faca fornecida pela ENYLA, com destaque (tirar o refile), uma batida por folha.", "3.000 folhas, 1 batida/folha", [
     { preco: 200, fornecedorNome: "Rodrigo" }, { preco: 280, fornecedorNome: "Fabiano" }, { preco: 280, fornecedorNome: "Jacuna" },
   ]),
-  c("colagem", "3.000 cartuchos com cola lateral.", "3.000 cartuchos", [{ preco: 280, fornecedorNome: "Fabiano" }]),
-  c("faca", "1 faca de corte e vinco para uma caixa cartucho de tamanho médio.", "1 faca"),
-  c("papel", "3.000 folhas de cartão 300 g, formato 66 × 96 cm.", "3.000 folhas 66×96 cm", [{ preco: 4500 }]),
-  c("arte", "Arte de 1 caixa cartucho, com a planificação (faca) montada.", "1 arte"),
-  c("fechamento", "Fechamento de arquivo de 1 caixa cartucho, pronto para a gráfica.", "1 arquivo"),
-  c("transporte", "1 entrega de 100 kg dentro da região metropolitana de São Paulo.", "1 entrega, 100 kg"),
+  c("colagem", "3.000 cartuchos já cortados e vincados, cola lateral, cartão 300 g.", "3.000 cartuchos", [{ preco: 280, fornecedorNome: "Fabiano" }]),
+  c("faca", "1 faca plana, montada com borracha, pronta para máquina, para cartucho em cartão 300 g, arquivo em DXF, 1 modelo.", "1 faca"),
+  c("papel", "3.000 folhas de cartão 300 g no formato 66 × 96 cm, com entrega no endereço da ENYLA em Barueri.", "3.000 folhas 66×96 cm", [{ preco: 4500 }]),
+  c("arte", "1 arte de cartucho de perfume (1 modelo), com planificação (dieline) e um jogo de views, pronta para impressão.", "1 arte"),
+  c("fechamento", "fechamento de 1 arquivo de cartucho (1 modelo, 4 cores), com imposição e chapa (CTP) para o formato 66 × 96 cm.", "1 arquivo"),
+  c("transporte", "1 viagem de ida e volta, Barueri (base da ENYLA) ↔ Osasco, carga de 50 kg, utilitário / Fiorino ou equivalente.", "1 entrega, 100 kg"),
 ]
 
 export const temCenario = (id: IdServicoParceiro) => id !== "outro"
