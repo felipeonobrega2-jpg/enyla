@@ -208,3 +208,9 @@ Os `conjuntos` de `GET ?o=meta_ads` passam a trazer `verbaDiaria` e `verbaTotal`
 **Não faz.** Não paga nem cobra, não muda preço, não mexe em chaves, não apaga nada de vez: desativar/estornar marcam `estornadoEm`/`estornadoPor`, e o `desfazer` da conciliação estorna os lançamentos criados em vez de apagá-los (o `desfazer` de `aplicar()` não é exposto). Sem `contraparte_doc` nem `bruto` na resposta.
 
 **Migração (só depois do merge, aditiva).** `supabase/migrations/20261126_lancamento_estorno.sql` acrescenta `estornadoEm` e `estornadoPor` em `LancamentoFinanceiro`. Enquanto não rodar, o estorno grava só a marca em `obs`. A leitura financeira ainda não filtra lançamentos estornados: item a combinar.
+
+## 17. Porta externa: erro da Meta na escrita (code 100) deixa de virar "não achou"
+
+**Status:** Claude Code. **PR:** o PR da issue #43. Não junta sozinho.
+
+Em `erroGraph`, code 100 na escrita (`POST /{id}`) não vira mais 404 `CAMPANHA_NAO_ENCONTRADA`: com `error_subcode` 33, "Unsupported post request", permissão ou `ads_management` responde 403 (`SEM_ADS_MANAGEMENT`); senão 400 (`PARAMETRO_INVALIDO`). O `erro` e o `motivo` do registro trazem a message e o subcode da Meta, sem o token. Na leitura, code 100 segue 404. Regras (só CMO, 20%, teto R$ 200) e `conjuntoId` inalterados.
