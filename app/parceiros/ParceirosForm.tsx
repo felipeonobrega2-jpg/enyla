@@ -4,6 +4,7 @@
 // técnicos/preço/prazo, operação), gostoso no celular e no computador. O rascunho fica no aparelho.
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import ExplainerParceiros from "./ExplainerParceiros"
 import { Printer, Layers, Sparkles, Stamp, Mountain, Scissors, Package, Shapes, FileStack, Palette, FileCheck, Truck, Plus, Check, ChevronLeft, ArrowRight, Paperclip, X, Clock, BarChart3, ShieldCheck, Handshake, Loader2, MessageCircle, MapPin, Zap, Banknote, Wallet, Camera, Globe } from "lucide-react"
 import {
   SERVICOS_PARCEIRO, FORMAS_COBRANCA, PERGUNTAS, ETAPAS_IDS, errosDaEtapa, mascaraDocumento, mascaraTelefone, mascaraCep, GERENTE_PADRAO,
@@ -286,6 +287,8 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
           ))}
         </div>
       </section>
+
+      <ExplainerParceiros onComecar={comecar} />
 
       {/* Como funciona */}
       <section className="max-w-[1040px] mx-auto px-5 pt-12 pb-4">
