@@ -16,6 +16,7 @@ import {
   margemContribuicao, conversao, orcamentosDoPeriodo, parseData, nomeChave, isTerceirizado, isAberto,
 } from "../lib/negocio"
 import { EnviarWhatsapp, Envio } from "../components/EnviarWhatsapp"
+import { chaveSistema } from "../lib/pendenciaDispensada"
 import { pendencias, Pendencia, TipoPendencia, cardDoPedido, prazoTexto, prazoDoPedido, linkWhatsApp } from "../lib/pendencias"
 import { normalizarProducao, nomeServicos } from "../lib/producao"
 import { normalizarMetas } from "../lib/metas"
@@ -190,8 +191,10 @@ export default function MobilePage() {
 
   const abrir = (c?: KanbanCard) => { if (!c) return; setAberto(c); setFolhaAberta(true) }
 
-  const pend = useMemo(() => pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom: propostas, clientes, config, hoje }),
-    [pedidos, kanban, lancamentos, historico, propostas, clientes, config, hoje])
+  const [dispensadas, setDispensadas] = useState<Set<string>>(new Set())   // dispensadas com motivo (reabrir é no computador)
+  useEffect(() => { fetch("/api/pendencias/dispensadas").then(r => r.json()).then(d => setDispensadas(new Set((d.dispensadas ?? []).map((x: { chave: string }) => x.chave)))).catch(() => {}) }, [])
+  const pend = useMemo(() => pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom: propostas, clientes, config, hoje }).filter(x => !dispensadas.has(chaveSistema(x.id))),
+    [pedidos, kanban, lancamentos, historico, propostas, clientes, config, hoje, dispensadas])
   const rec = useMemo(() => recebiveis(pedidos, lancamentos), [pedidos, lancamentos])
   const urgentes = pend.filter(p => p.tom === "perigo").length
 

@@ -3,10 +3,13 @@
 // por enquanto o placar já funciona. Puro.
 import type { FinanceiroAndar } from "./financeiroAndar"
 import type { KanbanCard } from "../types"
+import { chaveDecisao, slug } from "./pendenciaDispensada"
+
+type Item = { texto: string; chave: string }
 
 export type Tom = "ok" | "atencao" | "problema"
 export type IdDiretor = "coo" | "cco" | "cmo" | "cfo" | "cto"
-export type Diretor = { id: IdDiretor; cargo: string; area: string; placar: { rotulo: string; valor: string; tom: Tom }[]; decisoes: string[]; tom: Tom; conhecimento: number }
+export type Diretor = { id: IdDiretor; cargo: string; area: string; placar: { rotulo: string; valor: string; tom: Tom }[]; decisoes: string[]; decisoesChaves?: string[]; tom: Tom; conhecimento: number }
 export type LicaoDiretor = { id: string; texto: string; em: string }
 // Nomes fictícios: os diretores são agentes de IA com personalidade própria (o Felipe conversa com cada um)
 export const DIRETORES: { id: IdDiretor; nome: string; cargo: string; area: string; faz: string; jeito: string }[] = [
@@ -47,14 +50,21 @@ export function montarDiretoria(e: {
   agentesTravados: string[]; rotinas?: Rotina[] | null; whatsapp: "conectado" | "desconectado" | null; semCredito: boolean
   cota?: { usados: number; limite: number }
   conhecimento?: Partial<Record<IdDiretor, number>>
+  dispensadas?: Set<string>     // chaves de decisão dispensadas com motivo: somem daqui (nada é apagado)
 }, hojeIso = new Date().toLocaleDateString("sv-SE")): Diretor[] {
+  // Cada decisão tem chave estável (tipo + pedido/jid/título), igual de um dia para o outro: é por ela que se dispensa
+  const D = (texto: string, chave: string): Item => ({ texto, chave: chaveDecisao(chave) })
+  const fim = (d: Omit<Diretor, "decisoes"> & { decisoes: Item[] }): Diretor => {
+    const ficam = d.decisoes.filter(x => !e.dispensadas?.has(x.chave))
+    return { ...d, decisoes: ficam.map(x => x.texto), decisoesChaves: ficam.map(x => x.chave) }
+  }
   // COO: operação (produção, entregas, agentes)
   const esperando = e.hoje?.responder?.length ?? 0, orcar = e.hoje?.orcar?.length ?? 0
   const promessas = (e.hoje?.resolver ?? []).filter(x => x.tipo === "promessa")
   const naProducao = e.kanban.filter(c => c.coluna >= 2 && c.coluna <= 8)
   const atrasados = naProducao.filter(c => !!c.dataEntregaPrevista && c.dataEntregaPrevista.slice(0, 10) < hojeIso)
   const meta = e.hoje?.meta?.resumo
-  const coo: Diretor = {
+  const coo0: Omit<Diretor, "decisoes"> & { decisoes: Item[] } = {
     id: "coo", cargo: "COO", area: "Operação", conhecimento: e.conhecimento?.coo ?? 0,
     placar: [
       { rotulo: "Pedidos na produção", valor: String(naProducao.length), tom: "ok" },
@@ -62,15 +72,16 @@ export function montarDiretoria(e: {
       { rotulo: "Agentes travados", valor: String(e.agentesTravados.length), tom: e.agentesTravados.length ? "problema" : "ok" },
     ],
     decisoes: [
-      ...atrasados.slice(0, 3).map(c => `Avisar ${c.nomeCliente} do atraso (${c.numero}) e ajustar a data`),
-      ...(e.agentesTravados.length ? [`Destravar: ${e.agentesTravados.join(", ")}`] : []),
+      ...atrasados.slice(0, 3).map(c => D(`Avisar ${c.nomeCliente} do atraso (${c.numero}) e ajustar a data`, `atraso:${c.numero}`)),
+      ...(e.agentesTravados.length ? [D(`Destravar: ${e.agentesTravados.join(", ")}`, "agentes-travados")] : []),
     ],
     tom: "ok",
   }
-  coo.tom = pior(coo.placar.map(p => p.tom))
+  coo0.tom = pior(coo0.placar.map(p => p.tom))
+  const coo = fim(coo0)
 
   // CCO: comercial (lead não espera, orçamento sai, promessa se cumpre)
-  const cco: Diretor = {
+  const cco0: Omit<Diretor, "decisoes"> & { decisoes: Item[] } = {
     id: "cco", cargo: "CCO", area: "Comercial", conhecimento: e.conhecimento?.cco ?? 0,
     placar: [
       { rotulo: "Leads esperando", valor: String(esperando), tom: esperando > 10 ? "problema" : esperando > 3 ? "atencao" : "ok" },
@@ -79,16 +90,17 @@ export function montarDiretoria(e: {
       ...(meta && meta.total ? [{ rotulo: "MQL orçado em 24 h", valor: `${meta.orcados} de ${meta.total}`, tom: (meta.orcados / meta.total >= 0.8 ? "ok" : meta.orcados / meta.total >= 0.5 ? "atencao" : "problema") as Tom }] : []),
     ],
     decisoes: [
-      ...promessas.slice(0, 3).map(p => `Mandar o orçamento prometido para ${p.titulo.split(" · ")[0]}`),
-      ...(orcar ? [`Orçar ${orcar} ${orcar === 1 ? "lead que já passou tudo" : "leads que já passaram tudo"}`] : []),
+      ...promessas.slice(0, 3).map(p => D(`Mandar o orçamento prometido para ${p.titulo.split(" · ")[0]}`, `promessa:${p.titulo}`)),
+      ...(orcar ? [D(`Orçar ${orcar} ${orcar === 1 ? "lead que já passou tudo" : "leads que já passaram tudo"}`, "orcar-leads")] : []),
     ],
     tom: "ok",
   }
-  cco.tom = pior(cco.placar.map(p => p.tom))
+  cco0.tom = pior(cco0.placar.map(p => p.tom))
+  const cco = fim(cco0)
 
   // CMO: marketing (o que o anúncio trouxe nas últimas 24 h e o saldo)
   const an = e.hoje?.anuncio, mk = e.hoje?.marketing, saldoMeta = (e.hoje?.gastos?.alertas ?? []).find(a => a.tipo === "meta")
-  const cmo: Diretor = {
+  const cmo0: Omit<Diretor, "decisoes"> & { decisoes: Item[] } = {
     id: "cmo", cargo: "CMO", area: "Marketing", conhecimento: e.conhecimento?.cmo ?? 0,
     placar: [
       { rotulo: "Leads do anúncio (24 h)", valor: String(an?.leads ?? 0), tom: an && an.leads === 0 ? "atencao" : "ok" },
@@ -97,17 +109,18 @@ export function montarDiretoria(e: {
       { rotulo: "Saldo da Meta", valor: saldoMeta ? (saldoMeta.nivel === "perigo" ? "acabando" : "baixo") : "ok", tom: saldoMeta ? (saldoMeta.nivel === "perigo" ? "problema" : "atencao") : "ok" },
     ],
     decisoes: [
-      ...(saldoMeta ? ["Recarregar a Meta: os anúncios param sem saldo"] : []),
-      ...(mk?.acao ? [mk.acao] : []),
+      ...(saldoMeta ? [D("Recarregar a Meta: os anúncios param sem saldo", "meta-saldo")] : []),
+      ...(mk?.acao ? [D(mk.acao, `mk-acao:${slug(mk.acao)}`)] : []),
     ],
     tom: "ok",
   }
-  cmo.tom = pior(cmo.placar.map(p => p.tom))
+  cmo0.tom = pior(cmo0.placar.map(p => p.tom))
+  const cmo = fim(cmo0)
 
   // CFO: dinheiro
   const f = e.fin
   const sinal = (e.hoje?.resolver ?? []).filter(x => x.tipo === "pagamento")
-  const cfo: Diretor = {
+  const cfo0: Omit<Diretor, "decisoes"> & { decisoes: Item[] } = {
     id: "cfo", cargo: "CFO", area: "Dinheiro", conhecimento: e.conhecimento?.cfo ?? 0,
     placar: f ? [
       { rotulo: "Recebido no mês", valor: brl(f.recebidoMes), tom: "ok" },
@@ -117,18 +130,19 @@ export function montarDiretoria(e: {
       { rotulo: "Sinal que não caiu", valor: String(sinal.length), tom: sinal.length ? "atencao" : "ok" },
     ] : [],
     decisoes: [
-      ...(f?.vencidos ?? []).slice(0, 3).map(v => `Cobrar ${v.cliente} (${v.numero}): ${brl(v.valor)} vencido`),
-      ...sinal.slice(0, 2).map(s => `Sinal não caiu: ${s.titulo.split(" · ")[0]}${s.valor ? ` (${brl(s.valor)})` : ""}`),
-      ...(f && f.resultadoMes < 0 ? ["O mês está no vermelho: rever as despesas da semana"] : []),
+      ...(f?.vencidos ?? []).slice(0, 3).map(v => D(`Cobrar ${v.cliente} (${v.numero}): ${brl(v.valor)} vencido`, `cobrar:${v.numero}`)),
+      ...sinal.slice(0, 2).map(s => D(`Sinal não caiu: ${s.titulo.split(" · ")[0]}${s.valor ? ` (${brl(s.valor)})` : ""}`, `sinal:${s.titulo}`)),
+      ...(f && f.resultadoMes < 0 ? [D("O mês está no vermelho: rever as despesas da semana", "mes-vermelho")] : []),
     ],
     tom: "ok",
   }
-  cfo.tom = pior(cfo.placar.map(p => p.tom))
+  cfo0.tom = pior(cfo0.placar.map(p => p.tom))
+  const cfo = fim(cfo0)
 
   // CTO: sistema
   const problemas = (e.rotinas ?? []).filter(r => r.situacao.tom === "erro" || r.situacao.tom === "atrasada")
   const cota = e.cota ? e.cota.usados / Math.max(1, e.cota.limite) : 0
-  const cto: Diretor = {
+  const cto0: Omit<Diretor, "decisoes"> & { decisoes: Item[] } = {
     id: "cto", cargo: "CTO", area: "Sistema", conhecimento: e.conhecimento?.cto ?? 0,
     placar: [
       { rotulo: "WhatsApp", valor: e.whatsapp === "desconectado" ? "fora do ar" : e.whatsapp ? "conectado" : "sem sinal", tom: e.whatsapp === "desconectado" ? "problema" : "ok" },
@@ -137,12 +151,13 @@ export function montarDiretoria(e: {
       ...(e.cota ? [{ rotulo: "Envios usados na última hora", valor: `${e.cota.usados} de ${e.cota.limite} permitidos`, tom: (cota >= 1 ? "problema" : cota >= 0.8 ? "atencao" : "ok") as Tom }] : []),
     ],
     decisoes: [
-      ...(e.whatsapp === "desconectado" ? ["Ler o QR do WhatsApp: os leads estão sem resposta"] : []),
-      ...(e.semCredito ? ["Recarregar a IA: o agente parou de responder"] : []),
-      ...problemas.slice(0, 3).map(r => `${r.nome}: ${r.situacao.texto}`),
+      ...(e.whatsapp === "desconectado" ? [D("Ler o QR do WhatsApp: os leads estão sem resposta", "whatsapp-qr")] : []),
+      ...(e.semCredito ? [D("Recarregar a IA: o agente parou de responder", "ia-credito")] : []),
+      ...problemas.slice(0, 3).map(r => D(`${r.nome}: ${r.situacao.texto}`, `rotina:${slug(r.nome)}`)),
     ],
     tom: "ok",
   }
-  cto.tom = pior(cto.placar.map(p => p.tom))
+  cto0.tom = pior(cto0.placar.map(p => p.tom))
+  const cto = fim(cto0)
   return [coo, cco, cmo, cfo, cto]
 }
