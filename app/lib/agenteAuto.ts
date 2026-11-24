@@ -16,6 +16,9 @@ import { evo } from "./evolution"
 import { gravarLote, WaMessage, deveIgnorar } from "./whatsappDados"
 import { atender, lerConfigAtendente } from "./atendenteServidor"
 import { etapaDoLead } from "./etapaLead"
+import { leadsDoFollowUp } from "./leadsDoFollowUp"
+import { lerEstadosLead } from "./leadEstadoServidor"
+import { perdidoAtivo, orcadoManualAtivo } from "./leadEstado"
 import { lerRegistros, gravarRegistro, lerIdsAgente, guardarIdAgente, reservarTratada, liberarTratada, temTabelas } from "./registroAgente"
 import { garantirTelefone } from "./contatosServidor"
 import { textoAvisoReativacao } from "./reativacao"
@@ -828,8 +831,9 @@ export async function talvezRetomarParados(origem: string): Promise<string> {
     .gte("ultima_recebida_at", new Date(agora - HORAS_RETOMAR * 3_600_000).toISOString()).order("ultima_recebida_at", { ascending: false }).limit(300)
   // A última "enviada" da conversa pode ser só automática do WhatsApp Business ("fora do horário", botões sem
   // texto, que chegam até horas depois): a conversa entra e a mensagem certa é conferida abaixo, ignorando essas
+  const estadosLead = await lerEstadosLead().catch(() => new Map())   // lead perdido com motivo: o Atendente não retoma
   const candidatas = (convs ?? []).filter(c => !deveIgnorar(c.jid) && !["mql", "descartado", "perdido"].includes(c.status_lead ?? "")
-    && !(c.etiquetas ?? []).includes("Fornecedora") && !!c.ultima_recebida_at)
+    && !(c.etiquetas ?? []).includes("Fornecedora") && !!c.ultima_recebida_at && !perdidoAtivo(estadosLead.get(c.jid), c.ultima_recebida_at))
   const logTodo = cfg.agenteLog ?? []
   // Retomada cuja resposta não saiu (WhatsApp fora do ar) não conta: tenta de novo
   const naoSaiu = new Set(logTodo.filter((l, i) => /^não enviou/.test(l.motivo ?? "") && !logTodo.slice(0, i).some(x => x.jid === l.jid && x.enviou)).map(l => l.jid))
@@ -913,7 +917,10 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
   // Só leads que o agente já atendeu (estão no registro) e não descartados. No MQL (seu) ele só etiqueta, não envia.
   // Quem recebeu retomada fica fora: é contato antigo (o agente não responde) e quem cobra é você
   const marcos = cfg.agenteMarcos ?? marcosDoRegistro(cfg.agenteLog ?? [])
-  const jidsDoAgente = Object.entries(marcos).filter(([, m]) => !m.passos?.["Reativação"]).sort((a, b) => b[1].em.localeCompare(a[1].em)).map(([j]) => j)
+  const doAgente = Object.entries(marcos).filter(([, m]) => !m.passos?.["Reativação"]).sort((a, b) => b[1].em.localeCompare(a[1].em)).map(([j]) => j)
+  // Orçado pelo Felipe entra (a conta parte da data do orçamento); perdido com motivo sai
+  const { perdidos, orcados } = await leadsDoFollowUp(DIAS_FOLLOW_UP, new Set(doAgente), (cfg as { agenteIds?: string[] }).agenteIds).catch(() => ({ perdidos: new Set<string>(), orcados: new Map<string, string>() }))
+  const jidsDoAgente = [...new Set([...doAgente.filter(j => !perdidos.has(j)), ...orcados.keys()])]
   if (!jidsDoAgente.length) return
   const { data } = await supabase.from("whatsapp_conversas")
     .select("jid, nome, telefone, etiquetas, status_lead, ultima_recebida_at, ultima_enviada_at, fechada_em")
@@ -924,7 +931,7 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
   // Campanha digital é uma mensagem só: quem recebeu e não respondeu não ganha follow-up (contato frio = risco ao número)
   const campanha = (cfg as { campanhaDigital?: EstadoCampanha }).campanhaDigital?.enviados ?? {}
   const tentados = (cfg as { agenteFollowupTentados?: Record<string, string> }).agenteFollowupTentados ?? {}
-  const candidatos = (data ?? []).filter(c =>
+  const candidatos = (data ?? []).map(c => orcados.has(c.jid) && orcados.get(c.jid)! > c.ultima_enviada_at ? { ...c, ultima_enviada_at: orcados.get(c.jid)! } : c).filter(c =>
     !c.fechada_em && !["descartado", "perdido", "orcamento", "negociando", "pedido"].includes(c.status_lead ?? "")
     && !(campanha[c.jid] && !(c.ultima_recebida_at && c.ultima_recebida_at > campanha[c.jid].em))
     && (!c.ultima_recebida_at || c.ultima_recebida_at < c.ultima_enviada_at))
