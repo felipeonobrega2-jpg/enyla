@@ -4,6 +4,7 @@ import { lerConfigLinha } from "./configAtomica"
 import { mudarConfig } from "./configAtomica"
 import { supabase } from "./supabase"
 import { notificar } from "./notificar"
+import { avisarCampanhasParadas } from "./metaCampanhaParada"
 import { ContaMeta, precisaAvisar, situacaoMeta, textoAvisoMeta } from "./metaSaldo"
 
 const BASE = "https://graph.facebook.com/v20.0"
@@ -31,6 +32,7 @@ export async function talvezConferirMeta() {
   const media = Number(ins?.data?.[0]?.spend ?? 0) / 7
   const s = situacaoMeta(c, media)
   const tipo = precisaAvisar(s)
+  await avisarCampanhasParadas(token, conta, c, media)
   if (!tipo) {
     if (cfg.metaSaldoAviso) await mudarConfig(() => ({ metaSaldoAviso: undefined }))
     return

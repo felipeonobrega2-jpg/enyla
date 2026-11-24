@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { conferirChave, LIMITE_POR_HORA } from "@/app/lib/acessoExterno"
 import { DIRETORES, type IdDiretor, type LicaoDiretor } from "@/app/lib/diretoria"
-import { aquecerFoto, executarFerramenta, fotoRapida } from "@/app/lib/conversaDiretor"
+import { aquecerFoto, executarFerramenta, fotoRapida, renovarFoto } from "@/app/lib/conversaDiretor"
 import { lerConversa, gravarConversa, lerPlanos, type MsgConversa } from "@/app/lib/diretoriaServidor"
 import { lerCampos } from "@/app/lib/configAtomica"
 import { supabase } from "@/app/lib/supabase"
@@ -12,8 +12,10 @@ import { conciliacao } from "@/app/lib/conciliacaoExterna"
 import { categoria } from "@/app/lib/categoriaExterna"
 import { leituraFinanceira, AJUDA_FINANCEIRO } from "@/app/lib/financeiroExterno"
 import { leituraMetaAds, ErroMeta } from "@/app/lib/metaAdsLeitura"
+import { paradasParaLeitura } from "@/app/lib/metaCampanhaParada"
 import { acaoMetaAds } from "@/app/lib/metaAdsAcoes"
 import { leadExterno } from "@/app/lib/leadExterno"
+import { pedidoExterno } from "@/app/lib/pedidoExterno"
 
 // Porta de acesso dos diretores na nuvem (ex.: Grok Bot). Pública no proxy, mas cada chamada exige a chave do diretor
 // (Authorization: Bearer enyla_<diretor>_...). Leitura da empresa e as mesmas ferramentas da conversa com o Felipe;
@@ -62,7 +64,7 @@ export async function GET(req: NextRequest) {
 
   if (o === "meta_ads") {
     if (diretor !== "cmo") return NextResponse.json({ erro: "A leitura da Meta Ads é só da CMO." }, { status: 403 })
-    try { return NextResponse.json(await leituraMetaAds()) }
+    try { const l = await leituraMetaAds(); return NextResponse.json({ ...l, campanhasParadas: await paradasParaLeitura(l.conta) }) }
     catch (e) {
       if (e instanceof ErroMeta) return NextResponse.json({ erro: e.message, codigo: e.codigo }, { status: e.status })
       return NextResponse.json({ erro: "Falha ao ler a Meta Ads." }, { status: 500 })
@@ -105,7 +107,7 @@ export async function GET(req: NextRequest) {
   if (o === "detalhe") {
     const area = req.nextUrl.searchParams.get("area") ?? ""
     if (!AREAS.includes(area)) return NextResponse.json({ erro: `Área: ${AREAS.join(", ")}` }, { status: 400 })
-    return NextResponse.json({ area, em: hora(foto.em), dados: foto.detalhes[area] })
+    return NextResponse.json({ area, em: hora(foto.em), dados: foto.detalhes[area], ...(area === "marketing" ? { campanhasParadas: await paradasParaLeitura() } : {}) })
   }
   if (o === "empresa") {
     const [planos, cfg] = await Promise.all([lerPlanos(), lerCampos<{ conhecimentoDiretoria?: Partial<Record<string, LicaoDiretor[]>> }>(["conhecimentoDiretoria"])])
@@ -157,6 +159,13 @@ export async function POST(req: NextRequest) {
     msg = { id: novoId(), de: "diretor", texto: r.resultado, em: new Date().toISOString(), nuvem: true }
     await gravarConversa(diretor, [...await lerConversa(diretor), msg])
     return NextResponse.json({ ok: true, resultado: r.resultado, jid: r.jid })
+  } else if (b.acao === "pedido") {
+    const r = await pedidoExterno(diretor, b)
+    if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
+    msg = { id: novoId(), de: "diretor", texto: r.resultado, em: new Date().toISOString(), nuvem: true }
+    await gravarConversa(diretor, [...await lerConversa(diretor), msg])
+    after(() => { renovarFoto().catch(() => null) })   // o detalhe da produção já mostra a marca nova
+    return NextResponse.json({ ok: true, resultado: r.resultado, aguardandoPagamento: r.aguardandoPagamento })
   } else if (b.acao === "meta_ads") {
     const r = await acaoMetaAds(diretor, b)
     return NextResponse.json(r.corpo, { status: r.status })

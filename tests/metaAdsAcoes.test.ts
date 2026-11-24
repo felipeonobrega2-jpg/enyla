@@ -214,6 +214,45 @@ describe("POST acao=meta_ads por conjuntoId", () => {
     expect(escritas()).toHaveLength(0)
   })
 
+  it("POST com code 100 (subcode 33) depois de GET ok: 403, não é 'não achou', registro útil, sem token", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {}), err = vi.spyOn(console, "error").mockImplementation(() => {})
+    fetchMock.mockImplementation(async (_u: string, init?: RequestInit) => ({ json: async () => init?.method === "POST"
+      ? { error: { code: 100, type: "GraphMethodException", error_subcode: 33, message: `Unsupported post request. access_token=${TOKEN}` } } : campanha }))
+    const r = await post(msgC({ operacao: "ajustar_verba", verbaDiaria: 80 }))
+    const j = await r.json()
+    expect(r.status).toBe(403)
+    expect(j.codigo).not.toBe("CAMPANHA_NAO_ENCONTRADA")
+    expect(j.erro).not.toContain("não achou")
+    expect(j.erro).toContain("Unsupported post request")
+    expect(j.erro).toContain("33")
+    expect(escritas()).toHaveLength(1)
+    expect(inserts).toHaveLength(1)
+    expect(inserts[0].dados).toMatchObject({ aceita: false, conjuntoId: "222" })
+    expect(String(inserts[0].dados.motivo)).toContain("Unsupported post request")
+    expect(JSON.stringify([j, inserts, ...log.mock.calls, ...err.mock.calls])).not.toContain(TOKEN)
+    log.mockRestore(); err.mockRestore()
+  })
+
+  it("POST com code 100 sem cara de permissão: 400 com a message da Meta", async () => {
+    fetchMock.mockImplementation(async (_u: string, init?: RequestInit) => ({ json: async () => init?.method === "POST"
+      ? { error: { code: 100, type: "OAuthException", error_subcode: 1885, message: "Invalid parameter" } } : campanha }))
+    const r = await post(msgC({ operacao: "ajustar_verba", verbaDiaria: 80 }))
+    const j = await r.json()
+    expect(r.status).toBe(400)
+    expect(j.codigo).toBe("PARAMETRO_INVALIDO")
+    expect(j.erro).toContain("Invalid parameter")
+    expect(j.erro).not.toContain("não achou")
+    expect(inserts[0].dados).toMatchObject({ aceita: false, conjuntoId: "222" })
+  })
+
+  it("GET do conjunto com code 100: 404 e nenhuma escrita", async () => {
+    campanha = { error: { code: 100, type: "GraphMethodException", message: "Unsupported get request" } }
+    const r = await post(msgC({ operacao: "ajustar_verba", verbaDiaria: 80 }))
+    expect(r.status).toBe(404)
+    expect((await r.json()).codigo).toBe("CAMPANHA_NAO_ENCONTRADA")
+    expect(escritas()).toHaveLength(0)
+  })
+
   it.each([
     [{ campanhaId: "111", conjuntoId: "222", operacao: "pausar" }],
     [{ operacao: "pausar", conjuntoId: undefined, campanhaId: undefined }],
