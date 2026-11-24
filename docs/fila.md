@@ -29,6 +29,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 11 | Porta externa: leitura ao vivo da Meta Ads para a CMO (`?o=meta_ads`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/25 |
 | 12 | Porta externa: CMO liga, pausa e ajusta verba diária de campanha existente (`acao=meta_ads`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 (7h33–7h34) | (PR da issue #29) |
 | 13 | Prospector: envio automático (primeiro contato e lembrete) | operação | esta leva | — | Diego | sim (o Felipe aprova o merge; chave `prospector_envio_ativo` nasce desligada) | (PR da issue #11) |
+| 14 | Porta externa: leitura financeira (`?o=financeiro`) para o CFO | CFO | — | — | Claude Code | não | (PR da issue #24) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -183,3 +184,9 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 **Regras.** Até 10 primeiros contatos por dia, segunda a sexta, 9h–17h America/Sao_Paulo (a rota recusa fora disso). Lembrete único 3 dias depois; depois encerra. Resposta para a cadência; recusa vira `opt_out`. Nenhuma resposta automática nova.
 
 **Chave.** `prospector_envio_ativo` nasce desligada e este PR não a liga. Antes de ligar: rodar a migração no Supabase e conferir o Gmail do Felipe (resposta de e-mail não é lida pelo sistema).
+
+## 14. Porta externa: leitura financeira para o CFO
+
+**Status:** Claude Code. **PR:** o PR da issue #24. Não junta sozinho.
+
+`GET /api/externo?o=financeiro`, só com a chave do CFO (as outras recebem 403). Só leitura: receber, pagar, banco, saldos, gastos, margem e depende. Sem `contraparte_doc` nem `bruto`, e sem dados pessoais de cliente além de nome e valor. Não escreve nada financeiro; a ação `gasto_fixo` segue como está.
