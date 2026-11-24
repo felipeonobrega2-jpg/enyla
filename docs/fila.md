@@ -30,7 +30,9 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 12 | Porta externa: CMO liga, pausa e ajusta verba diária de campanha existente (`acao=meta_ads`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 (7h33–7h34) | (PR da issue #29) |
 | 13 | Prospector: envio automático (primeiro contato e lembrete) | operação | esta leva | — | Diego | sim (o Felipe aprova o merge; chave `prospector_envio_ativo` nasce desligada) | (PR da issue #11) |
 | 14 | Porta externa: leitura financeira (`?o=financeiro`) para o CFO | CFO | — | — | Claude Code | não | (PR da issue #24) |
-| 15 | Cadastro de parceiros: cenário-exemplo e preço de referência por serviço | Felipe | — | — | Claude Code | pedido pelo Felipe em 24/11/2026 | (PR da issue #36) |
+| 15 | Porta externa: verba do conjunto (ABO) na leitura e no ajuste (`acao=meta_ads`, `conjuntoId`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 (mesmas regras por conjunto) | (PR da issue #32) |
+| 16 | Porta externa: escrita financeira do CFO (`acao=lancamento`, `conciliacao`, `categoria`) | CFO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026, 7h31 ("Libera para o Otávio") | (PR da issue #35) |
+| 17 | Cadastro de parceiros: cenário-exemplo e preço de referência por serviço | Felipe | — | — | Claude Code | pedido pelo Felipe em 24/11/2026 | (PR da issue #36) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -197,3 +199,19 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 **Status:** Claude Code. **Aprovo:** o Felipe liberou ligar, pausar e ajustar verba de campanha existente em 24/11/2026; as mesmas regras valem por conjunto. **PR:** o PR da issue #32. Não junta sozinho.
 
 Os `conjuntos` de `GET ?o=meta_ads` passam a trazer `verbaDiaria` e `verbaTotal` em reais (ou `null`, em CBO). `POST acao=meta_ads` aceita `conjuntoId` no lugar de `campanhaId` (nunca os dois) para ligar, pausar e ajustar a verba diária do conjunto: no máximo 20% e teto de R$ 200 por conjunto (recusa, não corta). Conjunto CBO em `ajustar_verba`: 400, a verba está na campanha, use `campanhaId`. Registro em `metaAdsAcoes` com `conjuntoId` e `conjuntoNome`. Não cria nada e não entrega o aviso de campanha parada (item 1).
+
+## 16. Porta externa: escrita financeira para o CFO
+
+**Status:** Claude Code. **Aprovo:** o Felipe liberou em 24/11/2026, 7h31 ("Libera para o Otávio"). **PR:** o PR da issue #35. Não junta sozinho.
+
+`POST /api/externo` com `acao` = `lancamento` (criar, editar, desativar, estornar; inclui contas a pagar), `conciliacao` (vincular, vincularVarios, atualizar, criar, ignorar e um desfazer lógico) ou `categoria` (criar, editar, desativar; `ativa?: boolean` em `CategoriaFinanceira`), só com a chave do CFO (as outras recebem 403). Cada sucesso grava a conversa e `alteradoPor:"cfo"`/`alteradoEm`.
+
+**Não faz.** Não paga nem cobra, não muda preço, não mexe em chaves, não apaga nada de vez: desativar/estornar marcam `estornadoEm`/`estornadoPor`, e o `desfazer` da conciliação estorna os lançamentos criados em vez de apagá-los (o `desfazer` de `aplicar()` não é exposto). Sem `contraparte_doc` nem `bruto` na resposta.
+
+**Migração (só depois do merge, aditiva).** `supabase/migrations/20261126_lancamento_estorno.sql` acrescenta `estornadoEm` e `estornadoPor` em `LancamentoFinanceiro`. Enquanto não rodar, o estorno grava só a marca em `obs`. A leitura financeira ainda não filtra lançamentos estornados: item a combinar.
+
+## 17. Cadastro de parceiros: cenário-exemplo e preço de referência por serviço
+
+**Status:** Claude Code. **Pedido:** o Felipe, em 24/11/2026. **PR:** o PR da issue #36 (#39). Não junta sozinho.
+
+Config editável `cenariosParceiros` no AppConfig (padrão no código; a equipe edita na tela Fornecedores). `/parceiros` mostra o enunciado e pede o preço de cada exemplo; impressão (offset e digital) não tem cenário e pede formato da máquina, acerto e milheiro; laminação tem quatro cenários e arte pede preço por arte e pacote de 3. A tela Fornecedores compara com a referência interna e mostra média, mínimo e máximo dos parceiros por cenário. A referência e esses números nunca vão ao parceiro. Sem migração SQL (tudo no JSON da config). Pendente: o Felipe confirmar a referência da laminação fosca (R$ 765,28) e o preço do Ronaldo para brilho, soft touch e dois lados.
