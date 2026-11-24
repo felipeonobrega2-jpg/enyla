@@ -26,6 +26,7 @@ import {
 } from "./agenteLeads"
 import { corrigirCumprimento, type DadosPedido } from "./atendente"
 import { mudarConfig } from "./configAtomica"
+import { ehProspecto } from "./prospectorTrava"
 import { notificar, LINK_SISTEMA } from "./notificar"
 import { limparEmojis, leadEstaRindo } from "./estilo"
 import { escolherMidia, MidiaAgente } from "./midiaAgente"
@@ -451,6 +452,11 @@ async function aindaEhAUltima(msgId: string) {
   return ultima && ultima.id === msgId && !ultima.from_me ? msg.jid as string : null
 }
 
+async function jidDaMensagem(msgId: string) {
+  const { data } = await supabase.from("whatsapp_mensagens").select("jid").eq("id", msgId).maybeSingle()
+  return (data?.jid as string | undefined) ?? null
+}
+
 // 1ª etapa (no webhook): espera o lead terminar de escrever (costumam mandar 2–3 mensagens seguidas)
 export async function agendarResposta(msgId: string, origem: string) {
   const cfg = await lerCfg()
@@ -468,6 +474,8 @@ export async function agendarResposta(msgId: string, origem: string) {
     const pessoal = (cfg.agenteAuto as { avisoNumero?: string } | undefined)?.avisoNumero?.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "")
     if (pessoal && pessoal.length >= 10 && String(m?.jid ?? "").split("@")[0].replace(/^55(?=\d{10,11}$)/, "") === pessoal) return
   }
+  // Gráfica do Prospector que respondeu não é cliente: a Atendente não agenda (a mensagem já está gravada)
+  if (await ehProspecto(await jidDaMensagem(msgId))) return
   // Ritmo de gente (somado à 2ª etapa): de dia ~40 s a 1 min; de madrugada mais devagar (~1 a 1,5 min)
   const hSP = Number(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false })) % 24
   await (hSP >= 8 && hSP < 22 ? espera(20, 32) : espera(35, 50))
@@ -551,6 +559,8 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   if (!opts.atrasada) await espera(10, 25)
   const jid = await aindaEhAUltima(msgId)
   if (!jid) return
+  // Gráfica do Prospector (também na resposta atrasada, em assumir e continuar e em retomar parados): sem IA, sem envio
+  if (await ehProspecto(jid)) return
   // Cada mensagem do lead é respondida uma vez só (dois disparos ao mesmo tempo: só um passa)
   if (!await reservarMensagem(msgId) && !opts.atrasada) return
   // Atrasada passa por cima da reserva (a tentativa que falhou já reservou): trava própria de 10 min por mensagem,
