@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Printer, Layers, Sparkles, Stamp, Mountain, Scissors, Package, Shapes, FileStack, Palette, FileCheck, Truck, Plus, Check, ChevronLeft, ArrowRight, Paperclip, X, Clock, BarChart3, ShieldCheck, Handshake, Loader2, MessageCircle, MapPin, Zap, Banknote, Wallet, Camera, Globe } from "lucide-react"
+import type { CenarioPublico } from "../lib/cenariosParceiros"
 import {
   SERVICOS_PARCEIRO, FORMAS_COBRANCA, PERGUNTAS, ETAPAS_IDS, errosDaEtapa, mascaraDocumento, mascaraTelefone, mascaraCep, GERENTE_PADRAO,
   type CadastroParceiro, type ServicoCadastrado, type IdServicoParceiro, type Pergunta, type Resposta, type Formato,
@@ -107,7 +108,7 @@ function Rodape({ whatsappGerente }: { whatsappGerente: string | null }) {
   )
 }
 
-export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: string | null }) {
+export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { whatsappGerente: string | null; cenarios?: CenarioPublico[] }) {
   const [passo, setPasso] = useState(-1)          // -1 = boas-vindas; 0..N-1 = etapas; N = enviado
   const [d, setD] = useState<Dados>(VAZIO)
   const [erros, setErros] = useState<Record<string, string>>({})
@@ -434,7 +435,7 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
         {et === "detalhes" && <>
           {sub === 0 && <div className="par-surge">
             <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Conta como cada serviço funciona</h2>
-            <p className="text-[14px] text-[#6b6878] mt-1.5">Um serviço por vez. Com isso a gente manda para você só o que cabe na sua máquina. Tudo é opcional, menos como você cobra e o prazo.</p>
+            <p className="text-[14px] text-[#6b6878] mt-1.5">Um serviço por vez. Com isso a gente manda para você só o que cabe na sua máquina. Tudo é opcional, menos o preço do exemplo, como você cobra e o prazo.</p>
           </div>}
           {escolhidos.length > 1 && <div className="flex gap-1.5" aria-hidden>{escolhidos.map((x, i) => <span key={x.id} className="h-1.5 flex-1 rounded-full transition-colors duration-300" style={{ background: i <= sub ? ROXO : "#e6e2f0" }} />)}</div>}
           {escolhidos.filter((_, i) => i === sub).map(sv => {
@@ -442,6 +443,7 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
             const forma = FORMAS_COBRANCA.find(f => f.id === s.cobranca)
             const temErro = Object.keys(erros).some(k => k.startsWith(`${sv.id}.`))
             const perguntas = PERGUNTAS[sv.id] ?? []
+            const cenario = cenarios.find(x => x.servicoId === sv.id)
             return (
               <section key={sv.id} className={`rounded-3xl bg-white p-5 border ${temErro ? "border-[#d33a3c]/40" : "border-[#ece9f4]"} shadow-[0_2px_10px_rgba(40,20,90,0.04)] space-y-5`}>
                 <div className="flex items-center gap-3">
@@ -453,6 +455,15 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
                 {perguntas.map(p => <PerguntaTecnica key={p.id} p={p} v={s.tecnico?.[p.id]} onChange={v => mudarTecnico(sv.id, p.id, v)} />)}
 
                 {perguntas.length > 0 && <div className="h-px bg-[#efedf5]" />}
+                {cenario && (
+                  <div data-erro={marca(`${sv.id}.precoExemplo`)} className={`rounded-2xl p-4 bg-[#7c4ee4]/[0.05] border ${E(`${sv.id}.precoExemplo`) ? "border-[#d33a3c]/50" : "border-[#7c4ee4]/15"}`}>
+                    <Campo rotulo="Preço para este exemplo (R$)" erro={E(`${sv.id}.precoExemplo`)}
+                      dica={<span><b className="text-[#4a4658]">Exemplo:</b> {cenario.enunciado} Quanto você cobraria por este trabalho? É só uma referência, cada pedido a gente combina com você.</span>}>
+                      <input enterKeyHint="next" className={inputCls(E(`${sv.id}.precoExemplo`))} inputMode="decimal" value={s.precoExemplo ?? ""} placeholder="0,00"
+                        onChange={e => mudarServico(sv.id, { precoExemplo: Number(e.target.value.replace(",", ".")) || null, cenarioId: sv.id, cenarioVersao: cenario.versao })} />
+                    </Campo>
+                  </div>
+                )}
                 <div data-erro={marca(`${sv.id}.cobranca`)}><Campo rotulo="Como você cobra?" erro={E(`${sv.id}.cobranca`)}>
                   <div className="flex flex-wrap gap-2">{FORMAS_COBRANCA.map(f => <Chip key={f.id} on={s.cobranca === f.id} onClick={() => mudarServico(sv.id, { cobranca: f.id })}>{f.nome}</Chip>)}</div>
                 </Campo></div>

@@ -7,6 +7,25 @@ import React from "react"
 import { Handshake, Copy, Check, ChevronDown, Paperclip, MessageCircle, Mail, X } from "lucide-react"
 import { nomeServico, textoCobranca, textoPrazo, textoTecnico, textoEndereco, paraFornecedor, type CadastroParceiro } from "../lib/parceiros"
 import type { FornecedorProducao } from "../lib/producao"
+import { compararExemplo, type CenarioParceiro } from "../lib/cenariosParceiros"
+import { CenariosParceirosEditor } from "./CenariosParceirosEditor"
+
+const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+const sinal = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${brl(Math.abs(v))}`
+
+// Só da equipe: o preço que o parceiro deu no exemplo contra a nossa referência (ou "sem referência")
+export function LinhaExemplo({ precoExemplo, cenario }: { precoExemplo?: number | null; cenario?: CenarioParceiro }) {
+  if (!precoExemplo) return <p className="text-[#898892] mt-0.5">Exemplo: sem preço informado</p>
+  const comp = compararExemplo(precoExemplo, cenario?.referencias)
+  return (
+    <div className="mt-0.5">
+      <p className="text-[#191625]">Exemplo ({cenario?.unidade ?? "cenário"}): <b>{brl(precoExemplo)}</b></p>
+      {comp.length === 0
+        ? <p className="text-[#898892]">sem referência</p>
+        : comp.map((k, i) => <p key={i} className="text-[#5e5c68]">Referência{k.fornecedorNome ? ` (${k.fornecedorNome})` : ""}: {brl(k.referencia)} · diferença <b className={k.diferenca > 0 ? "text-[#c26a0a]" : "text-[#009351]"}>{sinal(k.diferenca)} ({k.percentual > 0 ? "+" : ""}{String(k.percentual).replace(".", ",")}%)</b></p>)}
+    </div>
+  )
+}
 
 const LINK = "https://app.enyla.com.br/parceiros"
 const doc = (c: CadastroParceiro) => c.tipoDocumento === "cnpj"
@@ -18,6 +37,8 @@ export function CadastrosParceirosCard({ onAprovar }: { onAprovar: (f: Fornecedo
   const [aberto, setAberto] = React.useState<string | null>(null)
   const [copiado, setCopiado] = React.useState(false)
   const [verTodos, setVerTodos] = React.useState(false)
+  const [cenarios, setCenarios] = React.useState<CenarioParceiro[]>([])
+  React.useEffect(() => { fetch("/api/parceiros/cenarios").then(r => r.ok ? r.json() : null).then(d => setCenarios(d?.cenarios ?? [])).catch(() => {}) }, [])
   React.useEffect(() => { fetch("/api/parceiros").then(r => r.ok ? r.json() : null).then(d => setLista(d?.cadastros ?? [])).catch(() => setLista([])) }, [])
 
   const status = (id: string, s: CadastroParceiro["status"], fornecedorId?: string) => {
@@ -46,6 +67,8 @@ export function CadastrosParceirosCard({ onAprovar }: { onAprovar: (f: Fornecedo
           {copiado ? <><Check className="w-4 h-4" />Copiado</> : <><Copy className="w-4 h-4" />Copiar link</>}
         </button>
       </div>
+
+      <CenariosParceirosEditor cenarios={cenarios} onSalvo={setCenarios} />
 
       {lista && lista.length > 0 && (
         <div className="mt-4 space-y-2">
@@ -80,6 +103,7 @@ export function CadastrosParceirosCard({ onAprovar }: { onAprovar: (f: Fornecedo
                         <div key={s.id} className="px-3 py-2 text-[12.5px]">
                           <p className="font-semibold text-[#191625]">{nomeServico(s)}</p>
                           <p className="text-[#5e5c68]">{textoCobranca(s)} · {textoPrazo(s)}{s.minimo ? ` · mínimo ${s.minimo}` : ""}</p>
+                          <LinhaExemplo precoExemplo={s.precoExemplo} cenario={cenarios.find(x => x.servicoId === s.id)} />
                           {textoTecnico(s) && <p className="text-[#5e5c68] mt-0.5">{textoTecnico(s)}</p>}
                           {s.obs && <p className="text-[#898892] mt-0.5">{s.obs}</p>}
                         </div>

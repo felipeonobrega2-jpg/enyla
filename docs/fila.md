@@ -30,6 +30,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 12 | Porta externa: CMO liga, pausa e ajusta verba diária de campanha existente (`acao=meta_ads`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 (7h33–7h34) | (PR da issue #29) |
 | 13 | Prospector: envio automático (primeiro contato e lembrete) | operação | esta leva | — | Diego | sim (o Felipe aprova o merge; chave `prospector_envio_ativo` nasce desligada) | (PR da issue #11) |
 | 14 | Porta externa: leitura financeira (`?o=financeiro`) para o CFO | CFO | — | — | Claude Code | não | (PR da issue #24) |
+| 15 | Cadastro de parceiros: cenário-exemplo e preço de referência por serviço | Felipe | — | — | Claude Code | pedido pelo Felipe em 24/11/2026 | (PR da issue #36) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
