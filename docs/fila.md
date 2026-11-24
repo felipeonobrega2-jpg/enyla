@@ -229,3 +229,10 @@ Config editável `cenariosParceiros` no AppConfig (padrão no código; a equipe 
 **Status:** Claude Code. **PR:** o PR da issue #43. Não junta sozinho.
 
 Em `erroGraph`, code 100 na escrita (`POST /{id}`) não vira mais 404 `CAMPANHA_NAO_ENCONTRADA`: com `error_subcode` 33, "Unsupported post request", permissão ou `ads_management` responde 403 (`SEM_ADS_MANAGEMENT`); senão 400 (`PARAMETRO_INVALIDO`). O `erro` e o `motivo` do registro trazem a message e o subcode da Meta, sem o token. Na leitura, code 100 segue 404. Regras (só CMO, 20%, teto R$ 200) e `conjuntoId` inalterados.
+
+
+## 20. Referência interna da laminação fosca: R$ 450,00
+
+**Status:** Claude Code. **Aprovo:** não (o Felipe já confirmou o valor em 24/11/2026). **PR:** o PR da issue #62. Não junta sozinho.
+
+Em `CENARIOS_PADRAO`, a referência interna de `laminacao-fosca` (Ronaldo Osasco) passa de R$ 765,28 (calculado, não confirmado) para R$ 450,00, o mesmo do verniz. Nada muda no que o parceiro vê em `/parceiros`. Sem migração.
