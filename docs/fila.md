@@ -23,7 +23,7 @@ Fila única, compartilhada entre o Diego (CTO, agentes na nuvem) e o Felipe com 
 | 5 | Dispensar pendência com motivo | COO (aprovada) | 4 (junto com o 4) | 11/12/2026 | livre | não | |
 | 6 | Enviar pedido de ferramenta ao Claude Code | CTO | depois das 5 | depois do item 5 | livre | sim | |
 | 7 | Integração com o Claude Code / vaga Desenvolvedor de ferramentas | CTO | depois das 5 | depois do item 5 | livre | sim | |
-| 8 | Prospector de Parceiros (base, nota e funil) | operação | esta leva | — | Diego | não | |
+| 8 | Prospector de Parceiros (base, nota e funil) | operação | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/2 |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -135,7 +135,7 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 
 ## 8. Prospector de Parceiros (base, nota e funil)
 
-**Status:** Diego. **Aprovo:** não. **PR:** vazio. Pedido da operação. Esta leva. Não entra na frente dos itens 1 a 7: é outra frente, e não manda mensagem, não mexe em cobrança, não apaga dado e não cria chave.
+**Status:** Diego. **Aprovo:** não. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/2. Pedido da operação. Esta leva. Não entra na frente dos itens 1 a 7: é outra frente, e não manda mensagem, não mexe em cobrança, não apaga dado e não cria chave.
 
 **O que já existe.** O cadastro público em `/parceiros` e a aprovação na tela Fornecedores (`CadastrosParceirosCard`). A aprovação continua com o Felipe, do jeito que está.
 
