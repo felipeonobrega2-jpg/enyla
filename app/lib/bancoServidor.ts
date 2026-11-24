@@ -15,7 +15,11 @@ import type { Configuracoes } from "../config"
 import { gravarCampos, mudarConfig } from "./configAtomica"
 
 export type ConfigPluggy = { itens?: { id: string; nome?: string }[]; dataCorte?: string; automatico?: boolean; documentosProprios?: string[] }
-export type StatusPluggy = { em: string; contas: { id: string; nome: string; banco: string; saldo: number | null }[]; novas: number; erro?: string | null }
+export type StatusPluggy = {
+  em: string; contas: { id: string; nome: string; banco: string; saldo: number | null }[]; novas: number; erro?: string | null
+  // Quando o BANCO mandou dados pela última vez (não quando o sistema perguntou) e por que parou, se parou
+  bancos?: { banco: string; atualizadoEm: string | null; parado: boolean; motivo: string | null }[]
+}
 
 const agora = () => new Date().toISOString()
 const hojeSP = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
@@ -49,12 +53,16 @@ export async function sincronizar(): Promise<{ ok: boolean; novas: number; suger
   if (!itens.length) return { ok: false, novas: 0, sugeridas: 0, erro: "Nenhum banco conectado: cole o Item ID de cada banco em Financeiro → Banco." }
 
   // Pede à Pluggy para buscar no banco de novo (o que chegar depois entra na próxima sincronização, em poucos minutos)
-  await Promise.all(itens.map(it => atualizarItem(it.id).catch(() => false)))
-  const status: StatusPluggy = { em: agora(), contas: [], novas: 0, erro: null }
+  const pedidos = await Promise.all(itens.map(it => atualizarItem(it.id).catch(() => ({ ok: false, erro: "Sem conexão com a Pluggy." }))))
+  const status: StatusPluggy = { em: agora(), contas: [], novas: 0, erro: null, bancos: [] }
   const linhas: Record<string, unknown>[] = []
-  for (const it of itens) {
+  for (const [i, it] of itens.entries()) {
     const info = await itemPluggy(it.id)
     const banco = it.nome || info.dados?.connector?.name || "Banco"
+    const atualizadoEm = info.dados?.lastUpdatedAt ?? null
+    const velho = !atualizadoEm || Date.now() - new Date(atualizadoEm).getTime() > 36 * 3600_000
+    const motivo = !pedidos[i].ok ? pedidos[i].erro ?? null : info.dados?.error?.message ?? (info.dados?.status && !["UPDATED", "UPDATING"].includes(info.dados.status) ? `conexão com status ${info.dados.status}` : null)
+    status.bancos!.push({ banco, atualizadoEm, parado: velho || !pedidos[i].ok, motivo })
     const r = await contasPluggy(it.id)
     if (!r.ok) { status.erro = `${banco}: ${r.erro}`; continue }
     for (const c of (r.dados?.results ?? []).filter((c: ContaPluggy) => c.type === "BANK")) {

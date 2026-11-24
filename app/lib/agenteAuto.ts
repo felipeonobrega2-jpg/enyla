@@ -16,11 +16,14 @@ import { evo } from "./evolution"
 import { gravarLote, WaMessage, deveIgnorar } from "./whatsappDados"
 import { atender, lerConfigAtendente } from "./atendenteServidor"
 import { etapaDoLead } from "./etapaLead"
+import { leadsDoFollowUp, jidsDoFollowUp } from "./leadsDoFollowUp"
+import { lerEstadosLead } from "./leadEstadoServidor"
+import { perdidoAtivo, orcadoManualAtivo } from "./leadEstado"
 import { lerRegistros, gravarRegistro, lerIdsAgente, guardarIdAgente, reservarTratada, liberarTratada, temTabelas } from "./registroAgente"
 import { garantirTelefone } from "./contatosServidor"
 import { textoAvisoReativacao } from "./reativacao"
 import {
-  AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, TEXTO_SEM_IA, filtroEfetivo,
+  AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, ehSaudacaoAutomaticaDoLead, TEXTO_SEM_IA, filtroEfetivo,
   organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, ehSemCredito, proximoFollowUp, horarioDeFollowUp, dentroDoHorario, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE, ETIQUETAS_AGENTE,
   marcar, marcosDoRegistro, Marcos, paradoParaRetomar,
 } from "./agenteLeads"
@@ -397,7 +400,8 @@ async function avisarSemCredito(cfg: CfgAgente) {
 // fazia o agente achar que você já tinha respondido (o lead da noite ficava sem a abertura)
 const ultimaDa = async (jid: string) => {
   const { data } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo, tipo").eq("jid", jid).order("ts", { ascending: false }).limit(6)
-  const m = (data ?? []).find(x => !(x.from_me && ehMensagemAutomaticaDoWhatsapp(x.corpo, x.tipo)))
+  // A saudação automática que o lead manda também não conta: ele não está esperando resposta
+  const m = (data ?? []).find(x => !(x.from_me && ehMensagemAutomaticaDoWhatsapp(x.corpo, x.tipo)) && !(!x.from_me && ehSaudacaoAutomaticaDoLead(x.corpo)))
   return m ? { id: m.id as string, from_me: m.from_me as boolean, ts: m.ts as string } : null
 }
 
@@ -476,6 +480,8 @@ export async function agendarResposta(msgId: string, origem: string) {
   }
   // Gráfica do Prospector que respondeu não é cliente: a Atendente não agenda (a mensagem já está gravada)
   if (await ehProspecto(await jidDaMensagem(msgId))) return
+  // Saudação automática do lead: segura e avisa o Felipe já, sem a espera nem a IA
+  if (await segurarSaudacaoDoLead(cfg, msgId).catch(() => false)) return
   // Ritmo de gente (somado à 2ª etapa): de dia ~40 s a 1 min; de madrugada mais devagar (~1 a 1,5 min)
   const hSP = Number(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false })) % 24
   await (hSP >= 8 && hSP < 22 ? espera(20, 32) : espera(35, 50))
@@ -502,6 +508,25 @@ async function reservarMensagem(msgId: string): Promise<boolean> {
     return { agenteTratadas: [msgId, ...(d.agenteTratadas ?? [])].slice(0, 500) }
   })
   return minha
+}
+
+// Saudação automática do WhatsApp Business do lead ("agradecemos seu contato"): o agente não responde, não chama a IA,
+// não mexe no follow-up e só avisa o Felipe (nunca o lead). Roda ANTES de aindaEhAUltima: ultimaDa ignora essa
+// saudação, então aindaEhAUltima devolveria null e o aviso se perderia. true = a mensagem é saudação (tratada aqui).
+export async function segurarSaudacaoDoLead(cfg: CfgAgente, msgId: string): Promise<boolean> {
+  const { data: msg } = await supabase.from("whatsapp_mensagens").select("jid, from_me, corpo, ts").eq("id", msgId).maybeSingle()
+  if (!msg?.jid || msg.from_me || !ehSaudacaoAutomaticaDoLead(msg.corpo as string | null)) return false
+  // Só vale se for a última coisa que o lead disse: se veio mensagem de gente depois, ela dispara por conta própria
+  const { data: depois } = await supabase.from("whatsapp_mensagens").select("id, corpo").eq("jid", msg.jid).eq("from_me", false).gt("ts", msg.ts).limit(5)
+  if ((depois ?? []).some(m => !ehSaudacaoAutomaticaDoLead(m.corpo as string | null))) return true
+  if (!await reservarMensagem(msgId)) return true   // já tratada: não avisa duas vezes
+  const c = await lerConversa(msg.jid as string)
+  if (!c) return true
+  const texto = String(msg.corpo ?? "").trim().slice(0, 200)
+  const motivo = `saudação automática do WhatsApp Business do lead ("${texto}"), não é resposta dele`
+  await avisarSegurado(cfg, c, motivo, "").catch(() => null)   // vai só ao Felipe, mesmo para lead pequeno/digital
+  await registrar({ em: new Date().toISOString(), jid: c.jid, nome: c.nome, perfil: "indefinido", enviou: false, texto: "", motivo: `segurou: ${motivo}` }).catch(() => null)
+  return true
 }
 
 // 2ª etapa: mais um tempo (como quem viu e vai responder), pensa, lê e digita
@@ -556,6 +581,8 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   const auto = cfg.agenteAuto
   if (!auto?.ligado || !dentroDoHorario(auto.horario)) return
   const inicio = Date.now()
+  // Saudação automática do lead: antes da espera, de aindaEhAUltima, do semFollowUp e da IA
+  if (await segurarSaudacaoDoLead(cfg, msgId).catch(() => false)) return
   if (!opts.atrasada) await espera(10, 25)
   const jid = await aindaEhAUltima(msgId)
   if (!jid) return
@@ -838,8 +865,9 @@ export async function talvezRetomarParados(origem: string): Promise<string> {
     .gte("ultima_recebida_at", new Date(agora - HORAS_RETOMAR * 3_600_000).toISOString()).order("ultima_recebida_at", { ascending: false }).limit(300)
   // A última "enviada" da conversa pode ser só automática do WhatsApp Business ("fora do horário", botões sem
   // texto, que chegam até horas depois): a conversa entra e a mensagem certa é conferida abaixo, ignorando essas
+  const estadosLead = await lerEstadosLead().catch(() => new Map())   // lead perdido com motivo: o Atendente não retoma
   const candidatas = (convs ?? []).filter(c => !deveIgnorar(c.jid) && !["mql", "descartado", "perdido"].includes(c.status_lead ?? "")
-    && !(c.etiquetas ?? []).includes("Fornecedora") && !!c.ultima_recebida_at)
+    && !(c.etiquetas ?? []).includes("Fornecedora") && !!c.ultima_recebida_at && !perdidoAtivo(estadosLead.get(c.jid), c.ultima_recebida_at))
   const logTodo = cfg.agenteLog ?? []
   // Retomada cuja resposta não saiu (WhatsApp fora do ar) não conta: tenta de novo
   const naoSaiu = new Set(logTodo.filter((l, i) => /^não enviou/.test(l.motivo ?? "") && !logTodo.slice(0, i).some(x => x.jid === l.jid && x.enviou)).map(l => l.jid))
@@ -923,7 +951,11 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
   // Só leads que o agente já atendeu (estão no registro) e não descartados. No MQL (seu) ele só etiqueta, não envia.
   // Quem recebeu retomada fica fora: é contato antigo (o agente não responde) e quem cobra é você
   const marcos = cfg.agenteMarcos ?? marcosDoRegistro(cfg.agenteLog ?? [])
-  const jidsDoAgente = Object.entries(marcos).filter(([, m]) => !m.passos?.["Reativação"]).sort((a, b) => b[1].em.localeCompare(a[1].em)).map(([j]) => j)
+  const doAgente = Object.entries(marcos).filter(([, m]) => !m.passos?.["Reativação"]).sort((a, b) => b[1].em.localeCompare(a[1].em)).map(([j]) => j)
+  // Follow-up manda sozinho: não ganha lead novo. Só quem já é do agente; perdido com motivo sai.
+  // Orçado pelo Felipe (já do agente) só troca a data de partida da contagem
+  const { perdidos, orcados } = await leadsDoFollowUp(DIAS_FOLLOW_UP, new Set(doAgente), (cfg as { agenteIds?: string[] }).agenteIds).catch(() => ({ perdidos: new Set<string>(), orcados: new Map<string, string>() }))
+  const jidsDoAgente = jidsDoFollowUp(doAgente, perdidos)
   if (!jidsDoAgente.length) return
   const { data } = await supabase.from("whatsapp_conversas")
     .select("jid, nome, telefone, etiquetas, status_lead, ultima_recebida_at, ultima_enviada_at, fechada_em")
@@ -934,7 +966,7 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
   // Campanha digital é uma mensagem só: quem recebeu e não respondeu não ganha follow-up (contato frio = risco ao número)
   const campanha = (cfg as { campanhaDigital?: EstadoCampanha }).campanhaDigital?.enviados ?? {}
   const tentados = (cfg as { agenteFollowupTentados?: Record<string, string> }).agenteFollowupTentados ?? {}
-  const candidatos = (data ?? []).filter(c =>
+  const candidatos = (data ?? []).map(c => orcados.has(c.jid) && orcados.get(c.jid)! > c.ultima_enviada_at ? { ...c, ultima_enviada_at: orcados.get(c.jid)! } : c).filter(c =>
     !c.fechada_em && !["descartado", "perdido", "orcamento", "negociando", "pedido"].includes(c.status_lead ?? "")
     && !(campanha[c.jid] && !(c.ultima_recebida_at && c.ultima_recebida_at > campanha[c.jid].em))
     && (!c.ultima_recebida_at || c.ultima_recebida_at < c.ultima_enviada_at))

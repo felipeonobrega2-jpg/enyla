@@ -34,7 +34,10 @@ export async function montarCaixaServidor() {
     pedidosDigitais?: { id: string; nome: string | null; quantidade: number; total: number; status: string; negociacao?: { status: string; em: string; pedidoTotal: number | null } | null }[]
   }
   const kanban = kanbanBruto.map(unpackTerceirizado)
-  const pend = pendencias({ pedidos: montarPedidos(kanban, lancamentos), kanban, lancamentos, historico, propostasCustom, clientes, config: cfg })
+  // Dispensadas com motivo (pendenciaDispensada) não entram no resumo do WhatsApp nem na caixa
+  const { dispensadasVigentes, chaveSistema } = await import("./pendenciaDispensada")
+  const dispensadas = new Set((await dispensadasVigentes()).map(d => d.chave))
+  const pend = pendencias({ pedidos: montarPedidos(kanban, lancamentos), kanban, lancamentos, historico, propostasCustom, clientes, config: cfg }).filter(x => !dispensadas.has(chaveSistema(x.id)))
   const numerosPend = new Set(pend.map(x => (x as { card?: { numero?: string } }).card?.numero).filter(Boolean))
   const nivel = (t: string) => t === "perigo" ? "perigo" as const : t === "alerta" ? "alerta" as const : t === "sucesso" ? "sucesso" as const : "info" as const
   const itens: ItemResumo[] = []

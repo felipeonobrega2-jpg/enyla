@@ -17,10 +17,10 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 0 | CI e coordenação | CTO | — | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/1 |
 | 1 | Conexão com a Meta Ads | CMO | 1 | 30/11/2026 | livre | sim | |
-| 2 | Detectar orçamento já enviado e lead perdido | CCO (aprovada) | 2 | 30/11/2026 | livre | não | |
-| 3 | Diretor aciona Atendente e Follow-up por lead | CCO (aprovada) | 3 | 11/12/2026 | livre | sim | |
-| 4 | Status "aguardando pagamento" no pedido | COO (aprovada) | 4 (junto com o 5) | 11/12/2026 | livre | sim | |
-| 5 | Dispensar pendência com motivo | COO (aprovada) | 4 (junto com o 4) | 11/12/2026 | livre | não | |
+| 2 | Detectar orçamento já enviado e lead perdido | CCO (aprovada) | 2 | 30/11/2026 | Claude Code | não | https://github.com/felipeonobrega2-jpg/enyla/pull/55 (na main) |
+| 3 | Diretor aciona Atendente e Follow-up por lead | CCO (aprovada) | 3 | 11/12/2026 | Claude Code | sim | https://github.com/felipeonobrega2-jpg/enyla/pull/56 (aberto, esperando o Aprovo) |
+| 4 | Status "aguardando pagamento" no pedido | COO (aprovada) | 4 (junto com o 5) | 11/12/2026 | Claude Code | sim | https://github.com/felipeonobrega2-jpg/enyla/pull/57 (na main) |
+| 5 | Dispensar pendência com motivo | COO (aprovada) | 4 (junto com o 4) | 11/12/2026 | Claude Code | não | https://github.com/felipeonobrega2-jpg/enyla/pull/58 (na main) |
 | 6 | Enviar pedido de ferramenta ao Claude Code | CTO | depois das 5 | depois do item 5 | livre | sim | |
 | 7 | Integração com o Claude Code / vaga Desenvolvedor de ferramentas | CTO | depois das 5 | depois do item 5 | livre | sim | |
 | 8 | Prospector de Parceiros (base, nota e funil) | operação | esta leva | — | Diego | aprovado 23/11/2026 22:27 | https://github.com/felipeonobrega2-jpg/enyla/pull/2 (na main) |
@@ -29,7 +29,30 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 11 | Porta externa: leitura ao vivo da Meta Ads para a CMO (`?o=meta_ads`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/25 |
 | 12 | Porta externa: CMO liga, pausa e ajusta verba diária de campanha existente (`acao=meta_ads`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 (7h33–7h34) | (PR da issue #29) |
 | 13 | Prospector: envio automático (primeiro contato e lembrete) | operação | esta leva | — | Diego | sim (o Felipe aprova o merge; chave `prospector_envio_ativo` nasce desligada) | (PR da issue #11) |
-| 14 | Atendente não responde sozinha a gráficas do Prospector | operação | — | — | Claude Code | não | (PR da issue #34) |
+| 14 | Porta externa: leitura financeira (`?o=financeiro`) para o CFO | CFO | — | — | Claude Code | não | (PR da issue #24) |
+| 15 | Porta externa: verba do conjunto (ABO) na leitura e no ajuste (`acao=meta_ads`, `conjuntoId`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 (mesmas regras por conjunto) | (PR da issue #32) |
+| 16 | Porta externa: escrita financeira do CFO (`acao=lancamento`, `conciliacao`, `categoria`) | CFO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026, 7h31 ("Libera para o Otávio") | (PR da issue #35) |
+| 17 | Porta externa: leitura financeira ignora lançamentos estornados (`incluirEstornados`) | CFO | — | — | Claude Code | pedido do Felipe na issue #41 | (PR da issue #41) |
+| 18 | Cadastro de parceiros: cenário-exemplo e preço de referência por serviço | Felipe | — | — | Claude Code | pedido pelo Felipe em 24/11/2026 | (PR da issue #36) |
+| 19 | Porta externa: code 100 da Meta na escrita não vira "não achou" (`erroGraph`) | CMO | — | — | Claude Code | não (correção de erro) | (PR da issue #43) |
+| 20 | Agente: segurar saudação automática do WhatsApp Business do lead e não contar como resposta | COO | — | — | Claude Code | aprovado pelo Felipe em 24/11/2026, 8:38 ("Aprovo as mudanças do Rafael") | https://github.com/felipeonobrega2-jpg/enyla/pull/54 |
+| 21 | Referência interna da laminação fosca: R$ 450,00 | Felipe | — | — | Claude Code | não (o Felipe já confirmou o valor) | #63 (issue #62) |
+| 22 | Correção: R$ 450 é do verniz UV total; laminação fosca volta a R$ 765,28 (regra do sistema) | Felipe | — | — | Claude Code | não (o Felipe corrigiu o destino do R$ 450; a fosca veio do cadastro e do motor) | (PR da issue #66) |
+| 23 | Detectar orçamento enviado pelo Felipe e lead perdido com motivo (porta: `acao=lead`, CCO e COO). Follow-up só para leads que já são do agente | CCO | 2 | 30/11/2026 | Claude Code | não | https://github.com/felipeonobrega2-jpg/enyla/pull/55 (na main, b590a1f) |
+| 24 | CCO e CMO acionam Atendente, Follow-up e Reativação por lead (só envia com o Aprovo) | CCO/CMO | 3 | 11/12/2026 | Claude Code | sim (esperando o Aprovo do Felipe) | https://github.com/felipeonobrega2-jpg/enyla/pull/56 (aberto) |
+| 25 | Pedido "aguardando pagamento do cliente" (para o relógio de atraso; `acao=pedido`, COO e CFO) | COO | 4 | 11/12/2026 | Claude Code | não | https://github.com/felipeonobrega2-jpg/enyla/pull/57 (na main, 296d13d) |
+| 26 | Dispensar pendência com motivo, sem apagar (`dispensar_pendencia` / `reabrir_pendencia`) | COO | 4 | 11/12/2026 | Claude Code | não | https://github.com/felipeonobrega2-jpg/enyla/pull/58 (na main, 3cf9093) |
+| 27 | Meta Ads: aviso de campanha parada | CMO | — | — | Claude Code | não | https://github.com/felipeonobrega2-jpg/enyla/pull/59 (na main, 58c0574) |
+| 28 | Porta externa: data de entrada em cada etapa da produção | COO | — | — | Claude Code | não | https://github.com/felipeonobrega2-jpg/enyla/pull/60 (na main, 95cc331) |
+| 29 | Porta externa: funil e custo por MQL por campanha para a CMO | CMO | — | — | Claude Code | não | https://github.com/felipeonobrega2-jpg/enyla/pull/61 (na main, 88ad864) |
+| 30 | Porta externa: diretor põe tarefa no "Depende de você" do Felipe (`acao=tarefa_felipe`) | CFO | — | — | Claude Code | não | https://github.com/felipeonobrega2-jpg/enyla/pull/65 (na main, 6311505) |
+| 31 | Medidor de IA por tipo de token e origem | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/21 (na main) |
+| 32 | Follow-up confere a cota da hora antes de chamar a IA | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/22 (na main) |
+| 33 | WhatsApp: sugestão só ao clicar em "Gerar sugestão" | CTO (custo de IA) | esta leva | — | Diego | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/23 (na main) |
+| 34 | Classificação inline só com mensagem nova do cliente (migração aditiva `classificacao_guardada` aplicada em produção em 24/11/2026) | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/28 (na main) |
+| 35 | Script de comparação do classificador Opus × Sonnet × Haiku (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/30 (na main) |
+| 36 | Script de comparação do follow-up Opus × Sonnet (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/37 (na main) |
+| 37 | Atendente não responde sozinha a gráficas do Prospector | operação | — | — | Claude Code | não | (PR da issue #34) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -61,7 +84,7 @@ O Aprovo ainda espera a aprovação na tela e o acesso da conta de anúncios. Se
 
 ## 2. Detectar orçamento já enviado e lead perdido
 
-**Status:** livre. **Aprovo:** não. **PR:** vazio. Pedido do CCO, já aprovada. Prioridade 2. Prazo 30/11/2026. Construção automática.
+**Status:** Claude Code. **Aprovo:** não. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/55 (na main). Pedido do CCO, já aprovada. Prioridade 2. Prazo 30/11/2026. Construção automática.
 
 **O que já existe.** O funil do WhatsApp (`app/lib/funilWhatsapp.ts`) marca "Orçamento enviado" quando o cliente ligado tem orçamento aberto no sistema (coluna 0) e "Perdido" depois de 14 dias sem o cliente falar, ou à mão. `app/lib/metaMql.ts` pergunta se o MQL recebeu PDF, preço no texto ou orçamento no sistema (`estadoDoMql`). Isso não lê o histórico para cravar que foi o Felipe quem orçou, nem passa o lead ao Follow-up, nem grava perdido com motivo.
 
@@ -73,7 +96,7 @@ O Aprovo ainda espera a aprovação na tela e o acesso da conta de anúncios. Se
 
 ## 3. Diretor aciona Atendente e Follow-up por lead
 
-**Status:** livre. **Aprovo:** sim. **PR:** vazio. Pedido do CCO, já aprovada. Prioridade 3. Prazo 11/12/2026.
+**Status:** Claude Code. **Aprovo:** sim. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/56 (aberto, esperando o Aprovo). Pedido do CCO, já aprovada. Prioridade 3. Prazo 11/12/2026.
 
 Precisa do Aprovo porque manda mensagem a cliente. A mensagem só sai com o Aprovo do Felipe, no molde de `ordenar_funcionario`.
 
@@ -87,7 +110,7 @@ Precisa do Aprovo porque manda mensagem a cliente. A mensagem só sai com o Apro
 
 ## 4. Status "aguardando pagamento" no pedido
 
-**Status:** livre. **Aprovo:** sim. **PR:** vazio. Pedido do COO, já aprovada. Prioridade 4, junto com o item 5. Prazo 11/12/2026.
+**Status:** Claude Code. **Aprovo:** sim. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/57 (na main). Pedido do COO, já aprovada. Prioridade 4, junto com o item 5. Prazo 11/12/2026.
 
 Precisa do Aprovo porque o critério de atraso fica ligado a pagamento.
 
@@ -101,7 +124,7 @@ Precisa do Aprovo porque o critério de atraso fica ligado a pagamento.
 
 ## 5. Dispensar pendência com motivo
 
-**Status:** livre. **Aprovo:** não. **PR:** vazio. Pedido do COO, já aprovada. Prioridade 4, junto com o item 4. Prazo 11/12/2026. Construção automática.
+**Status:** Claude Code. **Aprovo:** não. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/58 (na main). Pedido do COO, já aprovada. Prioridade 4, junto com o item 4. Prazo 11/12/2026. Construção automática.
 
 **O que já existe.** `/api/perto` aceita `acao: "dispensar"` (`app/api/perto/route.ts`). Isso tira uma sugestão da lista "Perto de você" e não volta a sugerir aquele contato. É outra lista. Não dispensa pendência de decisão nem do Vigia, e não pede motivo.
 
@@ -184,3 +207,118 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 **Regras.** Até 10 primeiros contatos por dia, segunda a sexta, 9h–17h America/Sao_Paulo (a rota recusa fora disso). Lembrete único 3 dias depois; depois encerra. Resposta para a cadência; recusa vira `opt_out`. Nenhuma resposta automática nova.
 
 **Chave.** `prospector_envio_ativo` nasce desligada e este PR não a liga. Antes de ligar: rodar a migração no Supabase e conferir o Gmail do Felipe (resposta de e-mail não é lida pelo sistema).
+
+## 14. Porta externa: leitura financeira para o CFO
+
+**Status:** Claude Code. **PR:** o PR da issue #24. Não junta sozinho.
+
+`GET /api/externo?o=financeiro`, só com a chave do CFO (as outras recebem 403). Só leitura: receber, pagar, banco, saldos, gastos, margem e depende. Sem `contraparte_doc` nem `bruto`, e sem dados pessoais de cliente além de nome e valor. Não escreve nada financeiro; a ação `gasto_fixo` segue como está.
+
+## 15. Porta externa: verba do conjunto (ABO) na leitura e no ajuste
+
+**Status:** Claude Code. **Aprovo:** o Felipe liberou ligar, pausar e ajustar verba de campanha existente em 24/11/2026; as mesmas regras valem por conjunto. **PR:** o PR da issue #32. Não junta sozinho.
+
+Os `conjuntos` de `GET ?o=meta_ads` passam a trazer `verbaDiaria` e `verbaTotal` em reais (ou `null`, em CBO). `POST acao=meta_ads` aceita `conjuntoId` no lugar de `campanhaId` (nunca os dois) para ligar, pausar e ajustar a verba diária do conjunto: no máximo 20% e teto de R$ 200 por conjunto (recusa, não corta). Conjunto CBO em `ajustar_verba`: 400, a verba está na campanha, use `campanhaId`. Registro em `metaAdsAcoes` com `conjuntoId` e `conjuntoNome`. Não cria nada e não entrega o aviso de campanha parada (item 1).
+
+## 16. Porta externa: escrita financeira para o CFO
+
+**Status:** Claude Code. **Aprovo:** o Felipe liberou em 24/11/2026, 7h31 ("Libera para o Otávio"). **PR:** o PR da issue #35. Não junta sozinho.
+
+`POST /api/externo` com `acao` = `lancamento` (criar, editar, desativar, estornar; inclui contas a pagar), `conciliacao` (vincular, vincularVarios, atualizar, criar, ignorar e um desfazer lógico) ou `categoria` (criar, editar, desativar; `ativa?: boolean` em `CategoriaFinanceira`), só com a chave do CFO (as outras recebem 403). Cada sucesso grava a conversa e `alteradoPor:"cfo"`/`alteradoEm`.
+
+**Não faz.** Não paga nem cobra, não muda preço, não mexe em chaves, não apaga nada de vez: desativar/estornar marcam `estornadoEm`/`estornadoPor`, e o `desfazer` da conciliação estorna os lançamentos criados em vez de apagá-los (o `desfazer` de `aplicar()` não é exposto). Sem `contraparte_doc` nem `bruto` na resposta.
+
+**Migração (só depois do merge, aditiva).** `supabase/migrations/20261126_lancamento_estorno.sql` acrescenta `estornadoEm` e `estornadoPor` em `LancamentoFinanceiro`. Enquanto não rodar, o estorno grava só a marca em `obs`. A leitura financeira ainda não filtra lançamentos estornados: item a combinar.
+
+## 17. Porta externa: leitura financeira ignora lançamentos estornados
+
+**Status:** Claude Code. **PR:** o PR da issue #41. Não junta sozinho. Sem migração nova (a `20261126_lancamento_estorno.sql` já rodou em 24/11/2026, 8h37).
+
+`GET ?o=financeiro` passa a excluir lançamentos com `estornadoEm` preenchido (desativados e estornados) de resumo, `receber`, `pagar`, `gastos` e `margem`. `&incluirEstornados=1|true|sim` traz todos de volta; outro valor dá 400. A resposta traz `incluirEstornados`. `banco`, `saldos` e `depende` não mudam. A escrita (`estornarLogico`) já grava `estornadoEm`/`estornadoPor` e `obs`, com fallback só em `obs`; `LancamentoFinanceiro` ganhou os dois campos opcionais. Não mexe em chaves nem em pagamento/cobrança.
+
+## 18. Cadastro de parceiros: cenário-exemplo e preço de referência por serviço
+
+**Status:** Claude Code. **Pedido:** o Felipe, em 24/11/2026. **PR:** o PR da issue #36 (#39). Não junta sozinho.
+
+Config editável `cenariosParceiros` no AppConfig (padrão no código; a equipe edita na tela Fornecedores). `/parceiros` mostra o enunciado e pede o preço de cada exemplo; impressão (offset e digital) não tem cenário e pede formato da máquina, acerto e milheiro; laminação tem quatro cenários e arte pede preço por arte e pacote de 3. A tela Fornecedores compara com a referência interna e mostra média, mínimo e máximo dos parceiros por cenário. A referência e esses números nunca vão ao parceiro. Sem migração SQL (tudo no JSON da config). Pendente: o Felipe confirmar a referência da laminação fosca (R$ 765,28) e o preço do Ronaldo para brilho, soft touch e dois lados.
+
+## 19. Porta externa: erro da Meta na escrita (code 100) deixa de virar "não achou"
+
+**Status:** Claude Code. **PR:** o PR da issue #43. Não junta sozinho.
+
+Em `erroGraph`, code 100 na escrita (`POST /{id}`) não vira mais 404 `CAMPANHA_NAO_ENCONTRADA`: com `error_subcode` 33, "Unsupported post request", permissão ou `ads_management` responde 403 (`SEM_ADS_MANAGEMENT`); senão 400 (`PARAMETRO_INVALIDO`). O `erro` e o `motivo` do registro trazem a message e o subcode da Meta, sem o token. Na leitura, code 100 segue 404. Regras (só CMO, 20%, teto R$ 200) e `conjuntoId` inalterados.
+
+## 20. Agente: segurar saudação automática do WhatsApp Business do lead
+
+**Status:** Claude Code. **Aprovo:** aprovado pelo Felipe em 24/11/2026, 8:38. **PR:** #54 (issue #45). Pedido do COO.
+
+**O que muda.** Quando a última mensagem do lead é saudação automática do WhatsApp Business ("agradecemos seu contato", "em breve retornaremos"), o agente não chama a IA, não envia nada ao lead e avisa só o Felipe no formato "Segurei a resposta". Essa mensagem não avança `ultima_recebida_at` e não limpa F1/F2/F3, então o follow-up segue no tempo certo.
+
+**Limite duro.** Só segura ou reduz envios a cliente. Nada novo é enviado. Sem agente, rotina, fila, migração ou mudança de cobrança/chave.
+
+## 21. Referência interna da laminação fosca: R$ 450,00
+
+**Status:** Claude Code. **Aprovo:** não (o Felipe já confirmou o valor em 24/11/2026). **PR:** #63 (issue #62). Não junta sozinho.
+
+Em `CENARIOS_PADRAO`, a referência interna de `laminacao-fosca` (Ronaldo Osasco) passa de R$ 765,28 (calculado, não confirmado) para R$ 450,00, o mesmo do verniz. Nada muda no que o parceiro vê em `/parceiros`. Sem migração.
+
+## 22. Correção: R$ 450 é do verniz UV total; laminação fosca volta a R$ 765,28
+
+**Status:** Claude Code. **Aprovo:** não (o Felipe corrigiu o destino do R$ 450; a fosca veio do cadastro e do motor). **PR:** o PR da issue #66. Não junta sozinho.
+
+O R$ 450,00 confirmado pelo Felipe é do verniz UV total (3.000 folhas 48 × 44 cm), não da fosca; o #63 aplicou na fosca por engano. Verniz segue R$ 450,00. A fosca volta a R$ 765,28, com origem no sistema: `AppConfig.producao.fornecedores`, Ronaldo Osasco, laminação `por_m2`, acerto 100 + Fosca 1,05/m²; `cobrar` (`app/lib/producao.ts`) dá 100 + 1,05 × 633,6 m² = 765,28. Nada muda em `/parceiros`. Sem migração.
+
+## 23. Detectar orçamento enviado pelo Felipe e lead perdido com motivo
+
+**Status:** Claude Code. **Aprovo:** não. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/55 (na main, b590a1f). Pedido do CCO.
+
+**O que faz.** Porta `acao=lead` para o CCO e o COO: detecta orçamento enviado pelo Felipe e marca lead perdido com motivo. O Follow-up só atende leads que já são do agente. É o mesmo pedido do item 2.
+
+## 24. CCO e CMO acionam Atendente, Follow-up e Reativação por lead (só envia com o Aprovo)
+
+**Status:** Claude Code. **Aprovo:** sim (esperando o Aprovo do Felipe). **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/56 (aberto). Pedido do CCO/CMO.
+
+**O que faz.** CCO e CMO acionam Atendente, Follow-up e Reativação por lead. A mensagem só sai com o Aprovo do Felipe. É o mesmo pedido do item 3. Não se junta enquanto o Felipe não aprovar.
+
+## 25. Pedido "aguardando pagamento do cliente"
+
+**Status:** Claude Code. **Aprovo:** não. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/57 (na main, 296d13d). Pedido do COO.
+
+**O que faz.** Marca o pedido como "aguardando pagamento do cliente", o que para o relógio de atraso. Porta `acao=pedido`, COO e CFO. É o mesmo pedido do item 4.
+
+## 26. Dispensar pendência com motivo, sem apagar
+
+**Status:** Claude Code. **Aprovo:** não. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/58 (na main, 3cf9093). Pedido do COO.
+
+**O que faz.** `dispensar_pendencia` e `reabrir_pendencia`: dispensa uma pendência com motivo, sem apagar, e permite reabrir. É o mesmo pedido do item 5.
+
+## 27. Meta Ads: aviso de campanha parada
+
+**Status:** Claude Code. **Aprovo:** não. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/59 (na main, 58c0574). Pedido do CMO.
+
+**O que faz.** Meta Ads: aviso de campanha parada. Não recarrega, não mexe em verba nem em campanha.
+
+## 28. Porta externa: data de entrada em cada etapa da produção
+
+**Status:** Claude Code. **Aprovo:** não. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/60 (na main, 95cc331). Pedido do COO.
+
+**O que faz.** A porta externa passa a trazer a data de entrada em cada etapa da produção.
+
+## 29. Porta externa: funil e custo por MQL por campanha para a CMO
+
+**Status:** Claude Code. **Aprovo:** não. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/61 (na main, 88ad864). Pedido do CMO.
+
+**O que faz.** A porta externa traz o funil e o custo por MQL por campanha para a CMO.
+
+## 30. Porta externa: diretor põe tarefa no "Depende de você" do Felipe
+
+**Status:** Claude Code. **Aprovo:** não. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/65 (na main, 6311505). Pedido do CFO.
+
+**O que faz.** `acao=tarefa_felipe`: o diretor põe uma tarefa no "Depende de você" do Felipe.
+
+## Custo de IA (24/11/2026)
+
+Objetivo: reduzir os tokens gastos com IA sem perder eficácia. Os itens 31 a 36 registram os PRs dessa frente.
+Os dois scripts de comparação (classificador e follow-up) só rodam com autorização do Felipe, porque gastam tokens.
+Nenhuma troca de modelo entra sem o Diego revisar o resultado da comparação.
+O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).

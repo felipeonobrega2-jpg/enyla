@@ -372,6 +372,8 @@ export type LancamentoFinanceiro = {
   formaPagamento?: FormaPagamento
   obs?: string
   revisarDepois?: boolean
+  estornadoEm?: string     // desativado/estornado (lógico; a linha fica no livro)
+  estornadoPor?: string
   criadoEm: string
   unidade?: "offset" | "digital" | "cartuxo"   // linha de negócio (margem e DRE separados; caixa junto)
 }

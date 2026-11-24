@@ -148,6 +148,130 @@ describe("POST acao=meta_ads", () => {
   })
 })
 
+describe("POST acao=meta_ads por conjuntoId", () => {
+  const msgC = (c: object) => ({ acao: "meta_ads", conjuntoId: "222", ...c })
+  beforeEach(() => { campanha = { id: "222", name: "Conj A", status: "PAUSED", daily_budget: "10000", account_id: "9", campaign_id: "111" } })
+
+  it("outra chave: 403 sem chamar a Meta", async () => {
+    diretorChave = { ok: true, diretor: "cfo" }
+    expect((await post(msgC({ operacao: "pausar" }))).status).toBe(403)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([["ligar", "ACTIVE", "PAUSED"], ["pausar", "PAUSED", "ACTIVE"]])("%s: escreve %s no conjunto e registra", async (operacao, status, antes) => {
+    campanha.status = antes
+    const r = await post(msgC({ operacao }))
+    const j = await r.json()
+    expect(r.status).toBe(200)
+    const [url, init] = escritas()[0] as [string, RequestInit]
+    expect(url).toBe("https://graph.facebook.com/v20.0/222")
+    expect([...new URLSearchParams(init.body as URLSearchParams).keys()].sort()).toEqual(["access_token", "status"])
+    expect(new URLSearchParams(init.body as URLSearchParams).get("status")).toBe(status)
+    expect(j.registro).toMatchObject({ diretor: "cmo", operacao, conjuntoId: "222", conjuntoNome: "Conj A", campanhaId: "111", aceita: true, antes: { status: antes }, depois: { status } })
+    expect(Number.isNaN(Date.parse(j.registro.em))).toBe(false)
+    expect(inserts).toHaveLength(1)
+  })
+
+  it("ajuste dentro de 20% e ≤ 200: escreve daily_budget em centavos", async () => {
+    const r = await post(msgC({ operacao: "ajustar_verba", verbaDiaria: 110 }))
+    const j = await r.json()
+    expect(r.status).toBe(200)
+    expect(new URLSearchParams((escritas()[0][1] as RequestInit).body as URLSearchParams).get("daily_budget")).toBe("11000")
+    expect(j.registro).toMatchObject({ aceita: true, conjuntoId: "222", antes: { verbaDiaria: 100 }, depois: { verbaDiaria: 110 } })
+  })
+
+  it("acima de 20% (100 → 121): 400, sem escrita, recusa registrada", async () => {
+    const r = await post(msgC({ operacao: "ajustar_verba", verbaDiaria: 121 }))
+    expect(r.status).toBe(400)
+    expect(escritas()).toHaveLength(0)
+    expect(inserts[0].dados).toMatchObject({ aceita: false, conjuntoId: "222", antes: { verbaDiaria: 100 }, depois: null })
+    expect(inserts[0].dados.motivo).toContain("20%")
+  })
+
+  it("acima de R$ 200 (190 → 210): 400, não corta", async () => {
+    campanha.daily_budget = "19000"
+    const r = await post(msgC({ operacao: "ajustar_verba", verbaDiaria: 210 }))
+    expect(r.status).toBe(400)
+    expect(escritas()).toHaveLength(0)
+    expect(inserts[0].dados.motivo).toContain("teto")
+  })
+
+  it("conjunto CBO (sem daily_budget): 400 dizendo que a verba está na campanha", async () => {
+    delete campanha.daily_budget
+    const r = await post(msgC({ operacao: "ajustar_verba", verbaDiaria: 50 }))
+    const j = await r.json()
+    expect(r.status).toBe(400)
+    expect(j.erro).toContain("está na campanha")
+    expect(escritas()).toHaveLength(0)
+    expect(inserts[0].dados).toMatchObject({ aceita: false, conjuntoId: "222" })
+  })
+
+  it("conjunto de outra conta ou inexistente: sem escrita", async () => {
+    campanha.account_id = "777"
+    expect((await post(msgC({ operacao: "pausar" }))).status).toBe(404)
+    campanha = { error: { code: 100, type: "GraphMethodException" } }
+    expect((await post(msgC({ operacao: "pausar" }))).status).toBe(404)
+    expect(escritas()).toHaveLength(0)
+  })
+
+  it("POST com code 100 (subcode 33) depois de GET ok: 403, não é 'não achou', registro útil, sem token", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {}), err = vi.spyOn(console, "error").mockImplementation(() => {})
+    fetchMock.mockImplementation(async (_u: string, init?: RequestInit) => ({ json: async () => init?.method === "POST"
+      ? { error: { code: 100, type: "GraphMethodException", error_subcode: 33, message: `Unsupported post request. access_token=${TOKEN}` } } : campanha }))
+    const r = await post(msgC({ operacao: "ajustar_verba", verbaDiaria: 80 }))
+    const j = await r.json()
+    expect(r.status).toBe(403)
+    expect(j.codigo).not.toBe("CAMPANHA_NAO_ENCONTRADA")
+    expect(j.erro).not.toContain("não achou")
+    expect(j.erro).toContain("Unsupported post request")
+    expect(j.erro).toContain("33")
+    expect(escritas()).toHaveLength(1)
+    expect(inserts).toHaveLength(1)
+    expect(inserts[0].dados).toMatchObject({ aceita: false, conjuntoId: "222" })
+    expect(String(inserts[0].dados.motivo)).toContain("Unsupported post request")
+    expect(JSON.stringify([j, inserts, ...log.mock.calls, ...err.mock.calls])).not.toContain(TOKEN)
+    log.mockRestore(); err.mockRestore()
+  })
+
+  it("POST com code 100 sem cara de permissão: 400 com a message da Meta", async () => {
+    fetchMock.mockImplementation(async (_u: string, init?: RequestInit) => ({ json: async () => init?.method === "POST"
+      ? { error: { code: 100, type: "OAuthException", error_subcode: 1885, message: "Invalid parameter" } } : campanha }))
+    const r = await post(msgC({ operacao: "ajustar_verba", verbaDiaria: 80 }))
+    const j = await r.json()
+    expect(r.status).toBe(400)
+    expect(j.codigo).toBe("PARAMETRO_INVALIDO")
+    expect(j.erro).toContain("Invalid parameter")
+    expect(j.erro).not.toContain("não achou")
+    expect(inserts[0].dados).toMatchObject({ aceita: false, conjuntoId: "222" })
+  })
+
+  it("GET do conjunto com code 100: 404 e nenhuma escrita", async () => {
+    campanha = { error: { code: 100, type: "GraphMethodException", message: "Unsupported get request" } }
+    const r = await post(msgC({ operacao: "ajustar_verba", verbaDiaria: 80 }))
+    expect(r.status).toBe(404)
+    expect((await r.json()).codigo).toBe("CAMPANHA_NAO_ENCONTRADA")
+    expect(escritas()).toHaveLength(0)
+  })
+
+  it.each([
+    [{ campanhaId: "111", conjuntoId: "222", operacao: "pausar" }],
+    [{ operacao: "pausar", conjuntoId: undefined, campanhaId: undefined }],
+    [{ operacao: "pausar", adsetId: "5" }],
+    [{ operacao: "pausar", conjuntoId: "abc" }],
+  ])("pedido inválido %j: 400 e nenhuma escrita", async corpo => {
+    const r = await post({ acao: "meta_ads", ...corpo })
+    expect(r.status).toBe(400)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("sem token na resposta, no registro nem na URL", async () => {
+    const txt = JSON.stringify(await (await post(msgC({ operacao: "ajustar_verba", verbaDiaria: 110 }))).json())
+    expect(txt).not.toContain(TOKEN)
+    expect(JSON.stringify(inserts)).not.toContain(TOKEN)
+    expect(fetchMock.mock.calls.every(c => !String(c[0]).includes(TOKEN) || (c[1] as RequestInit | undefined)?.method !== "POST")).toBe(true)
+  })
+})
+
 describe("ajuda do GET", () => {
   const get = () => GET({ headers: new Headers({ authorization: "Bearer x" }), nextUrl: new URL("http://x/api/externo") } as never)
   it("mostra meta_ads só para a CMO", async () => {
