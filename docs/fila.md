@@ -25,16 +25,12 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 7 | Integração com o Claude Code / vaga Desenvolvedor de ferramentas | CTO | depois das 5 | depois do item 5 | livre | sim | |
 | 8 | Prospector de Parceiros (base, nota e funil) | operação | esta leva | — | Diego | aprovado 23/11/2026 22:27 | https://github.com/felipeonobrega2-jpg/enyla/pull/2 (na main) |
 | 9 | Prospector: importador gratuito dos dados abertos de CNPJ | operação | esta leva | — | Diego | não | (PR do importador, issue #6) |
-| 10 | Porta externa: leitura ao vivo da Meta Ads para a CMO (`?o=meta_ads`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 | (PR da issue #19) |
+| 10 | Porta externa: ação gasto_fixo para o CFO | CFO | — | — | Claude Code | não | (PR da issue #10) |
+| 11 | Porta externa: leitura ao vivo da Meta Ads para a CMO (`?o=meta_ads`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/25 |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
-## 10. Porta externa: leitura ao vivo da Meta Ads
-
-**Status:** Claude Code. **Aprovo:** o Felipe liberou a Lívia (CMO) em 24/11/2026. **PR:** issue #19.
-
-`GET /api/externo?o=meta_ads`, só com a chave da CMO (as outras recebem 403). Só leitura na Graph API: conta, campanhas, conjuntos e anúncios, hoje/7/30 dias, cache de 3 minutos. Não liga, não pausa, não ajusta verba. Não entrega o aviso de campanha parada: o item 1 continua livre.
-
+## 0. CI e coordenação
 
 **Status:** Diego. **Aprovo:** aprovado pelo Felipe em 23/11/2026 22:27 (ver `docs/decisoes.md`). **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/1
 
@@ -163,3 +159,9 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 **Critério de aceite.** Idempotente por CNPJ. Não reabre `descartado` nem `opt_out`, não volta etapa, não apaga. Nenhuma mensagem sai. Sem secret novo. A importação não é disparada em produção por este PR.
 
 **Como testar.** `npm test` cobre `tests/prospectorImportador.test.ts`. Depois do merge, chamar a rota uma vez com o Bearer do `CRON_SECRET` e conferir as linhas em `prospectos_parceiros`.
+
+## 11. Porta externa: leitura ao vivo da Meta Ads
+
+**Status:** Claude Code. **Aprovo:** o Felipe liberou a Lívia (CMO) em 24/11/2026. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/25
+
+`GET /api/externo?o=meta_ads`, só com a chave da CMO (as outras recebem 403). Só leitura na Graph API: conta, campanhas, conjuntos e anúncios, hoje/7/30 dias, cache de 3 minutos. Não liga, não pausa, não ajusta verba. Não entrega o aviso de campanha parada: o item 1 continua livre.
