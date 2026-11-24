@@ -4,6 +4,7 @@ import { supabase } from "@/app/lib/supabase"
 import { mudarConfig } from "@/app/lib/configAtomica"
 import { gastosAtuais } from "@/app/lib/gastosServidor"
 import { pendencias } from "@/app/lib/pendenciasDono"
+import { tarefasParaLista, marcarTarefa } from "@/app/lib/tarefaFelipe"
 import { dispensadasVigentes, chaveDono, separar } from "@/app/lib/pendenciaDispensada"
 
 // "Depende de você" (rota protegida pelo login): o que está parado esperando conta, chave, arquivo ou decisão sua
@@ -28,6 +29,7 @@ export async function GET() {
     feitos: d.pendenciasDono ?? {},
   })
   // Dispensadas com motivo saem da lista (nada é apagado; ver /api/pendencias/dispensadas)
+  lista.push(...await tarefasParaLista())   // tarefas que os diretores puseram para o Felipe
   const { visiveis } = separar(lista, p => chaveDono(p.id), await dispensadasVigentes())
   return NextResponse.json({ pendencias: visiveis.map(p => ({ ...p, chave: chaveDono(p.id) })) })
 }
@@ -36,6 +38,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => ({})) as { id?: string; feito?: boolean }
   if (!b.id) return NextResponse.json({ erro: "Faltou o item." }, { status: 400 })
+  if (await marcarTarefa(b.id, !!b.feito)) return GET()   // tarefa de diretor: mora em dados_sistema
   await mudarConfig(d => {
     const f = { ...((d as Dados).pendenciasDono ?? {}) }
     if (b.feito) f[b.id!] = new Date().toISOString(); else delete f[b.id!]
