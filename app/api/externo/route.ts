@@ -7,6 +7,9 @@ import { lerCampos } from "@/app/lib/configAtomica"
 import { supabase } from "@/app/lib/supabase"
 import { filtroDoAgente } from "@/app/lib/agenteLeads"
 import { gastoFixo } from "@/app/lib/gastoFixoExterno"
+import { lancamento } from "@/app/lib/lancamentoExterno"
+import { conciliacao } from "@/app/lib/conciliacaoExterna"
+import { categoria } from "@/app/lib/categoriaExterna"
 import { leituraFinanceira, AJUDA_FINANCEIRO } from "@/app/lib/financeiroExterno"
 import { leituraMetaAds, ErroMeta } from "@/app/lib/metaAdsLeitura"
 import { acaoMetaAds } from "@/app/lib/metaAdsAcoes"
@@ -39,7 +42,13 @@ export async function GET(req: NextRequest) {
     leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | "), "?o=conversa": "o que você e o Felipe conversaram", ...(diretor === "cfo" ? AJUDA_FINANCEIRO : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa" }), ...(diretor === "cmo" ? { "?o=meta_ads": "Meta Ads ao vivo (só leitura): conta, campanhas, conjuntos e anúncios; hoje, 7 e 30 dias; cache de 3 min" } : {}) },
     escrita: { "POST {acao:'relatar', texto}": "manda algo ao Felipe",
       ...(diretor === "cmo" ? { "POST {acao:'meta_ads', operacao:'ligar'|'pausar'|'ajustar_verba', campanhaId | conjuntoId, verbaDiaria}": "SÓ A CHAVE DA CMO. Só em campanha ou conjunto que já existe (conjuntoId substitui campanhaId, nunca os dois; campanha ABO tem a verba no conjunto, campanha CBO se ajusta na campanha: conjunto CBO recebe 400): ligar (ACTIVE), pausar (PAUSED) ou ajustar a verba diária (verbaDiaria em reais, só em ajustar_verba). Mudança de verba de no máximo 20% sobre a atual e nunca acima de R$ 200 por campanha ou por conjunto: fora disso, 400 e nada é alterado (não corta). Criar campanha, conjunto ou anúncio e publicar são do Felipe. Resposta: { ok, registro } com antes e depois; cada ação e recusa fica registrada" } : {}),
-      "POST {acao:'gasto_fixo', operacao:'criar'|'editar'|'desativar', id, nome, valor, diaVencimento, categoriaId, contaId, obs}": "SÓ A CHAVE DO CFO (as outras recebem 403). Cadastra, edita ou desativa um gasto fixo (Financeiro → Cadastros → Gastos fixos). criar exige nome e valor (reais, > 0); editar e desativar exigem id; diaVencimento 1 a 31; a conta de pagamento é contaId e anotações como 'cartão 7150' vão em obs. Desativar só põe ativa:false, nunca apaga. Resposta: { ok, resultado, gasto } com o item gravado", ...Object.fromEntries(FERRAMENTAS.map(f => [`POST {acao:'${f}', ...}`, "ferramenta (ver instruções)"])) },
+      "POST {acao:'gasto_fixo', operacao:'criar'|'editar'|'desativar', id, nome, valor, diaVencimento, categoriaId, contaId, obs}": "SÓ A CHAVE DO CFO (as outras recebem 403). Cadastra, edita ou desativa um gasto fixo (Financeiro → Cadastros → Gastos fixos). criar exige nome e valor (reais, > 0); editar e desativar exigem id; diaVencimento 1 a 31; a conta de pagamento é contaId e anotações como 'cartão 7150' vão em obs. Desativar só põe ativa:false, nunca apaga. Resposta: { ok, resultado, gasto } com o item gravado",
+      ...(diretor === "cfo" ? {
+        "POST {acao:'lancamento', operacao:'criar'|'editar'|'desativar'|'estornar', id, tipo, descricao, valor, dataVencimento, dataPagamento, status, categoria, subcategoria, contaId, fornecedorId, formaPagamento, obs, cardId, cardNumero, nomeCliente, loteId, loteNumero}": "SÓ A CHAVE DO CFO. Lançamentos e contas a pagar (despesa não paga). criar exige tipo (receita|despesa), descricao, valor (reais, > 0) e dataVencimento; editar, desativar e estornar exigem id; datas AAAA-MM-DD; status pendente|pago|atrasado; formaPagamento pix|boleto|cartao_credito|cartao_debito|dinheiro|transferencia|outro|conta. status 'pago' é só baixa no livro: não dispara pagamento. Desativar e estornar nunca apagam a linha (marcam estornadoEm/estornadoPor). Resposta: { ok, resultado, lancamento }",
+        "POST {acao:'conciliacao', operacao:'vincular'|'vincularVarios'|'atualizar'|'criar'|'ignorar'|'desfazer', txId, lancamentoId, lancamentoIds, campos, lancamentos, sempre, ensinar}": "SÓ A CHAVE DO CFO. Decide um movimento de banco_transacoes (txId): vincular a um lançamento, vincularVarios, atualizar (baixa no lançamento com campos), criar lançamentos ou ignorar. desfazer é lógico: estorna os lançamentos criados (nada é apagado) e devolve a transação a pendente. Sem contraparte_doc nem bruto na resposta. Resposta: { ok, resultado, tx, lancamentos }",
+        "POST {acao:'categoria', operacao:'criar'|'editar'|'desativar', tipo:'receita'|'despesa', id, nome, subcategorias, ativa}": "SÓ A CHAVE DO CFO. Categorias financeiras. criar exige nome; editar e desativar exigem id. Desativar só põe ativa:false, a categoria continua na lista. Resposta: { ok, resultado, categoria }",
+      } : {}),
+      ...Object.fromEntries(FERRAMENTAS.map(f => [`POST {acao:'${f}', ...}`, "ferramenta (ver instruções)"])) },
     limitePorHora: LIMITE_POR_HORA,
   })
 
@@ -131,6 +140,15 @@ export async function POST(req: NextRequest) {
     msg = { id: novoId(), de: "diretor", texto: r.resultado, em: new Date().toISOString(), nuvem: true }
     await gravarConversa(diretor, [...await lerConversa(diretor), msg])
     return NextResponse.json({ ok: true, resultado: r.resultado, gasto: r.gasto })
+  } else if (b.acao === "lancamento" || b.acao === "conciliacao" || b.acao === "categoria") {
+    if (diretor !== "cfo") return NextResponse.json({ erro: `${b.acao} é só para a chave do CFO.` }, { status: 403 })
+    const r = b.acao === "lancamento" ? await lancamento(b) : b.acao === "conciliacao" ? await conciliacao(b) : await categoria(b)
+    if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
+    msg = { id: novoId(), de: "diretor", texto: r.resultado, em: new Date().toISOString(), nuvem: true }
+    await gravarConversa(diretor, [...await lerConversa(diretor), msg])
+    const { ok: _ok, resultado, ...resto } = r
+    void _ok
+    return NextResponse.json({ ok: true, resultado, ...resto })
   } else if (b.acao === "meta_ads") {
     const r = await acaoMetaAds(diretor, b)
     return NextResponse.json(r.corpo, { status: r.status })
