@@ -46,6 +46,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 28 | Porta externa: data de entrada em cada etapa da produção | COO | — | — | Claude Code | não | https://github.com/felipeonobrega2-jpg/enyla/pull/60 (na main, 95cc331) |
 | 29 | Porta externa: funil e custo por MQL por campanha para a CMO | CMO | — | — | Claude Code | não | https://github.com/felipeonobrega2-jpg/enyla/pull/61 (na main, 88ad864) |
 | 30 | Porta externa: diretor põe tarefa no "Depende de você" do Felipe (`acao=tarefa_felipe`) | CFO | — | — | Claude Code | não | https://github.com/felipeonobrega2-jpg/enyla/pull/65 (na main, 6311505) |
+| 31 | Atendente não responde sozinha a gráficas do Prospector | operação | — | — | Claude Code | não | (PR da issue #34) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
