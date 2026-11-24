@@ -23,6 +23,7 @@ Fila única, compartilhada entre o Diego (CTO, agentes na nuvem) e o Felipe com 
 | 5 | Dispensar pendência com motivo | COO (aprovada) | 4 (junto com o 4) | 11/12/2026 | livre | não | |
 | 6 | Enviar pedido de ferramenta ao Claude Code | CTO | depois das 5 | depois do item 5 | livre | sim | |
 | 7 | Integração com o Claude Code / vaga Desenvolvedor de ferramentas | CTO | depois das 5 | depois do item 5 | livre | sim | |
+| 8 | Prospector de Parceiros (base, nota e funil) | operação | esta leva | — | Diego | não | |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -131,3 +132,15 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 **Critério de aceite.** A vaga existe no quadro só depois que o Felipe contratar. O desenvolvedor de ferramentas entra pelo mesmo caminho do Claude Code (fila, decisões, pull request, CI). Nenhuma chave fica no repositório.
 
 **Como testar.** Caso real, antes de liberar: com a vaga ainda não contratada, ninguém executa por ela. Depois do Aprovo e da contratação, um item da fila pode ser marcado **Claude Code** e sair em pull request com o CI verde, sem chave commitada.
+
+## 8. Prospector de Parceiros (base, nota e funil)
+
+**Status:** Diego. **Aprovo:** não. **PR:** vazio. Pedido da operação. Esta leva. Não entra na frente dos itens 1 a 7: é outra frente, e não manda mensagem, não mexe em cobrança, não apaga dado e não cria chave.
+
+**O que já existe.** O cadastro público em `/parceiros` e a aprovação na tela Fornecedores (`CadastrosParceirosCard`). A aprovação continua com o Felipe, do jeito que está.
+
+**O que falta neste item.** A tabela `prospectos_parceiros`, a nota de 0 a 100, o mapeamento de CNAE e o bloco só leitura na tela Fornecedores. O desenho completo, inclusive o que fica para depois, está em `docs/prospector.md`. A coleta dos dados abertos da Receita e a abordagem (e-mail e WhatsApp) não são este item. A abordagem precisa de Aprovo do Felipe e não se constrói aqui.
+
+**Critério de aceite.** A migração só cria a tabela nova. A nota, o CNAE, a distância e o funil têm teste. A tela mostra a contagem e as qualificadas, sem botão de envio. Cadastro em `/parceiros` com o mesmo CNPJ avança o prospecto para `cadastrou` quando a regra deixa, sem mudar o resto do cadastro. Quem marcou "não quero receber" não volta.
+
+**Como testar.** `npm test` cobre `tests/prospector.test.ts`. Na tela Fornecedores, o bloco aparece embaixo dos cadastros. Sem a tabela no Supabase, o bloco pede para rodar o SQL e a aprovação de parceiro segue igual.
