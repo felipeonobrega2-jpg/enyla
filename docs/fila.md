@@ -53,6 +53,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 35 | Script de comparação do classificador Opus × Sonnet × Haiku (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/30 (na main) |
 | 36 | Script de comparação do follow-up Opus × Sonnet (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/37 (na main) |
 | 37 | Prospector: importador não trava quando a BrasilAPI falha (grava com os dados do arquivo, `falhasCadastro`) | operação | — | — | Claude Code | não (correção de erro) | (PR da issue #88) |
+| 38 | Atendente não responde sozinha a gráficas do Prospector | operação | — | — | Claude Code | não | (PR da issue #34) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
