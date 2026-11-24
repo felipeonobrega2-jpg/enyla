@@ -7,6 +7,7 @@ import { lerCampos } from "@/app/lib/configAtomica"
 import { supabase } from "@/app/lib/supabase"
 import { filtroDoAgente } from "@/app/lib/agenteLeads"
 import { gastoFixo } from "@/app/lib/gastoFixoExterno"
+import { leituraFinanceira, AJUDA_FINANCEIRO } from "@/app/lib/financeiroExterno"
 
 // Porta de acesso dos diretores na nuvem (ex.: Grok Bot). Pública no proxy, mas cada chamada exige a chave do diretor
 // (Authorization: Bearer enyla_<diretor>_...). Leitura da empresa e as mesmas ferramentas da conversa com o Felipe;
@@ -33,11 +34,17 @@ export async function GET(req: NextRequest) {
 
   if (!o) return NextResponse.json({
     voce: `${info.nome}, ${info.cargo} (${info.area})`,
-    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | "), "?o=conversa": "o que você e o Felipe conversaram" },
+    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | "), "?o=conversa": "o que você e o Felipe conversaram", ...(diretor === "cfo" ? AJUDA_FINANCEIRO : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa" }) },
     escrita: { "POST {acao:'relatar', texto}": "manda algo ao Felipe",
       "POST {acao:'gasto_fixo', operacao:'criar'|'editar'|'desativar', id, nome, valor, diaVencimento, categoriaId, contaId, obs}": "SÓ A CHAVE DO CFO (as outras recebem 403). Cadastra, edita ou desativa um gasto fixo (Financeiro → Cadastros → Gastos fixos). criar exige nome e valor (reais, > 0); editar e desativar exigem id; diaVencimento 1 a 31; a conta de pagamento é contaId e anotações como 'cartão 7150' vão em obs. Desativar só põe ativa:false, nunca apaga. Resposta: { ok, resultado, gasto } com o item gravado", ...Object.fromEntries(FERRAMENTAS.map(f => [`POST {acao:'${f}', ...}`, "ferramenta (ver instruções)"])) },
     limitePorHora: LIMITE_POR_HORA,
   })
+
+  if (o === "financeiro") {
+    if (diretor !== "cfo") return NextResponse.json({ erro: "?o=financeiro é só para a chave do CFO." }, { status: 403 })
+    const l = await leituraFinanceira(req.nextUrl.searchParams)
+    return NextResponse.json(l.corpo, { status: l.status })
+  }
 
   if (o === "conversa") {
     const ms = (await lerConversa(diretor)).slice(-30)
@@ -89,7 +96,7 @@ export async function GET(req: NextRequest) {
       outrasAreas: blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")),
     })
   }
-  return NextResponse.json({ erro: "o: empresa, detalhe ou conversa" }, { status: 400 })
+  return NextResponse.json({ erro: "o: empresa, detalhe, conversa ou financeiro (só CFO)" }, { status: 400 })
 }
 
 export async function POST(req: NextRequest) {
