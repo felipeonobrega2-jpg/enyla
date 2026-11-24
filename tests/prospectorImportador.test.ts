@@ -43,7 +43,7 @@ vi.mock("@/app/lib/supabase", () => {
 })
 
 import { candidatoDaLinha, decidirGravacao, montarProspecto, type LinhaProspecto } from "@/app/lib/prospectorImportador"
-import { importar } from "@/app/lib/prospectorImportadorServidor"
+import { importar, urlArquivo, AUTH_RECEITA } from "@/app/lib/prospectorImportadorServidor"
 import { GET } from "@/app/api/prospector/importar/route"
 import { NextRequest } from "next/server"
 
@@ -155,6 +155,31 @@ describe("importar", () => {
     expect(urls.length).toBeGreaterThan(0)
     expect(urls.every(u => /^https:\/\/(arquivos\.receitafederal\.gov\.br|brasilapi\.com\.br)\//.test(u))).toBe(true)
     expect(enviar.evo).not.toHaveBeenCalled(); expect(enviar.notificar).not.toHaveBeenCalled(); expect(enviar.email).not.toHaveBeenCalled()
+  })
+})
+
+describe("endereço da Receita (WebDAV público)", () => {
+  beforeEach(() => { estado.cfg = {}; estado.tabela = []; estado.seq = 1; vi.clearAllMocks() })
+  it("monta a URL e o header Basic com o token e senha vazia", () => {
+    expect(urlArquivo("2026-11", 3)).toBe("https://arquivos.receitafederal.gov.br/public.php/webdav/2026-11/Estabelecimentos3.zip")
+    expect(AUTH_RECEITA).toBe("Basic " + Buffer.from("YggdBLfdninEJX9:").toString("base64"))
+  })
+  it("envia o header e cai para o mês anterior no 404; 502 vem com o status da Receita", async () => {
+    const chamadas: { url: string; auth: string | null }[] = []
+    const f404 = (ok: boolean) => vi.fn(async (u: string | URL | Request, init?: RequestInit) => {
+      const url = String(u)
+      chamadas.push({ url, auth: new Headers(init?.headers).get("authorization") })
+      if (url.includes("/2026-11/") || !ok) return new Response("", { status: 404 })
+      return new Response(new Uint8Array(zip("")), { status: 200 })
+    }) as unknown as typeof fetch
+    const agora = () => new Date("2026-11-24T12:00:00Z")
+    const r = await importar({ fetch: f404(true), agora, maxCnpjs: 10 })
+    expect(r.ok).toBe(true)
+    expect(chamadas.map(c => c.url)).toEqual([urlArquivo("2026-11", 0), urlArquivo("2026-10", 0)])
+    expect(chamadas.every(c => c.auth === AUTH_RECEITA)).toBe(true)
+    estado.cfg = {}
+    const r2 = await importar({ fetch: f404(false), agora, maxCnpjs: 10 })
+    expect(r2).toMatchObject({ ok: false, erro: "Receita respondeu 404" })
   })
 })
 
