@@ -32,6 +32,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 14 | Porta externa: leitura financeira (`?o=financeiro`) para o CFO | CFO | — | — | Claude Code | não | (PR da issue #24) |
 | 15 | Porta externa: verba do conjunto (ABO) na leitura e no ajuste (`acao=meta_ads`, `conjuntoId`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 (mesmas regras por conjunto) | (PR da issue #32) |
 | 16 | Porta externa: escrita financeira do CFO (`acao=lancamento`, `conciliacao`, `categoria`) | CFO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026, 7h31 ("Libera para o Otávio") | (PR da issue #35) |
+| 17 | Agente: segurar saudação automática do WhatsApp Business do lead e não contar como resposta | COO | — | — | Claude Code | aprovado pelo Felipe em 24/11/2026, 8:38 ("Aprovo as mudanças do Rafael") | (PR da issue #45) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -208,3 +209,11 @@ Os `conjuntos` de `GET ?o=meta_ads` passam a trazer `verbaDiaria` e `verbaTotal`
 **Não faz.** Não paga nem cobra, não muda preço, não mexe em chaves, não apaga nada de vez: desativar/estornar marcam `estornadoEm`/`estornadoPor`, e o `desfazer` da conciliação estorna os lançamentos criados em vez de apagá-los (o `desfazer` de `aplicar()` não é exposto). Sem `contraparte_doc` nem `bruto` na resposta.
 
 **Migração (só depois do merge, aditiva).** `supabase/migrations/20261126_lancamento_estorno.sql` acrescenta `estornadoEm` e `estornadoPor` em `LancamentoFinanceiro`. Enquanto não rodar, o estorno grava só a marca em `obs`. A leitura financeira ainda não filtra lançamentos estornados: item a combinar.
+
+## 17. Agente: segurar saudação automática do WhatsApp Business do lead
+
+**Status:** Claude Code. **Aprovo:** aprovado pelo Felipe em 24/11/2026, 8:38. **PR:** o da issue #45. Pedido do COO.
+
+**O que muda.** Quando a última mensagem do lead é saudação automática do WhatsApp Business ("agradecemos seu contato", "em breve retornaremos"), o agente não chama a IA, não envia nada ao lead e avisa só o Felipe no formato "Segurei a resposta". Essa mensagem não avança `ultima_recebida_at` e não limpa F1/F2/F3, então o follow-up segue no tempo certo.
+
+**Limite duro.** Só segura ou reduz envios a cliente. Nada novo é enviado. Sem agente, rotina, fila, migração ou mudança de cobrança/chave.

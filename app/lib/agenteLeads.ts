@@ -231,6 +231,31 @@ export const ehSeguraSemIA = (t: string | null | undefined) => !!t && /^oi, tudo
 export const ehMensagemAutomaticaDoWhatsapp = (t: string | null, tipo?: string | null) =>
   (!!t && /^estou fora do hor[aá]rio/i.test(t.trim())) || ehSeguraSemIA(t) || (!t?.trim() && /interactive|template|buttons|list/i.test(tipo ?? ""))
 
+// Saudação/ausência automática do WhatsApp Business que o LEAD manda ("agradecemos seu contato", "em breve
+// retornaremos"). Só para mensagem RECEBIDA; não é a ehMensagemAutomaticaDoWhatsapp (essa é a nossa, de saída).
+// Regra barata, sem IA. Pega o template; fala humana com pedido concreto (quantidade, medida) nunca entra.
+// Limites conhecidos: template fora dessas frases passa (falso negativo, cai no fluxo normal); humano que escreve
+// exatamente "como podemos ajudar?" é segurado (falso positivo, o Felipe recebe o aviso e decide).
+const semAcento = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+const TEMPLATE_AUTOMATICO = [
+  /agradece(mos)? (o |pelo |por seu |pelo seu )?(seu )?contato/,
+  /obrigad[oa] (pelo|por entrar em|por seu|pelo seu) contato.{0,40}(como podemos|em breve|retorn)/,
+  /como (podemos|posso) (te |lhe |vos )?ajudar/,
+  /(em breve|brevemente) (retornaremos|retornarei|responderemos|responderei|entraremos em contato|entrarei em contato)/,
+  /(retornaremos|retornarei|responderemos|responderei) (a sua mensagem )?(em breve|assim que)/,
+  /no momento nao (podemos|posso|estamos|estou) (te |lhe )?(atender|disponive)/,
+  /(estou|estamos) (ausente|ausentes|fora do horario|fora do expediente)/,
+  /fora do (nosso )?(horario|expediente) de (atendimento|funcionamento)/,
+  /(aviso|mensagem|resposta) automatic[ao]/,
+  /mensagem de (ausencia|saudacao)/,
+]
+const PEDIDO_CONCRETO = /\d[\d.,]*\s*(un\b|unid|caixas?|pecas?|cm\b|mm\b|ml\b|mil\b|k\b)|\b\d{3,}\b/
+export function ehSaudacaoAutomaticaDoLead(t: string | null | undefined): boolean {
+  const x = semAcento((t ?? "").trim())
+  if (!x || x.length > 350 || PEDIDO_CONCRETO.test(x)) return false
+  return TEMPLATE_AUTOMATICO.some(r => r.test(x))
+}
+
 // Filtro inicial, tirado das conversas reais do Felipe com os leads do anúncio (04/11/2026). Fica editável em Configurações.
 export const FILTRO_PADRAO = `OBJETIVO
 Descobrir os bons negócios e poupar o meu tempo. Bom negócio é caixa em volume OU os outros produtos do ramo em que eu também ganho: frasco, essência, válvula, envase, produto pronto (frasco + essência + caixa). Lead ruim eu não quero ver; lead bom eu quero receber já qualificado.
