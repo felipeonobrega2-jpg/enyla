@@ -26,7 +26,8 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 8 | Prospector de Parceiros (base, nota e funil) | operação | esta leva | — | Diego | aprovado 23/11/2026 22:27 | https://github.com/felipeonobrega2-jpg/enyla/pull/2 (na main) |
 | 9 | Prospector: importador gratuito dos dados abertos de CNPJ | operação | esta leva | — | Diego | não | (PR do importador, issue #6) |
 | 10 | Porta externa: ação gasto_fixo para o CFO | CFO | — | — | Claude Code | não | (PR da issue #10) |
-| 11 | Prospector: envio automático (primeiro contato e lembrete) | operação | esta leva | — | Diego | sim (o Felipe aprova o merge; chave `prospector_envio_ativo` nasce desligada) | (PR da issue #11) |
+| 11 | Porta externa: leitura ao vivo da Meta Ads para a CMO (`?o=meta_ads`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/25 |
+| 12 | Prospector: envio automático (primeiro contato e lembrete) | operação | esta leva | — | Diego | sim (o Felipe aprova o merge; chave `prospector_envio_ativo` nasce desligada) | (PR da issue #11) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -160,7 +161,13 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 
 **Como testar.** `npm test` cobre `tests/prospectorImportador.test.ts`. Depois do merge, chamar a rota uma vez com o Bearer do `CRON_SECRET` e conferir as linhas em `prospectos_parceiros`.
 
-## 11. Prospector: envio automático (primeiro contato e lembrete)
+## 11. Porta externa: leitura ao vivo da Meta Ads
+
+**Status:** Claude Code. **Aprovo:** o Felipe liberou a Lívia (CMO) em 24/11/2026. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/25
+
+`GET /api/externo?o=meta_ads`, só com a chave da CMO (as outras recebem 403). Só leitura na Graph API: conta, campanhas, conjuntos e anúncios, hoje/7/30 dias, cache de 3 minutos. Não liga, não pausa, não ajusta verba. Não entrega o aviso de campanha parada: o item 1 continua livre.
+
+## 12. Prospector: envio automático (primeiro contato e lembrete)
 
 **Status:** Diego (no mesmo PR da issue #11). **Aprovo:** o Felipe aprova o merge; o texto já está aprovado. **PR:** (PR da issue #11)
 

@@ -213,7 +213,22 @@ export function leadQuente(a: { etiquetas?: string[] | null; status_lead?: strin
 
 // Envios da última hora na tabela leve (linhas "envio:<horário>"): o AppConfig de 600 KB não é regravado a cada
 // mensagem (19/11: isso estourou o disco do banco). Sem a tabela, cai no jeito antigo (AppConfig).
-async function vezPelaTabela(essencial: boolean, proativo: boolean): Promise<{ esperaMs: number } | { erro: string } | null> {
+// Regra única da cota/fila de envio (usada na reserva e na checagem prévia do follow-up, para não haver duas regras).
+// `envios`: horários (ms) dos envios da última hora. `jitterSeg`: folga aleatória de espaçamento (0 = mínimo).
+export function decidirVez(o: { envios: number[]; agora: number; aquecendo: boolean; essencial: boolean; proativo: boolean; jitterSeg: number }): { vez: number } | { erro: string } {
+  const { envios, agora, aquecendo, essencial, proativo, jitterSeg } = o
+  const limite = Math.floor((aquecendo ? LIMITE_HORA_AQUECENDO : LIMITE_HORA) * (proativo ? FRACAO_PROATIVO : 1))
+  // Responder quem escreveu não tem teto por hora (só o espaçamento entre mensagens); o teto vale para o que a ENYLA
+  // puxa (follow-up, reativação, convite) e para o aquecimento logo depois de reconectar o número
+  if (!essencial && (proativo || aquecendo) && envios.length >= limite) return { erro: `não enviou (limite de ${limite} por hora${proativo ? " para follow-up" : ""}${aquecendo ? ", aquecendo depois de conectar" : ""})` }
+  const ultima = Math.max(0, ...envios.filter(n => !isNaN(n)))
+  const vez = Math.max(agora, ultima + (INTERVALO_MIN_SEG + jitterSeg) * 1000)
+  if (vez - agora > ESPERA_MAX_VEZ_SEG * 1000 && !essencial) return { erro: "não enviou (fila de envio cheia)" }
+  return { vez }
+}
+
+// Leitura dos envios da última hora na tabela leve + se está aquecendo. null = sem tabela/erro (cai no AppConfig).
+async function lerEnviosDaTabela() {
   if (!await temTabelas()) return null
   const agora = Date.now()
   // Só pelo prefixo: comparar faixa de texto ("envio:" até "envio;") não funciona com a ordenação do banco, que ignora
@@ -221,22 +236,52 @@ async function vezPelaTabela(essencial: boolean, proativo: boolean): Promise<{ e
   const { data, error } = await supabase.from("agente_tratadas").select("id").like("id", "envio:%").limit(2000)
   if (error) return null
   const todos = (data ?? []).map(x => ({ id: x.id as string, t: new Date((x.id as string).slice(6, 30)).getTime() })).filter(x => !isNaN(x.t))
-  const lista = todos.filter(x => x.t >= agora - 3_600_000).map(x => new Date(x.t).toISOString())
+  const envios = todos.filter(x => x.t >= agora - 3_600_000).map(x => x.t)
   const cfg = await supabase.from("AppConfig").select("data->whatsappConexao").eq("id", 1).maybeSingle()
   const con = (cfg.data as { whatsappConexao?: { aquecerDesde?: string; aquecimentoV?: number } } | null)?.whatsappConexao
   const desdeAq = con?.aquecimentoV === 2 ? con.aquecerDesde : undefined
   const aquecendo = !!desdeAq && agora - new Date(desdeAq).getTime() < HORAS_AQUECENDO * 3_600_000
-  const limite = Math.floor((aquecendo ? LIMITE_HORA_AQUECENDO : LIMITE_HORA) * (proativo ? FRACAO_PROATIVO : 1))
-  if (!essencial && (proativo || aquecendo) && lista.length >= limite) return { erro: `não enviou (limite de ${limite} por hora${proativo ? " para follow-up" : ""}${aquecendo ? ", aquecendo depois de conectar" : ""})` }
-  const ultima = Math.max(0, ...lista.map(t => new Date(t).getTime()).filter(n => !isNaN(n)))
-  const vez = Math.max(agora, ultima + (INTERVALO_MIN_SEG + Math.random() * 7) * 1000)
-  if (vez - agora > ESPERA_MAX_VEZ_SEG * 1000 && !essencial) return { erro: "não enviou (fila de envio cheia)" }
-  const id = `envio:${new Date(vez).toISOString()}:${Math.random().toString(36).slice(2, 7)}`
+  return { agora, todos, envios, aquecendo }
+}
+
+// Checagem SÓ DE LEITURA da cota proativa (não reserva vaga): devolve o motivo se o envio proativo seria barrado agora.
+// Em dúvida (erro de leitura) devolve null: o envio continua sendo a última palavra.
+export async function cotaProativaEsgotada(): Promise<string | null> {
+  try {
+    const t = await lerEnviosDaTabela()
+    let envios: number[], aquecendo: boolean, agora = Date.now()
+    if (t) ({ envios, aquecendo, agora } = t)
+    else {
+      const { data } = await lerConfigLinha()
+      const d = (data?.data ?? {}) as { agenteEnviosHora?: string[]; whatsappConexao?: { aquecerDesde?: string; aquecimentoV?: number } }
+      envios = (d.agenteEnviosHora ?? []).map(x => new Date(x).getTime()).filter(n => n > agora - 3_600_000)
+      const desde = d.whatsappConexao?.aquecimentoV === 2 ? d.whatsappConexao.aquecerDesde : undefined
+      aquecendo = !!desde && agora - new Date(desde).getTime() < HORAS_AQUECENDO * 3_600_000
+    }
+    const r = decidirVez({ envios, agora, aquecendo, essencial: false, proativo: true, jitterSeg: 0 })
+    return "erro" in r ? r.erro : null
+  } catch { return null }
+}
+
+// Follow-up: confere a cota ANTES de pagar a IA. Cota cheia: não chama a IA (o lead segue elegível na próxima rodada).
+export async function iaDoFollowUp<T>(chamar: () => Promise<T>, esgotada: () => Promise<string | null> = cotaProativaEsgotada): Promise<{ segurado: string } | { resultado: T }> {
+  const motivo = await esgotada()
+  if (motivo) return { segurado: motivo }
+  return { resultado: await chamar() }
+}
+
+async function vezPelaTabela(essencial: boolean, proativo: boolean): Promise<{ esperaMs: number } | { erro: string } | null> {
+  const t = await lerEnviosDaTabela()
+  if (!t) return null
+  const { agora, todos, envios, aquecendo } = t
+  const r = decidirVez({ envios, agora, aquecendo, essencial, proativo, jitterSeg: Math.random() * 7 })
+  if ("erro" in r) return r
+  const id = `envio:${new Date(r.vez).toISOString()}:${Math.random().toString(36).slice(2, 7)}`
   if (await reservarTratada(id) === null) return null
   // limpeza: envios com mais de 2 h saem da tabela
   const velhos = todos.filter(x => x.t < agora - 2 * 3_600_000).map(x => x.id).slice(0, 300)
   if (velhos.length) void supabase.from("agente_tratadas").delete().in("id", velhos).then(() => null)
-  return { esperaMs: vez - agora }
+  return { esperaMs: r.vez - agora }
 }
 
 export async function reservarVezDeEnviar(opcoes: { essencial?: boolean; proativo?: boolean } = {}): Promise<{ esperaMs: number } | { erro: string }> {
@@ -251,13 +296,9 @@ export async function reservarVezDeEnviar(opcoes: { essencial?: boolean; proativ
     // Só vale o aquecimento marcado pela regra nova (aparelho removido); o antigo ligava em oscilação
     const desde = con?.aquecimentoV === 2 ? con.aquecerDesde : undefined
     const aquecendo = !!desde && agora - new Date(desde).getTime() < HORAS_AQUECENDO * 3_600_000
-    const limite = Math.floor((aquecendo ? LIMITE_HORA_AQUECENDO : LIMITE_HORA) * (proativo ? FRACAO_PROATIVO : 1))
-    // Responder quem escreveu não tem teto por hora (só o espaçamento entre mensagens); o teto vale para o que a ENYLA
-    // puxa (follow-up, reativação, convite) e para o aquecimento logo depois de reconectar o número
-    if (!essencial && (proativo || aquecendo) && lista.length >= limite) { res = { erro: `não enviou (limite de ${limite} por hora${proativo ? " para follow-up" : ""}${aquecendo ? ", aquecendo depois de conectar" : ""})` }; return null }
-    const ultima = Math.max(0, ...lista.map(t => new Date(t).getTime()))
-    const vez = Math.max(agora, ultima + (INTERVALO_MIN_SEG + Math.random() * 7) * 1000)
-    if (vez - agora > ESPERA_MAX_VEZ_SEG * 1000 && !essencial) { res = { erro: "não enviou (fila de envio cheia)" }; return null }
+    const r = decidirVez({ envios: lista.map(t => new Date(t).getTime()), agora, aquecendo, essencial, proativo, jitterSeg: Math.random() * 7 })
+    if ("erro" in r) { res = r; return null }
+    const vez = r.vez
     res = { esperaMs: vez - agora }
     return { agenteEnviosHora: [...lista, new Date(vez).toISOString()].slice(-200) }
   })
@@ -586,7 +627,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   // Chamado quando o atendimento viu bom negócio ou pequeno, ou o lead acabou de falar de volume.
   if (r.lead.perfil !== "nao_lead" && !conversa.clienteCadastrado && (ehQualificado(r.lead.perfil) || r.lead.perfil === "pequeno"
     || temSinalDeVolume(conversa.mensagens.filter(m => !m.from_me).slice(-3).map(m => m.corpo)))) {
-    const cl = await import("./classificarLeadServidor").then(m => m.classificarConversa(jid, { aplicar: false, origem: "classificador-inline" })).catch(() => null)
+    const cl = await import("./classificarLeadServidor").then(m => m.classificarConversa(jid, { aplicar: false, reusar: true, origem: "classificador-inline" })).catch(() => null)
     if (cl) r.lead = { ...r.lead, perfil: cl.classificacao.perfil, quantidade_total: cl.classificacao.quantidade_total, motivo: cl.classificacao.motivo }
   }
 
@@ -976,7 +1017,10 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     }
     const primeira = await primeiraDa(c.jid)
     const recente = !!primeira && Date.now() - new Date(primeira.ts).getTime() < DIAS_FOLLOW_UP * 86_400_000
-    const a = await atender(c.jid, { cfg, automatico: true, followUp: nivel }).catch(() => null)
+    // Cota da hora cheia: nem chama a IA (antes pagava o Opus e o envio barrava depois). Segue elegível na próxima rodada.
+    const ia = await iaDoFollowUp(() => atender(c.jid, { cfg, automatico: true, followUp: nivel }).catch(() => null))
+    if ("segurado" in ia) return
+    const a = ia.resultado
     if (!a?.ok) return
     const { r, conversa } = a
     r.resposta = limparEmojis(r.resposta, emojiCtx(conversa.mensagens, cfg))

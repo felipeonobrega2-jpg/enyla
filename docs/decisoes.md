@@ -12,6 +12,12 @@ Diretores propõem. Estas decisões é que mandam no que se constrói.
 4. Se a decisão mudar um item da fila, atualize [docs/fila.md](fila.md) no mesmo pull request.
 5. Não apague decisão antiga. Ela fica embaixo, para se saber o que valeu antes.
 
+## 2026-11-24 — CMO lê as campanhas pela porta
+
+**Decisão.** O Felipe liberou a CMO (Lívia) a ler as campanhas da Meta Ads pela porta externa e, à parte, a ligar/pausar e ajustar a verba de campanha existente, com no máximo 20% por ajuste e teto de R$ 200 por dia por campanha. O primeiro pull request entrega só a leitura; ligar, pausar e ajustar verba vêm em outro.
+
+**Porquê.** A CMO precisa ver as campanhas por conta própria, pelo caminho gratuito (Graph API direto). Leitura e escrita entram separadas para poder desfazer uma sem a outra.
+
 ## 23/11/2026 22:40 — envio automático do Prospector e código do Diego pelo Claude Code
 
 **Decisão.** Horário: 23/11/2026 22:40 (America/Sao_Paulo). O envio do Prospector de Parceiros será automático, dentro dos limites aprovados às 22:27 (até 10 abordagens por dia, de segunda a sexta, um lembrete após 4 dias, opt-out e link `/parceiros`). Todo código do Diego passa a ser construído pelo Claude Code via GitHub Action (`@claude`), não mais por agentes de nuvem.
