@@ -12,7 +12,7 @@ export type Sinais = {
   videos: number
   feitos: Record<string, string>     // marcados à mão como feitos
 }
-export type Pendencia = { id: string; grupo: "Dinheiro parado" | "Braço digital" | "Integrações" | "Conteúdo"; titulo: string; porque: string; como: string; nivel: "urgente" | "importante" | "quando der"; feito: boolean; manual: boolean; onde?: string }
+export type Pendencia = { id: string; grupo: "Dinheiro parado" | "Braço digital" | "Integrações" | "Conteúdo" | "Pedidos dos diretores"; titulo: string; porque: string; como: string; nivel: "urgente" | "importante" | "quando der"; feito: boolean; manual: boolean; onde?: string }
 
 const dias = (iso: string | null, agora: number) => iso ? (new Date(iso).getTime() - agora) / 86_400_000 : null
 
