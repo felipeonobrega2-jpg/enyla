@@ -513,7 +513,7 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
   if (u.startsWith("/api/banco/transacoes")) {
     const t = (id: string, p: Record<string, unknown>) => ({ id, conta_id: "c1", conta_nome: "Santander · 2005886-0", data: "2026-11-03", valor: 100, tipo: "saida", descricao: "PIX ENVIADO", contraparte_nome: null, contraparte_doc: null, categoria_pluggy: null, estado: "pendente", lancamento_ids: [], historico: [], ...p })
     return new Response(JSON.stringify({ configurada: true, tabela: true, erro: null, pendentes: 5,
-      status: { em: new Date().toISOString(), novas: 5, contas: [{ id: "c1", nome: "Santander · 2005886-0", saldo: 12840.55 }, { id: "c2", nome: "Inter · 1234", saldo: 3120.1 }] },
+      status: { em: new Date().toISOString(), novas: 5, contas: [{ id: "c1", nome: "Santander · 2005886-0", saldo: 12840.55 }, { id: "c2", nome: "Inter · 1234", saldo: 3120.1 }], bancos: [{ banco: "Santander", atualizadoEm: "2026-11-18T14:02:00Z", parado: true, motivo: "Trial expired" }, { banco: "Inter", atualizadoEm: new Date().toISOString(), parado: false, motivo: null }] },
       transacoes: [
         t("a", { tipo: "entrada", valor: 650, contraparte_nome: "ANA COSMETICOS LTDA", descricao: "PIX RECEBIDO", sugestao: { acao: "atualizar", lancamentoId: "x", campos: { status: "pago" }, motivo: "" } }),
         t("b", { valor: 2000, contraparte_nome: "JEROGRAF GRAFICA E EDITORA", contraparte_doc: "03999896000152", sugestao: { acao: "criar", origem: "conta", motivo: "pagamento da conta Jerograf: abate o saldo devedor (não é custo novo)", lancamentos: [{ descricao: "Pagamento da conta — Jerograf", valor: 2000, tipo: "receita" }] } }),
