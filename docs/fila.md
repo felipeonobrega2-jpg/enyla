@@ -33,12 +33,13 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 15 | Porta externa: verba do conjunto (ABO) na leitura e no ajuste (`acao=meta_ads`, `conjuntoId`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 (mesmas regras por conjunto) | (PR da issue #32) |
 | 16 | Porta externa: escrita financeira do CFO (`acao=lancamento`, `conciliacao`, `categoria`) | CFO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026, 7h31 ("Libera para o Otávio") | (PR da issue #35) |
 | 17 | Porta externa: leitura financeira ignora lançamentos estornados (`incluirEstornados`) | CFO | — | — | Claude Code | pedido do Felipe na issue #41 | (PR da issue #41) |
-| 18 | Medidor de IA por tipo de token e origem | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/21 (na main) |
-| 19 | Follow-up confere a cota da hora antes de chamar a IA | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/22 (na main) |
-| 20 | WhatsApp: sugestão só ao clicar em "Gerar sugestão" | CTO (custo de IA) | esta leva | — | Diego | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/23 (na main) |
-| 21 | Classificação inline só com mensagem nova do cliente (migração aditiva `classificacao_guardada` aplicada em produção em 24/11/2026) | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/28 (na main) |
-| 22 | Script de comparação do classificador Opus × Sonnet × Haiku (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/30 (na main) |
-| 23 | Script de comparação do follow-up Opus × Sonnet (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/37 (na main) |
+| 18 | Cadastro de parceiros: cenário-exemplo e preço de referência por serviço | Felipe | — | — | Claude Code | pedido pelo Felipe em 24/11/2026 | (PR da issue #36) |
+| 19 | Medidor de IA por tipo de token e origem | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/21 (na main) |
+| 20 | Follow-up confere a cota da hora antes de chamar a IA | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/22 (na main) |
+| 21 | WhatsApp: sugestão só ao clicar em "Gerar sugestão" | CTO (custo de IA) | esta leva | — | Diego | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/23 (na main) |
+| 22 | Classificação inline só com mensagem nova do cliente (migração aditiva `classificacao_guardada` aplicada em produção em 24/11/2026) | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/28 (na main) |
+| 23 | Script de comparação do classificador Opus × Sonnet × Haiku (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/30 (na main) |
+| 24 | Script de comparação do follow-up Opus × Sonnet (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/37 (na main) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -222,9 +223,15 @@ Os `conjuntos` de `GET ?o=meta_ads` passam a trazer `verbaDiaria` e `verbaTotal`
 
 `GET ?o=financeiro` passa a excluir lançamentos com `estornadoEm` preenchido (desativados e estornados) de resumo, `receber`, `pagar`, `gastos` e `margem`. `&incluirEstornados=1|true|sim` traz todos de volta; outro valor dá 400. A resposta traz `incluirEstornados`. `banco`, `saldos` e `depende` não mudam. A escrita (`estornarLogico`) já grava `estornadoEm`/`estornadoPor` e `obs`, com fallback só em `obs`; `LancamentoFinanceiro` ganhou os dois campos opcionais. Não mexe em chaves nem em pagamento/cobrança.
 
+## 18. Cadastro de parceiros: cenário-exemplo e preço de referência por serviço
+
+**Status:** Claude Code. **Pedido:** o Felipe, em 24/11/2026. **PR:** o PR da issue #36 (#39). Não junta sozinho.
+
+Config editável `cenariosParceiros` no AppConfig (padrão no código; a equipe edita na tela Fornecedores). `/parceiros` mostra o enunciado e pede o preço de cada exemplo; impressão (offset e digital) não tem cenário e pede formato da máquina, acerto e milheiro; laminação tem quatro cenários e arte pede preço por arte e pacote de 3. A tela Fornecedores compara com a referência interna e mostra média, mínimo e máximo dos parceiros por cenário. A referência e esses números nunca vão ao parceiro. Sem migração SQL (tudo no JSON da config). Pendente: o Felipe confirmar a referência da laminação fosca (R$ 765,28) e o preço do Ronaldo para brilho, soft touch e dois lados.
+
 ## Custo de IA (24/11/2026)
 
-Objetivo: reduzir os tokens gastos com IA sem perder eficácia. Os itens 18 a 23 registram os PRs dessa frente.
+Objetivo: reduzir os tokens gastos com IA sem perder eficácia. Os itens 19 a 24 registram os PRs dessa frente.
 Os dois scripts de comparação (classificador e follow-up) só rodam com autorização do Felipe, porque gastam tokens.
 Nenhuma troca de modelo entra sem o Diego revisar o resultado da comparação.
 O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
