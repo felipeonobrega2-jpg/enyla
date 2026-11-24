@@ -1,6 +1,7 @@
 // Cobertura do prédio: a Diretoria. Cada diretor (COO, CCO, CMO, CFO, CTO) com o placar da área e as decisões que precisam do
 // CEO (o Felipe), montados com os dados de hoje. Os agentes de IA dos diretores vêm depois e ocupam essas cadeiras;
 // por enquanto o placar já funciona. Puro.
+import { estaSegurado, type MapaSegurados } from "./pedidoSegurado"
 import type { FinanceiroAndar } from "./financeiroAndar"
 import type { KanbanCard } from "../types"
 
@@ -47,12 +48,13 @@ export function montarDiretoria(e: {
   agentesTravados: string[]; rotinas?: Rotina[] | null; whatsapp: "conectado" | "desconectado" | null; semCredito: boolean
   cota?: { usados: number; limite: number }
   conhecimento?: Partial<Record<IdDiretor, number>>
+  segurados?: MapaSegurados   // aguardando pagamento do cliente: fora das entregas atrasadas
 }, hojeIso = new Date().toLocaleDateString("sv-SE")): Diretor[] {
   // COO: operação (produção, entregas, agentes)
   const esperando = e.hoje?.responder?.length ?? 0, orcar = e.hoje?.orcar?.length ?? 0
   const promessas = (e.hoje?.resolver ?? []).filter(x => x.tipo === "promessa")
   const naProducao = e.kanban.filter(c => c.coluna >= 2 && c.coluna <= 8)
-  const atrasados = naProducao.filter(c => !!c.dataEntregaPrevista && c.dataEntregaPrevista.slice(0, 10) < hojeIso)
+  const atrasados = naProducao.filter(c => !!c.dataEntregaPrevista && c.dataEntregaPrevista.slice(0, 10) < hojeIso && !estaSegurado(e.segurados, c.numero))
   const meta = e.hoje?.meta?.resumo
   const coo: Diretor = {
     id: "coo", cargo: "COO", area: "Operação", conhecimento: e.conhecimento?.coo ?? 0,

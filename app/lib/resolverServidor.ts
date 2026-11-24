@@ -1,6 +1,8 @@
 // "Para resolver agora": o que passou do prazo ou depende de você, num lugar só, por valor.
 // Liga sozinho cada conversa ao orçamento que ela recebeu (mensagem nossa com "ORC-2026-123" ou o link de aprovação),
 // gravando em whatsapp_conversas.kanban_card_id. Só roda no servidor.
+import { lerSegurados } from "./pedidoSeguradoServidor"
+import { estaSegurado } from "./pedidoSegurado"
 import { prazoDigital } from "./prazoDigital"
 import { supabase } from "./supabase"
 import { COL_FECHADO, COL_HOT, COL_ENTREGUE, COL_PERDIDO } from "../types"
@@ -121,9 +123,11 @@ export async function paraResolver(cfg: { grandesNegocios?: import("./grandesNeg
 
   // Entrega prevista vencida e o pedido ainda não saiu
   const { data: atrasados } = await supabase.from("KanbanCard").select("id, numero, nomeCliente, preco, coluna, dataEntregaPrevista").gte("coluna", COL_FECHADO).lt("coluna", COL_ENTREGUE).lt("dataEntregaPrevista", hoje).not("dataEntregaPrevista", "is", null)
-  const idsAt = (atrasados ?? []).map(c => c.id)
+  const segurados = await lerSegurados().catch(() => ({}))   // aguardando pagamento: atraso do cliente, não pede "avisar"
+  const atrasadosNossos = (atrasados ?? []).filter(k => !estaSegurado(segurados, k.numero))
+  const idsAt = atrasadosNossos.map(c => c.id)
   const { data: cvAt } = idsAt.length ? await supabase.from("whatsapp_conversas").select("jid, kanban_card_id").in("kanban_card_id", idsAt) : { data: [] }
-  for (const k of atrasados ?? []) {
+  for (const k of atrasadosNossos) {
     const d = dias(`${k.dataEntregaPrevista}T12:00:00-03:00`, agora)
     itens.push({ tipo: "atrasado", titulo: `${k.nomeCliente} · ${k.numero}`, detalhe: `entrega era ${String(k.dataEntregaPrevista).split("-").reverse().slice(0, 2).join("/")} (${d} ${d === 1 ? "dia" : "dias"} de atraso): avise o cliente e ajuste a data`, valor: Number(k.preco) || null, jid: cvAt?.find(c => c.kanban_card_id === k.id)?.jid ?? null, numero: k.numero, desde: k.dataEntregaPrevista, nivel: d >= 3 ? "perigo" : "alerta" })
   }
