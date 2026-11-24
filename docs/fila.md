@@ -27,7 +27,8 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 9 | Prospector: importador gratuito dos dados abertos de CNPJ | operação | esta leva | — | Diego | não | (PR do importador, issue #6) |
 | 10 | Porta externa: ação gasto_fixo para o CFO | CFO | — | — | Claude Code | não | (PR da issue #10) |
 | 11 | Porta externa: leitura ao vivo da Meta Ads para a CMO (`?o=meta_ads`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/25 |
-| 12 | Porta externa: leitura financeira (`?o=financeiro`) para o CFO | CFO | — | — | Claude Code | não | (PR da issue #24) |
+| 12 | Porta externa: CMO liga, pausa e ajusta verba diária de campanha existente (`acao=meta_ads`) | CMO | — | — | Claude Code | liberado pelo Felipe em 24/11/2026 (7h33–7h34) | (PR da issue #29) |
+| 13 | Porta externa: leitura financeira (`?o=financeiro`) para o CFO | CFO | — | — | Claude Code | não | (PR da issue #24) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -166,3 +167,15 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 **Status:** Claude Code. **Aprovo:** o Felipe liberou a Lívia (CMO) em 24/11/2026. **PR:** https://github.com/felipeonobrega2-jpg/enyla/pull/25
 
 `GET /api/externo?o=meta_ads`, só com a chave da CMO (as outras recebem 403). Só leitura na Graph API: conta, campanhas, conjuntos e anúncios, hoje/7/30 dias, cache de 3 minutos. Não liga, não pausa, não ajusta verba. Não entrega o aviso de campanha parada: o item 1 continua livre.
+
+## 12. Porta externa: escrita limitada da CMO na Meta Ads
+
+**Status:** Claude Code. **Aprovo:** o Felipe liberou a Lívia (CMO) em 24/11/2026, 7h33–7h34. **PR:** o PR da issue #29. Não junta sozinho.
+
+`POST /api/externo` com `{ acao: "meta_ads", operacao: "ligar" | "pausar" | "ajustar_verba", campanhaId, verbaDiaria }`, só com a chave da CMO (as outras recebem 403). Só campanha que já existe na conta configurada. Mudança de verba de no máximo 20% sobre a atual e nunca acima de R$ 200 por campanha: fora disso, 400 e nada muda (não corta). Cada ação e cada recusa fica em `dados_sistema` (coleção `metaAdsAcoes`) com diretor, hora, antes e depois. Criar campanha, conjunto ou anúncio e publicar continuam com o Felipe. Não entrega o aviso de campanha parada (item 1).
+
+## 13. Porta externa: leitura financeira para o CFO
+
+**Status:** Claude Code. **PR:** o PR da issue #24. Não junta sozinho.
+
+`GET /api/externo?o=financeiro`, só com a chave do CFO (as outras recebem 403). Só leitura: receber, pagar, banco, saldos, gastos, margem e depende. Sem `contraparte_doc` nem `bruto`, e sem dados pessoais de cliente além de nome e valor. Não escreve nada financeiro; a ação `gasto_fixo` segue como está.
