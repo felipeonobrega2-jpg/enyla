@@ -13,6 +13,18 @@ export type Classificacao = {
   fornecedor: boolean
 }
 
+// Última classificação feita pela IA, guardada na conversa. "ate" = hora da última mensagem do cliente que ela viu.
+export type ClassificacaoGuardada = { c: Classificacao; em: string; ate: string }
+
+// Pode reaproveitar a guardada? Só se o cliente não escreveu nada depois do que a IA já viu (mesmas mensagens dele).
+export function classificacaoReaproveitavel(g: unknown, ultimaDoClienteTs: string | null | undefined): Classificacao | null {
+  const x = g as Partial<ClassificacaoGuardada> | null | undefined
+  if (!x || typeof x !== "object" || !x.c || typeof x.c !== "object" || typeof x.c.perfil !== "string" || typeof x.ate !== "string" || !ultimaDoClienteTs) return null
+  const ate = new Date(x.ate).getTime(), ultima = new Date(ultimaDoClienteTs).getTime()
+  if (!Number.isFinite(ate) || !Number.isFinite(ultima) || ate < ultima) return null
+  return x.c
+}
+
 export const ESQUEMA_CLASSIFICAR = {
   type: "object", additionalProperties: false,
   required: ["perfil", "quantidade_total", "recorrente", "evidencia", "motivo", "fornecedor"],
