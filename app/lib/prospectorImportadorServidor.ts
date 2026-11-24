@@ -8,7 +8,12 @@ import { lerCampos, gravarCampos } from "./configAtomica"
 import { supabase } from "./supabase"
 import { candidatoDaLinha, decidirGravacao, montarProspecto, type Candidato, type CadastroBrasilApi, type Existente } from "./prospectorImportador"
 
-export const BASE_RECEITA = "https://arquivos.receitafederal.gov.br/dados/cnpj/dados_abertos_cnpj"
+// A Receita publica os dados abertos de CNPJ num compartilhamento público do Nextcloud:
+// https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
+// O token do compartilhamento é público (não é segredo); no WebDAV ele vai como usuário do Basic Auth, com senha vazia.
+export const TOKEN_RECEITA = "YggdBLfdninEJX9"
+export const BASE_RECEITA = "https://arquivos.receitafederal.gov.br/public.php/webdav"
+export const AUTH_RECEITA = `Basic ${Buffer.from(`${TOKEN_RECEITA}:`).toString("base64")}`
 export const BASE_BRASILAPI = "https://brasilapi.com.br/api/cnpj/v1"
 export const ARQUIVOS = 10
 export const MAX_CNPJS_POR_EXECUCAO = 400
@@ -98,8 +103,10 @@ async function varrer(corpo: ReadableStream<Uint8Array>, offset: number, maxCnpj
   return { candidatos, offsetFinal: parouEm >= 0 ? parouEm : pos + resto.length, fimDoArquivo, lidos }
 }
 
+export const urlArquivo = (mes: string, arquivo: number) => `${BASE_RECEITA}/${mes}/Estabelecimentos${arquivo}.zip`
+
 async function abrirArquivo(f: typeof fetch, mes: string, arquivo: number) {
-  return f(`${BASE_RECEITA}/${mes}/Estabelecimentos${arquivo}.zip`, { headers: { "user-agent": "enyla-prospector-importador" } })
+  return f(urlArquivo(mes, arquivo), { headers: { "user-agent": "enyla-prospector-importador", authorization: AUTH_RECEITA } })
 }
 
 type Busca = { ok: true; cad: CadastroBrasilApi } | { ok: false; semCadastro: boolean }
