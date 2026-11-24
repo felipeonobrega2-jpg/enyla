@@ -121,3 +121,14 @@ Resposta ao "não" (não é enviada automaticamente; o Prospector só marca o op
 ```
 Obrigado pelo retorno. Não vamos voltar a escrever. Um abraço, ENYLA.
 ```
+
+
+## Rodar o importador à mão (uma vez, em produção)
+
+A rota é a mesma do cron e usa a mesma senha. Não liga `prospector_envio_ativo` e não envia nada:
+
+```
+curl -sS -m 300 -H "Authorization: Bearer $CRON_SECRET" https://app.enyla.com.br/api/prospector/importar
+```
+
+Cada chamada trata até 400 CNPJs e avança o cursor; repita até `cursor.concluido` ou até ter base suficiente. A resposta traz `ok`, `erro`, `lidos`, `inseridos` e `cursor`. Toda chamada deixa rastro em `AppConfig.prospectorImportadorUltima` (`iniciou`, `ok`, `falhou` ou `erro`, com a mensagem), mesmo quando falha antes de gravar o cursor. Se a chave não existir, a rota não foi alcançada (cron não registrado, 401 ou proxy).

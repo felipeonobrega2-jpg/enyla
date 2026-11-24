@@ -122,10 +122,12 @@ export async function importar(deps: Deps = {}): Promise<Resultado> {
   if (salvo?.concluido && salvo.mes >= mesAtual) return { ok: true, ja: true, ...zero, cursor: salvo }
   let cursor: Cursor = salvo && !salvo.concluido ? salvo : { mes: mesAtual, arquivo: 0, offset: 0 }
 
-  let resp = await abrirArquivo(f, cursor.mes, cursor.arquivo)
-  if (resp.status === 404 && cursor.arquivo === 0 && cursor.offset === 0) {
-    // a Receita publica o mês com atraso: cai para o mês anterior
-    cursor = { mes: mesDe(agora(), -1), arquivo: 0, offset: 0 }
+  let resp: Response
+  try { resp = await abrirArquivo(f, cursor.mes, cursor.arquivo) }
+  catch (e) { return { ok: false, erro: `não consegui abrir a Receita: ${e instanceof Error ? e.message : String(e)}`, ...zero, cursor } }
+  // a Receita publica o mês com atraso (ou a pasta do mês atual ainda não existe): recua até 3 meses
+  for (let volta = 1; volta <= 3 && resp.status === 404 && cursor.arquivo === 0 && cursor.offset === 0; volta++) {
+    cursor = { mes: mesDe(agora(), -volta), arquivo: 0, offset: 0 }
     resp = await abrirArquivo(f, cursor.mes, 0)
   }
   if (!resp.ok || !resp.body) return { ok: false, erro: `Receita respondeu ${resp.status}`, ...zero, cursor }
