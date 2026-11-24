@@ -23,7 +23,8 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 5 | Dispensar pendência com motivo | COO (aprovada) | 4 (junto com o 4) | 11/12/2026 | livre | não | |
 | 6 | Enviar pedido de ferramenta ao Claude Code | CTO | depois das 5 | depois do item 5 | livre | sim | |
 | 7 | Integração com o Claude Code / vaga Desenvolvedor de ferramentas | CTO | depois das 5 | depois do item 5 | livre | sim | |
-| 8 | Prospector de Parceiros (base, nota e funil) | operação | esta leva | — | Diego | aprovado 23/11/2026 22:27 | https://github.com/felipeonobrega2-jpg/enyla/pull/2 |
+| 8 | Prospector de Parceiros (base, nota e funil) | operação | esta leva | — | Diego | aprovado 23/11/2026 22:27 | https://github.com/felipeonobrega2-jpg/enyla/pull/2 (na main) |
+| 9 | Prospector: importador gratuito dos dados abertos de CNPJ | operação | esta leva | — | Diego | não | (PR do importador, issue #6) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -139,8 +140,20 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 
 **O que já existe.** O cadastro público em `/parceiros` e a aprovação na tela Fornecedores (`CadastrosParceirosCard`). A aprovação continua com o Felipe, do jeito que está.
 
-**O que falta neste item.** A tabela `prospectos_parceiros`, a nota de 0 a 100, o mapeamento de CNAE e o bloco só leitura na tela Fornecedores. O desenho completo, inclusive o que fica para depois, está em `docs/prospector.md`. A coleta dos dados abertos da Receita e a abordagem (e-mail e WhatsApp) não são este item. A abordagem precisa de Aprovo do Felipe e não se constrói aqui.
+**O que falta neste item.** A tabela `prospectos_parceiros`, a nota de 0 a 100, o mapeamento de CNAE e o bloco só leitura na tela Fornecedores. O desenho completo, inclusive o que fica para depois, está em `docs/prospector.md`. A coleta dos dados abertos da Receita é o item 9. A abordagem (e-mail e WhatsApp) não é este item. A abordagem precisa de Aprovo do Felipe e não se constrói aqui.
 
 **Critério de aceite.** A migração só cria a tabela nova. A nota, o CNAE, a distância e o funil têm teste. A tela mostra a contagem e as qualificadas, sem botão de envio. Cadastro em `/parceiros` com o mesmo CNPJ só registra no histórico do prospecto (`cadastro recebido (aguardando aprovação do Felipe)`); a etapa vai para `cadastrou` quando o Felipe aprova o cadastro, sem mudar o resto do cadastro. Quem marcou "não quero receber" não volta.
 
 **Como testar.** `npm test` cobre `tests/prospector.test.ts`. Na tela Fornecedores, o bloco aparece embaixo dos cadastros. Sem a tabela no Supabase, o bloco pede para rodar o SQL e a aprovação de parceiro segue igual.
+
+## 9. Prospector: importador gratuito dos dados abertos de CNPJ
+
+**Status:** Diego. **Aprovo:** não (só lê dados públicos e grava na tabela que já existe em produção, com RLS e zero linhas). **PR:** o PR desta issue (#6). Não junta sozinho.
+
+**O que já existe.** A tabela `prospectos_parceiros` (já criada em produção), `notaDoProspect` e `CNAES_PROSPECTO` em `app/lib/prospector.ts`.
+
+**O que entra.** Importador em fluxo dos dados abertos da Receita, UF = SP, situação ativa e os CNAEs da tabela, com cursor e teto por execução. Rota `/api/prospector/importar` com a autenticação dos outros crons. Detalhes em `docs/prospector.md`.
+
+**Critério de aceite.** Idempotente por CNPJ. Não reabre `descartado` nem `opt_out`, não volta etapa, não apaga. Nenhuma mensagem sai. Sem secret novo. A importação não é disparada em produção por este PR.
+
+**Como testar.** `npm test` cobre `tests/prospectorImportador.test.ts`. Depois do merge, chamar a rota uma vez com o Bearer do `CRON_SECRET` e conferir as linhas em `prospectos_parceiros`.
