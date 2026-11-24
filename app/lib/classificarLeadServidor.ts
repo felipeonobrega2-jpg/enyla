@@ -13,7 +13,7 @@ import { filtroDoAgente, ehQualificado, dentroDoHorario, type AgenteAuto } from 
 import { conhecimentoNoPrompt, type Conhecimento } from "./agenteAprende"
 import {
   Classificacao, validarClassificacao, etiquetasDaClassificacao, mesmasEtiquetas, conversaParaIA,
-  temSinalDeVolume, temEtiquetaDeMql, pedidoClassificador, mensagensParaIA,
+  temSinalDeVolume, temEtiquetaDeMql, pedidoClassificador, mensagensParaIA, classificacaoReaproveitavel, type ClassificacaoGuardada,
 } from "./classificarLead"
 
 export type Cfg = {
@@ -55,7 +55,7 @@ export async function perguntarIA(cfg: Cfg, nome: string | null, texto: string, 
 export type Resultado = { classificacao: Classificacao; mudou: boolean; virouMql: boolean } | null
 
 // Classifica uma conversa. aplicar=false só devolve (o agente aplica do jeito dele); sempre marca a hora.
-export async function classificarConversa(jid: string, opts: { cfg?: Cfg; aplicar?: boolean; origem?: string; cache?: { cards?: { nomeCliente: string; coluna: number }[] } } = {}): Promise<Resultado> {
+export async function classificarConversa(jid: string, opts: { cfg?: Cfg; aplicar?: boolean; origem?: string; reusar?: boolean; cache?: { cards?: { nomeCliente: string; coluna: number }[] } } = {}): Promise<Resultado> {
   const cfg = opts.cfg ?? await lerCfg()
   let erro = ""
   const marcar = () => supabase.from("whatsapp_conversas").update({ ultima_classificacao_at: new Date().toISOString() }).eq("jid", jid)
@@ -70,6 +70,13 @@ export async function classificarConversa(jid: string, opts: { cfg?: Cfg; aplica
   const ms = mensagensParaIA(todas)
   const doCliente = ms.filter(m => !m.from_me).map(m => m.corpo ?? "")
   if (!doCliente.some(t => t.trim())) { await marcar(); return null }
+  // Chamada inline (reusar): se a classificação guardada já viu a última mensagem do cliente, não paga a IA de novo
+  const ultimaDoClienteTs = [...todas].reverse().find(m => !m.from_me)?.ts as string | undefined
+  if (opts.reusar && ultimaDoClienteTs) {
+    const { data: g } = await supabase.from("whatsapp_conversas").select("classificacao_guardada").eq("jid", jid).maybeSingle()
+    const guardada = classificacaoReaproveitavel((g as { classificacao_guardada?: unknown } | null)?.classificacao_guardada, ultimaDoClienteTs)
+    if (guardada) return { classificacao: guardada, mudou: false, virouMql: false }
+  }
   let bruto: Classificacao | null = null
   try { bruto = await perguntarIA(cfg, conv.nome, conversaParaIA(ms), opts.origem ?? "classificador-fundo") } catch (e) { erro = String(e).slice(0, 300) }
   if (!bruto) {
@@ -79,6 +86,11 @@ export async function classificarConversa(jid: string, opts: { cfg?: Cfg; aplica
   }
   const c = validarClassificacao(bruto, doCliente)
   await marcar()
+  // Guarda o resultado (coluna aditiva; se ainda não existir, só não guarda e o comportamento é o de sempre)
+  if (ultimaDoClienteTs) {
+    const guardada: ClassificacaoGuardada = { c, em: new Date().toISOString(), ate: ultimaDoClienteTs }
+    await Promise.resolve(supabase.from("whatsapp_conversas").update({ classificacao_guardada: guardada }).eq("jid", jid)).catch(() => null)
+  }
   if (opts.aplicar === false) return { classificacao: c, mudou: false, virouMql: false }
 
   // Você mexeu nas etiquetas desta conversa: o classificador só promove (nunca rebaixa o que você decidiu)
