@@ -21,6 +21,7 @@ const ESTADOS = ["pendente", "vinculada", "criada", "ignorada", "todas"]
 
 export const AJUDA_FINANCEIRO: Record<string, string> = {
   "?o=financeiro": "SÓ A CHAVE DO CFO (as outras recebem 403). Só leitura. Sem &parte devolve o resumo (a receber, a pagar, saldos, números do mês) e a lista das partes. Período opcional: &periodo=mes (padrão) | trimestre | semestre | ano | tudo, em America/Sao_Paulo",
+  "?o=financeiro&incluirEstornados=": "opcional, junto com qualquer parte: 1 | true | sim inclui nos cálculos os lançamentos desativados/estornados (estornadoEm preenchido); sem ele, ficam de fora de receber, pagar, gastos e margem. Outro valor: 400. A resposta traz incluirEstornados",
   "?o=financeiro&parte=receber": "contas a receber: pedidos com saldo, vencidos e lançamentos a conferir. De cliente, só nome e valores",
   "?o=financeiro&parte=pagar": "contas a pagar: despesas não pagas (fora a conta corrente de fornecedor), com flag de vencido",
   "?o=financeiro&parte=banco&estado=": "movimentos e conciliação do banco (pendente | vinculada | criada | ignorada | todas; padrão pendente), sem documento da contraparte",
@@ -163,17 +164,21 @@ export async function leituraFinanceira(params: URLSearchParams): Promise<Leitur
   if (!(PERIODOS as readonly string[]).includes(pn)) return { status: 400, corpo: { erro: `periodo: ${PERIODOS.join(" | ")}` } }
   const estado = params.get("estado") ?? "pendente"
   if (!ESTADOS.includes(estado)) return { status: 400, corpo: { erro: `estado: ${ESTADOS.join(" | ")}` } }
+  const ie = params.get("incluirEstornados")
+  if (ie !== null && !["1", "true", "sim"].includes(ie)) return { status: 400, corpo: { erro: "incluirEstornados: 1 | true | sim" } }
+  const incluirEstornados = ie !== null
   const per = intervalo(pn as PeriodoNome), hj = hoje()
   const periodo = { nome: pn, de: per.from ? per.from.toLocaleDateString("sv-SE") : null, ate: per.to ? per.to.toLocaleDateString("sv-SE") : null, fuso: "America/Sao_Paulo" }
   const d = await carregar()
+  if (!incluirEstornados) d.lancamentos = d.lancamentos.filter(l => !l.estornadoEm)
 
   if (!parte) {
     const rec = receber(d), pagar = contasPagar(d.lancamentos, hj), sal = saldos(d.cfg)
     const mes = financeiroDoAndar(d.kanban, d.lancamentos, sal.total, dia(hj))
-    return { status: 200, corpo: { hoje: hj, periodo, aReceber: { total: rec.aReceberTotal, vencido: rec.emAtrasoTotal }, aPagar: { total: pagar.total, vencido: pagar.vencido, quantidade: pagar.quantidade },
+    return { status: 200, corpo: { hoje: hj, periodo, incluirEstornados, aReceber: { total: rec.aReceberTotal, vencido: rec.emAtrasoTotal }, aPagar: { total: pagar.total, vencido: pagar.vencido, quantidade: pagar.quantidade },
       saldos: { total: sal.total, contas: sal.contas.length }, mes, partes: PARTES } }
   }
   const corpo = parte === "receber" ? receber(d) : parte === "pagar" ? contasPagar(d.lancamentos, hj) : parte === "banco" ? await banco(estado, per)
     : parte === "saldos" ? saldos(d.cfg) : parte === "gastos" ? gastos(d, per) : parte === "margem" ? await margem(d, per) : await depende(d)
-  return { status: 200, corpo: { parte, hoje: hj, periodo, ...corpo } }
+  return { status: 200, corpo: { parte, hoje: hj, periodo, incluirEstornados, ...corpo } }
 }

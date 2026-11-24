@@ -102,6 +102,30 @@ describe("?o=financeiro", () => {
     for (const p of PARTES) tudo += JSON.stringify(await (await ler(`o=financeiro&parte=${p}&periodo=tudo&estado=todas`)).json())
     for (const proibido of ["contraparte_doc", "123.456.789-00", "bruto", "11999990000", "a@cliente.com", "12.345.678", "telefone", "email", "cnpj", "SEGREDO"]) expect(tudo, proibido).not.toContain(proibido)
   })
+  it("estornados ficam fora dos totais por padrão e voltam com incluirEstornados", async () => {
+    const ls = estado.tabelas.LancamentoFinanceiro as Record<string, unknown>[]
+    ls.push({ id: "l7", tipo: "despesa", descricao: "Estornada", valor: 70, dataVencimento: "2026-10-12", status: "pendente", categoria: "materiais", estornadoEm: "2026-11-24T10:00:00Z", estornadoPor: "cfo", criadoEm: "x" })
+    ls.push({ id: "l8", tipo: "despesa", descricao: "Gasto estornado", valor: 55, dataVencimento: `${mes}-03`, dataPagamento: `${mes}-03`, status: "pago", categoria: "outros", estornadoEm: "2026-11-24T10:00:00Z", criadoEm: "x" })
+    ls.push({ id: "l9", tipo: "receita", descricao: "Receita estornada", valor: 900, dataVencimento: "2026-10-25", status: "pendente", cardId: "k1", cardNumero: "100", nomeCliente: "Cliente A", estornadoEm: "2026-11-24T10:00:00Z", criadoEm: "x" })
+    const j = await (await ler("o=financeiro")).json()
+    expect(j.incluirEstornados).toBe(false)
+    expect(j.aPagar).toMatchObject({ total: 250, quantidade: 1 }); expect(j.aReceber.total).toBe(600)
+    const pag = await (await ler("o=financeiro&parte=pagar")).json()
+    expect(pag.itens.map((i: { id: string }) => i.id)).toEqual(["l3"])
+    const gas = await (await ler("o=financeiro&parte=gastos")).json()
+    expect(gas.variaveis.total).toBe(30)
+    const rec = await (await ler("o=financeiro&parte=receber")).json()
+    expect(rec.pedidos[0].aReceber).toBe(600)
+    for (const v of ["1", "true", "sim"]) {
+      const k = await (await ler(`o=financeiro&incluirEstornados=${v}`)).json()
+      expect(k.incluirEstornados).toBe(true); expect(k.aPagar).toMatchObject({ total: 320, quantidade: 2 })
+    }
+    const pag2 = await (await ler("o=financeiro&parte=pagar&incluirEstornados=1")).json()
+    expect(pag2.incluirEstornados).toBe(true); expect(pag2.itens.map((i: { id: string }) => i.id).sort()).toEqual(["l3", "l7"])
+    expect((await (await ler("o=financeiro&parte=gastos&incluirEstornados=1")).json()).variaveis.total).toBe(85)
+    expect((await ler("o=financeiro&incluirEstornados=talvez")).status).toBe(400)
+    expect((await ler("o=financeiro&incluirEstornados=0")).status).toBe(400)
+  })
   it("nada é gravado", async () => {
     await ler("o=financeiro")
     for (const p of PARTES) await ler(`o=financeiro&parte=${p}`)
