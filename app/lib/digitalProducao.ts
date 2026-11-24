@@ -1,6 +1,7 @@
 // Porta externa (só leitura): pedidos digitais (DIG) em andamento para a leitura de produção.
 // Só dados operacionais: nada de telefone, e-mail, documento, jid ou endereço. Funções puras, nada é gravado.
-import { diasUteisEntre } from "./diasUteis"
+import { diasUteisEntre, somarDiasUteis } from "./diasUteis"
+import { prazoDigital } from "./prazoDigital"
 import { hojeBrasilia } from "./etapasProducao"
 
 const LIMITE = 7000
@@ -8,7 +9,7 @@ const STATUS = ["sinal_pago", "arte", "producao"] as const
 const ETAPAS = ["arte", "producao", "pronto", "enviado"] as const
 
 type PedidoDig = {
-  id: string; nome?: string | null; produto?: string | null; quantidade?: number; status: string
+  id: string; nome?: string | null; empresa?: string | null; briefing?: { marca?: string }; entregaPrevista?: string | null; produto?: string | null; quantidade?: number; status: string
   em?: string; sinalPagoEm?: string; arteEnviadaEm?: string; arteAprovadaEm?: string
   designerAvisadoEm?: string; villaEnviadoEm?: string; prontoEm?: string; statusEm?: string
 }
@@ -17,6 +18,7 @@ const CAMPOS_DATA = ["em", "sinalPagoEm", "arteEnviadaEm", "arteAprovadaEm", "de
 export type PedidoDigitalProducao = {
   id: string; cliente: string | null; produto: string | null; quantidade: number | null; status: string
   naEtapaDesde: string | null; diasUteisNaEtapa: number | null; faltam: string[]
+  numero: string; marca: string | null; entregaPrevista: string | null; arte: "pendente" | "enviada" | "aprovada"; arteEm: string | null
 } & Record<(typeof CAMPOS_DATA)[number], string | null>
 
 // Data (aaaa-mm-dd) em Brasília; data sem hora fica como veio
@@ -36,12 +38,17 @@ export function digitaisEmProducao(pedidos: PedidoDig[] | undefined, hoje = hoje
     const dias = d ? Math.max(0, diasUteisEntre(diaDe(d), hoje)) : null
     const faltam = ETAPAS.slice(Math.max(0, ETAPAS.indexOf(p.status as never))).filter(e => !(e === "pronto" && p.prontoEm))
     const datas = Object.fromEntries(CAMPOS_DATA.map(c => [c, p[c] ?? null])) as Record<(typeof CAMPOS_DATA)[number], string | null>
-    return { id: p.id, cliente: p.nome ?? null, produto: p.produto ?? null, quantidade: p.quantidade ?? null, status: p.status,
-      ...datas, naEtapaDesde: d, diasUteisNaEtapa: dias, faltam }
+    const arte = p.arteAprovadaEm ? "aprovada" : p.arteEnviadaEm ? "enviada" : "pendente"
+    const arteDia = p.arteAprovadaEm ?? p.arteEnviadaEm
+    // Entrega prevista: a gravada no pedido ou, com a arte aprovada, o prazo do digital (dias úteis) a partir da aprovação
+    const entrega = p.entregaPrevista ?? (p.arteAprovadaEm && p.quantidade ? somarDiasUteis(diaDe(p.arteAprovadaEm), prazoDigital(p.quantidade).max) : null)
+    return { id: p.id, numero: p.id, cliente: p.nome ?? null, marca: p.briefing?.marca?.trim() || p.empresa?.trim() || null, produto: p.produto ?? null, quantidade: p.quantidade ?? null, status: p.status,
+      ...datas, naEtapaDesde: d, diasUteisNaEtapa: dias, faltam, entregaPrevista: entrega, arte, arteEm: arteDia ? diaDe(arteDia) : null }
   })
 }
 
-/** Junta o bloco `digital` ao JSON da produção (offset), mantendo o total em até 7000 caracteres e sempre JSON válido. */
+/** Junta o bloco `digital` ao JSON da produção (offset). Nenhum pedido não cancelado fica de fora: se passar de 7000
+ *  caracteres, tira só as datas soltas (o essencial continua) e o limite deixa de valer para o bloco digital. */
 export function comDigital(jsonProducao: string, pedidos: PedidoDig[] | undefined, hoje = hojeBrasilia()): string {
   const lista = digitaisEmProducao(pedidos, hoje)
   if (!lista.length) return jsonProducao
@@ -50,13 +57,7 @@ export function comDigital(jsonProducao: string, pedidos: PedidoDig[] | undefine
   const monta = (digital: unknown) => JSON.stringify({ ...base, digital })
   const completo = monta({ pedidos: lista })
   if (completo.length <= LIMITE) return completo
-  // Resume: tira as datas soltas e depois corta pedidos (os parados há mais tempo ficam)
-  const enxutos = lista.map(p => ({ id: p.id, cliente: p.cliente, produto: p.produto, quantidade: p.quantidade, status: p.status, naEtapaDesde: p.naEtapaDesde, diasUteisNaEtapa: p.diasUteisNaEtapa, faltam: p.faltam }))
-    .sort((a, b) => (b.diasUteisNaEtapa ?? -1) - (a.diasUteisNaEtapa ?? -1))
-  const com = (n: number) => monta({ pedidos: enxutos.slice(0, n), omitidos: enxutos.length - n })
-  let n = enxutos.length
-  while (n > 0 && com(n).length > LIMITE) n--
-  if (n > 0) return com(n)
-  const resumo = monta({ total: lista.length, porStatus: Object.fromEntries(STATUS.map(s => [s, lista.filter(p => p.status === s).length])) })
-  return resumo.length <= LIMITE ? resumo : jsonProducao
+  const enxutos = lista.map(p => { const e: Record<string, unknown> = { ...p }; for (const c of CAMPOS_DATA) if (c !== "sinalPagoEm") delete e[c]; return e })
+    .sort((a, b) => ((b.diasUteisNaEtapa as number | null) ?? -1) - ((a.diasUteisNaEtapa as number | null) ?? -1))
+  return monta({ pedidos: enxutos })
 }
