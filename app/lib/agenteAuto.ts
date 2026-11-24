@@ -586,7 +586,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   // Chamado quando o atendimento viu bom negócio ou pequeno, ou o lead acabou de falar de volume.
   if (r.lead.perfil !== "nao_lead" && !conversa.clienteCadastrado && (ehQualificado(r.lead.perfil) || r.lead.perfil === "pequeno"
     || temSinalDeVolume(conversa.mensagens.filter(m => !m.from_me).slice(-3).map(m => m.corpo)))) {
-    const cl = await import("./classificarLeadServidor").then(m => m.classificarConversa(jid, { aplicar: false })).catch(() => null)
+    const cl = await import("./classificarLeadServidor").then(m => m.classificarConversa(jid, { aplicar: false, origem: "classificador-inline" })).catch(() => null)
     if (cl) r.lead = { ...r.lead, perfil: cl.classificacao.perfil, quantidade_total: cl.classificacao.quantidade_total, motivo: cl.classificacao.motivo }
   }
 

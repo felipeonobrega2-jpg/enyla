@@ -27,20 +27,36 @@ export function custoUsd(modelo: string, u: UsoIA): number {
   return usd / 1_000_000
 }
 
+// Tokens por tipo (campos opcionais: dia antigo sem eles continua lendo)
+export type TokensIA = { entrada: number; cacheLido: number; cacheGravado: number; saida: number }
+export type GastoOrigem = { usd: number; chamadas: number } & Partial<TokensIA>
+
+// Tokens de uma chamada por tipo (cache gravado soma 5 min e 1 h)
+export function tokensDoUso(u: UsoIA): TokensIA {
+  return { entrada: u.input_tokens ?? 0, cacheLido: u.cache_read_input_tokens ?? 0, cacheGravado: u.cache_creation_input_tokens ?? 0, saida: u.output_tokens ?? 0 }
+}
+
 // Gasto da IA por dia (São Paulo): { "2026-11-06": { usd, chamadas } }
-export type GastoDia = { usd: number; chamadas: number; por?: Record<string, { usd: number; chamadas: number }> }
+export type GastoDia = { usd: number; chamadas: number; por?: Record<string, GastoOrigem> }
 export const diaSP = (d = new Date()) => d.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
 
-// "origem": quem gastou (atendente, classificador, aprendizado...), para saber onde está o custo. O detalhe por origem
-// fica só nos últimos 14 dias (o AppConfig não cresce); o total do dia fica 90 dias.
-export function somarUso(dias: Record<string, GastoDia>, dia: string, usd: number, manterDias = 90, origem?: string): Record<string, GastoDia> {
+export const DIAS_DETALHE_ORIGEM = 30
+
+// "origem": quem gastou (atendente, classificador-fundo, aprendizado...), para saber onde está o custo. O detalhe por
+// origem (US$, chamadas e tokens por tipo) fica só nos últimos 30 dias (o AppConfig não cresce); o total do dia fica 90.
+export function somarUso(dias: Record<string, GastoDia>, dia: string, usd: number, manterDias = 90, origem?: string, tokens?: Partial<TokensIA>): Record<string, GastoDia> {
   const atual = dias[dia] ?? { usd: 0, chamadas: 0 }
   const por = { ...(atual.por ?? {}) }
-  if (origem) { const o = por[origem] ?? { usd: 0, chamadas: 0 }; por[origem] = { usd: o.usd + usd, chamadas: o.chamadas + 1 } }
+  if (origem) {
+    const o = por[origem] ?? { usd: 0, chamadas: 0 }
+    const novo: GastoOrigem = { ...o, usd: o.usd + usd, chamadas: o.chamadas + 1 }
+    if (tokens) for (const k of ["entrada", "cacheLido", "cacheGravado", "saida"] as const) novo[k] = (o[k] ?? 0) + (tokens[k] ?? 0)
+    por[origem] = novo
+  }
   const novo: Record<string, GastoDia> = { ...dias, [dia]: { usd: atual.usd + usd, chamadas: atual.chamadas + 1, ...(Object.keys(por).length ? { por } : {}) } }
   const ordem = Object.keys(novo).sort()
   for (const k of ordem.slice(0, Math.max(0, ordem.length - manterDias))) delete novo[k]
-  for (const k of ordem.slice(0, Math.max(0, ordem.length - 14))) if (novo[k]?.por) { const resto = { ...novo[k] }; delete resto.por; novo[k] = resto }
+  for (const k of ordem.slice(0, Math.max(0, ordem.length - DIAS_DETALHE_ORIGEM))) if (novo[k]?.por) { const resto = { ...novo[k] }; delete resto.por; novo[k] = resto }
   return novo
 }
 
