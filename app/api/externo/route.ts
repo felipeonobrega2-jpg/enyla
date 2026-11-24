@@ -13,6 +13,7 @@ import { categoria } from "@/app/lib/categoriaExterna"
 import { leituraFinanceira, AJUDA_FINANCEIRO } from "@/app/lib/financeiroExterno"
 import { leituraMetaAds, ErroMeta } from "@/app/lib/metaAdsLeitura"
 import { acaoMetaAds } from "@/app/lib/metaAdsAcoes"
+import { ehComercial, podeAcionarComercial, comerciaisDoDiretor } from "@/app/lib/ordemComercial"
 
 // Porta de acesso dos diretores na nuvem (ex.: Grok Bot). Pública no proxy, mas cada chamada exige a chave do diretor
 // (Authorization: Bearer enyla_<diretor>_...). Leitura da empresa e as mesmas ferramentas da conversa com o Felipe;
@@ -48,6 +49,7 @@ export async function GET(req: NextRequest) {
         "POST {acao:'conciliacao', operacao:'vincular'|'vincularVarios'|'atualizar'|'criar'|'ignorar'|'desfazer', txId, lancamentoId, lancamentoIds, campos, lancamentos, sempre, ensinar}": "SÓ A CHAVE DO CFO. Decide um movimento de banco_transacoes (txId): vincular a um lançamento, vincularVarios, atualizar (baixa no lançamento com campos), criar lançamentos ou ignorar. desfazer é lógico: estorna os lançamentos criados (nada é apagado) e devolve a transação a pendente. Sem contraparte_doc nem bruto na resposta. Resposta: { ok, resultado, tx, lancamentos }",
         "POST {acao:'categoria', operacao:'criar'|'editar'|'desativar', tipo:'receita'|'despesa', id, nome, subcategorias, ativa}": "SÓ A CHAVE DO CFO. Categorias financeiras. criar exige nome; editar e desativar exigem id. Desativar só põe ativa:false, a categoria continua na lista. Resposta: { ok, resultado, categoria }",
       } : {}),
+      ...(comerciaisDoDiretor(diretor).length ? { "POST {acao:'ordenar_funcionario', funcionario:'atendente'|'followup'|'reativacao', cliente | jid, ordem}": "SÓ CCO e CMO (as outras recebem 403). O agente do Comercial escreve a mensagem para UM lead com o histórico do WhatsApp; ela fica esperando o Aprovo do Felipe (nada é enviado por aqui). Lead sem WhatsApp: 404. No máximo 20 ordens esperando o Aprovo por diretor: a 21ª volta 429" } : {}),
       ...Object.fromEntries(FERRAMENTAS.map(f => [`POST {acao:'${f}', ...}`, "ferramenta (ver instruções)"])) },
     limitePorHora: LIMITE_POR_HORA,
   })
@@ -113,7 +115,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       numerosDe: hora(foto.em), norte: foto.norte, suaArea: meu, detalheDaSuaArea: foto.detalhes[MINHA_AREA[diretor]] ?? "",
       seuPlano: planos[diretor] ?? null, oQueOFelipeEnsinou: licoes, equipe: foto.equipe, ferramentasDoSistema: foto.ferramentasTxt,
-      resultados: foto.resultados, cultura: foto.cultura, funcionarios: foto.exec.map(f => ({ id: f.id, nome: f.nome })),
+      resultados: foto.resultados, cultura: foto.cultura, funcionarios: [...foto.exec, ...comerciaisDoDiretor(diretor)].map(f => ({ id: f.id, nome: f.nome })),
       outrasAreas: blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")),
     })
   }
@@ -154,10 +156,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(r.corpo, { status: r.status })
   } else if (FERRAMENTAS.includes(b.acao)) {
     const { apiKey } = await lerCampos<{ apiKey?: string }>(["apiKey"])
+    if (b.acao === "ordenar_funcionario" && ehComercial(b.funcionario) && !podeAcionarComercial(diretor)) return NextResponse.json({ erro: `${b.funcionario} só atende ordens da CCO e da CMO.` }, { status: 403 })
     if (b.acao === "ordenar_funcionario" && !apiKey) return NextResponse.json({ erro: "Sem chave da IA no sistema." }, { status: 503 })
     const r = await executarFerramenta(diretor, b.acao, b, { ctx: await fotoRapida(), apiKey: apiKey ?? "", grava: true })
     saida = r.saida
-    if (!r.acao) return NextResponse.json({ ok: false, resultado: saida }, { status: 400 })
+    if (!r.acao) return NextResponse.json({ ok: false, resultado: saida }, { status: r.status ?? 400 })
     msg = { id: novoId(), de: "diretor", texto: texto || saida, em: new Date().toISOString(), acoes: [r.acao], nuvem: true }
   } else return NextResponse.json({ erro: `acao: relatar, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
   await gravarConversa(diretor, [...await lerConversa(diretor), msg])
