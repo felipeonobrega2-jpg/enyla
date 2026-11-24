@@ -30,10 +30,14 @@ const UN_LAM = "3.000 folhas 48×44 cm (633,6 m²)"
 // Valor inicial; o que estiver salvo na config (AppConfig.cenariosParceiros) sobrescreve.
 // Impressão (offset e digital) não tem cenário: cobra acerto + milheiro.
 export const CENARIOS_PADRAO: CenarioParceiro[] = [
-  c("laminacao-fosca", "laminacao", `${FOLHAS}, laminação fosca só na frente (um lado).`, UN_LAM, [{ preco: 765.28, fornecedorNome: "Ronaldo Osasco" }]), // regra do Ronaldo: R$ 100 + R$ 1,05 × 633,6 m²
+  // Fosca: 765,28 vem do sistema (consultado em 24/11/2026, só leitura): AppConfig.producao.fornecedores, Ronaldo Osasco
+  // (id mvvo9p0rkpa4), servicos.laminacao = por_m2, acerto 100, precosPorTipo.Fosca 1,05. Em app/lib/producao.ts,
+  // `cobrar` (por_m2) devolve acerto + v * m2 = 100 + 1,05 × 633,6 = 765,28. Brilho, soft e dois lados não têm preço cadastrado.
+  c("laminacao-fosca", "laminacao", `${FOLHAS}, laminação fosca só na frente (um lado).`, UN_LAM, [{ preco: 765.28, fornecedorNome: "Ronaldo Osasco" }]),
   c("laminacao-brilho", "laminacao", `${FOLHAS}, laminação brilho só na frente (um lado).`, UN_LAM),
   c("laminacao-soft", "laminacao", `${FOLHAS}, laminação soft touch só na frente (um lado).`, UN_LAM),
   c("laminacao-dois-lados", "laminacao", `${FOLHAS}, laminação nos dois lados.`, UN_LAM),
+  // Verniz UV total: R$ 450,00 é o valor confirmado pelo Felipe para este exemplo (não o do motor).
   c("verniz", "verniz", `${FOLHAS}, verniz UV total só na frente.`, UN_FOLHAS, [{ preco: 450, fornecedorNome: "Ronaldo Osasco" }]),
   c("hotStamping", "hotStamping", `${FOLHAS}, hot stamping dourado, uma área de gravação, clichê fornecido pela ENYLA (informe só o preço da estampagem).`, UN_FOLHAS, [{ preco: 1387.5, fornecedorNome: "Guilherme" }]),
   c("relevo", "relevo", `${FOLHAS}, relevo seco, uma área, clichê fornecido pela ENYLA.`, UN_FOLHAS),

@@ -1,5 +1,6 @@
 "use client"
 
+import { MarcarLead, marcarLead } from "./MarcarLead"
 import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag, ChevronRight, Reply, Keyboard, Sparkles, Laptop, Smartphone, Trash2, Square, Merge, Search, Star } from "lucide-react"
 import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect, useSyncExternalStore } from "react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
@@ -551,6 +552,7 @@ export default function WhatsAppView({
                 <Star className="w-4 h-4" fill={perto.has(ativa.jid) ? "currentColor" : "none"} />{perto.has(ativa.jid) ? "Perto" : "Pôr perto"}
               </button>
               <ProximoPasso key={ativa.jid} jid={ativa.jid} rotulo="Próximo passo" />
+              <MarcarLead jid={ativa.jid} />
               <button onClick={() => alterar([ativa.jid], { fechar: !estaFechada(ativa) })} title={estaFechada(ativa) ? "Reabrir conversa" : "Fechar conversa (volta sozinha se o cliente escrever)"}
                 className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-2 rounded-xl transition-colors hover:bg-black/5" style={{ color: "var(--text-sub)" }}>
                 <Archive className="w-4 h-4" />{estaFechada(ativa) ? "Reabrir" : "Fechar"}
@@ -1244,6 +1246,8 @@ export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover
                         <span className="hidden group-hover:flex wa-acoes absolute top-2 right-2 items-center gap-0.5 rounded-lg shadow-sm" style={{ background: "var(--bg-surface)" }} onClick={ev => ev.stopPropagation()}>
                           <button title="Responder sem abrir" onClick={ev => esp.espiar(c, ev.currentTarget.closest("[data-linha]") as HTMLElement, true)}
                             className="w-7 h-7 rounded-lg grid place-items-center hover:bg-[#25a35a]/15 text-[#1d8a4b]"><Reply className="w-4 h-4" /></button>
+                          <button title="Marcar perdido (com motivo)" onClick={() => { esp.fechar(); void marcarLead(c.jid, "perdido") }}
+                            className="h-7 px-1.5 rounded-lg text-[11px] font-semibold hover:bg-black/5" style={{ color: "var(--text-sub)" }}>Perdido</button>
                           {onFechar && <button title="Fechar conversa" onClick={() => { esp.fechar(); onFechar([c.jid]) }}
                             className="w-7 h-7 rounded-lg grid place-items-center hover:bg-black/5" style={{ color: "var(--text-sub)" }}><Archive className="w-4 h-4" /></button>}
                         </span>

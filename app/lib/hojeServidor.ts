@@ -17,12 +17,55 @@ import { notificar, LINK_SISTEMA } from "./notificar"
 import { dentroDoHorario } from "./agenteLeads"
 import { evo } from "./evolution"
 import { estadoDoMql, resumirMeta, DIAS_META, MsgMeta, Momento } from "./metaMql"
+import { orcadoPeloFelipe } from "./orcadoPeloFelipe"
+import { perdidoAtivo, orcadoManualAtivo, type EstadoLead } from "./leadEstado"
+import { lerEstadosLead } from "./leadEstadoServidor"
+import { lerIdsAgente } from "./registroAgente"
 import { ligarConversasAosOrcamentos, paraResolver } from "./resolverServidor"
 
 // O "momento" da última leitura da IA (de quem é a vez); conversa lida antes disso não tem
 const momentoDaConversa = (pa: string | null | undefined): Momento | null => { try { return (JSON.parse(pa ?? "") as { r?: { momento?: Momento } }).r?.momento ?? null } catch { return null } }
 import type { ItemMeta } from "./hoje"
 import type { PerfilCaixa } from "./caixaEntrada"
+
+// O que sabemos de um lead além das regras de sempre: perdido com motivo (manual) e orçado pelo Felipe (detectado nas
+// mensagens ou marcado à mão). Lê as mensagens no máximo uma vez por conversa em cada montagem.
+type Marca = { orcadoPeloFelipe?: NonNullable<ItemHoje["orcadoPeloFelipe"]>; perdido?: NonNullable<ItemHoje["perdido"]> }
+function criarMarcador(convs: ConvHoje[], estados: Map<string, EstadoLead>, idsAgente: Set<string>) {
+  const porJid = new Map(convs.map(c => [c.jid, c]))
+  const cache = new Map<string, Promise<Marca>>()
+  return (jid: string) => {
+    let p = cache.get(jid)
+    if (!p) {
+      p = (async () => {
+        const recebida = porJid.get(jid)?.ultima_recebida_at
+        const est = estados.get(jid)
+        const perdido = perdidoAtivo(est, recebida)
+        if (perdido) return { perdido: { motivo: perdido.motivo ?? "", por: perdido.por, em: perdido.em } }
+        const manual = orcadoManualAtivo(est, recebida)
+        if (manual) return { orcadoPeloFelipe: { em: manual.em, evidencia: manual.motivo ?? "marcado à mão", manual: true } }
+        const { data } = await supabase.from("whatsapp_mensagens").select("id, from_me, tipo, ts, corpo").eq("jid", jid).order("ts", { ascending: false }).limit(120)
+        const o = orcadoPeloFelipe((data ?? []) as never, idsAgente)
+        return o.orcado && o.em ? { orcadoPeloFelipe: { em: o.em, evidencia: o.evidencia } } : {}
+      })().catch(() => ({}))
+      cache.set(jid, p)
+    }
+    return p
+  }
+}
+type Marcador = ReturnType<typeof criarMarcador>
+
+// Sai da fila quem foi perdido, ou foi orçado pelo Felipe e o lead não escreveu depois
+const saiDaFila = (m: Marca, recebida: string | null | undefined) => !!m.perdido || (!!m.orcadoPeloFelipe && !(recebida && recebida > m.orcadoPeloFelipe.em))
+
+async function descontar(itens: ItemHoje[], marcar: Marcador, recebidaDe: Map<string, string | null>) {
+  const out: ItemHoje[] = []
+  for (let i = 0; i < itens.length; i += 10) {
+    const lote = await Promise.all(itens.slice(i, i + 10).map(async x => ({ x, m: await marcar(x.jid) })))
+    for (const { x, m } of lote) if (!saiDaFila(m, recebidaDe.get(x.jid))) out.push({ ...x, ...m })
+  }
+  return out
+}
 
 export async function montarHoje(): Promise<Hoje> {
   const desde = new Date(Date.now() - DIAS_PERDIDO * 86_400_000).toISOString()
@@ -33,15 +76,24 @@ export async function montarHoje(): Promise<Hoje> {
       .not("jid", "like", "%@g.us").gte("ultima_at", desde).order("ultima_at", { ascending: false }).limit(1500),
   ])
   if (error) throw new Error(error.message)
-  const convs = (data ?? []) as ConvHoje[]
-  const { responder, retomar, outros } = quemResponder(convs, cfg.agenteMarcos ?? marcosDoRegistro(cfg.agenteLog ?? []), Date.now(), cfg.vinculosWhatsapp, cfg.proximosPassos)
-  const orcar = await orcamentosParaFazer(convs, cfg.proximosPassos ?? {}, cfg.vinculosWhatsapp ?? {})
+  const todas = (data ?? []) as ConvHoje[]
+  const [estados, idsReg] = await Promise.all([lerEstadosLead().catch(() => new Map<string, EstadoLead>()), lerIdsAgente().catch(() => null)])
+  const idsAgente = new Set(idsReg ?? (cfg as { agenteIds?: string[] }).agenteIds ?? [])
+  const marcar = criarMarcador(todas, estados, idsAgente)
+  const recebidaDe = new Map(todas.map(c => [c.jid, c.ultima_recebida_at]))
+  // Perdido com motivo e orçado à mão saem de esperando/orçar/meta (voltam sozinhos quando o lead escreve de novo)
+  const convs = todas.filter(c => !perdidoAtivo(estados.get(c.jid), c.ultima_recebida_at) && !orcadoManualAtivo(estados.get(c.jid), c.ultima_recebida_at))
+  const q = quemResponder(convs, cfg.agenteMarcos ?? marcosDoRegistro(cfg.agenteLog ?? []), Date.now(), cfg.vinculosWhatsapp, cfg.proximosPassos)
+  const outros = q.outros
+  const responder = await descontar(q.responder, marcar, recebidaDe), retomar = await descontar(q.retomar, marcar, recebidaDe)
+  const orcar = await orcamentosParaFazer(convs, cfg.proximosPassos ?? {}, cfg.vinculosWhatsapp ?? {}, marcar)
   const devendo = new Set(orcar.map(x => x.jid))
   const rel = (cfg.marketingRelatorios ?? [])[0]
   const t = rel ? total(rel.dia1) : null
   const auto = cfg.reativacaoAuto ?? { ligado: false, porDia: POR_DIA_PADRAO }
   const fila = await candidatos(cfg).catch(() => [])
-  const meta = await metaDoMql(convs, cfg.proximosPassos ?? {}, cfg.vinculosWhatsapp ?? {}, devendo).catch(() => undefined)
+  const foraDoMql = new Set([...devendo, ...convs.length < todas.length ? todas.filter(c => !convs.includes(c)).map(c => c.jid) : []])
+  const meta = await metaDoMql(todas.filter(c => !perdidoAtivo(estados.get(c.jid), c.ultima_recebida_at)), cfg.proximosPassos ?? {}, cfg.vinculosWhatsapp ?? {}, foraDoMql).catch(() => undefined)
   const gastos = await gastosAtuais().then(g => ({ alertas: g.alertas, totalDia: g.totalDia })).catch(() => undefined)
   // Liga conversa ↔ orçamento (no máximo a cada 10 min) e monta o "Para resolver agora"
   const c2 = cfg as typeof cfg & { ligacoesEm?: string }
@@ -52,7 +104,7 @@ export async function montarHoje(): Promise<Hoje> {
   const resolver = await paraResolver(cfg as never).catch(e => { console.error("[resolver]", e); return undefined })
   const perfis = await perfisDasConversas(convs, [...orcar, ...responder, ...retomar, ...(meta?.travados ?? []), ...(resolver ?? [])].map(x => x.jid))
   return {
-    gastos, meta, resolver, perfis, cards: await conversasDosCards(),
+    leadsMarcados: await marcados(todas, marcar), gastos, meta, resolver, perfis, cards: await conversasDosCards(),
     orcar, responder: responder.filter(x => !devendo.has(x.jid)), retomar: retomar.filter(x => !devendo.has(x.jid)), outrosEsperando: outros, anuncio: doAnuncio(convs),
     marketing: rel?.leitura?.acao ? { dia: rel.dia, acao: rel.leitura.acao, custoMql: t ? custoPor(t.gasto, t.mql) : null } : null,
     reativacao: {
@@ -93,7 +145,17 @@ async function conversasDosCards(): Promise<Record<string, { jid: string; perfil
 }
 
 // Quem passou tudo para cotar e ainda não recebeu: sem PDF/documento seu e sem orçamento no sistema depois da última dele
-async function orcamentosParaFazer(convs: ConvHoje[], passos: Passos, vinculos: Record<string, string>): Promise<ItemHoje[]> {
+async function marcados(convs: ConvHoje[], marcar: Marcador) {
+  const out: NonNullable<Hoje["leadsMarcados"]> = []
+  const recentes = convs.filter(c => c.ultima_recebida_at && Date.now() - new Date(c.ultima_recebida_at).getTime() < 7 * 86_400_000).slice(0, 80)
+  for (let i = 0; i < recentes.length; i += 10) {
+    const lote = await Promise.all(recentes.slice(i, i + 10).map(async c => ({ c, m: await marcar(c.jid) })))
+    for (const { c, m } of lote) if (m.perdido || m.orcadoPeloFelipe) out.push({ jid: c.jid, nome: c.nome, ...m })
+  }
+  return out
+}
+
+async function orcamentosParaFazer(convs: ConvHoje[], passos: Passos, vinculos: Record<string, string>, marcar?: Marcador): Promise<ItemHoje[]> {
   const marcados = new Set(Object.entries(passos).filter(([, p]) => p.tipo === "orcar").map(([j]) => j))
   const pre = convs.filter(c => marcados.has(c.jid) || (etapaDaConversa(c.proxima_acao) === "orcamento" && qualidadeDoLead(c) === "mql" && (momentoDaConversa(c.proxima_acao) ?? "agora") === "agora" && c.ultima_recebida_at
     && Date.now() - new Date(c.ultima_recebida_at).getTime() < 7 * 86_400_000)).slice(0, 60)
@@ -106,6 +168,7 @@ async function orcamentosParaFazer(convs: ConvHoje[], passos: Passos, vinculos: 
     const marcado = p?.tipo === "orcar"
     const desde = marcado ? p.em : c.ultima_recebida_at
     if (!desde) return
+    if (marcar) { const m = await marcar(c.jid); if (saiDaFila(m, c.ultima_recebida_at)) return }   // perdido ou já orçado pelo Felipe: não é mais seu
     const { count } = await supabase.from("whatsapp_mensagens").select("id", { count: "exact", head: true })
       .eq("jid", c.jid).eq("from_me", true).in("tipo", ["document", "documentMessage", "documentWithCaptionMessage"]).gt("ts", desde)
     const cli = vinculos[c.jid]

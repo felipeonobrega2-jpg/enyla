@@ -13,6 +13,7 @@ import { nomeChave } from "./negocio"
 import { COL_FECHADO, COL_ENTREGUE } from "../types"
 import { filtroEfetivo } from "./agenteLeads"
 import { montarHoje } from "./hojeServidor"
+import { dadosDaConversa } from "./hoje"
 import { mudarConfig } from "./configAtomica"
 import {
   LinhaCampanha, Periodo, Relatorio, SEM_CAMPANHA, campanhaPeloGasto, linhaVazia, qualidadeDoLead, periodos, dentro, diaSP, somarDias,
@@ -55,12 +56,12 @@ async function daMeta(cfg: Cfg, p: Periodo): Promise<Map<string, LinhaCampanha>>
   return out
 }
 
-type Lead = { jid: string; campanhaId: string; campanhaNome: string; entrada: string; qualidade: ReturnType<typeof qualidadeDoLead>; orcamentos: number; pedidos: number; faturamento: number }
+export type Lead = { jid: string; campanhaId: string; campanhaNome: string; entrada: string; qualidade: ReturnType<typeof qualidadeDoLead>; orcamentos: number; pedidos: number; faturamento: number; informouVolume?: boolean }
 
 // Leads do anúncio (com a data em que chegaram) e o que aconteceu com cada um: orçamento, pedido
-async function leadsDoAnuncio(cfg: Cfg): Promise<Lead[]> {
+export async function leadsDoAnuncio(cfg: Cfg): Promise<Lead[]> {
   const [{ data: convs }, { data: cards }] = await Promise.all([
-    supabase.from("whatsapp_conversas").select("jid, nome, criado_em, campanha, status_lead, etiquetas").ilike("campanha", "%anuncio%"),
+    supabase.from("whatsapp_conversas").select("jid, nome, criado_em, campanha, status_lead, etiquetas, proxima_acao").ilike("campanha", "%anuncio%"),
     supabase.from("KanbanCard").select("nomeCliente, coluna, preco, createdAt"),
   ])
   const nomes = [...new Set((cards ?? []).map(c => c.nomeCliente).filter(Boolean))] as string[]
@@ -77,7 +78,7 @@ async function leadsDoAnuncio(cfg: Cfg): Promise<Lead[]> {
     const fechados = doCliente.filter(k => k.coluna >= COL_FECHADO && k.coluna <= COL_ENTREGUE)
     out.push({
       jid: c.jid, campanhaId: o.campanhaId ?? SEM_CAMPANHA, campanhaNome: o.campanhaNome ?? "Anúncio (campanha a identificar)", entrada,
-      qualidade: qualidadeDoLead(c), orcamentos: doCliente.length, pedidos: fechados.length, faturamento: fechados.reduce((s, k) => s + (Number(k.preco) || 0), 0),
+      qualidade: qualidadeDoLead(c), informouVolume: (dadosDaConversa(c.proxima_acao)?.quantidade ?? 0) > 0, orcamentos: doCliente.length, pedidos: fechados.length, faturamento: fechados.reduce((s, k) => s + (Number(k.preco) || 0), 0),
     })
   }
   return out
