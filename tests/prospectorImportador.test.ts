@@ -43,7 +43,7 @@ vi.mock("@/app/lib/supabase", () => {
 })
 
 import { candidatoDaLinha, decidirGravacao, montarProspecto, type LinhaProspecto } from "@/app/lib/prospectorImportador"
-import { importar } from "@/app/lib/prospectorImportadorServidor"
+import { importar, urlArquivo, AUTH_RECEITA } from "@/app/lib/prospectorImportadorServidor"
 import { GET } from "@/app/api/prospector/importar/route"
 import { NextRequest } from "next/server"
 
@@ -145,16 +145,63 @@ describe("importar", () => {
     const r3 = await importar({ fetch: f, maxCnpjs: 100 })
     expect(r3.cursor).toMatchObject({ arquivo: 1, offset: 0 })
   })
-  it("se a BrasilAPI falha (429), o cursor não passa do CNPJ que falhou", async () => {
-    const r = await importar({ fetch: fetchFalso(csv, () => new Response("", { status: 429 })), maxCnpjs: 100 })
-    expect(r.inseridos).toBe(0)
-    expect(r.cursor?.offset).toBe(0)
+  it.each([403, 429, 500])("BrasilAPI %i: grava com os dados do arquivo e avança o cursor", async status => {
+    const f = fetchFalso(csv, () => new Response("", { status }))
+    const r = await importar({ fetch: f, maxCnpjs: 100, pausaMs: 0 })
+    expect(r).toMatchObject({ ok: true, inseridos: 2, falhasCadastro: 2, semCadastro: 0 })
+    expect(estado.tabela[0]).toMatchObject({ cnpj: "11111111000111", razao_social: "", fonte: expect.any(String) })
+    expect(r.cursor).toMatchObject({ arquivo: 1, offset: 0 })   // avançou para o próximo arquivo
+    const chamadas = urls.filter(u => u.includes("brasilapi")).length
+    expect(chamadas).toBe(status === 403 ? 2 : 6)   // 403 não repete; 429/5xx repetem até 3 vezes
+  })
+  it("erro de rede na BrasilAPI também grava com os dados do arquivo", async () => {
+    const f = vi.fn(async (u: string | URL | Request) => {
+      if (String(u).includes("receitafederal")) return new Response(new Uint8Array(zip(csv)), { status: 200 })
+      throw new Error("rede")
+    }) as unknown as typeof fetch
+    const r = await importar({ fetch: f, maxCnpjs: 100, pausaMs: 0 })
+    expect(r).toMatchObject({ ok: true, inseridos: 2, falhasCadastro: 2 })
+  })
+  it("404 continua semCadastro e não grava", async () => {
+    const r = await importar({ fetch: fetchFalso(csv, () => new Response("", { status: 404 })), maxCnpjs: 100, pausaMs: 0 })
+    expect(r).toMatchObject({ ok: true, inseridos: 0, semCadastro: 2, falhasCadastro: 0 })
+    expect(estado.tabela).toHaveLength(0)
+  })
+  it("linha parcial não apaga a razão social de quem já existe", async () => {
+    estado.tabela = [{ id: 1, cnpj: "11111111000111", etapa: "encontrado", opt_out: false, razao_social: "GRAFICA ANTIGA LTDA", porte: "03", historico_etapas: [] }]
+    await importar({ fetch: fetchFalso(csv, () => new Response("", { status: 500 })), maxCnpjs: 100, pausaMs: 0 })
+    expect(estado.tabela[0]).toMatchObject({ razao_social: "GRAFICA ANTIGA LTDA", porte: "03" })
   })
   it("nada é enviado: só leitura na Receita e na BrasilAPI", async () => {
     await importar({ fetch: fetchFalso(csv), maxCnpjs: 100 })
     expect(urls.length).toBeGreaterThan(0)
     expect(urls.every(u => /^https:\/\/(arquivos\.receitafederal\.gov\.br|brasilapi\.com\.br)\//.test(u))).toBe(true)
     expect(enviar.evo).not.toHaveBeenCalled(); expect(enviar.notificar).not.toHaveBeenCalled(); expect(enviar.email).not.toHaveBeenCalled()
+  })
+})
+
+describe("endereço da Receita (WebDAV público)", () => {
+  beforeEach(() => { estado.cfg = {}; estado.tabela = []; estado.seq = 1; vi.clearAllMocks() })
+  it("monta a URL e o header Basic com o token e senha vazia", () => {
+    expect(urlArquivo("2026-11", 3)).toBe("https://arquivos.receitafederal.gov.br/public.php/webdav/2026-11/Estabelecimentos3.zip")
+    expect(AUTH_RECEITA).toBe("Basic " + Buffer.from("YggdBLfdninEJX9:").toString("base64"))
+  })
+  it("envia o header e cai para o mês anterior no 404; 502 vem com o status da Receita", async () => {
+    const chamadas: { url: string; auth: string | null }[] = []
+    const f404 = (ok: boolean) => vi.fn(async (u: string | URL | Request, init?: RequestInit) => {
+      const url = String(u)
+      chamadas.push({ url, auth: new Headers(init?.headers).get("authorization") })
+      if (url.includes("/2026-11/") || !ok) return new Response("", { status: 404 })
+      return new Response(new Uint8Array(zip("")), { status: 200 })
+    }) as unknown as typeof fetch
+    const agora = () => new Date("2026-11-24T12:00:00Z")
+    const r = await importar({ fetch: f404(true), agora, maxCnpjs: 10 })
+    expect(r.ok).toBe(true)
+    expect(chamadas.map(c => c.url)).toEqual([urlArquivo("2026-11", 0), urlArquivo("2026-10", 0)])
+    expect(chamadas.every(c => c.auth === AUTH_RECEITA)).toBe(true)
+    estado.cfg = {}
+    const r2 = await importar({ fetch: f404(false), agora, maxCnpjs: 10 })
+    expect(r2).toMatchObject({ ok: false, erro: "Receita respondeu 404" })
   })
 })
 
