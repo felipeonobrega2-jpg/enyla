@@ -1,6 +1,7 @@
 // "Precisa de você": o que pede ação agora, em ordem de urgência.
 // Fonte única para o Painel (computador) e para o celular.
 
+import type { MapaSegurados } from "./pedidoSegurado"
 import { KanbanCard, LancamentoFinanceiro, PropostaCustom, Cliente, FormData, COL_FECHADO, COL_EXPEDICAO, COL_PERDIDO, COL_HOT } from "../types"
 import { Configuracoes } from "../config"
 import { Pedido, producao, recebiveis, pedidoEntregue, isTerceirizado, parseData, diasAte, nomeChave } from "./negocio"
@@ -62,11 +63,12 @@ export function pendencias(args: {
   clientes: Cliente[]
   config: Configuracoes
   hoje?: Date
+  segurados?: MapaSegurados   // pedidos aguardando pagamento do cliente: não geram "atrasado"
 }): Pendencia[] {
   const { pedidos, kanban, lancamentos, historico, propostasCustom, clientes, config } = args
   const hoje = args.hoje ?? new Date()
   const hojeIso = hoje.toLocaleDateString("sv-SE")
-  const prod = producao(pedidos, hoje)
+  const prod = producao(pedidos, hoje, args.segurados)
   const rec = recebiveis(pedidos, lancamentos)
   const telefoneDe = (nome: string) => clientes.find(c => nomeChave(c.nome) === nomeChave(nome))?.telefone
 

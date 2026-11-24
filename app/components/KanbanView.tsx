@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Flame, X, ChevronDown } from "lucide-react"
+import { Flame, X, ChevronDown, PauseCircle, PlayCircle } from "lucide-react"
+import { estaSegurado, textoSegurado, type MapaSegurados } from "../lib/pedidoSegurado"
 import { KanbanCard, KanbanOpcao, Lote, LancamentoFinanceiro, NegocioParceiro, StatusLoteParceiro, COLUNAS_KANBAN, COL_FECHADO, COL_EXPEDICAO, COL_ENTREGUE, COL_PERDIDO, COL_HOT } from "../types"
 import { brl, num } from "../utils"
 import { COL_COLORS } from "./kanban-colors"
@@ -190,6 +191,8 @@ export function KanbanView({
   hideDashboard,
   selectedCardIds,
   onSelectCard,
+  segurados,
+  onSegurar,
 }: {
   cards: KanbanCard[]
   onMove: (id: string, coluna: number) => void
@@ -212,6 +215,8 @@ export function KanbanView({
   hideDashboard?: boolean
   selectedCardIds?: Set<string>
   onSelectCard?: (cardId: string) => void
+  segurados?: MapaSegurados                                 // pedidos aguardando pagamento do cliente
+  onSegurar?: (numero: string, segurar: boolean) => void
 }) {
   const [dragId, setDragId]       = useState<string | null>(null)
   const [overCol, setOverCol]     = useState<number | null>(null)
@@ -425,6 +430,7 @@ export function KanbanView({
         const atrasados = cards.filter(c =>
           c.dataEntregaPrevista && c.dataEntregaPrevista < hj &&
           c.coluna < COL_EXPEDICAO && c.coluna !== COL_PERDIDO   // na expedição já está pronto: não é atraso
+          && !estaSegurado(segurados, c.numero)                  // segurado por falta de pagamento: atraso do cliente
         )
         if (atrasados.length === 0 || hideDashboard) return null
         return (
@@ -549,6 +555,8 @@ export function KanbanView({
                       isDark={isDark}
                       isSelected={selectedCardIds?.has(card.id)}
                       onSelectCard={onSelectCard}
+                      segurado={segurados?.[card.numero]}
+                      onSegurar={onSegurar}
                     />
                   ))}
                 </div>
@@ -652,7 +660,7 @@ function fmt(iso?: string) {
 function KanbanCardItem({
   card, colIdx, prevCol, nextCol, isDragging, colors, onDragStart, onDragEnd, onDelete, onMove, onSetMotivo, onDetalhes,
   lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge, onLoteRename, negocios, onUpdateNegocio, allCards,
-  onAddLancamento, isDark, isSelected, onSelectCard,
+  onAddLancamento, isDark, isSelected, onSelectCard, segurado, onSegurar,
 }: {
   card: KanbanCard
   colIdx: number
@@ -679,6 +687,8 @@ function KanbanCardItem({
   isDark?: boolean
   isSelected?: boolean
   onSelectCard?: (cardId: string) => void
+  segurado?: import("../lib/pedidoSegurado").Segurado
+  onSegurar?: (numero: string, segurar: boolean) => void
 }) {
   const isPerdido = colIdx === COL_PERDIDO
   const [isOpen,        setIsOpen]        = useState(false)
@@ -772,7 +782,7 @@ function KanbanCardItem({
   const diasEnt = entregaDate && !isPerdido && colIdx < COL_EXPEDICAO
     ? Math.round((new Date(entregaDate + "T12:00:00").getTime() - Date.now()) / 86_400_000)
     : null
-  const emAtraso  = diasEnt !== null && diasEnt < 0
+  const emAtraso  = diasEnt !== null && diasEnt < 0 && !segurado
   const quaseVenc = diasEnt !== null && diasEnt >= 0 && diasEnt <= 3
   const cardBg  = isDark ? "#2C2C2E" : "#fff"
   const border  = isPerdido ? "rgba(255,59,48,0.2)" : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"
@@ -818,6 +828,10 @@ function KanbanCardItem({
             <span className="inline-flex items-center h-5 px-2 rounded-full whitespace-nowrap text-[10.5px] font-semibold bg-[#d33a3c]/10 text-[#d33a3c] truncate max-w-[180px]">
               {card.motivoPerdido || "Perdido"}
             </span>
+          ) : segurado ? (
+            <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full whitespace-nowrap text-[10.5px] font-semibold bg-[#c57800]/10 text-[#c57800] truncate max-w-[220px]" title={segurado.motivo}>
+              <PauseCircle className="w-3 h-3 shrink-0" />{textoSegurado(segurado)}
+            </span>
           ) : diasEnt !== null ? (
             <span className={`inline-flex items-center h-5 px-2 rounded-full text-[10.5px] font-semibold ${
               emAtraso ? "bg-[#d33a3c]/10 text-[#d33a3c]" : quaseVenc ? "bg-[#c57800]/10 text-[#c57800]" : "bg-[rgba(116,116,128,0.1)] text-[#5e5c68]"}`}>
@@ -862,6 +876,14 @@ function KanbanCardItem({
           {/* ── Action bar ── */}
         {!isPerdido && !confirmando && (
           <div className="flex items-center gap-0.5 px-2.5 pb-2.5 pt-0" onClick={e => e.stopPropagation()}>
+            {onSegurar && card.numero && colIdx >= 1 && colIdx < COL_ENTREGUE && (
+              <button onClick={() => onSegurar(card.numero, !segurado)}
+                title={segurado ? "Liberar: o prazo volta a contar" : "Segurar: cliente não pagou, o atraso não é nosso"}
+                className="h-7 px-2 mr-1 flex items-center gap-1 text-[11px] font-medium text-[#5e5c68] hover:text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)] rounded-lg transition-all whitespace-nowrap">
+                {segurado ? <PlayCircle className="w-3.5 h-3.5" /> : <PauseCircle className="w-3.5 h-3.5" />}
+                {segurado ? "Liberar" : "Aguardando pagamento"}
+              </button>
+            )}
 
             <button disabled={prevCol === null} onClick={() => prevCol !== null && onMove(card.id, prevCol)}
               className="w-7 h-7 flex items-center justify-center text-[11px] text-[rgba(60,60,67,0.36)] hover:text-[#1C1C1E] hover:bg-[rgba(0,0,0,0.04)] rounded-lg disabled:opacity-0 transition-all">
