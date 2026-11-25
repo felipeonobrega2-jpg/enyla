@@ -59,6 +59,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 41 | Porta: ordem a lead sai direto pelo agente; cliente A/B/C e indefinido seguem no Aprovo; `cancelar_ordem`; nível na leitura (`?o=perto`, detalhe comercial) | Felipe (regra de 25/11/2026, 7h51, confirmada 8h10) | — | — | Claude Code | **NÃO JUNTAR sem revisão do CTO** (mexe na trava que protege os clientes A, B e C) | (PR da issue #108) |
 | 42 | Prospector: e-mail sem teto diário; WhatsApp com teto de 10 por dia; limite técnico por execução; pausa e retry 429 na Resend | Felipe (decisão 25/11/2026, 8h28) | — | — | Claude Code | não | (PR da issue #112) |
 | 43 | Atendente: aceitar caixa de medicamento e de qualquer marca; quem nunca comprou é lead (nível) | Felipe (decisão 25/11/2026, 8h29) | — | — | Claude Code | não (ordem do Felipe) | (PR da issue #114) |
+| 44 | Porta externa: leitura `?o=facas` (modelos por chapa de cada faca salva, só leitura) | CCO | — | — | Claude Code | não | (PR da issue #117) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
