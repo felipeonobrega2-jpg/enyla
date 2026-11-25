@@ -12,7 +12,11 @@ export type EnvioHistorico = { passo: Passo; canal: Canal; status: StatusEnvio; 
 export const CHAVE_ENVIO_ATIVO = "prospector_envio_ativo"
 export const CHAVE_NOTA_MINIMA = "prospector_nota_minima"
 export const NOTA_MINIMA_PADRAO = 1
-export const LIMITE_PRIMEIROS_POR_DIA = 10
+/** Cota de primeiros contatos por dia (dia de São Paulo), só do WhatsApp. E-mail não tem teto diário. */
+export const LIMITE_WHATSAPP_PRIMEIROS_POR_DIA = 10
+/** Limite técnico por execução (a rota tem maxDuration de 120s): e-mails enviados (primeiro contato e lembrete) e tempo total. O resto fica para o próximo cron. */
+export const MAX_EMAILS_POR_EXECUCAO = 60
+export const ORCAMENTO_MS_POR_EXECUCAO = 90_000
 export const DIAS_ATE_LEMBRETE = 3
 export const DIAS_ATE_ENCERRAR = 3
 export const HORA_INICIO = 8
