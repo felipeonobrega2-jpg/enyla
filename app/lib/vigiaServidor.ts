@@ -67,9 +67,9 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
     await notificar("WhatsApp da Enyla desconectado", "Os leads não estão recebendo resposta. Abra Configurações → WhatsApp e leia o QR.", { prioridade: "alta", tags: ["rotating_light"], link: `${LINK_SISTEMA}/?aba=config` }).catch(() => null)
     out.whatsapp = "avisado"
   }
-  // Auditor de dados: conferência completa no máximo uma vez por hora
+  // Auditor de dados: conferência completa uma vez por noite (2h às 6h); quando pula, devolve o motivo
   const { talvezAuditar } = await import("./auditoriaServidor")
-  out.auditoria = await talvezAuditar(cfg as never).catch(e => String(e))
+  out.auditoria = await talvezAuditar(cfg as never).catch(e => `erro: ${String(e).slice(0, 140)}`)
   // Follow-up e retomada do agente também saem daqui (antes só pegavam carona nas mensagens do webhook e, de 20/11
   // em diante, morriam lá sem ninguém ver). A trava de cada uma (rodada na tabela leve) impede rodar em dobro.
   const agente = await import("./agenteAuto")
