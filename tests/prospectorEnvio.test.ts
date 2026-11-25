@@ -183,6 +183,19 @@ describe("qualificação", () => {
     expect(doBanco(baixa).etapa).toBe("encontrado")
     expect(doBanco(semContato).etapa).toBe("encontrado")
   })
+  it("filtro de público: nome fora do ramo, só encadernação e CNAE só secundário não são abordados e ficam na base", async () => {
+    mundo.cfg = { prospector_envio_ativo: true }
+    const nome = novo({ etapa: "encontrado", nota: 90, razao_social: "Mundo dos Infláveis", cnae_principal: "1813001", cnaes_secundarios: [] })
+    const encad = novo({ etapa: "encontrado", nota: 90, cnae_principal: "1822901", cnaes_secundarios: [] })
+    const secBaixa = novo({ etapa: "encontrado", nota: 1, cnae_principal: "4711301", cnaes_secundarios: ["1813001"] })
+    const secOk = novo({ etapa: "encontrado", nota: 2, cnae_principal: "4711301", cnaes_secundarios: ["1813001"] })
+    const princ = novo({ etapa: "encontrado", nota: 1, cnae_principal: "1821100", cnaes_secundarios: [] })
+    await rodar(SEG_10H)
+    for (const l of [nome, encad, secBaixa]) expect(doBanco(l).etapa).toBe("encontrado")
+    expect(doBanco(secOk).etapa).toBe("abordado")
+    expect(doBanco(princ).etapa).toBe("abordado")
+    expect(mundo.prospectos).toHaveLength(5)
+  })
   it("padrão do mínimo é 1 e não reabre descartado nem opt-out", async () => {
     const zero = novo({ etapa: "encontrado", nota: 0 })
     const um = novo({ etapa: "encontrado", nota: 1 })
