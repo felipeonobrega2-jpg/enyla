@@ -14,6 +14,8 @@ import { transcreverPendentes } from "./transcricao"
 import { obterMidia } from "./midiaWhatsapp"
 import { Conhecimento } from "./agenteAprende"
 import { type EstiloFelipe } from "./estilo"
+import { CHAVE_PERGUNTA_VB, TEXTO_VB, deveFazerPerguntaVb, interpretarRespostaVb, perguntaVbAtiva, respostaDoLeadAoVb } from "./perguntaQuantidade"
+import { gravarNoConfig, perfilDaResposta, registrarPerguntaVb, tratarRespostaVb } from "./perguntaQuantidadeServidor"
 import { arquivosDoCliente, contextoDaConversa, historicoDaConversa, pedidoAtendente, type Bloco } from "./pedidoAtendente"
 
 
@@ -29,7 +31,7 @@ export type ConversaLida = {
   mensagens: { id: string; from_me: boolean; corpo: string | null; tipo: string; ts: string }[]
 }
 
-type Cfg = { aberturaTeste?: TesteAbertura; apiKey?: string; guiaAtendimento?: string; filtroLeads?: string; agenteAuto?: { pequenoParceiro?: boolean }; vinculosWhatsapp?: Vinculos; conhecimentoAgente?: Conhecimento[]; estiloFelipe?: EstiloFelipe }
+type Cfg = { [CHAVE_PERGUNTA_VB]?: boolean; aberturaTeste?: TesteAbertura; apiKey?: string; guiaAtendimento?: string; filtroLeads?: string; agenteAuto?: { pequenoParceiro?: boolean }; vinculosWhatsapp?: Vinculos; conhecimentoAgente?: Conhecimento[]; estiloFelipe?: EstiloFelipe }
 
 // Arquivos que o cliente mandou (foto do frasco com régua, desenho ou PDF da caixa): a IA vê junto da conversa,
 // para tirar as medidas. Até 4, os mais recentes; o que não for imagem ou PDF (ex.: .cdr) fica de fora.
@@ -84,9 +86,25 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
   }
   // 2. Lead novo que só mandou a mensagem do anúncio (ou "oi"): a resposta é sempre a sua saudação do filtro
   // (teste A/B ligado: metade dos leads recebe a desafiante; cada lead sempre a mesma)
+  // Pergunta numerada de quantidade (Versão B da CMO): só com a flag ligada (nasce desligada) e só para lead novo
+  const abertura = !outraPergunta && !opts.outra && !clienteAtivo && soAbertura(mensagens)
+  if (abertura && perguntaVbAtiva(cfg)) {
+    const { nivelDoDestinatario } = await import("./nivelCliente")
+    const nv = await nivelDoDestinatario(jid)
+    if (deveFazerPerguntaVb({ flag: true, nivel: nv.nivel })) {
+      if (opts.automatico) await registrarPerguntaVb(jid).catch(() => null)
+      const r: ResultadoAtendente = {
+        resposta: TEXTO_VB, etapa: "primeiro_contato", alerta: "nenhum", motivo_alerta: "", sugere_video: false,
+        dados: { itens: [], produto: "", volume_ml: null, caixa_cm: null, frasco_cm: null, quantidade: null, tem_arte: null, referencia: null, acabamento: null, modelos: null, resumo: "" },
+        lead: { perfil: "indefinido", quantidade_total: null, motivo: "Primeiro contato (lead novo): pergunta numerada de quantidade (Versão B), sem IA.", fornecedor: false },
+        pode_enviar_sozinho: true, ultimaId,
+      }
+      return { ok: true, r, conversa: conversaLida }
+    }
+  }
   const saudacaoA = saudacaoDoFiltro(filtroDoAgente(cfg))
   const saudacao = saudacaoA ? aberturaPara(jid, saudacaoA, cfg.aberturaTeste).texto : null
-  if (!outraPergunta && !opts.outra && saudacao && !clienteAtivo && soAbertura(mensagens)) {
+  if (abertura && saudacao) {
     const r: ResultadoAtendente = {
       resposta: saudacao, etapa: "primeiro_contato", alerta: "nenhum", motivo_alerta: "", sugere_video: false,
       dados: { itens: [], produto: "", volume_ml: null, caixa_cm: null, frasco_cm: null, quantidade: null, tem_arte: null, referencia: null, acabamento: null, modelos: null, resumo: "" },
@@ -94,6 +112,15 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
       pode_enviar_sozinho: true, ultimaId,
     }
     return { ok: true, r, conversa: conversaLida }
+  }
+
+  // Resposta à pergunta numerada: 1/2/3, número ou "não sei" (sem IA). Grava a faixa; a IA segue o atendimento.
+  const respostaVb = perguntaVbAtiva(cfg) && !opts.followUp && !opts.reativar ? interpretarRespostaVb(respostaDoLeadAoVb(mensagens)) : null
+  if (respostaVb && opts.automatico) {
+    await tratarRespostaVb(jid, respostaVb, {
+      gravar: gravarNoConfig,
+      avisar: async q => { const { avisarMql } = await import("./agenteAuto"); return avisarMql(cfg as never, { jid, nome: conv?.nome ?? null, telefone: null, etiquetas: null, status_lead: null }, { lead: { perfil: "icp", quantidade_total: q, motivo: "Respondeu a pergunta numerada: 5 mil ou mais (faixa 3)" } }) },
+    }).catch(() => null)
   }
 
   const anexos = await arquivosDoCliente(mensagens, obterMidia).catch(() => ({ blocos: [] as Bloco[], numero: new Map<string, number>() }))
@@ -108,6 +135,14 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
   let a: Omit<ResultadoAtendente, "ultimaId">
   try { a = JSON.parse(texto) } catch { return { ok: false, erro: "A IA respondeu fora do formato. Tente de novo.", status: 502 } }
   if (a.resposta) a.resposta = corrigirCumprimento(a.resposta)
+  // Volume que o lead informou na pergunta numerada: a faixa vira o perfil (número exato só se ele digitou)
+  if (respostaVb?.tipo === "faixa" && a.lead) {
+    if (respostaVb.quantidade != null) {
+      a.lead = { ...a.lead, quantidade_total: respostaVb.quantidade }
+      if (a.dados && a.dados.quantidade == null) a.dados = { ...a.dados, quantidade: respostaVb.quantidade }
+    }
+    if (a.lead.perfil === "indefinido") a.lead = { ...a.lead, perfil: perfilDaResposta(respostaVb)! }
+  }
   const resultado: ResultadoAtendente = { ...a, ultimaId, uso: { entrada: r.usage.input_tokens, cache: r.usage.cache_read_input_tokens ?? 0, gravouCache: r.usage.cache_creation_input_tokens ?? 0, saida: r.usage.output_tokens } }
   // Guarda para reaproveitar enquanto não chegar mensagem nova (follow-up e retomada não: são outra pergunta)
   if (!outraPergunta) await supabase.from("whatsapp_conversas").update({ proxima_acao: JSON.stringify({ assinatura, ultimaId, auto: !!opts.automatico, em: new Date().toISOString(), r: { ...resultado, uso: undefined } }) }).eq("jid", jid)
