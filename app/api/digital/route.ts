@@ -8,6 +8,7 @@ import { mudarStatus, trocarFrete, restanteUnico, arteAtual, acertoDaSemana, Ped
 import { mudarConfig } from "@/app/lib/configAtomica"
 import { lerSugestoes, decidirSugestao } from "@/app/lib/arteAprovadaServidor"
 import { auth } from "@/auth"
+import { validarGravarDigital, aplicarGravacaoDigital, prazoDoPedido, prazoPadraoDias } from "@/app/lib/digitalPrazo"
 
 type Dados = { pedidosDigitais?: PedidoComBriefing[]; digitalContatos?: ContatosDigital; digital?: import("@/app/lib/precoDigital").RegraDigital }
 
@@ -16,6 +17,7 @@ export async function GET() {
   const { data } = await lerConfigLinha()
   const d = (data?.data ?? {}) as Dados
   const todos = d.pedidosDigitais ?? []
+  const prazoPadrao = prazoPadraoDias(d.digital as { prazoPadraoDiasUteis?: unknown } | undefined)
   const desde = Date.now() - 45 * 86_400_000
   const pedidos = todos.filter(p => new Date(p.em).getTime() >= desde || (p.villaEnviadoEm && !p.acertadoEm)).map(p => ({
     id: p.id, jid: p.jid, nome: p.nome, em: p.em, ml: p.ml, medidas: p.medidas, padrao: p.padrao, folha: p.folha,
@@ -30,6 +32,7 @@ export async function GET() {
     arteAtual: arteAtual(p), versoes: (p.artes ?? []).length, arteEnviadaEm: p.arteEnviadaEm ?? null, arteAprovadaEm: p.arteAprovadaEm ?? null,
     ajustes: p.ajustes ?? [], designerAvisadoEm: p.designerAvisadoEm ?? null, villaEnviadoEm: p.villaEnviadoEm ?? null,
     frete: p.frete ?? null, restante: p.restante ?? null, restantePagoEm: p.restantePagoEm ?? null, prontoEm: p.prontoEm ?? null, entrega: p.entrega ?? null, acertadoEm: p.acertadoEm ?? null,
+    situacaoArte: p.situacaoArte ?? "", prazoEntrega: p.prazoEntrega ?? "", prazoVisivel: prazoDoPedido(p, prazoPadrao).texto,
     negociacao: p.negociacao ?? null, termosAceitosEm: p.termos?.em ?? null,
   }))
   const acerto = acertoDaSemana(todos)
@@ -40,7 +43,7 @@ export async function GET() {
 
 // POST { id, status } avança ou cancela · { id, acao } frete, arte, Villa, designer · { acertar: ids } · { contatos }
 export async function POST(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as { teste?: boolean; id?: string; status?: StatusDigital; acao?: string; frete?: number; quantidade?: number; enviar?: boolean; acertar?: string[]; contatos?: ContatosDigital; decisao?: "aprovar" | "recusar" | "eu" | "confirmar" | "descartar"; total?: number; a?: number; l?: number; p?: number; salvar?: boolean; avisarCliente?: boolean }
+  const b = await req.json().catch(() => ({})) as { teste?: boolean; id?: string; status?: StatusDigital; acao?: string; frete?: number; quantidade?: number; enviar?: boolean; acertar?: string[]; contatos?: ContatosDigital; situacaoArte?: string; prazoEntrega?: string; motivo?: string; decisao?: "aprovar" | "recusar" | "eu" | "confirmar" | "descartar"; total?: number; a?: number; l?: number; p?: number; salvar?: boolean; avisarCliente?: boolean }
 
   // Pedido de teste: na sua conversa com você mesmo, com o link do pedido
   if (b.teste) {
@@ -66,6 +69,15 @@ export async function POST(req: NextRequest) {
     const { data } = await lerConfigLinha()
     const r = await decidirSugestao(((data?.data ?? {}) as Dados).pedidosDigitais ?? [], b.id, b.decisao, "Painel (login do sistema)")
     return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ erro: r.erro }, { status: 400 })
+  }
+  // Situação da arte e prazo de entrega, à mão: só esses campos, com quem gravou, quando e o motivo
+  if (b.acao === "acompanhamento") {
+    const sessao = await auth().catch(() => null)
+    if (!sessao) return NextResponse.json({ erro: "Entre no sistema para gravar." }, { status: 401 })
+    const v = validarGravarDigital(b as Record<string, unknown>)
+    if ("erro" in v) return NextResponse.json({ erro: v.erro }, { status: 400 })
+    const novo = await gravarPedido(v.id, p => aplicarGravacaoDigital(p, v, "Painel (login do sistema)"))
+    return novo ? NextResponse.json({ ok: true, id: novo.id, situacaoArte: novo.situacaoArte ?? "", prazoEntrega: novo.prazoEntrega ?? "" }) : NextResponse.json({ erro: "Pedido não encontrado." }, { status: 404 })
   }
   if (b.acertar?.length) {
     const ids = new Set(b.acertar)

@@ -7,6 +7,7 @@ import { supabase } from "./supabase"
 import { lerConfigLinha } from "./configAtomica"
 import { hoje, calcularResumoFinanceiro, dreDoPeriodo } from "./financeiro"
 import { montarPedidos, recebiveis, noPeriodo, type Periodo as Intervalo } from "./negocio"
+import { receberDigital, idsVinculados, type PedidoReceber } from "./digitalReceber"
 import { financeiroDoAndar } from "./financeiroAndar"
 import { saldoInformado } from "./caixa"
 import { compararPedidos } from "./calibragem"
@@ -22,7 +23,7 @@ const ESTADOS = ["pendente", "vinculada", "criada", "ignorada", "todas"]
 export const AJUDA_FINANCEIRO: Record<string, string> = {
   "?o=financeiro": "SÓ A CHAVE DO CFO (as outras recebem 403). Só leitura. Sem &parte devolve o resumo (a receber, a pagar, saldos, números do mês) e a lista das partes. Período opcional: &periodo=mes (padrão) | trimestre | semestre | ano | tudo, em America/Sao_Paulo",
   "?o=financeiro&incluirEstornados=": "opcional, junto com qualquer parte: 1 | true | sim inclui nos cálculos os lançamentos desativados/estornados (estornadoEm preenchido); sem ele, ficam de fora de receber, pagar, gastos e margem. Outro valor: 400. A resposta traz incluirEstornados",
-  "?o=financeiro&parte=receber": "contas a receber: pedidos com saldo, vencidos e lançamentos a conferir. De cliente, só nome e valores",
+  "?o=financeiro&parte=receber": "contas a receber: pedidos com saldo, vencidos e lançamentos a conferir; em digital, cada pedido Digital com sinal ou saldo (valorTotal, sinal, restante, pago, emConferencia, saldo, vencimentoSaldo): só conta como pago o que tem txId asaas: ou vínculo com transação do banco. De cliente, só nome e valores",
   "?o=financeiro&parte=pagar": "contas a pagar: despesas não pagas (fora a conta corrente de fornecedor), com flag de vencido",
   "?o=financeiro&parte=banco&estado=": "movimentos e conciliação do banco (pendente | vinculada | criada | ignorada | todas; padrão pendente), sem documento da contraparte",
   "?o=financeiro&parte=saldos": "saldo por conta (cadastro e Pluggy) e total",
@@ -81,6 +82,12 @@ function saldos(cfg: Cfg) {
     total: saldoInformado(cfg), contas,
     pluggy: p ? { em: p.em, erro: p.erro ?? null, contas: (p.contas ?? []).map(c => ({ id: c.id, nome: c.nome, banco: c.banco, saldo: c.saldo })) } : null,
   }
+}
+
+// Digital no a receber (leitura): sinal, restante, pago (Asaas ou vínculo bancário), em conferência, saldo e vencimento
+async function digitalAReceber(d: Dados) {
+  const { data } = await supabase.from("banco_transacoes").select("lancamento_ids").not("lancamento_ids", "is", null).limit(5000)
+  return receberDigital((d.cfg.pedidosDigitais ?? []) as PedidoReceber[], d.lancamentos.filter(l => l.unidade === "digital"), idsVinculados((data ?? []) as { lancamento_ids: string[] | null }[]), hoje())
 }
 
 function receber(d: Dados) {
@@ -178,7 +185,7 @@ export async function leituraFinanceira(params: URLSearchParams): Promise<Leitur
     return { status: 200, corpo: { hoje: hj, periodo, incluirEstornados, aReceber: { total: rec.aReceberTotal, vencido: rec.emAtrasoTotal }, aPagar: { total: pagar.total, vencido: pagar.vencido, quantidade: pagar.quantidade },
       saldos: { total: sal.total, contas: sal.contas.length }, mes, partes: PARTES } }
   }
-  const corpo = parte === "receber" ? receber(d) : parte === "pagar" ? contasPagar(d.lancamentos, hj) : parte === "banco" ? await banco(estado, per)
+  const corpo = parte === "receber" ? { ...receber(d), digital: await digitalAReceber(d) } : parte === "pagar" ? contasPagar(d.lancamentos, hj) : parte === "banco" ? await banco(estado, per)
     : parte === "saldos" ? saldos(d.cfg) : parte === "gastos" ? gastos(d, per) : parte === "margem" ? await margem(d, per) : await depende(d)
   return { status: 200, corpo: { parte, hoje: hj, periodo, incluirEstornados, ...corpo } }
 }

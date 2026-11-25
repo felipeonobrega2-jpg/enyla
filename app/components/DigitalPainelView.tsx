@@ -22,7 +22,7 @@ type Pedido = {
   vistoEm: string | null; ultimaVista: string | null; vistas: number; lembretes: { nivel: number; em: string }[]
   briefing: { marca: string; cores: string; referencias: string; laminacao: string; arquivos: number } | null
   vence: string; link: string; linkDesigner: string
-  arteAtual: { url: string; nome: string; em: string } | null; versoes: number; arteEnviadaEm: string | null; arteAprovadaEm: string | null
+  arteAtual: { url: string; nome: string; em: string } | null; versoes: number; arteEnviadaEm: string | null; arteAprovadaEm: string | null; situacaoArte: string; prazoEntrega: string; prazoVisivel: string
   ajustes: { texto: string; em: string }[]; designerAvisadoEm: string | null; villaEnviadoEm: string | null
   frete: number | null; restante: number | null; restantePagoEm: string | null; prontoEm?: string | null; entrega: { cep: string; endereco: string } | null; acertadoEm: string | null
   teste?: boolean
@@ -231,6 +231,8 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
               <Info rotulo="Termos" valor={sel.termosAceitosEm ? `aceitos em ${new Date(sel.termosAceitosEm).toLocaleDateString("pt-BR")}` : sel.status === "aguardando_sinal" ? "ainda não aceitos" : "de antes dos termos"} />
             </div>
 
+            {sel.status !== "aguardando_sinal" && sel.status !== "cancelado" && <Acompanhamento key={sel.id} pedido={sel} onFeito={async () => aplicar(await buscar())} />}
+
             {sel.sugestaoArte && <SugestaoArteAprovada id={sel.id} nome={sel.nome} s={sel.sugestaoArte} ocupado={!!ocupado} onDecidir={decidirArte} />}
 
             {["aguardando_sinal", "sinal_pago", "arte"].includes(sel.status) && !sel.arteAprovadaEm && (
@@ -337,6 +339,46 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
         )}
       </Gaveta>
     </Pagina>
+  )
+}
+
+const SITUACOES = ["sem arte", "enviada", "ajustes pedidos", "aprovada", "prova autorizada"]
+// Situação da arte e prazo de entrega à mão (só esses dois campos; registra quem, quando e o motivo; não manda nada ao cliente)
+function Acompanhamento({ pedido, onFeito }: { pedido: Pedido; onFeito: () => Promise<void> }) {
+  const [situacao, setSituacao] = useState(pedido.situacaoArte)
+  const [prazo, setPrazo] = useState(pedido.prazoEntrega)
+  const [motivo, setMotivo] = useState("")
+  const [gravando, setGravando] = useState(false)
+  const mudou = situacao !== pedido.situacaoArte || prazo !== pedido.prazoEntrega
+  const gravar = async () => {
+    setGravando(true)
+    try {
+      const corpo: Record<string, unknown> = { acao: "acompanhamento", id: pedido.id, motivo }
+      if (situacao !== pedido.situacaoArte && situacao) corpo.situacaoArte = situacao
+      if (prazo !== pedido.prazoEntrega) corpo.prazoEntrega = prazo
+      const r = await fetch("/api/digital", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) })
+      const j = await r.json() as { erro?: string }
+      if (!r.ok) { alert(j.erro ?? "Não deu para gravar."); return }
+      setMotivo(""); await onFeito()
+    } finally { setGravando(false) }
+  }
+  return (
+    <div className="rounded-xl bg-[rgba(116,116,128,0.06)] px-3.5 py-3 space-y-2">
+      <p className="text-[12px] font-semibold text-[#191625]">Acompanhamento · prazo que o cliente vê: {pedido.prazoVisivel}</p>
+      <div className="flex gap-2 flex-wrap items-center">
+        <select value={situacao} onChange={e => setSituacao(e.target.value)} className="h-8 rounded-lg px-2 text-[12.5px] text-[#191625] bg-white ds-borda focus:outline-none">
+          <option value="">Situação da arte…</option>
+          {SITUACOES.map(x => <option key={x} value={x}>{x}</option>)}
+        </select>
+        <input type="date" value={prazo} onChange={e => setPrazo(e.target.value)} title="Prazo de entrega (vazio = a confirmar)" className="h-8 rounded-lg px-2 text-[12.5px] text-[#191625] bg-white ds-borda focus:outline-none" />
+      </div>
+      {mudou && (
+        <div className="flex gap-2 items-center">
+          <input value={motivo} onChange={e => setMotivo(e.target.value.slice(0, 300))} placeholder="Motivo (obrigatório)" className="flex-1 h-8 rounded-lg px-2.5 text-[12.5px] text-[#191625] bg-white ds-borda focus:outline-none" />
+          <Botao disabled={gravando || !motivo.trim()} onClick={() => void gravar()}>Gravar</Botao>
+        </div>
+      )}
+    </div>
   )
 }
 

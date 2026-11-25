@@ -69,6 +69,9 @@ export type PedidoDigital = {
   email?: string                                             // do cliente (opcional, no aceite dos termos): comprovante, arte, envio
   restante?: number; restantePagoEm?: string; pagamentoFinal?: { txId: string; valor: number; data: string; nome: string | null }
   acertadoEm?: string
+  // Acompanhamento (link do cliente): opcionais, vazios nos pedidos existentes; gravados à mão (painel ou porta gravar_digital)
+  situacaoArte?: SituacaoArte; prazoEntrega?: string
+  gravacoesDigital?: GravacaoDigital[]                        // quem gravou, quando (Brasília) e o motivo (as últimas 20)
   lembreteDepois?: string; lembreteParado?: boolean           // lead adiou (espera) · você assumiu a conversa (sem lembrete)
   reenviadoEm?: string                                         // orçamento reenviado com os valores (varredura)
   documento?: string                                         // CPF/CNPJ (cobrança no Asaas e nota)
@@ -77,6 +80,8 @@ export type PedidoDigital = {
   // Cartão na InfinitePay (o link aberto de cada parte; o Pix segue no Asaas)
   infinitepay?: { sinal?: LinkCartao; restante?: LinkCartao }
 }
+export type SituacaoArte = "sem arte" | "enviada" | "ajustes pedidos" | "aprovada" | "prova autorizada"
+export type GravacaoDigital = { por: string; em: string; motivo: string; situacaoArte?: SituacaoArte | ""; prazoEntrega?: string }
 export type CobrancaPix = { id: string; valor: number; payload: string; imagem: string; fatura: string; em: string }
 export type Arte = { url: string; nome: string; em: string }
 export type Ajuste = { texto: string; em: string }

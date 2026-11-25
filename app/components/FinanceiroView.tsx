@@ -1120,6 +1120,7 @@ export function FinanceiroView({
   const kanban = linha === "digital" ? SEM_CARDS : kanbanTodo
   // Parcerias (comissões) são do Offset
   const negocios = linha === "digital" ? SEM_NEGOCIOS : negociosTodos
+  const restantesDigital = useMemo(() => todosLancamentos.filter(l => l.unidade === "digital" && l.tipo === "receita" && l.status !== "pago" && l.id.endsWith("-restante") && !l.estornadoEm), [todosLancamentos])
   const temDigital = useMemo(() => todosLancamentos.some(l => l.unidade === "digital"), [todosLancamentos])
   const [tab, setTab] = useState<FinTab>("dash")
   const irAba = (t: FinTab) => { setTab(t); sessionStorage.setItem("fin:tab", t) }
@@ -1391,7 +1392,7 @@ export function FinanceiroView({
 
 
   const abas: { v: FinTab; nome: string; conta?: number }[] = linha !== "offset"
-    ? [{ v: "dash", nome: "Visão geral" }, { v: "lancamentos", nome: "Lançamentos" }, { v: "dre", nome: "DRE" }]
+    ? [{ v: "dash", nome: "Visão geral" }, { v: "receber", nome: "A receber", conta: restantesDigital.filter(l => l.dataVencimento && l.dataVencimento < hoje()).length }, { v: "lancamentos", nome: "Lançamentos" }, { v: "dre", nome: "DRE" }]
     : [
       { v: "dash", nome: "Visão geral" },
       { v: "receber", nome: "A receber", conta: vencidos.length },
@@ -1795,6 +1796,23 @@ export function FinanceiroView({
             <p className="text-[11.5px] text-[#8E8E93] mb-3">
               Pedidos fechados ou em produção, e ganhos de parcerias pendentes.
             </p>
+
+            {/* Digital: restante a receber de cada pedido (sem vencimento até o material ficar pronto) */}
+            {linha !== "offset" && (
+              <div className="rounded-xl border border-[rgba(60,60,67,0.12)] bg-white overflow-hidden mb-4">
+                <div className="px-5 py-3 flex items-center justify-between">
+                  <span className="text-[12px] font-semibold text-[#191625]">Digital · restante a receber</span>
+                  <span className="text-[13px] font-semibold text-[#c57800] ds-num">{brl(restantesDigital.reduce((s, l) => s + l.valor, 0))}</span>
+                </div>
+                {restantesDigital.length === 0 && <p className="px-5 pb-3 text-[12px] text-[#8E8E93]">Nenhum restante Digital em aberto.</p>}
+                {restantesDigital.map(l => (
+                  <div key={l.id} className="px-5 py-2 flex items-center justify-between border-t border-[rgba(60,60,67,0.08)] text-[12.5px]">
+                    <span className="text-[#191625] truncate">{l.descricao}</span>
+                    <span className="shrink-0 ml-3 text-[#8E8E93]">{l.dataVencimento ? `vence ${l.dataVencimento.split("-").reverse().join("/")}` : "sem vencimento (aguardando o material ficar pronto)"} · <b className="text-[#191625] ds-num">{brl(l.valor)}</b></span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Search + filter */}
             <div className="flex flex-col gap-2 mb-4">

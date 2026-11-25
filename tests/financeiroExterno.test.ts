@@ -16,7 +16,7 @@ vi.mock("@/app/lib/gastosServidor", () => ({ gastosAtuais: vi.fn(async () => ({ 
 vi.mock("@/app/lib/supabase", () => {
   const consulta = (t: string) => {
     const q: Record<string, unknown> = {}
-    for (const m of ["select", "eq", "order", "limit", "neq", "in"]) q[m] = () => q
+    for (const m of ["select", "eq", "order", "limit", "neq", "in", "not"]) q[m] = () => q
     for (const m of ["insert", "update", "delete", "upsert"]) q[m] = () => { estado.escritas++; return q }
     q.then = (ok: (v: unknown) => unknown) => ok({ data: estado.tabelas[t] ?? [], count: (estado.tabelas[t] ?? []).length, error: null })
     return q
