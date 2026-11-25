@@ -93,3 +93,9 @@ Os demais limites de 23/11 seguem: até 10 abordagens por dia, de segunda a sext
 **Decisão.** Diretores gerem. A execução é de funcionários e de agentes.
 
 **Porquê.** Diretor que executa vira gargalo e mistura a decisão com a tarefa. Quem decide não é quem manda a mensagem nem quem mexe no pedido.
+
+## 25/11/2026 — o que o Felipe fala e decide chega a todos os diretores (registro único)
+
+**Decisão.** O que o Felipe fala com clientes (o que digita no celular), escreve no GitHub e diz aos diretores fica num registro único (`registro_felipe`), lido por todas as chaves em `GET /api/externo?o=decisoes`. Só leitura e registro: nada é enviado a cliente, nada é apagado. Sem segredo novo (o GitHub é lido pela API pública).
+
+**Porquê.** Ordem do Felipe (25/11, 20h10): as decisões e promessas dele têm de chegar a todos os diretores, não ficar na conversa de um só.

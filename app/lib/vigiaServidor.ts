@@ -75,6 +75,7 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
   const agente = await import("./agenteAuto")
   out.followup = await agente.talvezFollowUps().catch(e => `erro: ${String(e).slice(0, 140)}`)
   out.retomada = await agente.talvezRetomarParados(LINK_SISTEMA).catch(e => `erro: ${String(e).slice(0, 140)}`)
+  out.registroFelipe = await import("./registroFelipe").then(m => m.rotinaRegistroFelipe()).catch(e => `erro: ${String(e).slice(0, 140)}`)
   // Captador de parceiros: convites aprovados por você saem aos poucos
   // Carimbo da ronda: o Escritório mostra se o vigia está de pé
   await mudarConfig(() => ({ vigiaRodouEm: agora.toISOString() })).catch(() => null)
@@ -86,6 +87,7 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
   const marcar: [string, unknown][] = [["vigia", "ok"], ["esperando", out.esperando ?? "ok"], ["promessas", out.promessas ?? "ok"],
     ["digitalFinanceiro", typeof df === "string" ? df : df?.criados || df?.atualizados ? `${df.criados ?? 0} lançados, ${df.atualizados ?? 0} atualizados` : "nada novo"],
     ["emails", typeof em === "string" ? em : em?.erros?.length ? `erro: ${em.erros[0]}` : em?.enviados ? `${em.enviados} enviados` : "nada para enviar"]]
+  marcar.push(["registroFelipe", out.registroFelipe])
   if (out.auditoria != null) marcar.push(["auditoria", out.auditoria])
   if (out.rotina !== undefined) marcar.push(["resumo", out.rotina ?? "enviado"])
   if (out.reuniao !== undefined) marcar.push(["reuniao", out.reuniao])

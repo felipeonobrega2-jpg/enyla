@@ -52,7 +52,7 @@ function ferramentas(execIds: string[]): Anthropic.Beta.BetaTool[] {
     { name: "registrar_plano", description: "Registra o plano da sua área combinado com o Felipe (substitui o anterior). Você vai cobrar esse plano nas reuniões.",
       input_schema: { type: "object", properties: { objetivo: { type: "string" }, indicador: { type: "string", description: "Como medir, com número e prazo" }, passos: { type: "array", items: { type: "string" } } }, required: ["objetivo", "indicador", "passos"] } },
     { name: "guardar_conhecimento", description: "Guarda algo que o Felipe ensinou e que vale para sempre na sua área (regra, preferência, contexto).",
-      input_schema: { type: "object", properties: { texto: { type: "string" } }, required: ["texto"] } },
+      input_schema: { type: "object", properties: { texto: { type: "string" }, marca: { type: "string", enum: ["decisao_felipe"], description: "Só quando o texto cita palavras do Felipe (decisão dele): entra no registro de decisões" } }, required: ["texto"] } },
   ]
 }
 
@@ -114,6 +114,7 @@ export async function executarFerramenta(diretor: IdDiretor, nome: string, x: Re
     if (nome === "guardar_conhecimento") {
       const t = String(x.texto).slice(0, 1500)
       const licao: LicaoDiretor = { id: `${diretor}-${Date.now().toString(36)}`, texto: t, em: new Date().toISOString() }
+      if (grava && x.marca === "decisao_felipe") await import("./registroFelipe").then(m => m.registrarDiretoria({ diretor, de: "diretor", texto: t, em: licao.em, id: licao.id, marca: x.marca })).catch(() => null)
       if (grava) await mudarConfig((d: { conhecimentoDiretoria?: Partial<Record<IdBase, LicaoDiretor[]>> }) => ({ conhecimentoDiretoria: { ...(d.conhecimentoDiretoria ?? {}), [diretor]: [licao, ...((d.conhecimentoDiretoria ?? {})[diretor] ?? [])].slice(0, 300) } }))
       return { acao: { id: novoId(), tipo: "aprendi", texto: t }, saida: "Guardado." }
     }
@@ -171,6 +172,7 @@ export async function conversar(diretor: IdDiretor, textoFelipe: string, op: { s
   if (!cfg.apiKey) throw new Error("Sem chave da IA nas Configurações.")
   const historico = op.historico ?? await lerConversa(diretor)
   const minha: MsgConversa = { id: novoId(), de: "felipe", texto: textoFelipe.slice(0, 4000), em: new Date().toISOString() }
+  if (grava) await import("./registroFelipe").then(m => m.registrarDiretoria({ diretor, de: "felipe", texto: minha.texto, em: minha.em, id: minha.id })).catch(() => null)
   const colegas = DIRETORES.filter(d => d.id !== diretor).map(d => `${d.nome.split(" ")[0]} (${d.cargo}, ${d.area})`).join(", ")
   const blocos = ctx.bloco.split(/\n\n(?=## )/)
   const meu = blocos.find(b => b.includes(`, ${info.cargo} (`)) ?? ""

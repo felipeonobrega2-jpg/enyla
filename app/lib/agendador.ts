@@ -21,6 +21,7 @@ export const ROTINAS: Rotina[] = [
   { id: "reuniao", nome: "Reunião de diretoria", faz: "Os 5 diretores leem a área e o que você ensinou; a ata vai para o seu WhatsApp", onde: "vigia", quando: "8h (seg a sáb)", esperadoMin: null },
   { id: "auditoria", nome: "Auditor de dados", faz: "Confere se os números do Financeiro e dos pedidos batem", onde: "vigia", quando: "1 vez por dia, de madrugada", esperadoMin: 26 * 60 },
   { id: "digitalFinanceiro", nome: "Digital no Financeiro", faz: "Sinal, restante e custo da Villa viram lançamentos da linha Digital", onde: "vigia", quando: "a cada 5 min", esperadoMin: 5 },
+  { id: "registroFelipe", nome: "Registro do Felipe", faz: "Guarda o que o Felipe digita no WhatsApp, escreve no GitHub e diz aos diretores (só leitura)", onde: "vigia", quando: "a cada 5 min (GitHub a cada 15)", esperadoMin: 5 },
   { id: "emails", nome: "E-mails do cliente", faz: "Pedido aprovado, sinal, arte, enviado", onde: "vigia", quando: "a cada 5 min", esperadoMin: 5 },
   { id: "carona", nome: "Tarefas de carona", faz: "Aprendizado, reativação, marketing, Pix do digital, saldo da Meta… (rodam junto das mensagens)", onde: "carona", quando: "a cada 5 min quando chega mensagem", esperadoMin: 60, horarioDoAgente: true },
   { id: "aprendizado", nome: "Aprendizado do agente", faz: "Lê as suas conversas e ensina o atendente", onde: "carona", quando: "a cada 6 h", esperadoMin: 6 * 60 + 30 },
