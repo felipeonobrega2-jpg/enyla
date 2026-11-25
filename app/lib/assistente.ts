@@ -310,6 +310,12 @@ export async function talvezAssistente(msgId: string, remoteJid: string, fromMe:
   if (!ehComandoDoDono({ fromMe, remoteJid: jid, id: msgId }, dono) && !pessoalOk) return
   const { reservarTratada } = await import("./registroAgente")
   if ((await reservarTratada(`assistente:${msgId}`)) === false) return
+  // Vídeo do Felipe → conhecimento vivo (desligado por padrão: AppConfig.videosConhecimento.ativo). Responde só a ele.
+  if (/^video/i.test(tipo)) {
+    const { processarVideoDoFelipe } = await import("./videosConhecimentoServidor")
+    const conf = await processarVideoDoFelipe(msgId).catch(e => `Recebi o vídeo, mas deu erro: ${String(e).slice(0, 160)}`)
+    if (conf) { const { evo } = await import("./evolution"); await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: pessoalOk ? digitos(pessoal) : dono, text: conf }) }).catch(() => null); return }
+  }
   let texto: string | null = null
   if (/audio|ptt/i.test(tipo)) {
     const { transcreverPendentes } = await import("./transcricao")
