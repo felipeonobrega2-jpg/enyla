@@ -8,6 +8,8 @@ import { supabase } from "@/app/lib/supabase"
 import { filtroDoAgente } from "@/app/lib/agenteLeads"
 import { gastoFixo } from "@/app/lib/gastoFixoExterno"
 import { lancamento } from "@/app/lib/lancamentoExterno"
+import { lancarDespesaExterno } from "@/app/lib/lancarDespesaExterno"
+import { renomearFornecedorExterno } from "@/app/lib/renomearFornecedorExterno"
 import { conciliacao } from "@/app/lib/conciliacaoExterna"
 import { categoria } from "@/app/lib/categoriaExterna"
 import { leituraFinanceira, AJUDA_FINANCEIRO } from "@/app/lib/financeiroExterno"
@@ -69,6 +71,10 @@ export async function GET(req: NextRequest) {
         "POST {acao:'lancamento', operacao:'criar'|'editar'|'desativar'|'estornar', id, tipo, descricao, valor, dataVencimento, dataPagamento, status, categoria, subcategoria, contaId, fornecedorId, formaPagamento, obs, cardId, cardNumero, nomeCliente, loteId, loteNumero}": "SÓ A CHAVE DO CFO. Lançamentos e contas a pagar (despesa não paga). criar exige tipo (receita|despesa), descricao, valor (reais, > 0) e dataVencimento; editar, desativar e estornar exigem id; datas AAAA-MM-DD; status pendente|pago|atrasado; formaPagamento pix|boleto|cartao_credito|cartao_debito|dinheiro|transferencia|outro|conta. status 'pago' é só baixa no livro: não dispara pagamento. Desativar e estornar nunca apagam a linha (marcam estornadoEm/estornadoPor). Resposta: { ok, resultado, lancamento }",
         "POST {acao:'conciliacao', operacao:'vincular'|'vincularVarios'|'atualizar'|'criar'|'ignorar'|'desfazer', txId, lancamentoId, lancamentoIds, campos, lancamentos, sempre, ensinar}": "SÓ A CHAVE DO CFO. Decide um movimento de banco_transacoes (txId): vincular a um lançamento, vincularVarios, atualizar (baixa no lançamento com campos), criar lançamentos ou ignorar. desfazer é lógico: estorna os lançamentos criados (nada é apagado) e devolve a transação a pendente. Sem contraparte_doc nem bruto na resposta. Resposta: { ok, resultado, tx, lancamentos }",
         "POST {acao:'categoria', operacao:'criar'|'editar'|'desativar', tipo:'receita'|'despesa', id, nome, subcategorias, ativa}": "SÓ A CHAVE DO CFO. Categorias financeiras. criar exige nome; editar e desativar exigem id. Desativar só põe ativa:false, a categoria continua na lista. Resposta: { ok, resultado, categoria }",
+      } : {}),
+      ...(diretor === "cto" ? {
+        "POST {acao:'lancar_despesa', chaveIdempotencia, fornecedorId, descricao, valor, dataVencimento, dataPagamento, status:'pago'|'pendente', rateio:[{loteNumero | loteId, valor}]}": "SÓ A CHAVE DO CTO (CFO e as outras recebem 403; o CFO só confere por leitura em ?o=financeiro). Lança UMA despesa (total em valor, reais) rateada por lote: cada item do rateio leva a fatia do lote (> 0, no máximo 2 casas); a soma tem de ser igual ao total, comparada em centavos (senão 400 e nada é gravado; o residual não é acertado). Lote repetido: 400; lote ou fornecedor inexistente: 404. Grava uma linha por lote com a fatia e um id de grupo (nunca o total em cada lote): custo direto, a pagar, caixa e DRE contam o total uma vez. chaveIdempotencia obrigatória (400 sem): a mesma chave com o mesmo payload devolve o resultado original sem duplicar; com payload diferente: 409. status 'pago' é só baixa no livro (dataPagamento opcional, padrão = dataVencimento): não dispara pagamento, não chama Asaas, Pluggy nem banco. Registra quem, quando (Brasília) e o payload. Resposta: { ok, resultado, despesa, rateio, registro }",
+        "POST {acao:'renomear_fornecedor', id, nome}": "SÓ A CHAVE DO CTO (as outras, inclusive a do CFO, recebem 403). Troca só o nome exibido do fornecedor (AppConfig.fornecedores); o id e os vínculos continuam. id inexistente: 404; nome vazio: 400. Registra quem, quando (Brasília), id, nome anterior e novo. Resposta: { ok, resultado, fornecedor, registro }",
       } : {}),
       ...(comerciaisDoDiretor(diretor).length ? { "POST {acao:'ordenar_funcionario', funcionario:'atendente'|'followup'|'reativacao', cliente | jid, ordem}": "SÓ CCO e CMO (as outras recebem 403). O agente do Comercial escreve a mensagem para UM lead com o histórico do WhatsApp; REGRA (25/11): só 'cliente' (quem já comprou, nível A, B ou C) precisa do Aprovo do Felipe. Para LEAD (nunca comprou; cadastro sem compra e orçamento aberto não contam) a mensagem SAI DIRETO pelo agente indicado, só com o agente ligado e dentro do horário dele (senão 409 'fora do horário do agente', nada é criado), no máximo 20 envios diretos por dia por diretor (a 21ª volta 429). Cliente A, B, C ou nível 'indefinido' (já comprou sem curva, compra antiga, só digital, ligação fraca com quem comprou, erro de leitura) vai para a fila do Aprovo, no máximo 20 esperando por diretor (a 21ª volta 429). Texto que promete orçamento sem link real, Felipe escrevendo na conversa e gráfica do Prospector também vão para a fila. Lead sem WhatsApp: 404. Resposta: { ok, resultado, destino: 'enviado_direto'|'fila_aprovo', motivo, nivel, id }; leia o nível antes em ?o=perto ou ?o=detalhe&area=comercial" } : {}),
       "POST {acao:'mover_card', numero | loteNumero, coluna, motivo}": "QUALQUER DIRETOR. Avança um pedido de etapa na produção. numero (ORC-...) ou loteNumero (move os cards do lote); coluna de 2 (Arte/Dieline) a 8 (Expedição); motivo obrigatório (até 300 caracteres). Só avança (destino maior que a coluna atual) e só de cards já Fechados (coluna 1 em diante); nunca volta, nunca vai a 0, 9 (Entregue) ou 10 (Perdido): 400 com o motivo e nada é alterado. Só muda a coluna (preço, quantidade, sinal e opcoes ficam como estão). Registra no Tracking quem moveu (seu nome) e o motivo. Não manda mensagem nem e-mail ao cliente. Resposta: { ok, resultado, movidos: [{numero, de, para}] }",
@@ -192,6 +198,15 @@ export async function POST(req: NextRequest) {
     const { ok: _ok, resultado, ...resto } = r
     void _ok
     return NextResponse.json({ ok: true, resultado, ...resto })
+  } else if (b.acao === "lancar_despesa" || b.acao === "renomear_fornecedor") {
+    if (diretor !== "cto") return NextResponse.json({ erro: `${b.acao} é só para a chave do CTO.` }, { status: 403 })
+    const r = b.acao === "lancar_despesa" ? await lancarDespesaExterno(diretor, b) : await renomearFornecedorExterno(diretor, b)
+    if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
+    msg = { id: novoId(), de: "diretor", texto: r.resultado, em: new Date().toISOString(), nuvem: true }
+    await gravarConversa(diretor, [...await lerConversa(diretor), msg])
+    const { ok: _ok, resultado, ...resto } = r
+    void _ok
+    return NextResponse.json({ ok: true, resultado, ...resto })
   } else if (b.acao === "lead") {
     const r = await leadExterno(b, diretor)
     if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
@@ -240,7 +255,7 @@ export async function POST(req: NextRequest) {
       await gravarConversa(diretor, [...await lerConversa(diretor), msg])
       return NextResponse.json({ ok: true, resultado: saida, destino: r.destino, motivo: r.motivo, nivel: r.nivel, id: r.acao.id })
     }
-  } else return NextResponse.json({ erro: `acao: relatar, mover_card, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
+  } else return NextResponse.json({ erro: `acao: relatar, lancar_despesa, renomear_fornecedor, mover_card, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
   await gravarConversa(diretor, [...await lerConversa(diretor), msg])
   return NextResponse.json({ ok: true, resultado: saida })
 }
