@@ -7,6 +7,7 @@ import { asaasConfigurado } from "@/app/lib/asaas"
 import { infinitePayConfigurado, numeroDoOrderNsu } from "@/app/lib/infinitePay"
 import { termosDigital, VERSAO_TERMOS } from "@/app/lib/termosDigital"
 import { mascararDocumento } from "@/app/lib/documento"
+import { acompanhamentoDoPedido } from "@/app/lib/acompanhamentoDigital"
 
 // Página pública do pedido digital (/d/DIG-0001?t=…): só com o link assinado. Nunca devolve custo nem margem.
 // Link da arte (Leandro): nenhum valor de venda (total, sinal, restante, opções, cobrança), ele não pode saber por quanto foi vendido
@@ -50,7 +51,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const voce = designer || !!(await auth().catch(() => null))
   if (!voce && (!pedido.ultimaVista || Date.now() - new Date(pedido.ultimaVista).getTime() > 10 * 60_000))
     after(() => gravarPedido(id, p => ({ ...p, vistoEm: p.vistoEm ?? new Date().toISOString(), ultimaVista: new Date().toISOString(), vistas: (p.vistas ?? 0) + 1 })).then(() => undefined).catch(() => undefined))
-  return NextResponse.json(publico(pedido, cfg.digital, designer))
+  // Acompanhamento no modelo da Offset: só para o cliente (a designer não vê valores) e já filtrado
+  const acompanhamento = designer ? null : await acompanhamentoDoPedido(pedido, Number((cfg as Record<string, unknown>).digitalPrazoPadraoDias) || null).catch(() => null)
+  return NextResponse.json({ ...publico(pedido, cfg.digital, designer), acompanhamento })
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

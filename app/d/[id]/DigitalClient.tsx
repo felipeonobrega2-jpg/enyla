@@ -25,7 +25,15 @@ type Pedido = {
   asaas: boolean; documento: string | null
   cobranca: { parte: "sinal" | "restante"; payload: string; imagem: string; fatura: string } | null
   cartao?: boolean
+  acompanhamento?: Acomp | null
 }
+type Acomp = {
+  numero: string; primeiroNome: string | null; medida: string; quantidade: number; tipo: string
+  etapaAtual: { nome: string; em: string | null }; historico: { nome: string; em: string | null }[]
+  arte: string; prazoEntrega: string; total: number; sinal: number
+  pago: { valor: number; em: string | null } | null; conferencia: boolean; saldo: { valor: number; vencimento: string | null } | null
+}
+const dataBr = (s: string | null) => s && /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10).split("-").reverse().join("/") : s ?? "a confirmar"
 const ehPdf = (u: string) => /\.pdf($|\?)/i.test(u)
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -319,6 +327,8 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
           ))}
         </div>
       )}
+
+      {!p.designer && p.acompanhamento && <Acompanhamento a={p.acompanhamento} />}
 
       {!p.designer && p.restante != null && !p.restantePagoEm && !p.prontoEm && (
         <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
@@ -641,4 +651,45 @@ function MudarMedidaCliente({ id, t, p, onPedido, onRascunho }: { id: string; t:
       </div>
     </div>
   )
+}
+
+// Acompanhamento no modelo da Offset: etapa atual, linha do tempo, prazo e pagamento (só o que veio filtrado da API)
+function Acompanhamento({ a }: { a: Acomp }) {
+  const card = "bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5"
+  const Linha = ({ r, v }: { r: string; v: string }) => <div className="flex justify-between gap-3 text-[13px] py-1"><span className="text-[#5e5c68]">{r}</span><span className="font-semibold text-[#191625] text-right ds-num">{v}</span></div>
+  return (<>
+    <div className={card}>
+      <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">Etapa atual</p>
+      <p className="text-[18px] font-bold text-[#191625] mt-1">{a.etapaAtual.nome}</p>
+      <p className="text-[12.5px] text-[#5e5c68]">desde {dataBr(a.etapaAtual.em)}</p>
+      <div className="mt-3 border-t border-[rgba(60,60,67,0.07)] pt-2">
+        <Linha r="Pedido" v={a.numero} />
+        {a.primeiroNome && <Linha r="Cliente" v={a.primeiroNome} />}
+        <Linha r="Medida (A × L × P)" v={a.medida} />
+        <Linha r="Quantidade" v={a.quantidade.toLocaleString("pt-BR")} />
+        <Linha r="Tipo" v={a.tipo} />
+        <Linha r="Arte" v={a.arte} />
+        <Linha r="Prazo de entrega" v={dataBr(a.prazoEntrega)} />
+      </div>
+      {a.prazoEntrega === "a confirmar" && <p className="text-[12px] text-[#898892] mt-1">A data de entrega sai depois da aprovação da arte.</p>}
+    </div>
+    <div className={card}>
+      <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-2">Linha do tempo</p>
+      <ol className="space-y-2">
+        {a.historico.map(h => (
+          <li key={h.nome} className="flex items-center gap-2 text-[13px]"><Check className="w-4 h-4 text-[#009351] shrink-0" /><span className="flex-1 text-[#191625]">{h.nome}</span><span className="text-[#898892] ds-num">{dataBr(h.em)}</span></li>
+        ))}
+      </ol>
+    </div>
+    <div className={card}>
+      <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892] mb-1">Pagamento</p>
+      <Linha r="Valor total" v={brl(a.total)} />
+      <Linha r="Sinal de 50%" v={brl(a.sinal)} />
+      {a.pago && a.saldo ? (<>
+        <Linha r={`Já pago${a.pago.em ? ` (até ${dataBr(a.pago.em)})` : ""}`} v={brl(a.pago.valor)} />
+        <Linha r="Saldo" v={brl(a.saldo.valor)} />
+        {a.saldo.valor > 0 && <Linha r="Vencimento do saldo" v={a.saldo.vencimento ? dataBr(a.saldo.vencimento) : "quando o material ficar pronto"} />}
+      </>) : <Linha r="Pago e saldo" v="em conferência" />}
+    </div>
+  </>)
 }
