@@ -1,6 +1,7 @@
 // Importador do Prospector de Parceiros: parte pura (filtro, leitura do CSV da Receita, montagem da linha e regra de gravação).
 // Nada aqui chama rede nem envia mensagem. A nota vem de notaDoProspect (app/lib/prospector.ts); não é reimplementada.
 import { CNAES_PROSPECTO, codigoCnae, notaDoProspect, servicosDosCnaes } from "./prospector"
+import { soEncadernacao, termoForaDoRamo } from "./prospectorEnvio"
 
 export const FONTE_IMPORTADOR = "Receita Federal, dados abertos de CNPJ (Estabelecimentos) + BrasilAPI (razão social e porte)"
 export const MOTIVO_IMPORTADO = "importado dos dados abertos de CNPJ"
@@ -53,6 +54,8 @@ export function candidatoDaLinha(linha: string): Candidato | null {
   const principal = codigoCnae(c[11])
   const secundarios = c[12].split(",").map(codigoCnae).filter(Boolean)
   if (![principal, ...secundarios].some(id => id in CNAES_PROSPECTO)) return null
+  // Encadernação/plastificação (1822-9/01) como único CNAE da lista não interessa.
+  if (soEncadernacao(principal, secundarios, id => id in CNAES_PROSPECTO)) return null
   const cnpj = `${c[0]}${c[1]}${c[2]}`.replace(/\D/g, "")
   if (cnpj.length !== 14) return null
   const rua = [c[13], c[14]].map(s => s.trim()).filter(Boolean).join(" ")
@@ -107,7 +110,7 @@ export type Existente = { id: number; etapa: string; opt_out: boolean }
 export type Gravacao =
   | { tipo: "inserir"; linha: LinhaProspecto & { etapa: "encontrado"; historico_etapas: { etapa: "encontrado"; em: string; motivo: string }[] } }
   | { tipo: "atualizar"; id: number; campos: LinhaProspecto }
-  | { tipo: "ignorar"; motivo: "descartado" | "opt-out" | "não ativa" }
+  | { tipo: "ignorar"; motivo: "descartado" | "opt-out" | "não ativa" | "fora do ramo" }
 
 /** Idempotente por CNPJ. Descartado e opt-out não são tocados. Quem já avançou só ganha dados cadastrais e nota: etapa e histórico ficam. */
 export function decidirGravacao(existente: Existente | null, linha: LinhaProspecto, agora: Date): Gravacao {
@@ -115,5 +118,7 @@ export function decidirGravacao(existente: Existente | null, linha: LinhaProspec
   if (existente?.etapa === "descartado") return { tipo: "ignorar", motivo: "descartado" }
   if (existente) return { tipo: "atualizar", id: existente.id, campos: linha }
   if (linha.nota <= 0) return { tipo: "ignorar", motivo: "não ativa" }
+  // Razão social ou nome fantasia claramente fora de gráfica/embalagem: não entra na base nova (quem já existe não é apagado).
+  if (termoForaDoRamo(linha.razao_social, linha.nome_fantasia)) return { tipo: "ignorar", motivo: "fora do ramo" }
   return { tipo: "inserir", linha: { ...linha, etapa: "encontrado", historico_etapas: [{ etapa: "encontrado", em: agora.toISOString(), motivo: MOTIVO_IMPORTADO }] } }
 }

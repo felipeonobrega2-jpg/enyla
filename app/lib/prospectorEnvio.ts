@@ -1,6 +1,41 @@
 // Envio automático do Prospector (primeiro contato e lembrete): regras puras. Nada aqui envia mensagem.
 // O servidor (prospectorEnvioServidor.ts) usa estas funções e é quem fala com Resend e Evolution.
 
+const semAcento = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+const soDigitos = (v: string | null | undefined) => (v ?? "").replace(/\D/g, "")
+
+/** Termo de TERMOS_FORA_DO_RAMO achado na razão social ou no nome fantasia, ou null. */
+export function termoForaDoRamo(razaoSocial: string | null | undefined, nomeFantasia: string | null | undefined): string | null {
+  const nomes = [razaoSocial, nomeFantasia].map(n => semAcento(n ?? ""))
+  return TERMOS_FORA_DO_RAMO.find(t => { const k = semAcento(t).trim(); return !!k && nomes.some(n => n.includes(k)) }) ?? null
+}
+
+/** `listados`: ids de CNAE (só dígitos) que estão em CNAES_PROSPECTO. Verdadeiro se o único da lista é 1822-9/01. */
+export function soEncadernacao(principal: string | null | undefined, secundarios: readonly string[] | null | undefined, listados: (id: string) => boolean): boolean {
+  const da = [...new Set([principal, ...(secundarios ?? [])].map(soDigitos).filter(id => id && listados(id)))]
+  return da.length === 1 && da[0] === CNAE_SO_ENCADERNACAO
+}
+
+/** Nota mínima para qualificar: a configurada, ou NOTA_MINIMA_SO_SECUNDARIO (se for maior) quando o CNAE principal está fora da lista. */
+export function notaMinimaDe(principal: string | null | undefined, minimoConfigurado: number, listados: (id: string) => boolean): number {
+  const p = soDigitos(principal)
+  // Sem CNAE principal registrado não há como saber: segue o mínimo configurado.
+  return !p || listados(p) ? minimoConfigurado : Math.max(minimoConfigurado, NOTA_MINIMA_SO_SECUNDARIO)
+}
+
+/** Motivo de não qualificar (a pessoa fica na base, só não é abordada), ou null se serve. */
+export function motivoNaoQualifica(
+  p: { razao_social?: string | null; nome_fantasia?: string | null; cnae_principal?: string | null; cnaes_secundarios?: readonly string[] | null; nota?: number | null },
+  minimoConfigurado: number, listados: (id: string) => boolean,
+): string | null {
+  const termo = termoForaDoRamo(p.razao_social, p.nome_fantasia)
+  if (termo) return `nome fora do ramo (“${termo}”)`
+  if (soEncadernacao(p.cnae_principal, p.cnaes_secundarios, listados)) return "só encadernação/plastificação (1822-9/01)"
+  const min = notaMinimaDe(p.cnae_principal, minimoConfigurado, listados)
+  if ((p.nota ?? 0) < min) return `CNAE da lista só como secundário: nota ${p.nota ?? 0} < mínimo ${min}`
+  return null
+}
+
 export type Passo = "primeiro_contato" | "lembrete"
 export type Canal = "whatsapp" | "email"
 /** reservado = gravado antes de enviar (um segundo disparo já enxerga); enviado = saiu; falhou = não saiu, pode tentar de novo. */
@@ -12,6 +47,14 @@ export type EnvioHistorico = { passo: Passo; canal: Canal; status: StatusEnvio; 
 export const CHAVE_ENVIO_ATIVO = "prospector_envio_ativo"
 export const CHAVE_NOTA_MINIMA = "prospector_nota_minima"
 export const NOTA_MINIMA_PADRAO = 1
+/** Nota mínima de quem tem CNAE da lista só como secundário (o principal está fora da lista): é gráfica "talvez", então exige mais.
+ *  Quem tem o CNAE principal na lista usa `prospector_nota_minima`. Vale como piso: nunca fica abaixo da nota mínima configurada. */
+export const NOTA_MINIMA_SO_SECUNDARIO = 2
+/** Termos que, na razão social ou no nome fantasia, mostram que a empresa não é gráfica/embalagem. Fácil de editar: acrescente ou tire uma palavra.
+ *  Comparação sem acento e sem maiúsculas, por trecho do nome (o termo "festa" pega "festas"). */
+export const TERMOS_FORA_DO_RAMO: readonly string[] = ["inflavel", "inflaveis", "balao", "baloes", "figurinha", "brinquedo", "festa"]
+/** Único CNAE da lista que, sozinho, não qualifica: encadernação e plastificação (1822-9/01). */
+const CNAE_SO_ENCADERNACAO = "1822901"
 /** Cota de primeiros contatos por dia (dia de São Paulo), só do WhatsApp. E-mail não tem teto diário. */
 export const LIMITE_WHATSAPP_PRIMEIROS_POR_DIA = 10
 /** Limite técnico por execução (a rota tem maxDuration de 120s): e-mails enviados (primeiro contato e lembrete) e tempo total. O resto fica para o próximo cron. */
