@@ -267,6 +267,19 @@ describe("cadência do lembrete", () => {
     await rodar(dias(SEG_10H, 21)); await rodar(dias(SEG_10H, 42))
     expect(envios.evo).toHaveBeenCalledTimes(2)   // primeiro contato + lembrete, nunca terceira
   })
+  it("primeiro contato por e-mail: sem lembrete em nenhum canal e sem encerramento (resposta por e-mail não é detectada)", async () => {
+    const a = novo({ email: "a@grafica.com.br" })
+    await rodar(SEG_10H)
+    expect(envios.email).toHaveBeenCalledTimes(1)
+    expect(envios.evo).toHaveBeenCalledTimes(1)
+    expect((await rodar(dias(SEG_10H, 3))).lembretes).toBe(0)
+    const fim = await rodar(dias(SEG_10H, 7))
+    expect(fim.lembretes).toBe(0); expect(fim.encerrados).toBe(0)
+    await rodar(dias(SEG_10H, 42))
+    expect(doBanco(a).etapa).toBe("abordado")
+    expect(envios.email).toHaveBeenCalledTimes(1)
+    expect(envios.evo).toHaveBeenCalledTimes(1)
+  })
   it("encerrado não volta a ser qualificado nem recebe nada", async () => {
     const a = novo({ etapa: "encerrado_sem_resposta" })
     await rodar(SEG_10H)

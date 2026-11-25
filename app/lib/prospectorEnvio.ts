@@ -62,6 +62,13 @@ export const MAX_EMAILS_POR_EXECUCAO = 60
 export const ORCAMENTO_MS_POR_EXECUCAO = 90_000
 export const DIAS_ATE_LEMBRETE = 3
 export const DIAS_ATE_ENCERRAR = 3
+/**
+ * Lembrete (e o encerramento por falta de resposta) para quem recebeu o primeiro contato por e-mail.
+ * Desligado porque a resposta ao e-mail cai só no Gmail (Reply-To) e nenhum código a detecta: quem já respondeu
+ * ainda estaria `abordado` e receberia o lembrete. Volta a `true` quando a entrada de e-mail (detecção de resposta) existir.
+ * Quem foi abordado só por WhatsApp não é afetado: a detecção de resposta do WhatsApp já para a cadência.
+ */
+export const LEMBRETE_EMAIL_ATIVO = false
 export const HORA_INICIO = 8
 export const HORA_FIM = 20
 export const MAX_FALHAS_POR_CANAL = 3
@@ -159,6 +166,11 @@ export function passoIniciado(envios: readonly EnvioHistorico[], passo: Passo): 
 export function passoSaiu(envios: readonly EnvioHistorico[], passo: Passo): EnvioHistorico | null {
   const feitos = envios.filter(e => e.passo === passo && saiu(e)).sort((a, b) => a.em.localeCompare(b.em))
   return feitos[0] ?? null
+}
+
+/** Cadência (lembrete e encerramento) suspensa: o primeiro contato saiu por e-mail e ainda não há detecção de resposta por e-mail. */
+export function cadenciaSuspensaPorEmail(envios: readonly EnvioHistorico[]): boolean {
+  return !LEMBRETE_EMAIL_ATIVO && envios.some(e => e.passo === "primeiro_contato" && e.canal === "email" && saiu(e))
 }
 
 export const MS_DIA = 86_400_000
