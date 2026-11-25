@@ -12,6 +12,10 @@ Diretores propõem. Estas decisões é que mandam no que se constrói.
 4. Se a decisão mudar um item da fila, atualize [docs/fila.md](fila.md) no mesmo pull request.
 5. Não apague decisão antiga. Ela fica embaixo, para se saber o que valeu antes.
 
+## 25/11/2026 08:29 — qualquer caixa de medicamento e de qualquer marca; quem nunca comprou é lead
+
+**Decisão.** Horário: 25/11/2026 08:29 (America/Sao_Paulo). A ENYLA faz caixa de medicamento, farmácia, peptídeo, suplemento e de qualquer marca, inclusive marca de terceiro; ninguém é desqualificado por isso e o agente nunca pergunta se o cliente é dono da marca (qualifica pelo volume). A recusa de cigarro continua. Quem nunca comprou é `lead` (mesmo com cadastro em `Cliente` ou orçamento aberto) e a mensagem sai direto; só A, B e C vão para o Aprovo, e `indefinido` fica para falha de leitura, compra sem curva e ligação fraca com quem comprou. **Porquê.** Somos especialistas nesse tipo de caixa e o sistema estava dispensando oportunidades; o cadastro sem compra não é cliente.
+
 ## 24/11/2026 07:07 — texto do Prospector: sem opt-out e sem link no primeiro contato
 
 **Decisão.** Horário: 24/11/2026 07:07 (America/Sao_Paulo). Esta decisão **substitui** a de 23/11/2026 sobre o texto do Prospector (22:27 e 22:40: "opt-out e link `/parceiros`" em toda mensagem).

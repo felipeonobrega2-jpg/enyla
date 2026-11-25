@@ -3,8 +3,9 @@ import { supabase } from "@/app/lib/supabase"
 import { clienteClaude, erroClaude, FALLBACK, MODELO, MSG_RECUSA } from "@/app/lib/claude"
 import { calcularResumoFinanceiro } from "@/app/lib/financeiro"
 import type { KanbanCard, LancamentoFinanceiro, NegocioParceiro } from "@/app/types"
-import { COLUNAS_KANBAN, COL_FECHADO } from "@/app/types"
+import { COLUNAS_KANBAN } from "@/app/types"
 import { licoesNoPrompt, adicionarLicao } from "@/app/lib/licoesIA"
+import { moverCard } from "@/app/lib/moverCard"
 import { lerLicoesIA, mudarLicoesIA } from "@/app/lib/licoesIAServidor"
 
 type ChatMsg = { role: "user" | "assistant"; content: string }
@@ -202,19 +203,8 @@ async function executarAcao(token: string): Promise<{ ok: true; mensagem: string
   }
 
   if (acao.tool === "mover_pedido") {
-    const dataFechamento = acao.novaColuna === COL_FECHADO ? hoje() : undefined
-    const { error } = await supabase.from("KanbanCard")
-      .update({ coluna: acao.novaColuna, ...(dataFechamento ? { dataFechamento } : {}) })
-      .eq("id", acao.id)
-    if (error) return { erro: "Erro ao mover o pedido no banco." }
-
-    const { data: tracking } = await supabase.from("Tracking").select("*").eq("numero", acao.numero).maybeSingle()
-    if (tracking) {
-      const colNome = COLUNAS_KANBAN[acao.novaColuna] ?? `Coluna ${acao.novaColuna}`
-      const jaTem = (tracking.etapas ?? []).some((e: { coluna: number }) => e.coluna === acao.novaColuna)
-      const etapas = jaTem ? tracking.etapas : [...(tracking.etapas ?? []), { coluna: acao.novaColuna, nome: colNome, dataHora: new Date().toLocaleString("pt-BR") }]
-      await supabase.from("Tracking").update({ colunaAtual: acao.novaColuna, etapas }).eq("numero", acao.numero)
-    }
+    const r = await moverCard({ id: acao.id, numero: acao.numero }, acao.novaColuna)
+    if (!r.ok) return { erro: "Erro ao mover o pedido no banco." }
     return { ok: true, mensagem: `Pedido ${acao.numero} movido para "${COLUNAS_KANBAN[acao.novaColuna]}".` }
   }
 

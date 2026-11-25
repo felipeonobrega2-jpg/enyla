@@ -12,6 +12,7 @@ import { faltaParaProposta, faltaParaOrcar } from "./propostaPronta"
 import { emCampanha, type EstadoCampanha } from "./campanhaDigital"
 import type { RegraDigital } from "./precoDigital"
 import { supabase } from "./supabase"
+import { maisRecentesPrimeiro, ultimaMensagemReal } from "./ultimaMensagem"
 import { evo } from "./evolution"
 import { gravarLote, WaMessage, deveIgnorar } from "./whatsappDados"
 import { atender, lerConfigAtendente } from "./atendenteServidor"
@@ -398,11 +399,10 @@ async function avisarSemCredito(cfg: CfgAgente) {
 
 // A última mensagem de verdade: o "Estou fora do horário" do WhatsApp Business sai na hora, como se fosse sua, e
 // fazia o agente achar que você já tinha respondido (o lead da noite ficava sem a abertura)
-const ultimaDa = async (jid: string) => {
-  const { data } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo, tipo").eq("jid", jid).order("ts", { ascending: false }).limit(6)
+export const ultimaDa = async (jid: string) => {
   // A saudação automática que o lead manda também não conta: ele não está esperando resposta
-  const m = (data ?? []).find(x => !(x.from_me && ehMensagemAutomaticaDoWhatsapp(x.corpo, x.tipo)) && !(!x.from_me && ehSaudacaoAutomaticaDoLead(x.corpo)))
-  return m ? { id: m.id as string, from_me: m.from_me as boolean, ts: m.ts as string } : null
+  const m = await ultimaMensagemReal(jid)
+  return m ? { id: m.id, from_me: m.from_me, ts: m.ts } : null
 }
 
 const primeiraDa = async (jid: string) =>
@@ -449,11 +449,15 @@ const contexto = (cfg: CfgAgente, log: Registro[], jid: string) => ({
 const espera = (min: number, max: number) => new Promise(r => setTimeout(r, (min + Math.random() * (max - min)) * 1000))
 
 // A conversa pelo id gravado (a gravação pode ter juntado o @lid com o número); null se a mensagem já não é a última
-async function aindaEhAUltima(msgId: string) {
-  const { data: msg } = await supabase.from("whatsapp_mensagens").select("jid").eq("id", msgId).maybeSingle()
+// Mensagem do lead com o mesmo `ts` da última conta como a última (ele mandou junto), para a resposta não sair calada.
+export async function aindaEhAUltima(msgId: string) {
+  const { data: msg } = await supabase.from("whatsapp_mensagens").select("jid, ts, from_me").eq("id", msgId).maybeSingle()
   if (!msg?.jid) return null
   const ultima = await ultimaDa(msg.jid as string)
-  return ultima && ultima.id === msgId && !ultima.from_me ? msg.jid as string : null
+  if (!ultima || ultima.from_me) return null
+  if (ultima.id === msgId) return msg.jid as string
+  const junto = !msg.from_me && !!msg.ts && new Date(ultima.ts).getTime() === new Date(msg.ts as string).getTime()
+  return junto ? msg.jid as string : null
 }
 
 async function jidDaMensagem(msgId: string) {
@@ -585,7 +589,11 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   if (await segurarSaudacaoDoLead(cfg, msgId).catch(() => false)) return
   if (!opts.atrasada) await espera(10, 25)
   const jid = await aindaEhAUltima(msgId)
-  if (!jid) return
+  if (!jid) {
+    // Atrasada que perdeu para uma mensagem mais nova do lead: o vigia não pode dá-la como tentada (a conversa ficaria parada)
+    if (opts.atrasada) await mudarConfig((d: { vigiaTentouV3?: string[] }) => ({ vigiaTentouV3: (d.vigiaTentouV3 ?? []).filter(x => x !== msgId) })).catch(() => null)
+    return
+  }
   // Gráfica do Prospector (também na resposta atrasada, em assumir e continuar e em retomar parados): sem IA, sem envio
   if (await ehProspecto(jid)) return
   // Cada mensagem do lead é respondida uma vez só (dois disparos ao mesmo tempo: só um passa)
@@ -889,7 +897,7 @@ export async function talvezRetomarParados(origem: string): Promise<string> {
   for (const c of candidatas) {
     if (disparadas >= RETOMADAS_POR_RODADA) break
     const feitas = new Set(naoSaiu.has(c.jid) ? [] : feitasTodas)
-    const { data: todas } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo, tipo").eq("jid", c.jid).order("ts", { ascending: false }).limit(40)
+    const { data: todas } = await maisRecentesPrimeiro(supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo, tipo").eq("jid", c.jid)).limit(40)
     const ms = (todas ?? []).filter(m => !(m.from_me && ehMensagemAutomaticaDoWhatsapp(m.corpo, m.tipo)))
     const u = ms[0]
     if (!u || u.from_me || feitas.has(u.id) || agora - new Date(u.ts).getTime() < 5 * 60_000) continue   // já respondida, já retomada ou recém-chegada

@@ -1,7 +1,7 @@
 // Montagem do pedido do atendente à IA (parte pura: não lê banco nem chama a IA). O servidor (atendenteServidor.ts) e o
 // script de comparação (scripts/comparar-followup.mts) usam estas funções, para o pedido ser idêntico nos dois.
 
-import { conhecimentoRelevante, conhecimentoNoPrompt, filtroDoAgente, type Conhecimento } from "./agenteLeads"
+import { conhecimentoRelevante, conhecimentoNoPrompt, filtroDoAgente, REGRA_PRODUTO, type Conhecimento } from "./agenteLeads"
 import { agoraParaIA } from "./atendente"
 import { instrucaoDoMotivo } from "./reativacao"
 import { textoEstilo, type EstiloFelipe } from "./estilo"
@@ -141,6 +141,9 @@ Seu trabalho principal com quem chega do anúncio é descobrir os bons negócios
 <filtro_leads>
 ${filtroDoAgente(cfg)}
 </filtro_leads>
+
+${REGRA_PRODUTO}
+
 Como decidir a resposta:
 - Responda ao que o cliente disse por último, no ponto da conversa em que estão. Espelhe o tom dele.
 - No máximo 2 mensagens curtas (separadas por uma linha em branco); quase sempre 1 basta. Frases completas, nada de fragmentos soltos.
@@ -175,17 +178,21 @@ Regras que nunca quebram:
   const todos = cfg.conhecimentoAgente ?? []
   const ensinado = todos.filter(i => i.id.startsWith("felipe-"))
   const doAssunto = conhecimentoRelevante(todos, `${historicoAnterior}\n${historico}`).filter(i => !i.id.startsWith("felipe-"))
-  const intro = `O que você já aprendeu com os atendimentos do próprio Felipe (conversas e áudios dele). Use para responder como ele; se contradiz o filtro, vale o filtro. Valores daqui são histórico dele: não cite valor que não esteja no filtro.`
+  const intro = `O que você já aprendeu com os atendimentos do próprio Felipe (conversas e áudios dele). Use para responder como ele; se contradiz o filtro ou a regra sobre o produto, vale o filtro e a regra. Valores daqui são histórico dele: não cite valor que não esteja no filtro.`
   const aprendido = ensinado.length ? `${intro}
 
 <aprendido>
 ${conhecimentoNoPrompt(ensinado)}
-</aprendido>` : ""
+</aprendido>
+
+${REGRA_PRODUTO}` : ""
   const aprendidoDoAssunto = doAssunto.length ? `${ensinado.length ? "Mais do que você aprendeu, escolhido pelo assunto desta conversa (mesmas regras do bloco acima):" : intro}
 
 <aprendido_desta_conversa>
 ${conhecimentoNoPrompt(doAssunto)}
-</aprendido_desta_conversa>` : ""
+</aprendido_desta_conversa>
+
+${REGRA_PRODUTO}` : ""
   const nome = nomeParaChamar(conv?.nome)
   const extra = [
     p.agora ?? agoraParaIA(),
