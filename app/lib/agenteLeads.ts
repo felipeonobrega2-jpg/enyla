@@ -266,6 +266,7 @@ QUEM É O NOSSO CLIENTE
 - Pedido mínimo: em torno de 1.000 no total. Regra: quanto menor a caixa, maior precisa ser a quantidade (caixinha de 15ml: umas 1.000 de cada modelo).
 
 FAIXAS
+- Cada faixa vale por um modelo e uma arte (24/11/2026): entre 201 e 999 de uma arte é inviável (oferecer descer para até 200 no digital ou subir para pelo menos 1.000 no offset); nunca some artes, mesmo na mesma faca.
 - Menos de 1.000 no total (10, 30, 50, 100, 500…): não é nosso cliente. É a maioria dos leads do anúncio.
 - 1.000 a 4.999: atendemos, mas deixe claro que o custo unitário fica mais alto ("é padrão de indústria: quanto menor a quantidade, maior o custo unitário"). Siga levantando os dados.
 - 5.000 ou mais, ou recorrente (ex.: 3 mil por semana, 20 mil por mês): cliente ideal. Levante os dados e me chame (decisao_sua): eu assumo.
@@ -314,17 +315,20 @@ export const filtroEfetivo = (t?: string | null) => t?.trim() || FILTRO_PADRAO
 // Você vende o lead pequeno em impressão digital: troca a regra de indicar o parceiro por levantar os dados do orçamento
 export const SECAO_DIGITAL = `LEAD PEQUENO (menos de 1.000): VENDEMOS EM IMPRESSÃO DIGITAL
 - Poucas unidades a gente também faz, em impressão digital: triplex 300g com laminação fosca ou brilhante, arte inclusa (nossa designer cria). Não indique outra gráfica e não passe contato de parceiro.
-- Pedido mínimo: em offset fica em torno de 1.000; abaixo disso, de 20 a 500 caixas, a gente faz em impressão digital.
+- FAIXAS DE QUANTIDADE (Felipe, 24/11/2026): valem SEMPRE por um modelo e uma arte; nunca some modelos, fragrâncias ou artes, nem quando usam a mesma faca. Cada arte entra na sua faixa:
+  · até 200 unidades da arte: vale no digital; arte extra no mesmo pedido: R$ 100 por arte.
+  · de 201 a 999 unidades da arte (inclusive 500): inviável, caro demais em digital e em offset. Não cote. Ofereça os dois caminhos: diminuir para até 200 no digital (MVP/teste) ou aumentar para pelo menos 1.000 no offset para diluir o custo.
+  · 1.000 ou mais da arte: offset. Quem orça offset é o Felipe: levante os dados, não passe valor e use alerta "decisao_sua".
 - O que precisa para o orçamento: a quantidade e o ml do frasco (ou as medidas da caixa: altura x largura x profundidade). Pergunte o que faltar, uma coisa por vez.
 - Não escreva preço da impressão digital. Assim que tiver a quantidade e o ml (ou as medidas), o orçamento com o link do sinal de 50% pelo Pix sai na sua próxima mensagem — não anuncie isso, só pergunte o que falta. Depois que ele foi, você pode repetir os valores que estão nele.
 - Frete: não fale dele por conta própria. Só se ele perguntar: é calculado no final do pedido, pelo CEP. Prazo: começa depois do sinal; a designer manda a arte para ele aprovar antes de imprimir.
 - Hot stamping em digital não dá: sugira simular o hot stamping na arte.
-- Modelos ou fragrâncias diferentes: dá para fazer artes diferentes no mesmo pedido (a designer ajusta o nome de cada uma). Pergunte quantas de cada, mas o orçamento é pela quantidade total.
+- Modelos ou fragrâncias diferentes: dá para fazer artes diferentes no mesmo pedido (a designer ajusta o nome de cada uma). Pergunte quantas de cada: a faixa vale por arte, não pelo total. Ex.: 2 artes de 500 na mesma faca = cada arte em 500, inviável (não vira 1.000 de offset).
 - Deixe a porta aberta para frasco, essência, válvula ou envase (só vira oportunidade em volume: 1.000+ ou recorrente).
-- Se ele topar 1.000 ou mais, vira lead normal (offset).`
+- Se ele topar 1.000 ou mais por arte, vira lead normal (offset).`
 export function filtroDoModo(filtro: string, parceiro: boolean): string {
   if (parceiro) return filtro
-  const faixa = filtro.replace(/^- Menos de 1\.000 no total[^\n]*$/m, "- Menos de 1.000 no total: atendemos em impressão digital (ver LEAD PEQUENO).")
+  const faixa = filtro.replace(/^- Menos de 1\.000 no total[^\n]*$/m, "- Faixas por modelo e arte (nunca somar): até 200 digital; de 201 a 999 inviável (oferecer 200 no digital ou 1.000 no offset); 1.000 ou mais offset (ver LEAD PEQUENO).")
   const sec = /^LEAD PEQUENO[^\n]*\n[\s\S]*?(?=\n\n[A-ZÇÃÕÉÊÍÓÚ][A-ZÇÃÕÉÊÍÓÚ ]+\n|(?![\s\S]))/m
   return sec.test(faixa) ? faixa.replace(sec, SECAO_DIGITAL) : `${faixa}\n\n${SECAO_DIGITAL}\n(Esta regra vale sobre qualquer outra sobre lead pequeno acima.)`
 }

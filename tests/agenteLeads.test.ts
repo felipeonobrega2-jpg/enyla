@@ -138,6 +138,24 @@ describe("lead pequeno: parceiro ou digital", async () => {
     expect(f).toContain("O QUE NÃO FAZEMOS")      // o resto do filtro continua
     expect(f).toContain("LEVANTAR DADOS")
   })
+  it("faixas por modelo e arte (24/11/2026)", async () => {
+    const f = filtroDoModo(FILTRO_PADRAO, false)
+    expect(f).not.toContain("de 20 a 500")
+    expect(f).not.toContain("orçamento é pela quantidade total")
+    expect(SECAO_DIGITAL).not.toContain("de 20 a 500")
+    expect(SECAO_DIGITAL).not.toContain("orçamento é pela quantidade total")
+    expect(SECAO_DIGITAL).toContain("até 200 unidades da arte: vale no digital")     // 200, uma arte
+    expect(SECAO_DIGITAL).toContain("de 201 a 999 unidades da arte (inclusive 500): inviável") // 300 e 500
+    expect(SECAO_DIGITAL).toContain("pelo menos 1.000 no offset")
+    expect(SECAO_DIGITAL).toContain("nunca some modelos")                              // 2×500 mesma faca
+    expect(SECAO_DIGITAL).toContain("não vira 1.000 de offset")
+    expect(SECAO_DIGITAL).toMatch(/1\.000 ou mais da arte: offset[^\n]*não passe valor/)  // sem inventar preço
+    const { pedidoAtendente } = await import("@/app/lib/pedidoAtendente")
+    const pedido = JSON.stringify(pedidoAtendente({ modelo: "m", cfg: { agenteAuto: { pequenoParceiro: false } } as any, opts: {}, contexto: "", origem: "", historico: "", historicoAnterior: "", blocos: [], nomeConversa: null }))
+    expect(pedido).toContain("2 artes de 500 = cada uma em 500")
+    expect(pedido).toContain("De 201 a 999 por arte (inclusive 500) NÃO emita orçamento")
+    expect(pedido).toContain("sem valor")
+  })
   it("filtro seu sem a seção: acrescenta a regra no fim", () => {
     expect(filtroDoModo("OBJETIVO\nvender caixa", false)).toContain(SECAO_DIGITAL)
   })

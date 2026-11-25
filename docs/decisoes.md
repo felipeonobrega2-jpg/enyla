@@ -12,6 +12,21 @@ Diretores propõem. Estas decisões é que mandam no que se constrói.
 4. Se a decisão mudar um item da fila, atualize [docs/fila.md](fila.md) no mesmo pull request.
 5. Não apague decisão antiga. Ela fica embaixo, para se saber o que valeu antes.
 
+## 24/11/2026 07:56 — faixas de quantidade sempre por um modelo e uma arte
+
+**Decisão.** Horário: 24/11/2026 07:56 (America/Sao_Paulo), item `cco-mwukx9zo`; regra final fechada em 25/11/2026 07:51 por Rafael (COO) e Otávio (CFO), por delegação do Felipe. Texto da CCO:
+
+> Faixas de quantidade do Felipe (24/11/2026), sempre considerando UM modelo/arte: ate 200 unidades vale no Digital. Entre ~201 e ~999 unidades fica inviavel (caro demais em Digital e em Offset): recomendar ao lead diminuir para ate 200 no Digital (MVP/teste) ou aumentar para pelo menos 1.000 unidades no Offset para diluir o custo. Esta regra detalha a regra anterior dos ~500 unidades.
+
+- Até 200 por arte: Digital, com R$ 100 por arte extra.
+- De 201 a 999 por arte: inviável; o Atendente não cota e oferece descer para 200 no Digital ou subir para 1.000 no Offset.
+- 1.000 ou mais por arte: Offset (quem orça é o Felipe).
+- Mesma faca com várias artes conta por arte, sem somar (caso Roger: 2 artes de 500 = inviável em cada arte). O classificador de MQL pode continuar somando; a resposta ao lead não.
+- Preço (`calcular()` e o 1,8 «com faca») não muda.
+- O aprendizado `8qcdislv` («1.000 no total, não por modelo») não foi alterado no banco; no prompt o filtro vale sobre ele. Deve ser encerrado depois, pelo sistema.
+
+**Porquê.** O Atendente cotava 500 unidades no Digital («de 20 a 500 caixas») e somava 2×500 na mesma faca para virar Offset de 1.000 («orçamento pela quantidade total»).
+
 ## 24/11/2026 07:07 — texto do Prospector: sem opt-out e sem link no primeiro contato
 
 **Decisão.** Horário: 24/11/2026 07:07 (America/Sao_Paulo). Esta decisão **substitui** a de 23/11/2026 sobre o texto do Prospector (22:27 e 22:40: "opt-out e link `/parceiros`" em toda mensagem).
