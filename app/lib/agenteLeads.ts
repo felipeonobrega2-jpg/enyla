@@ -160,6 +160,36 @@ function travaFirme(c: ContextoEnvio): string | null {
   return null
 }
 
+// ── Promessa de orçamento sem proposta real ──────────────────────────────────
+// "Segue o orçamento", "já te mando", "tô finalizando", "segue em anexo": só podem sair junto de um link /d/DIG-… de
+// pedido que existe ou de um PDF realmente anexado. Sem isso, a frase é trocada por "estou preparando" e a pendência
+// vai para o Felipe (alerta "decisao_sua"). "Vou preparar o seu orçamento" não promete envio nem anexo: continua válido.
+export const TEXTO_PREPARANDO_ORCAMENTO = "Vou preparar o seu orçamento."
+const PROMETE_ENVIO = new RegExp([
+  String.raw`\b(segue|seguem|aqui est[aá]|segue em anexo|em anexo|anexei|mandei|enviei)\b[^.!?\n]{0,40}\b(or[cç]amento|proposta|pdf|link|valor|anexo)`,
+  String.raw`\bsegue(m)? em anexo\b`,
+  String.raw`\b(te mand(o|ei)|te envio|te passo|te encaminho)\b[^.!?\n]{0,40}\b(or[cç]amento|proposta|pdf|link|valor)`,
+  String.raw`\bj[aá] te (mando|envio|passo|encaminho)\b`,
+  String.raw`\b(t[oô]|estou|to) finalizando\b`,
+  String.raw`\bvou (montar|finalizar|fechar)\b[^.!?\n]{0,40}\b(or[cç]amento|proposta)\b[^.!?\n]{0,40}\b(mand|envi|passo)`,
+].join("|"), "i")
+export const prometeEnvioDeOrcamento = (t: string) => PROMETE_ENVIO.test(t)
+
+// Links /d/DIG-… do texto que são de pedidos que existem
+export const temPropostaReal = (texto: string, idsExistentes: Iterable<string>) => {
+  const ids = new Set([...idsExistentes].map(i => i.toUpperCase()))
+  return [...texto.matchAll(/\/d\/(DIG-\d+)/gi)].some(m => ids.has(m[1].toUpperCase()))
+}
+
+// Devolve a resposta segura: com proposta real (ou PDF anexado) a fala passa intacta; sem ela, as frases que prometem
+// envio saem e, se não sobrar nada, fica "Vou preparar o seu orçamento." Quem chama marca a pendência (decisao_sua).
+export function travaPromessaDeOrcamento(resposta: string, o: { idsExistentes: Iterable<string>; pdfAnexado?: boolean }): { resposta: string; reescrita: boolean } {
+  if (o.pdfAnexado || !prometeEnvioDeOrcamento(resposta) || temPropostaReal(resposta, o.idsExistentes)) return { resposta, reescrita: false }
+  const linhas = resposta.split(/\n/).map(l => l.split(/(?<=[.!?])\s+/).filter(f => !prometeEnvioDeOrcamento(f)).join(" ").trim())
+  const resto = linhas.join("\n").replace(/\n{3,}/g, "\n\n").trim()
+  return { resposta: resto && /\w/.test(resto) ? resto : TEXTO_PREPARANDO_ORCAMENTO, reescrita: true }
+}
+
 // ── Etiquetas e etapas que o agente organiza ─────────────────────────────────
 // Lead bom → MQL (você atende, sem o contato perceber a troca). Lead ruim → Descartado.
 // Sem resposta → F1, F2, F3 e, por fim, Sem resposta (vai para Perdido).
