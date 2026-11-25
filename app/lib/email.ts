@@ -25,7 +25,7 @@ export function esperaDoRetryAfter(v: string | null): number {
 
 export const emailConfigurado = () => !!process.env.RESEND_API_KEY
 
-export async function enviarEmail(para: string, e: Email, anexos: { nome: string; base64: string }[] = [], opcoes: { de?: string; responderPara?: string } = {}): Promise<{ ok: true; id: string } | { ok: false; erro: string }> {
+export async function enviarEmail(para: string, e: Email, anexos: { nome: string; base64: string }[] = [], opcoes: { de?: string; responderPara?: string } = {}): Promise<{ ok: true; id: string } | { ok: false; erro: string; status?: number; cota?: boolean }> {
   const chave = process.env.RESEND_API_KEY
   if (!chave) return { ok: false, erro: "e-mail ainda não configurado (falta a chave da Resend)" }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(para)) return { ok: false, erro: "e-mail inválido" }
@@ -46,7 +46,10 @@ export async function enviarEmail(para: string, e: Email, anexos: { nome: string
       if (r.status !== 429 || tentativa >= MAX_TENTATIVAS_429) break
       await dormir(esperaDoRetryAfter(r.headers.get("retry-after")))
     }
-    const j = await r.json().catch(() => ({})) as { id?: string; message?: string }
-    return r.ok && j.id ? { ok: true, id: j.id } : { ok: false, erro: j.message ?? `Resend respondeu ${r.status}` }
+    const j = await r.json().catch(() => ({})) as { id?: string; message?: string; name?: string }
+    if (r.ok && j.id) return { ok: true, id: j.id }
+    // cota diária/mensal esgotada (429 com name *_quota_exceeded): quem chama pode guardar na fila em vez de perder
+    const cota = r.status === 429 && /quota/i.test(`${j.name ?? ""} ${j.message ?? ""}`)
+    return { ok: false, erro: j.message ?? `Resend respondeu ${r.status}`, status: r.status, ...(cota ? { cota: true } : {}) }
   } catch (err) { return { ok: false, erro: String(err) } }
 }

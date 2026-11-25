@@ -142,3 +142,22 @@ Resposta ao "não" (não é enviada automaticamente; o Prospector só marca o op
 ```
 Obrigado pelo retorno. Não vamos voltar a escrever. Um abraço, ENYLA.
 ```
+
+## Resposta dos diretores aos e-mails (porta externa)
+
+A CCO e a CMO respondem aos prospectos pela porta (`app/api/externo/route.ts`), sem depender do Gmail do Felipe. Código em `app/lib/respostaProspecto.ts`.
+
+**Ação** `POST {acao:"responder_prospecto", prospecto_id, texto, assunto?}`, só chaves do CCO e da CMO (outras: 403).
+- Destinatário = `prospectos_parceiros.email` do prospecto. O corpo nunca escolhe o endereço.
+- Recusa com 409 se `opt_out` ou etapa `descartado`. Sem e-mail válido: 422.
+- Se o e-mail ou o CNPJ casar com um cliente de nível A, B, C ou indefinido (`nivelCliente`), não envia: 409 com `destino: "fila_aprovo"`; o caminho é `ordenar_funcionario`, que segue no Aprovo do Felipe. Falha ao ler o cadastro de clientes conta como cliente.
+- Remetente `parceiros@enyla.com.br`. `reply_to` = `PROSPECTOR_REPLY_TO` se preenchida, senão o atual (`REMETENTE_REPLY_TO`). Assunto padrão `Re: ` + `ASSUNTO_EMAIL`.
+- Enviado: 200 `{ ok, enviado, id }` e o `historico_etapas` do prospecto ganha `{ resposta: { canal: "email", diretor, em } }`, sem mudar a etapa e sem contar como envio do Prospector.
+
+**Fila.** Migração só aditiva `supabase/migrations/20261128_emails_saida_fila.sql` (tabela `emails_saida_fila`, RLS ligada e sem políticas; o app usa a service key). O Felipe roda uma vez no SQL Editor. A ação grava `na_fila` antes de enviar, para nada se perder. Cota da Resend esgotada (429 diária ou mensal; Free: 100/dia, dia UTC, volta às 21h de Brasília) ou 5xx: fica `na_fila` e a resposta é 202 `{ fila: true, tentaDe: "21:00 de Brasília" }`. O cron `/api/prospector/fila-respostas` (a cada 15 minutos, `CRON_SECRET` como os outros, sem janela de horário) envia os mais antigos primeiro, só os que estão na fila há mais de 2 minutos. Cota esgotada não conta tentativa e encerra a rodada; outro erro conta, e na 3ª vira `falhou`. Prospecto que pediu para sair depois de entrar na fila não recebe (vira `falhou`).
+
+**Cota separada.** Estes envios não entram no teto do Prospector (#136): vivem em outra tabela e não deixam `envio` no histórico. Teto próprio de `RESPOSTAS_TETO_EMAIL_DIA` (padrão 20) por dia de São Paulo, somando ação e cron; acima disso fica `na_fila` para o dia seguinte (202 com `tentaDe`).
+
+**Leitura** `GET ?o=respostas_prospector` (CCO e CMO): teto, enviados hoje, restante, a fila (`naFila`), `falhou` e `enviadosHojeLista`, com status, tentativas e último erro, sem o corpo do e-mail.
+
+Não mexe em chave, DNS, cobrança nem nos textos do Prospector, e não apaga dado.
