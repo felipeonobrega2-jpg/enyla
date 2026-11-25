@@ -573,6 +573,37 @@ export function comDesculpa(texto: string): string {
   return `${saudacao}Desculpa a demora pra te responder! ${resto}`.trim()
 }
 
+// Conversa em que o agente mandou algo nas últimas 48 h: pelo registro dele ou por mensagem from_me cujo id é do agente
+// (ordem direta e outros envios do agente entram em agente_mensagens/agenteIds, não no registro com enviou: true).
+// 25/11: "desculpa a demora" por ordem direta em conversa antiga, o lead respondeu e o agente saiu calado.
+export function agenteAtendeuRecente(jid: string, log: Registro[], idsDoAgente: Iterable<string>, mensagensMinhas: { id: string }[], agora = Date.now()) {
+  if (log.some(l => l.jid === jid && l.enviou && agora - new Date(l.em).getTime() < 48 * 3_600_000)) return true
+  const ids = new Set(idsDoAgente)
+  return mensagensMinhas.some(m => ids.has(m.id))
+}
+
+async function agenteMandouNasUltimas48h(jid: string, cfg: CfgAgente) {
+  const log = cfg.agenteLog ?? []
+  if (log.some(l => l.jid === jid && l.enviou && Date.now() - new Date(l.em).getTime() < 48 * 3_600_000)) return true
+  const ids = new Set([...log.flatMap(l => l.ids ?? []), ...(cfg.agenteIds ?? [])])
+  if (!ids.size) return false
+  const desde = new Date(Date.now() - 48 * 3_600_000).toISOString()
+  const { data } = await supabase.from("whatsapp_mensagens").select("id").eq("jid", jid).eq("from_me", true).gte("ts", desde).order("ts", { ascending: false }).limit(30)
+  return agenteAtendeuRecente(jid, log, ids, (data ?? []) as { id: string }[])
+}
+
+// Saída silenciosa antes da IA: grava só na tabela (sem regravar o AppConfig) para a decisão ficar visível.
+// "em" é o horário da mensagem do lead: com o mesmo motivo, a gravação repetida é ignorada (uma por mensagem).
+export async function registrarSaidaSilenciosa(msgId: string, jid: string | null, nome: string | null, motivo: string) {
+  try {
+    const { data: m } = await supabase.from("whatsapp_mensagens").select("jid, ts").eq("id", msgId).maybeSingle()
+    const j = jid ?? (m?.jid as string | undefined)
+    if (!j) return
+    const em = m?.ts ? new Date(m.ts as string).toISOString() : new Date().toISOString()
+    await gravarRegistro({ em, jid: j, nome, perfil: "indefinido", enviou: false, texto: "", motivo })
+  } catch { /* só visibilidade: nunca derruba a resposta */ }
+}
+
 // atrasada: resposta que não saiu na hora (ex.: IA sem crédito). Sai já, sem a espera, mesmo que a mensagem já
 // tenha sido "reservada" pela tentativa que falhou, e começa pedindo desculpa pela demora. As travas são as de sempre
 // (cliente antigo, conversa sua, MQL, limites): só muda o tempo e a primeira frase.
@@ -585,7 +616,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   if (await segurarSaudacaoDoLead(cfg, msgId).catch(() => false)) return
   if (!opts.atrasada) await espera(10, 25)
   const jid = await aindaEhAUltima(msgId)
-  if (!jid) return
+  if (!jid) return registrarSaidaSilenciosa(msgId, null, null, "chegou outra mensagem depois: a última é quem responde")
   // Gráfica do Prospector (também na resposta atrasada, em assumir e continuar e em retomar parados): sem IA, sem envio
   if (await ehProspecto(jid)) return
   // Cada mensagem do lead é respondida uma vez só (dois disparos ao mesmo tempo: só um passa)
@@ -599,7 +630,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   // Respondeu à campanha digital (conversa antiga): o agente atende como conversa nova
   // Conversa em que o agente já está atendendo (respondeu nas últimas 48 h) também é dele, mesmo com contato antigo:
   // 19/11, depois da recuperação o cliente respondia e a próxima resposta só saía 20 min depois, pelo vigia
-  const agenteAtendendo = (cfg.agenteLog ?? []).some(l => l.jid === jid && l.enviou && Date.now() - new Date(l.em).getTime() < 48 * 3_600_000)
+  const agenteAtendendo = await agenteMandouNasUltimas48h(jid, cfg)
   const conversaNova = (!!primeira && Date.now() - new Date(primeira.ts).getTime() < DIAS_CONVERSA_NOVA * 86_400_000)
     || agenteAtendendo || emCampanha((cfg as { campanhaDigital?: EstadoCampanha }).campanhaDigital, jid)
   const c = await lerConversa(jid)
@@ -624,10 +655,10 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     const falta = pediuMedida ? null : faltaParaOrcar(antes)
     if (!falta || perguntasLevantando(cfg, jid) >= MAX_PERGUNTAS_MQL) {
       // Orçamento do Offset é do Felipe (proposta automática desligada até melhorar)
-      if (!opts.atrasada) return   // esperando há 20+ min: o agente responde (sem preço) e a proposta segue com você
+      if (!opts.atrasada) return registrarSaidaSilenciosa(msgId, jid, c.nome, "MQL completo: espera a recuperação de 20 min")   // esperando há 20+ min: o agente responde (sem preço) e a proposta segue com você
     } else coletandoMql = falta
   }
-  if (!conversaNova && !opts.atrasada) return
+  if (!conversaNova && !opts.atrasada) return registrarSaidaSilenciosa(msgId, jid, c.nome, "conversa antiga sem atendimento do agente")
   // Você escreveu nesta conversa nas últimas 24 h (celular ou tela do sistema): a conversa é sua, o agente não entra.
   // Lead do digital é a exceção: esse é todo do agente.
   // Atrasada (o cliente esperou 20+ min e ninguém respondeu): ninguém fica sem resposta, o agente responde mesmo
@@ -637,7 +668,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
 
   const log = (cfg.agenteLog ?? []).filter(l => l.jid === jid)
   const manualRecente = await voceNaConversa(jid, log, cfg)
-  if (manualRecente) return
+  if (manualRecente) return registrarSaidaSilenciosa(msgId, jid, c.nome, "você está nessa conversa agora")
 
   // Atrasada: a IA sabe quanto tempo passou e responde ligada ao resto da conversa (19/11: respostas da recuperação
   // soavam soltas, como se a mensagem tivesse acabado de chegar)
