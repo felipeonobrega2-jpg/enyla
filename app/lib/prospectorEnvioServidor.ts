@@ -11,10 +11,10 @@ import { evo } from "./evolution"
 import { enviarEmail } from "./email"
 import { CNAES_PROSPECTO, aplicarOptOut, hojeSp, podeTransicionar, type EtapaFunil, type MudancaEtapa } from "./prospector"
 import {
-  ASSUNTO_EMAIL, CHAVE_ENVIO_ATIVO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector,
+  ASSUNTO_EMAIL, CHAVE_ENVIO_ATIVO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector,
   canaisDisponiveis, canaisPendentes, celularWhatsapp, chaveTelefone, dentroDoHorario, ehRecusa, emailValido, enviosDoHistorico,
   motivoNaoQualifica, passoIniciado, passoSaiu, passouDias, saiu, textoDoPasso,
-  type Canal, type EnvioHistorico, type Passo,
+  type Canal, type EnvioHistorico, type MotivoParada, type Passo,
 } from "./prospectorEnvio"
 
 const TABELA = "prospectos_parceiros"
@@ -30,10 +30,11 @@ export type Linha = {
 
 export type ResultadoEnvio = {
   ok: boolean; ativo: boolean; enviado: boolean; motivo?: string; erro?: string
+  emailHoje: number; tetoEmailDia: number; motivoParada?: MotivoParada
   qualificados: number; primeiros: number; lembretes: number; encerrados: number; responderam: number; optOuts: number; falhas: number
 }
 
-const vazio = (): ResultadoEnvio => ({ ok: true, ativo: true, enviado: false, qualificados: 0, primeiros: 0, lembretes: 0, encerrados: 0, responderam: 0, optOuts: 0, falhas: 0 })
+const vazio = (): ResultadoEnvio => ({ ok: true, ativo: true, enviado: false, emailHoje: 0, tetoEmailDia: 0, qualificados: 0, primeiros: 0, lembretes: 0, encerrados: 0, responderam: 0, optOuts: 0, falhas: 0 })
 export const historicoDe = (l: Linha): MudancaEtapa[] => (Array.isArray(l.historico_etapas) ? l.historico_etapas : []).filter((x): x is MudancaEtapa => !!x && typeof x === "object")
 const enviosDe = (l: Linha) => enviosDoHistorico(historicoDe(l))
 
@@ -76,15 +77,28 @@ type Estado = {
   usados: Record<Passo, Record<Canal, Map<string, string>>>   // chave do telefone/e-mail → CNPJ que já recebeu
   bloqueadosTel: Set<string>; bloqueadosEmail: Set<string>      // quem pediu para sair (qualquer CNPJ com o mesmo contato)
   emailsNestaExecucao: number; limiteAte: number                // limite técnico por execução (rota de 120s)
+  emailsFeitosHoje: number; teto: number                        // e-mails do Prospector já enviados hoje (antes desta execução) e o teto diário (0 = sem)
+  cotaEsgotada: boolean; motivoParada?: MotivoParada
 }
 
 function novoEstado(): Estado {
   const m = () => ({ whatsapp: new Map<string, string>(), email: new Map<string, string>() })
-  return { usados: { primeiro_contato: m(), lembrete: m() }, bloqueadosTel: new Set(), bloqueadosEmail: new Set(), emailsNestaExecucao: 0, limiteAte: Date.now() + ORCAMENTO_MS_POR_EXECUCAO }
+  return { usados: { primeiro_contato: m(), lembrete: m() }, bloqueadosTel: new Set(), bloqueadosEmail: new Set(), emailsNestaExecucao: 0, limiteAte: Date.now() + ORCAMENTO_MS_POR_EXECUCAO, emailsFeitosHoje: 0, teto: 0, cotaEsgotada: false }
 }
 
 /** Esgotou o que cabe nesta execução: o que sobrar sai no próximo cron. */
-const semFolga = (est: Estado) => est.emailsNestaExecucao >= MAX_EMAILS_POR_EXECUCAO || Date.now() >= est.limiteAte
+const semFolga = (est: Estado) => {
+  const sem = est.emailsNestaExecucao >= MAX_EMAILS_POR_EXECUCAO || Date.now() >= est.limiteAte
+  if (sem) est.motivoParada ??= "limite_execucao"
+  return sem
+}
+
+/** E-mail parado pelo resto do dia: a Resend recusou por cota, ou o teto diário do Prospector foi atingido. Só o e-mail para; o WhatsApp segue. */
+function emailParado(est: Estado): boolean {
+  if (est.cotaEsgotada) { est.motivoParada = "cota_resend"; return true }
+  if (est.teto > 0 && est.emailsFeitosHoje + est.emailsNestaExecucao >= est.teto) { est.motivoParada ??= "teto_diario"; return true }
+  return false
+}
 
 const chaveCanal = (c: Canal, l: Linha) => (c === "whatsapp" ? chaveTelefone(celularWhatsapp(l.telefone)) : emailValido(l.email) ?? "")
 
@@ -104,7 +118,7 @@ function bloqueado(est: Estado, passo: Passo, canal: Canal, l: Linha): boolean {
   return !!dono && dono !== l.cnpj
 }
 
-async function enviarPeloCanal(canal: Canal, l: Linha, texto: string): Promise<{ ok: true } | { ok: false; erro: string }> {
+async function enviarPeloCanal(canal: Canal, l: Linha, texto: string): Promise<{ ok: true } | { ok: false; erro: string; cota?: true }> {
   if (canal === "whatsapp") {
     const numero = celularWhatsapp(l.telefone)
     if (!numero) return { ok: false, erro: "sem celular válido" }
@@ -115,7 +129,7 @@ async function enviarPeloCanal(canal: Canal, l: Linha, texto: string): Promise<{
   if (!para) return { ok: false, erro: "e-mail inválido" }
   const esc = texto.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
   const r = await enviarEmail(para, { assunto: ASSUNTO_EMAIL, texto, html: `<p>${esc}</p>` }, [], { de: REMETENTE, responderPara: replyToDoProspector() })
-  return r.ok ? { ok: true } : { ok: false, erro: r.erro }
+  return r.ok ? { ok: true } : { ok: false, erro: r.erro, ...(r.cota ? { cota: true as const } : {}) }
 }
 
 /** Reserva, envia e fecha um canal de um passo. Devolve se saiu, se falhou, ou null se não reservou (alguém foi mais rápido). */
@@ -127,8 +141,10 @@ async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, ag
   if (!reservada) return null
   const k = chaveCanal(canal, l)
   if (k) est.usados[passo][canal].set(k, l.cnpj)
-  let r: { ok: true } | { ok: false; erro: string }
+  let r: { ok: true } | { ok: false; erro: string; cota?: true }
   try { r = await enviarPeloCanal(canal, l, texto) } catch (e) { r = { ok: false, erro: String(e) } }
+  // Cota da Resend esgotada: o e-mail para pelo resto do dia. A linha fica "falhou" com a mensagem de cota, que não conta como falha do lead.
+  if (!r.ok && canal === "email" && (r.cota || ehErroDeCota(r.erro))) est.cotaEsgotada = true
   // Fecha a reserva. Se a trava perder (outra gravação no meio), relê e tenta de novo; a reserva já protege contra duplicata.
   let atual: Linha | null = reservada
   for (let i = 0; i < 4 && atual; i++) {
@@ -158,6 +174,7 @@ async function mandarPasso(est: Estado, l: Linha, passo: Passo, canais: Canal[],
   for (const canal of canais) {
     if (bloqueado(est, passo, canal, atual)) continue
     if (semFolga(est)) break
+    if (canal === "email" && emailParado(est)) continue
     if (canal === "email") est.emailsNestaExecucao++
     const r = await enviarCanal(est, atual, passo, canal, agora)
     if (!r) break
@@ -212,6 +229,28 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
     const t = chaveTelefone(celularWhatsapp(s.telefone)); if (t) est.bloqueadosTel.add(t)
     const e = emailValido(s.email); if (e) est.bloqueadosEmail.add(e)
   }
+  // Teto diário de e-mail: conta no banco, de TODOS os prospectos (não só os elegíveis desta lista), os envios de e-mail do Prospector
+  // (primeiro contato e lembrete, enviado ou reservado) do dia de São Paulo, somando todas as execuções. O cron roda das 11h às 22h UTC
+  // (8h às 19h em SP): nessa janela o dia de SP e o dia UTC da Resend são o mesmo. Transacional e resposta da diretoria não passam por aqui.
+  est.teto = tetoEmailDia()
+  res.tetoEmailDia = est.teto
+  const hoje = hojeSp(agora)
+  if (est.teto > 0) {
+    // Todo envio grava atualizado_em, então só as linhas tocadas hoje (SP, UTC-3) interessam. O PostgREST corta em 1000 linhas por
+    // chamada (max-rows): pagina com range até vir página incompleta. Falha em qualquer página: o e-mail não sai nesta execução.
+    const inicioDoDia = new Date(`${hoje}T00:00:00-03:00`).toISOString()
+    const PAGINA = 1000
+    let feitos = 0
+    for (let de = 0; ; de += PAGINA) {
+      const { data, error } = await supabase.from(TABELA).select("id, historico_etapas").contains("historico_etapas", [{ envio: { canal: "email" } }])
+        .gte("atualizado_em", inicioDoDia).order("id", { ascending: true }).range(de, de + PAGINA - 1)
+      if (error) return { ...res, ok: false, erro: `não consegui contar os e-mails de hoje: ${error.message}` }
+      const pagina = (data ?? []) as Linha[]
+      feitos += pagina.reduce((n, l) => n + enviosDe(l).filter(e => e.canal === "email" && saiu(e) && hojeSp(new Date(e.em)) === hoje).length, 0)
+      if (pagina.length < PAGINA) break
+    }
+    est.emailsFeitosHoje = feitos
+  }
   const jaContatadas = (contatadas.data ?? []) as Linha[]
   const lista = (elegiveis.data ?? []) as Linha[]
   for (const l of [...jaContatadas, ...lista]) registrarUsos(est, l)
@@ -219,7 +258,6 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
   await detectarRespostas(jaContatadas, agora, res)
 
   // Cota só do WhatsApp: primeiros contatos por WhatsApp que começaram hoje, em horário de São Paulo. E-mail não tem teto diário.
-  const hoje = hojeSp(agora)
   const zapHoje = (l: Linha) => enviosDe(l).some(e => e.passo === "primeiro_contato" && e.canal === "whatsapp" && saiu(e) && hojeSp(new Date(e.em)) === hoje)
   let zapFeitosHoje = [...jaContatadas, ...lista].filter(zapHoje).length
 
@@ -282,6 +320,9 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
     if (r.algumOk && !iniciado) res.primeiros++
   }
 
+  emailParado(est)
+  res.emailHoje = est.emailsFeitosHoje + est.emailsNestaExecucao
+  if (est.motivoParada) res.motivoParada = est.motivoParada
   res.enviado = res.primeiros + res.lembretes > 0
   return res
 }
