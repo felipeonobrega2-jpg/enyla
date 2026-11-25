@@ -69,4 +69,14 @@ describe("sugestão de arte aprovada", () => {
     expect(resto).toEqual(p)
     expect(confirmarArteAprovada({ ...p, status: "producao" }, { em: "x", trecho: "y" }, "P", "z")).toBeNull()
   })
+  it("clique dias depois da mensagem: arteAprovadaEm é o horário da mensagem do cliente, o do clique fica só em arteAprovadaPor.em", () => {
+    const msgTs = "2026-11-13T14:00:00Z"
+    const cliqueTs = "2026-11-25T23:30:00Z"
+    const [s] = sugestoesDeArte([ped("DIG-0900")], { j1: [arte("2026-11-12T10:00:00Z"), cli(msgTs, "Pode sim")] })
+    const n = confirmarArteAprovada({ id: "DIG-0900", status: "arte" }, s, "Painel", cliqueTs)!
+    expect(n.arteAprovadaEm).toBe(msgTs)
+    expect(n.arteAprovadaEm).not.toBe(cliqueTs)
+    expect(n.arteAprovadaPor.em).toBe(cliqueTs)
+    expect(n.status).toBe("arte")
+  })
 })
