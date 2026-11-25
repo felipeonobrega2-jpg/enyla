@@ -149,6 +149,20 @@ export const CENARIOS_IDS: Record<IdServicoParceiro, string[]> = {
   verniz: ["verniz"], hotStamping: ["hotStamping"], relevo: ["relevo"], corteVinco: ["corteVinco"], colagem: ["colagem"], faca: ["faca"],
   papel: ["papel"], arte: ["arte-unitaria", "arte-pacote3"], fechamento: ["fechamento"], transporte: ["transporte"], outro: [],
 }
+// Experiência guiada: o parceiro marca o que faz (variantes) e só o marcado pede preço. Serviço sem regra aqui
+// pede o(s) exemplo(s) do serviço inteiro (marcar o serviço já é dizer que faz). Sem preço nem nome de fornecedor.
+type RespostasTec = Record<string, Resposta> | undefined
+const marcou = (t: RespostasTec, pergunta: string, opcao: string) => { const v = t?.[pergunta]; return Array.isArray(v) && v.includes(opcao) }
+const REGRAS_VARIANTE: Partial<Record<string, (t: RespostasTec) => boolean>> = {
+  "laminacao-fosca": t => marcou(t, "tipos", "Fosca"),
+  "laminacao-brilho": t => marcou(t, "tipos", "Brilho"),
+  "laminacao-soft": t => marcou(t, "tipos", "Soft touch"),
+  "laminacao-dois-lados": t => t?.lados === "Os dois lados",
+  verniz: t => marcou(t, "tipos", "UV total"),
+  hotStamping: t => marcou(t, "fitas", "Dourado"),
+}
+export const cenarioAtivo = (cid: string, t: RespostasTec) => { const r = REGRAS_VARIANTE[cid]; return r ? r(t) : true }
+export const cenariosAtivosIds = (s: Pick<ServicoCadastrado, "id" | "tecnico">) => (CENARIOS_IDS[s.id] ?? []).filter(cid => cenarioAtivo(cid, s.tecnico))
 export const ROTULO_PRECO_CENARIO: Record<string, string> = { "arte-unitaria": "Preço por arte (R$)", "arte-pacote3": "Preço do pacote de 3 artes (R$)" }
 export const cobraPorAcertoMilheiro = (id: IdServicoParceiro) => id === "impressaoOffset" || id === "impressaoDigital"
 const formatoOk = (f: unknown) => !!f && typeof f === "object" && Number((f as Formato).l) > 0 && Number((f as Formato).a) > 0
@@ -257,7 +271,7 @@ export function errosDaEtapa(c: Partial<CadastroParceiro>, etapa: Etapa): Record
       if (!(Number(s.acerto) > 0)) e[`${s.id}.acerto`] = "Informe o acerto"
       if (!(Number(s.valor) > 0)) e[`${s.id}.valor`] = "Informe o valor do milheiro"
     } else {
-      for (const cid of CENARIOS_IDS[s.id] ?? []) if (!(Number(s.precosExemplo?.[cid]) > 0)) e[`${s.id}.preco.${cid}`] = "Informe o preço para este exemplo"
+      for (const cid of cenariosAtivosIds(s)) if (!(Number(s.precosExemplo?.[cid]) > 0)) e[`${s.id}.preco.${cid}`] = "Informe o preço para este exemplo"
       if (!s.cobranca) e[`${s.id}.cobranca`] = "Escolha uma das opções"
     }
     if (!s.prazoVaria && !(s.prazoDias && s.prazoDias > 0 && s.prazoDias <= 120)) e[`${s.id}.prazo`] = "Informe o prazo médio ou marque que varia"
@@ -289,7 +303,7 @@ export function limparTecnico(id: IdServicoParceiro, t: unknown): Record<string,
 // Preços e versões só dos cenários que existem para o serviço
 function limparExemplos(s: Partial<ServicoCadastrado> & { id: IdServicoParceiro }): Pick<ServicoCadastrado, "precosExemplo" | "cenarioVersoes"> {
   const precos: Record<string, number> = {}, versoes: Record<string, number> = {}
-  for (const cid of CENARIOS_IDS[s.id] ?? []) {
+  for (const cid of cenariosAtivosIds({ id: s.id, tecnico: limparTecnico(s.id, s.tecnico) })) {
     const k = Number(s.precosExemplo?.[cid]), v = Number(s.cenarioVersoes?.[cid])
     if (!Number.isFinite(k) || k <= 0 || k > 10_000_000) continue
     precos[cid] = Math.round(k * 100) / 100

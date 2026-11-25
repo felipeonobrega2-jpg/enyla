@@ -324,6 +324,12 @@ O R$ 450,00 confirmado pelo Felipe é do verniz UV total (3.000 folhas 48 × 44 
 
 **O que faz.** `acao=tarefa_felipe`: o diretor põe uma tarefa no "Depende de você" do Felipe.
 
+## 31. Cadastro de parceiros: experiência guiada por serviço e exemplos no padrão do sistema
+
+**Status:** Claude Code. **Aprovo:** não (o Felipe pediu a correção). **PR:** aberto pela issue #73, não juntar (o Felipe junta em lote).
+
+**O que faz.** Em `/parceiros` o parceiro marca o que faz e só então o preço daquilo aparece e é exigido: laminação (fosca, brilho, soft touch, dois lados), verniz (UV total) e hot stamping (dourado). O que não foi marcado não aparece, não é obrigatório e o preço não é gravado. Preço e nome dos fornecedores nossos seguem só na tela interna. Sem migração, sem preço nem unidade novos.
+
 ## Custo de IA (24/11/2026)
 
 Objetivo: reduzir os tokens gastos com IA sem perder eficácia. Os itens 31 a 36 registram os PRs dessa frente.
