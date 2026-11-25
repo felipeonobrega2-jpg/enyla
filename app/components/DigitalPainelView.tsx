@@ -10,6 +10,8 @@ import { CampanhaDigitalCard } from "./CampanhaDigitalCard"
 import { Pagina, CabecalhoPagina, Cartao, Kpi, GradeKpis, Selo, Botao, Segmentado, LinhaLista, Vazio, Gaveta, type Tom } from "./ds"
 import { ROTULO_STATUS, PROXIMO_STATUS, type StatusDigital } from "@/app/lib/digital"
 import { haQuanto } from "@/app/lib/hoje"
+import { SugestaoArteAprovada } from "./SugestaoArteAprovada"
+import type { SugestaoArte } from "@/app/lib/arteAprovadaSugestao"
 
 type Pedido = {
   termosAceitosEm?: string | null
@@ -24,6 +26,7 @@ type Pedido = {
   ajustes: { texto: string; em: string }[]; designerAvisadoEm: string | null; villaEnviadoEm: string | null
   frete: number | null; restante: number | null; restantePagoEm: string | null; prontoEm?: string | null; entrega: { cep: string; endereco: string } | null; acertadoEm: string | null
   teste?: boolean
+  sugestaoArte?: SugestaoArte | null
 }
 type Contatos = { villa?: string; designer?: string; designerNome?: string }
 type Filtro = "abertos" | "pagos" | "enviados" | "acerto" | "todos"
@@ -107,6 +110,10 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
       aplicar(await buscar())
     } finally { setOcupado(null) }
   }
+  const decidirArte = (id: string, decisao: "confirmar" | "descartar") => {
+    if (decisao === "confirmar" && !confirm(`Confirmar que o cliente aprovou a arte do ${id}? Só marca a aprovação no pedido; nada é enviado ao cliente.`)) return
+    void acao("arteSugestao", { id, acao: "arteSugestao", decisao })
+  }
   const subirArte = async (p: Pedido, f: File | undefined) => {
     if (!f) return
     setOcupado("arte")
@@ -138,6 +145,16 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
         <Kpi rotulo="Andamento" valor={pedidos ? resumo.andamento : null} formato={n => String(n)} tom="info" icone={<Printer className="w-3.5 h-3.5" />} sub="arte e produção" />
         <Kpi rotulo="Margem" valor={pedidos ? resumo.margem : null} formato={brl} icone={<Wallet className="w-3.5 h-3.5" />} sub="pagos em 30 dias" />
       </GradeKpis>
+
+      {(pedidos ?? []).some(p => p.sugestaoArte) && (
+        <Cartao className="mt-3">
+          <p className="text-[13px] font-semibold text-[#191625] mb-1">Arte aprovada no WhatsApp?</p>
+          <p className="text-[11.5px] text-[#898892] mb-2.5">O cliente respondeu como quem aprova a arte ou a prova. Nada muda sem o seu clique.</p>
+          <div className="flex flex-col gap-2.5">
+            {(pedidos ?? []).filter(p => p.sugestaoArte).map(p => <SugestaoArteAprovada key={p.id} id={p.id} nome={p.nome} s={p.sugestaoArte!} ocupado={!!ocupado} onDecidir={decidirArte} />)}
+          </div>
+        </Cartao>
+      )}
 
       <div className="mt-3"><CampanhaDigitalCard /></div>
 
@@ -213,6 +230,8 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
               <Info rotulo="Sua margem" valor={brl(sel.margem)} />
               <Info rotulo="Termos" valor={sel.termosAceitosEm ? `aceitos em ${new Date(sel.termosAceitosEm).toLocaleDateString("pt-BR")}` : sel.status === "aguardando_sinal" ? "ainda não aceitos" : "de antes dos termos"} />
             </div>
+
+            {sel.sugestaoArte && <SugestaoArteAprovada id={sel.id} nome={sel.nome} s={sel.sugestaoArte} ocupado={!!ocupado} onDecidir={decidirArte} />}
 
             {["aguardando_sinal", "sinal_pago", "arte"].includes(sel.status) && !sel.arteAprovadaEm && (
               <MudarMedidas key={sel.id} pedido={sel} onFeito={async () => aplicar(await buscar())} />

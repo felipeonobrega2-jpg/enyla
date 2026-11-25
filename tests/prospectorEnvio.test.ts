@@ -106,9 +106,10 @@ describe("horário e dia útil", () => {
   it.each([
     ["sábado 10h", "2026-11-28T13:00:00Z"],
     ["domingo 10h", "2026-11-29T13:00:00Z"],
-    ["quarta 8h59", "2026-11-25T11:59:00Z"],
-    ["quarta 17h", "2026-11-25T20:00:00Z"],
+    ["quarta 7h59", "2026-11-25T10:59:00Z"],
+    ["quarta 20h", "2026-11-25T23:00:00Z"],
     ["quarta 22h", "2026-11-26T01:00:00Z"],
+    ["quarta 20h30", "2026-11-25T23:30:00Z"],
   ])("recusa %s", async (_n, iso) => {
     novo()
     const r = await rodar(new Date(iso))
@@ -117,9 +118,9 @@ describe("horário e dia útil", () => {
     expect(envios.evo).not.toHaveBeenCalled()
     expect(doBanco(mundo.prospectos[0]).etapa).toBe("qualificado")
   })
-  it("aceita 9h00 e 16h59 de segunda a sexta", () => {
-    expect(dentroDoHorario(new Date("2026-11-23T12:00:00Z"))).toBe(true)
-    expect(dentroDoHorario(new Date("2026-11-27T19:59:00Z"))).toBe(true)
+  it("aceita 8h00 e 19h59 de segunda a sexta", () => {
+    expect(dentroDoHorario(new Date("2026-11-23T11:00:00Z"))).toBe(true)
+    expect(dentroDoHorario(new Date("2026-11-27T22:59:00Z"))).toBe(true)
   })
 })
 

@@ -81,9 +81,10 @@ export type LinhaProspecto = {
   fonte: string; coletado_em: string; nota: number
 }
 
-export function montarProspecto(c: Candidato, cad: CadastroBrasilApi, agora: Date): LinhaProspecto | null {
+/** `parcial`: a BrasilAPI falhou (não é 404). Grava só com o que veio do arquivo da Receita, com a razão social vazia para completar depois. */
+export function montarProspecto(c: Candidato, cad: CadastroBrasilApi, agora: Date, parcial = false): LinhaProspecto | null {
   const razao = (cad.razao_social ?? "").trim()
-  if (!razao) return null
+  if (!razao && !parcial) return null
   const situacao = (cad.descricao_situacao_cadastral ?? "").trim().toUpperCase() || c.situacao
   const uf = (cad.uf ?? c.uf).trim().toUpperCase()
   const porte = cad.codigo_porte != null ? String(cad.codigo_porte).padStart(2, "0") : vazio(cad.porte ?? undefined)

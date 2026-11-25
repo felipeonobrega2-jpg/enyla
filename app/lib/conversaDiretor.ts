@@ -30,9 +30,12 @@ async function lerRastreios(): Promise<Rastreio[]> {
 // e acerta os feriados (AppConfig.feriados) usados nos dias úteis
 async function lerDigitais(): Promise<Parameters<typeof comDigital>[1]> {
   try {
-    const c = await lerCampos<{ pedidosDigitais?: Parameters<typeof comDigital>[1]; feriados?: unknown }>(["pedidosDigitais", "feriados"])
+    const c = await lerCampos<{ pedidosDigitais?: (NonNullable<Parameters<typeof comDigital>[1]>[number] & { jid: string })[]; feriados?: unknown }>(["pedidosDigitais", "feriados"])
     definirFeriadosLocais((c.feriados ?? CONFIG_PADRAO.feriados) as never)
-    return c.pedidosDigitais ?? []
+    const pedidos = c.pedidosDigitais ?? []
+    const { lerSugestoes } = await import("./arteAprovadaServidor")
+    const sug = await lerSugestoes(pedidos)   // só leitura: nada é gravado
+    return pedidos.map(p => { const s = sug.find(x => x.pedido === p.id); return s ? { ...p, sugestaoArteAprovada: { trecho: s.trecho, em: s.em } } : p })
   } catch { return [] }
 }
 

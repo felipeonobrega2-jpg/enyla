@@ -37,6 +37,12 @@ async function entrar(req: NextRequest) {
   return c.ok ? c : NextResponse.json({ erro: c.erro }, { status: c.status })
 }
 
+// COO: quem espera a Enyla há mais de 24 h (pedido, cliente, desde quando, horas). Sem telefone e sem texto da conversa.
+async function lerEsperandoAEnyla() {
+  const { esperaLonga } = await lerCampos<{ esperaLonga?: import("@/app/lib/esperaLongaServidor").EsperaLongaGravada }>(["esperaLonga"])
+  return { atualizadoEm: esperaLonga?.em ? hora(esperaLonga.em) : null, itens: (esperaLonga?.itens ?? []).map(e => ({ pedido: e.pedido, cliente: e.nome, desde: hora(e.desde), horasEsperando: e.horas })) }
+}
+
 export async function GET(req: NextRequest) {
   const c = await entrar(req)
   if (c instanceof NextResponse) return c
@@ -115,7 +121,7 @@ export async function GET(req: NextRequest) {
   if (o === "detalhe") {
     const area = req.nextUrl.searchParams.get("area") ?? ""
     if (!AREAS.includes(area)) return NextResponse.json({ erro: `Área: ${AREAS.join(", ")}` }, { status: 400 })
-    return NextResponse.json({ area, em: hora(foto.em), dados: area === "producao" ? await producaoAtual(foto) : foto.detalhes[area], ...(area === "marketing" ? { campanhasParadas: await paradasParaLeitura() } : {}) })
+    return NextResponse.json({ area, em: hora(foto.em), dados: area === "producao" ? await producaoAtual(foto) : foto.detalhes[area], ...(area === "marketing" ? { campanhasParadas: await paradasParaLeitura() } : {}), ...(area === "producao" ? { esperandoAEnyla24h: await lerEsperandoAEnyla() } : {}) })
   }
   if (o === "empresa") {
     const [planos, cfg] = await Promise.all([lerPlanos(), lerCampos<{ conhecimentoDiretoria?: Partial<Record<string, LicaoDiretor[]>> }>(["conhecimentoDiretoria"])])

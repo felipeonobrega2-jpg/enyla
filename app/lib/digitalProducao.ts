@@ -12,6 +12,7 @@ type PedidoDig = {
   id: string; nome?: string | null; empresa?: string | null; briefing?: { marca?: string }; entregaPrevista?: string | null; produto?: string | null; quantidade?: number; status: string
   em?: string; sinalPagoEm?: string; arteEnviadaEm?: string; arteAprovadaEm?: string
   designerAvisadoEm?: string; villaEnviadoEm?: string; prontoEm?: string; statusEm?: string
+  sugestaoArteAprovada?: { trecho: string; em: string } | null   // só leitura: o cliente parece ter aprovado a arte; falta o clique de uma pessoa
 }
 const CAMPOS_DATA = ["em", "sinalPagoEm", "arteEnviadaEm", "arteAprovadaEm", "designerAvisadoEm", "villaEnviadoEm", "prontoEm", "statusEm"] as const
 
@@ -19,6 +20,7 @@ export type PedidoDigitalProducao = {
   id: string; cliente: string | null; produto: string | null; quantidade: number | null; status: string
   naEtapaDesde: string | null; diasUteisNaEtapa: number | null; faltam: string[]
   numero: string; marca: string | null; entregaPrevista: string | null; arte: "pendente" | "enviada" | "aprovada"; arteEm: string | null
+  sugestaoArteAprovada?: { trecho: string; em: string }
 } & Record<(typeof CAMPOS_DATA)[number], string | null>
 
 // Data (aaaa-mm-dd) em Brasília; data sem hora fica como veio
@@ -43,7 +45,8 @@ export function digitaisEmProducao(pedidos: PedidoDig[] | undefined, hoje = hoje
     // Entrega prevista: a gravada no pedido ou, com a arte aprovada, o prazo do digital (dias úteis) a partir da aprovação
     const entrega = p.entregaPrevista ?? (p.arteAprovadaEm && p.quantidade ? somarDiasUteis(diaDe(p.arteAprovadaEm), prazoDigital(p.quantidade).max) : null)
     return { id: p.id, numero: p.id, cliente: p.nome ?? null, marca: p.briefing?.marca?.trim() || p.empresa?.trim() || null, produto: p.produto ?? null, quantidade: p.quantidade ?? null, status: p.status,
-      ...datas, naEtapaDesde: d, diasUteisNaEtapa: dias, faltam, entregaPrevista: entrega, arte, arteEm: arteDia ? diaDe(arteDia) : null }
+      ...datas, naEtapaDesde: d, diasUteisNaEtapa: dias, faltam, entregaPrevista: entrega, arte, arteEm: arteDia ? diaDe(arteDia) : null,
+      ...(p.sugestaoArteAprovada ? { sugestaoArteAprovada: { trecho: p.sugestaoArteAprovada.trecho, em: p.sugestaoArteAprovada.em } } : {}) }
   })
 }
 
