@@ -172,6 +172,12 @@ const PROMETE_ENVIO = new RegExp([
   String.raw`\bj[aá] te (mando|envio|passo|encaminho)\b`,
   String.raw`\b(t[oô]|estou|to) finalizando\b`,
   String.raw`\bvou (montar|finalizar|fechar)\b[^.!?\n]{0,40}\b(or[cç]amento|proposta)\b[^.!?\n]{0,40}\b(mand|envi|passo)`,
+  // Promessa em curto prazo (#110): "já monto o orçamento e te mando", "o orçamento já sai", "em instantes te envio o orçamento"
+  String.raw`\bj[aá] (monto|fa[cç]o|preparo|fecho)\b[^.!?\n]{0,30}\bor[cç]amento\b[^.!?\n]{0,30}\b(mand|envi|pass)`,
+  String.raw`\bor[cç]amento\b[^.!?\n]{0,20}\bj[aá] sai\b`,
+  String.raw`\bj[aá] sai\b[^.!?\n]{0,20}\bor[cç]amento\b`,
+  String.raw`\bor[cç]amento\b[^.!?\n]{0,20}\bsai (hoje|agora|em instantes|em minutos)\b`,
+  String.raw`\b(em instantes|em minutos|daqui a pouco|hoje ainda)\b[^.!?\n]{0,25}\b(mando|envio|passo)\b[^.!?\n]{0,30}\bor[cç]amento\b`,
 ].join("|"), "i")
 export const prometeEnvioDeOrcamento = (t: string) => PROMETE_ENVIO.test(t)
 
