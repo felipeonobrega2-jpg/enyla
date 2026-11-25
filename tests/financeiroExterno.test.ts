@@ -1,13 +1,13 @@
 // Porta externa, ?o=financeiro: só a chave do CFO, só leitura, sem dado pessoal de cliente nem documento do banco.
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-const estado = vi.hoisted(() => ({ diretor: "cfo" as string | null, escritas: 0, tabelas: {} as Record<string, unknown[]>, cfg: {} as Record<string, unknown> }))
+const estado = vi.hoisted(() => ({ diretor: "cfo" as string | null, escritas: 0, tabelas: {} as Record<string, unknown[]>, cfg: {} as Record<string, unknown>, digitais: [] as unknown[] }))
 vi.mock("@/app/lib/acessoExterno", () => ({
   LIMITE_POR_HORA: 120,
   conferirChave: vi.fn(async () => estado.diretor ? { ok: true, diretor: estado.diretor } : { ok: false, status: 401, erro: "Sem chave." }),
 }))
 vi.mock("@/app/lib/configAtomica", () => ({
-  lerCampos: vi.fn(async () => ({})), lerConfigLinha: vi.fn(async () => ({ data: { data: estado.cfg }, error: null })),
+  lerCampos: vi.fn(async () => ({ pedidosDigitais: estado.digitais })), lerConfigLinha: vi.fn(async () => ({ data: { data: estado.cfg }, error: null })),
   mudarConfig: vi.fn(async () => { estado.escritas++ }),
 }))
 vi.mock("@/app/lib/diretoriaServidor", () => ({ lerConversa: vi.fn(async () => []), gravarConversa: vi.fn(async () => { estado.escritas++ }), lerPlanos: vi.fn() }))
@@ -16,7 +16,7 @@ vi.mock("@/app/lib/gastosServidor", () => ({ gastosAtuais: vi.fn(async () => ({ 
 vi.mock("@/app/lib/supabase", () => {
   const consulta = (t: string) => {
     const q: Record<string, unknown> = {}
-    for (const m of ["select", "eq", "order", "limit", "neq", "in"]) q[m] = () => q
+    for (const m of ["select", "eq", "order", "limit", "neq", "in", "overlaps"]) q[m] = () => q
     for (const m of ["insert", "update", "delete", "upsert"]) q[m] = () => { estado.escritas++; return q }
     q.then = (ok: (v: unknown) => unknown) => ok({ data: estado.tabelas[t] ?? [], count: (estado.tabelas[t] ?? []).length, error: null })
     return q
@@ -28,11 +28,11 @@ import { GET, POST } from "@/app/api/externo/route"
 import { NextRequest } from "next/server"
 
 const ler = (q = "") => GET(new NextRequest(`http://x/api/externo?${q}`, { headers: { authorization: "Bearer k" } }))
-const PARTES = ["receber", "pagar", "banco", "saldos", "gastos", "margem", "depende"]
+const PARTES = ["receber", "asaas", "pagar", "banco", "saldos", "gastos", "margem", "depende"]
 const mes = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 7)
 
 beforeEach(() => {
-  estado.diretor = "cfo"; estado.escritas = 0
+  estado.diretor = "cfo"; estado.escritas = 0; estado.digitais = []
   estado.cfg = { contas: [{ id: "c1", nome: "Itaú", banco: "Itaú", tipo: "corrente", cor: "#000", saldo: 1500, ativa: true }, { id: "c2", nome: "Cartão", banco: "X", tipo: "credito", cor: "#000", saldo: 300, ativa: true }],
     gastosFixos: [{ id: "g1", nome: "Railway", categoriaId: "servicos", valor: 100, diaVencimento: 5, ativa: true }],
     pluggyStatus: { em: "2026-11-01", novas: 0, contas: [{ id: "p1", nome: "Itaú", banco: "Itaú", saldo: 1500 }] },
@@ -50,6 +50,37 @@ beforeEach(() => {
     NegocioParceiro: [], HistoricoItem: [],
     banco_transacoes: [{ id: "t1", conta_id: "c1", conta_nome: "Itaú", data: "2026-11-02", valor: 50, tipo: "saida", descricao: "Pix", contraparte_nome: "Fulano", contraparte_doc: "123.456.789-00", bruto: { x: 1 }, categoria_pluggy: null, estado: "pendente", lancamento_ids: [], sugestao: null }],
   }
+})
+
+describe("?o=financeiro&parte=asaas e digital no a receber", () => {
+  const ped = (id: string, extra: Record<string, unknown> = {}) => ({ id, nome: "Cliente Digital", jid: "5511999@s.whatsapp.net", email: "d@x.com", documento: "123.456", status: "producao", total: 1000, sinal: 500.13, sinalPagoEm: "2026-11-02T12:00:00Z", ...extra })
+  it("lista por pedido o id Asaas, valor, status e recebimento, sem dado pessoal; ignora teste", async () => {
+    estado.digitais = [
+      ped("DIG-0201", { pagamento: { txId: "asaas:pay_s1", valor: 500.13, data: "2026-11-02" }, asaas: { restante: { id: "pay_r1" } } }),
+      ped("DIG-0202", { pagamento: { txId: "pix-x", valor: 500.13, data: "2026-11-02" } }),
+      ped("DIG-0203", { teste: true }),
+    ]
+    const j = await (await ler("o=financeiro&parte=asaas")).json()
+    expect(j.pedidos.map((p: { pedido: string }) => p.pedido)).toEqual(["DIG-0201", "DIG-0202"])
+    expect(j.pedidos[0].sinal).toEqual({ cobrancaAsaas: "pay_s1", valor: 500.13, situacao: "confirmado pelo Asaas", dataRecebimento: "2026-11-02" })
+    expect(j.pedidos[0].restante).toMatchObject({ cobrancaAsaas: "pay_r1", valor: 499.87, situacao: "a receber", dataRecebimento: null })
+    expect(j.pedidos[1].sinal.situacao).toBe("em conferência")
+    expect(JSON.stringify(j)).not.toMatch(/Cliente Digital|5511999|d@x\.com|123\.456/)
+    expect(estado.escritas).toBe(0)
+  })
+  it("lancamento_ids no banco confirma o pago", async () => {
+    estado.digitais = [ped("DIG-0204", { pagamento: { txId: "tx-1", valor: 500.13, data: "2026-11-03" } })]
+    ;(estado.tabelas.banco_transacoes as unknown[]).push({ id: "t9", lancamento_ids: ["dig-DIG-0204-sinal"] })
+    const j = await (await ler("o=financeiro&parte=asaas")).json()
+    expect(j.pedidos[0].sinal.situacao).toBe("confirmado pelo Asaas")
+  })
+  it("parte=receber traz o Digital com saldo complementar e o Offset não muda", async () => {
+    estado.digitais = [ped("DIG-0205", { pagamento: { txId: "pix-x", valor: 500.13, data: "2026-11-02" } })]
+    const j = await (await ler("o=financeiro&parte=receber")).json()
+    expect(j.digital).toHaveLength(1)
+    expect(j.digital[0]).toMatchObject({ id: "DIG-0205", pago: 0, emConferencia: 500.13, saldo: 499.87, vencimentoSaldo: null, atrasado: false })
+    expect(j.aReceberTotal).toBe(600); expect(j.pedidos).toHaveLength(1)
+  })
 })
 
 describe("?o=financeiro", () => {

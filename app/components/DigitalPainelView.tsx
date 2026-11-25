@@ -26,6 +26,7 @@ type Pedido = {
   ajustes: { texto: string; em: string }[]; designerAvisadoEm: string | null; villaEnviadoEm: string | null
   frete: number | null; restante: number | null; restantePagoEm: string | null; prontoEm?: string | null; entrega: { cep: string; endereco: string } | null; acertadoEm: string | null
   teste?: boolean
+  situacaoArte?: string | null; prazoEntrega?: string | null; prazoNoLink?: string
   sugestaoArte?: SugestaoArte | null
 }
 type Contatos = { villa?: string; designer?: string; designerNome?: string }
@@ -52,6 +53,7 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
   const [editContatos, setEditContatos] = useState<Contatos | null>(null)
   const [acerto, setAcerto] = useState<{ ids: string[]; total: number }>({ ids: [], total: 0 })
   const [frete, setFrete] = useState("")
+  const [artePrazo, setArtePrazo] = useState<{ id: string; situacaoArte: string; prazoEntrega: string; motivo: string } | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
 
   const buscar = useCallback(() => fetch("/api/digital").then(async r => {
@@ -305,6 +307,27 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
                 )}
               </div>
             )}
+
+            {sel.status !== "aguardando_sinal" && sel.status !== "cancelado" && !sel.teste && (() => {
+              const f = artePrazo?.id === sel.id ? artePrazo : { id: sel.id, situacaoArte: sel.situacaoArte ?? "", prazoEntrega: sel.prazoEntrega ?? "", motivo: "" }
+              const campo = "h-8 rounded-lg px-2.5 text-[12.5px] text-[#191625] bg-white ds-borda focus:outline-none"
+              return (
+                <div className="rounded-xl bg-[rgba(116,116,128,0.06)] px-3.5 py-3 space-y-2">
+                  <p className="font-semibold text-[#191625]">Arte e prazo <span className="font-normal text-[#898892]">· no link: {sel.prazoNoLink ?? "a confirmar"}</span></p>
+                  <div className="flex gap-2 flex-wrap items-center">
+                    <select value={f.situacaoArte} onChange={e => setArtePrazo({ ...f, situacaoArte: e.target.value })} className={campo}>
+                      <option value="">Situação da arte (não mudar)</option>
+                      {["sem arte", "enviada", "ajustes pedidos", "aprovada", "prova autorizada"].map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                    <input type="date" value={f.prazoEntrega} onChange={e => setArtePrazo({ ...f, prazoEntrega: e.target.value })} className={campo} aria-label="Prazo de entrega" />
+                    <input value={f.motivo} onChange={e => setArtePrazo({ ...f, motivo: e.target.value })} placeholder="Motivo (obrigatório)" maxLength={300} className={`${campo} flex-1 min-w-[140px]`} />
+                    <Botao disabled={!!ocupado || !f.motivo.trim() || (!f.situacaoArte && f.prazoEntrega === (sel.prazoEntrega ?? ""))}
+                      onClick={() => { void acao("arte_prazo", { id: sel.id, acao: "arte_prazo", ...(f.situacaoArte ? { situacaoArte: f.situacaoArte } : {}), ...(f.prazoEntrega !== (sel.prazoEntrega ?? "") ? { prazoEntrega: f.prazoEntrega } : {}), motivo: f.motivo }).then(() => setArtePrazo(null)) }}>Gravar</Botao>
+                  </div>
+                  <p className="text-[11px] text-[#898892]">Fica registrado quem gravou, quando e o motivo. Não manda nada ao cliente. Prazo gravado vale mais que o calculado; vazio volta ao cálculo.</p>
+                </div>
+              )
+            })()}
 
             {sel.arteAprovadaEm && (
               <div className="rounded-xl bg-[rgba(116,116,128,0.06)] px-3.5 py-3 space-y-1.5">

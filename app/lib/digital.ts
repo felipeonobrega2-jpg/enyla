@@ -65,6 +65,9 @@ export type PedidoDigital = {
   medidasAntes?: { medidas: { a: number; l: number; p: number }; total: number; em: string }[]   // mudanças de medida (a mais recente por último)
   designerAvisadoEm?: string; villaEnviadoEm?: string
   frete?: number; entrega?: Entrega
+  situacaoArte?: "sem arte" | "enviada" | "ajustes pedidos" | "aprovada" | "prova autorizada"   // gravada à mão (painel ou porta gravar_digital); vazia nos pedidos antigos
+  prazoEntrega?: string                                      // aaaa-mm-dd gravado à mão; vale mais que o prazo calculado
+  gravadoArtePrazo?: { por: string; em: string; motivo: string }[]   // quem gravou situacaoArte/prazoEntrega, quando (Brasília) e por quê
   prontoEm?: string                                          // material pronto (você marcou): libera o restante
   email?: string                                             // do cliente (opcional, no aceite dos termos): comprovante, arte, envio
   restante?: number; restantePagoEm?: string; pagamentoFinal?: { txId: string; valor: number; data: string; nome: string | null }

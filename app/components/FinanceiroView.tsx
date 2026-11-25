@@ -17,6 +17,7 @@ import { brl, num } from "../utils"
 import { CategoriaFinanceira, ContaBancaria, Configuracoes } from "../config"
 import { ContasTab } from "./financeiro/ContasTab"
 import { BancoTab } from "./financeiro/BancoTab"
+import { DigitalReceberCard } from "./financeiro/DigitalReceberCard"
 import { FixasTab } from "./financeiro/FixasTab"
 import { FornecedoresTab } from "./financeiro/FornecedoresTab"
 import {
@@ -1070,7 +1071,7 @@ const PERIODO_LABEL: Record<Periodo, string> = {
 
 const SEM_CARDS: KanbanCard[] = []
 type Linha = "offset" | "digital" | "todas"
-const ABAS_DIGITAL: FinTab[] = ["dash", "lancamentos", "dre"]
+const ABAS_DIGITAL: FinTab[] = ["dash", "receber", "lancamentos", "dre"]
 const CADASTROS: { v: FinTab; nome: string }[] = [
   { v: "contas", nome: "Contas" }, { v: "fixas", nome: "Gastos fixos" }, { v: "fornecedores", nome: "Fornecedores" }, { v: "config", nome: "Categorias" },
 ]
@@ -1391,7 +1392,7 @@ export function FinanceiroView({
 
 
   const abas: { v: FinTab; nome: string; conta?: number }[] = linha !== "offset"
-    ? [{ v: "dash", nome: "Visão geral" }, { v: "lancamentos", nome: "Lançamentos" }, { v: "dre", nome: "DRE" }]
+    ? [{ v: "dash", nome: "Visão geral" }, { v: "receber", nome: "A receber" }, { v: "lancamentos", nome: "Lançamentos" }, { v: "dre", nome: "DRE" }]
     : [
       { v: "dash", nome: "Visão geral" },
       { v: "receber", nome: "A receber", conta: vencidos.length },
@@ -1792,6 +1793,7 @@ export function FinanceiroView({
         {/* ── A RECEBER ── */}
         {tab === "receber" && (
           <div className="space-y-2">
+            {linha !== "offset" && <DigitalReceberCard />}
             <p className="text-[11.5px] text-[#8E8E93] mb-3">
               Pedidos fechados ou em produção, e ganhos de parcerias pendentes.
             </p>

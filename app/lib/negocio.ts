@@ -312,7 +312,7 @@ export function recebiveis(pedidos: Pedido[], lancamentos: LancamentoFinanceiro[
   const ligados = new Set(pedidos.flatMap(p => p.receitas.map(l => l.id)))
   const quitados = pedidos.filter(p => p.aReceber <= 0.5)
     .flatMap(p => p.receitas.filter(l => l.status !== "pago" && !p.sobrasQuitadas.includes(l.id) && !pixExpirado(l, hojeIso)))
-  const soltos = lancamentos.filter(l => l.tipo === "receita" && l.status !== "pago" && !ligados.has(l.id) && l.formaPagamento !== "conta" && !pixExpirado(l, hojeIso))
+  const soltos = lancamentos.filter(l => (l.unidade ?? "offset") === "offset" && l.tipo === "receita" && l.status !== "pago" && !ligados.has(l.id) && l.formaPagamento !== "conta" && !pixExpirado(l, hojeIso))
   const soma = (f: (p: Pedido) => number) => comSaldo.reduce((s, p) => s + f(p), 0)
   return {
     aReceber: soma(p => p.aReceber),

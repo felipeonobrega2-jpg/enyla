@@ -31,13 +31,25 @@ describe("digitaisEmProducao", () => {
 })
 
 describe("comDigital", () => {
-  it("junta ao JSON da produção e respeita 7000", () => {
+  it("junta ao JSON da produção", () => {
     const base = JSON.stringify({ prazoMedioPorEtapa: {}, pedidos: [] })
     expect(JSON.parse(comDigital(base, pedidos as never, hoje)).digital.pedidos).toHaveLength(2)
-    const muitos = Array.from({ length: 200 }, (_, i) => ({ id: `DIG-${i}`, nome: "Cliente", status: "arte", sinalPagoEm: "2026-03-01" }))
-    const s = comDigital(base, muitos as never, hoje)
+  })
+  it("lista TODOS os Digital abertos mesmo passando de 7000: enxuga datas e Offset, nunca omite Digital", () => {
+    const offset = JSON.stringify({ prazoMedioPorEtapa: {}, pedidos: Array.from({ length: 60 }, (_, i) => ({ numero: `ORC-${i}`, cliente: "Cliente Offset", etapa: "Impressão", diasNaEtapa: i })) })
+    const muitos = Array.from({ length: 25 }, (_, i) => ({ id: `DIG-${i}`, nome: "Cliente", produto: "Caixa 30 ml", quantidade: 200, status: i % 3 === 0 ? "sinal_pago" : i % 3 === 1 ? "arte" : "producao", sinalPagoEm: "2026-03-01", arteEnviadaEm: "2026-03-02", arteAprovadaEm: "2026-03-03", statusEm: "2026-03-04" }))
+    const s = comDigital(offset, [...muitos, { id: "DIG-T", status: "arte", teste: true }, { id: "DIG-E", status: "enviado" }] as never, hoje)
+    const d = JSON.parse(s).digital.pedidos as { id: string }[]
     expect(s.length).toBeLessThanOrEqual(7000)
-    expect(JSON.parse(s).digital.omitidos).toBeGreaterThan(0)
+    expect(d.map(p => p.id)).toEqual(muitos.map(p => p.id))
+    expect(JSON.parse(s).pedidos.length).toBeLessThan(60)   // o Offset foi enxugado, não o Digital
+  })
+  it("mesmo com 200 Digital abertos nenhum some", () => {
+    const base = JSON.stringify({ prazoMedioPorEtapa: {}, pedidos: [] })
+    const muitos = Array.from({ length: 200 }, (_, i) => ({ id: `DIG-${i}`, nome: "Cliente", status: "arte", sinalPagoEm: "2026-03-01" }))
+    const r = JSON.parse(comDigital(base, muitos as never, hoje))
+    expect(r.digital.pedidos).toHaveLength(200)
+    expect(r.digital.omitidos).toBeUndefined()
   })
   it("sem digitais devolve o JSON como veio", () => {
     expect(comDigital("{}", [], hoje)).toBe("{}")

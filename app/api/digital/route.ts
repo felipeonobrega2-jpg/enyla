@@ -8,13 +8,15 @@ import { mudarStatus, trocarFrete, restanteUnico, arteAtual, acertoDaSemana, Ped
 import { mudarConfig } from "@/app/lib/configAtomica"
 import { lerSugestoes, decidirSugestao } from "@/app/lib/arteAprovadaServidor"
 import { auth } from "@/auth"
+import { gravarDigital } from "@/app/lib/gravarDigitalExterno"
+import { prazoVisivelDigital, prazoPadraoDe } from "@/app/lib/prazoDigital"
 
 type Dados = { pedidosDigitais?: PedidoComBriefing[]; digitalContatos?: ContatosDigital; digital?: import("@/app/lib/precoDigital").RegraDigital }
 
 // Painel do braço digital (rota protegida pelo login): os pedidos dos últimos 45 dias com o link e o que o cliente fez
 export async function GET() {
   const { data } = await lerConfigLinha()
-  const d = (data?.data ?? {}) as Dados
+  const d = (data?.data ?? {}) as Dados & Parameters<typeof prazoPadraoDe>[0]
   const todos = d.pedidosDigitais ?? []
   const desde = Date.now() - 45 * 86_400_000
   const pedidos = todos.filter(p => new Date(p.em).getTime() >= desde || (p.villaEnviadoEm && !p.acertadoEm)).map(p => ({
@@ -30,6 +32,7 @@ export async function GET() {
     arteAtual: arteAtual(p), versoes: (p.artes ?? []).length, arteEnviadaEm: p.arteEnviadaEm ?? null, arteAprovadaEm: p.arteAprovadaEm ?? null,
     ajustes: p.ajustes ?? [], designerAvisadoEm: p.designerAvisadoEm ?? null, villaEnviadoEm: p.villaEnviadoEm ?? null,
     frete: p.frete ?? null, restante: p.restante ?? null, restantePagoEm: p.restantePagoEm ?? null, prontoEm: p.prontoEm ?? null, entrega: p.entrega ?? null, acertadoEm: p.acertadoEm ?? null,
+    situacaoArte: p.situacaoArte ?? null, prazoEntrega: p.prazoEntrega ?? null, prazoNoLink: prazoVisivelDigital(p, d).texto,
     negociacao: p.negociacao ?? null, termosAceitosEm: p.termos?.em ?? null,
   }))
   const acerto = acertoDaSemana(todos)
@@ -40,7 +43,7 @@ export async function GET() {
 
 // POST { id, status } avança ou cancela · { id, acao } frete, arte, Villa, designer · { acertar: ids } · { contatos }
 export async function POST(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as { teste?: boolean; id?: string; status?: StatusDigital; acao?: string; frete?: number; quantidade?: number; enviar?: boolean; acertar?: string[]; contatos?: ContatosDigital; decisao?: "aprovar" | "recusar" | "eu" | "confirmar" | "descartar"; total?: number; a?: number; l?: number; p?: number; salvar?: boolean; avisarCliente?: boolean }
+  const b = await req.json().catch(() => ({})) as { teste?: boolean; id?: string; status?: StatusDigital; acao?: string; frete?: number; quantidade?: number; enviar?: boolean; acertar?: string[]; contatos?: ContatosDigital; decisao?: "aprovar" | "recusar" | "eu" | "confirmar" | "descartar"; total?: number; a?: number; l?: number; p?: number; salvar?: boolean; avisarCliente?: boolean; situacaoArte?: string; prazoEntrega?: string; motivo?: string }
 
   // Pedido de teste: na sua conversa com você mesmo, com o link do pedido
   if (b.teste) {
@@ -66,6 +69,14 @@ export async function POST(req: NextRequest) {
     const { data } = await lerConfigLinha()
     const r = await decidirSugestao(((data?.data ?? {}) as Dados).pedidosDigitais ?? [], b.id, b.decisao, "Painel (login do sistema)")
     return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ erro: r.erro }, { status: 400 })
+  }
+  // Situação da arte e prazo de entrega gravados à mão (mesma regra da porta gravar_digital; só login do sistema)
+  if (b.acao === "arte_prazo") {
+    const sessao = await auth().catch(() => null)
+    if (!sessao) return NextResponse.json({ erro: "Entre no sistema para gravar." }, { status: 401 })
+    const por = (sessao.user?.name ?? sessao.user?.email ?? "Painel").toString().slice(0, 60)
+    const r = await gravarDigital(por, b as Record<string, unknown>)
+    return r.ok ? NextResponse.json({ ok: true, situacaoArte: r.situacaoArte, prazoEntrega: r.prazoEntrega }) : NextResponse.json({ erro: r.erro }, { status: r.status })
   }
   if (b.acertar?.length) {
     const ids = new Set(b.acertar)
