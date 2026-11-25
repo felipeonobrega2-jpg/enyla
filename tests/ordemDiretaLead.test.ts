@@ -20,8 +20,9 @@ vi.mock("@/app/lib/diretoriaServidor", () => ({ lerConversa: vi.fn(async () => e
 vi.mock("@/app/lib/funcionariosServidor", () => ({ redigirComoFuncionario: e.redigir }))
 vi.mock("@/app/lib/nivelCliente", () => ({ nivelDoDestinatario: vi.fn(async () => e.nivel) }))
 vi.mock("@/app/lib/prospectorTrava", () => ({ ehProspecto: vi.fn(async () => false) }))
+vi.mock("@/app/lib/conversaDoFelipe", () => ({ lerConversaDoFelipe: vi.fn(async () => ({ doFelipe: e.voce, motivo: e.voce ? "escreveu nas últimas 24 h" : null })) }))
 vi.mock("@/app/lib/agenteAuto", () => ({
-  lerCfg: vi.fn(async () => e.cfg), enviar: e.enviar, voceNaConversa: vi.fn(async () => e.voce),
+  lerCfg: vi.fn(async () => e.cfg), enviar: e.enviar,
   lerConversa: vi.fn(async (jid: string) => ({ jid, nome: "Maria Perfumes", telefone: "5511999990001", etiquetas: [], status_lead: null })),
 }))
 const enviarAoCliente = vi.hoisted(() => vi.fn())

@@ -1,7 +1,8 @@
 // Pede a medida aos bons negócios que só passaram o ml (um por rodada, a cada 10 min, no horário do agente)
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
-import { lerCfg, lerConversa, enviar, registrar, voceAtende, Conversa } from "./agenteAuto"
+import { lerConversaDoFelipe } from "./conversaDoFelipe"
+import { lerCfg, lerConversa, enviar, registrar, Conversa } from "./agenteAuto"
 import { dentroDoHorario } from "./agenteLeads"
 import { dadosDaConversa, etapaDaConversa } from "./hoje"
 import { devePedirMedida, textoPedirMedida, MINUTOS_ENTRE_PEDIDOS, HORAS_ESPERA_MAX, ConvMedida } from "./pedirMedida"
@@ -21,7 +22,8 @@ export async function talvezPedirMedida() {
   const cands = (data ?? []).map(x => ({ ...x, dados: dadosDaConversa(x.proxima_acao), etapa: etapaDaConversa(x.proxima_acao) }) as ConvMedida)
     .filter(c => devePedirMedida(c, ja, vinculados))
   for (const alvo of cands) {
-    if (await voceAtende(alvo.jid, cfg)) continue                 // você está na conversa: é sua
+    // Conversa do Felipe (24 h, último a falar ou estrela): pula antes de gastar a vez (#150)
+    if ((await lerConversaDoFelipe(alvo.jid, cfg).catch(() => ({ doFelipe: true }))).doFelipe) continue
     // Reserva a vez (duas rodadas ao mesmo tempo: só uma passa) e marca o contato (pede uma vez só)
     let minha = false
     await mudarConfig((d: Cfg) => {

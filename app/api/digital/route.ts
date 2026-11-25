@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     let novo: PedidoComBriefing | null = null
     await mudarConfig(d => { const todos = (d as Dados).pedidosDigitais ?? []; novo = pedidoDeTeste(todos, jid) as PedidoComBriefing; return { pedidosDigitais: [...todos, novo] } })
     const p = novo as unknown as PedidoComBriefing
-    await enviar({ jid, nome: "Você", telefone: num, etiquetas: null, status_lead: null }, `*Teste* · ${textoLinkPedido(p, linkPedido(p.id))}`).catch(() => null)
+    await enviar({ jid, nome: "Você", telefone: num, etiquetas: null, status_lead: null }, `*Teste* · ${textoLinkPedido(p, linkPedido(p.id))}`, undefined, { peloFelipe: true }).catch(() => null)
     return NextResponse.json({ ok: true, id: p.id, link: linkPedido(p.id), linkDesigner: linkDesigner(p.id) })
   }
   if (b.contatos) {
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     if (!novo) return NextResponse.json({ erro: "Não dá para mudar a quantidade (sinal já pago, ou quantidade fora da tabela)." }, { status: 400 })
     if (b.enviar) {
       const c = await conversaDoPedido(novo.jid)
-      const env = c ? await enviar(c, textoLinkPedido(novo, linkPedido(novo.id)), undefined, { essencial: true }) : { ids: [], erro: "conversa não encontrada" }
+      const env = c ? await enviar(c, textoLinkPedido(novo, linkPedido(novo.id)), undefined, { essencial: true, peloFelipe: true }) : { ids: [], erro: "conversa não encontrada" }
       if (!env.ids.length) return NextResponse.json({ erro: `Quantidade mudou, mas a mensagem não saiu (${env.erro ?? "erro"}). Mande o link à mão.` }, { status: 502 })
     }
     return NextResponse.json({ ok: true })
@@ -100,14 +100,14 @@ export async function POST(req: NextRequest) {
       const novo = await gravarPedido(b.id, (p, todos) => aprovarNegociacao(p, todos, Number(b.total)) as PedidoComBriefing | null)
       if (!novo) return NextResponse.json({ erro: "Não deu para mudar o valor (sinal já pago ou valor inválido)." }, { status: 400 })
       const c = await conversaDoPedido(novo.jid)
-      const env = c ? await enviar(c, textoNegociacaoAprovada(novo, linkPedido(novo.id)), undefined, { essencial: true }) : { ids: [], erro: "conversa não encontrada" }
+      const env = c ? await enviar(c, textoNegociacaoAprovada(novo, linkPedido(novo.id)), undefined, { essencial: true, peloFelipe: true }) : { ids: [], erro: "conversa não encontrada" }
       return env.ids.length ? NextResponse.json({ ok: true }) : NextResponse.json({ erro: `Valor mudou, mas a mensagem não saiu (${env.erro ?? "erro"}). Avise o cliente à mão.` }, { status: 502 })
     }
     const novo = await gravarPedido(b.id, p => recusarNegociacao(p) as PedidoComBriefing | null)
     if (!novo) return NextResponse.json({ erro: "Essa negociação já foi decidida." }, { status: 400 })
     if (b.decisao === "recusar") {
       const c = await conversaDoPedido(novo.jid)
-      const env = c ? await enviar(c, textoNegociacaoRecusada(novo, linkPedido(novo.id)), undefined, { essencial: true }) : { ids: [], erro: "conversa não encontrada" }
+      const env = c ? await enviar(c, textoNegociacaoRecusada(novo, linkPedido(novo.id)), undefined, { essencial: true, peloFelipe: true }) : { ids: [], erro: "conversa não encontrada" }
       if (!env.ids.length) return NextResponse.json({ erro: `A mensagem não saiu (${env.erro ?? "erro"}). Responda à mão.` }, { status: 502 })
     }
     return NextResponse.json({ ok: true })
@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
         : `Atualizei as medidas da sua caixa para *${fmtMedidas(novo.medidas)} cm* (altura × largura × profundidade).${mudouValor ? ` Com essa medida o pedido fica em *${brl(novo.total)}*: o sinal que você já pagou continua valendo e muda só o restante, que fica ${brl(novo.total - novo.sinal)}.` : " O valor não muda."}
 
 O pedido está aqui: ${linkPedido(novo.id)}`
-      const env = c ? await enviar(c, texto, undefined, { essencial: true }) : { ids: [] }
+      const env = c ? await enviar(c, texto, undefined, { essencial: true, peloFelipe: true }) : { ids: [] }
       cliente = env.ids.length > 0
     }
     return NextResponse.json({ ok: true, leandro, cliente })

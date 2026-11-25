@@ -50,6 +50,10 @@ export async function POST(req: NextRequest) {
   const { data: conv } = await supabase.from("whatsapp_conversas").select("jid, nome, telefone, etiquetas, status_lead, proxima_acao").eq("jid", jid).maybeSingle()
   if (!conv) return NextResponse.json({ erro: "conversa não encontrada" }, { status: 404 })
   const c: Conversa = { jid: conv.jid, nome: conv.nome, telefone: conv.telefone, etiquetas: conv.etiquetas, status_lead: conv.status_lead }
+  // Conversa do Felipe: a varredura não entra (antes de qualquer trabalho; o envio central também barra) (#150)
+  const { lerConversaDoFelipe, textoDoFelipe } = await import("@/app/lib/conversaDoFelipe")
+  const df = await lerConversaDoFelipe(jid).catch(() => ({ doFelipe: true, motivo: null }))
+  if (df.doFelipe) return NextResponse.json({ ok: false, enviou: false, motivo: df.motivo ? textoDoFelipe(df) : "conversa do Felipe" })
   const cfg = await lerCfg()
   const abertos = (cfg.pedidosDigitais ?? []).filter(p => p.jid === jid && p.status === "aguardando_sinal")
 

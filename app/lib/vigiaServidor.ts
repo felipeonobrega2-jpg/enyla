@@ -2,6 +2,7 @@
 //  1. Recuperação: quem ficou sem resposta (IA fora, cota cheia) é respondido assim que der, bons negócios primeiro.
 //  2. Rotina: checagem das 13h e fechamento das 18h no seu WhatsApp (a manhã já vai pelo resumo do marketing).
 //  3. WhatsApp desconectado há 5+ min: aviso no celular (pelo ntfy, já que o WhatsApp está fora).
+import { lerConversaDoFelipe } from "./conversaDoFelipe"
 import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
@@ -186,10 +187,13 @@ async function recuperarFila(cfg: Cfg, agora: Date, vagas: { n: number }, despac
   const ordem = [...fila].sort((a, b) => peso(b.jid) - peso(a.jid) || a.em.localeCompare(b.em))
   const sair = new Set<string>()
   const vez: { p: Pendente; msgId: string }[] = []
+  let doFelipe = 0
   for (const p of ordem.slice(0, 30)) {
     if (vez.length >= vagas.n) break
     const ult = await ultimaReal(p.jid)
     if (!ult || ult.from_me) { sair.add(p.msgId); continue }   // já respondida (você ou o agente)
+    // Conversa do Felipe: não vai ao Atendente (sai da fila; fica só no aviso interno a ele) (#150)
+    if ((await lerConversaDoFelipe(p.jid, cfg).catch(() => ({ doFelipe: true }))).doFelipe) { sair.add(p.msgId); doFelipe++; continue }
     sair.add(p.msgId); vez.push({ p, msgId: ult.id })           // a resposta é para a última dele
   }
   // Sai da fila antes de despachar: se falhar, quem falhou devolve (sem corrida com esta gravação)
@@ -201,7 +205,7 @@ async function recuperarFila(cfg: Cfg, agora: Date, vagas: { n: number }, despac
     await mudarConfig((d: Cfg) => ({ respostasPendentes: [...(d.respostasPendentes ?? []).filter(p => p.jid !== v.p.jid), v.p] }))
   }
   vagas.n -= ok
-  return { fila: fila.length, despachadas: ok, quentes: vez.filter(v => peso(v.p.jid) >= 3).length, jaRespondidas: sair.size - vez.length }
+  return { fila: fila.length, despachadas: ok, quentes: vez.filter(v => peso(v.p.jid) >= 3).length, jaRespondidas: sair.size - vez.length - doFelipe, doFelipe }
 }
 
 // ── Cobrador de promessas ───────────────────────────────────────────────────
@@ -274,6 +278,7 @@ async function cuidarDeQuemEspera(cfg: Cfg & { vigiaTentou?: string[]; esperaAvi
     if (despachadas.has(e.jid)) continue
     const ult = await ultimaReal(e.jid)
     if (!ult || ult.from_me || tentou.has(ult.id)) continue
+    if ((await lerConversaDoFelipe(e.jid, cfg).catch(() => ({ doFelipe: true }))).doFelipe) continue   // do Felipe: só o aviso interno (#150)
     novasTentativas.push(ult.id)
     if (await despachar(ult.id, ordem)) { despachadas.add(e.jid); vagas.n--; ordem++ }
   }

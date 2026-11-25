@@ -20,6 +20,7 @@ import { etapaDoLead } from "./etapaLead"
 import { leadsDoFollowUp, jidsDoFollowUp } from "./leadsDoFollowUp"
 import { lerEstadosLead } from "./leadEstadoServidor"
 import { perdidoAtivo, orcadoManualAtivo } from "./leadEstado"
+import { lerConversaDoFelipe, textoDoFelipe } from "./conversaDoFelipe"
 import { lerRegistros, gravarRegistro, lerIdsAgente, guardarIdAgente, reservarTratada, liberarTratada, temTabelas } from "./registroAgente"
 import { garantirTelefone } from "./contatosServidor"
 import { textoAvisoReativacao } from "./reativacao"
@@ -310,9 +311,19 @@ export async function reservarVezDeEnviar(opcoes: { essencial?: boolean; proativ
   return res
 }
 
-export async function enviar(c: Conversa, texto: string, lida?: string, opcoes: { essencial?: boolean; proativo?: boolean } = {}): Promise<{ ids: string[]; erro?: string }> {
+// Trava central (#150): conversa do Felipe não recebe mensagem de agente nem de ordem direta. Só passa quem declara
+// { peloFelipe: true } (ação explícita dele na tela) ou o chat "Você" (aviso a ele, não é cliente). Se a leitura falhar, barra.
+async function travaDoFelipe(c: Conversa, opcoes: { peloFelipe?: boolean }): Promise<string | null> {
+  if (opcoes.peloFelipe || c.nome === "Você") return null
+  const r = await lerConversaDoFelipe(c.jid).catch(() => ({ doFelipe: true, motivo: null }))
+  return r.doFelipe ? (r.motivo ? textoDoFelipe(r) : "conversa do Felipe (não deu para conferir)") : null
+}
+
+export async function enviar(c: Conversa, texto: string, lida?: string, opcoes: { essencial?: boolean; proativo?: boolean; peloFelipe?: boolean } = {}): Promise<{ ids: string[]; erro?: string }> {
   const number = c.telefone || c.jid
   const ids: string[] = []
+  const doFelipe = await travaDoFelipe(c, opcoes)
+  if (doFelipe) return { ids, erro: doFelipe }
   const vez = await reservarVezDeEnviar(opcoes)
   if ("erro" in vez) return { ids, erro: vez.erro }
   if (vez.esperaMs > 0) await new Promise(res => setTimeout(res, vez.esperaMs))
@@ -333,8 +344,10 @@ export async function enviar(c: Conversa, texto: string, lida?: string, opcoes: 
 }
 
 // Imagem ou PDF pela URL (arte para aprovar), com legenda; também fica guardada como mensagem do agente
-export async function enviarArquivo(c: Conversa, url: string, mime: string, legenda: string, nome = "arte", opcoes: { essencial?: boolean; proativo?: boolean } = {}): Promise<{ ids: string[]; erro?: string }> {
+export async function enviarArquivo(c: Conversa, url: string, mime: string, legenda: string, nome = "arte", opcoes: { essencial?: boolean; proativo?: boolean; peloFelipe?: boolean } = {}): Promise<{ ids: string[]; erro?: string }> {
   const number = c.telefone || c.jid
+  const doFelipe = await travaDoFelipe(c, opcoes)
+  if (doFelipe) return { ids: [], erro: doFelipe }
   const vez = await reservarVezDeEnviar(opcoes)
   if ("erro" in vez) return { ids: [], erro: vez.erro }
   if (vez.esperaMs > 0) await new Promise(res => setTimeout(res, vez.esperaMs))
@@ -636,12 +649,11 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     } else coletandoMql = falta
   }
   if (!conversaNova && !opts.atrasada) return
-  // Você escreveu nesta conversa nas últimas 24 h (celular ou tela do sistema): a conversa é sua, o agente não entra.
-  // Lead do digital é a exceção: esse é todo do agente.
-  // Atrasada (o cliente esperou 20+ min e ninguém respondeu): ninguém fica sem resposta, o agente responde mesmo
-  // em conversa sua (só não entra se você escreveu nos últimos minutos: voceNaConversa, abaixo)
-  if (!opts.atrasada && !(c.etiquetas ?? []).includes(ETIQUETAS_AGENTE.digital) && await voceAtende(jid, cfg))
-    return registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: "indefinido", enviou: false, texto: "", motivo: "conversa sua (você escreveu nas últimas 24 h)" })
+  // Conversa do Felipe (escreveu em 24 h, foi o último a falar ou estrela): o agente não entra, nem atrasada.
+  // #150: vale também na atrasada e no lead do digital (a ordem do Felipe de 25/11 não tem exceção, só o "assuma")
+  const doFelipe = await lerConversaDoFelipe(jid, cfg).catch(() => ({ doFelipe: true, motivo: null }))
+  if (doFelipe.doFelipe)
+    return registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: "indefinido", enviou: false, texto: "", motivo: doFelipe.motivo ? textoDoFelipe(doFelipe) : "conversa do Felipe (não deu para conferir)" })
 
   const log = (cfg.agenteLog ?? []).filter(l => l.jid === jid)
   const manualRecente = await voceNaConversa(jid, log, cfg)
@@ -1042,7 +1054,12 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     }
     const log = (cfg.agenteLog ?? []).filter(l => l.jid === c.jid)
     // Conversa que você está atendendo (escreveu nas últimas 24 h): sem follow-up do agente (o digital segue)
-    if (!(c.etiquetas ?? []).includes(ETIQUETAS_AGENTE.digital) && await voceAtende(c.jid, cfg)) return
+    const doFelipe = await lerConversaDoFelipe(c.jid, cfg).catch(() => ({ doFelipe: true, motivo: null }))
+    if (doFelipe.doFelipe) {
+      const motivo = `F${nivel}: ${doFelipe.motivo ? textoDoFelipe(doFelipe) : "conversa do Felipe"}`
+      // Uma linha só por motivo (a rodada repete: sem encher o registro)
+      return log[0]?.motivo === motivo ? undefined : registrar({ ...base, perfil: "indefinido", enviou: false, texto: "", motivo, passo: `F${nivel}` })
+    }
     // Orçamento digital esperando o sinal: o follow-up é o lembrete do pedido (texto fixo com o link, sem IA)
     const pd = pedidoPendente(cfg.pedidosDigitais, c.jid)
     if (pd) {
@@ -1141,7 +1158,7 @@ export async function assumirEContinuar(jid: string): Promise<{ ok: boolean; tex
   const texto = a.r.resposta?.trim()
   if (!texto) return { ok: true, motivo: "a IA achou que não há o que mandar agora" }
   const quente = leadQuente({ etiquetas: c.etiquetas, status_lead: c.status_lead, perfil: a.r.lead.perfil, jid, pedidosDigitais: cfg.pedidosDigitais })
-  const env = await enviar(c, limparEmojis(texto, emojiCtx(a.conversa.mensagens, cfg)), undefined, { essencial: quente })
+  const env = await enviar(c, limparEmojis(texto, emojiCtx(a.conversa.mensagens, cfg)), undefined, { essencial: quente, peloFelipe: true })
   await registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: a.r.lead.perfil, texto, enviou: env.ids.length > 0, ids: env.ids, motivo: env.erro ?? "assumiu a conversa do Felipe" })
   return { ok: env.ids.length > 0, texto, motivo: env.erro }
 }

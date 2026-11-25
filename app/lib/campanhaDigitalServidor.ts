@@ -71,9 +71,16 @@ export async function talvezCampanhaDigital() {
     return { campanhaDigital: { ...x, proximaEm: proximoIntervalo() } }
   })
   if (!minha) return
-  const [alvo] = await fila(cfg)
-  if (!alvo) return
-  await enviarPara(alvo, cfg)
+  // Conversa do Felipe (24 h, último a falar ou estrela): pula e segue para o próximo, antes de IA/pedido (#150).
+  // O motivo fica no registro uma vez por conversa (a rodada repete).
+  const { lerConversaDoFelipe, textoDoFelipe } = await import("./conversaDoFelipe")
+  for (const alvo of (await fila(cfg)).slice(0, 15)) {
+    const df = await lerConversaDoFelipe(alvo.jid, cfg).catch(() => ({ doFelipe: true, motivo: null }))
+    if (!df.doFelipe) return enviarPara(alvo, cfg)
+    const motivo = `Campanha digital: ${df.motivo ? textoDoFelipe(df) : "conversa do Felipe"}`
+    if (!((await lerRegistros(50, { jid: alvo.jid }).catch(() => null)) ?? []).some(l => l.motivo === motivo))
+      await registrar({ em: new Date().toISOString(), jid: alvo.jid, nome: alvo.nome, perfil: "pequeno", texto: "", passo: "Campanha digital", enviou: false, motivo })
+  }
 }
 
 async function enviarPara(alvo: Candidato, cfg: Cfg) {

@@ -10,6 +10,7 @@ import type { Funcionario } from "./rh"
 
 export const MAX_DIRETOS_DIA = 20
 export const MOTIVO_FORA_DO_HORARIO = "fora do horário do agente"
+export const MOTIVO_CONVERSA_DO_FELIPE = "conversa do Felipe: espera o Aprovo"
 export const MOTIVO_PROMETIA_ORCAMENTO = "prometia orçamento sem proposta real"
 
 type Lead = { jid: string; nome: string }
@@ -34,15 +35,16 @@ export async function travasAntesDeRedigir(func: Pick<Funcionario, "id">, lead: 
 
 // Já com o texto redigido: últimas travas e envio. Devolve a ação "enviado" (direto), a fila ou a recusa.
 export async function enviarAoLead(a: { diretor: string; func: Pick<Funcionario, "id" | "nome">; lead: Lead; texto: string; novoId: () => string }): Promise<{ acao: AcaoConversa } | Fila | Recusa> {
-  const { lerCfg, enviar, voceNaConversa, lerConversa } = await import("./agenteAuto")
+  const { lerCfg, enviar, lerConversa } = await import("./agenteAuto")
   const { ehProspecto } = await import("./prospectorTrava")
   const cfg = await lerCfg()
   // Trava do "segue o orçamento" (#106): sem proposta real o texto vai reescrito para o Aprovo
   const t = travaPromessaDeOrcamento(a.texto, { idsExistentes: (cfg.pedidosDigitais ?? []).map(p => p.id) })
   if (t.reescrita) return { fila: true, motivo: MOTIVO_PROMETIA_ORCAMENTO, texto: t.resposta }
   if (await ehProspecto(a.lead.jid).catch(() => true)) return { fila: true, motivo: "gráfica do Prospector: o Felipe decide" }
-  // O Felipe escreveu há pouco nessa conversa: não entra por cima
-  if (await voceNaConversa(a.lead.jid, (cfg.agenteLog ?? []).filter(l => l.jid === a.lead.jid), cfg).catch(() => true)) return { fila: true, motivo: "o Felipe escreveu há pouco nessa conversa" }
+  // Conversa do Felipe (escreveu em 24 h, foi o último a falar ou estrela): ordem direta não entra, espera o Aprovo
+  const { lerConversaDoFelipe } = await import("./conversaDoFelipe")
+  if ((await lerConversaDoFelipe(a.lead.jid, cfg).catch(() => ({ doFelipe: true }))).doFelipe) return { fila: true, motivo: MOTIVO_CONVERSA_DO_FELIPE }
   const conversa = await lerConversa(a.lead.jid)
   if (!conversa) return { recusa: true, status: 404, motivo: "sem conversa", saida: "Conversa não encontrada: nada foi enviado." }
 

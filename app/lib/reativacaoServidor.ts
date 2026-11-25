@@ -3,6 +3,7 @@
 
 import { supabase } from "./supabase"
 import { atender } from "./atendenteServidor"
+import { lerConversaDoFelipe, textoDoFelipe } from "./conversaDoFelipe"
 import { lerCfg, gravarCfg, registrar, lerConversa, aplicar, enviar, CfgAgente } from "./agenteAuto"
 import { valoresEmReais, filtroEfetivo, PerfilLead } from "./agenteLeads"
 import {
@@ -94,7 +95,8 @@ export async function preparar(jid: string, cfg?: Cfg) {
 export async function enviarRetomada(jid: string, texto: string, quem: "voce" | "agente", perfil?: PerfilLead) {
   const c = await lerConversa(jid)
   if (!c) return { ok: false as const, erro: "Conversa não encontrada." }
-  const env = await enviar(c, texto.trim(), undefined, { proativo: true })
+  // quem === "voce": o Felipe mandou pela tela (ação explícita dele). Do agente, a trava da conversa do Felipe vale.
+  const env = await enviar(c, texto.trim(), undefined, { proativo: true, peloFelipe: quem === "voce" })
   if (env.ids.length) await aplicar(c, [...new Set([...(c.etiquetas ?? []), ETIQUETA_REATIVACAO])], null)
   const p = perfil ?? PERFIL[(c.etiquetas ?? []).find(e => PERFIL[e]) ?? "MQL"] ?? "icp"
   await registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: p, enviou: env.ids.length > 0, ids: env.ids, texto, passo: "Reativação",
@@ -127,7 +129,17 @@ export async function talvezReativar() {
   await gravarCfg(() => ({ reativacaoProximaEm: proxima } as Partial<CfgAgente>))
 
   // Tenta até 2 da fila (a IA pode achar que um não vale retomar)
-  for (const c of (await candidatos(cfg)).slice(0, 2)) {
+  let tentadas = 0
+  for (const c of (await candidatos(cfg)).slice(0, 12)) {
+    if (tentadas >= 2) return
+    // Conversa do Felipe (24 h, último a falar ou estrela): pula antes da IA, registra o motivo e sai da fila por um tempo (#150)
+    const df = await lerConversaDoFelipe(c.jid, cfg).catch(() => ({ doFelipe: true, motivo: null }))
+    if (df.doFelipe) {
+      await pular(c.jid)
+      await registrar({ em: new Date().toISOString(), jid: c.jid, nome: c.nome, perfil: PERFIL[c.motivo], enviou: false, texto: "", passo: "Reativação segurada", motivo: df.motivo ? textoDoFelipe(df) : "conversa do Felipe" })
+      continue
+    }
+    tentadas++
     const p = await preparar(c.jid, cfg).catch(e => ({ ok: false as const, erro: String(e) }))
     if (!p.ok) return registrar({ em: new Date().toISOString(), jid: c.jid, nome: c.nome, perfil: PERFIL[c.motivo], enviou: false, texto: "", passo: "Reativação", motivo: `IA falhou: ${p.erro.slice(0, 120)}` })
     if (p.trava) {
