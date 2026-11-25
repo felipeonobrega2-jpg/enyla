@@ -61,6 +61,7 @@ export type PedidoDigital = {
   statusEm?: string                                          // última mudança de status
   // Fases 4–6: arte, produção na Villa, restante (com frete) e acerto semanal
   artes?: Arte[]; arteEnviadaEm?: string; arteAprovadaEm?: string; ajustes?: Ajuste[]
+  arteAprovadaPor?: { por: string; em: string; trecho: string }   // aprovação confirmada por uma pessoa a partir da sugestão do WhatsApp
   medidasAntes?: { medidas: { a: number; l: number; p: number }; total: number; em: string }[]   // mudanças de medida (a mais recente por último)
   designerAvisadoEm?: string; villaEnviadoEm?: string
   frete?: number; entrega?: Entrega

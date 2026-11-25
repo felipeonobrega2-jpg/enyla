@@ -26,7 +26,12 @@ async function lerRastreios(): Promise<Rastreio[]> {
 
 // Só leitura dos pedidos digitais (mesmo array da configuração); se falhar, o detalhe sai sem eles
 async function lerDigitais(): Promise<Parameters<typeof comDigital>[1]> {
-  try { return (await lerCampos<{ pedidosDigitais?: Parameters<typeof comDigital>[1] }>(["pedidosDigitais"])).pedidosDigitais ?? [] } catch { return [] }
+  try {
+    const pedidos = (await lerCampos<{ pedidosDigitais?: (NonNullable<Parameters<typeof comDigital>[1]>[number] & { jid: string })[] }>(["pedidosDigitais"])).pedidosDigitais ?? []
+    const { lerSugestoes } = await import("./arteAprovadaServidor")
+    const sug = await lerSugestoes(pedidos)   // só leitura: nada é gravado
+    return pedidos.map(p => { const s = sug.find(x => x.pedido === p.id); return s ? { ...p, sugestaoArteAprovada: { trecho: s.trecho, em: s.em } } : p })
+  } catch { return [] }
 }
 
 const novoId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
