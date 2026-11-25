@@ -55,7 +55,8 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 37 | Prospector: importador não trava quando a BrasilAPI falha (grava com os dados do arquivo, `falhasCadastro`) | operação | — | — | Claude Code | não (correção de erro) | (PR da issue #88) |
 | 38 | Atendente não responde sozinha a gráficas do Prospector | operação | — | — | Claude Code | não | (PR da issue #34) |
 | 39 | Prospector: janela de envio 8h–20h (seg-sex), cron `0 11-22 * * 1-5` | Felipe (decisão 24/11/2026, 17:56) | — | — | Claude Code | não | (PR da issue #99) |
-| 40 | Porta externa: paginar `?o=detalhe&area=comercial` (`pagina`, `jid`; não corta lead no meio) | CCO (pedido do Felipe) | — | — | Claude Code | não | (PR da issue #102) |
+| 40 | Atendente: não dizer «segue o orçamento» sem link ou PDF real de proposta existente | Felipe | — | — | Claude Code | **NÃO JUNTAR sem o Aprovo do Felipe** (mexe na fala do Atendente com cliente) | (PR da issue #104) |
+| 41 | Porta externa: paginar `?o=detalhe&area=comercial` (`pagina`, `jid`; não corta lead no meio) | CCO (pedido do Felipe) | — | — | Claude Code | não | (PR da issue #102) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 

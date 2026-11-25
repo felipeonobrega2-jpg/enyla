@@ -239,3 +239,30 @@ describe("saudação automática do WhatsApp Business que o lead manda", () => {
     expect(semFollowUp(["F1", "MQL"])).not.toContain("F1")
   })
 })
+
+import { travaPromessaDeOrcamento, prometeEnvioDeOrcamento, TEXTO_PREPARANDO_ORCAMENTO } from "@/app/lib/agenteLeads"
+
+describe("promessa de orçamento sem proposta real", () => {
+  const sem = { idsExistentes: [] as string[] }
+  it("«segue o orçamento» e equivalentes sem link/PDF real: não passam", () => {
+    for (const f of ["Segue o orçamento!", "Tô finalizando, já te mando.", "Vou montar seu orçamento e já te mando", "Segue em anexo.", "Segue o orçamento: https://app.enyla.com.br/d/DIG-9999?t=x"]) {
+      expect(prometeEnvioDeOrcamento(f)).toBe(true)
+      const r = travaPromessaDeOrcamento(f, sem)
+      expect(r.reescrita).toBe(true)
+      expect(r.resposta).toBe(TEXTO_PREPARANDO_ORCAMENTO)
+    }
+  })
+  it("mantém o resto da fala quando só uma frase promete", () => {
+    expect(travaPromessaDeOrcamento("Anotei tudo. Segue o orçamento.", sem).resposta).toBe("Anotei tudo.")
+  })
+  it("com link de proposta existente ou PDF anexado: não impede a fala", () => {
+    const f = "Segue o orçamento: https://app.enyla.com.br/d/DIG-12?t=x"
+    expect(travaPromessaDeOrcamento(f, { idsExistentes: ["DIG-12"] })).toEqual({ resposta: f, reescrita: false })
+    expect(travaPromessaDeOrcamento("Segue em anexo.", { idsExistentes: [], pdfAnexado: true }).reescrita).toBe(false)
+  })
+  it("«vou preparar o seu orçamento» continua válido", () => {
+    const f = "Perfeito, vou preparar o seu orçamento."
+    expect(prometeEnvioDeOrcamento(f)).toBe(false)
+    expect(travaPromessaDeOrcamento(f, sem)).toEqual({ resposta: f, reescrita: false })
+  })
+})
