@@ -286,8 +286,9 @@ function Cartao({ a, primeiro, rh, ferr, onResponder, onVaga, onFerramenta }: {
       <p className={`${rotulo} text-[#007a43]`}>{a.funcionario} vai enviar para {a.cliente}</p>
       {aberto ? <textarea value={edit} onChange={e => setEdit(e.target.value)} rows={Math.min(8, Math.ceil(edit.length / 52) + 1)} className="mt-1 w-full resize-none rounded-lg bg-white px-2 py-1.5 text-[12px] text-[#3c3a45] leading-snug border border-black/10 focus:outline-none focus:ring-2 focus:ring-[#009351]/25" />
         : <p className="mt-0.5 text-[12px] text-[#3c3a45] leading-snug whitespace-pre-line">{a.texto}</p>}
-      {a.status === "enviado" && <p className="text-[11px] font-semibold text-[#009351] mt-1">Enviado{a.em ? ` às ${hhmm(a.em)}` : ""}</p>}
+      {a.status === "enviado" && <p className="text-[11px] font-semibold text-[#009351] mt-1">Enviado{a.direto ? " direto (lead)" : ""}{a.em ? ` às ${hhmm(a.em)}` : ""}</p>}
       {a.status === "descartado" && <p className="text-[11px] text-[#6b6876] mt-1">Descartada</p>}
+      {a.status === "cancelado" && <p className="text-[11px] text-[#6b6876] mt-1">Cancelada pelo diretor</p>}
       {a.status === "erro" && <p className="text-[11px] text-[#d33a3c] mt-1">Não enviou: {a.erro}</p>}
       {aberto && <div className="flex gap-1.5 mt-1.5">
         <button disabled={indo || !edit.trim()} onClick={async () => { setIndo(true); await onResponder(a.id, "aprovo", edit !== a.texto ? edit : undefined); setIndo(false) }} className="text-[11.5px] font-semibold px-2.5 py-1 rounded-lg bg-[#009351] text-white disabled:opacity-50">{indo ? "Enviando…" : a.status === "erro" ? "Tentar de novo" : "Aprovo e envio"}</button>

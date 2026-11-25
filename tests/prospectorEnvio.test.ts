@@ -50,7 +50,7 @@ vi.mock("@/app/lib/supabase", () => ({
 }))
 
 import { executarEnvio } from "@/app/lib/prospectorEnvioServidor"
-import { celularWhatsapp, dentroDoHorario, ehRecusa, textoPrimeiroContato, TEXTO_LEMBRETE } from "@/app/lib/prospectorEnvio"
+import { MAX_EMAILS_POR_EXECUCAO, celularWhatsapp, dentroDoHorario, ehRecusa, textoPrimeiroContato, TEXTO_LEMBRETE } from "@/app/lib/prospectorEnvio"
 
 // 2026-11-23 é segunda. São Paulo é UTC-3. Os deslocamentos em dias caem em dia útil (o horário é checado de verdade).
 const SEG_10H = new Date("2026-11-23T13:00:00Z")
@@ -183,6 +183,19 @@ describe("qualificação", () => {
     expect(doBanco(baixa).etapa).toBe("encontrado")
     expect(doBanco(semContato).etapa).toBe("encontrado")
   })
+  it("filtro de público: nome fora do ramo, só encadernação e CNAE só secundário não são abordados e ficam na base", async () => {
+    mundo.cfg = { prospector_envio_ativo: true }
+    const nome = novo({ etapa: "encontrado", nota: 90, razao_social: "Mundo dos Infláveis", cnae_principal: "1813001", cnaes_secundarios: [] })
+    const encad = novo({ etapa: "encontrado", nota: 90, cnae_principal: "1822901", cnaes_secundarios: [] })
+    const secBaixa = novo({ etapa: "encontrado", nota: 1, cnae_principal: "4711301", cnaes_secundarios: ["1813001"] })
+    const secOk = novo({ etapa: "encontrado", nota: 2, cnae_principal: "4711301", cnaes_secundarios: ["1813001"] })
+    const princ = novo({ etapa: "encontrado", nota: 1, cnae_principal: "1821100", cnaes_secundarios: [] })
+    await rodar(SEG_10H)
+    for (const l of [nome, encad, secBaixa]) expect(doBanco(l).etapa).toBe("encontrado")
+    expect(doBanco(secOk).etapa).toBe("abordado")
+    expect(doBanco(princ).etapa).toBe("abordado")
+    expect(mundo.prospectos).toHaveLength(5)
+  })
   it("padrão do mínimo é 1 e não reabre descartado nem opt-out", async () => {
     const zero = novo({ etapa: "encontrado", nota: 0 })
     const um = novo({ etapa: "encontrado", nota: 1 })
@@ -195,8 +208,8 @@ describe("qualificação", () => {
   })
 })
 
-describe("limite de 10 primeiros contatos por dia", () => {
-  it("manda 10 e para; nova execução no mesmo dia não manda mais; no dia seguinte manda os próximos", async () => {
+describe("cota por canal: WhatsApp 10 por dia; e-mail sem teto diário", () => {
+  it("WhatsApp: manda 10 e para; nova execução no mesmo dia não manda mais; no dia seguinte manda os próximos", async () => {
     for (let i = 0; i < 13; i++) novo({ nota: 100 - i })
     expect((await rodar(SEG_10H)).primeiros).toBe(10)
     expect((await rodar(dias(SEG_10H, 0))).primeiros).toBe(0)
@@ -204,6 +217,28 @@ describe("limite de 10 primeiros contatos por dia", () => {
     const dia2 = await rodar(dias(SEG_10H, 1))
     expect(dia2.primeiros).toBe(3)
     expect(envios.evo).toHaveBeenCalledTimes(13)
+  })
+  it("e-mail não tem teto diário: 15 só com e-mail saem no mesmo dia", async () => {
+    for (let i = 0; i < 15; i++) novo({ nota: 100 - i, telefone: null, email: `a${i}@gr.com.br` })
+    expect((await rodar(SEG_10H)).primeiros).toBe(15)
+    expect(envios.email).toHaveBeenCalledTimes(15)
+    expect(envios.evo).not.toHaveBeenCalled()
+  })
+  it("quem tem os dois canais: com a cota do WhatsApp cheia, o e-mail sai e o WhatsApp espera o dia seguinte", async () => {
+    for (let i = 0; i < 12; i++) novo({ nota: 100 - i, email: `b${i}@gr.com.br` })
+    const r = await rodar(SEG_10H)
+    expect(r.primeiros).toBe(12)
+    expect(envios.evo).toHaveBeenCalledTimes(10)
+    expect(envios.email).toHaveBeenCalledTimes(12)
+    await rodar(dias(SEG_10H, 1))
+    expect(envios.evo).toHaveBeenCalledTimes(12)
+    expect(envios.email).toHaveBeenCalledTimes(12)
+  })
+  it("limite técnico por execução: o que passa de MAX_EMAILS_POR_EXECUCAO fica para o próximo cron", async () => {
+    for (let i = 0; i < MAX_EMAILS_POR_EXECUCAO + 5; i++) novo({ nota: 200 - i, telefone: null, email: `c${i}@gr.com.br` })
+    expect((await rodar(SEG_10H)).primeiros).toBe(MAX_EMAILS_POR_EXECUCAO)
+    expect((await rodar(SEG_10H)).primeiros).toBe(5)
+    expect(envios.email).toHaveBeenCalledTimes(MAX_EMAILS_POR_EXECUCAO + 5)
   })
   it("lembretes não entram na cota", async () => {
     for (let i = 0; i < 10; i++) novo({ nota: 90 - i })
@@ -231,6 +266,19 @@ describe("cadência do lembrete", () => {
     expect(doBanco(a).etapa).toBe("encerrado_sem_resposta")
     await rodar(dias(SEG_10H, 21)); await rodar(dias(SEG_10H, 42))
     expect(envios.evo).toHaveBeenCalledTimes(2)   // primeiro contato + lembrete, nunca terceira
+  })
+  it("primeiro contato por e-mail: sem lembrete em nenhum canal e sem encerramento (resposta por e-mail não é detectada)", async () => {
+    const a = novo({ email: "a@grafica.com.br" })
+    await rodar(SEG_10H)
+    expect(envios.email).toHaveBeenCalledTimes(1)
+    expect(envios.evo).toHaveBeenCalledTimes(1)
+    expect((await rodar(dias(SEG_10H, 3))).lembretes).toBe(0)
+    const fim = await rodar(dias(SEG_10H, 7))
+    expect(fim.lembretes).toBe(0); expect(fim.encerrados).toBe(0)
+    await rodar(dias(SEG_10H, 42))
+    expect(doBanco(a).etapa).toBe("abordado")
+    expect(envios.email).toHaveBeenCalledTimes(1)
+    expect(envios.evo).toHaveBeenCalledTimes(1)
   })
   it("encerrado não volta a ser qualificado nem recebe nada", async () => {
     const a = novo({ etapa: "encerrado_sem_resposta" })

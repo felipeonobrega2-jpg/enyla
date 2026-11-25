@@ -5,43 +5,29 @@ import { supabase } from "./supabase"
 import { lerCampos } from "./configAtomica"
 import { podeAcionarComercial } from "./ordemComercial"
 import { PREFIXO_PERTO, PREFIXO_FORA, lerMarca, sugestoesPerto, rotuloPerfil, type ConversaPerto, type MarcaPerto } from "./perto"
-import { clienteDaConversa, ligacaoForte, type Vinculos } from "./vinculoWhatsapp"
-import { nomeChave } from "./negocio"
-import { COL_FECHADO, COL_ENTREGUE } from "../types"
+import type { Vinculos } from "./vinculoWhatsapp"
+import { jaClienteDaConversa, classificarNivel, carregarFontesNivel, type Nivel, type FontesNivel, type CardLido, type PedidoDig } from "./nivelCliente"
 import type { IdDiretor } from "./diretoria"
 
 export const LIMITE_PERTO = 100
-export const AJUDA_PERTO = "SÓ CCO e CMO (as outras recebem 403). A lista 'Perto de você' da tela: estrela:true são os que o Felipe marcou (vêm primeiro), estrela:false são as sugestões da semana; nota (a nota que ele pôs, ou null), perfil, esperando ('lead' = o lead espera a nossa resposta; 'nos' = nós esperamos o lead) com ultimaDoLead e ultimaNossa, jaCliente (já comprou: pedido fechado no sistema, offset ou digital) com ultimoPedido. Até 100 itens; total mostra quantos há. É a lista em que mensagem precisa do Aprovo do Felipe: confira aqui antes de acionar Atendente, Follow-up ou Reativação por lead. Só leitura; sem telefone, e-mail ou endereço"
+export const AJUDA_PERTO = "SÓ CCO e CMO (as outras recebem 403). A lista 'Perto de você' da tela: estrela:true são os que o Felipe marcou (vêm primeiro), estrela:false são as sugestões da semana; nota (a nota que ele pôs, ou null), perfil, esperando ('lead' = o lead espera a nossa resposta; 'nos' = nós esperamos o lead) com ultimaDoLead e ultimaNossa, jaCliente (já comprou: pedido fechado no sistema, offset ou digital) com ultimoPedido, e nivel: 'A', 'B' ou 'C' (cliente pela curva de vendas de 12 meses), 'lead' (nunca comprou: cadastro sem compra e orçamento aberto não contam) ou 'indefinido' (já comprou mas sem curva, compra antiga ou só digital, ligação fraca com quem comprou, ou erro de leitura: conta como cliente). Até 100 itens; total mostra quantos há. REGRA: ordenar_funcionario a nivel 'lead' sai direto pelo agente (se estiver no horário dele); nivel A, B, C ou indefinido espera o Aprovo do Felipe. Confira o nivel aqui antes de acionar Atendente, Follow-up ou Reativação. Só leitura; sem telefone, e-mail ou endereço"
 
 const CAMPOS = "jid, nome, status_lead, etiquetas, ultima_msg, ultima_at, ultima_recebida_at, ultima_enviada_at, fechada_em, kanban_card_id"
-const DIGITAL_COMPROU = new Set(["sinal_pago", "arte", "producao", "enviado"])
-
-type CardLido = { numero: string | null; nomeCliente: string | null; coluna: number; createdAt: string | null }
-type PedidoDig = { id: string; jid: string; em: string; status: string; teste?: boolean }
 export type ItemPerto = {
   jid: string; nome: string | null; estrela: boolean; nota: string | null; perfil: string
   esperando: { quem: "lead" | "nos" | null; ultimaDoLead: string | null; ultimaNossa: string | null }
-  jaCliente: boolean; ultimoPedido: string | null
+  jaCliente: boolean; ultimoPedido: string | null; nivel: Nivel
 }
 
 const ms = (s?: string | null) => (s ? new Date(s).getTime() : 0) || 0
 
 export function montarPerto(a: {
   marcas: MarcaPerto[]; fora: Set<string>; daLista: ConversaPerto[]; recentes: ConversaPerto[]
-  cards: CardLido[]; pedidosDigitais: PedidoDig[]; vinculos?: Vinculos; agora?: number
+  cards: CardLido[]; pedidosDigitais: PedidoDig[]; vinculos?: Vinculos; agora?: number; fontes?: FontesNivel
 }): { itens: ItemPerto[]; total: number } {
   const porJid = new Map(a.daLista.map(c => [c.jid, c]))
-  const nomes = [...new Set(a.cards.map(c => c.nomeCliente).filter(Boolean))] as string[]
-  const compras = a.cards.filter(c => c.coluna >= COL_FECHADO && c.coluna <= COL_ENTREGUE)
 
-  const jaCliente = (c: ConversaPerto) => {
-    const achados: { numero: string | null; em: number }[] = []
-    const cli = clienteDaConversa(c, nomes, a.vinculos)
-    if (cli && ligacaoForte(c, cli)) for (const k of compras) if (nomeChave(k.nomeCliente ?? "") === nomeChave(cli.nome)) achados.push({ numero: k.numero, em: ms(k.createdAt) })
-    for (const p of a.pedidosDigitais) if (p.jid === c.jid && DIGITAL_COMPROU.has(p.status) && !p.teste) achados.push({ numero: p.id, em: ms(p.em) })
-    const ultimo = achados.sort((x, y) => y.em - x.em)[0]
-    return { jaCliente: achados.length > 0, ultimoPedido: ultimo?.numero ?? null }
-  }
+  const jaCliente = (c: ConversaPerto) => jaClienteDaConversa(c, { cards: a.cards, pedidosDigitais: a.pedidosDigitais, vinculos: a.vinculos })
   const monta = (jid: string, c: ConversaPerto | null, estrela: boolean, nota: string | null): ItemPerto => {
     const conv: ConversaPerto = c ?? { jid, nome: null }
     const rec = ms(conv.ultima_recebida_at), env = ms(conv.ultima_enviada_at)
@@ -49,6 +35,8 @@ export function montarPerto(a: {
       jid, nome: conv.nome ?? null, estrela, nota: nota || null, perfil: rotuloPerfil(conv),
       esperando: { quem: !rec && !env ? null : rec > env ? "lead" : "nos", ultimaDoLead: conv.ultima_recebida_at ?? null, ultimaNossa: conv.ultima_enviada_at ?? null },
       ...jaCliente(conv),
+      // Sem as fontes do nível (curvas, cadastro) não dá para afirmar "lead": fica "indefinido" (conta como cliente)
+      nivel: a.fontes ? classificarNivel(conv, a.fontes).nivel : "indefinido",
     }
   }
 
@@ -74,9 +62,10 @@ export async function lerPertoExterno(diretor: IdDiretor): Promise<{ status: num
     supabase.from("KanbanCard").select("numero, nomeCliente, coluna, createdAt"),
     lerCampos<{ vinculosWhatsapp?: Vinculos; pedidosDigitais?: PedidoDig[] }>(["vinculosWhatsapp", "pedidosDigitais"]),
   ])
+  const fontes = await carregarFontesNivel()
   const r = montarPerto({
     marcas, fora, daLista: (daLista ?? []) as ConversaPerto[], recentes: (recentes ?? []) as ConversaPerto[],
-    cards: (cards ?? []) as unknown as CardLido[], pedidosDigitais: cfg.pedidosDigitais ?? [], vinculos: cfg.vinculosWhatsapp,
+    cards: (cards ?? []) as unknown as CardLido[], pedidosDigitais: cfg.pedidosDigitais ?? [], vinculos: cfg.vinculosWhatsapp, fontes,
   })
   return { status: 200, corpo: { total: r.total, limite: LIMITE_PERTO, itens: r.itens } }
 }
