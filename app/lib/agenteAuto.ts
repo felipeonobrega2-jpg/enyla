@@ -16,16 +16,20 @@ import { evo } from "./evolution"
 import { gravarLote, WaMessage, deveIgnorar } from "./whatsappDados"
 import { atender, lerConfigAtendente } from "./atendenteServidor"
 import { etapaDoLead } from "./etapaLead"
+import { leadsDoFollowUp, jidsDoFollowUp } from "./leadsDoFollowUp"
+import { lerEstadosLead } from "./leadEstadoServidor"
+import { perdidoAtivo, orcadoManualAtivo } from "./leadEstado"
 import { lerRegistros, gravarRegistro, lerIdsAgente, guardarIdAgente, reservarTratada, liberarTratada, temTabelas } from "./registroAgente"
 import { garantirTelefone } from "./contatosServidor"
 import { textoAvisoReativacao } from "./reativacao"
 import {
-  AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, TEXTO_SEM_IA, filtroEfetivo,
+  AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, ehSaudacaoAutomaticaDoLead, TEXTO_SEM_IA, filtroEfetivo,
   organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, ehSemCredito, proximoFollowUp, horarioDeFollowUp, dentroDoHorario, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE, ETIQUETAS_AGENTE,
   marcar, marcosDoRegistro, Marcos, paradoParaRetomar,
 } from "./agenteLeads"
 import { corrigirCumprimento, type DadosPedido } from "./atendente"
 import { mudarConfig } from "./configAtomica"
+import { ehProspecto } from "./prospectorTrava"
 import { notificar, LINK_SISTEMA } from "./notificar"
 import { limparEmojis, leadEstaRindo } from "./estilo"
 import { escolherMidia, MidiaAgente } from "./midiaAgente"
@@ -213,7 +217,22 @@ export function leadQuente(a: { etiquetas?: string[] | null; status_lead?: strin
 
 // Envios da última hora na tabela leve (linhas "envio:<horário>"): o AppConfig de 600 KB não é regravado a cada
 // mensagem (19/11: isso estourou o disco do banco). Sem a tabela, cai no jeito antigo (AppConfig).
-async function vezPelaTabela(essencial: boolean, proativo: boolean): Promise<{ esperaMs: number } | { erro: string } | null> {
+// Regra única da cota/fila de envio (usada na reserva e na checagem prévia do follow-up, para não haver duas regras).
+// `envios`: horários (ms) dos envios da última hora. `jitterSeg`: folga aleatória de espaçamento (0 = mínimo).
+export function decidirVez(o: { envios: number[]; agora: number; aquecendo: boolean; essencial: boolean; proativo: boolean; jitterSeg: number }): { vez: number } | { erro: string } {
+  const { envios, agora, aquecendo, essencial, proativo, jitterSeg } = o
+  const limite = Math.floor((aquecendo ? LIMITE_HORA_AQUECENDO : LIMITE_HORA) * (proativo ? FRACAO_PROATIVO : 1))
+  // Responder quem escreveu não tem teto por hora (só o espaçamento entre mensagens); o teto vale para o que a ENYLA
+  // puxa (follow-up, reativação, convite) e para o aquecimento logo depois de reconectar o número
+  if (!essencial && (proativo || aquecendo) && envios.length >= limite) return { erro: `não enviou (limite de ${limite} por hora${proativo ? " para follow-up" : ""}${aquecendo ? ", aquecendo depois de conectar" : ""})` }
+  const ultima = Math.max(0, ...envios.filter(n => !isNaN(n)))
+  const vez = Math.max(agora, ultima + (INTERVALO_MIN_SEG + jitterSeg) * 1000)
+  if (vez - agora > ESPERA_MAX_VEZ_SEG * 1000 && !essencial) return { erro: "não enviou (fila de envio cheia)" }
+  return { vez }
+}
+
+// Leitura dos envios da última hora na tabela leve + se está aquecendo. null = sem tabela/erro (cai no AppConfig).
+async function lerEnviosDaTabela() {
   if (!await temTabelas()) return null
   const agora = Date.now()
   // Só pelo prefixo: comparar faixa de texto ("envio:" até "envio;") não funciona com a ordenação do banco, que ignora
@@ -221,22 +240,52 @@ async function vezPelaTabela(essencial: boolean, proativo: boolean): Promise<{ e
   const { data, error } = await supabase.from("agente_tratadas").select("id").like("id", "envio:%").limit(2000)
   if (error) return null
   const todos = (data ?? []).map(x => ({ id: x.id as string, t: new Date((x.id as string).slice(6, 30)).getTime() })).filter(x => !isNaN(x.t))
-  const lista = todos.filter(x => x.t >= agora - 3_600_000).map(x => new Date(x.t).toISOString())
+  const envios = todos.filter(x => x.t >= agora - 3_600_000).map(x => x.t)
   const cfg = await supabase.from("AppConfig").select("data->whatsappConexao").eq("id", 1).maybeSingle()
   const con = (cfg.data as { whatsappConexao?: { aquecerDesde?: string; aquecimentoV?: number } } | null)?.whatsappConexao
   const desdeAq = con?.aquecimentoV === 2 ? con.aquecerDesde : undefined
   const aquecendo = !!desdeAq && agora - new Date(desdeAq).getTime() < HORAS_AQUECENDO * 3_600_000
-  const limite = Math.floor((aquecendo ? LIMITE_HORA_AQUECENDO : LIMITE_HORA) * (proativo ? FRACAO_PROATIVO : 1))
-  if (!essencial && (proativo || aquecendo) && lista.length >= limite) return { erro: `não enviou (limite de ${limite} por hora${proativo ? " para follow-up" : ""}${aquecendo ? ", aquecendo depois de conectar" : ""})` }
-  const ultima = Math.max(0, ...lista.map(t => new Date(t).getTime()).filter(n => !isNaN(n)))
-  const vez = Math.max(agora, ultima + (INTERVALO_MIN_SEG + Math.random() * 7) * 1000)
-  if (vez - agora > ESPERA_MAX_VEZ_SEG * 1000 && !essencial) return { erro: "não enviou (fila de envio cheia)" }
-  const id = `envio:${new Date(vez).toISOString()}:${Math.random().toString(36).slice(2, 7)}`
+  return { agora, todos, envios, aquecendo }
+}
+
+// Checagem SÓ DE LEITURA da cota proativa (não reserva vaga): devolve o motivo se o envio proativo seria barrado agora.
+// Em dúvida (erro de leitura) devolve null: o envio continua sendo a última palavra.
+export async function cotaProativaEsgotada(): Promise<string | null> {
+  try {
+    const t = await lerEnviosDaTabela()
+    let envios: number[], aquecendo: boolean, agora = Date.now()
+    if (t) ({ envios, aquecendo, agora } = t)
+    else {
+      const { data } = await lerConfigLinha()
+      const d = (data?.data ?? {}) as { agenteEnviosHora?: string[]; whatsappConexao?: { aquecerDesde?: string; aquecimentoV?: number } }
+      envios = (d.agenteEnviosHora ?? []).map(x => new Date(x).getTime()).filter(n => n > agora - 3_600_000)
+      const desde = d.whatsappConexao?.aquecimentoV === 2 ? d.whatsappConexao.aquecerDesde : undefined
+      aquecendo = !!desde && agora - new Date(desde).getTime() < HORAS_AQUECENDO * 3_600_000
+    }
+    const r = decidirVez({ envios, agora, aquecendo, essencial: false, proativo: true, jitterSeg: 0 })
+    return "erro" in r ? r.erro : null
+  } catch { return null }
+}
+
+// Follow-up: confere a cota ANTES de pagar a IA. Cota cheia: não chama a IA (o lead segue elegível na próxima rodada).
+export async function iaDoFollowUp<T>(chamar: () => Promise<T>, esgotada: () => Promise<string | null> = cotaProativaEsgotada): Promise<{ segurado: string } | { resultado: T }> {
+  const motivo = await esgotada()
+  if (motivo) return { segurado: motivo }
+  return { resultado: await chamar() }
+}
+
+async function vezPelaTabela(essencial: boolean, proativo: boolean): Promise<{ esperaMs: number } | { erro: string } | null> {
+  const t = await lerEnviosDaTabela()
+  if (!t) return null
+  const { agora, todos, envios, aquecendo } = t
+  const r = decidirVez({ envios, agora, aquecendo, essencial, proativo, jitterSeg: Math.random() * 7 })
+  if ("erro" in r) return r
+  const id = `envio:${new Date(r.vez).toISOString()}:${Math.random().toString(36).slice(2, 7)}`
   if (await reservarTratada(id) === null) return null
   // limpeza: envios com mais de 2 h saem da tabela
   const velhos = todos.filter(x => x.t < agora - 2 * 3_600_000).map(x => x.id).slice(0, 300)
   if (velhos.length) void supabase.from("agente_tratadas").delete().in("id", velhos).then(() => null)
-  return { esperaMs: vez - agora }
+  return { esperaMs: r.vez - agora }
 }
 
 export async function reservarVezDeEnviar(opcoes: { essencial?: boolean; proativo?: boolean } = {}): Promise<{ esperaMs: number } | { erro: string }> {
@@ -251,13 +300,9 @@ export async function reservarVezDeEnviar(opcoes: { essencial?: boolean; proativ
     // Só vale o aquecimento marcado pela regra nova (aparelho removido); o antigo ligava em oscilação
     const desde = con?.aquecimentoV === 2 ? con.aquecerDesde : undefined
     const aquecendo = !!desde && agora - new Date(desde).getTime() < HORAS_AQUECENDO * 3_600_000
-    const limite = Math.floor((aquecendo ? LIMITE_HORA_AQUECENDO : LIMITE_HORA) * (proativo ? FRACAO_PROATIVO : 1))
-    // Responder quem escreveu não tem teto por hora (só o espaçamento entre mensagens); o teto vale para o que a ENYLA
-    // puxa (follow-up, reativação, convite) e para o aquecimento logo depois de reconectar o número
-    if (!essencial && (proativo || aquecendo) && lista.length >= limite) { res = { erro: `não enviou (limite de ${limite} por hora${proativo ? " para follow-up" : ""}${aquecendo ? ", aquecendo depois de conectar" : ""})` }; return null }
-    const ultima = Math.max(0, ...lista.map(t => new Date(t).getTime()))
-    const vez = Math.max(agora, ultima + (INTERVALO_MIN_SEG + Math.random() * 7) * 1000)
-    if (vez - agora > ESPERA_MAX_VEZ_SEG * 1000 && !essencial) { res = { erro: "não enviou (fila de envio cheia)" }; return null }
+    const r = decidirVez({ envios: lista.map(t => new Date(t).getTime()), agora, aquecendo, essencial, proativo, jitterSeg: Math.random() * 7 })
+    if ("erro" in r) { res = r; return null }
+    const vez = r.vez
     res = { esperaMs: vez - agora }
     return { agenteEnviosHora: [...lista, new Date(vez).toISOString()].slice(-200) }
   })
@@ -355,7 +400,8 @@ async function avisarSemCredito(cfg: CfgAgente) {
 // fazia o agente achar que você já tinha respondido (o lead da noite ficava sem a abertura)
 const ultimaDa = async (jid: string) => {
   const { data } = await supabase.from("whatsapp_mensagens").select("id, from_me, ts, corpo, tipo").eq("jid", jid).order("ts", { ascending: false }).limit(6)
-  const m = (data ?? []).find(x => !(x.from_me && ehMensagemAutomaticaDoWhatsapp(x.corpo, x.tipo)))
+  // A saudação automática que o lead manda também não conta: ele não está esperando resposta
+  const m = (data ?? []).find(x => !(x.from_me && ehMensagemAutomaticaDoWhatsapp(x.corpo, x.tipo)) && !(!x.from_me && ehSaudacaoAutomaticaDoLead(x.corpo)))
   return m ? { id: m.id as string, from_me: m.from_me as boolean, ts: m.ts as string } : null
 }
 
@@ -410,6 +456,11 @@ async function aindaEhAUltima(msgId: string) {
   return ultima && ultima.id === msgId && !ultima.from_me ? msg.jid as string : null
 }
 
+async function jidDaMensagem(msgId: string) {
+  const { data } = await supabase.from("whatsapp_mensagens").select("jid").eq("id", msgId).maybeSingle()
+  return (data?.jid as string | undefined) ?? null
+}
+
 // 1ª etapa (no webhook): espera o lead terminar de escrever (costumam mandar 2–3 mensagens seguidas)
 export async function agendarResposta(msgId: string, origem: string) {
   const cfg = await lerCfg()
@@ -427,6 +478,10 @@ export async function agendarResposta(msgId: string, origem: string) {
     const pessoal = (cfg.agenteAuto as { avisoNumero?: string } | undefined)?.avisoNumero?.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "")
     if (pessoal && pessoal.length >= 10 && String(m?.jid ?? "").split("@")[0].replace(/^55(?=\d{10,11}$)/, "") === pessoal) return
   }
+  // Gráfica do Prospector que respondeu não é cliente: a Atendente não agenda (a mensagem já está gravada)
+  if (await ehProspecto(await jidDaMensagem(msgId))) return
+  // Saudação automática do lead: segura e avisa o Felipe já, sem a espera nem a IA
+  if (await segurarSaudacaoDoLead(cfg, msgId).catch(() => false)) return
   // Ritmo de gente (somado à 2ª etapa): de dia ~40 s a 1 min; de madrugada mais devagar (~1 a 1,5 min)
   const hSP = Number(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false })) % 24
   await (hSP >= 8 && hSP < 22 ? espera(20, 32) : espera(35, 50))
@@ -453,6 +508,25 @@ async function reservarMensagem(msgId: string): Promise<boolean> {
     return { agenteTratadas: [msgId, ...(d.agenteTratadas ?? [])].slice(0, 500) }
   })
   return minha
+}
+
+// Saudação automática do WhatsApp Business do lead ("agradecemos seu contato"): o agente não responde, não chama a IA,
+// não mexe no follow-up e só avisa o Felipe (nunca o lead). Roda ANTES de aindaEhAUltima: ultimaDa ignora essa
+// saudação, então aindaEhAUltima devolveria null e o aviso se perderia. true = a mensagem é saudação (tratada aqui).
+export async function segurarSaudacaoDoLead(cfg: CfgAgente, msgId: string): Promise<boolean> {
+  const { data: msg } = await supabase.from("whatsapp_mensagens").select("jid, from_me, corpo, ts").eq("id", msgId).maybeSingle()
+  if (!msg?.jid || msg.from_me || !ehSaudacaoAutomaticaDoLead(msg.corpo as string | null)) return false
+  // Só vale se for a última coisa que o lead disse: se veio mensagem de gente depois, ela dispara por conta própria
+  const { data: depois } = await supabase.from("whatsapp_mensagens").select("id, corpo").eq("jid", msg.jid).eq("from_me", false).gt("ts", msg.ts).limit(5)
+  if ((depois ?? []).some(m => !ehSaudacaoAutomaticaDoLead(m.corpo as string | null))) return true
+  if (!await reservarMensagem(msgId)) return true   // já tratada: não avisa duas vezes
+  const c = await lerConversa(msg.jid as string)
+  if (!c) return true
+  const texto = String(msg.corpo ?? "").trim().slice(0, 200)
+  const motivo = `saudação automática do WhatsApp Business do lead ("${texto}"), não é resposta dele`
+  await avisarSegurado(cfg, c, motivo, "").catch(() => null)   // vai só ao Felipe, mesmo para lead pequeno/digital
+  await registrar({ em: new Date().toISOString(), jid: c.jid, nome: c.nome, perfil: "indefinido", enviou: false, texto: "", motivo: `segurou: ${motivo}` }).catch(() => null)
+  return true
 }
 
 // 2ª etapa: mais um tempo (como quem viu e vai responder), pensa, lê e digita
@@ -507,9 +581,13 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   const auto = cfg.agenteAuto
   if (!auto?.ligado || !dentroDoHorario(auto.horario)) return
   const inicio = Date.now()
+  // Saudação automática do lead: antes da espera, de aindaEhAUltima, do semFollowUp e da IA
+  if (await segurarSaudacaoDoLead(cfg, msgId).catch(() => false)) return
   if (!opts.atrasada) await espera(10, 25)
   const jid = await aindaEhAUltima(msgId)
   if (!jid) return
+  // Gráfica do Prospector (também na resposta atrasada, em assumir e continuar e em retomar parados): sem IA, sem envio
+  if (await ehProspecto(jid)) return
   // Cada mensagem do lead é respondida uma vez só (dois disparos ao mesmo tempo: só um passa)
   if (!await reservarMensagem(msgId) && !opts.atrasada) return
   // Atrasada passa por cima da reserva (a tentativa que falhou já reservou): trava própria de 10 min por mensagem,
@@ -586,7 +664,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   // Chamado quando o atendimento viu bom negócio ou pequeno, ou o lead acabou de falar de volume.
   if (r.lead.perfil !== "nao_lead" && !conversa.clienteCadastrado && (ehQualificado(r.lead.perfil) || r.lead.perfil === "pequeno"
     || temSinalDeVolume(conversa.mensagens.filter(m => !m.from_me).slice(-3).map(m => m.corpo)))) {
-    const cl = await import("./classificarLeadServidor").then(m => m.classificarConversa(jid, { aplicar: false, origem: "classificador-inline" })).catch(() => null)
+    const cl = await import("./classificarLeadServidor").then(m => m.classificarConversa(jid, { aplicar: false, reusar: true, origem: "classificador-inline" })).catch(() => null)
     if (cl) r.lead = { ...r.lead, perfil: cl.classificacao.perfil, quantidade_total: cl.classificacao.quantidade_total, motivo: cl.classificacao.motivo }
   }
 
@@ -787,8 +865,9 @@ export async function talvezRetomarParados(origem: string): Promise<string> {
     .gte("ultima_recebida_at", new Date(agora - HORAS_RETOMAR * 3_600_000).toISOString()).order("ultima_recebida_at", { ascending: false }).limit(300)
   // A última "enviada" da conversa pode ser só automática do WhatsApp Business ("fora do horário", botões sem
   // texto, que chegam até horas depois): a conversa entra e a mensagem certa é conferida abaixo, ignorando essas
+  const estadosLead = await lerEstadosLead().catch(() => new Map())   // lead perdido com motivo: o Atendente não retoma
   const candidatas = (convs ?? []).filter(c => !deveIgnorar(c.jid) && !["mql", "descartado", "perdido"].includes(c.status_lead ?? "")
-    && !(c.etiquetas ?? []).includes("Fornecedora") && !!c.ultima_recebida_at)
+    && !(c.etiquetas ?? []).includes("Fornecedora") && !!c.ultima_recebida_at && !perdidoAtivo(estadosLead.get(c.jid), c.ultima_recebida_at))
   const logTodo = cfg.agenteLog ?? []
   // Retomada cuja resposta não saiu (WhatsApp fora do ar) não conta: tenta de novo
   const naoSaiu = new Set(logTodo.filter((l, i) => /^não enviou/.test(l.motivo ?? "") && !logTodo.slice(0, i).some(x => x.jid === l.jid && x.enviou)).map(l => l.jid))
@@ -872,7 +951,11 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
   // Só leads que o agente já atendeu (estão no registro) e não descartados. No MQL (seu) ele só etiqueta, não envia.
   // Quem recebeu retomada fica fora: é contato antigo (o agente não responde) e quem cobra é você
   const marcos = cfg.agenteMarcos ?? marcosDoRegistro(cfg.agenteLog ?? [])
-  const jidsDoAgente = Object.entries(marcos).filter(([, m]) => !m.passos?.["Reativação"]).sort((a, b) => b[1].em.localeCompare(a[1].em)).map(([j]) => j)
+  const doAgente = Object.entries(marcos).filter(([, m]) => !m.passos?.["Reativação"]).sort((a, b) => b[1].em.localeCompare(a[1].em)).map(([j]) => j)
+  // Follow-up manda sozinho: não ganha lead novo. Só quem já é do agente; perdido com motivo sai.
+  // Orçado pelo Felipe (já do agente) só troca a data de partida da contagem
+  const { perdidos, orcados } = await leadsDoFollowUp(DIAS_FOLLOW_UP, new Set(doAgente), (cfg as { agenteIds?: string[] }).agenteIds).catch(() => ({ perdidos: new Set<string>(), orcados: new Map<string, string>() }))
+  const jidsDoAgente = jidsDoFollowUp(doAgente, perdidos)
   if (!jidsDoAgente.length) return
   const { data } = await supabase.from("whatsapp_conversas")
     .select("jid, nome, telefone, etiquetas, status_lead, ultima_recebida_at, ultima_enviada_at, fechada_em")
@@ -883,7 +966,7 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
   // Campanha digital é uma mensagem só: quem recebeu e não respondeu não ganha follow-up (contato frio = risco ao número)
   const campanha = (cfg as { campanhaDigital?: EstadoCampanha }).campanhaDigital?.enviados ?? {}
   const tentados = (cfg as { agenteFollowupTentados?: Record<string, string> }).agenteFollowupTentados ?? {}
-  const candidatos = (data ?? []).filter(c =>
+  const candidatos = (data ?? []).map(c => orcados.has(c.jid) && orcados.get(c.jid)! > c.ultima_enviada_at ? { ...c, ultima_enviada_at: orcados.get(c.jid)! } : c).filter(c =>
     !c.fechada_em && !["descartado", "perdido", "orcamento", "negociando", "pedido"].includes(c.status_lead ?? "")
     && !(campanha[c.jid] && !(c.ultima_recebida_at && c.ultima_recebida_at > campanha[c.jid].em))
     && (!c.ultima_recebida_at || c.ultima_recebida_at < c.ultima_enviada_at))
@@ -976,7 +1059,10 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     }
     const primeira = await primeiraDa(c.jid)
     const recente = !!primeira && Date.now() - new Date(primeira.ts).getTime() < DIAS_FOLLOW_UP * 86_400_000
-    const a = await atender(c.jid, { cfg, automatico: true, followUp: nivel }).catch(() => null)
+    // Cota da hora cheia: nem chama a IA (antes pagava o Opus e o envio barrava depois). Segue elegível na próxima rodada.
+    const ia = await iaDoFollowUp(() => atender(c.jid, { cfg, automatico: true, followUp: nivel }).catch(() => null))
+    if ("segurado" in ia) return
+    const a = ia.resultado
     if (!a?.ok) return
     const { r, conversa } = a
     r.resposta = limparEmojis(r.resposta, emojiCtx(conversa.mensagens, cfg))

@@ -13,7 +13,7 @@ import { ModalLancamento } from "../FinanceiroView"
 import { Botao, Selo, Segmentado, Vazio } from "../ds"
 
 type Estado = "pendente" | "vinculada" | "criada" | "ignorada"
-type Resposta = { configurada: boolean; tabela: boolean; erro: string | null; status: { em: string; contas: { id: string; nome: string; saldo: number | null }[]; novas: number; erro?: string | null } | null; pendentes: number; transacoes: TxBanco[] }
+type Resposta = { configurada: boolean; tabela: boolean; erro: string | null; status: { em: string; contas: { id: string; nome: string; saldo: number | null }[]; novas: number; erro?: string | null; bancos?: { banco: string; atualizadoEm: string | null; parado: boolean; motivo: string | null }[] } | null; pendentes: number; transacoes: TxBanco[] }
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 const dataBR = (d: string) => d.split("-").reverse().slice(0, 2).join("/")
@@ -230,6 +230,12 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
                 {dados.status.contas.map(c => <span key={c.id} className="text-[11px] px-2 py-0.5 rounded-md bg-[rgba(116,116,128,0.08)] text-[#5e5c68]">{c.nome}{c.saldo != null ? ` · ${brl(c.saldo)}` : ""}</span>)}
               </div>
             )}
+            {dados?.status?.bancos?.filter(b => b.parado).map(b => (
+              <p key={b.banco} className="text-[11.5px] mt-1.5 text-[#d33a3c]">
+                {b.banco}: o banco não manda dados novos {b.atualizadoEm ? `desde ${new Date(b.atualizadoEm).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}` : "(nunca atualizou)"}.
+                {b.motivo ? ` Motivo da Pluggy: ${b.motivo}` : ""}
+              </p>
+            ))}
             {(dados?.status?.erro || msg) && <p className={`text-[11.5px] mt-1.5 ${dados?.status?.erro || msg?.includes("Pluggy") ? "text-[#d33a3c]" : "text-[#009351]"}`}>{msg ?? dados?.status?.erro}</p>}
           </div>
           <div className="flex items-center gap-2 shrink-0">

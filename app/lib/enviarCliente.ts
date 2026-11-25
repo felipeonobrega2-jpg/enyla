@@ -24,10 +24,12 @@ export async function destinoDoCliente(cliente: string): Promise<{ destino: stri
   return { destino, jid }
 }
 
-export async function enviarAoCliente(cliente: string, texto: string): Promise<{ ok: true; jid: string } | { ok: false; erro: string; status: number }> {
+// leadJid: ordem da diretoria a um lead (conversa do WhatsApp sem cadastro). Vai para essa conversa e conta na cota por hora.
+export async function enviarAoCliente(cliente: string, texto: string, leadJid?: string): Promise<{ ok: true; jid: string } | { ok: false; erro: string; status: number }> {
   if (!cliente || !texto?.trim()) return { ok: false, erro: "Cliente e mensagem são obrigatórios.", status: 400 }
-  const { destino, jid } = await destinoDoCliente(cliente)
+  const { destino, jid } = leadJid ? { destino: leadJid, jid: leadJid } : await destinoDoCliente(cliente)
   if (!destino) return { ok: false, erro: `Sem telefone de ${cliente} no cadastro e nenhuma conversa ligada a ele.`, status: 404 }
+  if (leadJid) await (await import("./agenteAuto")).reservarVezDeEnviar({ essencial: true }).catch(() => null)   // só registra na cota (Felipe aprovou: não barra)
   const r = await evo<WaMessage>("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: texto.trim() }) })
   if (!r.ok || !r.corpo?.key?.id) return { ok: false, erro: `Não enviou (${r.status}). Confira a conexão do WhatsApp.`, status: 502 }
   const remoteJid = jid ?? r.corpo.key.remoteJid

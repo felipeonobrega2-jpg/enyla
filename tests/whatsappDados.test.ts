@@ -66,4 +66,14 @@ describe("gravação em lote do WhatsApp", () => {
     expect(parDaMensagem({ remoteJid: "1@s.whatsapp.net", remoteJidAlt: "2@lid", fromMe: false, id: "x" })).toEqual({ lid: "2@lid", pn: "1@s.whatsapp.net" })
     expect(parDaMensagem({ remoteJid: "2@lid", fromMe: false, id: "x" })).toBeNull()
   })
+  it("saudação automática do lead: grava a mensagem e o texto, mas não avança ultima_recebida_at", async () => {
+    await gravarLote([msg("a@lid", "g1", Date.parse("2026-11-24") / 1000, "Agradecemos seu contato. Em breve retornaremos.")])
+    const c = upserts[0][0]
+    expect(c.ultima_msg).toBe("Agradecemos seu contato. Em breve retornaremos.")
+    expect(c.ultima_recebida_at).toBe("2026-10-01T00:00:00.000Z")
+  })
+  it("mensagem humana avança ultima_recebida_at como antes", async () => {
+    await gravarLote([msg("a@lid", "g2", Date.parse("2026-11-24") / 1000, "Quero 5.000 caixas")])
+    expect(String(upserts[0][0].ultima_recebida_at)).toMatch(/^2026-11-24/)
+  })
 })

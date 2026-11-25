@@ -1,6 +1,8 @@
 // "Para resolver agora": o que passou do prazo ou depende de você, num lugar só, por valor.
 // Liga sozinho cada conversa ao orçamento que ela recebeu (mensagem nossa com "ORC-2026-123" ou o link de aprovação),
 // gravando em whatsapp_conversas.kanban_card_id. Só roda no servidor.
+import { lerSegurados } from "./pedidoSeguradoServidor"
+import { estaSegurado } from "./pedidoSegurado"
 import { prazoDigital } from "./prazoDigital"
 import { supabase } from "./supabase"
 import { COL_FECHADO, COL_HOT, COL_ENTREGUE, COL_PERDIDO } from "../types"
@@ -121,9 +123,11 @@ export async function paraResolver(cfg: { grandesNegocios?: import("./grandesNeg
 
   // Entrega prevista vencida e o pedido ainda não saiu
   const { data: atrasados } = await supabase.from("KanbanCard").select("id, numero, nomeCliente, preco, coluna, dataEntregaPrevista").gte("coluna", COL_FECHADO).lt("coluna", COL_ENTREGUE).lt("dataEntregaPrevista", hoje).not("dataEntregaPrevista", "is", null)
-  const idsAt = (atrasados ?? []).map(c => c.id)
+  const segurados = await lerSegurados().catch(() => ({}))   // aguardando pagamento: atraso do cliente, não pede "avisar"
+  const atrasadosNossos = (atrasados ?? []).filter(k => !estaSegurado(segurados, k.numero))
+  const idsAt = atrasadosNossos.map(c => c.id)
   const { data: cvAt } = idsAt.length ? await supabase.from("whatsapp_conversas").select("jid, kanban_card_id").in("kanban_card_id", idsAt) : { data: [] }
-  for (const k of atrasados ?? []) {
+  for (const k of atrasadosNossos) {
     const d = dias(`${k.dataEntregaPrevista}T12:00:00-03:00`, agora)
     itens.push({ tipo: "atrasado", titulo: `${k.nomeCliente} · ${k.numero}`, detalhe: `entrega era ${String(k.dataEntregaPrevista).split("-").reverse().slice(0, 2).join("/")} (${d} ${d === 1 ? "dia" : "dias"} de atraso): avise o cliente e ajuste a data`, valor: Number(k.preco) || null, jid: cvAt?.find(c => c.kanban_card_id === k.id)?.jid ?? null, numero: k.numero, desde: k.dataEntregaPrevista, nivel: d >= 3 ? "perigo" : "alerta" })
   }
@@ -136,6 +140,14 @@ export async function paraResolver(cfg: { grandesNegocios?: import("./grandesNeg
       .not("jid", "like", "%@g.us").gte("ultima_recebida_at", new Date(agora - 3 * DIA).toISOString()).limit(800)
     for (const e of quemEspera((cvs ?? []) as never, agora, 30).filter(paraOFelipe).slice(0, 15))
       itens.push({ tipo: "esperando", titulo: e.nome, detalhe: `${e.rotulo} esperando há ${tempoEspera(e.minutos)}: “${e.mensagem}”`, valor: null, jid: e.jid, numero: null, desde: null, nivel: e.minutos >= 120 || e.peso >= 3 ? "perigo" : "alerta" })
+  }
+  // Espera longa (24 h+): avisada hoje pelo vigia, com pedido primeiro. Interno: nada vai ao cliente.
+  {
+    const el = (cfg as { esperaLonga?: import("./esperaLongaServidor").EsperaLongaGravada }).esperaLonga
+    for (const e of (el?.itens ?? []).filter(x => x.avisadoEm && agora - new Date(x.avisadoEm).getTime() < DIA)) {
+      const h = e.horas >= 48 ? `${Math.floor(e.horas / 24)} dias` : `${e.horas} h`
+      itens.push({ tipo: "esperando", titulo: e.pedido ? `${e.nome} · ${e.pedido}` : e.nome, detalhe: `${e.pedido ? "cliente com pedido ativo" : "lead"} esperando a Enyla há ${h}`, valor: null, jid: e.jid, numero: e.pedido, desde: e.desde, nivel: e.pedido ? "perigo" : "alerta" })
+    }
   }
   // Grande negócio com o próximo passo vencido (ou sem próximo passo): sobe logo depois do sistema
   const { precisaDeVoce } = await import("./grandesNegocios")

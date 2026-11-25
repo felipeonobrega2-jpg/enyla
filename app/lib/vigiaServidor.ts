@@ -32,6 +32,8 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
   //     não for sua, as travas dele seguram); o que sobra vira aviso no seu WhatsApp (cada conversa no máximo a cada 3 h)
   out.fechadas = await fecharOObvio(agora).catch(e => String(e))
   out.esperando = await cuidarDeQuemEspera(cfg, agora, vagas, despachadas).catch(e => String(e))
+  // 1b2. Espera longa (24 h+): aviso interno ao Felipe, no máximo uma vez por dia por conversa (nada vai ao cliente)
+  out.esperaLonga = await import("./esperaLongaServidor").then(m => m.avisarEsperaLonga(cfg as never, agora)).catch(e => String(e))
   // 1e. Dinheiro do digital no Financeiro (linha separada): sinal, restante e custo da Villa; concilia o Pix
   out.digitalFinanceiro = await import("./digitalFinanceiro").then(m => m.sincronizarDigitalNoFinanceiro()).catch(e => String(e))
   // 1d. E-mails para o cliente (pedido aprovado, sinal, arte, arte aprovada, enviado): cada um uma vez só
@@ -162,9 +164,9 @@ async function despachar(msgId: string, ordem: number) {
 
 // A última mensagem de verdade da conversa (sem o "já te respondo" e as automáticas do WhatsApp Business)
 async function ultimaReal(jid: string) {
-  const { ehMensagemAutomaticaDoWhatsapp } = await import("./agenteLeads")
+  const { ehMensagemAutomaticaDoWhatsapp, ehSaudacaoAutomaticaDoLead } = await import("./agenteLeads")
   const { data } = await supabase.from("whatsapp_mensagens").select("id, from_me, corpo, tipo").eq("jid", jid).order("ts", { ascending: false }).limit(8)
-  return (data ?? []).find(m => !(m.from_me && ehMensagemAutomaticaDoWhatsapp(m.corpo, m.tipo))) as { id: string; from_me: boolean } | undefined
+  return (data ?? []).find(m => !(m.from_me && ehMensagemAutomaticaDoWhatsapp(m.corpo, m.tipo)) && !(!m.from_me && ehSaudacaoAutomaticaDoLead(m.corpo))) as { id: string; from_me: boolean } | undefined
 }
 
 async function recuperarFila(cfg: Cfg, agora: Date, vagas: { n: number }, despachadas: Set<string>) {

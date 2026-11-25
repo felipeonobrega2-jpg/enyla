@@ -6,8 +6,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import ExplainerParceiros from "./ExplainerParceiros"
 import { Printer, Layers, Sparkles, Stamp, Mountain, Scissors, Package, Shapes, FileStack, Palette, FileCheck, Truck, Plus, Check, ChevronLeft, ArrowRight, Paperclip, X, Clock, BarChart3, ShieldCheck, Handshake, Loader2, MessageCircle, MapPin, Zap, Banknote, Wallet, Camera, Globe } from "lucide-react"
+import type { CenarioPublico } from "../lib/cenariosParceiros"
 import {
-  SERVICOS_PARCEIRO, FORMAS_COBRANCA, PERGUNTAS, ETAPAS_IDS, errosDaEtapa, mascaraDocumento, mascaraTelefone, mascaraCep, GERENTE_PADRAO,
+  SERVICOS_PARCEIRO, FORMAS_COBRANCA, PERGUNTAS, ROTULO_PRECO_CENARIO, cobraPorAcertoMilheiro, ETAPAS_IDS, errosDaEtapa, mascaraDocumento, mascaraTelefone, mascaraCep, GERENTE_PADRAO,
   type CadastroParceiro, type ServicoCadastrado, type IdServicoParceiro, type Pergunta, type Resposta, type Formato,
 } from "../lib/parceiros"
 
@@ -108,7 +109,7 @@ function Rodape({ whatsappGerente }: { whatsappGerente: string | null }) {
   )
 }
 
-export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: string | null }) {
+export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { whatsappGerente: string | null; cenarios?: CenarioPublico[] }) {
   const [passo, setPasso] = useState(-1)          // -1 = boas-vindas; 0..N-1 = etapas; N = enviado
   const [d, setD] = useState<Dados>(VAZIO)
   const [erros, setErros] = useState<Record<string, string>>({})
@@ -437,7 +438,7 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
         {et === "detalhes" && <>
           {sub === 0 && <div className="par-surge">
             <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Conta como cada serviço funciona</h2>
-            <p className="text-[14px] text-[#6b6878] mt-1.5">Um serviço por vez. Com isso a gente manda para você só o que cabe na sua máquina. Tudo é opcional, menos como você cobra e o prazo.</p>
+            <p className="text-[14px] text-[#6b6878] mt-1.5">Um serviço por vez. Com isso a gente manda para você só o que cabe na sua máquina. Tudo é opcional, menos os preços dos exemplos (quando houver), como você cobra e o prazo.</p>
           </div>}
           {escolhidos.length > 1 && <div className="flex gap-1.5" aria-hidden>{escolhidos.map((x, i) => <span key={x.id} className="h-1.5 flex-1 rounded-full transition-colors duration-300" style={{ background: i <= sub ? ROXO : "#e6e2f0" }} />)}</div>}
           {escolhidos.filter((_, i) => i === sub).map(sv => {
@@ -445,6 +446,7 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
             const forma = FORMAS_COBRANCA.find(f => f.id === s.cobranca)
             const temErro = Object.keys(erros).some(k => k.startsWith(`${sv.id}.`))
             const perguntas = PERGUNTAS[sv.id] ?? []
+            const cenariosDoServico = cenarios.filter(x => x.servicoId === sv.id), porAcerto = cobraPorAcertoMilheiro(sv.id)
             return (
               <section key={sv.id} className={`rounded-3xl bg-white p-5 border ${temErro ? "border-[#d33a3c]/40" : "border-[#ece9f4]"} shadow-[0_2px_10px_rgba(40,20,90,0.04)] space-y-5`}>
                 <div className="flex items-center gap-3">
@@ -453,13 +455,37 @@ export default function ParceirosForm({ whatsappGerente }: { whatsappGerente: st
                 </div>
                 {sv.id === "outro" && <div data-erro={marca(`${sv.id}.qual`)}><Campo rotulo="Qual serviço?" erro={E(`${sv.id}.qual`)}><input enterKeyHint="next" className={inputCls(E(`${sv.id}.qual`))} value={s.qual ?? ""} onChange={e => mudarServico(sv.id, { qual: e.target.value })} /></Campo></div>}
 
-                {perguntas.map(p => <PerguntaTecnica key={p.id} p={p} v={s.tecnico?.[p.id]} onChange={v => mudarTecnico(sv.id, p.id, v)} />)}
+                {perguntas.map(p => porAcerto && p.id === "formatoMax"
+                  ? <div key={p.id} data-erro={marca(`${sv.id}.formatoMax`)}><Campo rotulo="Formato da máquina" dica="A maior folha que a máquina aceita, em cm" erro={E(`${sv.id}.formatoMax`)}><CampoFormato v={s.tecnico?.formatoMax as Formato | undefined} onChange={v => mudarTecnico(sv.id, p.id, v)} /></Campo></div>
+                  : <PerguntaTecnica key={p.id} p={p} v={s.tecnico?.[p.id]} onChange={v => mudarTecnico(sv.id, p.id, v)} />)}
 
                 {perguntas.length > 0 && <div className="h-px bg-[#efedf5]" />}
-                <div data-erro={marca(`${sv.id}.cobranca`)}><Campo rotulo="Como você cobra?" erro={E(`${sv.id}.cobranca`)}>
+                {cenariosDoServico.map(cenario => {
+                  const k = `${sv.id}.preco.${cenario.id}`
+                  return (
+                    <div key={cenario.id} data-erro={marca(k)} className={`rounded-2xl p-4 bg-[#7c4ee4]/[0.05] border ${E(k) ? "border-[#d33a3c]/50" : "border-[#7c4ee4]/15"}`}>
+                      <Campo rotulo={ROTULO_PRECO_CENARIO[cenario.id] ?? "Preço para este exemplo (R$)"} erro={E(k)}
+                        dica={<span><b className="text-[#4a4658]">Exemplo:</b> {cenario.enunciado} Quanto você cobraria por este trabalho? É só uma referência, cada pedido a gente combina com você.</span>}>
+                        <input enterKeyHint="next" className={inputCls(E(k))} inputMode="decimal" value={s.precosExemplo?.[cenario.id] ?? ""} placeholder="0,00"
+                          onChange={e => {
+                            const n = Number(e.target.value.replace(",", "."))
+                            const precos = { ...s.precosExemplo }; if (n > 0) precos[cenario.id] = n; else delete precos[cenario.id]
+                            mudarServico(sv.id, { precosExemplo: precos, cenarioVersoes: { ...s.cenarioVersoes, [cenario.id]: cenario.versao } })
+                          }} />
+                      </Campo>
+                    </div>
+                  )
+                })}
+                {porAcerto && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div data-erro={marca(`${sv.id}.acerto`)}><Campo rotulo="Acerto (R$)" erro={E(`${sv.id}.acerto`)}><input enterKeyHint="next" className={inputCls(E(`${sv.id}.acerto`))} inputMode="decimal" value={s.acerto ?? ""} onChange={e => mudarServico(sv.id, { cobranca: "acertoMilheiro", acerto: Number(e.target.value.replace(",", ".")) || null })} placeholder="0,00" /></Campo></div>
+                    <div data-erro={marca(`${sv.id}.valor`)}><Campo rotulo="Valor do milheiro (R$)" erro={E(`${sv.id}.valor`)}><input enterKeyHint="next" className={inputCls(E(`${sv.id}.valor`))} inputMode="decimal" value={s.valor ?? ""} onChange={e => mudarServico(sv.id, { cobranca: "acertoMilheiro", valor: Number(e.target.value.replace(",", ".")) || null })} placeholder="0,00" /></Campo></div>
+                  </div>
+                )}
+                {!porAcerto && <div data-erro={marca(`${sv.id}.cobranca`)}><Campo rotulo="Como você cobra?" erro={E(`${sv.id}.cobranca`)}>
                   <div className="flex flex-wrap gap-2">{FORMAS_COBRANCA.map(f => <Chip key={f.id} on={s.cobranca === f.id} onClick={() => mudarServico(sv.id, { cobranca: f.id })}>{f.nome}</Chip>)}</div>
-                </Campo></div>
-                {forma?.unidade && (
+                </Campo></div>}
+                {!porAcerto && forma?.unidade && (
                   <div key={s.cobranca} className={`grid gap-3 par-surge ${s.cobranca === "acertoMilheiro" ? "grid-cols-2" : "grid-cols-1"}`}>
                     {s.cobranca === "acertoMilheiro" && <Campo rotulo="Acerto (R$)" opcional><input enterKeyHint="next" className={inputCls()} inputMode="decimal" value={s.acerto ?? ""} onChange={e => mudarServico(sv.id, { acerto: Number(e.target.value.replace(",", ".")) || null })} placeholder="0,00" /></Campo>}
                     <Campo rotulo={`Valor ${forma.unidade} (R$)`} dica={s.cobranca === "acertoMilheiro" ? undefined : "Um valor médio de referência"} opcional>

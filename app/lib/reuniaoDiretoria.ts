@@ -8,9 +8,11 @@ import { lerCampos, mudarConfig } from "./configAtomica"
 import { clienteClaude, MODELO } from "./claude"
 import { montarDiretoria, DIRETORES, EQUIPE, type IdDiretor, type IdBase, type LicaoDiretor, type Diretor } from "./diretoria"
 import { quadro, executores, type Funcionario } from "./rh"
+import { chaveRecomendacao } from "./pendenciaDispensada"
 
 // executor: o funcionário que executa (ou o Felipe). mensagem: o texto que o funcionário escreveu; o "Aprovo" envia.
 export type Recomendacao = {
+  chave?: string                                               // estável de um dia para o outro (diretor + texto da ordem): é por ela que se dispensa
   id: string; texto: string; urgencia: "hoje" | "semana"; resposta?: "aprovo" | "depois" | null
   executor?: string                                          // id do funcionário (quadro do RH) ou "felipe"
   executorNome?: string | null
@@ -62,23 +64,29 @@ export async function coletarContexto() {
     import("../api/agendador/route"), import("../api/escritorio/route"),
   ])
   const { lerPlanos, listarFerramentas } = await import("./diretoriaServidor")
-  const [hoje, kanbanBruto, lancamentos, cfg, rot, esc, planos, ferramentas] = await Promise.all([
+  const { lerSegurados } = await import("./pedidoSeguradoServidor")
+  const [hoje, kanbanBruto, lancamentos, cfg, rot, esc, planos, ferramentas, segurados] = await Promise.all([
     montarHoje().catch(() => null), todas<import("../types").KanbanCard>("KanbanCard"), todas<import("../types").LancamentoFinanceiro>("LancamentoFinanceiro"),
     lerCampos<{ apiKey?: string; conhecimentoDiretoria?: Partial<Record<IdBase, LicaoDiretor[]>>; contas?: { ativa?: boolean; tipo?: string; saldo?: number | null }[]
       ultimaReuniao?: Reuniao; conhecimentoAgente?: import("./agenteLeads").Conhecimento[]; funcionarios?: Funcionario[] }>(["apiKey", "conhecimentoDiretoria", "contas", "ultimaReuniao", "conhecimentoAgente", "funcionarios"]),
     agendador.GET().then(r => r.json()).catch(() => null), escritorio.GET().then(r => r.json()).catch(() => null),
     lerPlanos().catch(() => ({} as Awaited<ReturnType<typeof lerPlanos>>)), listarFerramentas().catch(() => [] as Awaited<ReturnType<typeof listarFerramentas>>),
+    lerSegurados().catch(() => ({} as import("./pedidoSegurado").MapaSegurados)),
   ])
   if (!cfg.apiKey) throw new Error("Sem chave da IA nas Configurações.")
   const kanban = kanbanBruto.map(unpackTerceirizado)
   const contas = (cfg.contas ?? []).filter(c => c.ativa && c.tipo !== "credito" && c.saldo != null)
   const fin = financeiroDoAndar(kanban, lancamentos, contas.length ? contas.reduce((t, c) => t + (c.saldo ?? 0), 0) : null)
   const base = cfg.conhecimentoDiretoria ?? {}
-  const diretores = montarDiretoria({
+  const dispensadas = await import("./pendenciaDispensada").then(m => m.dispensadasVigentes()).then(l => new Set(l.map(d => d.chave)))
+  const entradaDiretoria = {
     hoje: hoje as never, fin, kanban, agentesTravados: (esc?.mesas ?? []).filter((m: { estado: string }) => m.estado === "travado").map((m: { nome: string }) => m.nome),
     rotinas: rot?.rotinas ?? null, whatsapp: esc?.whatsapp ?? null, semCredito: !!esc?.semCredito, cota: esc?.cota,
-    conhecimento: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, v?.length ?? 0])),
-  })
+    conhecimento: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, v?.length ?? 0])), segurados,
+  }
+  const diretores = montarDiretoria({ ...entradaDiretoria, dispensadas })
+  // Sem filtro: para a porta externa listar as dispensadas à parte (o filtro é aplicado na hora da leitura)
+  const decisoesTodas = Object.fromEntries(montarDiretoria(entradaDiretoria).map(d => [d.id, d.decisoes.map((texto, k) => ({ texto, chave: d.decisoesChaves![k] }))]))
   const { progressoDaEmpresa } = await import("./animarServidor")
   const prog = await progressoDaEmpresa(kanban, lancamentos)
   const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
@@ -115,11 +123,11 @@ ${licoes || "- (ainda nada)"}${plano ? `\nPlano em andamento (combinado com o Fe
   const ferr = ferramentas.filter(f => f.status !== "recusada")
   const ferramentasTxt = `# Ferramentas que os diretores pediram para o sistema (o CTO acompanha)
 ${ferr.map(f => `- ${f.nome} (pedido do ${f.pedidoPor.toUpperCase()}, ${f.status === "pedida" ? "esperando o Felipe" : f.status === "aprovada" ? "aprovada, falta construir" : "pronta"}): ${f.paraQue}`).join("\n") || "- nenhuma"}`
-  return { cfg, hoje, kanban, lancamentos, fin, rot, esc, base, diretores, prog, norte, resultados, q, exec, equipe, bloco, cultura, planos, ferramentas: ferr, ferramentasTxt }
+  return { segurados, decisoesTodas, dispensadas, cfg, hoje, kanban, lancamentos, fin, rot, esc, base, diretores, prog, norte, resultados, q, exec, equipe, bloco, cultura, planos, ferramentas: ferr, ferramentasTxt }
 }
 
 export async function convocarReuniao(op: { salvar?: boolean } = {}): Promise<Reuniao> {
-  const { cfg, diretores, exec, norte, resultados, equipe, bloco, cultura, ferramentasTxt } = await coletarContexto()
+  const { dispensadas, cfg, diretores, exec, norte, resultados, equipe, bloco, cultura, ferramentasTxt } = await coletarContexto()
   if (!cfg.apiKey) throw new Error("Sem chave da IA nas Configurações.")
 
   const resp = await clienteClaude(cfg.apiKey, "diretoria").beta.messages.create({
@@ -139,8 +147,8 @@ Regras: cada diretor só fala da área dele e segue o que o Felipe ensinou a ele
     id, em: new Date().toISOString(), abertura: r.abertura, fechamento: r.fechamento,
     falas: r.falas.filter(f => diretores.some(d => d.id === f.diretor)).map(f => {
       const d = diretores.find(x => x.id === f.diretor)!
-      return { diretor: f.diretor, cargo: d.cargo, nome: DIRETORES.find(x => x.id === f.diretor)?.nome, ferramenta: f.ferramenta ? { nome: f.ferramenta.nome, paraQue: f.ferramenta.paraQue } : null, tom: d.tom, fala: f.fala, contratacao: f.contratacao ? { cargo: f.contratacao.cargo, motivo: f.contratacao.motivo, vagaId: null, erro: null } : null, recomendacoes: f.recomendacoes.slice(0, 3).map((x, k): Recomendacao => ({
-        id: `${f.diretor}-${k}`, texto: x.texto, urgencia: x.urgencia, resposta: null, executor: x.executor, executorNome: x.executor === "felipe" ? "você" : exec.find(e => e.id === x.executor)?.nome ?? null,
+      return { diretor: f.diretor, cargo: d.cargo, nome: DIRETORES.find(x => x.id === f.diretor)?.nome, ferramenta: f.ferramenta ? { nome: f.ferramenta.nome, paraQue: f.ferramenta.paraQue } : null, tom: d.tom, fala: f.fala, contratacao: f.contratacao ? { cargo: f.contratacao.cargo, motivo: f.contratacao.motivo, vagaId: null, erro: null } : null, recomendacoes: f.recomendacoes.filter(x => !dispensadas.has(chaveRecomendacao(f.diretor, x.texto))).slice(0, 3).map((x, k): Recomendacao => ({
+        id: `${f.diretor}-${k}`, chave: chaveRecomendacao(f.diretor, x.texto), texto: x.texto, urgencia: x.urgencia, resposta: null, executor: x.executor, executorNome: x.executor === "felipe" ? "você" : exec.find(e => e.id === x.executor)?.nome ?? null,
         mensagem: null, pendencia: null, ...(x.cliente?.trim() ? { _cliente: x.cliente.trim() } : {}),
       })) }
     }),
