@@ -6,6 +6,7 @@ import type { RegraDigital } from "@/app/lib/precoDigital"
 import { asaasConfigurado } from "@/app/lib/asaas"
 import { infinitePayConfigurado, numeroDoOrderNsu } from "@/app/lib/infinitePay"
 import { termosDigital, VERSAO_TERMOS } from "@/app/lib/termosDigital"
+import { prazoDoPedido, prazoDigital } from "@/app/lib/prazoDigital"
 import { mascararDocumento } from "@/app/lib/documento"
 
 // Página pública do pedido digital (/d/DIG-0001?t=…): só com o link assinado. Nunca devolve custo nem margem.
@@ -23,7 +24,7 @@ const dadosPublicos = (p: PedidoComBriefing, regra?: RegraDigital, designer = fa
   ajustes: designer ? (p.ajustes ?? []) : [],
   restante: p.restante ?? null, frete: p.frete ?? null, restantePagoEm: p.restantePagoEm ?? null, prontoEm: p.prontoEm ?? null,
   // Termos: o texto já na medida e quantidade deste pedido, e se (e quando) o cliente aceitou
-  termos: termosDigital({ quantidade: p.quantidade, medidas: p.medidas, validadeDias: DIAS_VALIDADE_DIGITAL }), termosVersao: VERSAO_TERMOS,
+  termos: termosDigital({ quantidade: p.quantidade, medidas: p.medidas, validadeDias: DIAS_VALIDADE_DIGITAL, prazo: prazoDoPedido(p).texto }), termosVersao: p.termos?.versao ?? VERSAO_TERMOS,
   termosAceitosEm: p.termos?.em ?? null,
   entrega: p.entrega ? { cep: p.entrega.cep, endereco: p.entrega.endereco } : null,
   designer,
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (tokenDesignerValido(id, b.dz)) return NextResponse.json({ erro: "Só o cliente aceita os termos." }, { status: 403 })
     // E-mail opcional (comprovante, arte para aprovar, aviso de envio)
     const email = typeof b.email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(b.email.trim()) ? b.email.trim().toLowerCase().slice(0, 120) : undefined
-    const novo = await gravarPedido(id, p => p.termos ? null : { ...p, termos: { versao: VERSAO_TERMOS, em: new Date().toISOString() }, ...(email ? { email } : {}) })
+    const novo = await gravarPedido(id, p => p.termos ? null : { ...p, termos: { versao: VERSAO_TERMOS, em: new Date().toISOString(), prazo: prazoDigital(p.quantidade, p.em) }, ...(email ? { email } : {}) })
     return NextResponse.json(publico(novo ?? pedido, cfg.digital))
   }
   if (b.acao === "briefing") {
