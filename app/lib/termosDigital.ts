@@ -4,11 +4,11 @@ import { prazoDigital } from "./prazoDigital"
 // Decisões do Felipe (12/11/2026): 2 rodadas de ajuste na arte; sinal devolvido até a aprovação da arte; quantidade
 // exata (o digital não tem perda).
 
-export const VERSAO_TERMOS = "2026-11-19.1"   // 19/11: prazo por quantidade (até 200: 7 a 10 dias úteis; 500+: 14)
+export const VERSAO_TERMOS = "2026-11-25.1"   // 25/11: prazo por quantidade (até 200: 7 a 10 dias úteis; acima de 200: 15)
 
 export type SecaoTermos = { titulo: string; itens: string[] }
 
-export function termosDigital(p: { quantidade: number; medidas: { a: number; l: number; p: number }; validadeDias: number }): SecaoTermos[] {
+export function termosDigital(p: { quantidade: number; medidas: { a: number; l: number; p: number }; validadeDias: number; prazo?: string }): SecaoTermos[] {
   const cm = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
   return [
     { titulo: "Quem vende", itens: [
@@ -32,7 +32,7 @@ export function termosDigital(p: { quantidade: number; medidas: { a: number; l: 
       "A cor impressa pode variar um pouco em relação à tela do celular ou do computador.",
     ] },
     { titulo: "Prazo", itens: [
-      `A produção de ${p.quantidade.toLocaleString("pt-BR")} caixinhas leva ${prazoDigital(p.quantidade).texto}, contados depois do sinal pago e da arte aprovada. O tempo da entrega (frete) é à parte.`,
+      `A produção de ${p.quantidade.toLocaleString("pt-BR")} caixinhas leva ${p.prazo ?? prazoDigital(p.quantidade).texto}, contados depois do sinal pago e da arte aprovada. O tempo da entrega (frete) é à parte.`,
     ] },
     { titulo: "Pagamento", itens: [
       "50% de sinal para começar. O restante, com o frete, é pago antes do envio: o pedido sai quando estiver quitado.",

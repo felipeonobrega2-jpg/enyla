@@ -14,7 +14,8 @@ const recente = (iso?: string | null) => !!iso && iso >= DESDE && Date.now() - n
 
 type Ped = { id: string; nome: string | null; email?: string; quantidade: number; total: number; sinal: number; status: string; statusEm?: string
   sinalPagoEm?: string; arteEnviadaEm?: string; arteAprovadaEm?: string; artes?: { url: string }[]; restante?: number; teste?: boolean
-  prontoEm?: string; restantePagoEm?: string; frete?: number; entrega?: unknown }
+  prontoEm?: string; restantePagoEm?: string; frete?: number; entrega?: unknown
+  em?: string; prazoEntrega?: { min: number; max: number; texto: string }; termos?: { prazo?: { min: number; max: number; texto: string } } }
 type Aprov = { numero: string; cardId: string; nomeCliente: string; aprovadoPor: string; quantidade: number; preco: number; sinal: number; em: string; email?: string }
 type Cfg = { pedidosDigitais?: Ped[]; aprovacoesOnline?: Aprov[] }
 type Envio = { chave: string; para: string; email: Email }
@@ -23,7 +24,7 @@ export async function talvezEmailsDoCliente(cfg: Cfg): Promise<{ enviados: numbe
   if (!emailConfigurado()) return "sem chave da Resend"
   const fila: Envio[] = []
   const { linkPedido } = await import("./digitalLink")
-  const { prazoDigital } = await import("./prazoDigital")
+  const { prazoDoPedido } = await import("./prazoDigital")
   const whatsapp = await import("./agenteAuto").then(m => m.seuNumero()).catch(() => null)
 
   // Digital
@@ -31,7 +32,7 @@ export async function talvezEmailsDoCliente(cfg: Cfg): Promise<{ enviados: numbe
     if (p.teste || !p.email || p.status === "cancelado") continue
     const link = linkPedido(p.id)
     const arteUrl = (p.artes ?? []).at(-1)?.url ?? null
-    const prazo = prazoDigital(p.quantidade).texto
+    const prazo = prazoDoPedido(p).texto
     if (recente(p.sinalPagoEm)) fila.push({ chave: `email:sinal:${p.id}`, para: p.email, email: emailSinalRecebido({ nome: p.nome, id: p.id, quantidade: p.quantidade, total: p.total, sinal: p.sinal, em: p.sinalPagoEm!, link, prazo, whatsapp }) })
     const versao = Math.max(1, (p.artes ?? []).length)
     if (recente(p.arteEnviadaEm) && !p.arteAprovadaEm) fila.push({ chave: `email:arte:${p.id}:${p.arteEnviadaEm}`, para: p.email, email: emailArteParaAprovar({ nome: p.nome, id: p.id, versao, link, arteUrl, whatsapp }) })
