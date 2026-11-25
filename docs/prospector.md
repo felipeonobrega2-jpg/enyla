@@ -79,7 +79,7 @@ curl -sS -m 300 -H "Authorization: Bearer $CRON_SECRET" https://<dominio-de-prod
 
 Código: `app/lib/prospectorEnvio.ts` (textos, horário, canais e recusa, tudo puro), `app/lib/prospectorEnvioServidor.ts` (Supabase, Evolution, Resend) e a rota `GET /api/prospector/enviar`. O texto está aprovado. **A chave `prospector_envio_ativo` (AppConfig) começa desligada** e nenhuma migração, seed ou teste a liga. Desligada, a rota devolve `{ ativo: false }` e não lê a base nem envia. Quem liga é o Felipe.
 
-**Agendamento e acesso.** `vercel.json`: `0 12-20 * * 1-5` (12h–20h UTC). A rota confere o horário de verdade: só segunda a sexta, das 9h às 17h America/Sao_Paulo, e recusa fora disso mesmo que o cron dispare. Autenticação igual às outras rotas de cron (`CRON_SECRET` em Bearer, ou só o `User-Agent` `vercel-cron/`); liberada em `proxy.ts`. Sem secret novo.
+**Agendamento e acesso.** `vercel.json`: `0 11-22 * * 1-5` (11h–22h UTC, 8h–19h em Brasília). A rota confere o horário de verdade: só segunda a sexta, das 8h às 20h (fim exclusivo) America/Sao_Paulo, e recusa fora disso mesmo que o cron dispare. Autenticação igual às outras rotas de cron (`CRON_SECRET` em Bearer, ou só o `User-Agent` `vercel-cron/`); liberada em `proxy.ts`. Sem secret novo.
 
 **Canais.** E-mail pela Resend (`enviarEmail`), de `ENYLA Embalagens <parceiros@enyla.com.br>` e com Reply-To `felipeonobrega2@gmail.com`. O Reply-To vale só para o Prospector (parâmetro opcional `opcoes` de `enviarEmail`); as outras mensagens seguem com `EMAIL_RESPONDER_PARA`. WhatsApp pela instância Evolution que já existe (o número do atendimento), só para celular brasileiro com 9 dígitos depois do DDD. Quem tem os dois canais recebe os dois no mesmo dia, com o mesmo passo.
 

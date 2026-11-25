@@ -15,8 +15,8 @@ export const NOTA_MINIMA_PADRAO = 1
 export const LIMITE_PRIMEIROS_POR_DIA = 10
 export const DIAS_ATE_LEMBRETE = 3
 export const DIAS_ATE_ENCERRAR = 3
-export const HORA_INICIO = 9
-export const HORA_FIM = 17
+export const HORA_INICIO = 8
+export const HORA_FIM = 20
 export const MAX_FALHAS_POR_CANAL = 3
 export const REMETENTE_REPLY_TO = "felipeonobrega2@gmail.com"
 export const ASSUNTO_EMAIL = "ENYLA, gráfica de embalagens em Barueri"
@@ -34,7 +34,7 @@ export function relogioSp(agora: Date): { dia: string; hora: number; diaSemana: 
   return { dia: `${p.year}-${p.month}-${p.day}`, hora: Number(p.hour), diaSemana: semana[p.weekday] ?? 0 }
 }
 
-/** Segunda a sexta, das 9h (inclusive) às 17h (exclusive), America/Sao_Paulo. */
+/** Segunda a sexta, das 8h (inclusive) às 20h (exclusive), America/Sao_Paulo. */
 export function dentroDoHorario(agora: Date): boolean {
   const { hora, diaSemana } = relogioSp(agora)
   return diaSemana >= 1 && diaSemana <= 5 && hora >= HORA_INICIO && hora < HORA_FIM
