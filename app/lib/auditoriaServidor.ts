@@ -51,22 +51,36 @@ export async function ignorarProblema(id: string, voltar = false) {
   })
 }
 
-// O vigia roda a cada 5 min; a auditoria completa, no máximo uma vez por hora
-export async function talvezAuditar(cfg: { auditoriaDados?: { em?: string } }) {
-  const ult = cfg.auditoriaDados?.em
-  // Varredura completa só de madrugada (2h às 6h, uma vez): de dia ela pesava no banco junto com o atendimento (19/11)
-  const h = Number(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false })) % 24
-  if (h < 2 || h >= 6) return null
-  if (ult && Date.now() - new Date(ult).getTime() < 20 * 3_600_000) return null
-  // Marca o início antes de varrer: se a rodada cair no meio (tempo da Vercel), não tenta de novo a cada 2 min
+// O vigia roda a cada 5 min; a varredura completa roda no máximo uma vez por noite (2h às 6h, Brasília).
+// A trava olha só a última rodada NOTURNA (auditoriaComecouEm), nunca auditoriaDados.em: a tela "Exatidão dos dados"
+// também grava auditoriaDados.em, e abrir a tela de dia pulava a madrugada seguinte (parou em 22/11).
+// Devolve o resultado da rodada ou o motivo de não rodar (o vigia marca na rotina "auditoria").
+const LIMITE_RODADA_MS = 240_000
+const diaSP = (t: number | string | Date) => new Date(new Date(t).getTime() - 3 * 3_600_000).toISOString().slice(0, 10)
+
+export async function talvezAuditar(cfg: { auditoriaComecouEm?: string }, agora = new Date()): Promise<{ confianca: number; problemas: number } | string> {
+  // Varredura completa só de madrugada: de dia ela pesava no banco junto com o atendimento (19/11)
+  const h = Number(agora.toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false })) % 24
+  if (h < 2 || h >= 6) return "fora da janela (2h às 6h)"
+  const jaRodou = (c?: string) => !!c && diaSP(c) === diaSP(agora)
+  if (jaRodou(cfg.auditoriaComecouEm)) return "já rodou esta noite"
+  // Marca o início antes de varrer: se a rodada cair no meio (tempo da Vercel), não tenta de novo a cada volta do vigia
   // (19/11: a varredura completa repetindo a cada rodada do vigia engasgou o banco)
   let minha = false
   await mudarConfig((d: Record<string, unknown> & { auditoriaComecouEm?: string }) => {
-    if (d.auditoriaComecouEm && Date.now() - new Date(d.auditoriaComecouEm).getTime() < 20 * 3_600_000) return null
+    if (jaRodou(d.auditoriaComecouEm)) return null
     minha = true
-    return { auditoriaComecouEm: new Date().toISOString() }
+    return { auditoriaComecouEm: agora.toISOString() }
   })
-  if (!minha) return null
-  const r = await rodarAuditoria({ guardar: true })
-  return { confianca: r.confianca, problemas: r.total }
+  if (!minha) return "já rodou esta noite"
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const r = await Promise.race([
+      rodarAuditoria({ guardar: true }),
+      new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error("tempo esgotado")), LIMITE_RODADA_MS) }),
+    ])
+    return { confianca: r.confianca, problemas: r.total }
+  } catch (e) {
+    return `erro: ${(e instanceof Error ? e.message : String(e)).slice(0, 140)}`
+  } finally { if (timer) clearTimeout(timer) }
 }
