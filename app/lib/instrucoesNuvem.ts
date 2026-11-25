@@ -61,6 +61,7 @@ Tudo pela porta de acesso, com a sua chave (é secreta: não mostre, não cole e
 - Ajuda (lista do que existe):  curl -s ${auth} "${url}"
 - A empresa agora (números, sua área, plano, equipe):  curl -s ${auth} "${url}?o=empresa"
 - Detalhe de uma área (comercial, producao, financeiro, marketing, sistema):  curl -s ${auth} "${url}?o=detalhe&area=comercial"
+- Parceiros (SÓ CCO e CMO; só leitura): curl -s ${auth} "${url}?o=detalhe&area=parceiros"  (cadastros de /parceiros com e-mail mascarado e telefone com 4 dígitos, respostas do Prospector e funil)
 - O que você e o Felipe já conversaram:  curl -s ${auth} "${url}?o=conversa"
 - Dossiê (lista de arquivos) e um arquivo:  "${url}?o=dossie"  e  "${url}?o=arquivo&nome=..."
 - Conhecimento vivo do sistema:  "${url}?o=conhecimento"

@@ -329,3 +329,4 @@ Os dois scripts de comparação (classificador e follow-up) só rodam com autori
 Nenhuma troca de modelo entra sem o Diego revisar o resultado da comparação.
 O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 | 43 | Porta externa: ação `mover_card` para avançar etapa de produção (só avança, 1→2..8, motivo obrigatório) | Felipe | — | — | Claude Code | não | (PR da issue #137) |
+| 44 | Porta externa: leitura `?o=detalhe&area=parceiros` (cadastros de /parceiros, respostas e funil do Prospector; só leitura, CCO e CMO) | Felipe | — | — | Claude Code | não | (PR da issue #144) |

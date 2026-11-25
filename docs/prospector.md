@@ -142,3 +142,11 @@ Resposta ao "não" (não é enviada automaticamente; o Prospector só marca o op
 ```
 Obrigado pelo retorno. Não vamos voltar a escrever. Um abraço, ENYLA.
 ```
+
+## Leitura pela porta externa (`?o=detalhe&area=parceiros`)
+
+Só leitura, só para as chaves do CCO e da CMO (as outras recebem 403). Devolve `cadastros` (coleção `cadastrosParceiros`, mais novos primeiro, até 100: `id`, `nome`, `empresa`, `data`, `origem`, `status`, `etapaProspector`), `respostas` e `funil`.
+- `origem` é `prospector` quando o documento (CNPJ) casa com um `prospectos_parceiros.cnpj`; senão `direto`.
+- Sem e-mail, telefone, documento ou endereço completos: e-mail mascarado (`ma***@dominio.com`) e telefone `***1234`.
+- `respostas.prospectosQueResponderam`: prospectos na etapa `respondeu`. `respostas.emailsRecebidos`: últimas 50 da tabela `prospectos_emails_recebidos` (#132), com corpo até 300 caracteres; `null` se a tabela não existir.
+- `funil`: encontrado, qualificado, abordado, respondeu, abriu, cadastrou.
