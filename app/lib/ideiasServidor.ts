@@ -98,6 +98,9 @@ const LOTES: { v: number; ideias: string[] }[] = [
     // 23/11, a pedido seu: celular deixa de travar melhoria; depois, uma rodada só dele
     "Versão otimizada para celular: uma rodada só para o celular das telas internas (caixa de entrada, Hoje, conversas, pedidos, Financeiro e o prédio em 2D), pensada para o uso rápido no dia a dia, com toque fácil e o essencial primeiro. Até lá, as melhorias saem pensando no computador.",
   ] },
+  { v: 13, ideias: [
+    "Custo de carga e descarga em pedido grande (Felipe, 25/11): quando o pedido é muito grande e vai em vários pallets, o motorista costuma cobrar ajudante de carga e descarga. Esse custo precisa entrar no orçamento junto do frete. O Felipe ainda vai pensar como fazer no sistema.",
+  ] },
 ]
 
 // Gastos fixos que o sistema põe uma vez (marca no servidor); apagou ou editou, não volta
