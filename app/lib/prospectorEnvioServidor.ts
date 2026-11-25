@@ -11,19 +11,19 @@ import { evo } from "./evolution"
 import { enviarEmail } from "./email"
 import { CNAES_PROSPECTO, aplicarOptOut, hojeSp, podeTransicionar, type EtapaFunil, type MudancaEtapa } from "./prospector"
 import {
-  ASSUNTO_EMAIL, CHAVE_ENVIO_ATIVO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, REMETENTE_REPLY_TO,
+  ASSUNTO_EMAIL, CHAVE_ENVIO_ATIVO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector,
   canaisDisponiveis, canaisPendentes, celularWhatsapp, chaveTelefone, dentroDoHorario, ehRecusa, emailValido, enviosDoHistorico,
   motivoNaoQualifica, passoIniciado, passoSaiu, passouDias, saiu, textoDoPasso,
   type Canal, type EnvioHistorico, type MotivoParada, type Passo,
 } from "./prospectorEnvio"
 
 const TABELA = "prospectos_parceiros"
-const COLUNAS = "id, cnpj, razao_social, nome_fantasia, cnae_principal, cnaes_secundarios, telefone, email, nota, etapa, opt_out, historico_etapas, atualizado_em"
+export const COLUNAS = "id, cnpj, razao_social, nome_fantasia, cnae_principal, cnaes_secundarios, telefone, email, nota, etapa, opt_out, historico_etapas, atualizado_em"
 const REMETENTE = "ENYLA Embalagens <parceiros@enyla.com.br>"
 const ETAPAS_CONTATADAS = ["abordado", "respondeu", "encerrado_sem_resposta", "abriu", "cadastrou"]
 const LIMITE_ELEGIVEIS = 1000
 
-type Linha = {
+export type Linha = {
   id: number; cnpj: string; razao_social: string | null; nome_fantasia: string | null; cnae_principal?: string | null; cnaes_secundarios?: string[] | null; telefone: string | null; email: string | null
   nota: number | null; etapa: string; opt_out: boolean; historico_etapas: unknown; atualizado_em: string
 }
@@ -35,13 +35,13 @@ export type ResultadoEnvio = {
 }
 
 const vazio = (): ResultadoEnvio => ({ ok: true, ativo: true, enviado: false, emailHoje: 0, tetoEmailDia: 0, qualificados: 0, primeiros: 0, lembretes: 0, encerrados: 0, responderam: 0, optOuts: 0, falhas: 0 })
-const historicoDe = (l: Linha): MudancaEtapa[] => (Array.isArray(l.historico_etapas) ? l.historico_etapas : []).filter((x): x is MudancaEtapa => !!x && typeof x === "object")
+export const historicoDe = (l: Linha): MudancaEtapa[] => (Array.isArray(l.historico_etapas) ? l.historico_etapas : []).filter((x): x is MudancaEtapa => !!x && typeof x === "object")
 const enviosDe = (l: Linha) => enviosDoHistorico(historicoDe(l))
 
 type Deps = { agora?: () => Date }
 
 /** Grava com trava otimista (id + atualizado_em lido + sem opt-out). Devolve a linha nova ou null se alguém mudou antes. */
-async function gravar(l: Linha, campos: Record<string, unknown>): Promise<Linha | null> {
+export async function gravar(l: Linha, campos: Record<string, unknown>): Promise<Linha | null> {
   const novoEm = new Date().toISOString()
   const { data, error } = await supabase.from(TABELA).update({ ...campos, atualizado_em: novoEm })
     .eq("id", l.id).eq("atualizado_em", l.atualizado_em).eq("opt_out", false).select("id")
@@ -49,7 +49,7 @@ async function gravar(l: Linha, campos: Record<string, unknown>): Promise<Linha 
   return { ...l, ...campos, atualizado_em: novoEm } as Linha
 }
 
-async function reler(id: number): Promise<Linha | null> {
+export async function reler(id: number): Promise<Linha | null> {
   const { data } = await supabase.from(TABELA).select(COLUNAS).eq("id", id).maybeSingle()
   return (data as Linha | null) ?? null
 }
@@ -59,7 +59,7 @@ function marcarOptOut(l: Linha, em: string): Record<string, unknown> {
   return { etapa: "descartado", opt_out: true, opt_out_em: em, historico_etapas: novo.historico }
 }
 
-async function gravarOptOut(l: Linha, em: string, motivo: string): Promise<Linha | null> {
+export async function gravarOptOut(l: Linha, em: string, motivo: string): Promise<Linha | null> {
   for (let i = 0; i < 3; i++) {
     const atual = i === 0 ? l : await reler(l.id)
     if (!atual || atual.opt_out) return null
@@ -128,7 +128,7 @@ async function enviarPeloCanal(canal: Canal, l: Linha, texto: string): Promise<{
   const para = emailValido(l.email)
   if (!para) return { ok: false, erro: "e-mail inválido" }
   const esc = texto.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
-  const r = await enviarEmail(para, { assunto: ASSUNTO_EMAIL, texto, html: `<p>${esc}</p>` }, [], { de: REMETENTE, responderPara: REMETENTE_REPLY_TO })
+  const r = await enviarEmail(para, { assunto: ASSUNTO_EMAIL, texto, html: `<p>${esc}</p>` }, [], { de: REMETENTE, responderPara: replyToDoProspector() })
   return r.ok ? { ok: true } : { ok: false, erro: r.erro, ...(r.cota ? { cota: true as const } : {}) }
 }
 
