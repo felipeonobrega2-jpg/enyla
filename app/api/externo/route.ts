@@ -21,6 +21,7 @@ import { acaoPendencia, lerPendenciasDaArea, renovarFotoDepois } from "@/app/lib
 import { acaoTarefaFelipe, tarefasDoDiretor } from "@/app/lib/tarefaFelipe"
 import { pedidoExterno } from "@/app/lib/pedidoExterno"
 import { lerPertoExterno, AJUDA_PERTO } from "@/app/lib/pertoExterno"
+import { lerComercial, AJUDA_COMERCIAL } from "@/app/lib/comercialExterno"
 
 // Porta de acesso dos diretores na nuvem (ex.: Grok Bot). Pública no proxy, mas cada chamada exige a chave do diretor
 // (Authorization: Bearer enyla_<diretor>_...). Leitura da empresa e as mesmas ferramentas da conversa com o Felipe;
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
 
   if (!o) return NextResponse.json({
     voce: `${info.nome}, ${info.cargo} (${info.area})`,
-    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | "), "?o=conversa": "o que você e o Felipe conversaram", ...(podeAcionarComercial(diretor) ? { "?o=perto": AJUDA_PERTO } : { "?o=perto": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): a lista 'Perto de você'" }), ...(diretor === "cfo" ? AJUDA_FINANCEIRO : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa" }), ...(diretor === "cmo" ? { "?o=meta_ads": "Meta Ads ao vivo (só leitura): conta, campanhas, conjuntos e anúncios; hoje, 7 e 30 dias; cache de 3 min; bloco funil por campanha (7 e 30 dias: leads, mql, orçamentos, pedidos, vendido, gasto, custo por lead e por MQL) e previsaoSaldoDias" } : {}) },
+    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | "), "?o=detalhe&area=comercial&pagina=&jid=": AJUDA_COMERCIAL, "?o=conversa": "o que você e o Felipe conversaram", ...(podeAcionarComercial(diretor) ? { "?o=perto": AJUDA_PERTO } : { "?o=perto": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): a lista 'Perto de você'" }), ...(diretor === "cfo" ? AJUDA_FINANCEIRO : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa" }), ...(diretor === "cmo" ? { "?o=meta_ads": "Meta Ads ao vivo (só leitura): conta, campanhas, conjuntos e anúncios; hoje, 7 e 30 dias; cache de 3 min; bloco funil por campanha (7 e 30 dias: leads, mql, orçamentos, pedidos, vendido, gasto, custo por lead e por MQL) e previsaoSaldoDias" } : {}) },
     escrita: { "POST {acao:'relatar', texto}": "manda algo ao Felipe",
       "POST {acao:'dispensar_pendencia', chave, motivo, ate?}": "QUALQUER DIRETOR. Dispensa uma pendência (a chave vem em ?o=empresa, campo pendencias) com motivo obrigatório (sem motivo: 400); ate (AAAA-MM-DD) opcional: depois dessa data ela volta. Não apaga nada",
       "POST {acao:'tarefa_felipe', titulo, detalhe?, prazo? (AAAA-MM-DD)}": "QUALQUER DIRETOR. Põe uma tarefa na lista 'Depende de você' do Felipe (pedido por você, com data e prazo). titulo obrigatório (até 140 caracteres); no máximo 10 abertas por diretor (a 11ª volta 429). Suas tarefas (abertas e feitas nos últimos 7 dias) estão em ?o=empresa, campo tarefasParaFelipe. {acao:'tarefa_felipe', operacao:'cancelar', id} cancela só as suas. Não manda mensagem a ninguém",
@@ -120,6 +121,15 @@ export async function GET(req: NextRequest) {
       oQueOsAgentesAprenderam: cfg.conhecimentoAgente ?? [], oQueOFelipeEnsinouADiretoria: cfg.conhecimentoDiretoria ?? {},
       planosDosDiretores: planos, bancoDeIdeias: cfg.ideias ?? [],
     })
+  }
+
+  // Comercial: a lista completa é lida agora (a foto guarda só o recorte de 7.000 caracteres) e paginada sem cortar item
+  if (o === "detalhe" && req.nextUrl.searchParams.get("area") === "comercial") {
+    const { montarHoje } = await import("@/app/lib/hojeServidor")
+    const hoje = await montarHoje().catch(() => null)
+    if (!hoje) return NextResponse.json({ erro: "Não consegui montar a lista comercial agora. Tente de novo." }, { status: 503 })
+    const l = lerComercial(hoje, { pagina: req.nextUrl.searchParams.get("pagina"), jid: req.nextUrl.searchParams.get("jid") })
+    return NextResponse.json(l.corpo, { status: l.status })
   }
 
   const foto = await fotoRapida()

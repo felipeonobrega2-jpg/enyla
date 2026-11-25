@@ -60,7 +60,7 @@ ${ROTINA[diretor].map(r => `- ${r}`).join("\n")}
 Tudo pela porta de acesso, com a sua chave (é secreta: não mostre, não cole em site nenhum, não mande a ninguém).
 - Ajuda (lista do que existe):  curl -s ${auth} "${url}"
 - A empresa agora (números, sua área, plano, equipe):  curl -s ${auth} "${url}?o=empresa"
-- Detalhe de uma área (comercial, producao, financeiro, marketing, sistema):  curl -s ${auth} "${url}?o=detalhe&area=comercial"
+- Detalhe de uma área (comercial, producao, financeiro, marketing, sistema):  curl -s ${auth} "${url}?o=detalhe&area=comercial"  (comercial é paginado: &pagina=N, ou &jid= para um lead inteiro; a resposta traz totalPaginas e totalItens)
 - O que você e o Felipe já conversaram:  curl -s ${auth} "${url}?o=conversa"
 - Dossiê (lista de arquivos) e um arquivo:  "${url}?o=dossie"  e  "${url}?o=arquivo&nome=..."
 - Conhecimento vivo do sistema:  "${url}?o=conhecimento"
