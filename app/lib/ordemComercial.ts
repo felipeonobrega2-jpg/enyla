@@ -1,7 +1,8 @@
 // Diretoria (só CCO e CMO) aciona os agentes do Comercial que já existem (Atendente, Follow-up, Reativação) para falar
 // com UM lead. Não é contratação nem agente novo: o agente só escreve a mensagem a pedido do diretor. O resultado é o
 // cartão "aguardando" de sempre (AcaoConversa tipo "mensagem"); quem envia é o "Aprovo e envio" do Felipe
-// (responderAcao). Este arquivo NUNCA envia nada. Só roda no servidor.
+// (responderAcao). Este arquivo NUNCA envia nada: o único envio é a ordem a LEAD pela porta externa, que passa por
+// ordemDireta (envio do agente) e só quando o nível é "lead" (nivelCliente). Só roda no servidor.
 import { supabase } from "./supabase"
 import { lerCampos } from "./configAtomica"
 import { lerConversa, type AcaoConversa } from "./diretoriaServidor"
@@ -61,18 +62,28 @@ export async function acharLead(x: { cliente?: string; jid?: string }): Promise<
   return { ok: true, jid: achou.jid, nome: cliente || achou.nome || achou.telefone || achou.jid }
 }
 
-type Pronto = { saida: string; acao?: AcaoConversa; status?: number }
+type Pronto = { saida: string; acao?: AcaoConversa; status?: number; destino?: "enviado_direto" | "fila_aprovo"; motivo?: string; nivel?: string }
 // A ordem do diretor: redige (sem enviar) e devolve o cartão "aguardando". Sem Aprovo do Felipe nada sai.
-export async function ordenarComercial(diretor: IdDiretor, x: Record<string, unknown>, op: { apiKey: string; cultura?: string[]; novoId: () => string }): Promise<Pronto> {
+export async function ordenarComercial(diretor: IdDiretor, x: Record<string, unknown>, op: { apiKey: string; cultura?: string[]; novoId: () => string; enviarLead?: boolean }): Promise<Pronto> {
   const func = EXECUTORES_COMERCIAIS.find(f => f.id === x.funcionario)
   if (!func) return { saida: "Funcionário não encontrado no quadro.", status: 400 }
   if (!podeAcionarComercial(diretor)) return { saida: `${func.nome} só atende ordens da CCO e da CMO.`, status: 403 }
   const ordem = String(x.ordem ?? "").trim()
   if (!ordem) return { saida: "Falta a ordem (o que o agente deve dizer ao lead).", status: 400 }
-  const pendentes = (await lerConversa(diretor)).flatMap(m => m.acoes ?? []).filter(a => a.tipo === "mensagem" && a.status === "aguardando").length
-  if (pendentes >= MAX_PENDENTES) return { saida: `Já são ${pendentes} mensagens esperando o Aprovo do Felipe (máximo ${MAX_PENDENTES} por diretor). Espere ele aprovar ou descartar antes de mandar outra.`, status: 429 }
   const lead = await acharLead({ cliente: x.cliente as string | undefined, jid: x.jid as string | undefined })
   if (!lead.ok) return { saida: lead.erro, status: 404 }
+  // Só quem já comprou (A, B, C) precisa do Aprovo; na dúvida ("indefinido") conta como cliente. Sem enviarLead, tudo vai à fila.
+  const { nivelDoDestinatario } = await import("./nivelCliente")
+  const nv = op.enviarLead ? await nivelDoDestinatario(lead.jid) : { nivel: "indefinido" as const, jaCliente: false, motivo: "" }
+  const direto = op.enviarLead && nv.nivel === "lead"
+  if (direto) {
+    const { travasAntesDeRedigir } = await import("./ordemDireta")
+    const t = await travasAntesDeRedigir(func, lead).catch(() => null)
+    if (t) return { saida: t.saida, status: t.status, motivo: t.motivo, nivel: nv.nivel }
+  } else {
+    const pendentes = (await lerConversa(diretor)).flatMap(m => m.acoes ?? []).filter(a => a.tipo === "mensagem" && a.status === "aguardando").length
+    if (pendentes >= MAX_PENDENTES) return { saida: `Já são ${pendentes} mensagens esperando o Aprovo do Felipe (máximo ${MAX_PENDENTES} por diretor). Espere ele aprovar ou descartar antes de mandar outra.`, status: 429 }
+  }
   const cfg = await lerCampos<{ guiaAtendimento?: string; conhecimentoAgente?: Conhecimento[] }>(["guiaAtendimento", "conhecimentoAgente"])
   const { redigirComoFuncionario } = await import("./funcionariosServidor")
   const r = await redigirComoFuncionario({
@@ -80,5 +91,21 @@ export async function ordenarComercial(diretor: IdDiretor, x: Record<string, unk
     guia: cfg.guiaAtendimento?.trim() || undefined,
   })
   if (!r.ok) return { saida: `Não deu: ${r.erro}`, acao: { id: op.novoId(), tipo: "falha", texto: r.erro }, status: 422 }
-  return { acao: { id: op.novoId(), tipo: "mensagem", funcionario: func.nome, cliente: lead.nome, jid: lead.jid, texto: r.texto, status: "aguardando" }, saida: `${func.nome} escreveu e a mensagem está esperando o Aprovo do Felipe: "${r.texto}"` }
+  const fila = (texto: string, motivo: string): Pronto => ({
+    acao: { id: op.novoId(), tipo: "mensagem", funcionario: func.nome, cliente: lead.nome, jid: lead.jid, texto, status: "aguardando" },
+    saida: `${func.nome} escreveu e a mensagem está esperando o Aprovo do Felipe: "${texto}"`, destino: "fila_aprovo", motivo, nivel: nv.nivel,
+  })
+  if (!direto) {
+    const motivo = !op.enviarLead ? "ordem pela conversa com o Felipe: espera o Aprovo" : nv.nivel === "indefinido" ? "nível indefinido: fila por segurança" : `cliente ${nv.nivel}: precisa do Aprovo do Felipe`
+    return fila(r.texto, motivo)
+  }
+  const { enviarAoLead } = await import("./ordemDireta")
+  const e = await enviarAoLead({ diretor, func, lead, texto: r.texto, novoId: op.novoId })
+  if ("recusa" in e) return { saida: e.saida, status: e.status, motivo: e.motivo, nivel: nv.nivel }
+  if ("fila" in e) {
+    const p = (await lerConversa(diretor)).flatMap(m => m.acoes ?? []).filter(a => a.tipo === "mensagem" && a.status === "aguardando").length
+    if (p >= MAX_PENDENTES) return { saida: `Já são ${p} mensagens esperando o Aprovo do Felipe (máximo ${MAX_PENDENTES} por diretor).`, status: 429, motivo: e.motivo, nivel: nv.nivel }
+    return fila(e.texto ?? r.texto, e.motivo)
+  }
+  return { acao: e.acao, saida: `${func.nome} enviou direto ao lead (sem compra, não precisa do Aprovo): "${(e.acao as { texto: string }).texto}"`, destino: "enviado_direto", motivo: `lead sem compra: enviado pelo ${func.nome}`, nivel: nv.nivel }
 }

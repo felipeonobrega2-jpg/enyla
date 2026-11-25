@@ -424,7 +424,7 @@ export async function voceAtende(jid: string, cfg: CfgAgente, horas = 24) {
   return (data ?? []).some(m => !ids.has(m.id) && !ehMensagemAutomaticaDoWhatsapp(m.corpo, m.tipo))
 }
 
-async function voceNaConversa(jid: string, log: Registro[], cfg?: CfgAgente) {
+export async function voceNaConversa(jid: string, log: Registro[], cfg?: CfgAgente) {
   if (await conversaAssumida(jid)) return false
   const idsDoAgente = new Set([...log.flatMap(l => l.ids ?? []), ...(cfg?.agenteIds ?? [])])
   const desde = new Date(Date.now() - MINUTOS_VOCE_NA_CONVERSA * 60_000).toISOString()

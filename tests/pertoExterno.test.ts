@@ -44,6 +44,8 @@ describe("?o=perto", () => {
       expect(itens[0]).toMatchObject({ estrela: true, nota: "quer 5 mil", esperando: { quem: "lead" }, jaCliente: true, ultimoPedido: "P-120" })
       expect(itens[1]).toMatchObject({ estrela: false, nota: null, esperando: { quem: "nos" }, jaCliente: true, ultimoPedido: "DIG-0007" })
       expect(JSON.stringify(r.corpo)).not.toMatch(/telefone|email/i)
+      for (const i of itens) expect(i).toHaveProperty("nivel")   // sem as fontes completas (mock) cai em indefinido, nunca lead
+      expect(itens.every(i => (i as unknown as { nivel: string }).nivel !== "lead")).toBe(true)
     }
   })
   it("as outras chaves recebem 403 e nada é lido", async () => {
