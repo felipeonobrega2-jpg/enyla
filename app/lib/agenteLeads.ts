@@ -292,6 +292,30 @@ export function ehSaudacaoAutomaticaDoLead(t: string | null | undefined): boolea
   return TEMPLATE_AUTOMATICO.some(r => r.test(x))
 }
 
+// ── Mínimo pela tiragem e pelos modelos na chapa (regra do Felipe, 25/11/2026 ~8h33) ──
+// Offset: ~1.000 unidades no TOTAL; as artes se dividem pelos modelos que cabem na chapa (4 na faca de 100 ml → 1.000 dão 4 artes).
+// Digital: até 200 vale; arte extra R$ 100. Quem orça offset é o Felipe: aqui nunca sai valor de offset.
+export const MINIMO_OFFSET = 1000
+export const LIMITE_DIGITAL = 200
+export const ARTE_EXTRA_DIGITAL = 100
+export type Orientacao = {
+  caminho: "digital" | "offset" | "intermediaria" | "precisa_faca"
+  artesExtras: number
+  acrescimoDigital: number   // R$ — só no digital (R$ 100 por arte extra); 0 nos demais
+  artesNoOffset: number | null // artes que o offset comporta: limitadas pelos modelos na chapa
+  decisaoSua: boolean        // offset e faixa intermediária: o Felipe orça
+}
+export function orientarTiragem(total: number, artes: number, modelosNaChapa: number | null): Orientacao {
+  const n = Math.max(1, Math.round(artes) || 1)
+  const extras = n - 1
+  const m = modelosNaChapa != null && modelosNaChapa > 0 ? Math.floor(modelosNaChapa) : null
+  const base = { artesExtras: extras, acrescimoDigital: 0, artesNoOffset: m, decisaoSua: false }
+  if (total > 0 && total <= LIMITE_DIGITAL) return { ...base, caminho: "digital", acrescimoDigital: extras * ARTE_EXTRA_DIGITAL }
+  if (m == null) return { ...base, caminho: "precisa_faca", artesNoOffset: null }
+  if (total >= MINIMO_OFFSET) return { ...base, caminho: "offset", decisaoSua: true }
+  return { ...base, caminho: "intermediaria", decisaoSua: true }
+}
+
 // Filtro inicial, tirado das conversas reais do Felipe com os leads do anúncio (04/11/2026). Fica editável em Configurações.
 export const FILTRO_PADRAO = `OBJETIVO
 Descobrir os bons negócios e poupar o meu tempo. Bom negócio é caixa em volume OU os outros produtos do ramo em que eu também ganho: frasco, essência, válvula, envase, produto pronto (frasco + essência + caixa). Lead ruim eu não quero ver; lead bom eu quero receber já qualificado.
@@ -299,7 +323,10 @@ Descobrir os bons negócios e poupar o meu tempo. Bom negócio é caixa em volum
 QUEM É O NOSSO CLIENTE
 - Somos gráfica offset. O ponto ótimo é 5.000 unidades no lote total; dentro de 5 mil dá para fazer de 4 a 6 modelos diferentes (depende de quantos cabem numa chapa).
 - Referência que eu passo: a caixinha padrão de 100ml (fundo automático, verniz, papel 300g) em 5 mil unidades sai R$ 0,85 a unidade. Não passe nenhum outro valor.
-- Pedido mínimo: em torno de 1.000 no total. Regra: quanto menor a caixa, maior precisa ser a quantidade (caixinha de 15ml: umas 1.000 de cada modelo).
+- Pedido mínimo no offset: em torno de 1.000 unidades no TOTAL da tiragem. As artes se dividem pelos modelos que cabem na chapa da faca (ex.: a faca do perfume de 100 ml com fundo automático cabe 4 modelos na chapa, então 1.000 unidades dão 4 artes).
+- ANTES de falar em mínimo ou em quantidade de artes, saiba quantos modelos cabem na chapa da faca (faca salva do cliente ou estimativa pela medida). Se ainda não sabe, não invente o número e não fale mínimo por arte: diga que precisa da faca ou das medidas da caixa.
+- Digital: até 200 unidades vale. Arte extra é R$ 100 por arte. Não passe nenhum outro valor.
+- Entre 200 e 1.000 no total, já sabendo o encaixe: não cote offset. Ofereça o digital até 200 (teste/MVP, com o acréscimo por arte extra) ou subir para 1.000 no offset. Quem orça offset sou eu (decisao_sua), sem valor inventado.
 
 FAIXAS
 - Menos de 1.000 no total (10, 30, 50, 100, 500…): não é nosso cliente. É a maioria dos leads do anúncio.
@@ -314,7 +341,7 @@ PRIMEIRA MENSAGEM (lead que chega: "gostaria de saber mais sobre as caixinhas", 
 Oi, tudo bem? aqui é o Luiz Felipe, da Jerograf / ENYLA👋 Você já tá vendendo seu produto ou tá lançando agora? E que volume você precisa?
 
 RESPOSTAS QUE EU USO
-- Pedido mínimo / quantidade mínima: "O pedido mínimo depende do tamanho da caixa, mas geralmente fica em torno de 1.000. A regra é: quanto menor a caixa, maior precisa ser a quantidade. Qual volume você precisa?"
+- Pedido mínimo / quantidade mínima: se já sabe quantos modelos cabem na chapa da faca: "No offset o pedido mínimo é em torno de 1.000 unidades no total, divididas entre os modelos que cabem na chapa. Qual volume e quantos modelos você precisa?" Se não sabe: "O mínimo depende de quantos modelos cabem na chapa da faca. Me passa as medidas da caixa (ou o ml do frasco) que eu te falo."
 - Preço sem quantidade: "O valor depende da quantidade e do tamanho da embalagem. O que você precisa?" Se insistir numa média, passe a referência de R$ 0,85 em 5 mil da caixinha de 100ml.
 - Tabela de preço / catálogo: não temos. Fabricamos sob demanda: qualquer tamanho, material, acabamento e fecho. Só preciso das medidas e da quantidade.
 - Outros produtos (cueca, vela, cosmético, café…): fazemos qualquer tipo de embalagem personalizada.
@@ -326,7 +353,7 @@ LEAD PEQUENO (menos de 1.000)
 - Na mesma mensagem, deixe a porta aberta para o resto: se ele precisar de frasco, essência, válvula ou envase, eu tenho fornecedor direto e consigo ajudar. Só vira oportunidade se for em volume (1.000+ ou recorrente); pouca quantidade continua lead pequeno.
 - Contato do parceiro de impressão digital (faz poucas unidades): (11) 96843-7324. Passe o número na mensagem.
 - Diga para ele falar que veio pelo Luiz, da ENYLA, e pedir o meu cupom quando for fechar. Deseje boa sorte ("todo começo é assim mesmo").
-- Depois disso não insista e não faça follow-up. Se ele topar 1.000 ("1000 então"), vira lead normal.
+- Depois disso não insista e não faça follow-up. Se ele topar 1.000 no total ("1000 então"), vira lead normal.
 
 O QUE NÃO FAZEMOS
 - Só rótulo/etiqueta: não. Se for caixa + rótulo, fazemos a caixa e ajudamos com o rótulo por parceiro.
@@ -350,12 +377,14 @@ export const filtroEfetivo = (t?: string | null) => t?.trim() || FILTRO_PADRAO
 // Você vende o lead pequeno em impressão digital: troca a regra de indicar o parceiro por levantar os dados do orçamento
 export const SECAO_DIGITAL = `LEAD PEQUENO (menos de 1.000): VENDEMOS EM IMPRESSÃO DIGITAL
 - Poucas unidades a gente também faz, em impressão digital: triplex 300g com laminação fosca ou brilhante, arte inclusa (nossa designer cria). Não indique outra gráfica e não passe contato de parceiro.
-- Pedido mínimo: em offset fica em torno de 1.000; abaixo disso, de 20 a 500 caixas, a gente faz em impressão digital.
+- Pedido mínimo: em offset fica em torno de 1.000 unidades no total da tiragem (as artes se dividem pelos modelos que cabem na chapa da faca; ex.: 4 modelos na faca de 100 ml, então 1.000 unidades dão 4 artes). Em impressão digital, até 200 unidades vale.
+- Digital: arte extra é R$ 100 por arte. Não invente outro preço de arte.
+- Entre 200 e 1.000 no total, com o encaixe já conhecido: não cote offset. Ofereça o digital até 200 (teste, com o acréscimo por arte extra) ou subir para 1.000 no offset (quem orça offset é o Felipe: decisao_sua, sem valor). Sem saber quantos modelos cabem na chapa, não fale mínimo por arte: precisa da faca ou das medidas.
 - O que precisa para o orçamento: a quantidade e o ml do frasco (ou as medidas da caixa: altura x largura x profundidade). Pergunte o que faltar, uma coisa por vez.
 - Não escreva preço da impressão digital. Assim que tiver a quantidade e o ml (ou as medidas), o orçamento com o link do sinal de 50% pelo Pix sai na sua próxima mensagem — não anuncie isso, só pergunte o que falta. Depois que ele foi, você pode repetir os valores que estão nele.
 - Frete: não fale dele por conta própria. Só se ele perguntar: é calculado no final do pedido, pelo CEP. Prazo: começa depois do sinal; a designer manda a arte para ele aprovar antes de imprimir.
 - Hot stamping em digital não dá: sugira simular o hot stamping na arte.
-- Modelos ou fragrâncias diferentes: dá para fazer artes diferentes no mesmo pedido (a designer ajusta o nome de cada uma). Pergunte quantas de cada, mas o orçamento é pela quantidade total.
+- Modelos ou fragrâncias diferentes: dá para fazer artes diferentes no mesmo pedido (a designer ajusta o nome de cada uma). Pergunte quantas de cada; a primeira arte está no preço e cada arte extra é R$ 100.
 - Deixe a porta aberta para frasco, essência, válvula ou envase (só vira oportunidade em volume: 1.000+ ou recorrente).
 - Se ele topar 1.000 ou mais, vira lead normal (offset).`
 export function filtroDoModo(filtro: string, parceiro: boolean): string {

@@ -471,6 +471,23 @@ export function ferramentalDoCliente(
   ) ?? null
 }
 
+// Quantos modelos (artes) cabem na chapa da faca, na máquina da Jerograf (48 × 45 cm). Puro.
+// Faca salva (mesma medida, tolerância de 3 mm) → o número salvo (`cavidades`). Sem faca salva → estimativa pela
+// medida, com `encaixar` e a mesma regra de pinça e margem do cálculo. Medida ausente ou que não cabe → null (não inventa).
+export const MAQUINA_JEROGRAF: Maquina = { nome: "Jerograf 48×45", largura: 480, altura: 450, pinca: 10, margem: 5 }
+export function modelosPorChapa(
+  blank: { largura: number; altura: number } | null | undefined,
+  facas: Ferramental[] = [], cliente?: string, esp = 2,
+): { modelos: number; origem: "faca_salva" | "estimado" } | null {
+  if (!blank || !(blank.largura > 0) || !(blank.altura > 0)) return null
+  const salva = cliente?.trim()
+    ? ferramentalDoCliente(facas, "faca", cliente, blank)
+    : facas.find(f => f.tipo === "faca" && ((Math.abs(f.blankLargura - blank.largura) <= 3 && Math.abs(f.blankAltura - blank.altura) <= 3) || (Math.abs(f.blankLargura - blank.altura) <= 3 && Math.abs(f.blankAltura - blank.largura) <= 3)))
+  if (salva && salva.cavidades > 0) return { modelos: salva.cavidades, origem: "faca_salva" }
+  const n = cavidadesFolha(MAQUINA_JEROGRAF.largura, MAQUINA_JEROGRAF.altura, blank, MAQUINA_JEROGRAF, esp)
+  return n > 0 ? { modelos: n, origem: "estimado" } : null
+}
+
 // ── Cálculo ───────────────────────────────────────────────────────────────────
 
 // Em quantos pedaços a folha comprada é cortada antes de entrar na máquina. Sexto e oitavo servem às máquinas

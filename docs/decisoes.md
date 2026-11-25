@@ -4,6 +4,13 @@ O que o Felipe decidiu, com data e porquê. Quando duas decisões discordam, val
 
 Diretores propõem. Estas decisões é que mandam no que se constrói.
 
+
+## 25/11/2026 (~8h33) — mínimo do offset é 1.000 no total, artes pelos modelos que cabem na chapa
+
+**Decisão.** Substitui o «mínimo de 1.000 por arte». Antes de orientar a quantidade, o Atendente precisa saber quantos modelos cabem na chapa da faca (faca salva ou estimativa pela medida, na máquina da Jerograf 48 × 45 cm). Offset: em torno de 1.000 unidades no total da tiragem, com as artes divididas pelos modelos na chapa (faca do perfume de 100 ml: 4 modelos, então 1.000 unidades dão 4 artes). Digital: até 200 unidades, com R$ 100 por arte extra (continua do #101). Entre 200 e 1.000 no total não se cota offset: digital até 200 ou subir para 1.000. Quem orça offset é o Felipe. Sem a faca ou a medida, o Atendente não fala mínimo por arte. O aprendizado `8qcdislv` permanece e não é encerrado.
+
+**Porquê.** O mínimo real depende de quantas artes cabem na mesma chapa, não de um número por arte.
+
 ## Como acrescentar uma decisão nova
 
 1. Escreva a decisão **no topo da lista**, acima das anteriores, neste arquivo.
