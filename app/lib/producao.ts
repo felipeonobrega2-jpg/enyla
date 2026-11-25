@@ -79,6 +79,7 @@ export type Ferramental = {
   custo: number
   data: string          // ISO
   desenhoId?: string    // faca: o desenho (DXF) da biblioteca que ela repete em X cavidades
+  modelosPorChapa?: number   // faca: quantos modelos (artes) cabem na chapa do impressor principal (inteiro ≥ 1; opcional)
 }
 
 export type EtapaPedido = "arte" | "impressao" | "acabamento" | "corteVinco" | "colagem" | "outro"
@@ -363,7 +364,7 @@ export function encaixar(W: number, H: number, a: number, b: number, esp: number
 }
 
 // Cavidades numa folha impressa: tira pinça de um lado e margem dos outros três
-function cavidadesFolha(w: number, h: number, blank: { largura: number; altura: number }, m: Maquina, esp: number) {
+export function cavidadesFolha(w: number, h: number, blank: { largura: number; altura: number }, m: Maquina, esp: number) {
   const opcoes = [
     [w - 2 * m.margem, h - m.pinca - m.margem],
     [w - m.pinca - m.margem, h - 2 * m.margem],
