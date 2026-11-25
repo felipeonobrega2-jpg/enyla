@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { prazoDigital, prazoDoPedido, ateDataPrazo, CORTE_PRAZO_15 } from "../app/lib/prazoDigital"
 import { termosDigital } from "../app/lib/termosDigital"
 
-const antes = "2026-11-20T12:00:00.000Z", depois = "2026-11-27T12:00:00.000Z"
+const antes = "2026-11-20T12:00:00.000Z", depois = "2026-11-27T12:00:00.000Z", logoAntes = "2026-11-26T02:59:59.000Z"
 describe("prazo digital", () => {
   it("até 200: 7 a 10, em qualquer data", () => {
     expect(prazoDigital(200, depois).texto).toBe("7 a 10 dias úteis")
@@ -12,6 +12,8 @@ describe("prazo digital", () => {
     expect(prazoDigital(201, depois).texto).toBe("15 dias úteis")
     expect(prazoDigital(201, antes).texto).toBe("14 dias úteis")
     expect(prazoDigital(201, CORTE_PRAZO_15).texto).toBe("15 dias úteis")
+    expect(prazoDigital(201, logoAntes).texto).toBe("14 dias úteis")
+    expect(CORTE_PRAZO_15).toBe("2026-11-26T03:00:00.000Z")
   })
   it("prioridade: prazoEntrega > termos.prazo > regra pela data de criação", () => {
     const manual = { min: 5, max: 5, texto: "5 dias úteis" }

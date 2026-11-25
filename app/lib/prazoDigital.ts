@@ -1,4 +1,4 @@
-// Prazo de produção do digital (Felipe, 19/11; ajustado em 25/11/2026 às 20h34, horário de Brasília): conta a partir
+// Prazo de produção do digital (Felipe, 19/11; ajustado em 25/11/2026): conta a partir
 // do sinal pago e da arte aprovada, em dias úteis (somarDiasUteis).
 // Até 200 caixinhas: 7 a 10 dias úteis. Acima de 200 (de 201 em diante): 15 dias úteis.
 // Propostas/pedidos criados antes do corte (CORTE_PRAZO_15) que passam de 200 seguem com os 14 dias que já foram prometidos.
@@ -9,8 +9,8 @@ export type PrazoDigital = { min: number; max: number; texto: string }
 // Valores da regra. Se a config `digital.prazoPadrao` (#164) passar a existir, é daqui que ela deve sair/ler.
 export const PRAZO_PADRAO_DIGITAL = { limite: 200, minAte200: 7, tetoAte200: 10, acima200: 15, acima200Antigo: 14 }
 
-// Data/hora do deploy desta mudança (25/11/2026, 20h45 em Brasília). Compara com `em` do pedido ("quando cotou").
-export const CORTE_PRAZO_15 = "2026-11-26T00:45:00.000Z"
+// Corte: meia-noite de Brasília de 26/11/2026 (03:00Z). Compara com `em` do pedido ("quando cotou"); criados antes ficam com 14 dias úteis.
+export const CORTE_PRAZO_15 = "2026-11-26T03:00:00.000Z"
 
 export function prazoDigital(quantidade: number, criadoEm?: string | null): PrazoDigital {
   const c = PRAZO_PADRAO_DIGITAL
