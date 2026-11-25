@@ -17,7 +17,7 @@ vi.mock("@/app/lib/evolution", () => ({ evo: vi.fn(async () => null) }))
 vi.mock("@/app/lib/agenteAuto", () => ({ seuNumero: vi.fn(async () => "") }))
 vi.mock("@/app/lib/prospectorServidor", () => ({ registrarCadastroRecebido: vi.fn(async () => null), marcarProspectCadastrou: vi.fn(async () => null) }))
 
-import { errosDaEtapa, limparCadastro, paraFornecedor, CENARIOS_IDS, type CadastroParceiro } from "@/app/lib/parceiros"
+import { cenariosAtivosIds, errosDaEtapa, limparCadastro, paraFornecedor, CENARIOS_IDS, type CadastroParceiro } from "@/app/lib/parceiros"
 import { CENARIOS_PADRAO, cenariosPublicos, compararExemplo, estatisticaCenario, mesclarCenarios, temCenario } from "@/app/lib/cenariosParceiros"
 import { receberCadastro, lerCenariosPublicos, salvarCenarios } from "@/app/lib/parceirosServidor"
 import ParceirosForm from "@/app/parceiros/ParceirosForm"
@@ -25,7 +25,7 @@ import { LinhaExemplo } from "@/app/components/CadastrosParceirosCard"
 import { LinhaMercado } from "@/app/components/CenariosParceirosEditor"
 
 const base = { nomeFantasia: "Gráfica Exemplo", tipoDocumento: "cnpj" as const, documento: "11222333000181", cep: "01310100", rua: "Avenida Paulista", numero: "1000", bairro: "Bela Vista", cidade: "São Paulo", uf: "SP", responsavel: "Marcos", whatsapp: "11988887777", email: "a@b.com.br", aceite: true }
-const serv = (extra = {}) => ({ id: "verniz" as const, cobranca: "folha" as const, prazoDias: 3, prazoVaria: false, ...extra })
+const serv = (extra = {}) => ({ id: "verniz" as const, cobranca: "folha" as const, prazoDias: 3, prazoVaria: false, tecnico: { tipos: ["UV total"] }, ...extra })
 const imp = (extra = {}) => ({ id: "impressaoOffset" as const, cobranca: null, prazoDias: 3, prazoVaria: false, tecnico: { formatoMax: { l: 66, a: 96 } }, acerto: 300, valor: 120, ...extra })
 const NOMES = CENARIOS_PADRAO.flatMap(c => c.referencias.map(r => r.fornecedorNome)).filter(Boolean) as string[]
 const cad = (servicos: unknown[]) => ({ servicos }) as Pick<CadastroParceiro, "servicos">
@@ -92,7 +92,7 @@ describe("preço do exemplo é obrigatório nos serviços com cenário", () => {
     expect(errosDaEtapa({ ...base, servicos: [{ id: "outro", qual: "X", cobranca: "varia", prazoDias: null, prazoVaria: true }] }, "detalhes")).toEqual({})
   })
   it("laminação grava os quatro preços e exige todos", async () => {
-    const lam = (precosExemplo: Record<string, number>) => ({ id: "laminacao" as const, cobranca: "folha" as const, prazoDias: 3, prazoVaria: false, precosExemplo })
+    const lam = (precosExemplo: Record<string, number>) => ({ id: "laminacao" as const, cobranca: "folha" as const, prazoDias: 3, prazoVaria: false, precosExemplo, tecnico: { tipos: ["Fosca", "Brilho", "Soft touch"], lados: "Os dois lados" } })
     const quatro = { "laminacao-fosca": 700, "laminacao-brilho": 650, "laminacao-soft": 900, "laminacao-dois-lados": 1300 }
     expect(errosDaEtapa({ ...base, servicos: [lam({ "laminacao-fosca": 700 })] }, "detalhes")).toEqual({
       "laminacao.preco.laminacao-brilho": expect.any(String), "laminacao.preco.laminacao-soft": expect.any(String), "laminacao.preco.laminacao-dois-lados": expect.any(String),
@@ -117,6 +117,33 @@ describe("preço do exemplo é obrigatório nos serviços com cenário", () => {
     const obs = paraFornecedor(c, "f-1").obs ?? ""
     expect(obs).toContain("exemplo")
     expect(obs).not.toMatch(/Ronaldo|450/)
+  })
+})
+
+describe("experiência guiada: só o que o parceiro marcou pede preço", () => {
+  const lamT = (tecnico?: Record<string, unknown>, precosExemplo: Record<string, number> = {}) => ({ id: "laminacao" as const, cobranca: "m2" as const, prazoDias: 3, prazoVaria: false, tecnico, precosExemplo } as never)
+  it("laminação sem variante marcada não pede preço nenhum", () => {
+    expect(errosDaEtapa({ ...base, servicos: [lamT()] }, "detalhes")).toEqual({})
+  })
+  it("só as variantes marcadas pedem preço; as outras não são obrigatórias", () => {
+    expect(Object.keys(errosDaEtapa({ ...base, servicos: [lamT({ tipos: ["Brilho"] })] }, "detalhes"))).toEqual(["laminacao.preco.laminacao-brilho"])
+    expect(errosDaEtapa({ ...base, servicos: [lamT({ tipos: ["Brilho"] }, { "laminacao-brilho": 600 })] }, "detalhes")).toEqual({})
+    expect(Object.keys(errosDaEtapa({ ...base, servicos: [lamT({ tipos: ["Fosca"], lados: "Os dois lados" })] }, "detalhes")).sort()).toEqual(["laminacao.preco.laminacao-dois-lados", "laminacao.preco.laminacao-fosca"])
+    expect(cenariosAtivosIds({ id: "laminacao", tecnico: { tipos: ["Soft touch"] } })).toEqual(["laminacao-soft"])
+  })
+  it("verniz só pede preço do UV total se marcado; hot stamping só se faz dourado", () => {
+    expect(errosDaEtapa({ ...base, servicos: [serv({ tecnico: { tipos: ["Base água"] } })] }, "detalhes")).toEqual({})
+    expect(errosDaEtapa({ ...base, servicos: [serv({ tecnico: undefined })] }, "detalhes")).toEqual({})
+    const hot = (tecnico?: Record<string, unknown>) => ({ id: "hotStamping" as const, cobranca: "folha" as const, prazoDias: 3, prazoVaria: false, tecnico } as never)
+    expect(errosDaEtapa({ ...base, servicos: [hot({ fitas: ["Prata"] })] }, "detalhes")).toEqual({})
+    expect(Object.keys(errosDaEtapa({ ...base, servicos: [hot({ fitas: ["Dourado"] })] }, "detalhes"))).toEqual(["hotStamping.preco.hotStamping"])
+  })
+  it("preço de variante desmarcada não é gravado", () => {
+    const c = limparCadastro({ ...base, servicos: [lamT({ tipos: ["Brilho"] }, { "laminacao-brilho": 600, "laminacao-fosca": 700 })] })
+    expect(c.servicos[0].precosExemplo).toEqual({ "laminacao-brilho": 600 })
+  })
+  it("serviços sem variante (colagem, corte e vinco) seguem pedindo o exemplo quando marcados", () => {
+    expect(Object.keys(errosDaEtapa({ ...base, servicos: [{ id: "colagem", cobranca: "folha", prazoDias: 3, prazoVaria: false }] }, "detalhes"))).toEqual(["colagem.preco.colagem"])
   })
 })
 

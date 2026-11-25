@@ -18,6 +18,7 @@ import { useGravador, useMicrofones, tempo, extensaoAudio } from "../lib/gravado
 import { filtrar, preencher, Rapida } from "../lib/mensagensRapidas"
 import { COL_HOT } from "../types"
 import { pedirSugestao, sugestaoVelha } from "../lib/sugestaoWhatsapp"
+import { casaBusca } from "../lib/buscaConversa"
 
 export type Conversa = {
   jid: string
@@ -133,6 +134,16 @@ export default function WhatsAppView({
   const [status, setStatus] = useState<StatusWhats | null>(null)
   useEffect(() => { fetch("/api/whatsapp/status").then(r => r.json()).then(setStatus).catch(() => {}) }, [])
   const [busca, setBusca] = useState("")
+  // Conversas antigas que não vêm na lista (só as 1.000 mais recentes vêm): a busca pergunta ao servidor
+  const [buscaServidor, setBuscaServidor] = useState<{ termo: string; lista: Conversa[] }>({ termo: "", lista: [] })
+  useEffect(() => {
+    const t = busca.trim()
+    if (t.length < 3) return
+    const pedido = setTimeout(() => {
+      fetch(`/api/whatsapp/conversas?q=${encodeURIComponent(t)}`).then(r => r.ok ? r.json() : []).then((d: unknown) => setBuscaServidor({ termo: t, lista: Array.isArray(d) ? d as Conversa[] : [] })).catch(() => {})
+    }, 350)
+    return () => clearTimeout(pedido)
+  }, [busca])
   const [filtro, setFiltro] = useState<"todas" | "responder" | "anuncio" | "site" | "clientes" | "fechadas">("todas")
   const [modo, setModo] = useState<"lista" | "funil" | "fila">("lista")
   const [etiquetaFiltro, setEtiquetaFiltro] = useState<string | null>(null)
@@ -241,12 +252,18 @@ export default function WhatsAppView({
 
   // Esperando você: o cliente falou por último (nos últimos 14 dias)
   const aguardando = (c: Conversa) => aguardandoResposta(c, agora)
-  const filtradas = conversas.filter(c =>
+  const naLista = useMemo(() => {
+    const achadasNaBusca = buscaServidor.termo === busca.trim() ? buscaServidor.lista : []
+    if (!achadasNaBusca.length) return conversas
+    const tem = new Set(conversas.map(c => c.jid))
+    return [...conversas, ...achadasNaBusca.filter(c => !tem.has(c.jid))]
+  }, [conversas, buscaServidor, busca])
+  const filtradas = naLista.filter(c =>
     (filtro === "fechadas" ? estaFechada(c) : !estaFechada(c)) &&
     (filtro !== "responder" || aguardando(c)) &&
     (!etiquetaFiltro || (c.etiquetas ?? []).includes(etiquetaFiltro)) &&
     (filtro === "todas" || filtro === "fechadas" || filtro === "responder" || (filtro === "clientes" ? comprou(c) : lerOrigem(c.campanha)?.canal === filtro)) &&
-    (c.nome.toLowerCase().includes(busca.toLowerCase()) || (c.ultima_msg ?? "").toLowerCase().includes(busca.toLowerCase()))
+    casaBusca(c, busca)
   )
 
   // Mesma pessoa em duas conversas (número e @lid com o mesmo nome): oferece juntar

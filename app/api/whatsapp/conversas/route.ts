@@ -1,15 +1,35 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { mudarConfig } from "@/app/lib/configAtomica"
+import { regexBusca } from "@/app/lib/buscaConversa"
 
-export async function GET() {
+// Só as colunas da lista (sem o resumo da IA, proxima_acao): a tela pede isto a cada poucos segundos, e o
+// select("*") de todas as conversas estourou a cota de tráfego do Supabase em 19/11
+const COLUNAS = "jid, nome, ultima_msg, ultima_at, nao_lidas, foto_url, campanha, ultima_recebida_at, ultima_enviada_at, status_lead, ultima_classificacao_at, fechada_em, etiquetas, telefone, kanban_card_id"
+
+// GET           as 1.000 conversas mais recentes (o Supabase não devolve mais que 1.000 por pedido)
+// GET ?q=termo  busca em TODAS as conversas, também nas antigas que não vêm na lista (nome sem acento e sem
+//               letra dobrada, ou telefone), até 50
+export async function GET(req: Request) {
+  const q = new URL(req.url).searchParams.get("q")?.trim()
+  if (q) {
+    const re = regexBusca(q)
+    const d = q.replace(/\D/g, "")
+    const pedidos = [
+      re ? supabase.from("whatsapp_conversas").select(COLUNAS).filter("nome", "imatch", re).order("ultima_at", { ascending: false }).limit(50) : null,
+      d.length >= 4 ? supabase.from("whatsapp_conversas").select(COLUNAS).or(`telefone.ilike.%${d}%,jid.ilike.%${d}%`).order("ultima_at", { ascending: false }).limit(50) : null,
+    ].filter(Boolean)
+    const rs = await Promise.all(pedidos)
+    const erro = rs.find(r => r!.error)?.error
+    if (erro) return NextResponse.json({ error: erro.message }, { status: 500 })
+    const vistos = new Set<string>()
+    return NextResponse.json(rs.flatMap(r => r!.data ?? []).filter(c => !vistos.has(c.jid) && !!vistos.add(c.jid)))
+  }
   const { data, error } = await supabase
     .from("whatsapp_conversas")
-    // Só as colunas da lista (sem o resumo da IA, proxima_acao): a tela pede isto a cada poucos segundos, e o
-    // select("*") de todas as conversas estourou a cota de tráfego do Supabase em 19/11
-    .select("jid, nome, ultima_msg, ultima_at, nao_lidas, foto_url, campanha, ultima_recebida_at, ultima_enviada_at, status_lead, ultima_classificacao_at, fechada_em, etiquetas, telefone, kanban_card_id")
+    .select(COLUNAS)
     .order("ultima_at", { ascending: false })
-    .limit(1500)
+    .limit(1000)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data ?? [])
