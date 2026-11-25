@@ -56,8 +56,11 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 38 | Atendente não responde sozinha a gráficas do Prospector | operação | — | — | Claude Code | não | (PR da issue #34) |
 | 39 | Prospector: janela de envio 8h–20h (seg-sex), cron `0 11-22 * * 1-5` | Felipe (decisão 24/11/2026, 17:56) | — | — | Claude Code | não | (PR da issue #99) |
 | 40 | Atendente: não dizer «segue o orçamento» sem link ou PDF real de proposta existente | Felipe | — | — | Claude Code | **NÃO JUNTAR sem o Aprovo do Felipe** (mexe na fala do Atendente com cliente) | (PR da issue #104) |
-| 41 | Termos de parceria aceitos no cadastro /parceiros | Felipe | depois do Prospector (itens 8 e 9) | — | livre | sim | |
-| 42 | Score do parceiro (prazo, qualidade, rapidez) em Fornecedores | Felipe | depois do Prospector (itens 8 e 9) | — | livre | não | |
+| 41 | Porta: ordem a lead sai direto pelo agente; cliente A/B/C e indefinido seguem no Aprovo; `cancelar_ordem`; nível na leitura (`?o=perto`, detalhe comercial) | Felipe (regra de 25/11/2026, 7h51, confirmada 8h10) | — | — | Claude Code | **NÃO JUNTAR sem revisão do CTO** (mexe na trava que protege os clientes A, B e C) | (PR da issue #108) |
+| 42 | Prospector: e-mail sem teto diário; WhatsApp com teto de 10 por dia; limite técnico por execução; pausa e retry 429 na Resend | Felipe (decisão 25/11/2026, 8h28) | — | — | Claude Code | não | (PR da issue #112) |
+| 43 | Atendente: aceitar caixa de medicamento e de qualquer marca; quem nunca comprou é lead (nível) | Felipe (decisão 25/11/2026, 8h29) | — | — | Claude Code | não (ordem do Felipe) | (PR da issue #114) |
+| 44 | Termos de parceria aceitos no cadastro /parceiros | Felipe | depois do Prospector (itens 8 e 9) | — | livre | sim | |
+| 45 | Score do parceiro (prazo, qualidade, rapidez) em Fornecedores | Felipe | depois do Prospector (itens 8 e 9) | — | livre | não | |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -327,8 +330,9 @@ Objetivo: reduzir os tokens gastos com IA sem perder eficácia. Os itens 31 a 36
 Os dois scripts de comparação (classificador e follow-up) só rodam com autorização do Felipe, porque gastam tokens.
 Nenhuma troca de modelo entra sem o Diego revisar o resultado da comparação.
 O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
+| 43 | Porta externa: ação `mover_card` para avançar etapa de produção (só avança, 1→2..8, motivo obrigatório) | Felipe | — | — | Claude Code | não | (PR da issue #137) |
 
-## 41. Termos de parceria aceitos no cadastro /parceiros
+## 44. Termos de parceria aceitos no cadastro /parceiros
 
 **Status:** livre. **Aprovo:** sim (o texto dos termos precisa do ok do Felipe antes de ir para a página pública). **PR:** vazio. Pedido do Felipe, decidido em 24/11/2026 às 7:21 (America/Sao_Paulo). Prioridade: depois do Prospector (itens 8 e 9).
 
@@ -340,7 +344,7 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 
 **Como testar.** A definir quando o item for construído, depois do Aprovo do texto.
 
-## 42. Score do parceiro (prazo, qualidade, rapidez) em Fornecedores
+## 45. Score do parceiro (prazo, qualidade, rapidez) em Fornecedores
 
 **Status:** livre. **Aprovo:** não (tela interna da equipe; não manda mensagem a cliente nem mexe em cobrança). **PR:** vazio. Pedido do Felipe, decidido em 24/11/2026 às 7:21 (America/Sao_Paulo). Prioridade: depois do Prospector (itens 8 e 9).
 

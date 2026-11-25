@@ -21,6 +21,9 @@ import { acaoPendencia, lerPendenciasDaArea, renovarFotoDepois } from "@/app/lib
 import { acaoTarefaFelipe, tarefasDoDiretor } from "@/app/lib/tarefaFelipe"
 import { pedidoExterno } from "@/app/lib/pedidoExterno"
 import { lerPertoExterno, AJUDA_PERTO } from "@/app/lib/pertoExterno"
+import { moverCardExterno } from "@/app/lib/moverCardExterno"
+import { cancelarOrdem } from "@/app/lib/cancelarOrdem"
+import { niveisDosLeads } from "@/app/lib/nivelNoDetalhe"
 
 // Porta de acesso dos diretores na nuvem (ex.: Grok Bot). Pública no proxy, mas cada chamada exige a chave do diretor
 // (Authorization: Bearer enyla_<diretor>_...). Leitura da empresa e as mesmas ferramentas da conversa com o Felipe;
@@ -66,7 +69,9 @@ export async function GET(req: NextRequest) {
         "POST {acao:'conciliacao', operacao:'vincular'|'vincularVarios'|'atualizar'|'criar'|'ignorar'|'desfazer', txId, lancamentoId, lancamentoIds, campos, lancamentos, sempre, ensinar}": "SÓ A CHAVE DO CFO. Decide um movimento de banco_transacoes (txId): vincular a um lançamento, vincularVarios, atualizar (baixa no lançamento com campos), criar lançamentos ou ignorar. desfazer é lógico: estorna os lançamentos criados (nada é apagado) e devolve a transação a pendente. Sem contraparte_doc nem bruto na resposta. Resposta: { ok, resultado, tx, lancamentos }",
         "POST {acao:'categoria', operacao:'criar'|'editar'|'desativar', tipo:'receita'|'despesa', id, nome, subcategorias, ativa}": "SÓ A CHAVE DO CFO. Categorias financeiras. criar exige nome; editar e desativar exigem id. Desativar só põe ativa:false, a categoria continua na lista. Resposta: { ok, resultado, categoria }",
       } : {}),
-      ...(comerciaisDoDiretor(diretor).length ? { "POST {acao:'ordenar_funcionario', funcionario:'atendente'|'followup'|'reativacao', cliente | jid, ordem}": "SÓ CCO e CMO (as outras recebem 403). O agente do Comercial escreve a mensagem para UM lead com o histórico do WhatsApp; ela fica esperando o Aprovo do Felipe (nada é enviado por aqui). Lead sem WhatsApp: 404. No máximo 20 ordens esperando o Aprovo por diretor: a 21ª volta 429" } : {}),
+      ...(comerciaisDoDiretor(diretor).length ? { "POST {acao:'ordenar_funcionario', funcionario:'atendente'|'followup'|'reativacao', cliente | jid, ordem}": "SÓ CCO e CMO (as outras recebem 403). O agente do Comercial escreve a mensagem para UM lead com o histórico do WhatsApp; REGRA (25/11): só 'cliente' (quem já comprou, nível A, B ou C) precisa do Aprovo do Felipe. Para LEAD (nunca comprou; cadastro sem compra e orçamento aberto não contam) a mensagem SAI DIRETO pelo agente indicado, só com o agente ligado e dentro do horário dele (senão 409 'fora do horário do agente', nada é criado), no máximo 20 envios diretos por dia por diretor (a 21ª volta 429). Cliente A, B, C ou nível 'indefinido' (já comprou sem curva, compra antiga, só digital, ligação fraca com quem comprou, erro de leitura) vai para a fila do Aprovo, no máximo 20 esperando por diretor (a 21ª volta 429). Texto que promete orçamento sem link real, Felipe escrevendo na conversa e gráfica do Prospector também vão para a fila. Lead sem WhatsApp: 404. Resposta: { ok, resultado, destino: 'enviado_direto'|'fila_aprovo', motivo, nivel, id }; leia o nível antes em ?o=perto ou ?o=detalhe&area=comercial" } : {}),
+      "POST {acao:'mover_card', numero | loteNumero, coluna, motivo}": "QUALQUER DIRETOR. Avança um pedido de etapa na produção. numero (ORC-...) ou loteNumero (move os cards do lote); coluna de 2 (Arte/Dieline) a 8 (Expedição); motivo obrigatório (até 300 caracteres). Só avança (destino maior que a coluna atual) e só de cards já Fechados (coluna 1 em diante); nunca volta, nunca vai a 0, 9 (Entregue) ou 10 (Perdido): 400 com o motivo e nada é alterado. Só muda a coluna (preço, quantidade, sinal e opcoes ficam como estão). Registra no Tracking quem moveu (seu nome) e o motivo. Não manda mensagem nem e-mail ao cliente. Resposta: { ok, resultado, movidos: [{numero, de, para}] }",
+      "POST {acao:'cancelar_ordem', id}": "QUALQUER DIRETOR. Cancela uma ordem SUA (id do cartão, devolvido por ordenar_funcionario) que ainda está esperando o Aprovo (status aguardando). Só marca como cancelada (canceladoPor, canceladoEm): nunca apaga nada e nada é enviado. Ordem de outro diretor ou que não existe: 404; já enviada, descartada, com erro ou cancelada: 409. A tela da diretoria mostra 'Cancelada' e não oferece o Aprovo. Resposta: { ok, resultado, id }",
       ...Object.fromEntries(FERRAMENTAS.map(f => [`POST {acao:'${f}', ...}`, "ferramenta (ver instruções)"])) },
     limitePorHora: LIMITE_POR_HORA,
   })
@@ -127,7 +132,7 @@ export async function GET(req: NextRequest) {
   if (o === "detalhe") {
     const area = req.nextUrl.searchParams.get("area") ?? ""
     if (!AREAS.includes(area)) return NextResponse.json({ erro: `Área: ${AREAS.join(", ")}` }, { status: 400 })
-    return NextResponse.json({ area, em: hora(foto.em), dados: foto.detalhes[area], ...(area === "marketing" ? { campanhasParadas: await paradasParaLeitura() } : {}), ...(area === "producao" ? { esperandoAEnyla24h: await lerEsperandoAEnyla() } : {}) })
+    return NextResponse.json({ area, em: hora(foto.em), dados: foto.detalhes[area], ...(area === "marketing" ? { campanhasParadas: await paradasParaLeitura() } : {}), ...(area === "comercial" ? { niveisDosLeads: await niveisDosLeads(foto.detalhes.comercial) } : {}), ...(area === "producao" ? { esperandoAEnyla24h: await lerEsperandoAEnyla() } : {}) })
   }
   if (o === "empresa") {
     const [planos, cfg] = await Promise.all([lerPlanos(), lerCampos<{ conhecimentoDiretoria?: Partial<Record<string, LicaoDiretor[]>> }>(["conhecimentoDiretoria"])])
@@ -191,6 +196,9 @@ export async function POST(req: NextRequest) {
     msg = { id: novoId(), de: "diretor", texto: String(r.corpo.resultado), em: new Date().toISOString(), nuvem: true }
     await gravarConversa(diretor, [...await lerConversa(diretor), msg])
     return NextResponse.json(r.corpo)
+  } else if (b.acao === "cancelar_ordem") {
+    const r = await cancelarOrdem(diretor, b)
+    return NextResponse.json(r.corpo, { status: r.status })
   } else if (b.acao === "pedido") {
     const r = await pedidoExterno(diretor, b)
     if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
@@ -198,6 +206,13 @@ export async function POST(req: NextRequest) {
     await gravarConversa(diretor, [...await lerConversa(diretor), msg])
     after(() => { renovarFoto().catch(() => null) })   // o detalhe da produção já mostra a marca nova
     return NextResponse.json({ ok: true, resultado: r.resultado, aguardandoPagamento: r.aguardandoPagamento })
+  } else if (b.acao === "mover_card") {
+    const r = await moverCardExterno(diretor, b)
+    if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
+    msg = { id: novoId(), de: "diretor", texto: r.resultado, em: new Date().toISOString(), nuvem: true }
+    await gravarConversa(diretor, [...await lerConversa(diretor), msg])
+    after(() => { renovarFoto().catch(() => null) })
+    return NextResponse.json({ ok: true, resultado: r.resultado, movidos: r.movidos })
   } else if (b.acao === "meta_ads") {
     const r = await acaoMetaAds(diretor, b)
     return NextResponse.json(r.corpo, { status: r.status })
@@ -205,11 +220,15 @@ export async function POST(req: NextRequest) {
     const { apiKey } = await lerCampos<{ apiKey?: string }>(["apiKey"])
     if (b.acao === "ordenar_funcionario" && ehComercial(b.funcionario) && !podeAcionarComercial(diretor)) return NextResponse.json({ erro: `${b.funcionario} só atende ordens da CCO e da CMO.` }, { status: 403 })
     if (b.acao === "ordenar_funcionario" && !apiKey) return NextResponse.json({ erro: "Sem chave da IA no sistema." }, { status: 503 })
-    const r = await executarFerramenta(diretor, b.acao, b, { ctx: await fotoRapida(), apiKey: apiKey ?? "", grava: true })
+    const r = await executarFerramenta(diretor, b.acao, b, { ctx: await fotoRapida(), apiKey: apiKey ?? "", grava: true, enviarLead: true })
     saida = r.saida
-    if (!r.acao) return NextResponse.json({ ok: false, resultado: saida }, { status: r.status ?? 400 })
+    if (!r.acao) return NextResponse.json({ ok: false, resultado: saida, ...(r.motivo ? { motivo: r.motivo } : {}), ...(r.nivel ? { nivel: r.nivel } : {}) }, { status: r.status ?? 400 })
     msg = { id: novoId(), de: "diretor", texto: texto || saida, em: new Date().toISOString(), acoes: [r.acao], nuvem: true }
-  } else return NextResponse.json({ erro: `acao: relatar, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
+    if (r.destino) {
+      await gravarConversa(diretor, [...await lerConversa(diretor), msg])
+      return NextResponse.json({ ok: true, resultado: saida, destino: r.destino, motivo: r.motivo, nivel: r.nivel, id: r.acao.id })
+    }
+  } else return NextResponse.json({ erro: `acao: relatar, mover_card, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
   await gravarConversa(diretor, [...await lerConversa(diretor), msg])
   return NextResponse.json({ ok: true, resultado: saida })
 }
