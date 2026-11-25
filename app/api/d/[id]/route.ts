@@ -8,6 +8,18 @@ import { infinitePayConfigurado, numeroDoOrderNsu } from "@/app/lib/infinitePay"
 import { termosDigital, VERSAO_TERMOS } from "@/app/lib/termosDigital"
 import { prazoDoPedido, prazoDigital } from "@/app/lib/prazoDigital"
 import { mascararDocumento } from "@/app/lib/documento"
+import { supabase } from "@/app/lib/supabase"
+import { receberDigital } from "@/app/lib/receberDigital"
+import { acompanhamentoDigital } from "@/app/lib/acompanhamentoDigital"
+import type { LancamentoFinanceiro } from "@/app/types"
+
+// Acompanhamento (depois do sinal): o pagamento vem só do "a receber" (lançamentos do Digital); fora dele, "em conferência"
+async function acompanhamentoDe(p: PedidoComBriefing) {
+  if (!p.sinalPagoEm) return null
+  const { data } = await supabase.from("LancamentoFinanceiro").select("*").like("id", `dig-${p.id}-%`).eq("unidade", "digital").limit(20)
+  const receber = receberDigital([p], (data ?? []) as LancamentoFinanceiro[]).find(r => r.digital.id === p.id)
+  return acompanhamentoDigital(p, receber)
+}
 
 // Página pública do pedido digital (/d/DIG-0001?t=…): só com o link assinado. Nunca devolve custo nem margem.
 // Link da arte (Leandro): nenhum valor de venda (total, sinal, restante, opções, cobrança), ele não pode saber por quanto foi vendido
@@ -51,7 +63,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const voce = designer || !!(await auth().catch(() => null))
   if (!voce && (!pedido.ultimaVista || Date.now() - new Date(pedido.ultimaVista).getTime() > 10 * 60_000))
     after(() => gravarPedido(id, p => ({ ...p, vistoEm: p.vistoEm ?? new Date().toISOString(), ultimaVista: new Date().toISOString(), vistas: (p.vistas ?? 0) + 1 })).then(() => undefined).catch(() => undefined))
-  return NextResponse.json(publico(pedido, cfg.digital, designer))
+  const base = publico(pedido, cfg.digital, designer)
+  // O link da designer não leva valores; o do cliente leva o acompanhamento
+  return NextResponse.json(designer ? base : { ...base, acompanhamento: await acompanhamentoDe(pedido).catch(() => null) })
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

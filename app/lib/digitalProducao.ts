@@ -7,7 +7,7 @@ const LIMITE = 7000
 const STATUS = ["sinal_pago", "arte", "producao"] as const
 const ETAPAS = ["arte", "producao", "pronto", "enviado"] as const
 
-type PedidoDig = {
+export type PedidoDig = {
   id: string; nome?: string | null; produto?: string | null; quantidade?: number; status: string
   em?: string; sinalPagoEm?: string; arteEnviadaEm?: string; arteAprovadaEm?: string
   designerAvisadoEm?: string; villaEnviadoEm?: string; prontoEm?: string; statusEm?: string
@@ -22,10 +22,10 @@ export type PedidoDigitalProducao = {
 } & Record<(typeof CAMPOS_DATA)[number], string | null>
 
 // Data (aaaa-mm-dd) em Brasília; data sem hora fica como veio
-const diaDe = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : (isNaN(Date.parse(s)) ? s.slice(0, 10) : new Date(s).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }))
+export const diaDe = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : (isNaN(Date.parse(s)) ? s.slice(0, 10) : new Date(s).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }))
 
 /** Data gravada que marca a entrada na etapa atual: statusEm ou, na falta, o evento que caracteriza a etapa. */
-function desde(p: PedidoDig): string | null {
+export function desde(p: PedidoDig): string | null {
   const evento = p.status === "producao" ? (p.villaEnviadoEm ?? p.arteAprovadaEm)
     : p.status === "arte" ? (p.designerAvisadoEm ?? p.sinalPagoEm)
     : p.sinalPagoEm
