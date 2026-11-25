@@ -76,6 +76,10 @@ export type PedidoDigital = {
   asaas?: { cliente?: string; sinal?: CobrancaPix; restante?: CobrancaPix }
   // Cartão na InfinitePay (o link aberto de cada parte; o Pix segue no Asaas)
   infinitepay?: { sinal?: LinkCartao; restante?: LinkCartao }
+  // Acompanhamento (#164): opcionais, vazios nos pedidos existentes. Só a tela ou a porta gravar_digital preenchem.
+  situacaoArte?: "sem arte" | "enviada" | "ajustes pedidos" | "aprovada" | "prova autorizada"
+  prazoEntrega?: string                                      // AAAA-MM-DD gravado na mão; vale mais que o prazo calculado
+  camposGravados?: { por: string; em: string; motivo: string; situacaoArte?: string; prazoEntrega?: string }[]   // quem, quando (Brasília) e por quê
 }
 export type CobrancaPix = { id: string; valor: number; payload: string; imagem: string; fatura: string; em: string }
 export type Arte = { url: string; nome: string; em: string }

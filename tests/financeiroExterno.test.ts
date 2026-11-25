@@ -16,7 +16,7 @@ vi.mock("@/app/lib/gastosServidor", () => ({ gastosAtuais: vi.fn(async () => ({ 
 vi.mock("@/app/lib/supabase", () => {
   const consulta = (t: string) => {
     const q: Record<string, unknown> = {}
-    for (const m of ["select", "eq", "order", "limit", "neq", "in"]) q[m] = () => q
+    for (const m of ["select", "eq", "order", "limit", "neq", "in", "not"]) q[m] = () => q
     for (const m of ["insert", "update", "delete", "upsert"]) q[m] = () => { estado.escritas++; return q }
     q.then = (ok: (v: unknown) => unknown) => ok({ data: estado.tabelas[t] ?? [], count: (estado.tabelas[t] ?? []).length, error: null })
     return q
@@ -28,7 +28,7 @@ import { GET, POST } from "@/app/api/externo/route"
 import { NextRequest } from "next/server"
 
 const ler = (q = "") => GET(new NextRequest(`http://x/api/externo?${q}`, { headers: { authorization: "Bearer k" } }))
-const PARTES = ["receber", "pagar", "banco", "saldos", "gastos", "margem", "depende"]
+const PARTES = ["receber", "pagar", "banco", "saldos", "gastos", "margem", "depende", "asaas"]
 const mes = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 7)
 
 beforeEach(() => {
@@ -36,7 +36,12 @@ beforeEach(() => {
   estado.cfg = { contas: [{ id: "c1", nome: "Itaú", banco: "Itaú", tipo: "corrente", cor: "#000", saldo: 1500, ativa: true }, { id: "c2", nome: "Cartão", banco: "X", tipo: "credito", cor: "#000", saldo: 300, ativa: true }],
     gastosFixos: [{ id: "g1", nome: "Railway", categoriaId: "servicos", valor: 100, diaVencimento: 5, ativa: true }],
     pluggyStatus: { em: "2026-11-01", novas: 0, contas: [{ id: "p1", nome: "Itaú", banco: "Itaú", saldo: 1500 }] },
-    pluggy: { itens: [{ id: "i", token: "SEGREDO" }] }, groqKey: "SEGREDO-GROQ" }
+    pluggy: { itens: [{ id: "i", token: "SEGREDO" }] }, groqKey: "SEGREDO-GROQ",
+    pedidosDigitais: [
+      { id: "DIG-0001", nome: "Cliente Digital", jid: "5511988887777@s.whatsapp.net", documento: "98765432100", status: "producao", total: 1000, sinal: 500.37, restante: 499.63, sinalPagoEm: "2026-11-10T12:00:00Z", pagamento: { txId: "asaas:pay_sinal1", valor: 500.37, data: "2026-11-10" }, prontoEm: "2026-11-20T12:00:00Z", asaas: { sinal: { id: "pay_sinal1", valor: 500.37 }, restante: { id: "pay_rest1", valor: 499.63, fatura: "https://asaas.test/i/rest1", em: "2026-11-20T15:00:00Z" } } },
+      { id: "DIG-0002", nome: "Outro", status: "sinal_pago", total: 400, sinal: 200.12, sinalPagoEm: "2026-11-11T12:00:00Z", pagamento: { txId: "infinitepay:x", valor: 200.12, data: "2026-11-11" } },
+      { id: "DIG-0003", nome: "Teste", teste: true, status: "arte", total: 10, sinal: 5, sinalPagoEm: "2026-11-11T12:00:00Z" },
+    ] }
   estado.tabelas = {
     KanbanCard: [{ id: "k1", numero: "100", nomeCliente: "Cliente A", telefone: "11999990000", email: "a@cliente.com", cnpj: "12.345.678/0001-90", coluna: 1, preco: 1000, quantidade: 100, data: "01/11/2026, 10:00:00" }],
     LancamentoFinanceiro: [
@@ -93,6 +98,19 @@ describe("?o=financeiro", () => {
     const dep = await g("depende")
     expect(dep.itens.map((i: { id: string }) => i.id).sort()).toEqual(["asaas", "ia-saldo", "meta-saldo", "pluggy"])
     expect(dep.itens[0]).toHaveProperty("nivel")
+  })
+  it("parte=asaas: por pedido Digital, sem teste e sem dado pessoal; pago só com asaas: ou vínculo bancário", async () => {
+    const r = await (await ler("o=financeiro&parte=asaas")).json()
+    expect(r.pedidos.map((p: { id: string }) => p.id)).toEqual(["DIG-0001", "DIG-0002"])
+    expect(r.pedidos[0].sinal).toMatchObject({ cobrancaId: "pay_sinal1", valor: 500.37, status: "confirmado_asaas", recebidoEm: "2026-11-10" })
+    expect(r.pedidos[0].restante).toMatchObject({ cobrancaId: "pay_rest1", valor: 499.63, status: "pendente", recebidoEm: null })
+    expect(r.pedidos[1].sinal).toMatchObject({ status: "em_conferencia", recebidoEm: null })
+    const txt = JSON.stringify(r)
+    for (const proibido of ["Cliente Digital", "Outro", "5511988887777", "98765432100", "jid", "documento"]) expect(txt, proibido).not.toContain(proibido)
+    const rec = await (await ler("o=financeiro&parte=receber")).json()
+    expect(rec.digital.pedidos).toHaveLength(2)
+    expect(rec.digital.pedidos[0]).toMatchObject({ id: "DIG-0001", saldo: 499.63, cobrancaRestante: { id: "pay_rest1", valor: 499.63, link: "https://asaas.test/i/rest1" } })
+    expect(rec.pedidos).toHaveLength(1)   // Offset não muda
   })
   it("400 para parte, período ou estado inválidos", async () => {
     for (const q of ["parte=x", "periodo=x", "parte=banco&estado=x"]) expect((await ler(`o=financeiro&${q}`)).status).toBe(400)

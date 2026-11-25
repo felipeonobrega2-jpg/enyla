@@ -26,6 +26,7 @@ type Pedido = {
   ajustes: { texto: string; em: string }[]; designerAvisadoEm: string | null; villaEnviadoEm: string | null
   frete: number | null; restante: number | null; restantePagoEm: string | null; prontoEm?: string | null; entrega: { cep: string; endereco: string } | null; acertadoEm: string | null
   teste?: boolean
+  situacaoArte?: string | null; prazoEntrega?: string | null; prazoVisivel?: { data: string | null; texto: string; origem: string }
   sugestaoArte?: SugestaoArte | null
 }
 type Contatos = { villa?: string; designer?: string; designerNome?: string }
@@ -327,6 +328,8 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
               </div>
             )}
 
+            {sel.status !== "aguardando_sinal" && sel.status !== "cancelado" && <CamposAcompanhamento key={sel.id} pedido={sel} onFeito={async () => aplicar(await buscar())} />}
+
             <div className="flex gap-3 flex-wrap">
               <a href={sel.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12px] text-[#8456e8] hover:underline">Ver a página do pedido <ExternalLink className="w-3 h-3" /></a>
               <button onClick={() => copiar(sel.link)} className="inline-flex items-center gap-1 text-[12px] text-[#8456e8] hover:underline">
@@ -350,6 +353,45 @@ function Info({ rotulo, valor }: { rotulo: string; valor: string }) {
 }
 
 // Cliente fechou e mudou o frasco: medidas novas, o preço da tabela na hora e o aviso ao Leandro (e ao cliente, se quiser)
+// Situação da arte e prazo de entrega (#164): gravados à mão, com o motivo (fica registrado quem, quando e por quê)
+const SITUACOES = ["sem arte", "enviada", "ajustes pedidos", "aprovada", "prova autorizada"]
+function CamposAcompanhamento({ pedido, onFeito }: { pedido: Pedido; onFeito: () => Promise<void> }) {
+  const [arte, setArte] = useState(pedido.situacaoArte ?? "")
+  const [prazo, setPrazo] = useState(pedido.prazoEntrega ?? "")
+  const [motivo, setMotivo] = useState("")
+  const [salvando, setSalvando] = useState(false)
+  const mudou = arte !== (pedido.situacaoArte ?? "") || prazo !== (pedido.prazoEntrega ?? "")
+  const salvar = async () => {
+    setSalvando(true)
+    try {
+      const corpo: Record<string, unknown> = { id: pedido.id, acao: "campos", motivo }
+      if (arte !== (pedido.situacaoArte ?? "")) corpo.situacaoArte = arte
+      if (prazo !== (pedido.prazoEntrega ?? "")) corpo.prazoEntrega = prazo
+      const r = await fetch("/api/digital", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) })
+      const j = await r.json().catch(() => ({})) as { erro?: string }
+      if (!r.ok) { alert(j.erro ?? "Não deu para gravar."); return }
+      setMotivo(""); await onFeito()
+    } finally { setSalvando(false) }
+  }
+  const campo = "h-8 rounded-lg px-2.5 text-[12.5px] text-[#191625] bg-white ds-borda focus:outline-none"
+  return (
+    <div className="rounded-xl bg-[rgba(116,116,128,0.06)] px-3.5 py-3 space-y-2">
+      <p className="text-[11.5px] font-semibold text-[#5e5c68]">Acompanhamento · no link o prazo aparece como “{pedido.prazoVisivel?.texto ?? "a confirmar"}”</p>
+      <div className="flex gap-2 flex-wrap items-center">
+        <select value={arte} onChange={e => setArte(e.target.value)} className={campo}>
+          <option value="">Situação da arte (vazio)</option>
+          {SITUACOES.map(x => <option key={x} value={x}>{x}</option>)}
+        </select>
+        <input type="date" value={prazo} onChange={e => setPrazo(e.target.value)} className={campo} title="Prazo de entrega gravado (vale mais que o calculado)" />
+      </div>
+      <div className="flex gap-2 items-center">
+        <input value={motivo} onChange={e => setMotivo(e.target.value.slice(0, 300))} placeholder="Motivo (obrigatório)" className={`${campo} flex-1`} />
+        <Botao disabled={salvando || !mudou || !motivo.trim() || (arte === "" && (pedido.situacaoArte ?? "") !== "")} onClick={() => void salvar()}>Gravar</Botao>
+      </div>
+    </div>
+  )
+}
+
 function MudarMedidas({ pedido, onFeito }: { pedido: Pedido; onFeito: () => Promise<void> }) {
   const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
   const fmt = (n: number) => String(n).replace(".", ",")

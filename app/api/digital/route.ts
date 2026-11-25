@@ -8,14 +8,18 @@ import { mudarStatus, trocarFrete, restanteUnico, arteAtual, acertoDaSemana, Ped
 import { mudarConfig } from "@/app/lib/configAtomica"
 import { lerSugestoes, decidirSugestao } from "@/app/lib/arteAprovadaServidor"
 import { auth } from "@/auth"
+import { validarCampos, aplicarCampos } from "@/app/lib/digitalCampos"
+import { prazoVisivel } from "@/app/lib/digitalPrazo"
+import { prazoPadraoDaConfig } from "@/app/lib/prazoDigital"
 
-type Dados = { pedidosDigitais?: PedidoComBriefing[]; digitalContatos?: ContatosDigital; digital?: import("@/app/lib/precoDigital").RegraDigital }
+type Dados = { pedidosDigitais?: PedidoComBriefing[]; digitalContatos?: ContatosDigital; digital?: import("@/app/lib/precoDigital").RegraDigital & { prazoPadrao?: Partial<import("@/app/lib/prazoDigital").PrazoPadraoDigital> } }
 
 // Painel do braço digital (rota protegida pelo login): os pedidos dos últimos 45 dias com o link e o que o cliente fez
 export async function GET() {
   const { data } = await lerConfigLinha()
   const d = (data?.data ?? {}) as Dados
   const todos = d.pedidosDigitais ?? []
+  const regraPrazo = prazoPadraoDaConfig(d)
   const desde = Date.now() - 45 * 86_400_000
   const pedidos = todos.filter(p => new Date(p.em).getTime() >= desde || (p.villaEnviadoEm && !p.acertadoEm)).map(p => ({
     id: p.id, jid: p.jid, nome: p.nome, em: p.em, ml: p.ml, medidas: p.medidas, padrao: p.padrao, folha: p.folha,
@@ -31,6 +35,7 @@ export async function GET() {
     ajustes: p.ajustes ?? [], designerAvisadoEm: p.designerAvisadoEm ?? null, villaEnviadoEm: p.villaEnviadoEm ?? null,
     frete: p.frete ?? null, restante: p.restante ?? null, restantePagoEm: p.restantePagoEm ?? null, prontoEm: p.prontoEm ?? null, entrega: p.entrega ?? null, acertadoEm: p.acertadoEm ?? null,
     negociacao: p.negociacao ?? null, termosAceitosEm: p.termos?.em ?? null,
+    situacaoArte: p.situacaoArte ?? null, prazoEntrega: p.prazoEntrega ?? null, prazoVisivel: prazoVisivel(p, regraPrazo),
   }))
   const acerto = acertoDaSemana(todos)
   const sug = await lerSugestoes(todos)
@@ -78,6 +83,15 @@ export async function POST(req: NextRequest) {
   const { pedido, cfg } = await lerPedido(b.id)
   if (!pedido) return NextResponse.json({ erro: "Pedido não encontrado." }, { status: 404 })
 
+  // Situação da arte e prazo de entrega (#164), editáveis na tela; só esses dois campos, com quem, quando e o motivo
+  if (b.acao === "campos") {
+    const sessao = await auth().catch(() => null)
+    if (!sessao) return NextResponse.json({ erro: "Entre no sistema para gravar." }, { status: 401 })
+    const c = validarCampos(b as Record<string, unknown>)
+    if (typeof c === "string") return NextResponse.json({ erro: c }, { status: 400 })
+    const novo = await gravarPedido(b.id, p => aplicarCampos(p, c, sessao.user?.name ?? sessao.user?.email ?? "Painel (login do sistema)"))
+    return NextResponse.json({ ok: true, situacaoArte: novo?.situacaoArte ?? null, prazoEntrega: novo?.prazoEntrega || null })
+  }
   if (b.acao === "frete") {
     const novo = await gravarPedido(b.id, (p, todos) => trocarFrete(p, todos, Number(b.frete)) as PedidoComBriefing | null)
     return novo ? NextResponse.json({ ok: true }) : NextResponse.json({ erro: "Não dá para mudar o frete agora (restante já pago?)." }, { status: 400 })
