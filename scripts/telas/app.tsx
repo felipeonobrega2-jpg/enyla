@@ -119,6 +119,9 @@ window.fetch = async (url: RequestInfo | URL, o?: RequestInit) => {
     { id: "2", atalho: "/pix", quando_usar: "Cobrar sinal", corpo: "Oi {{nome}}! Segue sua página com o Pix: {{pagina_cliente}}", ativa: true, ordem: 2 },
     { id: "3", atalho: "/m4", quando_usar: "Lead frio", corpo: "Olá {{nome}}! Passando pra saber se ainda tem interesse nas embalagens.", ativa: false, ordem: 4 },
   ]))
+  if (u.startsWith("/api/whatsapp/conversas?q=")) return new Response(JSON.stringify([
+    { jid: "99@s.whatsapp.net", nome: "Allison Pessoa - Similares", ultima_msg: "[audio]", ultima_at: new Date(Date.now() - 40 * 86_400_000).toISOString(), nao_lidas: 0, foto_url: null, ultima_recebida_at: new Date(Date.now() - 40 * 86_400_000).toISOString(), ultima_enviada_at: null, etiquetas: ["MQL"], status_lead: "mql", fechada_em: null },
+  ]))
   if (u.startsWith("/api/whatsapp/conversas")) {
     const h = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString()
     const c = (jid: string, nome: string, msg: string, rec: number, env: number | null, extra = {}) => ({ jid, nome, ultima_msg: msg, ultima_at: h(Math.min(rec, env ?? 99)), nao_lidas: 0, foto_url: null, ultima_recebida_at: h(rec), ultima_enviada_at: env == null ? null : h(env), ...extra })
@@ -750,7 +753,7 @@ function Telas() {
       return <div style={{ height: "100vh" }}><FilaMensagens kanban={kanban} lancamentos={lancs} onAvisado={() => {}} onDispensar={() => {}} onAbrirConversa={() => {}}
         conversas={[cv("1@lid", "Juliana", 5, 4), cv("2@lid", "rafael souza", 10, 8), cv("3@lid", "Bia Doces", 6, 3.5), cv("4@lid", "Maria Perfumes", 6, 5)]} /></div>
     }
-    case "whatsview": case "whatsview-espiar": return <div style={{ height: "100vh" }}><WhatsAppView onCriarCard={() => {}} kanban={dados.kanban} lancamentos={lancs} /></div>
+    case "whatsview": case "whatsview-espiar": case "whatsview-busca": return <div style={{ height: "100vh" }}><WhatsAppView onCriarCard={() => {}} kanban={dados.kanban} lancamentos={lancs} /></div>
     case "enviar": return <div style={{ height: "100vh" }}><EnviarWhatsapp envio={{ cliente: "Raniere Péricles", texto: "Olá! Tudo bem? Passando para saber se conseguiu ver a proposta ORC-2026-233. Ficou alguma dúvida sobre quantidade ou acabamento? Posso te ajudar a escolher." }} linkWhatsapp="https://wa.me/" onFechar={() => {}} /></div>
     case "calibragem": return pagina(<CalibragemView kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} config={cfg} onAtualizarConfig={setCfg} onDividir={() => {}} />)
     case "calibragem-correcoes": {
