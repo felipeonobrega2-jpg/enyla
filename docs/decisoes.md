@@ -12,6 +12,16 @@ Diretores propõem. Estas decisões é que mandam no que se constrói.
 4. Se a decisão mudar um item da fila, atualize [docs/fila.md](fila.md) no mesmo pull request.
 5. Não apague decisão antiga. Ela fica embaixo, para se saber o que valeu antes.
 
+## 24/11/2026 07:56 — faixas de quantidade sempre por um modelo e uma arte
+
+**Decisão.** Horário: 24/11/2026 07:56 (America/Sao_Paulo; ensinada à CCO entre 07:49 e 07:56, item `cco-mwukx9zo`). Texto da CCO:
+
+> Faixas de quantidade do Felipe (24/11/2026), sempre considerando UM modelo/arte: ate 200 unidades vale no Digital. Entre ~201 e ~999 unidades fica inviavel (caro demais em Digital e em Offset): recomendar ao lead diminuir para ate 200 no Digital (MVP/teste) ou aumentar para pelo menos 1.000 unidades no Offset para diluir o custo. Esta regra detalha a regra anterior dos ~500 unidades.
+
+No Atendente (`FILTRO_PADRAO` e `SECAO_DIGITAL`): até 200 por arte, digital; de 201 a 999, não cotar e oferecer os dois caminhos; 1.000 ou mais, offset, que continua com o Felipe (sem valor inventado). Não se somam modelos ou artes para mudar de faixa. O classificador de MQL continua somando; só a resposta ao lead segue a faixa por arte.
+
+**Porquê.** A regra ficava só no conhecimento da CCO e não chegava ao prompt do Atendente. O filtro dizia "de 20 a 500 caixas, em digital" e "orçamento pela quantidade total": o Atendente cotava 500 no digital e somava 2×500 para Offset de 1.000. O aprendizado `8qcdislv` ("mínimo offset em torno de 1.000 no total") deve ser encerrado ou reescrito depois, pelo sistema, pelo Felipe/Diego.
+
 ## 24/11/2026 07:07 — texto do Prospector: sem opt-out e sem link no primeiro contato
 
 **Decisão.** Horário: 24/11/2026 07:07 (America/Sao_Paulo). Esta decisão **substitui** a de 23/11/2026 sobre o texto do Prospector (22:27 e 22:40: "opt-out e link `/parceiros`" em toda mensagem).

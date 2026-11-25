@@ -138,6 +138,28 @@ describe("lead pequeno: parceiro ou digital", async () => {
     expect(f).toContain("O QUE NÃO FAZEMOS")      // o resto do filtro continua
     expect(f).toContain("LEVANTAR DADOS")
   })
+  it("faixas por modelo/arte: sem as frases antigas", () => {
+    for (const t of [FILTRO_PADRAO, SECAO_DIGITAL, filtroDoModo(FILTRO_PADRAO, false)]) {
+      expect(t).not.toMatch(/de 20 a 500/i)
+      expect(t).not.toMatch(/orçamento é pela quantidade total/i)
+    }
+  })
+  it("faixas: 200 digital; 201–999 não cota; 1.000+ offset do Felipe, por arte", () => {
+    const d = filtroDoModo(FILTRO_PADRAO, false)
+    expect(d).toContain("UM modelo e UMA arte")
+    expect(SECAO_DIGITAL).toMatch(/Até 200 unidades por arte[^\n]*digital/)
+    expect(SECAO_DIGITAL).toMatch(/De ~201 a ~999 por arte[^\n]*inclusive 500/)
+    expect(SECAO_DIGITAL).toMatch(/NÃO cote/)
+    expect(SECAO_DIGITAL).toMatch(/até 200 no digital \(MVP\/teste\) ou aumentar para pelo menos 1\.000 no offset/)
+    expect(SECAO_DIGITAL).toMatch(/2 artes de 500[^\n]*não viram offset de 1\.000/)
+    expect(SECAO_DIGITAL).toMatch(/1\.000 ou mais por arte: é offset[^\n]*Felipe[^\n]*não invente valor/)
+  })
+  it("pedido digital: 201–999 oferece dois caminhos em vez de orçar", async () => {
+    const { readFileSync } = await import("node:fs")
+    const src = readFileSync("app/lib/pedidoAtendente.ts", "utf8")
+    expect(src).toMatch(/de 201 a 999 \(inclusive 500\) NÃO monte orçamento/)
+    expect(src).toMatch(/cada arte na sua faixa, sem somar/)
+  })
   it("filtro seu sem a seção: acrescenta a regra no fim", () => {
     expect(filtroDoModo("OBJETIVO\nvender caixa", false)).toContain(SECAO_DIGITAL)
   })
