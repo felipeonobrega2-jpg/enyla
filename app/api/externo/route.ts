@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { conferirChave, LIMITE_POR_HORA } from "@/app/lib/acessoExterno"
 import { DIRETORES, type IdDiretor, type LicaoDiretor } from "@/app/lib/diretoria"
-import { aquecerFoto, executarFerramenta, fotoRapida, renovarFoto } from "@/app/lib/conversaDiretor"
+import { aquecerFoto, executarFerramenta, fotoRapida, producaoAtual, renovarFoto } from "@/app/lib/conversaDiretor"
 import { lerConversa, gravarConversa, lerPlanos, type MsgConversa } from "@/app/lib/diretoriaServidor"
 import { lerCampos } from "@/app/lib/configAtomica"
 import { supabase } from "@/app/lib/supabase"
@@ -132,7 +132,7 @@ export async function GET(req: NextRequest) {
   if (o === "detalhe") {
     const area = req.nextUrl.searchParams.get("area") ?? ""
     if (!AREAS.includes(area)) return NextResponse.json({ erro: `Área: ${AREAS.join(", ")}` }, { status: 400 })
-    return NextResponse.json({ area, em: hora(foto.em), dados: foto.detalhes[area], ...(area === "marketing" ? { campanhasParadas: await paradasParaLeitura() } : {}), ...(area === "comercial" ? { niveisDosLeads: await niveisDosLeads(foto.detalhes.comercial) } : {}), ...(area === "producao" ? { esperandoAEnyla24h: await lerEsperandoAEnyla() } : {}) })
+    return NextResponse.json({ area, em: hora(foto.em), dados: area === "producao" ? await producaoAtual(foto) : foto.detalhes[area], ...(area === "marketing" ? { campanhasParadas: await paradasParaLeitura() } : {}), ...(area === "comercial" ? { niveisDosLeads: await niveisDosLeads(foto.detalhes.comercial) } : {}), ...(area === "producao" ? { esperandoAEnyla24h: await lerEsperandoAEnyla() } : {}) })
   }
   if (o === "empresa") {
     const [planos, cfg] = await Promise.all([lerPlanos(), lerCampos<{ conhecimentoDiretoria?: Partial<Record<string, LicaoDiretor[]>> }>(["conhecimentoDiretoria"])])
@@ -140,7 +140,7 @@ export async function GET(req: NextRequest) {
     const meu = blocos.find(b => b.includes(`, ${info.cargo} (`)) ?? ""
     const licoes = (cfg.conhecimentoDiretoria?.[diretor] ?? []).slice(0, 40).map(l => l.texto)
     return NextResponse.json({
-      numerosDe: hora(foto.em), norte: foto.norte, suaArea: meu, detalheDaSuaArea: foto.detalhes[MINHA_AREA[diretor]] ?? "",
+      numerosDe: hora(foto.em), norte: foto.norte, suaArea: meu, detalheDaSuaArea: MINHA_AREA[diretor] === "producao" ? await producaoAtual(foto) : foto.detalhes[MINHA_AREA[diretor]] ?? "",
       seuPlano: planos[diretor] ?? null, oQueOFelipeEnsinou: licoes, equipe: foto.equipe, ferramentasDoSistema: foto.ferramentasTxt,
       resultados: foto.resultados, cultura: foto.cultura, funcionarios: [...foto.exec, ...comerciaisDoDiretor(diretor)].map(f => ({ id: f.id, nome: f.nome })),
       ...await tarefasDoDiretor(diretor),

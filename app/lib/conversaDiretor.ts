@@ -14,6 +14,8 @@ import { ehComercial, ordenarComercial, comerciaisDoDiretor } from "./ordemComer
 import { detalheProducao } from "./etapasProducao"
 import { comDigital } from "./digitalProducao"
 import type { Rastreio } from "./prazoProducao"
+import { definirFeriadosLocais } from "./diasUteis"
+import { CONFIG_PADRAO } from "../config"
 
 // Só leitura do histórico de etapas; se falhar, o detalhe sai sem as datas
 async function lerRastreios(): Promise<Rastreio[]> {
@@ -25,13 +27,30 @@ async function lerRastreios(): Promise<Rastreio[]> {
 }
 
 // Só leitura dos pedidos digitais (mesmo array da configuração); se falhar, o detalhe sai sem eles
+// e acerta os feriados (AppConfig.feriados) usados nos dias úteis
 async function lerDigitais(): Promise<Parameters<typeof comDigital>[1]> {
   try {
-    const pedidos = (await lerCampos<{ pedidosDigitais?: (NonNullable<Parameters<typeof comDigital>[1]>[number] & { jid: string })[] }>(["pedidosDigitais"])).pedidosDigitais ?? []
+    const c = await lerCampos<{ pedidosDigitais?: (NonNullable<Parameters<typeof comDigital>[1]>[number] & { jid: string })[]; feriados?: unknown }>(["pedidosDigitais", "feriados"])
+    definirFeriadosLocais((c.feriados ?? CONFIG_PADRAO.feriados) as never)
+    const pedidos = c.pedidosDigitais ?? []
     const { lerSugestoes } = await import("./arteAprovadaServidor")
     const sug = await lerSugestoes(pedidos)   // só leitura: nada é gravado
     return pedidos.map(p => { const s = sug.find(x => x.pedido === p.id); return s ? { ...p, sugestaoArteAprovada: { trecho: s.trecho, em: s.em } } : p })
   } catch { return [] }
+}
+
+// Versão do código que montou a foto: deploy novo invalida a foto guardada no banco
+export const VERSAO_CODIGO = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.VERCEL_DEPLOYMENT_ID ?? process.env.npm_package_version ?? "local"
+
+function producaoBase(ctx: Ctx, rastreios: Rastreio[]): string {
+  return detalheProducao(ctx.kanban.filter(c => c.coluna >= 2 && c.coluna <= 8).map(c => ({ ...c, aguardandoPagamento: ctx.segurados[c.numero] ?? null })), rastreios, COLUNAS_KANBAN as unknown as string[])
+}
+
+/** Detalhe da produção para a porta externa: a base vem da foto, mas o bloco digital é montado na hora da leitura
+ *  (uma leitura barata da configuração), então os pedidos DIG nunca ficam atrás do retrato. */
+export async function producaoAtual(foto: Foto): Promise<string> {
+  if (!foto.producaoBase) return foto.detalhes.producao
+  return comDigital(foto.producaoBase, await lerDigitais())
 }
 
 const novoId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
@@ -61,7 +80,7 @@ function detalhe(ctx: Ctx, area: string, rastreios: Rastreio[] = [], digitais: P
   const h = (ctx.hoje ?? {}) as Record<string, unknown>
   const corta = (x: unknown) => JSON.stringify(x).slice(0, 7000)
   if (area === "comercial") return corta({ responder: h.responder, orcar: h.orcar, resolver: h.resolver, meta: h.meta })
-  if (area === "producao") return comDigital(detalheProducao(ctx.kanban.filter(c => c.coluna >= 2 && c.coluna <= 8).map(c => ({ ...c, aguardandoPagamento: ctx.segurados[c.numero] ?? null })), rastreios, COLUNAS_KANBAN as unknown as string[]), digitais)
+  if (area === "producao") return comDigital(producaoBase(ctx, rastreios), digitais)
   if (area === "financeiro") return corta(ctx.fin)
   if (area === "marketing") return corta({ anuncio: h.anuncio, marketing: h.marketing, gastos: h.gastos })
   return corta({ rotinas: ctx.rot?.rotinas, whatsapp: ctx.esc?.whatsapp, semCredito: ctx.esc?.semCredito, cota: ctx.esc?.cota, agentes: (ctx.esc?.mesas ?? []).map((m: { nome: string; estado: string }) => ({ nome: m.nome, estado: m.estado })) })
@@ -126,7 +145,7 @@ export async function executarFerramenta(diretor: IdDiretor, nome: string, x: Re
 // e uma nova é montada em segundo plano ao abrir a conversa e depois de cada resposta, quando passa de 3 min.
 // Assim a resposta nunca espera a coleta; só sem foto nenhuma (ou muito velha) a primeira fala espera.
 const AREAS = ["comercial", "producao", "financeiro", "marketing", "sistema"] as const
-export type Foto = { em: string; norte: string; resultados: string; equipe: string; bloco: string; ferramentasTxt: string; cultura: string[]; exec: Ctx["exec"]; detalhes: Record<string, string>; decisoes?: Record<string, { texto: string; chave: string }[]> }
+export type Foto = { em: string; norte: string; resultados: string; equipe: string; bloco: string; ferramentasTxt: string; cultura: string[]; exec: Ctx["exec"]; detalhes: Record<string, string>; decisoes?: Record<string, { texto: string; chave: string }[]>; versao?: string; producaoBase?: string }
 let memFoto: { lidaEm: number; foto: Promise<Foto> } | null = null
 let montando: Promise<Foto> | null = null
 async function montarFoto(salvar: boolean): Promise<Foto> {
@@ -134,7 +153,7 @@ async function montarFoto(salvar: boolean): Promise<Foto> {
   const rastreios = await lerRastreios()
   const digitais = await lerDigitais()
   const foto: Foto = { em: new Date().toISOString(), norte: ctx.norte, resultados: ctx.resultados, equipe: ctx.equipe, bloco: ctx.bloco, ferramentasTxt: ctx.ferramentasTxt,
-    cultura: ctx.cultura, exec: ctx.exec, decisoes: ctx.decisoesTodas, detalhes: Object.fromEntries(AREAS.map(a => [a, detalhe(ctx, a, rastreios, digitais)])) }
+    cultura: ctx.cultura, exec: ctx.exec, decisoes: ctx.decisoesTodas, versao: VERSAO_CODIGO, producaoBase: producaoBase(ctx, rastreios), detalhes: Object.fromEntries(AREAS.map(a => [a, detalhe(ctx, a, rastreios, digitais)])) }
   const { gravarFoto } = await import("./diretoriaServidor")
   if (salvar) await gravarFoto(foto).catch(() => null)
   return foto
@@ -146,11 +165,14 @@ export function renovarFoto(salvar = true): Promise<Foto> {
   return p
 }
 const idade = (f: Foto) => Date.now() - Date.parse(f.em)
+/** A foto guardada só vale se foi montada por esta versão do código (deploy novo refaz) e tem menos de 12 h. */
+export const fotoValida = (f: Pick<Foto, "em" | "versao"> | null | undefined, versao = VERSAO_CODIGO, agora = Date.now()) =>
+  !!f && f.versao === versao && agora - Date.parse(f.em) < 12 * 3600_000
 export async function fotoRapida(salvar = true): Promise<Foto> {
   if (memFoto && Date.now() - memFoto.lidaEm < 60_000) return memFoto.foto
   const { lerFoto } = await import("./diretoriaServidor")
   const salva = await lerFoto<Foto>().catch(() => null)
-  if (salva && idade(salva) < 12 * 3600_000) { memFoto = { lidaEm: Date.now(), foto: Promise.resolve(salva) }; return salva }
+  if (salva && fotoValida(salva)) { memFoto = { lidaEm: Date.now(), foto: Promise.resolve(salva) }; return salva }
   return renovarFoto(salvar)
 }
 // Chamado depois de responder (e ao abrir a conversa): se a foto passou de 3 min, monta outra para a próxima fala
