@@ -8,7 +8,7 @@ import { Upload, Search, Box, Download, Trash2, Plus, Scissors, FileText, Loader
 import { Pagina, CabecalhoPagina, Cartao, Selo, Botao, Vazio } from "./ds"
 import { parseDXF, caixaDoDxf, type DXFResult } from "../lib/dxf"
 import { Desenho, nomeBonito, ondeCabe, frascoQueServe, servemParaFrasco, facasDoDesenho, descricaoCaixa, cm, nomeDoDesenho, buscarDesenhos, tagsMaisUsadas, lerTags, normalizarBusca } from "../lib/biblioteca"
-import type { Ferramental } from "../lib/producao"
+import { TIPO_CAIXA_CONHECIDO, type Ferramental } from "../lib/producao"
 
 type Uso = { numero: string; cliente: string; desenhoId?: string | null }
 
@@ -84,9 +84,10 @@ function NovaFaca({ d, fornecedores, onSalvar, onCancelar }: { d: Desenho; forne
 }
 
 // Seu nome e as palavras-chave do desenho: é por eles que você acha a faca no orçamento
-function EditarNome({ d, sugestoes, onSalvar, onCancelar }: { d: Desenho; sugestoes: string[]; onSalvar: (apelido: string, tags: string[]) => Promise<void>; onCancelar: () => void }) {
+function EditarNome({ d, sugestoes, onSalvar, onCancelar }: { d: Desenho; sugestoes: string[]; onSalvar: (apelido: string, tags: string[], tipoCaixa: string) => Promise<void>; onCancelar: () => void }) {
   const [apelido, setApelido] = useState(d.apelido ?? nomeBonito(d.nome))
   const [tags, setTags] = useState((d.tags ?? []).join(", "))
+  const [tipo, setTipo] = useState<string>(d.tipoCaixa ?? (TIPO_CAIXA_CONHECIDO.desenhos[d.id] ?? ""))
   const [salvando, setSalvando] = useState(false)
   const atuais = lerTags(tags)
   const faltam = sugestoes.filter(t => !atuais.includes(t)).slice(0, 8)
@@ -96,13 +97,19 @@ function EditarNome({ d, sugestoes, onSalvar, onCancelar }: { d: Desenho; sugest
         <input value={apelido} onChange={e => setApelido(e.target.value)} autoFocus placeholder="Perfume 20ml fundo automático" className="mt-0.5 w-full h-8 rounded-lg bg-white px-2 text-[13px] ds-borda" /></label>
       <label className="block text-[11px] text-[#5e5c68]">Palavras-chave (separe por vírgula)
         <input value={tags} onChange={e => setTags(e.target.value)} placeholder="perfume, 20ml, villa" className="mt-0.5 w-full h-8 rounded-lg bg-white px-2 text-[13px] ds-borda" /></label>
+      <label className="block text-[11px] text-[#5e5c68]">Tipo de caixa
+        <select value={tipo} onChange={e => setTipo(e.target.value)} className="mt-0.5 w-full h-8 rounded-lg bg-white px-2 text-[13px] ds-borda">
+          <option value="">Não informado</option>
+          <option value="simples">Simples</option><option value="fundo-automatico">Fundo automático</option>
+          <option value="aviao">Avião</option><option value="americano">Americano</option>
+        </select></label>
       {faltam.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {faltam.map(t => <button key={t} type="button" onClick={() => setTags([...atuais, t].join(", "))} className="h-6 px-2 rounded-full bg-[#8456e8]/[0.08] text-[#8456e8] text-[11px] font-semibold">+ {t}</button>)}
         </div>
       )}
       <div className="flex gap-2">
-        <Botao variante="primario" disabled={salvando} onClick={async () => { setSalvando(true); await onSalvar(apelido, atuais); setSalvando(false) }}>{salvando ? "Salvando…" : "Salvar"}</Botao>
+        <Botao variante="primario" disabled={salvando} onClick={async () => { setSalvando(true); await onSalvar(apelido, atuais, tipo); setSalvando(false) }}>{salvando ? "Salvando…" : "Salvar"}</Botao>
         <Botao variante="fantasma" onClick={onCancelar}>Cancelar</Botao>
       </div>
     </div>
@@ -112,7 +119,7 @@ function EditarNome({ d, sugestoes, onSalvar, onCancelar }: { d: Desenho; sugest
 function CardDesenho({ d, facas, usos, fornecedores, sugestoes, onUsar, onRegistrar, onApagar, onEditar, onTag }: {
   d: Desenho; facas: Ferramental[]; usos: Uso[]; fornecedores: string[]; sugestoes: string[]
   onUsar: () => void; onRegistrar: (f: Ferramental & { desenhoId: string }) => void; onApagar: () => void
-  onEditar: (apelido: string, tags: string[]) => Promise<void>; onTag: (t: string) => void
+  onEditar: (apelido: string, tags: string[], tipoCaixa: string) => Promise<void>; onTag: (t: string) => void
 }) {
   const [nova, setNova] = useState(false)
   const [editando, setEditando] = useState(false)
@@ -130,8 +137,8 @@ function CardDesenho({ d, facas, usos, fornecedores, sugestoes, onUsar, onRegist
       {!editando && (d.tags ?? []).length > 0 && (
         <div className="flex flex-wrap gap-1 mt-1.5">{d.tags!.map(t => <button key={t} onClick={() => onTag(t)} className="h-5 px-2 rounded-full bg-[#8456e8]/[0.08] text-[#8456e8] text-[10.5px] font-semibold">{t}</button>)}</div>
       )}
-      {editando && <EditarNome d={d} sugestoes={sugestoes} onSalvar={async (a, t) => { await onEditar(a, t); setEditando(false) }} onCancelar={() => setEditando(false)} />}
-      <p className="text-[11.5px] text-[#898892] mt-1">{d.modelo ? `${d.modelo} · ` : ""}caixa {descricaoCaixa(d)} · peça {cm(d.blank.largura)} × {cm(d.blank.altura)} cm</p>
+      {editando && <EditarNome d={d} sugestoes={sugestoes} onSalvar={async (a, t, tc) => { await onEditar(a, t, tc); setEditando(false) }} onCancelar={() => setEditando(false)} />}
+      <p className="text-[11.5px] text-[#898892] mt-1">{d.modelo ? `${d.modelo} · ` : ""}{(d.tipoCaixa ?? TIPO_CAIXA_CONHECIDO.desenhos[d.id]) ? `tipo ${(d.tipoCaixa ?? TIPO_CAIXA_CONHECIDO.desenhos[d.id])!.replace("-", " ")} · ` : ""}caixa {descricaoCaixa(d)} · peça {cm(d.blank.largura)} × {cm(d.blank.altura)} cm</p>
       <div className="flex flex-wrap gap-1.5 mt-2">
         <Selo tom={onde.digital ? "info" : "neutro"}>{onde.digital ? `Digital: ${onde.digital}` : "Maior que A3"}</Selo>
         {onde.offset[0]?.porFolha > 0 && <Selo tom="neutro">Offset: {onde.offset[0].porFolha} por folha {onde.offset[0].formato}</Selo>}
@@ -209,9 +216,9 @@ export function BibliotecaFacasView({ ferramentais, fornecedores = [], usos, onU
   const atalhos = useMemo(() => tagsMaisUsadas(lista ?? [], 14), [lista])
   const usados = normalizarBusca(busca).split(" ")
   const alternarTag = (t: string) => setBusca(usados.includes(t) ? usados.filter(x => x !== t).join(" ") : `${busca.trim()} ${t}`.trim())
-  async function editar(id: string, apelido: string, tags: string[]) {
-    const r = await fetch("/api/biblioteca", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, apelido, tags }) }).catch(() => null)
-    if (r?.ok) setLista(l => (l ?? []).map(d => d.id === id ? { ...d, apelido: apelido.trim() || undefined, tags: tags.length ? tags : undefined } : d))
+  async function editar(id: string, apelido: string, tags: string[], tipoCaixa: string) {
+    const r = await fetch("/api/biblioteca", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, apelido, tags, tipoCaixa: tipoCaixa || null }) }).catch(() => null)
+    if (r?.ok) setLista(l => (l ?? []).map(d => d.id === id ? { ...d, apelido: apelido.trim() || undefined, tags: tags.length ? tags : undefined, tipoCaixa: (tipoCaixa || undefined) as Desenho["tipoCaixa"] } : d))
   }
   const facasSemDesenho = useMemo(() => ferramentais.filter(f => f.tipo === "faca" && !(lista ?? []).some(d => facasDoDesenho(d, [f]).length)), [ferramentais, lista])
 
@@ -251,7 +258,7 @@ export function BibliotecaFacasView({ ferramentais, fornecedores = [], usos, onU
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {visiveis.map(d => (
               <CardDesenho key={d.id} d={d} facas={facasDoDesenho(d, ferramentais)} usos={usos.filter(u => u.desenhoId === d.id)} fornecedores={fornecedores}
-                sugestoes={atalhos} onEditar={(a, t) => editar(d.id, a, t)} onTag={alternarTag}
+                sugestoes={atalhos} onEditar={(a, t, tc) => editar(d.id, a, t, tc)} onTag={alternarTag}
                 onUsar={() => onUsar(d)} onRegistrar={onRegistrarFaca}
                 onApagar={() => { void fetch(`/api/biblioteca?id=${d.id}`, { method: "DELETE" }).then(carregar) }} />
             ))}

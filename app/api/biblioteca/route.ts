@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { lerIndice, guardarDesenho, editarDesenho, apagar } from "@/app/lib/bibliotecaServidor"
 import { lerTags } from "@/app/lib/biblioteca"
+import type { TipoCaixa } from "@/app/types"
 
-// Biblioteca de facas (rota protegida pelo login): GET a lista · POST (form) guarda um DXF · PATCH { id, apelido?, tags? } · DELETE ?id=
+// Biblioteca de facas (rota protegida pelo login): GET a lista · POST (form) guarda um DXF · PATCH { id, apelido?, tags?, tipoCaixa? } · DELETE ?id=
 export async function GET() {
   return NextResponse.json({ desenhos: await lerIndice() })
 }
@@ -22,10 +23,12 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as { id?: string; apelido?: string; tags?: string[] | string }
-  if (!b.id || (b.apelido === undefined && b.tags === undefined)) return NextResponse.json({ erro: "Faltou o nome ou as palavras-chave." }, { status: 400 })
+  const b = await req.json().catch(() => ({})) as { id?: string; apelido?: string; tags?: string[] | string; tipoCaixa?: string | null }
+  const TIPOS = ["simples", "aviao", "fundo-automatico", "americano"]
+  if (b.tipoCaixa && !TIPOS.includes(b.tipoCaixa)) return NextResponse.json({ erro: "Tipo de caixa inválido." }, { status: 400 })
+  if (!b.id || (b.apelido === undefined && b.tags === undefined && b.tipoCaixa === undefined)) return NextResponse.json({ erro: "Faltou o nome ou as palavras-chave." }, { status: 400 })
   const tags = b.tags === undefined ? undefined : lerTags(Array.isArray(b.tags) ? b.tags.join(",") : String(b.tags))
-  return (await editarDesenho(b.id, { apelido: b.apelido === undefined ? undefined : String(b.apelido), tags }))
+  return (await editarDesenho(b.id, { apelido: b.apelido === undefined ? undefined : String(b.apelido), tags, tipoCaixa: b.tipoCaixa === undefined ? undefined : (b.tipoCaixa as TipoCaixa | null) }))
     ? NextResponse.json({ ok: true }) : NextResponse.json({ erro: "Não achei esse desenho." }, { status: 404 })
 }
 

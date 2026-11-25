@@ -79,6 +79,7 @@ export type Ferramental = {
   custo: number
   data: string          // ISO
   desenhoId?: string    // faca: o desenho (DXF) da biblioteca que ela repete em X cavidades
+  tipoCaixa?: TipoCaixa // faca: o tipo de caixa dela (opcional; faca antiga sem o campo segue válida)
 }
 
 export type EtapaPedido = "arte" | "impressao" | "acabamento" | "corteVinco" | "colagem" | "outro"
@@ -469,6 +470,35 @@ export function ferramentalDoCliente(
     ((igual(f.blankLargura, blank.largura) && igual(f.blankAltura, blank.altura)) ||
      (igual(f.blankLargura, blank.altura) && igual(f.blankAltura, blank.largura)))
   ) ?? null
+}
+
+// Tipo de caixa conhecido de facas/desenhos cadastrados sem o campo (só para frente; não grava nada no banco nem no storage).
+// O que estiver gravado na faca ou no desenho vale mais que este mapa.
+export const TIPO_CAIXA_CONHECIDO: { facas: Record<string, TipoCaixa>; desenhos: Record<string, TipoCaixa> } = {
+  facas: { "f-mweu5lzf": "fundo-automatico" },
+  desenhos: { "91b661606f62a900": "fundo-automatico" },
+}
+
+// Tipo de caixa que o motor usa: o escolhido no form, ou — se o form está no padrão 'simples' — o da faca/desenho salvo.
+// Acha a faca por desenhoId ou pelo blank do DXF (não depende do cliente, que pode estar vazio). Não mexe no blank.
+export function tipoCaixaEfetivo(
+  form: { tipoCaixa: TipoCaixa; desenhoId?: string | null; blankOverride?: { largura: number; altura: number } | null },
+  ferramentais: Ferramental[],
+  desenhos: { id: string; tipoCaixa?: TipoCaixa }[] = [],
+): TipoCaixa {
+  if (form.tipoCaixa !== "simples") return form.tipoCaixa
+  const id = form.desenhoId ?? undefined
+  const b = form.blankOverride
+  const mesmo = (f: Ferramental) => !!b && (
+    (Math.abs(f.blankLargura - b.largura) <= 1 && Math.abs(f.blankAltura - b.altura) <= 1) ||
+    (Math.abs(f.blankLargura - b.altura) <= 1 && Math.abs(f.blankAltura - b.largura) <= 1))
+  const facas = ferramentais.filter(f => f.tipo === "faca" && ((id && f.desenhoId === id) || mesmo(f)))
+  const desenho = id ? desenhos.find(d => d.id === id) : undefined
+  return facas.find(f => f.tipoCaixa)?.tipoCaixa
+    ?? desenho?.tipoCaixa
+    ?? facas.map(f => TIPO_CAIXA_CONHECIDO.facas[f.id] ?? (f.desenhoId ? TIPO_CAIXA_CONHECIDO.desenhos[f.desenhoId] : undefined)).find(Boolean)
+    ?? (id ? TIPO_CAIXA_CONHECIDO.desenhos[id] : undefined)
+    ?? "simples"
 }
 
 // ── Cálculo ───────────────────────────────────────────────────────────────────

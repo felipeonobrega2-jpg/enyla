@@ -93,3 +93,7 @@ Os demais limites de 23/11 seguem: até 10 abordagens por dia, de segunda a sext
 **Decisão.** Diretores gerem. A execução é de funcionários e de agentes.
 
 **Porquê.** Diretor que executa vira gargalo e mistura a decisão com a tarefa. Quem decide não é quem manda a mensagem nem quem mexe no pedido.
+
+## 25/11/2026 — o ferramental guarda o tipo de caixa
+
+**Decisão.** Para frente, `Ferramental` e `Desenho` guardam `tipoCaixa` (opcional). A faca `f-mweu5lzf` (desenho `91b661606f62a900`) é fundo automático, por mapa versionado no código; o que estiver gravado vale mais. ORCs já enviados não são alterados (com `blankOverride` o preço é o mesmo nos dois tipos).

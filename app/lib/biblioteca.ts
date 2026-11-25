@@ -3,6 +3,7 @@
 // desenho dela. Aqui só as regras puras (o servidor guarda o arquivo; a tela desenha).
 
 import { FORMATOS_PAPEL } from "../dados"
+import type { TipoCaixa } from "../types"
 import { encaixar, type Ferramental } from "./producao"
 import { folhaDaFaca } from "./precoDigital"
 
@@ -14,6 +15,7 @@ export type Desenho = {
   blank: { largura: number; altura: number }                                // caixa aberta (a peça), mm
   criadoEm: string
   apelido?: string               // o nome que você dá ("Perfume 20ml fundo automático"); o do arquivo fica guardado
+  tipoCaixa?: TipoCaixa          // tipo de caixa deste desenho (opcional)
   tags?: string[]                // palavras-chave: "perfume", "20ml", "villa" (categoria é só uma palavra-chave)
 }
 

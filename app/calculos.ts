@@ -1,5 +1,5 @@
 import { FormData, Calculo, ResultadoFormato, LinhaTabela, FormatoPapel, LayoutChapa, TipoCaixa } from "./types"
-import { calcularRotas, normalizarProducao, Rota } from "./lib/producao"
+import { calcularRotas, normalizarProducao, tipoCaixaEfetivo, Rota } from "./lib/producao"
 import { FORMATOS_PAPEL } from "./dados"
 import { Configuracoes } from "./config"
 
@@ -185,12 +185,14 @@ export function calcular(form: FormData, config: Configuracoes): Calculo | null 
   const temDim = form.frente > 0 && form.lateral > 0 && form.alturaBox > 0
   if (!temDim && !form.blankOverride && !plana) return null
 
+  const producao = normalizarProducao(config.producao)
+  const tipoCaixa = tipoCaixaEfetivo(form, producao.ferramentais)
   const dielineCalc = calcularDieline(
     (form.frente  || 1) * 10,
     (form.lateral || 1) * 10,
     (form.alturaBox || 1) * 10,
     form.abaColagem * 10,
-    form.tipoCaixa,
+    tipoCaixa,
   )
   // Se o usuário importou um DXF real (Pacdora), usa as dimensões reais do blank
   // Peça plana: a própria peça é o "blank" (sem abas); senão, o DXF real (Pacdora) ou a conta da caixa
@@ -210,7 +212,6 @@ export function calcular(form: FormData, config: Configuracoes): Calculo | null 
   const todosFormatos: ResultadoFormato[] = []
   for (const fmt of formatosComConfig) todosFormatos.push(...testarFolhaInteira(dieline, fmt))
 
-  const producao = normalizarProducao(config.producao)
   const multiplicador = form.rota?.multiplicador || config.multiplicadores.semFaca || 2
   const quantidades = [...form.quantidades].filter(q => q > 0).sort((a, b) => a - b)
 
@@ -218,7 +219,7 @@ export function calcular(form: FormData, config: Configuracoes): Calculo | null 
     blank: { largura: dieline.largura, altura: dieline.altura },
     quantidades,
     numArtes: Math.max(1, form.numArtes),
-    tipoCaixa: form.tipoCaixa,
+    tipoCaixa,
     cliente: form.nomeCliente,
     comFaca: plana?.corte === "guilhotina" ? false : form.comFaca,
     valorFaca: plana?.corte === "guilhotina" ? 0 : form.comFaca ? form.valorFaca : 0,
