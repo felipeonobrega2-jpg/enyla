@@ -66,7 +66,7 @@ describe("ordenar_funcionario: lead sai direto", () => {
     expect(r.acao).toMatchObject({ status: "aguardando" })
     expect(e.enviar).not.toHaveBeenCalled(); expect(enviarAoCliente).not.toHaveBeenCalled()
   })
-  it("nível indefinido (compra antiga, cadastro sem compra, erro de leitura): fila por segurança", async () => {
+  it("nível indefinido (compra antiga ou só digital, ligação fraca, erro de leitura): fila por segurança", async () => {
     e.nivel = { nivel: "indefinido", jaCliente: false, motivo: "" }
     const r = await ordenar()
     expect(r.destino).toBe("fila_aprovo"); expect(r.motivo).toBe("nível indefinido: fila por segurança")
