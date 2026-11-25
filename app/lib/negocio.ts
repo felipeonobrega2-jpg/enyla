@@ -134,6 +134,8 @@ export type Pedido = {
   semCobranca: number
   /** Custos diretos lançados (pagos ou na conta do fornecedor). */
   custoDireto: number
+  /** Só nos pedidos Digital (receberDigital.ts): sinal, data do último pagamento e vencimento do saldo. */
+  digital?: { id: string; sinal: number; pagoEm: string | null; vencimento: string | null }
 }
 
 // Link Pix que venceu sem pagamento: era só um meio de cobrança, não conta como dívida

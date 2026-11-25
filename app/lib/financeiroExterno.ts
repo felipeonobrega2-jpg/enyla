@@ -6,6 +6,7 @@ import type { Configuracoes, GastoFixo } from "@/app/config"
 import { supabase } from "./supabase"
 import { lerConfigLinha } from "./configAtomica"
 import { hoje, calcularResumoFinanceiro, dreDoPeriodo } from "./financeiro"
+import { receberDigital, juntarPedidos, ehPedidoDigital, type PedidoParaReceber } from "./receberDigital"
 import { montarPedidos, recebiveis, noPeriodo, type Periodo as Intervalo } from "./negocio"
 import { financeiroDoAndar } from "./financeiroAndar"
 import { saldoInformado } from "./caixa"
@@ -86,10 +87,15 @@ function saldos(cfg: Cfg) {
 function receber(d: Dados) {
   const resumo = calcularResumoFinanceiro(d.kanban, d.lancamentos, d.negocios as never)
   const offset = offsetDe(d.lancamentos)
-  const rec = recebiveis(montarPedidos(d.kanban, offset), offset)
+  // Digital na mesma lista: o saldo do restante vem dos lançamentos dig-{id}-* (a mesma base da página do cliente)
+  const digLancs = d.lancamentos.filter(l => l.unidade === "digital" && l.formaPagamento !== "conta")
+  const digital = receberDigital(d.cfg.pedidosDigitais as PedidoParaReceber[] | undefined, digLancs)
+  const rec = recebiveis(juntarPedidos(montarPedidos(d.kanban, offset), digital), [...offset, ...digLancs])
   return {
     aReceberTotal: r2(resumo.aReceberTotal), emAtrasoTotal: r2(resumo.emAtrasoTotal), recebidoTotal: r2(resumo.recebidoTotal),
-    pedidos: rec.comSaldo.map(p => ({ numero: p.numero, cliente: p.nomeCliente, etapa: p.etapa, venda: r2(p.venda), recebido: r2(p.recebido), aReceber: r2(p.aReceber), cobrado: r2(p.cobrado), vencido: r2(p.vencido), semCobranca: r2(p.semCobranca) })),
+    aReceberDigital: r2(digital.reduce((s, p) => s + p.aReceber, 0)),
+    pedidos: rec.comSaldo.map(p => ({ numero: p.numero, cliente: p.nomeCliente, etapa: p.etapa, venda: r2(p.venda), recebido: r2(p.recebido), aReceber: r2(p.aReceber), cobrado: r2(p.cobrado), vencido: r2(p.vencido), semCobranca: r2(p.semCobranca),
+      ...(ehPedidoDigital(p) ? { unidade: "digital", sinal: r2(p.digital.sinal), pagoEm: p.digital.pagoEm, vencimento: p.digital.vencimento } : {}) })),
     vencidos: resumo.vencidos.map(v => ({ numero: v.loteNumero ?? v.cardNumero ?? null, cliente: v.nomeCliente, valor: r2(v.total), diasAtraso: v.diasAtraso, vencimento: v.lancamentos[0]?.dataVencimento ?? null, status: v.lancamentos[0]?.status ?? null })),
     aConferir: rec.aConferir.map(l => ({ id: l.id, numero: l.loteNumero ?? l.cardNumero ?? null, cliente: l.nomeCliente ?? null, valor: l.valor, vencimento: l.dataVencimento, status: l.status })),
     comissoesPendentes: soma(d.negocios.filter(n => n.status === "pendente").map(n => ({ valor: n.comissaoValor }))),
