@@ -1,7 +1,7 @@
 import { reservarTratada } from "@/app/lib/registroAgente"
 import { NextRequest, NextResponse, after } from "next/server"
 import { transcreverPendentes } from "@/app/lib/transcricao"
-import { registrarConexao, registrarRecibos, registrarContatos } from "@/app/lib/whatsappEventos"
+import { registrarConexao, registrarRecibos, registrarContatos, nomeDoEvento, lerEventoConexao, provaDeVida } from "@/app/lib/whatsappEventos"
 import { gravarLote, WaMessage, deveIgnorar, extractBody } from "@/app/lib/whatsappDados"
 import { supabase } from "@/app/lib/supabase"
 import { agendarResposta, talvezFollowUps, talvezRetomarParados } from "@/app/lib/agenteAuto"
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body  = await req.json()
-    const event = body.event as string
+    const event = nomeDoEvento(body.event)
     // Tarefas periódicas pegam carona nos eventos, mas no máximo 1 vez por minuto (por instância) e só em mensagem
     // nova ou mudança de conexão. Antes rodavam em todo evento (inclusive cada "lida"/"entregue"), e cada uma lê a
     // configuração inteira: com muito volume isso sufocava o banco (12/11: leitura simples levando 20-120 s).
@@ -85,6 +85,8 @@ export async function POST(req: NextRequest) {
       const data = body.data as WaMessage
       const novas = new Set<string>()
       await gravarLote([data], { contarNaoLidas: true, novas })
+      // Mensagem nova gravada (entrada ou saída): o número está no ar, mesmo que o connection.update tenha se perdido
+      if (novas.size) await provaDeVida().catch(() => null)
       // Clique no anúncio (o WhatsApp marca a primeira mensagem): grava a origem na hora, sem esperar a classificação do dia.
       // Só uma dica para o funil e para o agente; nada do payload é usado além disso.
       if (data?.key?.id && novas.has(data.key.id) && !data.key.fromMe && /externalAdReply|conversionSource|"ctwa/i.test(JSON.stringify(data))) {
@@ -127,9 +129,8 @@ export async function POST(req: NextRequest) {
 
     // ── connection.update — o número conectou ou caiu (Painel avisa)
     if (event === "connection.update") {
-      const estado = (body.data?.state ?? body.data?.connection) as string | undefined
-      const motivo = Number(body.data?.statusReason ?? body.data?.lastDisconnect?.error?.output?.statusCode ?? 0) || null
-      if (estado) await registrarConexao(estado, motivo)
+      const ev = lerEventoConexao(body.data)
+      if (ev) await registrarConexao(ev.estado, ev.motivo)
       return NextResponse.json({ ok: true })
     }
 

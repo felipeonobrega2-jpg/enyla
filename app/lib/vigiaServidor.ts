@@ -17,6 +17,8 @@ const lerCfg = async () => ((await lerConfigLinha()).data?.data ?? {}) as Cfg
 
 export async function vigiar(agora = new Date()): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {}
+  // Conexão do número: confere o connectionState (só leitura) e religa o carimbo se a sessão voltou; API fora não grava nada
+  out.conexao = await import("./whatsappEventos").then(m => m.conferirConexao()).catch(e => `erro: ${String(e).slice(0, 140)}`)
   const cfg = await lerCfg()
 
   // Lições novas da base de conhecimento valem antes de responder a fila (barato: só grava quando a versão muda)
