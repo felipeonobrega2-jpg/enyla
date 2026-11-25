@@ -1,0 +1,115 @@
+// Trava da Atendente: gráfica de prospectos_parceiros que responde não recebe resposta automática.
+// Supabase, IA e Evolution são simulados: nada é enviado de verdade.
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+
+type Linha = Record<string, unknown>
+const mundo = vi.hoisted(() => ({
+  prospectos: [] as Linha[], conversas: [] as Linha[], mensagens: [] as Linha[], apelidos: {} as Record<string, string>,
+  atender: vi.fn(async (..._a: unknown[]) => ({ ok: false as const, erro: "x", status: 500 })),
+  evo: vi.fn(async (..._a: unknown[]) => ({ ok: true, status: 200, corpo: {} })),
+}))
+
+vi.mock("@/app/lib/evolution", () => ({ evo: mundo.evo }))
+vi.mock("@/app/lib/atendenteServidor", () => ({
+  atender: mundo.atender,
+  lerConfigAtendente: vi.fn(async () => ({ agenteAuto: { ligado: true } })),
+}))
+vi.mock("@/app/lib/registroAgente", () => ({
+  lerRegistros: vi.fn(async () => null), gravarRegistro: vi.fn(), lerIdsAgente: vi.fn(async () => null), guardarIdAgente: vi.fn(),
+  reservarTratada: vi.fn(async () => true), liberarTratada: vi.fn(), temTabelas: vi.fn(async () => true),
+}))
+vi.mock("@/app/lib/juntarConversas", () => ({ lerApelidos: vi.fn(async () => mundo.apelidos), juntarConversas: vi.fn(), juntarGemeas: vi.fn() }))
+vi.mock("@/app/lib/supabase", () => ({
+  supabase: {
+    from: (tabela: string) => {
+      const fonte = tabela === "prospectos_parceiros" ? mundo.prospectos : tabela === "whatsapp_conversas" ? mundo.conversas : mundo.mensagens
+      const filtros: ((r: Linha) => boolean)[] = []
+      let ini = 0, fim = Infinity
+      const q: Record<string, unknown> = {}
+      q.select = () => q
+      q.eq = (c: string, v: unknown) => { filtros.push(r => r[c] === v); return q }
+      q.order = () => q
+      q.limit = () => q
+      q.range = (a: number, b: number) => { ini = a; fim = b + 1; return q }
+      const achar = () => fonte.filter(r => filtros.every(f => f(r))).slice(ini, fim)
+      q.maybeSingle = async () => ({ data: achar()[0] ?? null, error: null })
+      q.then = (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) => Promise.resolve({ data: structuredClone(achar()), error: null }).then(ok, ko)
+      return q
+    },
+  },
+}))
+
+import { ehProspecto } from "@/app/lib/prospectorTrava"
+import { agendarResposta, responderSozinho } from "@/app/lib/agenteAuto"
+
+const fetchSpy = vi.fn(async (..._a: unknown[]) => ({ ok: true }))
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.stubGlobal("fetch", fetchSpy)
+  fetchSpy.mockClear(); mundo.atender.mockClear(); mundo.evo.mockClear()
+  mundo.prospectos = [{ telefone: "(11) 98765-4321" }]
+  mundo.conversas = []; mundo.apelidos = {}
+  mundo.mensagens = []
+})
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
+
+const msg = (id: string, jid: string) => ({ id, jid, from_me: false, ts: "2026-11-24T12:00:00Z", corpo: "oi", tipo: "text" })
+const agendar = async (id: string) => { const p = agendarResposta(id, "http://x"); await vi.runAllTimersAsync(); await p }
+
+describe("ehProspecto", () => {
+  it("casa o número com e sem o 9 extra, com e sem 55", async () => {
+    expect(await ehProspecto("5511987654321@s.whatsapp.net")).toBe(true)
+    expect(await ehProspecto("551187654321@s.whatsapp.net")).toBe(true)
+    expect(await ehProspecto("11987654321@s.whatsapp.net")).toBe(true)
+  })
+  it("telefone de prospecto cadastrado sem o 9 também casa com o jid com 9", async () => {
+    mundo.prospectos = [{ telefone: "1187654321" }]
+    expect(await ehProspecto("5511987654321@s.whatsapp.net")).toBe(true)
+  })
+  it("contato comum não é prospecto", async () => {
+    expect(await ehProspecto("5521999998888@s.whatsapp.net")).toBe(false)
+  })
+  it("@lid ligado ao número do prospecto (apelido ou telefone da conversa)", async () => {
+    expect(await ehProspecto("123@lid")).toBe(false)
+    mundo.apelidos = { "123@lid": "5511987654321@s.whatsapp.net" }
+    expect(await ehProspecto("123@lid")).toBe(true)
+    mundo.apelidos = {}; mundo.conversas = [{ jid: "123@lid", telefone: "551187654321" }]
+    expect(await ehProspecto("123@lid")).toBe(true)
+  })
+  it("sem prospectos ou sem número, nunca trava", async () => {
+    mundo.prospectos = []
+    expect(await ehProspecto("5511987654321@s.whatsapp.net")).toBe(false)
+    expect(await ehProspecto("abc@lid")).toBe(false)
+  })
+})
+
+describe("Atendente com gráfica do Prospector", () => {
+  it.each(["5511987654321@s.whatsapp.net", "551187654321@s.whatsapp.net"])("agendarResposta não agenta %s: sem responder, sem IA, sem envio", async jid => {
+    mundo.mensagens = [msg("M1", jid)]
+    await agendar("M1")
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(mundo.atender).not.toHaveBeenCalled()
+    expect(mundo.evo).not.toHaveBeenCalled()
+  })
+  it("responderSozinho (atrasada, assumir, retomar) também não chama a IA nem envia", async () => {
+    mundo.mensagens = [msg("M2", "5511987654321@s.whatsapp.net")]
+    await responderSozinho("M2", { atrasada: true })
+    const p = responderSozinho("M2"); await vi.runAllTimersAsync(); await p
+    expect(mundo.atender).not.toHaveBeenCalled()
+    expect(mundo.evo).not.toHaveBeenCalled()
+  })
+  it("@lid ligado ao prospecto: não responde", async () => {
+    mundo.apelidos = { "123@lid": "5511987654321@s.whatsapp.net" }
+    mundo.mensagens = [msg("M3", "123@lid")]
+    await agendar("M3")
+    await responderSozinho("M3", { atrasada: true })
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(mundo.atender).not.toHaveBeenCalled()
+  })
+  it("contato comum: o fluxo atual segue", async () => {
+    mundo.mensagens = [msg("M4", "5521999998888@s.whatsapp.net")]
+    await agendar("M4")
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+})

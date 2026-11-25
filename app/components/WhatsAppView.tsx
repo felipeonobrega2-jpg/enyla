@@ -1,5 +1,6 @@
 "use client"
 
+import { MarcarLead, marcarLead } from "./MarcarLead"
 import { Image as ImageIcon, FileText, Smile, Check, CheckCheck, X, Paperclip, SendHorizontal, Mic, Video, Pin, Clock3, AlertCircle, Archive, Tag, ChevronRight, Reply, Keyboard, Sparkles, Laptop, Smartphone, Trash2, Square, Merge, Search, Star } from "lucide-react"
 import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect, useSyncExternalStore } from "react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
@@ -16,6 +17,7 @@ import { LeadAvaliado, ROTULO_PERFIL } from "../lib/agenteLeads"
 import { useGravador, useMicrofones, tempo, extensaoAudio } from "../lib/gravador"
 import { filtrar, preencher, Rapida } from "../lib/mensagensRapidas"
 import { COL_HOT } from "../types"
+import { pedirSugestao, sugestaoVelha } from "../lib/sugestaoWhatsapp"
 
 export type Conversa = {
   jid: string
@@ -550,6 +552,7 @@ export default function WhatsAppView({
                 <Star className="w-4 h-4" fill={perto.has(ativa.jid) ? "currentColor" : "none"} />{perto.has(ativa.jid) ? "Perto" : "Pôr perto"}
               </button>
               <ProximoPasso key={ativa.jid} jid={ativa.jid} rotulo="Próximo passo" />
+              <MarcarLead jid={ativa.jid} />
               <button onClick={() => alterar([ativa.jid], { fechar: !estaFechada(ativa) })} title={estaFechada(ativa) ? "Reabrir conversa" : "Fechar conversa (volta sozinha se o cliente escrever)"}
                 className="flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-2 rounded-xl transition-colors hover:bg-black/5" style={{ color: "var(--text-sub)" }}>
                 <Archive className="w-4 h-4" />{estaFechada(ativa) ? "Reabrir" : "Fechar"}
@@ -625,7 +628,7 @@ export default function WhatsAppView({
             </div>
 
             <RespostaComSugestao key={ativa.jid} jid={ativa.jid} contato={ativa.nome} cliente={clienteDe(ativa)?.nome ?? null}
-              ultima={mensagens[mensagens.length - 1]} auto={!loadingMsgs}
+              ultima={mensagens[mensagens.length - 1]}
               onOrcamento={d => onCriarCard(clienteDe(ativa)?.nome ?? ativa.nome, ativa.jid, d)}
               orcamento={(() => { const cl = clienteDe(ativa); return cl ? kanban.filter(k => nomeChave(k.nomeCliente) === nomeChave(cl.nome) && (k.coluna === 0 || k.coluna === COL_HOT)).map(k => k.numero).pop() ?? null : null })()}
               onEnviarEProxima={abrirProxima}
@@ -1243,6 +1246,8 @@ export function FunilConversas({ conversas, cardsDe, clienteDe, onAbrir, onMover
                         <span className="hidden group-hover:flex wa-acoes absolute top-2 right-2 items-center gap-0.5 rounded-lg shadow-sm" style={{ background: "var(--bg-surface)" }} onClick={ev => ev.stopPropagation()}>
                           <button title="Responder sem abrir" onClick={ev => esp.espiar(c, ev.currentTarget.closest("[data-linha]") as HTMLElement, true)}
                             className="w-7 h-7 rounded-lg grid place-items-center hover:bg-[#25a35a]/15 text-[#1d8a4b]"><Reply className="w-4 h-4" /></button>
+                          <button title="Marcar perdido (com motivo)" onClick={() => { esp.fechar(); void marcarLead(c.jid, "perdido") }}
+                            className="h-7 px-1.5 rounded-lg text-[11px] font-semibold hover:bg-black/5" style={{ color: "var(--text-sub)" }}>Perdido</button>
                           {onFechar && <button title="Fechar conversa" onClick={() => { esp.fechar(); onFechar([c.jid]) }}
                             className="w-7 h-7 rounded-lg grid place-items-center hover:bg-black/5" style={{ color: "var(--text-sub)" }}><Archive className="w-4 h-4" /></button>}
                         </span>
@@ -1458,7 +1463,7 @@ export function Espiada({ conversa, topo, esquerda, fixa, onFixar, onFechar, onA
         <div ref={fimRef} />
       </div>
       <RespostaComSugestao compacto autoFoco={fixa} jid={conversa.jid} contato={conversa.nome}
-        ultima={msgs?.[msgs.length - 1]} auto={fixa && !!msgs} onOrcamento={onOrcamento}
+        ultima={msgs?.[msgs.length - 1]} onOrcamento={onOrcamento}
         onOtimista={m => { setMsgs(prev => [...(prev ?? []), m]); onEnviada(m.corpo ?? "") }}
         onResultado={(tmp, real) => {
           if (real) setBase(b => new Set(b).add(real))
@@ -1469,9 +1474,9 @@ export function Espiada({ conversa, topo, esquerda, fixa, onFixar, onFechar, onA
 }
 
 // ── Atendente: resposta sugerida no seu tom + dados do pedido ─────────────────
-// Guardada por conversa (vale até chegar mensagem nova). Gera sozinha quando o cliente está esperando você.
+// Guardada por conversa (vale até chegar mensagem nova). Só gera quando o Felipe clica em "Gerar sugestão".
 const sugestoes = new Map<string, Atendimento>()
-function useAtendimento(jid: string, ultima: { id: string; from_me: boolean } | undefined, auto: boolean) {
+function useAtendimento(jid: string, ultima: { id: string; from_me: boolean } | undefined) {
   const [at, setAt] = useState<Atendimento | null>(() => sugestoes.get(jid) ?? null)
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -1479,22 +1484,12 @@ function useAtendimento(jid: string, ultima: { id: string; from_me: boolean } | 
   const gerar = useCallback(async (outra?: boolean) => {
     pedindo.current = jid
     setCarregando(true); setErro(null)
-    const r = await fetch("/api/whatsapp/atender", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jid, outra: outra === true }) }).catch(() => null)
-    const d = r ? await r.json().catch(() => null) : null
+    const r = await pedirSugestao(fetch, jid, outra)
     if (pedindo.current !== jid) return
-    if (r?.ok && d?.resposta !== undefined) { sugestoes.set(jid, d); setAt(d) } else setErro(d?.erro ?? "A IA não respondeu.")
+    if (r.at) { sugestoes.set(jid, r.at); setAt(r.at) } else setErro(r.erro ?? "A IA não respondeu.")
     setCarregando(false)
   }, [jid])
-  const guardada = sugestoes.get(jid)
-  const velha = !!guardada && !!ultima && guardada.ultimaId !== ultima.id
-  // Cliente falou por último e não há sugestão para a mensagem dele: gera (um componente por conversa: key = jid).
-  // Espera 600 ms: passando por várias conversas com ↑↓, só gera para aquela em que você parou.
-  const precisa = auto && !!ultima && !ultima.from_me && !ultima.id.startsWith("tmp-") && (!guardada || velha)
-  useEffect(() => {
-    if (!precisa) return
-    const t = setTimeout(() => gerar(), 600)
-    return () => clearTimeout(t)
-  }, [precisa, gerar, ultima?.id])
+  const velha = sugestaoVelha(sugestoes.get(jid), ultima)
   return { at: velha && !ultima?.from_me ? null : at, carregando, erro, gerar, descartar: () => { sugestoes.delete(jid); setAt(null) } }
 }
 
@@ -1508,7 +1503,7 @@ function SugestaoAtendente({ estado, onUsar, onOrcamento, compacto }: {
   if (!at && !carregando && !erro) return (
     <div className={`shrink-0 ${compacto ? "px-3 pt-2" : "px-4 pt-2.5"}`} style={{ background: "var(--bg-surface)" }}>
       <button onClick={() => gerar()} className="text-[11.5px] font-semibold flex items-center gap-1.5 px-2.5 h-7 rounded-lg hover:bg-[#8456e8]/10" style={{ color: "#8456e8" }}>
-        <Sparkles className="w-3.5 h-3.5" />Sugerir resposta
+        <Sparkles className="w-3.5 h-3.5" />Gerar sugestão
       </button>
     </div>
   )
@@ -1565,12 +1560,11 @@ function SugestaoAtendente({ estado, onUsar, onOrcamento, compacto }: {
 }
 
 // Caixa de resposta com o atendente em cima (conversa aberta e espiada)
-function RespostaComSugestao({ jid, ultima, auto, compacto, onOrcamento, ...props }: {
+function RespostaComSugestao({ jid, ultima, compacto, onOrcamento, ...props }: {
   ultima: { id: string; from_me: boolean } | undefined
-  auto: boolean
   onOrcamento?: (d: DadosPedido) => void
 } & Omit<Parameters<typeof Compositor>[0], "sugestao" | "usarTexto" | "colado">) {
-  const estado = useAtendimento(jid, ultima, auto)
+  const estado = useAtendimento(jid, ultima)
   const [usar, setUsar] = useState<{ texto: string; vez: number } | undefined>()
   return <>
     <SugestaoAtendente estado={estado} compacto={compacto} onOrcamento={onOrcamento} onUsar={t => setUsar({ texto: t, vez: Date.now() })} />
@@ -1711,7 +1705,7 @@ export function ConversaLateral({ jid, nome, dados, onFechar, onAbrir, responder
       {responder && msgs && (
         <div className="shrink-0 pb-2" style={{ background: "var(--bg-surface)" }}>
           <RespostaComSugestao compacto autoFoco jid={jid} contato={nome}
-            ultima={msgs[msgs.length - 1]} auto onOrcamento={onOrcamento} onEnviou={onEnviou}
+            ultima={msgs[msgs.length - 1]} onOrcamento={onOrcamento} onEnviou={onEnviou}
             onOtimista={m => { setBusca(""); setMsgs(prev => [...(prev ?? []), m]) }}
             onResultado={(tmp, real) => setMsgs(prev => (prev ?? []).map(x => x.id !== tmp ? x : real ? { ...x, id: real, status: "enviada" } : { ...x, status: "erro" }))} />
         </div>

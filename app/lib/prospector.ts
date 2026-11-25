@@ -18,9 +18,14 @@ export const SERVICOS_PROSPECTO = ["offset", "digital", "corteVinco", "colagem",
 export type ServicoProspect = (typeof SERVICOS_PROSPECTO)[number]
 
 export const ETAPAS_FUNIL = ["encontrado", "qualificado", "abordado", "abriu", "cadastrou"] as const
-export type EtapaFunil = (typeof ETAPAS_FUNIL)[number] | "descartado"
+/** Etapas do envio automático: não entram na contagem do funil da tela, mas andam no mesmo caminho. */
+export const ETAPAS_ENVIO = ["encerrado_sem_resposta", "respondeu"] as const
+export type EtapaFunil = (typeof ETAPAS_FUNIL)[number] | (typeof ETAPAS_ENVIO)[number] | "descartado"
 
-export type MudancaEtapa = { etapa: EtapaFunil; em: string; motivo?: string; cadastroId?: string }
+// Ordem em que a etapa só anda para frente. Respondeu e encerrado ficam entre abordado e abriu.
+const ORDEM_ETAPAS: readonly EtapaFunil[] = ["encontrado", "qualificado", "abordado", "encerrado_sem_resposta", "respondeu", "abriu", "cadastrou"]
+
+export type MudancaEtapa = { etapa: EtapaFunil; em: string; motivo?: string; cadastroId?: string; envio?: unknown }
 export type EstadoFunil = { etapa: EtapaFunil; optOut: boolean; historico: MudancaEtapa[] }
 
 /** Tudo que muda a nota está aqui. Os quatro tetos somam 100. */
@@ -230,15 +235,15 @@ export function notaDoProspect(p: EntradaNota): ResultadoNota {
 }
 
 export function etapaConhecida(v: unknown): v is EtapaFunil {
-  return v === "descartado" || (ETAPAS_FUNIL as readonly string[]).includes(String(v))
+  return v === "descartado" || (ETAPAS_FUNIL as readonly string[]).includes(String(v)) || (ETAPAS_ENVIO as readonly string[]).includes(String(v))
 }
 
 /** A etapa só anda para frente. Descartado é a exceção: sai de qualquer etapa e não volta. Opt-out trava. */
 export function podeTransicionar(atual: EtapaFunil, proxima: EtapaFunil, optOut: boolean): boolean {
   if (optOut || atual === "descartado") return false
   if (proxima === "descartado") return true
-  const de = ETAPAS_FUNIL.indexOf(atual as (typeof ETAPAS_FUNIL)[number])
-  const para = ETAPAS_FUNIL.indexOf(proxima as (typeof ETAPAS_FUNIL)[number])
+  const de = ORDEM_ETAPAS.indexOf(atual)
+  const para = ORDEM_ETAPAS.indexOf(proxima)
   return de >= 0 && para > de
 }
 

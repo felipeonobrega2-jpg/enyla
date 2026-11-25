@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { travaDoEnvio, valoresEmReais, partesDaResposta, ehMensagemAutomaticaDoWhatsapp, ContextoEnvio, FILTRO_PADRAO } from "@/app/lib/agenteLeads"
+import { travaDoEnvio, valoresEmReais, partesDaResposta, ehMensagemAutomaticaDoWhatsapp, ehSaudacaoAutomaticaDoLead, ContextoEnvio, FILTRO_PADRAO } from "@/app/lib/agenteLeads"
 
 const ok: ContextoEnvio = {
   ligado: true, resposta: "Oi, tudo bem? Que volume você precisa?", alerta: "nenhum", podeSozinho: true,
@@ -200,4 +200,42 @@ describe("horário do agente", async () => {
   it("atravessa a meia-noite: quarta 1h dentro (continuação da terça)", () => expect(dentroDoHorario(noite, sp("2026-11-11T01:00:00"))).toBe(true))
   it("atravessa a meia-noite: quarta 3h fora", () => expect(dentroDoHorario(noite, sp("2026-11-11T03:00:00"))).toBe(false))
   it("nenhum dia: nunca", () => expect(dentroDoHorario({ dias: [], inicio: "00:00", fim: "24:00" }, sp("2026-11-10T10:00:00"))).toBe(false))
+})
+
+describe("saudação automática do WhatsApp Business que o lead manda", () => {
+  it("template: true (acento e caixa variam)", () => {
+    for (const t of [
+      "Olá! Agradecemos seu contato. No momento não podemos atender. Em breve retornaremos.",
+      "Obrigado por entrar em contato. Como podemos ajudar?",
+      "Estou ausente no momento, retornarei em breve.",
+      "Esta é uma mensagem automática. Fora do horário de atendimento.",
+      "AGRADECE SEU CONTATO!", "agradecemos o seu contato", "Retornaremos em breve", "Este é um aviso automático",
+    ]) expect(ehSaudacaoAutomaticaDoLead(t), t).toBe(true)
+  })
+  it("fala humana: false", () => {
+    for (const t of [
+      "Oi", "Bom dia", "Tudo bem?", "Oi, como podemos fechar o pedido?", "Obrigado pelo contato, quero 5.000 caixas",
+      "Em breve te retorno o volume", "Pode me ajudar com um orçamento?",
+      "Agradecemos o contato. Preciso de 3000 caixas 10x5x5 cm com verniz, entrega em SP e prazo de 20 dias, " + "detalhe ".repeat(50),
+    ]) expect(ehSaudacaoAutomaticaDoLead(t), t).toBe(false)
+    expect(ehSaudacaoAutomaticaDoLead(null)).toBe(false)
+    expect(ehSaudacaoAutomaticaDoLead("agradecemos seu contato, preciso de 2000 caixas")).toBe(false)
+  })
+  it("limite conhecido: humano que escreve só 'como podemos ajudar?' é segurado (o Felipe decide)", () => {
+    expect(ehSaudacaoAutomaticaDoLead("Como podemos ajudar?")).toBe(true)
+  })
+  it("não muda a detecção das automáticas nossas", () => {
+    expect(ehMensagemAutomaticaDoWhatsapp("Agradecemos seu contato. Em breve retornaremos.")).toBe(false)
+  })
+  it("depois de um follow-up nosso, a saudação do lead não parece conversa nova", () => {
+    const msgs = [
+      { from_me: true, corpo: "Oi! Conseguiu ver a proposta?", tipo: "text" },
+      { from_me: false, corpo: "Agradecemos seu contato. Em breve retornaremos.", tipo: "text" },
+    ]
+    expect(soAbertura(msgs)).toBe(false)
+    expect(soAbertura([msgs[1]])).toBe(false)
+  })
+  it("semFollowUp continua limpando F1/F2/F3 (por isso o agente não pode chamá-lo na saudação)", () => {
+    expect(semFollowUp(["F1", "MQL"])).not.toContain("F1")
+  })
 })

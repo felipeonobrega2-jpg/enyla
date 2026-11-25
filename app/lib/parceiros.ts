@@ -137,7 +137,21 @@ export type ServicoCadastrado = {
   prazoVaria: boolean              // "não consigo mensurar agora"
   minimo?: string
   obs?: string
+  precosExemplo?: Record<string, number>   // R$ por cenário-exemplo respondido (id do cenário, ver cenariosParceiros.ts)
+  cenarioVersoes?: Record<string, number>  // versão do enunciado que o parceiro viu, por cenário
 }
+
+// Ids dos cenários-exemplo de cada serviço (estrutura fixa; só o texto e a referência são editáveis).
+// Impressão não tem cenário: cobra acerto + milheiro. Fica aqui, e não em cenariosParceiros.ts, para o formulário
+// público não carregar os preços e nomes de referência.
+export const CENARIOS_IDS: Record<IdServicoParceiro, string[]> = {
+  impressaoOffset: [], impressaoDigital: [], laminacao: ["laminacao-fosca", "laminacao-brilho", "laminacao-soft", "laminacao-dois-lados"],
+  verniz: ["verniz"], hotStamping: ["hotStamping"], relevo: ["relevo"], corteVinco: ["corteVinco"], colagem: ["colagem"], faca: ["faca"],
+  papel: ["papel"], arte: ["arte-unitaria", "arte-pacote3"], fechamento: ["fechamento"], transporte: ["transporte"], outro: [],
+}
+export const ROTULO_PRECO_CENARIO: Record<string, string> = { "arte-unitaria": "Preço por arte (R$)", "arte-pacote3": "Preço do pacote de 3 artes (R$)" }
+export const cobraPorAcertoMilheiro = (id: IdServicoParceiro) => id === "impressaoOffset" || id === "impressaoDigital"
+const formatoOk = (f: unknown) => !!f && typeof f === "object" && Number((f as Formato).l) > 0 && Number((f as Formato).a) > 0
 
 export type CadastroParceiro = {
   id: string
@@ -238,7 +252,14 @@ export function errosDaEtapa(c: Partial<CadastroParceiro>, etapa: Etapa): Record
   if (etapa === "servicos" && !(c.servicos?.length)) e.servicos = "Escolha pelo menos um serviço"
   if (etapa === "detalhes") for (const s of c.servicos ?? []) {
     if (s.id === "outro" && !s.qual?.trim()) e[`${s.id}.qual`] = "Qual serviço?"
-    if (!s.cobranca) e[`${s.id}.cobranca`] = "Escolha uma das opções"
+    if (cobraPorAcertoMilheiro(s.id)) {
+      if (!formatoOk(s.tecnico?.formatoMax)) e[`${s.id}.formatoMax`] = "Informe o formato da máquina"
+      if (!(Number(s.acerto) > 0)) e[`${s.id}.acerto`] = "Informe o acerto"
+      if (!(Number(s.valor) > 0)) e[`${s.id}.valor`] = "Informe o valor do milheiro"
+    } else {
+      for (const cid of CENARIOS_IDS[s.id] ?? []) if (!(Number(s.precosExemplo?.[cid]) > 0)) e[`${s.id}.preco.${cid}`] = "Informe o preço para este exemplo"
+      if (!s.cobranca) e[`${s.id}.cobranca`] = "Escolha uma das opções"
+    }
     if (!s.prazoVaria && !(s.prazoDias && s.prazoDias > 0 && s.prazoDias <= 120)) e[`${s.id}.prazo`] = "Informe o prazo médio ou marque que varia"
   }
   if (etapa === "final" && !c.aceite) e.aceite = "Precisa concordar para enviar"
@@ -265,6 +286,18 @@ export function limparTecnico(id: IdServicoParceiro, t: unknown): Record<string,
   return Object.keys(out).length ? out : undefined
 }
 
+// Preços e versões só dos cenários que existem para o serviço
+function limparExemplos(s: Partial<ServicoCadastrado> & { id: IdServicoParceiro }): Pick<ServicoCadastrado, "precosExemplo" | "cenarioVersoes"> {
+  const precos: Record<string, number> = {}, versoes: Record<string, number> = {}
+  for (const cid of CENARIOS_IDS[s.id] ?? []) {
+    const k = Number(s.precosExemplo?.[cid]), v = Number(s.cenarioVersoes?.[cid])
+    if (!Number.isFinite(k) || k <= 0 || k > 10_000_000) continue
+    precos[cid] = Math.round(k * 100) / 100
+    if (Number.isInteger(v) && v > 0) versoes[cid] = v
+  }
+  return { ...(Object.keys(precos).length ? { precosExemplo: precos } : {}), ...(Object.keys(versoes).length ? { cenarioVersoes: versoes } : {}) }
+}
+
 export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParceiro, "id" | "em" | "status" | "gerente" | "arquivos" | "base"> {
   const t = (s: unknown, max = 200) => String(s ?? "").replace(/\s+/g, " ").trim().slice(0, max)
   const n = (v: unknown, max: number) => { const k = Number(v); return Number.isFinite(k) && k > 0 && k <= max ? Math.round(k * 100) / 100 : null }
@@ -278,10 +311,11 @@ export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParce
     contatoProducao: t(x.contatoProducao, 160) || undefined,
     servicos: (x.servicos ?? []).filter(s => ids.has(s.id)).slice(0, 20).map(s => ({
       id: s.id, qual: s.id === "outro" ? t(s.qual, 80) : undefined, tecnico: limparTecnico(s.id, s.tecnico),
-      cobranca: s.cobranca && formas.has(s.cobranca) ? s.cobranca : null,
+      cobranca: cobraPorAcertoMilheiro(s.id) ? "acertoMilheiro" as const : s.cobranca && formas.has(s.cobranca) ? s.cobranca : null,
       valor: n(s.valor, 1_000_000), acerto: n(s.acerto, 1_000_000),
       prazoDias: s.prazoVaria ? null : n(s.prazoDias, 120), prazoVaria: !!s.prazoVaria,
       minimo: t(s.minimo, 120) || undefined, obs: t(s.obs, 600) || undefined,
+      ...limparExemplos(s),
     })),
     capacidade: t(x.capacidade, 300) || undefined, horario: t(x.horario, 160) || undefined, maquinas: t(x.maquinas, 600) || undefined,
     comoConheceu: t(x.comoConheceu, 200) || undefined, aceite: !!x.aceite,
@@ -290,6 +324,10 @@ export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParce
 
 export const nomeServico = (s: ServicoCadastrado) => s.id === "outro" ? (s.qual || "Outro") : SERVICOS_PARCEIRO.find(x => x.id === s.id)?.nome ?? s.id
 export const textoPrazo = (s: ServicoCadastrado) => s.prazoVaria ? "varia muito (sem média)" : s.prazoDias ? `${s.prazoDias} ${s.prazoDias === 1 ? "dia útil" : "dias úteis"}` : "—"
+export const textoExemplos = (s: ServicoCadastrado) => {
+  const v = Object.values(s.precosExemplo ?? {})
+  return v.length ? ` · exemplo${v.length > 1 ? "s" : ""} ${v.map(x => x.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })).join(", ")}` : ""
+}
 export function textoCobranca(s: ServicoCadastrado) {
   const f = FORMAS_COBRANCA.find(x => x.id === s.cobranca)
   if (!f) return "—"
@@ -313,7 +351,7 @@ export const textoEndereco = (c: Pick<CadastroParceiro, "rua" | "numero" | "comp
 // Aprovado: vira fornecedor de produção (prazo, contato, base no mapa e a máquina de impressão, se informada)
 export function paraFornecedor(c: CadastroParceiro, id: string): FornecedorProducao {
   const prazos = c.servicos.map(s => s.prazoDias).filter((d): d is number => !!d)
-  const resumo = c.servicos.map(s => [`${nomeServico(s)}: ${textoCobranca(s)} · ${textoPrazo(s)}${s.minimo ? ` · mínimo ${s.minimo}` : ""}`, textoTecnico(s)].filter(Boolean).join(" · ")).join(" | ")
+  const resumo = c.servicos.map(s => [`${nomeServico(s)}: ${textoCobranca(s)} · ${textoPrazo(s)}${s.minimo ? ` · mínimo ${s.minimo}` : ""}${textoExemplos(s)}`, textoTecnico(s)].filter(Boolean).join(" · ")).join(" | ")
   const offset = c.servicos.find(s => s.id === "impressaoOffset")
   const fmax = offset?.tecnico?.formatoMax as Formato | undefined
   return {

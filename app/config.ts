@@ -26,6 +26,7 @@ export type CategoriaFinanceira = {
   id: string
   nome: string
   subcategorias?: string[]
+  ativa?: boolean   // omitido = ativa; desativar põe false e a categoria continua na lista
 }
 
 export type ContaBancaria = {

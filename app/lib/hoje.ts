@@ -36,6 +36,8 @@ export type ItemHoje = {
   nota?: string                      // a nota do lembrete
   dados: DadosPedido | null          // o que a IA já tirou da conversa (para o orçamento sair preenchido)
   cliente: string | null             // cliente do cadastro ligado à conversa
+  orcadoPeloFelipe?: { em: string; evidencia: string | null; manual?: boolean }   // ele já mandou o orçamento pelo WhatsApp (ou você marcou à mão)
+  perdido?: { motivo: string; por: string; em: string }                             // lead perdido com motivo (some das filas)
 }
 
 // MQL da semana ainda sem orçamento: o que trava e há quantas horas ele chegou
@@ -86,6 +88,7 @@ export type Hoje = {
   digital?: { ligado: boolean; ativos: number; paraOrcar: number; esperando: number; aguardandoSinal?: number; pagos?: number }   // leads pequenos que você vende em digital (7 dias)
   perfis?: Record<string, import("./caixaEntrada").PerfilCaixa>   // perfil de cada conversa citada (ordem e grupo da caixa de entrada)
   cards?: Record<string, { jid: string; perfil?: import("./caixaEntrada").PerfilCaixa }>   // orçamento/pedido → a conversa dele
+  leadsMarcados?: { jid: string; nome: string | null; orcadoPeloFelipe?: ItemHoje["orcadoPeloFelipe"]; perdido?: ItemHoje["perdido"] }[]   // orçados pelo Felipe e perdidos com motivo (já descontados das filas)
   resolver?: import("./resolverServidor").ItemResolver[]   // para resolver agora: sistema, sinal que não caiu, entrega atrasada, proposta sem retomada
 }
 

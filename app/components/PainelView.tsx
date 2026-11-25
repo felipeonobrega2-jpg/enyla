@@ -4,6 +4,7 @@ import { CaixaEntrada, type ItemExterno } from "./CaixaEntrada"
 import { FunilAgoraCard } from "./FunilAgoraCard"
 
 import React from "react"
+import { useSegurados } from "../lib/useSegurados"
 import {
   AlertTriangle, CircleCheck, CalendarClock, CalendarX2, CircleDollarSign, Clock, Factory, FileText, Hourglass,
   MessageCircle, Percent, Plus, Receipt, TrendingUp, Truck, Users, Wallet, CheckCircle2, ArrowRight, Target, Trophy, Eye, MessageCircleHeart, Star, RotateCcw, Megaphone, ChevronDown,
@@ -23,6 +24,8 @@ import { pendencias, cardDoPedido, prazoDoPedido, TipoPendencia } from "../lib/p
 import { ehDiaUtil } from "../lib/diasUteis"
 import { normalizarMetas, sugerirMeta, conquistasDeSaude } from "../lib/metas"
 import { brl, num } from "../utils"
+import { useDispensadas, DispensarBotao } from "./Dispensar"
+import { chaveSistema } from "../lib/pendenciaDispensada"
 import {
   Pagina, CabecalhoPagina, Cartao, TituloCartao, Kpi, GradeKpis, Segmentado, Botao, LinhaLista,
   ListaBarras, Colunas, Vazio, Gaveta, Selo, Tom,
@@ -99,7 +102,8 @@ export function PainelView({
   const conv = conversao(orcs)
   const pipe = pipelineComercial(kanban)
   const margem = margemContribuicao(vendas.pedidos)
-  const prod = producao(pedidos, hoje)
+  const { segurados } = useSegurados()
+  const prod = producao(pedidos, hoje, segurados)
   const rec = recebiveis(pedidos, lancamentos)
 
 
@@ -112,7 +116,8 @@ export function PainelView({
     abriuProposta: <Eye className="w-4 h-4" />, comoFicou: <MessageCircleHeart className="w-4 h-4" />, avaliado: <Star className="w-4 h-4" />, reposicao: <RotateCcw className="w-4 h-4" />, meta: <Megaphone className="w-4 h-4" />, whatsapp: <MessageCircle className="w-4 h-4" />,
   }
   type Acao = { id: string; tom: Tom; icone: React.ReactNode; titulo: string; sub: string; valor?: string; ir: () => void; whatsapp?: string; envio?: Envio; cobrar?: Partial<LancamentoFinanceiro>; botao?: { rotulo: string; onClick: () => void } }
-  const acoes: (Acao & { tipo: string; numero?: string; cardId?: string; valorNum?: number | null })[] = pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom, clientes, config, hoje }).map(x => ({
+  const disp = useDispensadas()
+  const acoes: (Acao & { tipo: string; numero?: string; cardId?: string; valorNum?: number | null })[] = pendencias({ pedidos, kanban, lancamentos, historico, propostasCustom, clientes, config, hoje, segurados }).filter(x => !disp.chaves.has(chaveSistema(x.id))).map(x => ({
     tipo: x.tipo, numero: x.card?.numero, cardId: x.card?.id, valorNum: x.valor ?? null,
     id: x.id, tom: x.tom, icone: ICONE[x.tipo], titulo: x.titulo, sub: x.sub,
     valor: x.valor != null ? brl(x.valor) : undefined,
@@ -122,7 +127,8 @@ export function PainelView({
     cobrar: x.cobrar,
     botao: x.aprovacao && onAprovacaoOnline ? { rotulo: x.aprovacao.tipo === "recompra_qtd" ? "Orçar" : "Lançar sinal", onClick: () => onAprovacaoOnline(x.aprovacao!) } : undefined,
   }))
-  const acaoDe = (a: Acao) => (a.botao ? (
+  const acaoDe = (a: Acao) => (<>{acaoBase(a)}<DispensarBotao chave={chaveSistema(a.id)} titulo={a.titulo} onDispensar={disp.dispensar} /></>)
+  const acaoBase = (a: Acao) => (a.botao ? (
       <button onClick={a.botao.onClick}
         className="h-8 px-2.5 mr-1 rounded-lg text-[11.5px] font-semibold text-[#8456e8] hover:bg-[#8456e8]/[0.08] transition-colors shrink-0 whitespace-nowrap">
         {a.botao.rotulo}

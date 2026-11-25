@@ -20,6 +20,7 @@
  *   Pipeline / produção → foto do momento (sem período)
  */
 
+import { estaSegurado, type MapaSegurados } from "./pedidoSegurado"
 import {
   KanbanCard, LancamentoFinanceiro,
   COL_FECHADO, COL_EXPEDICAO, COL_ENTREGUE, COL_PERDIDO, COL_HOT, COLUNAS_KANBAN,
@@ -335,7 +336,7 @@ export type Producao = {
   porEtapa: { coluna: number; etapa: string; count: number; valor: number }[]
 }
 
-export function producao(pedidos: Pedido[], hoje = new Date()): Producao {
+export function producao(pedidos: Pedido[], hoje = new Date(), segurados?: MapaSegurados): Producao {
   const emProducao = pedidos.filter(pedidoEmProducao)
   const etapas = new Map<number, { count: number; valor: number }>()
   for (const p of emProducao) {
@@ -347,7 +348,8 @@ export function producao(pedidos: Pedido[], hoje = new Date()): Producao {
     valorEmProducao: emProducao.reduce((s, p) => s + p.valor, 0),
     entregues: pedidos.filter(pedidoEntregue),
     // Na expedição o pedido já está pronto: se ficou parado (cliente não pagou o restante, não retirou) não é atraso
-    atrasados: emProducao.filter(p => p.coluna < COL_EXPEDICAO && p.dataEntregaPrevista && diasAte(p.dataEntregaPrevista, hoje) < 0),
+    // Segurado por falta de pagamento do cliente (aguardando pagamento) é atraso dele, não nosso
+    atrasados: emProducao.filter(p => p.coluna < COL_EXPEDICAO && p.dataEntregaPrevista && diasAte(p.dataEntregaPrevista, hoje) < 0 && !estaSegurado(segurados, p.numero)),
     vencendo3d: emProducao.filter(p => {
       if (!p.dataEntregaPrevista || p.coluna >= COL_EXPEDICAO) return false
       const d = diasAte(p.dataEntregaPrevista, hoje)
