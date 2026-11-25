@@ -22,10 +22,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as { id?: string; apelido?: string; tags?: string[] | string }
-  if (!b.id || (b.apelido === undefined && b.tags === undefined)) return NextResponse.json({ erro: "Faltou o nome ou as palavras-chave." }, { status: 400 })
+  const b = await req.json().catch(() => ({})) as { id?: string; apelido?: string; tags?: string[] | string; modelosPorChapa?: number | null }
+  if (!b.id || (b.apelido === undefined && b.tags === undefined && b.modelosPorChapa === undefined)) return NextResponse.json({ erro: "Faltou o nome ou as palavras-chave." }, { status: 400 })
   const tags = b.tags === undefined ? undefined : lerTags(Array.isArray(b.tags) ? b.tags.join(",") : String(b.tags))
-  return (await editarDesenho(b.id, { apelido: b.apelido === undefined ? undefined : String(b.apelido), tags }))
+  return (await editarDesenho(b.id, { apelido: b.apelido === undefined ? undefined : String(b.apelido), tags, modelosPorChapa: b.modelosPorChapa === undefined ? undefined : (b.modelosPorChapa === null ? null : Number(b.modelosPorChapa)) }))
     ? NextResponse.json({ ok: true }) : NextResponse.json({ erro: "Não achei esse desenho." }, { status: 404 })
 }
 

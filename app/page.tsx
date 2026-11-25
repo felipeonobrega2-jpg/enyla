@@ -3051,6 +3051,8 @@ export default function Home() {
           ) : view === "biblioteca" ? (
             <BibliotecaFacasView
               ferramentais={normalizarProducao(config.producao).ferramentais}
+              maquina={normalizarProducao(config.producao).fornecedores.find(f => f.id === "tio")?.maquina ?? null}
+              espaco={normalizarProducao(config.producao).espacoEntrePecas}
               fornecedores={(() => {
                 const prod = normalizarProducao(config.producao)
                 const cv = prod.fornecedores.filter(f => f.ativo && f.servicos.corteVinco)

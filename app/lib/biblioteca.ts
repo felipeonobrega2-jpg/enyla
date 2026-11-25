@@ -3,7 +3,7 @@
 // desenho dela. Aqui só as regras puras (o servidor guarda o arquivo; a tela desenha).
 
 import { FORMATOS_PAPEL } from "../dados"
-import { encaixar, type Ferramental } from "./producao"
+import { encaixar, cavidadesFolha, type Ferramental, type Maquina } from "./producao"
 import { folhaDaFaca } from "./precoDigital"
 
 export type Desenho = {
@@ -15,6 +15,7 @@ export type Desenho = {
   criadoEm: string
   apelido?: string               // o nome que você dá ("Perfume 20ml fundo automático"); o do arquivo fica guardado
   tags?: string[]                // palavras-chave: "perfume", "20ml", "villa" (categoria é só uma palavra-chave)
+  modelosPorChapa?: number       // quantos modelos cabem na chapa do impressor principal (confirmado por alguém; inteiro ≥ 1)
 }
 
 const ESPACO_MM = 3   // entre peças na folha
@@ -55,6 +56,32 @@ export function facasDoDesenho(d: Pick<Desenho, "id" | "blank">, ferramentais: (
     || (Math.abs(f.blankLargura - d.blank.altura) <= 1 && Math.abs(f.blankAltura - d.blank.largura) <= 1)
   return ferramentais.filter(f => f.tipo === "faca" && (f.desenhoId ? f.desenhoId === d.id : mesma(f)))
 }
+
+// Quantos modelos (artes) cabem na chapa da faca, na máquina do impressor principal (hoje Jerograf, 48 × 45 cm).
+// Ordem: o número confirmado (desenho ou faca) → as cavidades da faca física salva → estimativa com encaixar na máquina.
+// Nunca calcula por cima do que está salvo. Sem medida da peça ou sem máquina, devolve null (desconhecido).
+export type ModelosPorChapa = { valor: number; origem: "confirmado" | "cavidades" | "estimado" }
+const inteiroPositivo = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n >= 1
+
+export function modelosPorChapaDetalhe(
+  d: Pick<Desenho, "id" | "blank"> & { modelosPorChapa?: number },
+  ferramentais: Ferramental[],
+  maquina: Maquina | null | undefined,
+  espacoMm = 2,
+): ModelosPorChapa | null {
+  if (inteiroPositivo(d.modelosPorChapa)) return { valor: d.modelosPorChapa, origem: "confirmado" }
+  const facas = facasDoDesenho(d, ferramentais)
+  const salvo = facas.find(f => inteiroPositivo(f.modelosPorChapa))
+  if (salvo) return { valor: salvo.modelosPorChapa!, origem: "confirmado" }
+  const cav = facas.find(f => inteiroPositivo(f.cavidades))
+  if (cav) return { valor: cav.cavidades, origem: "cavidades" }
+  const { largura, altura } = d.blank ?? {}
+  if (!maquina || !(largura > 0) || !(altura > 0)) return null
+  const n = cavidadesFolha(maquina.largura, maquina.altura, { largura, altura }, maquina, espacoMm)
+  return n >= 1 ? { valor: n, origem: "estimado" } : null
+}
+
+export const modelosPorChapa = (...a: Parameters<typeof modelosPorChapaDetalhe>) => modelosPorChapaDetalhe(...a)?.valor ?? null
 
 // Texto curto do card: "Caixa 50 × 120 × 50 mm · peça 21,4 × 18,7 cm"
 export const cm = (mm: number) => (mm / 10).toLocaleString("pt-BR", { maximumFractionDigits: 1 })

@@ -90,7 +90,7 @@ export async function lerDxf(id: string): Promise<string | null> {
 }
 
 // Seu nome e as palavras-chave do desenho (o nome do arquivo do Pacdora não muda)
-export async function editarDesenho(id: string, mudar: { apelido?: string; tags?: string[] }) {
+export async function editarDesenho(id: string, mudar: { apelido?: string; tags?: string[]; modelosPorChapa?: number | null }) {
   const lista = await lerIndice()
   if (!lista.some(d => d.id === id)) return false
   const novo = lista.map(d => {
@@ -98,6 +98,7 @@ export async function editarDesenho(id: string, mudar: { apelido?: string; tags?
     const x = { ...d }
     if (mudar.apelido !== undefined) { const a = mudar.apelido.trim().slice(0, 80); if (a) x.apelido = a; else delete x.apelido }
     if (mudar.tags !== undefined) { if (mudar.tags.length) x.tags = mudar.tags; else delete x.tags }
+    if (mudar.modelosPorChapa !== undefined) { if (mudar.modelosPorChapa !== null && Number.isInteger(mudar.modelosPorChapa) && mudar.modelosPorChapa >= 1) x.modelosPorChapa = mudar.modelosPorChapa; else delete x.modelosPorChapa }
     return x
   })
   await gravar(INDICE, JSON.stringify(novo), "application/json")

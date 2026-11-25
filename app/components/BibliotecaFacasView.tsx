@@ -7,8 +7,8 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Upload, Search, Box, Download, Trash2, Plus, Scissors, FileText, Loader2, Pencil } from "lucide-react"
 import { Pagina, CabecalhoPagina, Cartao, Selo, Botao, Vazio } from "./ds"
 import { parseDXF, caixaDoDxf, type DXFResult } from "../lib/dxf"
-import { Desenho, nomeBonito, ondeCabe, frascoQueServe, servemParaFrasco, facasDoDesenho, descricaoCaixa, cm, nomeDoDesenho, buscarDesenhos, tagsMaisUsadas, lerTags, normalizarBusca } from "../lib/biblioteca"
-import type { Ferramental } from "../lib/producao"
+import { Desenho, nomeBonito, ondeCabe, frascoQueServe, servemParaFrasco, facasDoDesenho, descricaoCaixa, cm, nomeDoDesenho, buscarDesenhos, modelosPorChapaDetalhe, tagsMaisUsadas, lerTags, normalizarBusca } from "../lib/biblioteca"
+import type { Ferramental, Maquina } from "../lib/producao"
 
 type Uso = { numero: string; cliente: string; desenhoId?: string | null }
 
@@ -109,8 +109,30 @@ function EditarNome({ d, sugestoes, onSalvar, onCancelar }: { d: Desenho; sugest
   )
 }
 
-function CardDesenho({ d, facas, usos, fornecedores, sugestoes, onUsar, onRegistrar, onApagar, onEditar, onTag }: {
-  d: Desenho; facas: Ferramental[]; usos: Uso[]; fornecedores: string[]; sugestoes: string[]
+function ModelosPorChapaLinha({ d, ferramentais, maquina, espaco, onSalvar }: { d: Desenho; ferramentais: Ferramental[]; maquina: Maquina | null; espaco: number; onSalvar: (n: number | null) => Promise<void> }) {
+  const r = modelosPorChapaDetalhe(d, ferramentais, maquina, espaco)
+  const [editando, setEditando] = useState(false), [txt, setTxt] = useState(""), [salvando, setSalvando] = useState(false)
+  const n = parseInt(txt, 10)
+  const valido = txt.trim() === "" || (Number.isInteger(n) && n >= 1)
+  const rotulo = !r ? "desconhecido" : r.origem === "estimado" ? `${r.valor} (estimativa — confirme)` : r.origem === "cavidades" ? `${r.valor} (das cavidades da faca)` : `${r.valor}`
+  return (
+    <div className="mt-2 text-[12px] text-[#191625]">
+      <span className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">Modelos por chapa</span>{" "}<b>{rotulo}</b>
+      {!editando && <button onClick={() => { setTxt(String(d.modelosPorChapa ?? r?.valor ?? "")); setEditando(true) }} className="ml-2 text-[11.5px] font-semibold text-[#8456e8]">{r?.origem === "confirmado" ? "Editar" : "Confirmar"}</button>}
+      {editando && (
+        <span className="ml-2 inline-flex items-center gap-1.5">
+          <input value={txt} onChange={e => setTxt(e.target.value)} inputMode="numeric" placeholder="4" className="w-14 h-7 rounded-lg bg-white px-2 text-[13px] ds-borda" />
+          <Botao variante="primario" disabled={salvando || !valido} onClick={async () => { setSalvando(true); await onSalvar(txt.trim() === "" ? null : n); setSalvando(false); setEditando(false) }}>Salvar</Botao>
+          <Botao variante="fantasma" onClick={() => setEditando(false)}>Cancelar</Botao>
+        </span>
+      )}
+    </div>
+  )
+}
+
+function CardDesenho({ d, facas, ferramentais, maquina, espaco, usos, fornecedores, sugestoes, onUsar, onRegistrar, onApagar, onEditar, onModelos, onTag }: {
+  d: Desenho; facas: Ferramental[]; ferramentais: Ferramental[]; maquina: Maquina | null; espaco: number; usos: Uso[]; fornecedores: string[]; sugestoes: string[]
+  onModelos: (n: number | null) => Promise<void>
   onUsar: () => void; onRegistrar: (f: Ferramental & { desenhoId: string }) => void; onApagar: () => void
   onEditar: (apelido: string, tags: string[]) => Promise<void>; onTag: (t: string) => void
 }) {
@@ -148,6 +170,8 @@ function CardDesenho({ d, facas, usos, fornecedores, sugestoes, onUsar, onRegist
           : <button onClick={() => setNova(true)} className="mt-1 text-[12px] font-semibold text-[#8456e8] flex items-center gap-1"><Plus className="w-3.5 h-3.5" />Registrar faca deste desenho</button>}
       </div>
 
+      <ModelosPorChapaLinha d={d} ferramentais={ferramentais} maquina={maquina} espaco={espaco} onSalvar={onModelos} />
+
       {usos.length > 0 && (
         <p className="text-[11.5px] text-[#5e5c68] mt-2 flex items-start gap-1.5"><FileText className="w-3.5 h-3.5 mt-px shrink-0 text-[#898892]" />
           <span>Usado em {usos.slice(0, 4).map(u => `${u.numero} (${u.cliente})`).join(", ")}{usos.length > 4 ? ` e mais ${usos.length - 4}` : ""}</span></p>
@@ -163,8 +187,10 @@ function CardDesenho({ d, facas, usos, fornecedores, sugestoes, onUsar, onRegist
   )
 }
 
-export function BibliotecaFacasView({ ferramentais, fornecedores = [], usos, onUsar, onRegistrarFaca }: {
+export function BibliotecaFacasView({ ferramentais, maquina = null, espaco = 2, fornecedores = [], usos, onUsar, onRegistrarFaca }: {
   ferramentais: Ferramental[]
+  maquina?: Maquina | null         // máquina do impressor principal (Jerograf): base do cálculo de modelos por chapa
+  espaco?: number                  // mm entre peças
   fornecedores?: string[]          // quem faz corte e vinco (o padrão primeiro)
   usos: Uso[]
   onUsar: (d: Desenho) => void
@@ -213,6 +239,10 @@ export function BibliotecaFacasView({ ferramentais, fornecedores = [], usos, onU
     const r = await fetch("/api/biblioteca", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, apelido, tags }) }).catch(() => null)
     if (r?.ok) setLista(l => (l ?? []).map(d => d.id === id ? { ...d, apelido: apelido.trim() || undefined, tags: tags.length ? tags : undefined } : d))
   }
+  async function editarModelos(id: string, n: number | null) {
+    const r = await fetch("/api/biblioteca", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, modelosPorChapa: n }) }).catch(() => null)
+    if (r?.ok) setLista(l => (l ?? []).map(d => d.id === id ? { ...d, modelosPorChapa: n ?? undefined } : d))
+  }
   const facasSemDesenho = useMemo(() => ferramentais.filter(f => f.tipo === "faca" && !(lista ?? []).some(d => facasDoDesenho(d, [f]).length)), [ferramentais, lista])
 
   return (
@@ -250,7 +280,7 @@ export function BibliotecaFacasView({ ferramentais, fornecedores = [], usos, onU
         : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {visiveis.map(d => (
-              <CardDesenho key={d.id} d={d} facas={facasDoDesenho(d, ferramentais)} usos={usos.filter(u => u.desenhoId === d.id)} fornecedores={fornecedores}
+              <CardDesenho key={d.id} d={d} facas={facasDoDesenho(d, ferramentais)} ferramentais={ferramentais} maquina={maquina} espaco={espaco} onModelos={n => editarModelos(d.id, n)} usos={usos.filter(u => u.desenhoId === d.id)} fornecedores={fornecedores}
                 sugestoes={atalhos} onEditar={(a, t) => editar(d.id, a, t)} onTag={alternarTag}
                 onUsar={() => onUsar(d)} onRegistrar={onRegistrarFaca}
                 onApagar={() => { void fetch(`/api/biblioteca?id=${d.id}`, { method: "DELETE" }).then(carregar) }} />

@@ -57,6 +57,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 39 | Prospector: janela de envio 8h–20h (seg-sex), cron `0 11-22 * * 1-5` | Felipe (decisão 24/11/2026, 17:56) | — | — | Claude Code | não | (PR da issue #99) |
 | 40 | Atendente: não dizer «segue o orçamento» sem link ou PDF real de proposta existente | Felipe | — | — | Claude Code | **NÃO JUNTAR sem o Aprovo do Felipe** (mexe na fala do Atendente com cliente) | (PR da issue #104) |
 | 41 | Porta: ordem a lead sai direto pelo agente; cliente A/B/C e indefinido seguem no Aprovo; `cancelar_ordem`; nível na leitura (`?o=perto`, detalhe comercial) | Felipe (regra de 25/11/2026, 7h51, confirmada 8h10) | — | — | Claude Code | **NÃO JUNTAR sem revisão do CTO** (mexe na trava que protege os clientes A, B e C) | (PR da issue #108) |
+| 42 | Facas salvas: campo `modelosPorChapa` (reusa cavidades e `encaixar`, máquina da Jerograf 48 × 45) | Felipe (regra de 25/11/2026, ~8h33) | — | — | Claude Code | não (mudança aditiva, sem tocar em preço) | (PR da issue #115) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 

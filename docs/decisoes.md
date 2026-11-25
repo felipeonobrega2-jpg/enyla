@@ -89,3 +89,9 @@ Os demais limites de 23/11 seguem: até 10 abordagens por dia, de segunda a sext
 **Decisão.** Diretores gerem. A execução é de funcionários e de agentes.
 
 **Porquê.** Diretor que executa vira gargalo e mistura a decisão com a tarefa. Quem decide não é quem manda a mensagem nem quem mexe no pedido.
+
+## 25/11/2026 (~8h33, America/Sao_Paulo) — modelos por chapa antes de orientar a quantidade no Offset
+
+**Decisão.** Antes de orientar a quantidade no Offset, o sistema precisa saber quantos modelos cabem na chapa da faca (campo `modelosPorChapa`). Vale o número salvo (campo ou cavidades da faca); sem ele, estima na máquina do impressor principal (Jerograf, 48 × 45 cm), nunca em 66 × 48. Sem medida, fica desconhecido.
+
+**Porquê.** A faca do perfume de 100 ml com fundo automático cabe 4 modelos na chapa da Jerograf: 1.000 unidades dão 4 artes.
