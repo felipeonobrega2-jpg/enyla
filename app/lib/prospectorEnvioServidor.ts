@@ -11,7 +11,7 @@ import { evo } from "./evolution"
 import { enviarEmail } from "./email"
 import { CNAES_PROSPECTO, aplicarOptOut, hojeSp, podeTransicionar, type EtapaFunil, type MudancaEtapa } from "./prospector"
 import {
-  ASSUNTO_EMAIL, CHAVE_ENVIO_ATIVO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, REMETENTE_REPLY_TO,
+  ASSUNTO_EMAIL, CHAVE_ENVIO_ATIVO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, REMETENTE_REPLY_TO,
   canaisDisponiveis, canaisPendentes, celularWhatsapp, chaveTelefone, dentroDoHorario, ehRecusa, emailValido, enviosDoHistorico,
   motivoNaoQualifica, passoIniciado, passoSaiu, passouDias, saiu, textoDoPasso,
   type Canal, type EnvioHistorico, type Passo,
@@ -229,6 +229,8 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
     const envios = enviosDe(l)
     const primeiro = passoSaiu(envios, "primeiro_contato")
     if (!primeiro || !passouDias(primeiro.em, DIAS_ATE_LEMBRETE, agora)) continue
+    // Primeiro contato por e-mail: sem detecção de resposta por e-mail, nem lembrete (em nenhum canal) nem encerramento.
+    if (cadenciaSuspensaPorEmail(envios)) continue
     const lembrete = passoSaiu(envios, "lembrete")
     if (lembrete && passouDias(lembrete.em, DIAS_ATE_ENCERRAR, agora)) {
       if (await gravar(l, { etapa: "encerrado_sem_resposta", historico_etapas: [...historicoDe(l), { etapa: "encerrado_sem_resposta", em: agora.toISOString(), motivo: "sem resposta ao lembrete" }] })) res.encerrados++

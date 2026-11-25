@@ -110,7 +110,7 @@ Nada é apagado: quem não serve fica na base em `encontrado`, não vira `qualif
 
 **Limitações.**
 
-- Resposta de e-mail cai no Gmail do Felipe (Reply-To). Não há leitor de Gmail: um "sim" ou "não" por e-mail **não para a cadência sozinho**. Quem responde por e-mail ainda pode receber o lembrete. O Felipe precisa olhar o Gmail e marcar o prospecto à mão (`respondeu` ou `opt_out`) enquanto não existir o leitor.
+- Resposta de e-mail cai no Gmail do Felipe (Reply-To). Não há leitor de Gmail: um "sim" ou "não" por e-mail **não para a cadência sozinho**. **Por isso o lembrete e o encerramento por falta de resposta estão suspensos para quem recebeu o primeiro contato por e-mail** (`LEMBRETE_EMAIL_ATIVO = false` em `app/lib/prospectorEnvio.ts`; nenhum canal recebe lembrete, e o prospecto não vai para `encerrado_sem_resposta`). Volta quando a entrada de e-mail existir. Quem foi abordado só por WhatsApp segue a cadência normal. O Felipe precisa olhar o Gmail e marcar o prospecto à mão (`respondeu` ou `opt_out`) enquanto não existir o leitor.
 - Resposta por WhatsApp de um contato que chega com `jid` `@lid` (sem o número) não é casada com o prospecto.
 - A tela do funil conta só as etapas antigas; `respondeu` e `encerrado_sem_resposta` ainda não aparecem nela.
 - O agente de atendimento que já existe continua tratando as conversas que entram. Este PR não muda isso.
