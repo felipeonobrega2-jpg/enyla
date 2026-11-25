@@ -1,5 +1,6 @@
 "use client"
 
+import { limparCustoTerceiroCard } from "@/app/lib/copiaPedido"
 import { unpackTerceirizado } from "./lib/kanbanUnpack"
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { Layers, ShoppingBag, Ruler, Calculator, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb, Truck, Gauge, Printer , Scissors, Building2, ShieldCheck } from "lucide-react"
@@ -929,18 +930,30 @@ export default function Home() {
 
   async function copiarPedido(entry: OrderEntry) {
     const agora = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })
-    const copias: KanbanCard[] = entry.cards.map(c => ({
-      ...c,
+    // Número novo para cada cópia (reservado no servidor, como no orçamento): a cópia não reutiliza o número do original
+    const numeros: string[] = []
+    try {
+      for (let i = 0; i < entry.cards.length; i++) {
+        const r = await fetch("/api/historico/numero", { method: "POST" })
+        const j = r.ok ? await r.json() : null
+        if (!j?.numero) throw new Error()
+        numeros.push(j.numero)
+      }
+    } catch {
+      alert("Não consegui reservar o número do pedido agora (servidor fora). Nada foi copiado: tente de novo em instantes.")
+      return
+    }
+    const copias: KanbanCard[] = entry.cards.map((c, i) => ({
+      ...limparCustoTerceiroCard(c),
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      numero: numeros[i],
       coluna: 0,
       data: agora,
       dataFechamento: undefined,
       dataEntregaPrevista: undefined,
       dataEntregaReal: undefined,
-      prazoRecebimentoInterno: undefined,
       loteId: undefined,
       loteNumero: undefined,
-      prazos: undefined,
       motivoPerdido: undefined,
     }))
 

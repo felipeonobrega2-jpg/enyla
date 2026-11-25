@@ -2,6 +2,7 @@ import { lerConfigLinha } from "../../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { carregarPortal } from "@/app/lib/portalCliente"
+import { limparOpcoesX } from "@/app/lib/copiaPedido"
 import { criarLote } from "@/app/lib/lotes"
 import { SINAL_PCT_PADRAO } from "@/app/lib/aprovacao"
 import { somarDiasUteis, definirFeriadosLocais } from "@/app/lib/diasUteis"
@@ -58,12 +59,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     const id = `${Date.now()}${Math.random().toString(36).slice(2, 6)}`
     const { createdAt: _c, id: _i, numero: _n, ...copia } = o as Record<string, unknown>
     void _c; void _i; void _n
-    // Metadados guardados em opcoes._x: prazos e prazo interno são do pedido antigo, não da recompra
-    const op = copia.opcoes as { _items?: unknown[]; _x?: Record<string, unknown> } | unknown[] | null
-    if (op && !Array.isArray(op) && op._x) {
-      const x = { ...op._x }; delete x.prazos; delete x.prazoRecebimentoInterno
-      copia.opcoes = Object.keys(x).length ? { ...op, _x: x } : (op._items ?? null)
-    }
+    // Custo de terceiro, fornecedor, projeção, prazos e prazo interno são do pedido antigo, não da recompra
+    copia.opcoes = limparOpcoesX(copia.opcoes as never)
+    // Só zera as colunas que existem na linha (não cria coluna que o banco não tem)
+    for (const k of ["custoTerceiro", "fornecedor", "projecaoCustos"]) if (k in copia) copia[k] = null
     const { error } = await supabase.from("KanbanCard").insert({
       ...copia, id, numero, data: dataBR, coluna: COL_FECHADO, dataFechamento: hoje, dataEntregaPrevista: entrega,
       dataEntregaReal: null, motivoPerdido: null, loteId: lote.id, loteNumero: lote.numero,
