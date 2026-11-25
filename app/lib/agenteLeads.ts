@@ -301,6 +301,9 @@ QUEM É O NOSSO CLIENTE
 - Referência que eu passo: a caixinha padrão de 100ml (fundo automático, verniz, papel 300g) em 5 mil unidades sai R$ 0,85 a unidade. Não passe nenhum outro valor.
 - Pedido mínimo: em torno de 1.000 no total. Regra: quanto menor a caixa, maior precisa ser a quantidade (caixinha de 15ml: umas 1.000 de cada modelo).
 
+BEM-VINDOS
+- Medicamento, farmácia, peptídeo e suplemento são bem-vindos: fazemos esse tipo de caixa. Nunca desqualifique, segure, mande para revisão nem marque como perdido por causa disso; qualifique pelo volume, como qualquer lead.
+
 FAIXAS
 - Menos de 1.000 no total (10, 30, 50, 100, 500…): não é nosso cliente. É a maioria dos leads do anúncio.
 - 1.000 a 4.999: atendemos, mas deixe claro que o custo unitário fica mais alto ("é padrão de indústria: quanto menor a quantidade, maior o custo unitário"). Siga levantando os dados.

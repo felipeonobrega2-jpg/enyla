@@ -16,12 +16,21 @@ describe("classificarNivel", () => {
     const dig = { id: "DIG-1", jid: conv.jid, em: "2026-10-01", status: "producao" }
     expect(classificarNivel({ ...conv, nome: "Zé" }, base({ pedidosDigitais: [dig] }))).toMatchObject({ nivel: "indefinido", jaCliente: true })
   })
-  it("cadastro sem compra: indefinido", () => {
-    expect(classificarNivel(conv, base({ cadastro: [{ nome: "Outro Nome", telefone: "(11) 99999-0001" }] })).nivel).toBe("indefinido")
+  it("cadastro sem compra: lead", () => {
+    expect(classificarNivel(conv, base({ cadastro: [{ nome: "Outro Nome", telefone: "(11) 99999-0001" }] }))).toMatchObject({ nivel: "lead", jaCliente: false })
+    expect(classificarNivel(conv, base({ cadastro: [{ nome: "Carla Dias", telefone: null }] })).nivel).toBe("lead")
+  })
+  it("cadastro com orçamento aberto (coluna 0), número internacional ou jid com sufixo: lead", () => {
+    const orc = { ...compra, coluna: 0 }
+    expect(classificarNivel(conv, base({ cards: [orc], cadastro: [{ nome: "Carla Dias", telefone: null }] })).nivel).toBe("lead")
+    const intl = { jid: "447535624212@s.whatsapp.net", nome: "Kingdom Healthcare", telefone: null }
+    expect(classificarNivel(intl, base({ cards: [{ ...compra, nomeCliente: "Kingdom Healthcare", coluna: 0 }], cadastro: [{ nome: "Kingdom Healthcare", telefone: null }] })).nivel).toBe("lead")
   })
   it("ligação fraca (só o primeiro nome) com cliente que comprou: indefinido", () => {
     const c = { jid: "9@s.whatsapp.net", nome: "Carla", telefone: null }
-    expect(classificarNivel(c, base({ cards: [{ ...compra, nomeCliente: "Carla" }, { ...compra, nomeCliente: "Carla Dias" }] })).nivel).not.toBe("A")
+    const cards = [{ ...compra, nomeCliente: "Carla" }, { ...compra, nomeCliente: "Carla Dias" }]
+    expect(classificarNivel(c, base({ cards })).nivel).not.toBe("A")
+    expect(classificarNivel(c, base({ cards, cadastro: [{ nome: "Carla", telefone: null }] })).nivel).toBe("indefinido")
   })
   it("erro de leitura: indefinido", () => {
     expect(classificarNivel(conv, base({ leituraOk: false })).nivel).toBe("indefinido")

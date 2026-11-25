@@ -1,10 +1,10 @@
 // Classificador único do destinatário de uma mensagem da diretoria: A, B, C (cliente pela curva), "lead" ou "indefinido".
 // Regra do Felipe (25/11/2026): "cliente" é só quem já comprou (nível A, B ou C). Só mensagem a cliente precisa do Aprovo;
-// mensagem a lead não precisa. Na dúvida (cadastro sem compra, compra antiga ou só digital, ligação fraca, erro de leitura)
-// o nível é "indefinido" e conta como cliente: fila do Aprovo. Só LÊ; sem telefone, e-mail ou endereço na saída.
+// mensagem a lead não precisa. Quem nunca comprou é "lead", mesmo com cadastro na tabela Cliente ou orçamento aberto.
+// Na dúvida (compra antiga ou só digital, ligação fraca com quem comprou, erro de leitura) o nível é "indefinido" e conta como cliente: fila do Aprovo. Só LÊ; sem telefone, e-mail ou endereço na saída.
 import { supabase } from "./supabase"
 import { lerCampos } from "./configAtomica"
-import { clienteDaConversa, ligacaoForte, chaveTelefone, type Vinculos } from "./vinculoWhatsapp"
+import { clienteDaConversa, ligacaoForte, type Vinculos } from "./vinculoWhatsapp"
 import { nomeChave, montarPedidos } from "./negocio"
 import { ritmoDosClientes } from "./ritmo"
 import { COL_FECHADO, COL_ENTREGUE, type KanbanCard, type LancamentoFinanceiro } from "../types"
@@ -41,9 +41,6 @@ export type FontesNivel = {
   leituraOk: boolean                             // false: alguma fonte falhou
 }
 
-const digitos = (s?: string | null) => (s ?? "").replace(/\D/g, "")
-const chaveTel = (s?: string | null) => { const d = digitos(s); return d.length >= 10 ? chaveTelefone(d.length <= 11 ? "55" + d : d) : null }
-
 export function classificarNivel(c: ConvNivel, f: FontesNivel): NivelDoDestinatario {
   if (!f.leituraOk) return { nivel: "indefinido", jaCliente: false, motivo: "não consegui ler todas as fontes: tratado como cliente por segurança" }
   const nomes = [...new Set(f.cards.map(k => k.nomeCliente).filter(Boolean))] as string[]
@@ -53,12 +50,9 @@ export function classificarNivel(c: ConvNivel, f: FontesNivel): NivelDoDestinata
   const curva = forte ? f.curvas.get(nomeChave(cli!.nome)) ?? null : null
   if (curva) return { nivel: curva, jaCliente: true, motivo: `cliente ${curva}` }
   if (jaCliente) return { nivel: "indefinido", jaCliente: true, motivo: "já comprou, mas sem curva (compra antiga ou só digital)" }
-  const kTel = chaveTel(c.telefone) ?? chaveTel(c.jid.split("@")[0])
-  const noCadastro = f.cadastro.some(x => (kTel && chaveTel(x.telefone) === kTel) || (nomeChave(x.nome) && nomeChave(x.nome) === nomeChave(c.nome)))
-  if (noCadastro) return { nivel: "indefinido", jaCliente: false, motivo: "tem cadastro de cliente, sem compra confirmada" }
   if (cli && !forte && f.cards.some(k => k.coluna >= COL_FECHADO && k.coluna <= COL_ENTREGUE && nomeChave(k.nomeCliente ?? "") === nomeChave(cli.nome)))
     return { nivel: "indefinido", jaCliente: false, motivo: "ligação fraca (só pelo nome) com cliente que comprou" }
-  return { nivel: "lead", jaCliente: false, motivo: "sem cadastro e sem compra" }
+  return { nivel: "lead", jaCliente: false, motivo: "nunca comprou (cadastro ou orçamento aberto não é compra)" }
 }
 
 async function todas<T>(tabela: string, sel: string): Promise<T[]> {

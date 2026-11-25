@@ -12,6 +12,12 @@ Diretores propõem. Estas decisões é que mandam no que se constrói.
 4. Se a decisão mudar um item da fila, atualize [docs/fila.md](fila.md) no mesmo pull request.
 5. Não apague decisão antiga. Ela fica embaixo, para se saber o que valeu antes.
 
+## 25/11/2026 08:29 — medicamento, farmácia, peptídeo e suplemento são bem-vindos; quem nunca comprou é lead
+
+**Decisão.** Horário: 25/11/2026 08:29 (America/Sao_Paulo). Caixa de medicamento, farmácia, peptídeo e suplemento é bem-vinda: o filtro, o Atendente e o classificador não desqualificam, seguram nem mandam para revisão por isso; qualifica-se pelo volume. Quem nunca comprou é `lead` (mesmo com cadastro em `Cliente` ou orçamento aberto); só A, B e C vão para o Aprovo, e `indefinido` fica para falha de leitura, compra sem curva e ligação fraca. A parte de marca de terceiro está **fora** desta decisão e segue como estava, até nova ordem.
+
+**Porquê.** Somos especialistas nesse tipo de caixa e o sistema dispensava oportunidades; cadastro sem compra não é cliente.
+
 ## 24/11/2026 07:07 — texto do Prospector: sem opt-out e sem link no primeiro contato
 
 **Decisão.** Horário: 24/11/2026 07:07 (America/Sao_Paulo). Esta decisão **substitui** a de 23/11/2026 sobre o texto do Prospector (22:27 e 22:40: "opt-out e link `/parceiros`" em toda mensagem).

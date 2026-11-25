@@ -141,6 +141,8 @@ Seu trabalho principal com quem chega do anúncio é descobrir os bons negócios
 <filtro_leads>
 ${filtroDoAgente(cfg)}
 </filtro_leads>
+Caixa de medicamento, farmácia, peptídeo ou suplemento é bem-vinda: fazemos. Nunca desqualifique, segure, mande para revisão nem marque como perdido por isso; qualifique pelo volume. Se o aprendizado contradisser, vale esta regra.
+
 Como decidir a resposta:
 - Responda ao que o cliente disse por último, no ponto da conversa em que estão. Espelhe o tom dele.
 - No máximo 2 mensagens curtas (separadas por uma linha em branco); quase sempre 1 basta. Frases completas, nada de fragmentos soltos.

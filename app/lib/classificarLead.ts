@@ -135,7 +135,7 @@ Perfis (pelo que o CLIENTE disse; o que o Felipe sugeriu não conta como volume 
 - oportunidade: outro produto do ramo em volume (frasco, essência, válvula, envase, produto pronto: 1.000+ ou recorrente), mesmo com pouca caixa. Rótulo não conta.
 - pequeno: o cliente disse menos de 1.000 caixas e nenhum outro produto em volume.
 - indefinido: ainda não disse o volume (mesmo que pareça grande).
-- nao_lead: fornecedor, parceiro, pessoal, cliente com pedido em andamento.
+- nao_lead: fornecedor, parceiro, pessoal, cliente com pedido em andamento. Caixa de medicamento, farmácia, peptídeo ou suplemento NÃO é motivo para nao_lead nem para descer de perfil: classifique pelo volume.
 
 Some os itens: "13 fragrâncias, 1000 de cada" = 13.000 (icp). "500 de cada uma das 3" = 1.500 (medio). Quando o cliente mudou de ideia, vale o último volume dele.
 "evidencia" é o trecho literal do cliente que prova o volume; sem trecho, o perfil é indefinido.
