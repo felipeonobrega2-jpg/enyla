@@ -59,6 +59,8 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 41 | Porta: ordem a lead sai direto pelo agente; cliente A/B/C e indefinido seguem no Aprovo; `cancelar_ordem`; nível na leitura (`?o=perto`, detalhe comercial) | Felipe (regra de 25/11/2026, 7h51, confirmada 8h10) | — | — | Claude Code | **NÃO JUNTAR sem revisão do CTO** (mexe na trava que protege os clientes A, B e C) | (PR da issue #108) |
 | 42 | Prospector: e-mail sem teto diário; WhatsApp com teto de 10 por dia; limite técnico por execução; pausa e retry 429 na Resend | Felipe (decisão 25/11/2026, 8h28) | — | — | Claude Code | não | (PR da issue #112) |
 | 43 | Atendente: aceitar caixa de medicamento e de qualquer marca; quem nunca comprou é lead (nível) | Felipe (decisão 25/11/2026, 8h29) | — | — | Claude Code | não (ordem do Felipe) | (PR da issue #114) |
+| 44 | Termos de parceria aceitos no cadastro /parceiros | Felipe | depois do Prospector (itens 8 e 9) | — | livre | sim | |
+| 45 | Score do parceiro (prazo, qualidade, rapidez) em Fornecedores | Felipe | depois do Prospector (itens 8 e 9) | — | livre | não | |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -329,3 +331,27 @@ Os dois scripts de comparação (classificador e follow-up) só rodam com autori
 Nenhuma troca de modelo entra sem o Diego revisar o resultado da comparação.
 O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 | 43 | Porta externa: ação `mover_card` para avançar etapa de produção (só avança, 1→2..8, motivo obrigatório) | Felipe | — | — | Claude Code | não | (PR da issue #137) |
+
+## 44. Termos de parceria aceitos no cadastro /parceiros
+
+**Status:** livre. **Aprovo:** sim (o texto dos termos precisa do ok do Felipe antes de ir para a página pública). **PR:** vazio. Pedido do Felipe, decidido em 24/11/2026 às 7:21 (America/Sao_Paulo). Prioridade: depois do Prospector (itens 8 e 9).
+
+**O que já existe.** O cadastro público em `/parceiros` tem um aceite de que a ENYLA registra tempo e qualidade e de que as informações estão corretas. Não há contrato além do cadastro.
+
+**O que falta.** Criar termos de parceria dentro da própria plataforma e pedi-los no cadastro de `/parceiros`, junto com o aceite. O Felipe disse que não haverá contrato à parte; os termos ficam no sistema.
+
+**Critério de aceite.** O parceiro só envia o cadastro se aceitar os termos. O texto é o que o Felipe aprovou. Dá para ler os termos na própria página.
+
+**Como testar.** A definir quando o item for construído, depois do Aprovo do texto.
+
+## 45. Score do parceiro (prazo, qualidade, rapidez) em Fornecedores
+
+**Status:** livre. **Aprovo:** não (tela interna da equipe; não manda mensagem a cliente nem mexe em cobrança). **PR:** vazio. Pedido do Felipe, decidido em 24/11/2026 às 7:21 (America/Sao_Paulo). Prioridade: depois do Prospector (itens 8 e 9).
+
+**O que já existe.** A página `/parceiros` e o cadastro prometem que o sistema registra tempo e qualidade, e que quem entrega bem ganha prioridade. Ainda não há um score.
+
+**O que falta.** Um score do parceiro na tela Fornecedores, com base em prazo, qualidade e rapidez das entregas. O Felipe decidiu que há pedidos frequentes, mas o parceiro precisa construir um bom score; quem tem score melhor recebe mais pedidos.
+
+**Critério de aceite.** A equipe vê o score na ficha do fornecedor/parceiro. O cálculo usa prazo, qualidade e rapidez, com teste.
+
+**Como testar.** A definir quando o item for construído.
