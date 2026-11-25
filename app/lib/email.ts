@@ -30,7 +30,7 @@ export function ehCotaEsgotada(j: { name?: string; message?: string }): boolean 
 
 export const emailConfigurado = () => !!process.env.RESEND_API_KEY
 
-export async function enviarEmail(para: string, e: Email, anexos: { nome: string; base64: string }[] = [], opcoes: { de?: string; responderPara?: string } = {}): Promise<{ ok: true; id: string } | { ok: false; erro: string; cota?: true }> {
+export async function enviarEmail(para: string, e: Email, anexos: { nome: string; base64: string }[] = [], opcoes: { de?: string; responderPara?: string } = {}): Promise<{ ok: true; id: string } | { ok: false; erro: string; status?: number; cota?: true }> {
   const chave = process.env.RESEND_API_KEY
   if (!chave) return { ok: false, erro: "e-mail ainda não configurado (falta a chave da Resend)" }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(para)) return { ok: false, erro: "e-mail inválido" }
@@ -50,11 +50,12 @@ export async function enviarEmail(para: string, e: Email, anexos: { nome: string
       })
       if (r.status !== 429) break
       const corpo429 = await r.clone().json().catch(() => ({})) as { name?: string; message?: string }
-      if (ehCotaEsgotada(corpo429)) return { ok: false, erro: corpo429.message ?? `${corpo429.name ?? "daily_quota_exceeded"}: cota de e-mail da Resend esgotada`, cota: true }
+      if (ehCotaEsgotada(corpo429)) return { ok: false, erro: corpo429.message ?? `${corpo429.name ?? "daily_quota_exceeded"}: cota de e-mail da Resend esgotada`, status: 429, cota: true }
       if (tentativa >= MAX_TENTATIVAS_429) break
       await dormir(esperaDoRetryAfter(r.headers.get("retry-after")))
     }
-    const j = await r.json().catch(() => ({})) as { id?: string; message?: string }
-    return r.ok && j.id ? { ok: true, id: j.id } : { ok: false, erro: j.message ?? `Resend respondeu ${r.status}` }
+    const j = await r.json().catch(() => ({})) as { id?: string; message?: string; name?: string }
+    if (r.ok && j.id) return { ok: true, id: j.id }
+    return { ok: false, erro: j.message ?? `Resend respondeu ${r.status}`, status: r.status }
   } catch (err) { return { ok: false, erro: String(err) } }
 }

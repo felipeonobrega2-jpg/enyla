@@ -41,7 +41,7 @@ describe("enviarEmail e a Resend", () => {
     vi.stubGlobal("fetch", f)
     const p = enviarEmail("a@b.com.br", msg)
     await vi.advanceTimersByTimeAsync(30_000)
-    expect(await p).toEqual({ ok: false, erro: "rate" })
+    expect(await p).toEqual({ ok: false, erro: "rate", status: 429 })   // sem "cota": 429 de taxa não vai para a fila de respostas
     expect(f).toHaveBeenCalledTimes(MAX_TENTATIVAS_429)
   })
   it.each(["daily_quota_exceeded", "monthly_quota_exceeded"])("429 de cota (%s) não retenta e devolve erro de cota", async nome => {

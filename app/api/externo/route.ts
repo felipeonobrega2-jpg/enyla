@@ -24,6 +24,7 @@ import { lerPertoExterno, AJUDA_PERTO } from "@/app/lib/pertoExterno"
 import { moverCardExterno } from "@/app/lib/moverCardExterno"
 import { cancelarOrdem } from "@/app/lib/cancelarOrdem"
 import { niveisDosLeads } from "@/app/lib/nivelNoDetalhe"
+import { responderProspecto, lerRespostasProspector, AJUDA_RESPONDER, AJUDA_RESPOSTAS } from "@/app/lib/respostaProspecto"
 import { leituraParceiros, AJUDA_PARCEIROS } from "@/app/lib/parceirosExterno"
 
 // Porta de acesso dos diretores na nuvem (ex.: Grok Bot). Pública no proxy, mas cada chamada exige a chave do diretor
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
 
   if (!o) return NextResponse.json({
     voce: `${info.nome}, ${info.cargo} (${info.area})`,
-    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | ") + " | parceiros (só CCO e CMO)", ...(podeAcionarComercial(diretor) ? { "?o=parceiros": AJUDA_PARCEIROS } : { "?o=parceiros": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): cadastros de /parceiros e respostas do Prospector" }), "?o=conversa": "o que você e o Felipe conversaram", ...(podeAcionarComercial(diretor) ? { "?o=perto": AJUDA_PERTO } : { "?o=perto": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): a lista 'Perto de você'" }), ...(diretor === "cfo" ? AJUDA_FINANCEIRO : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa" }), ...(diretor === "cmo" ? { "?o=meta_ads": "Meta Ads ao vivo (só leitura): conta, campanhas, conjuntos e anúncios; hoje, 7 e 30 dias; cache de 3 min; bloco funil por campanha (7 e 30 dias: leads, mql, orçamentos, pedidos, vendido, gasto, custo por lead e por MQL) e previsaoSaldoDias" } : {}) },
+    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | ") + " | parceiros (só CCO e CMO)", ...(podeAcionarComercial(diretor) ? { "?o=parceiros": AJUDA_PARCEIROS } : { "?o=parceiros": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): cadastros de /parceiros e respostas do Prospector" }), "?o=conversa": "o que você e o Felipe conversaram", ...(podeAcionarComercial(diretor) ? { "?o=perto": AJUDA_PERTO } : { "?o=perto": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): a lista 'Perto de você'" }), ...(podeAcionarComercial(diretor) ? { "?o=respostas_prospector": AJUDA_RESPOSTAS } : { "?o=respostas_prospector": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): fila de respostas por e-mail aos prospectos" }), ...(diretor === "cfo" ? AJUDA_FINANCEIRO : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa" }), ...(diretor === "cmo" ? { "?o=meta_ads": "Meta Ads ao vivo (só leitura): conta, campanhas, conjuntos e anúncios; hoje, 7 e 30 dias; cache de 3 min; bloco funil por campanha (7 e 30 dias: leads, mql, orçamentos, pedidos, vendido, gasto, custo por lead e por MQL) e previsaoSaldoDias" } : {}) },
     escrita: { "POST {acao:'relatar', texto}": "manda algo ao Felipe",
       "POST {acao:'dispensar_pendencia', chave, motivo, ate?}": "QUALQUER DIRETOR. Dispensa uma pendência (a chave vem em ?o=empresa, campo pendencias) com motivo obrigatório (sem motivo: 400); ate (AAAA-MM-DD) opcional: depois dessa data ela volta. Não apaga nada",
       "POST {acao:'tarefa_felipe', titulo, detalhe?, prazo? (AAAA-MM-DD)}": "QUALQUER DIRETOR. Põe uma tarefa na lista 'Depende de você' do Felipe (pedido por você, com data e prazo). titulo obrigatório (até 140 caracteres); no máximo 10 abertas por diretor (a 11ª volta 429). Suas tarefas (abertas e feitas nos últimos 7 dias) estão em ?o=empresa, campo tarefasParaFelipe. {acao:'tarefa_felipe', operacao:'cancelar', id} cancela só as suas. Não manda mensagem a ninguém",
@@ -71,6 +72,7 @@ export async function GET(req: NextRequest) {
         "POST {acao:'categoria', operacao:'criar'|'editar'|'desativar', tipo:'receita'|'despesa', id, nome, subcategorias, ativa}": "SÓ A CHAVE DO CFO. Categorias financeiras. criar exige nome; editar e desativar exigem id. Desativar só põe ativa:false, a categoria continua na lista. Resposta: { ok, resultado, categoria }",
       } : {}),
       ...(comerciaisDoDiretor(diretor).length ? { "POST {acao:'ordenar_funcionario', funcionario:'atendente'|'followup'|'reativacao', cliente | jid, ordem}": "SÓ CCO e CMO (as outras recebem 403). O agente do Comercial escreve a mensagem para UM lead com o histórico do WhatsApp; REGRA (25/11): só 'cliente' (quem já comprou, nível A, B ou C) precisa do Aprovo do Felipe. Para LEAD (nunca comprou; cadastro sem compra e orçamento aberto não contam) a mensagem SAI DIRETO pelo agente indicado, só com o agente ligado e dentro do horário dele (senão 409 'fora do horário do agente', nada é criado), no máximo 20 envios diretos por dia por diretor (a 21ª volta 429). Cliente A, B, C ou nível 'indefinido' (já comprou sem curva, compra antiga, só digital, ligação fraca com quem comprou, erro de leitura) vai para a fila do Aprovo, no máximo 20 esperando por diretor (a 21ª volta 429). Texto que promete orçamento sem link real, Felipe escrevendo na conversa e gráfica do Prospector também vão para a fila. Lead sem WhatsApp: 404. Resposta: { ok, resultado, destino: 'enviado_direto'|'fila_aprovo', motivo, nivel, id }; leia o nível antes em ?o=perto ou ?o=detalhe&area=comercial" } : {}),
+      "POST {acao:'responder_prospecto', prospecto_id, texto, assunto?}": AJUDA_RESPONDER,
       "POST {acao:'mover_card', numero | loteNumero, coluna, motivo}": "QUALQUER DIRETOR. Avança um pedido de etapa na produção. numero (ORC-...) ou loteNumero (move os cards do lote); coluna de 2 (Arte/Dieline) a 8 (Expedição); motivo obrigatório (até 300 caracteres). Só avança (destino maior que a coluna atual) e só de cards já Fechados (coluna 1 em diante); nunca volta, nunca vai a 0, 9 (Entregue) ou 10 (Perdido): 400 com o motivo e nada é alterado. Só muda a coluna (preço, quantidade, sinal e opcoes ficam como estão). Registra no Tracking quem moveu (seu nome) e o motivo. Não manda mensagem nem e-mail ao cliente. Resposta: { ok, resultado, movidos: [{numero, de, para}] }",
       "POST {acao:'cancelar_ordem', id}": "QUALQUER DIRETOR. Cancela uma ordem SUA (id do cartão, devolvido por ordenar_funcionario) que ainda está esperando o Aprovo (status aguardando). Só marca como cancelada (canceladoPor, canceladoEm): nunca apaga nada e nada é enviado. Ordem de outro diretor ou que não existe: 404; já enviada, descartada, com erro ou cancelada: 409. A tela da diretoria mostra 'Cancelada' e não oferece o Aprovo. Resposta: { ok, resultado, id }",
       ...Object.fromEntries(FERRAMENTAS.map(f => [`POST {acao:'${f}', ...}`, "ferramenta (ver instruções)"])) },
@@ -91,6 +93,11 @@ export async function GET(req: NextRequest) {
 
   if (o === "perto") {
     const l = await lerPertoExterno(diretor)
+    return NextResponse.json(l.corpo, { status: l.status })
+  }
+
+  if (o === "respostas_prospector") {
+    const l = await lerRespostasProspector(diretor)
     return NextResponse.json(l.corpo, { status: l.status })
   }
 
@@ -208,6 +215,13 @@ export async function POST(req: NextRequest) {
     msg = { id: novoId(), de: "diretor", texto: String(r.corpo.resultado), em: new Date().toISOString(), nuvem: true }
     await gravarConversa(diretor, [...await lerConversa(diretor), msg])
     return NextResponse.json(r.corpo)
+  } else if (b.acao === "responder_prospecto") {
+    const r = await responderProspecto(diretor, b)
+    if (r.status === 200 || r.status === 202) {
+      msg = { id: novoId(), de: "diretor", texto: r.status === 200 ? `Respondi por e-mail ao prospecto ${b.prospecto_id}.` : `Resposta ao prospecto ${b.prospecto_id} ficou na fila de e-mail.`, em: new Date().toISOString(), nuvem: true }
+      await gravarConversa(diretor, [...await lerConversa(diretor), msg])
+    }
+    return NextResponse.json(r.corpo, { status: r.status })
   } else if (b.acao === "cancelar_ordem") {
     const r = await cancelarOrdem(diretor, b)
     return NextResponse.json(r.corpo, { status: r.status })
@@ -240,7 +254,7 @@ export async function POST(req: NextRequest) {
       await gravarConversa(diretor, [...await lerConversa(diretor), msg])
       return NextResponse.json({ ok: true, resultado: saida, destino: r.destino, motivo: r.motivo, nivel: r.nivel, id: r.acao.id })
     }
-  } else return NextResponse.json({ erro: `acao: relatar, mover_card, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
+  } else return NextResponse.json({ erro: `acao: relatar, responder_prospecto, mover_card, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
   await gravarConversa(diretor, [...await lerConversa(diretor), msg])
   return NextResponse.json({ ok: true, resultado: saida })
 }
