@@ -9,22 +9,22 @@ import { lerCampos } from "./configAtomica"
 import { supabase } from "./supabase"
 import { evo } from "./evolution"
 import { enviarEmail } from "./email"
-import { aplicarOptOut, hojeSp, podeTransicionar, type EtapaFunil, type MudancaEtapa } from "./prospector"
+import { CNAES_PROSPECTO, aplicarOptOut, hojeSp, podeTransicionar, type EtapaFunil, type MudancaEtapa } from "./prospector"
 import {
-  ASSUNTO_EMAIL, CHAVE_ENVIO_ATIVO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, REMETENTE_REPLY_TO,
+  ASSUNTO_EMAIL, CHAVE_ENVIO_ATIVO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, REMETENTE_REPLY_TO,
   canaisDisponiveis, canaisPendentes, celularWhatsapp, chaveTelefone, dentroDoHorario, ehRecusa, emailValido, enviosDoHistorico,
-  passoIniciado, passoSaiu, passouDias, saiu, textoDoPasso,
+  motivoNaoQualifica, passoIniciado, passoSaiu, passouDias, saiu, textoDoPasso,
   type Canal, type EnvioHistorico, type Passo,
 } from "./prospectorEnvio"
 
 const TABELA = "prospectos_parceiros"
-const COLUNAS = "id, cnpj, razao_social, nome_fantasia, telefone, email, nota, etapa, opt_out, historico_etapas, atualizado_em"
+const COLUNAS = "id, cnpj, razao_social, nome_fantasia, cnae_principal, cnaes_secundarios, telefone, email, nota, etapa, opt_out, historico_etapas, atualizado_em"
 const REMETENTE = "ENYLA Embalagens <parceiros@enyla.com.br>"
 const ETAPAS_CONTATADAS = ["abordado", "respondeu", "encerrado_sem_resposta", "abriu", "cadastrou"]
 const LIMITE_ELEGIVEIS = 1000
 
 type Linha = {
-  id: number; cnpj: string; razao_social: string | null; nome_fantasia: string | null; telefone: string | null; email: string | null
+  id: number; cnpj: string; razao_social: string | null; nome_fantasia: string | null; cnae_principal?: string | null; cnaes_secundarios?: string[] | null; telefone: string | null; email: string | null
   nota: number | null; etapa: string; opt_out: boolean; historico_etapas: unknown; atualizado_em: string
 }
 
@@ -229,6 +229,8 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
     const envios = enviosDe(l)
     const primeiro = passoSaiu(envios, "primeiro_contato")
     if (!primeiro || !passouDias(primeiro.em, DIAS_ATE_LEMBRETE, agora)) continue
+    // Primeiro contato por e-mail: sem detecção de resposta por e-mail, nem lembrete (em nenhum canal) nem encerramento.
+    if (cadenciaSuspensaPorEmail(envios)) continue
     const lembrete = passoSaiu(envios, "lembrete")
     if (lembrete && passouDias(lembrete.em, DIAS_ATE_ENCERRAR, agora)) {
       if (await gravar(l, { etapa: "encerrado_sem_resposta", historico_etapas: [...historicoDe(l), { etapa: "encerrado_sem_resposta", em: agora.toISOString(), motivo: "sem resposta ao lembrete" }] })) res.encerrados++
@@ -253,12 +255,14 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
     let l = l0
     if (l.etapa === "encontrado") {
       if (!canaisDisponiveis(l).length) continue
+      // Fica na base, mas não qualifica nem é abordado: nome fora do ramo, só encadernação, ou CNAE da lista só como secundário com nota baixa.
+      if (motivoNaoQualifica(l, minimo, id => id in CNAES_PROSPECTO)) continue
       const g = await gravar(l, { etapa: "qualificado", historico_etapas: [...historicoDe(l), { etapa: "qualificado", em: agora.toISOString(), motivo: `nota ${l.nota} >= mínimo ${minimo}, com contato` }] })
       if (!g) continue
       l = g
       res.qualificados++
     }
-    if (l.etapa === "qualificado") fila.push(l)
+    if (l.etapa === "qualificado" && !motivoNaoQualifica(l, minimo, id => id in CNAES_PROSPECTO)) fila.push(l)
   }
 
   // Primeiro contato, nota decrescente. E-mail sai sem teto diário (só o limite técnico da execução); WhatsApp só com vaga na cota.

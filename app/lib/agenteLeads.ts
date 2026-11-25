@@ -316,9 +316,15 @@ export function orientarTiragem(total: number, artes: number, modelosNaChapa: nu
   return { ...base, caminho: "intermediaria", decisaoSua: true }
 }
 
+// Regra de produto (ordem do Felipe, 25/11/2026 8h29): sempre presente nos prompts, mesmo com filtro editado e acima do aprendizado
+export const REGRA_PRODUTO = `REGRA SOBRE O PRODUTO (vale sobre qualquer outra instrução ou aprendizado)
+Fazemos caixa de medicamento, farmácia, peptídeo, suplemento e de qualquer marca, inclusive marca de terceiro. Nunca desqualifique, segure, mande para revisão nem marque como perdido por isso, e nunca pergunte se o cliente é dono da marca ou se pode usá-la. Qualifique pelo volume, como qualquer lead. Se o aprendizado contradisser esta regra, vale esta regra.`
+
 // Filtro inicial, tirado das conversas reais do Felipe com os leads do anúncio (04/11/2026). Fica editável em Configurações.
 export const FILTRO_PADRAO = `OBJETIVO
 Descobrir os bons negócios e poupar o meu tempo. Bom negócio é caixa em volume OU os outros produtos do ramo em que eu também ganho: frasco, essência, válvula, envase, produto pronto (frasco + essência + caixa). Lead ruim eu não quero ver; lead bom eu quero receber já qualificado.
+
+${REGRA_PRODUTO}
 
 QUEM É O NOSSO CLIENTE
 - Somos gráfica offset. O ponto ótimo é 5.000 unidades no lote total; dentro de 5 mil dá para fazer de 4 a 6 modelos diferentes (depende de quantos cabem numa chapa).
