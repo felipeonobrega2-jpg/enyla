@@ -14,6 +14,7 @@ import {
   FormaPagamento, KanbanCard, COL_EXPEDICAO, COL_PERDIDO, NegocioParceiro, Lote,
 } from "../types"
 import { brl, num } from "../utils"
+import { ratearValor, type ModoRateio } from "../lib/ratearLotes"
 import { CategoriaFinanceira, ContaBancaria, Configuracoes } from "../config"
 import { ContasTab } from "./financeiro/ContasTab"
 import { BancoTab } from "./financeiro/BancoTab"
@@ -349,6 +350,7 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
         numero: cards[0].loteNumero ?? loteId,
         nomeCliente: cards[0].nomeCliente,
         valor: cards.reduce((s, c) => s + c.preco, 0),
+        quantidade: cards.reduce((s, c) => s + (Number(c.quantidade) || 0), 0),
         loteId,
         loteNumero: cards[0].loteNumero,
       })
@@ -359,6 +361,7 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
         numero: c.numero,
         nomeCliente: c.nomeCliente,
         valor: c.preco,
+        quantidade: Number(c.quantidade) || 0,
         cardId: c.id,
         cardNumero: c.numero,
       })
@@ -379,9 +382,16 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
     }
   }
 
+  const [modoRateio, setModoRateio] = useState<ModoRateio | "">("")
+  const itensVinc = vinculoKeys.filter(k => k).map(k => vinculaveis.find(x => x.key === k)).filter((x): x is VinculoItem => !!x)
+  const varios = itensVinc.length > 1
+  const previaRateio = varios && modoRateio && parseFloat(valor) > 0
+    ? ratearValor(parseFloat(valor), itensVinc.map(x => x.quantidade ?? 0), modoRateio) : null
+
   function salvar(partes?: { nome: string; valor: number }[] | "junto") {
     const v = parseFloat(valor)
     if (!descricao.trim() || !v || !dataVenc) return
+    if (vinculoKeys.filter(k => k).length > 1 && !modoRateio) return
     if (!partes && tipo === "despesa" && !(temSubs && subcategoria) && vinculoKeys.filter(k => k).length <= 1 && abrirDivisao(descricao, v)) return
     const base = {
       tipo,
@@ -417,10 +427,12 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
       }))
     } else {
       const now = Date.now()
+      const valores = ratearValor(v, activeKeys.map(k => vinculaveis.find(x => x.key === k)?.quantidade ?? 0), modoRateio || "cada")
       for (let i = 0; i < activeKeys.length; i++) {
         const vinSel = vinculaveis.find(x => x.key === activeKeys[i])
         onSave({
           ...base,
+          valor:       valores[i],
           id:          `${now}-${i}`,
           cardId:      vinSel?.cardId || undefined,
           cardNumero:  vinSel?.cardNumero,
@@ -554,10 +566,32 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
                   </button>
                 )}
               </div>
-              {vinculoKeys.filter(k => k).length > 1 && (
-                <p className="text-[10.5px] text-[#8456e8] mt-1.5 font-medium">
-                  {vinculoKeys.filter(k => k).length} despesas serão criadas, uma por lote
-                </p>
+              {varios && (
+                <div className="mt-1.5 space-y-1.5">
+                  <p className="text-[10.5px] text-[#8456e8] font-medium">
+                    {itensVinc.length} despesas serão criadas, uma por lote. O valor informado é:
+                  </p>
+                  {([["quantidade", "Total da nota, rateado por quantidade"], ["igual", "Total da nota, dividido igualmente"], ["cada", "Custo de cada lote (repete o valor)"]] as [ModoRateio, string][]).map(([m, rot]) => (
+                    <label key={m} className="flex items-center gap-2 text-[11px] text-[#5e5c68] cursor-pointer">
+                      <input type="radio" name="modoRateio" checked={modoRateio === m} onChange={() => setModoRateio(m)} />
+                      {rot}
+                    </label>
+                  ))}
+                  {!modoRateio && <p className="text-[10.5px] text-rose-600">Escolha como tratar o valor para salvar.</p>}
+                  {previaRateio && (
+                    <ul className="text-[11px] text-[#191625] bg-[#F5F3FA] rounded-lg px-2.5 py-1.5 space-y-0.5">
+                      {itensVinc.map((it, i) => (
+                        <li key={it.key} className="flex justify-between">
+                          <span>{it.loteId ? "Lote" : "Pedido"} {it.numero}{it.quantidade ? ` · ${it.quantidade} un` : ""}</span>
+                          <span className="font-semibold">{brl(previaRateio[i])}</span>
+                        </li>
+                      ))}
+                      <li className="flex justify-between border-t border-[rgba(60,60,67,0.12)] pt-0.5">
+                        <span>Total lançado</span><span className="font-semibold">{brl(previaRateio.reduce((s, x) => s + x, 0))}</span>
+                      </li>
+                    </ul>
+                  )}
+                </div>
               )}
             </Field>
           )}
@@ -702,6 +736,7 @@ type VinculoItem = {
   numero: string
   nomeCliente: string
   valor: number
+  quantidade?: number
   loteId?: string
   loteNumero?: string
   cardId?: string
