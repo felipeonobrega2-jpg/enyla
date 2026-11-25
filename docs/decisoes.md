@@ -12,6 +12,18 @@ Diretores propõem. Estas decisões é que mandam no que se constrói.
 4. Se a decisão mudar um item da fila, atualize [docs/fila.md](fila.md) no mesmo pull request.
 5. Não apague decisão antiga. Ela fica embaixo, para se saber o que valeu antes.
 
+## 24/11/2026 07:07 — texto do Prospector: sem opt-out e sem link no primeiro contato
+
+**Decisão.** Horário: 24/11/2026 07:07 (America/Sao_Paulo). Esta decisão **substitui** a de 23/11/2026 sobre o texto do Prospector (22:27 e 22:40: "opt-out e link `/parceiros`" em toda mensagem).
+- O primeiro contato vai **sem** linha de opt-out e **sem** link.
+- O link de `/parceiros` vai **só para quem responder sim**.
+- O lembrete é **único**, depois de 3 dias, e também vai sem opt-out e sem link.
+- Quem responde não fica com `opt_out`: a cadência só para. Só a recusa explícita vira `opt_out`.
+
+Os demais limites de 23/11 seguem: até 10 abordagens por dia, de segunda a sexta. O prazo do lembrete passa de 4 para 3 dias.
+
+**Porquê.** Mensagem curta, sem link e sem rodapé de descadastro, soa como conversa e não como disparo em massa; o link só faz sentido para quem já mostrou interesse. Responder não é recusar, então só a recusa explícita tira o prospecto da lista.
+
 ## 2026-11-24 — CMO lê as campanhas pela porta
 
 **Decisão.** O Felipe liberou a CMO (Lívia) a ler as campanhas da Meta Ads pela porta externa e, à parte, a ligar/pausar e ajustar a verba de campanha existente, com no máximo 20% por ajuste e teto de R$ 200 por dia por campanha. O primeiro pull request entrega só a leitura; ligar, pausar e ajustar verba vêm em outro.
@@ -20,13 +32,13 @@ Diretores propõem. Estas decisões é que mandam no que se constrói.
 
 ## 23/11/2026 22:40 — envio automático do Prospector e código do Diego pelo Claude Code
 
-**Decisão.** Horário: 23/11/2026 22:40 (America/Sao_Paulo). O envio do Prospector de Parceiros será automático, dentro dos limites aprovados às 22:27 (até 10 abordagens por dia, de segunda a sexta, um lembrete após 4 dias, opt-out e link `/parceiros`). Todo código do Diego passa a ser construído pelo Claude Code via GitHub Action (`@claude`), não mais por agentes de nuvem.
+**Decisão.** Horário: 23/11/2026 22:40 (America/Sao_Paulo). O envio do Prospector de Parceiros será automático, dentro dos limites aprovados às 22:27 (até 10 abordagens por dia, de segunda a sexta, um lembrete após 4 dias, opt-out e link `/parceiros`). **[Texto de mensagem, lembrete e opt-out substituídos em 24/11/2026 07:07: ver a decisão do topo. Não voltar atrás.]** Todo código do Diego passa a ser construído pelo Claude Code via GitHub Action (`@claude`), não mais por agentes de nuvem.
 
 **Porquê.** Dentro de limites fixos e com opt-out, a abordagem não precisa de um clique do Felipe por mensagem. Construir pelo Claude Code no próprio repositório deixa cada mudança num pull request visível, com o CI, no mesmo caminho do trabalho do Felipe.
 
 ## 23/11/2026 22:27 — Prospector de Parceiros aprovado
 
-**Decisão.** Horário: 23/11/2026 22:27 (America/Sao_Paulo). O Felipe aprovou o Prospector de Parceiros: raio no estado de SP inteiro, com nota pela distância de Barueri; todos os serviços; dados gratuitos da Receita por CNAE; até 10 abordagens por dia, de segunda a sexta; um lembrete após 4 dias; opt-out e link `/parceiros`; funil na tela Fornecedores; aprovação de parceiro com o Felipe. Isso responde à pergunta de processo da revisão: o item 8 da [fila](fila.md) está aprovado.
+**Decisão.** Horário: 23/11/2026 22:27 (America/Sao_Paulo). O Felipe aprovou o Prospector de Parceiros: raio no estado de SP inteiro, com nota pela distância de Barueri; todos os serviços; dados gratuitos da Receita por CNAE; até 10 abordagens por dia, de segunda a sexta; um lembrete após 4 dias; opt-out e link `/parceiros` **[em toda mensagem: substituído em 24/11/2026 07:07, ver a decisão do topo; lembrete agora após 3 dias]**; funil na tela Fornecedores; aprovação de parceiro com o Felipe. Isso responde à pergunta de processo da revisão: o item 8 da [fila](fila.md) está aprovado.
 
 **Porquê.** A rede de parceiros precisa crescer perto de Barueri, onde o frete é menor, sem depender de busca manual. A aprovação de quem entra na rede continua com o Felipe.
 
