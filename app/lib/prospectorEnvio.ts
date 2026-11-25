@@ -57,6 +57,16 @@ export const TERMOS_FORA_DO_RAMO: readonly string[] = ["inflavel", "inflaveis", 
 const CNAE_SO_ENCADERNACAO = "1822901"
 /** Cota de primeiros contatos por dia (dia de São Paulo), só do WhatsApp. E-mail não tem teto diário. */
 export const LIMITE_WHATSAPP_PRIMEIROS_POR_DIA = 10
+/** Teto diário de e-mails do Prospector (primeiro contato + lembrete), PROSPECTOR_TETO_EMAIL_DIA. Padrão 80: cota Free da Resend (100/dia) menos 20 de reserva
+ *  para o que não é prospecção (transacional a cliente e resposta da diretoria, que não entram neste teto). 0 = sem teto (plano pago). Vazio ou inválido = padrão. */
+export const TETO_EMAIL_DIA_PADRAO = 80
+export function tetoEmailDia(valor: string | null | undefined = process.env.PROSPECTOR_TETO_EMAIL_DIA): number {
+  const v = (valor ?? "").trim()
+  return /^\d+$/.test(v) ? Number(v) : TETO_EMAIL_DIA_PADRAO
+}
+export type MotivoParada = "teto_diario" | "cota_resend" | "limite_execucao"
+/** Erro de cota da Resend (já gravado no histórico): não é culpa do lead e não conta para MAX_FALHAS_POR_CANAL. */
+export const ehErroDeCota = (erro: string | null | undefined) => /(daily|monthly)\b.*\bquota|quota_exceeded/i.test(erro ?? "")
 /** Limite técnico por execução (a rota tem maxDuration de 120s): e-mails enviados (primeiro contato e lembrete) e tempo total. O resto fica para o próximo cron. */
 export const MAX_EMAILS_POR_EXECUCAO = 60
 export const ORCAMENTO_MS_POR_EXECUCAO = 90_000
@@ -151,7 +161,7 @@ export function canaisPendentes(envios: readonly EnvioHistorico[], passo: Passo,
   return disponiveis.filter(c => {
     const doCanal = envios.filter(e => e.passo === passo && e.canal === c)
     if (doCanal.some(saiu)) return false
-    return doCanal.filter(e => e.status === "falhou").length < MAX_FALHAS_POR_CANAL
+    return doCanal.filter(e => e.status === "falhou" && !ehErroDeCota(e.erro)).length < MAX_FALHAS_POR_CANAL
   })
 }
 

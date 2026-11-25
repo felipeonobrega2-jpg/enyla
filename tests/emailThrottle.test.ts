@@ -44,4 +44,13 @@ describe("enviarEmail e a Resend", () => {
     expect(await p).toEqual({ ok: false, erro: "rate" })
     expect(f).toHaveBeenCalledTimes(MAX_TENTATIVAS_429)
   })
+  it.each(["daily_quota_exceeded", "monthly_quota_exceeded"])("429 de cota (%s) não retenta e devolve erro de cota", async nome => {
+    vi.useFakeTimers(); vi.stubEnv("RESEND_API_KEY", "k")
+    const f = vi.fn(async () => resp(429, { name: nome, message: "You have reached your daily email sending quota.", statusCode: 429 }, { "retry-after": "1" }))
+    vi.stubGlobal("fetch", f)
+    const p = enviarEmail("a@b.com.br", msg)
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(await p).toEqual({ ok: false, erro: "You have reached your daily email sending quota.", cota: true })
+    expect(f).toHaveBeenCalledTimes(1)
+  })
 })
