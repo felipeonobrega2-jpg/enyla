@@ -236,9 +236,20 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
   res.tetoEmailDia = est.teto
   const hoje = hojeSp(agora)
   if (est.teto > 0) {
-    const { data, error } = await supabase.from(TABELA).select("id, historico_etapas").contains("historico_etapas", [{ envio: { canal: "email" } }]).limit(20000)
-    if (error) return { ...res, ok: false, erro: `não consegui contar os e-mails de hoje: ${error.message}` }
-    est.emailsFeitosHoje = ((data ?? []) as Linha[]).reduce((n, l) => n + enviosDe(l).filter(e => e.canal === "email" && saiu(e) && hojeSp(new Date(e.em)) === hoje).length, 0)
+    // Todo envio grava atualizado_em, então só as linhas tocadas hoje (SP, UTC-3) interessam. O PostgREST corta em 1000 linhas por
+    // chamada (max-rows): pagina com range até vir página incompleta. Falha em qualquer página: o e-mail não sai nesta execução.
+    const inicioDoDia = new Date(`${hoje}T00:00:00-03:00`).toISOString()
+    const PAGINA = 1000
+    let feitos = 0
+    for (let de = 0; ; de += PAGINA) {
+      const { data, error } = await supabase.from(TABELA).select("id, historico_etapas").contains("historico_etapas", [{ envio: { canal: "email" } }])
+        .gte("atualizado_em", inicioDoDia).order("id", { ascending: true }).range(de, de + PAGINA - 1)
+      if (error) return { ...res, ok: false, erro: `não consegui contar os e-mails de hoje: ${error.message}` }
+      const pagina = (data ?? []) as Linha[]
+      feitos += pagina.reduce((n, l) => n + enviosDe(l).filter(e => e.canal === "email" && saiu(e) && hojeSp(new Date(e.em)) === hoje).length, 0)
+      if (pagina.length < PAGINA) break
+    }
+    est.emailsFeitosHoje = feitos
   }
   const jaContatadas = (contatadas.data ?? []) as Linha[]
   const lista = (elegiveis.data ?? []) as Linha[]

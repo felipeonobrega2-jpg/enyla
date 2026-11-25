@@ -33,10 +33,14 @@ vi.mock("@/app/lib/supabase", () => ({
       q.contains = (c: string, v: { envio: { canal: string } }[]) => { filtros.push(r => ((r[c] as { envio?: { canal?: string } }[]) ?? []).some(h => h?.envio?.canal === v[0].envio.canal)); return q }
       q.order = (col: string, o: { ascending?: boolean }) => { ordem = { col, asc: o?.ascending !== false }; return q }
       q.limit = (n: number) => { limite = n; return q }
+      let faixa: [number, number] | null = null
+      q.range = (de: number, ate: number) => { faixa = [de, ate]; return q }
       const achar = () => {
         let rs = fonte.filter(r => filtros.every(f => f(r)))
         if (ordem) { const { col, asc } = ordem; rs = [...rs].sort((a, b) => ((a[col] as number) - (b[col] as number)) * (asc ? 1 : -1)) }
-        return rs.slice(0, limite)
+        // Como o PostgREST: no máximo 1000 linhas por chamada (max-rows), com ou sem range/limit.
+        if (faixa) rs = rs.slice(faixa[0], faixa[1] + 1)
+        return rs.slice(0, Math.min(limite, 1000))
       }
       const rodar = () => {
         const rs = achar()
@@ -437,8 +441,8 @@ describe("teto diário de e-mail e cota da Resend", () => {
   it("respeita o teto somando os envios do dia de outros prospectos e de execuções anteriores", async () => {
     vi.stubEnv("PROSPECTOR_TETO_EMAIL_DIA", "5")
     // 3 já enviados hoje (e 1 reservado) por prospectos que nem estão na lista; 1 de ontem não conta
-    for (let i = 0; i < 3; i++) comEmail({ etapa: "abordado", historico_etapas: [enviadoHoje("2026-11-23T12:00:00.000Z")] })
-    comEmail({ etapa: "abordado", historico_etapas: [enviadoHoje("2026-11-23T12:30:00.000Z", "reservado")] })
+    for (let i = 0; i < 3; i++) comEmail({ etapa: "abordado", atualizado_em: "2026-11-23T12:00:00.000Z", historico_etapas: [enviadoHoje("2026-11-23T12:00:00.000Z")] })
+    comEmail({ etapa: "abordado", atualizado_em: "2026-11-23T12:30:00.000Z", historico_etapas: [enviadoHoje("2026-11-23T12:30:00.000Z", "reservado")] })
     comEmail({ etapa: "abordado", historico_etapas: [enviadoHoje("2026-11-20T12:00:00.000Z")] })
     const fila = [comEmail(), comEmail(), comEmail()]
     const r = await rodar(SEG_10H)
@@ -447,6 +451,16 @@ describe("teto diário de e-mail e cota da Resend", () => {
     expect(r.tetoEmailDia).toBe(5)
     expect(r.motivoParada).toBe("teto_diario")
     expect(fila.filter(l => hist(l).length === 0)).toHaveLength(2)   // sem reserva, sem penalidade: sobram para amanhã
+  })
+  it("conta além de 1000 linhas: pagina com range e ignora linhas não tocadas hoje", async () => {
+    vi.stubEnv("PROSPECTOR_TETO_EMAIL_DIA", "1050")
+    for (let i = 0; i < 1049; i++) comEmail({ etapa: "abordado", atualizado_em: "2026-11-23T12:00:00.000Z", historico_etapas: [enviadoHoje("2026-11-23T12:00:00.000Z")] })
+    for (let i = 0; i < 30; i++) comEmail({ etapa: "abordado", historico_etapas: [enviadoHoje("2026-11-20T12:00:00.000Z")] })   // antigas: fora do filtro
+    comEmail(); comEmail()
+    const r = await rodar(SEG_10H)
+    expect(r.emailHoje).toBe(1050)   // 1049 (duas páginas) + 1 enviado agora = teto
+    expect(envios.email).toHaveBeenCalledTimes(1)
+    expect(r.motivoParada).toBe("teto_diario")
   })
   it("teto 0 = sem teto; limite por execução vira o motivo", async () => {
     vi.stubEnv("PROSPECTOR_TETO_EMAIL_DIA", "0")
@@ -458,7 +472,7 @@ describe("teto diário de e-mail e cota da Resend", () => {
   })
   it("teto atingido só para o e-mail: o WhatsApp segue", async () => {
     vi.stubEnv("PROSPECTOR_TETO_EMAIL_DIA", "1")
-    comEmail({ etapa: "abordado", historico_etapas: [enviadoHoje("2026-11-23T12:00:00.000Z")] })
+    comEmail({ etapa: "abordado", atualizado_em: "2026-11-23T12:00:00.000Z", historico_etapas: [enviadoHoje("2026-11-23T12:00:00.000Z")] })
     novo()
     await rodar(SEG_10H)
     expect(envios.email).not.toHaveBeenCalled()
