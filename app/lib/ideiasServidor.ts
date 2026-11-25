@@ -98,6 +98,9 @@ const LOTES: { v: number; ideias: string[] }[] = [
     // 23/11, a pedido seu: celular deixa de travar melhoria; depois, uma rodada só dele
     "Versão otimizada para celular: uma rodada só para o celular das telas internas (caixa de entrada, Hoje, conversas, pedidos, Financeiro e o prédio em 2D), pensada para o uso rápido no dia a dia, com toque fácil e o essencial primeiro. Até lá, as melhorias saem pensando no computador.",
   ] },
+  { v: 13, ideias: [
+    "Frete interno no orçamento (Felipe, 25/11): criar uma categoria 'frete interno' no orçamento. É o transporte entre as etapas terceirizadas, calculado pela média da rota programada (exemplo: sai do verniz, no Ronaldo Verniz, para o próximo fornecedor). Pedido grande vai em vários pallets, e o motorista costuma cobrar ajudante de carga e descarga, o que também entra nesse custo. A entrega ao cliente é outra coisa, separada do frete interno. O Felipe ainda vai pensar como fazer.",
+  ] },
 ]
 
 // Gastos fixos que o sistema põe uma vez (marca no servidor); apagou ou editou, não volta
