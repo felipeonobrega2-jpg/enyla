@@ -2,7 +2,8 @@
 // dados_sistema, coleção nova "sugestaoArteDecisao" (uma linha por pedido; nada é apagado). Nenhuma mensagem ao cliente.
 import { supabase } from "./supabase"
 import { gravarPedido } from "./digitalServidor"
-import { confirmarArteAprovada, sugestoesDeArte, type DecisaoSug, type MsgZap, type PedidoSug, type SugestaoArte } from "./arteAprovadaSugestao"
+import { lerConfigLinha } from "./configAtomica"
+import { confirmarArteAprovada, ehAprovacao, aprovacoesSemAmbiguidade, sugestoesDeArte, type DecisaoSug, type MsgZap, type PedidoSug, type SugestaoArte } from "./arteAprovadaSugestao"
 
 export const COLECAO_SUGESTAO = "sugestaoArteDecisao"
 
@@ -12,7 +13,7 @@ async function lerDecisoes(): Promise<DecisaoSug[]> {
 }
 
 /** Sugestões pendentes dos pedidos dados (só leitura; falha vira lista vazia). */
-export async function lerSugestoes(pedidos: PedidoSug[]): Promise<SugestaoArte[]> {
+export async function lerSugestoes(pedidos: PedidoSug[], soSemAmbiguidade = false): Promise<SugestaoArte[]> {
   try {
     const cand = pedidos.filter(p => ["sinal_pago", "arte"].includes(p.status) && !p.arteAprovadaEm)
     if (!cand.length) return []
@@ -22,7 +23,7 @@ export async function lerSugestoes(pedidos: PedidoSug[]): Promise<SugestaoArte[]
       const { data } = await supabase.from("whatsapp_mensagens").select("id, ts, from_me, tipo, corpo").eq("jid", jid).order("ts", { ascending: false }).limit(80)
       porJid[jid] = (data ?? []) as MsgZap[]
     }))
-    return sugestoesDeArte(cand, porJid, await lerDecisoes())
+    return (soSemAmbiguidade ? aprovacoesSemAmbiguidade : sugestoesDeArte)(cand, porJid, await lerDecisoes())
   } catch { return [] }
 }
 
@@ -52,4 +53,25 @@ export async function decidirSugestao(pedidos: PedidoSug[], id: string, decisao:
   if (!novo) return { erro: "Esse pedido não está mais esperando aprovação da arte." }
   await gravarDecisao({ pedido: id, msgId: s.msgId, decisao: "confirmada", por, em })
   return { ok: true }
+}
+
+/**
+ * Chamado quando chega mensagem nova do cliente: se for uma aprovação inequívoca da arte e houver um único pedido
+ * esperando naquele jid, grava na hora arteAprovadaEm/arteAprovadaPor (por: "sistema") e a decisão "confirmada".
+ * Não muda a etapa, não manda mensagem. Idempotente (arteAprovadaEm já preenchido não é sobrescrito).
+ * Ambíguo (mais de um pedido no jid) fica como sugestão no painel.
+ */
+export async function gravarAprovacaoDoChat(jid: string, corpo: string | null | undefined): Promise<string[]> {
+  if (!ehAprovacao(corpo)) return []
+  const { data } = await lerConfigLinha()
+  const todos = ((data?.data as { pedidosDigitais?: (PedidoSug & { jid: string })[] } | undefined)?.pedidosDigitais ?? []).filter(p => p.jid === jid)
+  const feitos: string[] = []
+  for (const s of await lerSugestoes(todos, true)) {
+    const em = new Date().toISOString()
+    const novo = await gravarPedido(s.pedido, p => confirmarArteAprovada(p, s, "sistema", em))
+    if (!novo) continue
+    await gravarDecisao({ pedido: s.pedido, msgId: s.msgId, decisao: "confirmada", por: "sistema", em }).catch(() => null)
+    feitos.push(s.pedido)
+  }
+  return feitos
 }

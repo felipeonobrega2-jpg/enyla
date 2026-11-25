@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { ehAprovacao, sugestoesDeArte, confirmarArteAprovada, type MsgZap } from "../app/lib/arteAprovadaSugestao"
+import { ehAprovacao, aprovacoesSemAmbiguidade, sugestoesDeArte, confirmarArteAprovada, type MsgZap } from "../app/lib/arteAprovadaSugestao"
 import { digitaisEmProducao } from "../app/lib/digitalProducao"
 import { aprovarArte } from "../app/lib/digital"
 
@@ -68,5 +68,33 @@ describe("sugestão de arte aprovada", () => {
     void _a; void _b
     expect(resto).toEqual(p)
     expect(confirmarArteAprovada({ ...p, status: "producao" }, { em: "x", trecho: "y" }, "P", "z")).toBeNull()
+  })
+  describe("gravação automática (sem clique)", () => {
+    const msgs = [arte("2026-11-12T10:00:00Z"), cli("2026-11-13T14:00:00Z", "Aprovado")]
+    it("aprovação inequívoca: grava o ts da mensagem, status não muda, segunda passagem não sobrescreve", () => {
+      const [s] = aprovacoesSemAmbiguidade([{ ...ped("DIG-0001"), status: "sinal_pago" }], { j1: msgs })
+      const p = { id: "DIG-0001", status: "sinal_pago" }
+      const n = confirmarArteAprovada(p, s, "sistema", "2026-11-13T14:00:05Z")!
+      expect(n.arteAprovadaEm).toBe("2026-11-13T14:00:00Z")
+      expect(n.arteAprovadaPor).toEqual({ por: "sistema", em: "2026-11-13T14:00:05Z", trecho: "Aprovado" })
+      expect(n.status).toBe("sinal_pago")
+      expect(confirmarArteAprovada(n, { em: "2026-11-20T00:00:00Z", trecho: "Aprovado" }, "sistema", "x")).toBeNull()
+      expect(aprovacoesSemAmbiguidade([{ ...ped("DIG-0001"), arteAprovadaEm: n.arteAprovadaEm }], { j1: msgs })).toEqual([])
+    })
+    it("ajuste ou negação: não grava", () => {
+      for (const t of ["Aprovado, mas troca a cor", "Não aprovo", "Pode sim, ajusta o texto"])
+        expect(aprovacoesSemAmbiguidade([ped("DIG-0001")], { j1: [arte("2026-11-12T10:00:00Z"), cli("2026-11-13T14:00:00Z", t)] })).toEqual([])
+    })
+    it("dois pedidos no mesmo jid: ambíguo, não grava sozinho", () => {
+      expect(aprovacoesSemAmbiguidade([ped("A"), ped("B")], { j1: msgs })).toEqual([])
+    })
+    it("decisão 'confirmada' registrada impede reaparecer", () => {
+      const d = [{ pedido: "DIG-0001", msgId: "c2026-11-13T14:00:00Z", decisao: "confirmada" as const, por: "sistema", em: "x" }]
+      expect(aprovacoesSemAmbiguidade([ped("DIG-0001")], { j1: msgs }, d)).toEqual([])
+    })
+    it("a regra é pura: não há envio de mensagem (nenhum import de envio no módulo)", async () => {
+      const src = await import("node:fs").then(f => f.readFileSync("app/lib/arteAprovadaSugestao.ts", "utf8"))
+      expect(src).not.toMatch(/import .*(evolution|enviar|notificar)/)
+    })
   })
 })

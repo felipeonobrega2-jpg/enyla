@@ -96,6 +96,9 @@ export async function POST(req: NextRequest) {
         const { data: salva } = await supabase.from("whatsapp_mensagens").select("jid, ts").eq("id", data.key.id).maybeSingle()
         if (salva?.jid) await marcarOrigemPelaFrase(salva.jid, extractBody(data).corpo, salva.ts).catch(() => null)
       }
+      // Digital: aprovação inequívoca da arte pelo cliente grava arteAprovadaEm na hora (sem mudar etapa, sem mensagem)
+      if (data?.key?.id && novas.has(data.key.id) && !data.key.fromMe && !deveIgnorar(data.key.remoteJid ?? "") && extractBody(data).tipo === "text")
+        after(() => import("@/app/lib/arteAprovadaServidor").then(m => m.gravarAprovacaoDoChat(data.key.remoteJid ?? "", extractBody(data).corpo)).catch(e => console.error("[arte aprovada]", e)))
       // Assistente do Felipe: mensagem dele no chat "você mesmo" (só a digitada no celular; os avisos do sistema não)
       // (com o WhatsApp institucional: também a mensagem que chega do número pessoal dele, agenteAuto.avisoNumero)
       if (data?.key?.id && novas.has(data.key.id) && !/^3EB0/i.test(data.key.id) && !deveIgnorar(data.key.remoteJid ?? ""))
