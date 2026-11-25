@@ -6,7 +6,7 @@ type Linha = Record<string, unknown>
 const mundo = vi.hoisted(() => ({ cfg: {} as Record<string, unknown>, prospectos: [] as Record<string, unknown>[], mensagens: [] as Record<string, unknown>[], consultas: 0 }))
 const envios = vi.hoisted(() => ({
   evo: vi.fn(async (..._a: unknown[]) => ({ ok: true, status: 200, corpo: { key: { id: "ABC" } } })),
-  email: vi.fn(async (..._a: unknown[]) => ({ ok: true as const, id: "e1" })),
+  email: vi.fn(async (..._a: unknown[]): Promise<{ ok: true; id: string } | { ok: false; erro: string; cota?: true }> => ({ ok: true, id: "e1" })),
 }))
 
 vi.mock("@/app/lib/configAtomica", () => ({
@@ -30,12 +30,17 @@ vi.mock("@/app/lib/supabase", () => ({
       q.in = (c: string, vs: unknown[]) => { filtros.push(r => vs.includes(r[c])); return q }
       q.gte = (c: string, v: number | string) => { filtros.push(r => r[c] != null && (r[c] as number | string) >= v); return q }
       q.or = () => q
+      q.contains = (c: string, v: { envio: { canal: string } }[]) => { filtros.push(r => ((r[c] as { envio?: { canal?: string } }[]) ?? []).some(h => h?.envio?.canal === v[0].envio.canal)); return q }
       q.order = (col: string, o: { ascending?: boolean }) => { ordem = { col, asc: o?.ascending !== false }; return q }
       q.limit = (n: number) => { limite = n; return q }
+      let faixa: [number, number] | null = null
+      q.range = (de: number, ate: number) => { faixa = [de, ate]; return q }
       const achar = () => {
         let rs = fonte.filter(r => filtros.every(f => f(r)))
         if (ordem) { const { col, asc } = ordem; rs = [...rs].sort((a, b) => ((a[col] as number) - (b[col] as number)) * (asc ? 1 : -1)) }
-        return rs.slice(0, limite)
+        // Como o PostgREST: no máximo 1000 linhas por chamada (max-rows), com ou sem range/limit.
+        if (faixa) rs = rs.slice(faixa[0], faixa[1] + 1)
+        return rs.slice(0, Math.min(limite, 1000))
       }
       const rodar = () => {
         const rs = achar()
@@ -50,7 +55,7 @@ vi.mock("@/app/lib/supabase", () => ({
 }))
 
 import { executarEnvio } from "@/app/lib/prospectorEnvioServidor"
-import { MAX_EMAILS_POR_EXECUCAO, celularWhatsapp, dentroDoHorario, ehRecusa, textoPrimeiroContato, TEXTO_LEMBRETE } from "@/app/lib/prospectorEnvio"
+import { MAX_EMAILS_POR_EXECUCAO, MAX_FALHAS_POR_CANAL, tetoEmailDia, ehErroDeCota, celularWhatsapp, dentroDoHorario, ehRecusa, textoPrimeiroContato, TEXTO_LEMBRETE } from "@/app/lib/prospectorEnvio"
 
 // 2026-11-23 é segunda. São Paulo é UTC-3. Os deslocamentos em dias caem em dia útil (o horário é checado de verdade).
 const SEG_10H = new Date("2026-11-23T13:00:00Z")
@@ -81,6 +86,8 @@ beforeEach(() => {
   mundo.consultas = 0
   envios.evo.mockClear()
   envios.email.mockClear()
+  envios.email.mockImplementation(async () => ({ ok: true as const, id: "e1" }))
+  vi.unstubAllEnvs()
 })
 
 describe("chave liga/desliga", () => {
@@ -414,5 +421,81 @@ describe("rota /api/prospector/enviar", () => {
     expect(await ok.json()).toMatchObject({ ok: true, ativo: false, enviado: false })
     expect(envios.evo).not.toHaveBeenCalled()
     vi.unstubAllEnvs()
+  })
+})
+
+const COTA = "You have reached your daily email sending quota."
+const comEmail = (p: Partial<Linha> = {}) => novo({ telefone: null, email: `g${seq + 1}@gr.com.br`, ...p })
+const enviadoHoje = (em: string, status = "enviado") => ({ etapa: "abordado", em, motivo: "x", envio: { passo: "primeiro_contato", canal: "email", status, em } })
+
+describe("teto diário de e-mail e cota da Resend", () => {
+  it("PROSPECTOR_TETO_EMAIL_DIA: padrão 80, 0 sem teto, inválido volta ao padrão", () => {
+    expect(tetoEmailDia(undefined)).toBe(80)
+    expect(tetoEmailDia("")).toBe(80)
+    expect(tetoEmailDia("0")).toBe(0)
+    expect(tetoEmailDia("50")).toBe(50)
+    expect(tetoEmailDia("abc")).toBe(80)
+    expect(tetoEmailDia("-5")).toBe(80)
+    expect(tetoEmailDia("1.5")).toBe(80)
+  })
+  it("respeita o teto somando os envios do dia de outros prospectos e de execuções anteriores", async () => {
+    vi.stubEnv("PROSPECTOR_TETO_EMAIL_DIA", "5")
+    // 3 já enviados hoje (e 1 reservado) por prospectos que nem estão na lista; 1 de ontem não conta
+    for (let i = 0; i < 3; i++) comEmail({ etapa: "abordado", atualizado_em: "2026-11-23T12:00:00.000Z", historico_etapas: [enviadoHoje("2026-11-23T12:00:00.000Z")] })
+    comEmail({ etapa: "abordado", atualizado_em: "2026-11-23T12:30:00.000Z", historico_etapas: [enviadoHoje("2026-11-23T12:30:00.000Z", "reservado")] })
+    comEmail({ etapa: "abordado", historico_etapas: [enviadoHoje("2026-11-20T12:00:00.000Z")] })
+    const fila = [comEmail(), comEmail(), comEmail()]
+    const r = await rodar(SEG_10H)
+    expect(envios.email).toHaveBeenCalledTimes(1)   // 4 de hoje + 1 = 5 = teto
+    expect(r.emailHoje).toBe(5)
+    expect(r.tetoEmailDia).toBe(5)
+    expect(r.motivoParada).toBe("teto_diario")
+    expect(fila.filter(l => hist(l).length === 0)).toHaveLength(2)   // sem reserva, sem penalidade: sobram para amanhã
+  })
+  it("conta além de 1000 linhas: pagina com range e ignora linhas não tocadas hoje", async () => {
+    vi.stubEnv("PROSPECTOR_TETO_EMAIL_DIA", "1050")
+    for (let i = 0; i < 1049; i++) comEmail({ etapa: "abordado", atualizado_em: "2026-11-23T12:00:00.000Z", historico_etapas: [enviadoHoje("2026-11-23T12:00:00.000Z")] })
+    for (let i = 0; i < 30; i++) comEmail({ etapa: "abordado", historico_etapas: [enviadoHoje("2026-11-20T12:00:00.000Z")] })   // antigas: fora do filtro
+    comEmail(); comEmail()
+    const r = await rodar(SEG_10H)
+    expect(r.emailHoje).toBe(1050)   // 1049 (duas páginas) + 1 enviado agora = teto
+    expect(envios.email).toHaveBeenCalledTimes(1)
+    expect(r.motivoParada).toBe("teto_diario")
+  })
+  it("teto 0 = sem teto; limite por execução vira o motivo", async () => {
+    vi.stubEnv("PROSPECTOR_TETO_EMAIL_DIA", "0")
+    for (let i = 0; i < MAX_EMAILS_POR_EXECUCAO + 5; i++) comEmail()
+    const r = await rodar(SEG_10H)
+    expect(envios.email).toHaveBeenCalledTimes(MAX_EMAILS_POR_EXECUCAO)
+    expect(r.tetoEmailDia).toBe(0)
+    expect(r.motivoParada).toBe("limite_execucao")
+  })
+  it("teto atingido só para o e-mail: o WhatsApp segue", async () => {
+    vi.stubEnv("PROSPECTOR_TETO_EMAIL_DIA", "1")
+    comEmail({ etapa: "abordado", atualizado_em: "2026-11-23T12:00:00.000Z", historico_etapas: [enviadoHoje("2026-11-23T12:00:00.000Z")] })
+    novo()
+    await rodar(SEG_10H)
+    expect(envios.email).not.toHaveBeenCalled()
+    expect(envios.evo).toHaveBeenCalledTimes(1)
+  })
+  it("cota da Resend esgotada: para o e-mail da execução e não penaliza o lead", async () => {
+    envios.email.mockImplementation(async () => ({ ok: false as const, erro: COTA, cota: true as const }))
+    const ls = [comEmail(), comEmail(), comEmail()]
+    const r = await rodar(SEG_10H)
+    expect(envios.email).toHaveBeenCalledTimes(1)
+    expect(r.motivoParada).toBe("cota_resend")
+    expect(hist(ls[0]).some(h => h.envio?.status === "falhou")).toBe(true)   // histórico preservado, nada marcado "enviado"
+    expect(hist(ls.find(l => hist(l).length === 0)!)).toHaveLength(0)
+  })
+  it("falhas de cota já gravadas não contam para MAX_FALHAS_POR_CANAL", async () => {
+    const falha = (erro: string, i: number) => ({ etapa: "qualificado", em: `2026-11-2${i}T12:00:00.000Z`, motivo: "x", envio: { passo: "primeiro_contato", canal: "email", status: "falhou", em: `2026-11-2${i}T12:00:00.000Z`, erro } })
+    const l = comEmail({ historico_etapas: Array.from({ length: MAX_FALHAS_POR_CANAL + 2 }, (_, i) => falha(COTA, i)) })
+    const m = comEmail({ historico_etapas: Array.from({ length: MAX_FALHAS_POR_CANAL }, (_, i) => falha("Invalid `to`", i)) })
+    await rodar(SEG_10H)
+    expect(envios.email).toHaveBeenCalledTimes(1)
+    expect(hist(l).some(h => h.envio?.status === "enviado")).toBe(true)
+    expect(hist(m).some(h => h.envio?.status === "enviado")).toBe(false)   // falha comum continua descartando
+    expect(ehErroDeCota(COTA)).toBe(true)
+    expect(ehErroDeCota("Invalid `to`")).toBe(false)
   })
 })

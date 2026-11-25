@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Printer, Layers, Sparkles, Stamp, Mountain, Scissors, Package, Shapes, FileStack, Palette, FileCheck, Truck, Plus, Check, ChevronLeft, ArrowRight, Paperclip, X, Clock, BarChart3, ShieldCheck, Handshake, Loader2, MessageCircle, MapPin, Zap, Banknote, Wallet, Camera, Globe } from "lucide-react"
 import type { CenarioPublico } from "../lib/cenariosParceiros"
 import {
-  SERVICOS_PARCEIRO, FORMAS_COBRANCA, PERGUNTAS, ROTULO_PRECO_CENARIO, cobraPorAcertoMilheiro, ETAPAS_IDS, errosDaEtapa, mascaraDocumento, mascaraTelefone, mascaraCep, GERENTE_PADRAO,
+  SERVICOS_PARCEIRO, FORMAS_COBRANCA, PERGUNTAS, ROTULO_PRECO_CENARIO, cobraPorAcertoMilheiro, cenarioAtivo, ETAPAS_IDS, errosDaEtapa, mascaraDocumento, mascaraTelefone, mascaraCep, GERENTE_PADRAO,
   type CadastroParceiro, type ServicoCadastrado, type IdServicoParceiro, type Pergunta, type Resposta, type Formato,
 } from "../lib/parceiros"
 
@@ -435,7 +435,7 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
         {et === "detalhes" && <>
           {sub === 0 && <div className="par-surge">
             <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Conta como cada serviço funciona</h2>
-            <p className="text-[14px] text-[#6b6878] mt-1.5">Um serviço por vez. Com isso a gente manda para você só o que cabe na sua máquina. Tudo é opcional, menos os preços dos exemplos (quando houver), como você cobra e o prazo.</p>
+            <p className="text-[14px] text-[#6b6878] mt-1.5">Um serviço por vez. Com isso a gente manda para você só o que cabe na sua máquina. Marque o que você faz: só o que você marcar pede preço de exemplo. O resto é opcional, menos como você cobra e o prazo.</p>
           </div>}
           {escolhidos.length > 1 && <div className="flex gap-1.5" aria-hidden>{escolhidos.map((x, i) => <span key={x.id} className="h-1.5 flex-1 rounded-full transition-colors duration-300" style={{ background: i <= sub ? ROXO : "#e6e2f0" }} />)}</div>}
           {escolhidos.filter((_, i) => i === sub).map(sv => {
@@ -443,7 +443,7 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
             const forma = FORMAS_COBRANCA.find(f => f.id === s.cobranca)
             const temErro = Object.keys(erros).some(k => k.startsWith(`${sv.id}.`))
             const perguntas = PERGUNTAS[sv.id] ?? []
-            const cenariosDoServico = cenarios.filter(x => x.servicoId === sv.id), porAcerto = cobraPorAcertoMilheiro(sv.id)
+            const cenariosDoServico = cenarios.filter(x => x.servicoId === sv.id && cenarioAtivo(x.id, s.tecnico)), porAcerto = cobraPorAcertoMilheiro(sv.id)
             return (
               <section key={sv.id} className={`rounded-3xl bg-white p-5 border ${temErro ? "border-[#d33a3c]/40" : "border-[#ece9f4]"} shadow-[0_2px_10px_rgba(40,20,90,0.04)] space-y-5`}>
                 <div className="flex items-center gap-3">

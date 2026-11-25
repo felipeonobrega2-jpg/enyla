@@ -23,9 +23,14 @@ export function esperaDoRetryAfter(v: string | null): number {
   return Math.min(Math.max(ms, 500), MAX_ESPERA_429_MS)
 }
 
+/** 429 de cota (diária ou mensal) da Resend: não adianta esperar, a recusa vale até virar o dia UTC (ou o mês). 429 de rate limit é outra coisa e se retenta. */
+export function ehCotaEsgotada(j: { name?: string; message?: string }): boolean {
+  return j.name === "daily_quota_exceeded" || j.name === "monthly_quota_exceeded" || /(daily|monthly)\b.*\bquota/i.test(j.message ?? "")
+}
+
 export const emailConfigurado = () => !!process.env.RESEND_API_KEY
 
-export async function enviarEmail(para: string, e: Email, anexos: { nome: string; base64: string }[] = [], opcoes: { de?: string; responderPara?: string } = {}): Promise<{ ok: true; id: string } | { ok: false; erro: string; status?: number; cota?: boolean }> {
+export async function enviarEmail(para: string, e: Email, anexos: { nome: string; base64: string }[] = [], opcoes: { de?: string; responderPara?: string } = {}): Promise<{ ok: true; id: string } | { ok: false; erro: string; status?: number; cota?: true }> {
   const chave = process.env.RESEND_API_KEY
   if (!chave) return { ok: false, erro: "e-mail ainda não configurado (falta a chave da Resend)" }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(para)) return { ok: false, erro: "e-mail inválido" }
@@ -43,13 +48,14 @@ export async function enviarEmail(para: string, e: Email, anexos: { nome: string
         body: corpo,
         signal: AbortSignal.timeout(anexos.length ? 30_000 : 10_000),
       })
-      if (r.status !== 429 || tentativa >= MAX_TENTATIVAS_429) break
+      if (r.status !== 429) break
+      const corpo429 = await r.clone().json().catch(() => ({})) as { name?: string; message?: string }
+      if (ehCotaEsgotada(corpo429)) return { ok: false, erro: corpo429.message ?? `${corpo429.name ?? "daily_quota_exceeded"}: cota de e-mail da Resend esgotada`, status: 429, cota: true }
+      if (tentativa >= MAX_TENTATIVAS_429) break
       await dormir(esperaDoRetryAfter(r.headers.get("retry-after")))
     }
     const j = await r.json().catch(() => ({})) as { id?: string; message?: string; name?: string }
     if (r.ok && j.id) return { ok: true, id: j.id }
-    // cota diária/mensal esgotada (429 com name *_quota_exceeded): quem chama pode guardar na fila em vez de perder
-    const cota = r.status === 429 && /quota/i.test(`${j.name ?? ""} ${j.message ?? ""}`)
-    return { ok: false, erro: j.message ?? `Resend respondeu ${r.status}`, status: r.status, ...(cota ? { cota: true } : {}) }
+    return { ok: false, erro: j.message ?? `Resend respondeu ${r.status}`, status: r.status }
   } catch (err) { return { ok: false, erro: String(err) } }
 }
