@@ -23,7 +23,7 @@ import { lerRegistros, gravarRegistro, lerIdsAgente, guardarIdAgente, reservarTr
 import { garantirTelefone } from "./contatosServidor"
 import { textoAvisoReativacao } from "./reativacao"
 import {
-  AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, ehSaudacaoAutomaticaDoLead, TEXTO_SEM_IA, filtroEfetivo,
+  AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, ehSaudacaoAutomaticaDoLead, TEXTO_SEM_IA, filtroEfetivo, travaPromessaDeOrcamento,
   organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, ehSemCredito, proximoFollowUp, horarioDeFollowUp, dentroDoHorario, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE, ETIQUETAS_AGENTE,
   marcar, marcosDoRegistro, Marcos, paradoParaRetomar,
 } from "./agenteLeads"
@@ -751,6 +751,18 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
       if (pend) r.resposta = `${r.resposta.trim()}\n${linkPedido(pend.id)}`
       else if (segurouPelaFoto) r.resposta = TEXTO_PEDE_MEDIDA
       else { r.pode_enviar_sozinho = false; r.motivo_alerta = "falou do orçamento/link, mas nenhum orçamento saiu" }
+    }
+  }
+
+  // Trava dura (qualquer modo): promessa de orçamento ("segue o orçamento", "já te mando"…) só sai com link de pedido que
+  // existe. Sem ele, vira "vou preparar o seu orçamento" e a pendência vai para o Felipe (decisao_sua), sem envio novo.
+  {
+    const ids = [...(cfg.pedidosDigitais ?? []).map(p => p.id), ...(novoGrupo ?? (novoPedido ? [novoPedido] : [])).map(p => p.id)]
+    const t = travaPromessaDeOrcamento(r.resposta, { idsExistentes: ids })
+    if (t.reescrita) {
+      r.resposta = t.resposta
+      r.alerta = "decisao_sua"; r.pode_enviar_sozinho = false
+      r.motivo_alerta = "falou que mandava o orçamento, mas não há proposta pronta (sem link/PDF): preparar o orçamento"
     }
   }
 
