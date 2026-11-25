@@ -21,7 +21,19 @@ const FECHO = new RegExp(`^\\s*((${PALAVRA_FECHO})[\\s!.,]*)+$`, "i")
 const AUTOMATICA = /seja (muito )?bem[- ]?vind|(é|e) um prazer ter voc|agradecemos (o seu |seu )?contato|em breve (retornaremos|responderemos|daremos)|fora do (nosso )?hor[aá]rio|mensagem autom[aá]tica|^\[(protocolMessage|reactionMessage|ephemeralMessage|senderKeyDistributionMessage)\]$/i
 const ELE_VAI = /\b(vou (providenciar|mandar|enviar|ver|medir|falar|conversar|pensar|passar|te (mandar|enviar|passar|falar))|(te|lhe) (mando|envio|passo|falo|retorno|respondo)|mando( (sim|já|ja|amanh[ãa]|depois|aí|ai))?|j[áa] (te )?mando|vou dar uma olhada|obrigad[oa] pela (aten[çc][ãa]o|ajuda|paci[êe]ncia)|assim que (eu )?(tiver|puder|chegar)|depois (eu )?(te )?(mando|falo|passo))\b/i
 const dadosDe = (pa?: string | null) => { try { return (JSON.parse(pa ?? "") as { r?: { dados?: Parameters<typeof faltaParaOrcar>[0] } }).r?.dados ?? null } catch { return null } }
-const momento = (pa?: string | null) => { try { return (JSON.parse(pa ?? "") as { r?: { momento?: string } }).r?.momento ?? null } catch { return null } }
+// "com ele" / "sem pressa" / "não atende" só valem se a leitura é posterior à última mensagem do lead: se ele escreveu
+// depois, a marca é velha e a conversa volta para a fila. Sem data (`em`) não dá para saber: vale a marca (como antes).
+export function momentoValido(pa: string | null | undefined, ultimaRecebidaAt: string | null | undefined): string | null {
+  try {
+    const g = JSON.parse(pa ?? "") as { em?: string; r?: { momento?: string } }
+    const mo = g.r?.momento ?? null
+    if (!mo) return null
+    const em = g.em ? new Date(g.em).getTime() : NaN
+    const ult = ultimaRecebidaAt ? new Date(ultimaRecebidaAt).getTime() : NaN
+    if (Number.isFinite(em) && Number.isFinite(ult) && em < ult) return null
+    return mo
+  } catch { return null }
+}
 
 export function rankQualificacao(et: string[] | null | undefined, status?: string | null): number {
   // Etapa num lugar só (etapaLead): descartado e fornecedor não pedem você; perdido que volta a escrever vale pelo perfil
@@ -50,7 +62,7 @@ export function quemEspera(convs: ConvEspera[], agora = Date.now(), minimoMin = 
     if (et.some(e => /fornecedor|descartado|sem resposta/i.test(e))) continue
     const msg = (c.ultima_msg ?? "").trim()
     if (FECHO.test(msg) || AUTOMATICA.test(msg) || ELE_VAI.test(msg)) continue
-    const mo = momento(c.proxima_acao)
+    const mo = momentoValido(c.proxima_acao, c.ultima_recebida_at)
     if (mo === "com_ele" || mo === "sem_pressa" || mo === "nao_atende") continue
     const bom = rankQualificacao(et, c.status_lead) >= 3
     const digital = et.includes("Digital")

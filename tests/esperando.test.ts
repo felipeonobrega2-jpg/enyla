@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { quemEspera } from "@/app/lib/esperando"
+import { quemEspera, momentoValido } from "@/app/lib/esperando"
 
 const agora = new Date("2026-11-18T18:00:00Z").getTime()
 const min = (m: number) => new Date(agora - m * 60_000).toISOString()
@@ -44,5 +44,24 @@ describe("checklist antes de passar para o Felipe", () => {
     expect(paraOFelipe({ ...e, checklistOk: true })).toBe(true)
     expect(paraOFelipe({ ...e, checklistOk: false, minutos: 200 })).toBe(true)
     expect(paraOFelipe({ ...e, peso: 2, checklistOk: true })).toBe(false)
+  })
+})
+
+describe("momento velho não tira o lead da fila", () => {
+  const pa = (momento: string, emMin: number) => JSON.stringify({ em: min(emMin), r: { momento } })
+  const dias7 = 7 * 1440 + 40
+  it("com_ele, sem_pressa e nao_atende velhos (anteriores à última mensagem) entram; recentes ficam fora", () => {
+    for (const m of ["com_ele", "sem_pressa", "nao_atende"]) {
+      expect(quemEspera([c({ proxima_acao: pa(m, dias7) })], agora)).toHaveLength(1)
+      expect(quemEspera([c({ proxima_acao: pa(m, 10) })], agora)).toHaveLength(0)
+    }
+  })
+  it("proxima_acao nulo ou inválido entra; FECHO continua fora mesmo com momento velho", () => {
+    expect(quemEspera([c({ proxima_acao: null }), c({ jid: "b", proxima_acao: "{lixo" })], agora)).toHaveLength(2)
+    expect(quemEspera([c({ ultima_msg: "Blz", proxima_acao: pa("com_ele", dias7) })], agora)).toHaveLength(0)
+  })
+  it("momentoValido", () => {
+    expect(momentoValido(pa("com_ele", dias7), min(40))).toBeNull()
+    expect(momentoValido(pa("com_ele", 10), min(40))).toBe("com_ele")
   })
 })
