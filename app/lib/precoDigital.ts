@@ -2,7 +2,8 @@
 // caixa aberta (a faca): cabe numa A4 → tabela A4; cabe numa A3 → tabela A3; maior que A3 → consultar a Villa.
 // Triplex 300g com laminação fosca ou brilhante. O preço ao cliente é o custo + a arte (designer) + a sua margem.
 
-export type RegraDigital = { arte: number; margem: number }
+// prazoPadraoDiasUteis: prazo que o cliente vê depois da arte aprovada. Vazio por padrão (sem prazo visível até o Felipe preencher)
+export type RegraDigital = { arte: number; margem: number; prazoPadraoDiasUteis?: number | null }
 export const REGRA_DIGITAL_PADRAO: RegraDigital = { arte: 70, margem: 150 }
 
 export type Folha = "A4" | "A3"

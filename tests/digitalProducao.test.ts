@@ -36,8 +36,20 @@ describe("comDigital", () => {
     expect(JSON.parse(comDigital(base, pedidos as never, hoje)).digital.pedidos).toHaveLength(2)
     const muitos = Array.from({ length: 200 }, (_, i) => ({ id: `DIG-${i}`, nome: "Cliente", status: "arte", sinalPagoEm: "2026-03-01" }))
     const s = comDigital(base, muitos as never, hoje)
-    expect(s.length).toBeLessThanOrEqual(7000)
-    expect(JSON.parse(s).digital.omitidos).toBeGreaterThan(0)
+    expect(JSON.parse(s).digital.pedidos).toHaveLength(200)   // nenhum Digital aberto some
+  })
+  it("lista todos os Digital abertos mesmo com o Offset ocupando o limite; enxuga o Offset", () => {
+    const offset = Array.from({ length: 60 }, (_, i) => ({ numero: `ORC-${i}`, cliente: "Cliente com nome comprido", etapa: "Arte/Dieline", entregaPrevista: "2026-04-01", naEtapaDesde: "2026-03-01", diasUteisNaEtapa: 3 }))
+    const base = JSON.stringify({ prazoMedioPorEtapa: {}, pedidos: offset })
+    const abertos = Array.from({ length: 40 }, (_, i) => ({ id: `DIG-${i}`, nome: "Cliente", produto: "Caixa", quantidade: 50, status: (["sinal_pago", "arte", "producao"] as const)[i % 3], sinalPagoEm: "2026-03-01" }))
+    const mistos = [...abertos, { id: "DIG-T", status: "arte", teste: true }, { id: "DIG-E", status: "enviado" }, { id: "DIG-C", status: "cancelado" }]
+    const j = JSON.parse(comDigital(base, mistos as never, hoje))
+    expect(j.digital.pedidos.map((p: { id: string }) => p.id).sort()).toEqual(abertos.map(p => p.id).sort())
+    expect(j.pedidos.length).toBeLessThan(60)
+    expect(j.omitidos).toBe(60 - j.pedidos.length)
+  })
+  it("pedido de teste não entra", () => {
+    expect(digitaisEmProducao([{ id: "DIG-T", status: "arte", teste: true }] as never, hoje)).toEqual([])
   })
   it("sem digitais devolve o JSON como veio", () => {
     expect(comDigital("{}", [], hoje)).toBe("{}")

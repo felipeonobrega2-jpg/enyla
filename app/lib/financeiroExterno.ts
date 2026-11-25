@@ -9,6 +9,7 @@ import { hoje, calcularResumoFinanceiro, dreDoPeriodo } from "./financeiro"
 import { montarPedidos, recebiveis, noPeriodo, type Periodo as Intervalo } from "./negocio"
 import { financeiroDoAndar } from "./financeiroAndar"
 import { saldoInformado } from "./caixa"
+import { receberDigital, type PedidoReceberDigital } from "./digitalReceber"
 import { compararPedidos } from "./calibragem"
 import { pendencias } from "./pendenciasDono"
 import type { StatusPluggy } from "./bancoServidor"
@@ -22,7 +23,7 @@ const ESTADOS = ["pendente", "vinculada", "criada", "ignorada", "todas"]
 export const AJUDA_FINANCEIRO: Record<string, string> = {
   "?o=financeiro": "SÓ A CHAVE DO CFO (as outras recebem 403). Só leitura. Sem &parte devolve o resumo (a receber, a pagar, saldos, números do mês) e a lista das partes. Período opcional: &periodo=mes (padrão) | trimestre | semestre | ano | tudo, em America/Sao_Paulo",
   "?o=financeiro&incluirEstornados=": "opcional, junto com qualquer parte: 1 | true | sim inclui nos cálculos os lançamentos desativados/estornados (estornadoEm preenchido); sem ele, ficam de fora de receber, pagar, gastos e margem. Outro valor: 400. A resposta traz incluirEstornados",
-  "?o=financeiro&parte=receber": "contas a receber: pedidos com saldo, vencidos e lançamentos a conferir. De cliente, só nome e valores",
+  "?o=financeiro&parte=receber": "contas a receber: pedidos com saldo, vencidos e lançamentos a conferir; bloco digital com os pedidos Digital (valor total, sinal, pago, em conferência, saldo e vencimento do saldo; só é pago o que está ligado a uma transação do banco). De cliente, só nome e valores",
   "?o=financeiro&parte=pagar": "contas a pagar: despesas não pagas (fora a conta corrente de fornecedor), com flag de vencido",
   "?o=financeiro&parte=banco&estado=": "movimentos e conciliação do banco (pendente | vinculada | criada | ignorada | todas; padrão pendente), sem documento da contraparte",
   "?o=financeiro&parte=saldos": "saldo por conta (cadastro e Pluggy) e total",
@@ -31,7 +32,7 @@ export const AJUDA_FINANCEIRO: Record<string, string> = {
   "?o=financeiro&parte=depende": "'Dinheiro parado' e integrações de cobrança/banco do 'Depende de você' (só situação)",
 }
 
-type Cfg = Configuracoes & { pluggy?: { itens?: unknown[] }; pluggyStatus?: StatusPluggy } & Record<string, unknown>
+type Cfg = Configuracoes & { pedidosDigitais?: unknown[]; pluggy?: { itens?: unknown[] }; pluggyStatus?: StatusPluggy } & Record<string, unknown>
 type Negocio = { comissaoValor: number; status: string }
 type Dados = { kanban: KanbanCard[]; lancamentos: LancamentoFinanceiro[]; negocios: Negocio[]; cfg: Cfg }
 
@@ -83,7 +84,15 @@ function saldos(cfg: Cfg) {
   }
 }
 
-function receber(d: Dados) {
+// Digital no a receber: só conta como pago o lançamento ligado a uma transação do banco (lancamento_ids); o resto fica em conferência
+async function digitalAReceber(d: Dados) {
+  const pedidos = (d.cfg.pedidosDigitais ?? []) as PedidoReceberDigital[]
+  if (!pedidos.length) return []
+  const { data } = await supabase.from("banco_transacoes").select("id, data, lancamento_ids").in("estado", ["vinculada", "criada"]).limit(5000)
+  return receberDigital(pedidos, d.lancamentos, (data ?? []) as { id: string; data: string | null; lancamento_ids: string[] | null }[]).map(i => ({ ...i, pagamentos: i.pagamentos.map(({ lancamentoId, ...x }) => ({ lancamento: lancamentoId, ...x })) }))
+}
+
+function receber(d: Dados, digital: Awaited<ReturnType<typeof digitalAReceber>> = []) {
   const resumo = calcularResumoFinanceiro(d.kanban, d.lancamentos, d.negocios as never)
   const offset = offsetDe(d.lancamentos)
   const rec = recebiveis(montarPedidos(d.kanban, offset), offset)
@@ -93,6 +102,7 @@ function receber(d: Dados) {
     vencidos: resumo.vencidos.map(v => ({ numero: v.loteNumero ?? v.cardNumero ?? null, cliente: v.nomeCliente, valor: r2(v.total), diasAtraso: v.diasAtraso, vencimento: v.lancamentos[0]?.dataVencimento ?? null, status: v.lancamentos[0]?.status ?? null })),
     aConferir: rec.aConferir.map(l => ({ id: l.id, numero: l.loteNumero ?? l.cardNumero ?? null, cliente: l.nomeCliente ?? null, valor: l.valor, vencimento: l.dataVencimento, status: l.status })),
     comissoesPendentes: soma(d.negocios.filter(n => n.status === "pendente").map(n => ({ valor: n.comissaoValor }))),
+    digital: { aReceber: r2(digital.reduce((s, i) => s + i.saldo, 0)), pedidos: digital },
   }
 }
 
@@ -178,7 +188,7 @@ export async function leituraFinanceira(params: URLSearchParams): Promise<Leitur
     return { status: 200, corpo: { hoje: hj, periodo, incluirEstornados, aReceber: { total: rec.aReceberTotal, vencido: rec.emAtrasoTotal }, aPagar: { total: pagar.total, vencido: pagar.vencido, quantidade: pagar.quantidade },
       saldos: { total: sal.total, contas: sal.contas.length }, mes, partes: PARTES } }
   }
-  const corpo = parte === "receber" ? receber(d) : parte === "pagar" ? contasPagar(d.lancamentos, hj) : parte === "banco" ? await banco(estado, per)
+  const corpo = parte === "receber" ? receber(d, await digitalAReceber(d)) : parte === "pagar" ? contasPagar(d.lancamentos, hj) : parte === "banco" ? await banco(estado, per)
     : parte === "saldos" ? saldos(d.cfg) : parte === "gastos" ? gastos(d, per) : parte === "margem" ? await margem(d, per) : await depende(d)
   return { status: 200, corpo: { parte, hoje: hj, periodo, incluirEstornados, ...corpo } }
 }

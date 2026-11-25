@@ -188,7 +188,7 @@ const DEFAULT_CATS_REC: CategoriaFinanceira[] = [
 
 function statusEfetivo(l: LancamentoFinanceiro): StatusLancamento {
   if (l.status === "pago") return "pago"
-  if (l.dataVencimento < hoje()) return "atrasado"
+  if (l.dataVencimento && l.dataVencimento < hoje()) return "atrasado"
   return "pendente"
 }
 
@@ -1236,6 +1236,10 @@ export function FinanceiroView({
   const pedidosLista = useMemo(() => montarPedidos(kanban, lancamentos), [kanban, lancamentos])
   const rec = useMemo(() => recebiveis(pedidosLista, lancamentos), [pedidosLista, lancamentos])
 
+  // Digital no a receber: saldo (restante) e sinais ainda não baixados, só nas linhas Digital e Juntas (no Offset a lista vem vazia)
+  const digitalPendentes = useMemo(() => lancamentos.filter(l => l.unidade === "digital" && l.tipo === "receita" && l.status !== "pago" && !l.estornadoEm && l.formaPagamento !== "conta")
+    .sort((a, b) => (a.dataVencimento || "9999").localeCompare(b.dataVencimento || "9999")), [lancamentos])
+
   const kpis = useMemo(() => {
     const semConta = (l: LancamentoFinanceiro) => l.formaPagamento !== "conta"
     const all = lancamentos.filter(inPeriodo).filter(semConta)
@@ -1250,13 +1254,13 @@ export function FinanceiroView({
       recebido:   totalRecebido,
       despesasPg: totalDespesas,
       // A receber e em atraso: mesma conta do Painel e do celular
-      aReceber:   rec.aReceber + negociosPendentes.reduce((s, n) => s + n.comissaoValor, 0),
-      emAtraso:   rec.vencido,
+      aReceber:   rec.aReceber + negociosPendentes.reduce((s, n) => s + n.comissaoValor, 0) + digitalPendentes.reduce((s, l) => s + l.valor, 0),
+      emAtraso:   rec.vencido + digitalPendentes.filter(l => l.dataVencimento && l.dataVencimento < hoje()).reduce((s, l) => s + l.valor, 0),
       resultado:  totalRecebido - totalDespesas,
       naoRegistrados: contarNaoRegistrados(pedidosFechadosTotais),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lancamentos, negocios, periodo, mesOffset, rec, pedidosFechadosTotais])
+  }, [lancamentos, negocios, periodo, mesOffset, rec, pedidosFechadosTotais, digitalPendentes])
 
   // Itens que compõem o "A receber" — mesma base do kpis.aReceber, detalhada item a item
   const receberItens = useMemo(() => {
@@ -1391,7 +1395,7 @@ export function FinanceiroView({
 
 
   const abas: { v: FinTab; nome: string; conta?: number }[] = linha !== "offset"
-    ? [{ v: "dash", nome: "Visão geral" }, { v: "lancamentos", nome: "Lançamentos" }, { v: "dre", nome: "DRE" }]
+    ? [{ v: "dash", nome: "Visão geral" }, { v: "receber", nome: "A receber", conta: digitalPendentes.length }, { v: "lancamentos", nome: "Lançamentos" }, { v: "dre", nome: "DRE" }]
     : [
       { v: "dash", nome: "Visão geral" },
       { v: "receber", nome: "A receber", conta: vencidos.length },
@@ -1795,6 +1799,25 @@ export function FinanceiroView({
             <p className="text-[11.5px] text-[#8E8E93] mb-3">
               Pedidos fechados ou em produção, e ganhos de parcerias pendentes.
             </p>
+
+            {/* Digital: saldo do pedido (restante) e sinais por baixar. Sem vencimento até o material ficar pronto: não conta como atrasado */}
+            {digitalPendentes.length > 0 && (
+              <div className="mb-4">
+                <p className="text-[10.5px] text-[#8E8E93] font-semibold mb-2">Digital · a receber</p>
+                <div className="rounded-xl border border-[rgba(60,60,67,0.12)] bg-white divide-y divide-[rgba(60,60,67,0.08)]">
+                  {digitalPendentes.map(l => (
+                    <div key={l.id} className="px-5 py-2.5 flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[12.5px] font-medium text-[#191625]">{l.nomeCliente ?? l.descricao}</span>
+                        <span className="text-[11px] text-[#8E8E93] ml-2">{l.descricao}</span>
+                      </div>
+                      <span className="text-[10.5px] text-[#8E8E93] shrink-0">{l.dataVencimento ? `vence ${l.dataVencimento.slice(8, 10)}/${l.dataVencimento.slice(5, 7)}` : "vence quando o material ficar pronto"}</span>
+                      <span className="text-[12px] font-semibold text-[#191625] ds-num">{brl(l.valor)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Search + filter */}
             <div className="flex flex-col gap-2 mb-4">

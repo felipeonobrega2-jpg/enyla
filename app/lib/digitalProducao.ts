@@ -9,7 +9,7 @@ const ETAPAS = ["arte", "producao", "pronto", "enviado"] as const
 
 type PedidoDig = {
   id: string; nome?: string | null; produto?: string | null; quantidade?: number; status: string
-  em?: string; sinalPagoEm?: string; arteEnviadaEm?: string; arteAprovadaEm?: string
+  teste?: boolean; em?: string; sinalPagoEm?: string; arteEnviadaEm?: string; arteAprovadaEm?: string
   designerAvisadoEm?: string; villaEnviadoEm?: string; prontoEm?: string; statusEm?: string
   sugestaoArteAprovada?: { trecho: string; em: string } | null   // só leitura: o cliente parece ter aprovado a arte; falta o clique de uma pessoa
 }
@@ -33,7 +33,7 @@ function desde(p: PedidoDig): string | null {
 }
 
 export function digitaisEmProducao(pedidos: PedidoDig[] | undefined, hoje = hojeBrasilia()): PedidoDigitalProducao[] {
-  return (pedidos ?? []).filter(p => (STATUS as readonly string[]).includes(p.status)).map(p => {
+  return (pedidos ?? []).filter(p => !p.teste && (STATUS as readonly string[]).includes(p.status)).map(p => {
     const d = desde(p)
     const dias = d ? Math.max(0, diasUteisEntre(diaDe(d), hoje)) : null
     const faltam = ETAPAS.slice(Math.max(0, ETAPAS.indexOf(p.status as never))).filter(e => !(e === "pronto" && p.prontoEm))
@@ -44,22 +44,30 @@ export function digitaisEmProducao(pedidos: PedidoDig[] | undefined, hoje = hoje
   })
 }
 
-/** Junta o bloco `digital` ao JSON da produção (offset), mantendo o total em até 7000 caracteres e sempre JSON válido. */
+/**
+ * Junta o bloco `digital` ao JSON da produção (offset). Todo Digital aberto (sinal_pago, arte, producao; teste fica de fora)
+ * entra sempre. Se não couber em 7000 caracteres, enxuga primeiro as datas soltas do Digital e depois o Offset (os pedidos
+ * do Offset do fim da lista saem, com `omitidos`); nunca um pedido Digital.
+ */
 export function comDigital(jsonProducao: string, pedidos: PedidoDig[] | undefined, hoje = hojeBrasilia()): string {
   const lista = digitaisEmProducao(pedidos, hoje)
   if (!lista.length) return jsonProducao
   let base: Record<string, unknown>
   try { base = JSON.parse(jsonProducao) } catch { return jsonProducao }
-  const monta = (digital: unknown) => JSON.stringify({ ...base, digital })
+  const monta = (digital: unknown, b: Record<string, unknown> = base) => JSON.stringify({ ...b, digital })
   const completo = monta({ pedidos: lista })
   if (completo.length <= LIMITE) return completo
-  // Resume: tira as datas soltas e depois corta pedidos (os parados há mais tempo ficam)
+  // 1) sem as datas soltas; os parados há mais tempo primeiro
   const enxutos = lista.map(p => ({ id: p.id, cliente: p.cliente, produto: p.produto, quantidade: p.quantidade, status: p.status, naEtapaDesde: p.naEtapaDesde, diasUteisNaEtapa: p.diasUteisNaEtapa, faltam: p.faltam, sugestaoArteAprovada: p.sugestaoArteAprovada }))
     .sort((a, b) => (b.diasUteisNaEtapa ?? -1) - (a.diasUteisNaEtapa ?? -1))
-  const com = (n: number) => monta({ pedidos: enxutos.slice(0, n), omitidos: enxutos.length - n })
-  let n = enxutos.length
+  const digital = { pedidos: enxutos }
+  const resumido = monta(digital)
+  if (resumido.length <= LIMITE) return resumido
+  // 2) tira pedidos do Offset (do fim) até caber
+  const offset = Array.isArray(base.pedidos) ? base.pedidos as unknown[] : []
+  const jaOmitidos = typeof base.omitidos === "number" ? base.omitidos : 0
+  const com = (n: number) => monta(digital, { ...base, pedidos: offset.slice(0, n), omitidos: jaOmitidos + offset.length - n })
+  let n = offset.length
   while (n > 0 && com(n).length > LIMITE) n--
-  if (n > 0) return com(n)
-  const resumo = monta({ total: lista.length, porStatus: Object.fromEntries(STATUS.map(s => [s, lista.filter(p => p.status === s).length])) })
-  return resumo.length <= LIMITE ? resumo : jsonProducao
+  return com(n)
 }

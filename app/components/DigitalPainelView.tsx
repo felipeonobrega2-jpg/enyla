@@ -26,6 +26,8 @@ type Pedido = {
   ajustes: { texto: string; em: string }[]; designerAvisadoEm: string | null; villaEnviadoEm: string | null
   frete: number | null; restante: number | null; restantePagoEm: string | null; prontoEm?: string | null; entrega: { cep: string; endereco: string } | null; acertadoEm: string | null
   teste?: boolean
+  situacaoArte?: string | null; prazoEntrega?: string | null; arteEPrazoGravado?: { por: string; em: string; motivo: string } | null
+  prazo?: { data: string | null; texto: string; origem: string }
   sugestaoArte?: SugestaoArte | null
 }
 type Contatos = { villa?: string; designer?: string; designerNome?: string }
@@ -52,6 +54,7 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
   const [editContatos, setEditContatos] = useState<Contatos | null>(null)
   const [acerto, setAcerto] = useState<{ ids: string[]; total: number }>({ ids: [], total: 0 })
   const [frete, setFrete] = useState("")
+  const [edArte, setEdArte] = useState<{ id: string; situacao: string; prazo: string } | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
 
   const buscar = useCallback(() => fetch("/api/digital").then(async r => {
@@ -305,6 +308,25 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
                 )}
               </div>
             )}
+
+            <div className="rounded-xl bg-[rgba(116,116,128,0.06)] px-3.5 py-3 space-y-1.5">
+              <p className="text-[11.5px] text-[#898892]">Acompanhamento do cliente · prazo visível: <b className="text-[#191625]">{sel.prazo?.texto ?? "a confirmar"}</b>{sel.prazo?.origem === "gravado" ? " (gravado)" : ""}</p>
+              <div className="flex flex-wrap gap-2 items-center">
+                <select value={edArte?.id === sel.id ? edArte.situacao : sel.situacaoArte ?? ""} onChange={e => setEdArte({ id: sel.id, situacao: e.target.value, prazo: edArte?.id === sel.id ? edArte.prazo : sel.prazoEntrega ?? "" })}
+                  className="h-8 rounded-lg px-2 text-[12.5px] text-[#191625] bg-white ds-borda focus:outline-none">
+                  <option value="">Situação da arte…</option>
+                  {["sem arte", "enviada", "ajustes pedidos", "aprovada", "prova autorizada"].map(x => <option key={x} value={x}>{x}</option>)}
+                </select>
+                <input type="date" value={edArte?.id === sel.id ? edArte.prazo : sel.prazoEntrega ?? ""} onChange={e => setEdArte({ id: sel.id, situacao: edArte?.id === sel.id ? edArte.situacao : sel.situacaoArte ?? "", prazo: e.target.value })}
+                  className="h-8 rounded-lg px-2 text-[12.5px] text-[#191625] bg-white ds-borda focus:outline-none" />
+                <Botao disabled={!!ocupado || edArte?.id !== sel.id} onClick={() => {
+                  const motivo = prompt("Motivo da mudança (obrigatório, até 300 caracteres):")?.trim()
+                  if (!motivo || !edArte) return
+                  void acao("arte_prazo", { id: sel.id, acao: "arte_prazo", motivo, ...(edArte.situacao ? { situacaoArte: edArte.situacao } : {}), prazoEntrega: edArte.prazo }).then(() => setEdArte(null))
+                }}>Gravar</Botao>
+              </div>
+              {sel.arteEPrazoGravado && <p className="text-[11px] text-[#898892]">Gravado por {sel.arteEPrazoGravado.por} em {sel.arteEPrazoGravado.em} · {sel.arteEPrazoGravado.motivo}</p>}
+            </div>
 
             {sel.arteAprovadaEm && (
               <div className="rounded-xl bg-[rgba(116,116,128,0.06)] px-3.5 py-3 space-y-1.5">

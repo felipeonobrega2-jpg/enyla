@@ -8,6 +8,8 @@ import { mudarStatus, trocarFrete, restanteUnico, arteAtual, acertoDaSemana, Ped
 import { mudarConfig } from "@/app/lib/configAtomica"
 import { lerSugestoes, decidirSugestao } from "@/app/lib/arteAprovadaServidor"
 import { auth } from "@/auth"
+import { gravarArtePrazo } from "@/app/lib/gravarDigitalExterno"
+import { prazoDoPedido } from "@/app/lib/digitalPrazo"
 
 type Dados = { pedidosDigitais?: PedidoComBriefing[]; digitalContatos?: ContatosDigital; digital?: import("@/app/lib/precoDigital").RegraDigital }
 
@@ -30,6 +32,7 @@ export async function GET() {
     arteAtual: arteAtual(p), versoes: (p.artes ?? []).length, arteEnviadaEm: p.arteEnviadaEm ?? null, arteAprovadaEm: p.arteAprovadaEm ?? null,
     ajustes: p.ajustes ?? [], designerAvisadoEm: p.designerAvisadoEm ?? null, villaEnviadoEm: p.villaEnviadoEm ?? null,
     frete: p.frete ?? null, restante: p.restante ?? null, restantePagoEm: p.restantePagoEm ?? null, prontoEm: p.prontoEm ?? null, entrega: p.entrega ?? null, acertadoEm: p.acertadoEm ?? null,
+    situacaoArte: p.situacaoArte ?? null, prazoEntrega: p.prazoEntrega ?? null, arteEPrazoGravado: p.arteEPrazoGravado ?? null, prazo: prazoDoPedido(p, d.digital?.prazoPadraoDiasUteis),
     negociacao: p.negociacao ?? null, termosAceitosEm: p.termos?.em ?? null,
   }))
   const acerto = acertoDaSemana(todos)
@@ -66,6 +69,13 @@ export async function POST(req: NextRequest) {
     const { data } = await lerConfigLinha()
     const r = await decidirSugestao(((data?.data ?? {}) as Dados).pedidosDigitais ?? [], b.id, b.decisao, "Painel (login do sistema)")
     return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ erro: r.erro }, { status: 400 })
+  }
+  // Situação da arte e prazo de entrega (só esses campos; quem, quando e motivo ficam gravados no pedido)
+  if (b.acao === "arte_prazo") {
+    const sessao = await auth().catch(() => null)
+    if (!sessao) return NextResponse.json({ erro: "Entre no sistema para gravar." }, { status: 401 })
+    const r = await gravarArtePrazo(sessao.user?.name ?? sessao.user?.email ?? "Painel (login do sistema)", b as Record<string, unknown>)
+    return r.ok ? NextResponse.json({ ok: true, id: r.id, situacaoArte: r.situacaoArte, prazoEntrega: r.prazoEntrega }) : NextResponse.json({ erro: r.erro }, { status: r.status })
   }
   if (b.acertar?.length) {
     const ids = new Set(b.acertar)
