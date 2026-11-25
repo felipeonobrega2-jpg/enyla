@@ -163,10 +163,9 @@ async function despachar(msgId: string, ordem: number) {
 }
 
 // A última mensagem de verdade da conversa (sem o "já te respondo" e as automáticas do WhatsApp Business)
-async function ultimaReal(jid: string) {
-  const { ehMensagemAutomaticaDoWhatsapp, ehSaudacaoAutomaticaDoLead } = await import("./agenteLeads")
-  const { data } = await supabase.from("whatsapp_mensagens").select("id, from_me, corpo, tipo").eq("jid", jid).order("ts", { ascending: false }).limit(8)
-  return (data ?? []).find(m => !(m.from_me && ehMensagemAutomaticaDoWhatsapp(m.corpo, m.tipo)) && !(!m.from_me && ehSaudacaoAutomaticaDoLead(m.corpo))) as { id: string; from_me: boolean } | undefined
+export async function ultimaReal(jid: string) {
+  const { ultimaMensagemReal } = await import("./ultimaMensagem")
+  return ultimaMensagemReal(jid) as Promise<{ id: string; from_me: boolean } | undefined>
 }
 
 async function recuperarFila(cfg: Cfg, agora: Date, vagas: { n: number }, despachadas: Set<string>) {

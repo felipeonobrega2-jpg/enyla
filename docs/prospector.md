@@ -85,7 +85,18 @@ Código: `app/lib/prospectorEnvio.ts` (textos, horário, canais e recusa, tudo p
 
 **Qualificação.** `encontrado` com nota maior ou igual a `prospector_nota_minima` (AppConfig, padrão 1) e celular ou e-mail válido vira `qualificado`, com linha no histórico. `descartado` e `opt_out` nunca são reabertos. A cada execução olha os 1000 de maior nota que têm telefone ou e-mail preenchido.
 
-**Fila.** `qualificado`, em ordem de nota decrescente. No máximo 10 *primeiros* contatos por dia (conta pelo dia de São Paulo em que o primeiro envio começou). Lembretes não entram nessa cota, mas só saem no mesmo horário.
+**Filtro de público (issue #128).** Todos os CNAEs de `CNAES_PROSPECTO` continuam (pré-impressão 1821 e acabamentos 1822-9/99 são fornecedores que a operação precisa). Regras, em `app/lib/prospectorEnvio.ts`, aplicadas na qualificação/envio (vale para quem já está na base) e no importador (novos):
+- **Encadernação/plastificação (1822-9/01) como único CNAE da lista**: não qualifica e o importador não importa.
+- **CNAE da lista só como secundário** (principal fora da lista): não é cortado, mas exige nota mínima `max(prospector_nota_minima, NOTA_MINIMA_SO_SECUNDARIO)`; a constante vale 2. Principal na lista segue `prospector_nota_minima`. Sem CNAE principal registrado, segue o mínimo configurado.
+- **Nome fora do ramo**: razão social ou nome fantasia com algum termo de `TERMOS_FORA_DO_RAMO` (inflável, balão, figurinha, brinquedo, festa…), sem acento e sem maiúsculas, por trecho. Para mudar a lista, edite o array. O importador não grava prospecto novo com esse nome (`ignorar`, motivo `fora do ramo`); quem já existe só tem os dados atualizados.
+
+Nada é apagado: quem não serve fica na base em `encontrado`, não vira `qualificado` e não é abordado. O motivo não é gravado no histórico (a tabela não tem campo de motivo e gravar a cada execução repetiria a linha); `motivoNaoQualifica` devolve o texto para quem quiser consultar. Quem já estava `qualificado` e cai numa regra também sai da fila de primeiro contato. Sem mensagem nova, cobrança ou chave.
+
+**Fila.** `qualificado`, em ordem de nota decrescente. Cota por canal (decisão do Felipe, 25/11/2026): **WhatsApp, no máximo 10 primeiros contatos por dia** (dia de São Paulo em que o envio saiu); **e-mail não tem teto diário**. Quem tem os dois canais: o e-mail sai mesmo com a cota do WhatsApp cheia; o WhatsApp só sai se ainda houver vaga (senão fica pendente para o próximo dia com vaga). Lembretes não entram na cota, mas só saem no mesmo horário.
+
+**Limite técnico por execução.** Sem teto diário não é um disparo só: cada execução manda no máximo `MAX_EMAILS_POR_EXECUCAO` (60) e-mails (primeiro contato e lembrete somados) e para depois de `ORCAMENTO_MS_POR_EXECUCAO` (90 s) dentro dos 120 s da rota (`maxDuration`). O restante sai no próximo cron (de hora em hora).
+
+**Limite da Resend.** A API aceita, por padrão, 10 requisições por segundo por time (compartilhado entre todas as chaves). `enviarEmail` (`app/lib/email.ts`) espera 350 ms entre chamadas (~3 por segundo, para sobrar para o resto do sistema) e, em resposta 429, respeita o `Retry-After` (mínimo 0,5 s, máximo 10 s) e tenta de novo até 3 vezes no total. Não há teto diário de e-mail definido por nós.
 
 **Cadência.**
 
@@ -99,7 +110,7 @@ Código: `app/lib/prospectorEnvio.ts` (textos, horário, canais e recusa, tudo p
 
 **Limitações.**
 
-- Resposta de e-mail cai no Gmail do Felipe (Reply-To). Não há leitor de Gmail: um "sim" ou "não" por e-mail **não para a cadência sozinho**. Quem responde por e-mail ainda pode receber o lembrete. O Felipe precisa olhar o Gmail e marcar o prospecto à mão (`respondeu` ou `opt_out`) enquanto não existir o leitor.
+- Resposta de e-mail cai no Gmail do Felipe (Reply-To). Não há leitor de Gmail: um "sim" ou "não" por e-mail **não para a cadência sozinho**. **Por isso o lembrete e o encerramento por falta de resposta estão suspensos para quem recebeu o primeiro contato por e-mail** (`LEMBRETE_EMAIL_ATIVO = false` em `app/lib/prospectorEnvio.ts`; nenhum canal recebe lembrete, e o prospecto não vai para `encerrado_sem_resposta`). Volta quando a entrada de e-mail existir. Quem foi abordado só por WhatsApp segue a cadência normal. O Felipe precisa olhar o Gmail e marcar o prospecto à mão (`respondeu` ou `opt_out`) enquanto não existir o leitor.
 - Resposta por WhatsApp de um contato que chega com `jid` `@lid` (sem o número) não é casada com o prospecto.
 - A tela do funil conta só as etapas antigas; `respondeu` e `encerrado_sem_resposta` ainda não aparecem nela.
 - O agente de atendimento que já existe continua tratando as conversas que entram. Este PR não muda isso.

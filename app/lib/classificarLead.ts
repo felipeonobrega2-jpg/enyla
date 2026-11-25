@@ -2,7 +2,7 @@
 // está atendendo, o agente está desligado ou fora do horário). MQL só com prova: a IA cita o que o cliente disse e o
 // código confere (menos de 1.000 nunca é MQL; 5.000+ é ICP). Puro: o servidor lê a conversa e grava.
 
-import { PerfilLead, ETIQUETA_PERFIL, ETIQUETAS_AGENTE } from "./agenteLeads"
+import { PerfilLead, ETIQUETA_PERFIL, ETIQUETAS_AGENTE, REGRA_PRODUTO } from "./agenteLeads"
 
 export type Classificacao = {
   perfil: PerfilLead
@@ -143,7 +143,10 @@ Some os itens: "13 fragrâncias, 1000 de cada" = 13.000 (icp). "500 de cada uma 
 Como o Felipe qualifica (filtro dele):
 <filtro>
 ${filtro.slice(0, 3000)}
-</filtro>${ensinado ? `
+</filtro>
+
+${REGRA_PRODUTO}
+No classificador isso quer dizer: medicamento, farmácia, peptídeo, suplemento e marca de terceiro nunca viram nao_lead nem descem de perfil por isso; o perfil sai só do volume.${ensinado ? `
 
 O que o Felipe ensinou:
 ${ensinado.slice(0, 3000)}` : ""}

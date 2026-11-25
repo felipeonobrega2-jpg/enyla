@@ -96,13 +96,14 @@ function resumoAcao(a: AcaoConversa): string {
 }
 
 // As ferramentas de um diretor: usadas na conversa com o Felipe e pela porta de acesso dos diretores na nuvem
-// (api/externo). Mensagem a cliente nunca sai daqui: fica esperando o Aprovo do Felipe.
-export async function executarFerramenta(diretor: IdDiretor, nome: string, x: Record<string, unknown>, op: { ctx: Foto; apiKey: string; grava: boolean }): Promise<{ saida: string; acao?: AcaoConversa; status?: number }> {
+// (api/externo). Mensagem a cliente nunca sai daqui: fica esperando o Aprovo do Felipe. Só a porta externa (enviarLead)
+// deixa a ordem a LEAD sair direto pelo agente (ordemDireta); cliente A/B/C e indefinido sempre esperam o Aprovo.
+export async function executarFerramenta(diretor: IdDiretor, nome: string, x: Record<string, unknown>, op: { ctx: Foto; apiKey: string; grava: boolean; enviarLead?: boolean }): Promise<{ saida: string; acao?: AcaoConversa; status?: number; destino?: "enviado_direto" | "fila_aprovo"; motivo?: string; nivel?: string }> {
   const { ctx, grava } = op
   try {
     if (nome === "detalhar") return { saida: ctx.detalhes[String(x.area)] ?? "Área desconhecida." }
     if (nome === "ordenar_funcionario" && ehComercial(x.funcionario)) {
-      return ordenarComercial(diretor, x, { apiKey: op.apiKey, cultura: ctx.cultura, novoId })
+      return ordenarComercial(diretor, x, { apiKey: op.apiKey, cultura: ctx.cultura, novoId, enviarLead: op.enviarLead })
     }
     if (nome === "ordenar_funcionario") {
       const func = ctx.exec.find(f => f.id === x.funcionario)
@@ -280,7 +281,7 @@ ${blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")).j
 export async function responderAcao(diretor: IdDiretor, acaoId: string, resposta: "aprovo" | "descartar", textoEditado?: string): Promise<MsgConversa[]> {
   const todas = await lerConversa(diretor)
   const acao = todas.flatMap(m => m.acoes ?? []).find(a => a.id === acaoId)
-  if (!acao || acao.tipo !== "mensagem" || acao.status === "enviado") return todas
+  if (!acao || acao.tipo !== "mensagem" || acao.status === "enviado" || acao.status === "cancelado") return todas
   if (resposta === "descartar") acao.status = "descartado"
   else {
     if (textoEditado?.trim()) acao.texto = textoEditado.trim().slice(0, 4000)
