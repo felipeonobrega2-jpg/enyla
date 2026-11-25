@@ -23,6 +23,10 @@ export const HORA_INICIO = 8
 export const HORA_FIM = 20
 export const MAX_FALHAS_POR_CANAL = 3
 export const REMETENTE_REPLY_TO = "felipeonobrega2@gmail.com"
+/** Reply-To do primeiro contato e do lembrete. Só troca quando PROSPECTOR_REPLY_TO está preenchida com um e-mail válido (entrada de respostas no ar); senão segue o Gmail. */
+export function replyToDoProspector(env: string | undefined = process.env.PROSPECTOR_REPLY_TO): string {
+  return emailValido(env) ?? REMETENTE_REPLY_TO
+}
 export const ASSUNTO_EMAIL = "ENYLA, gráfica de embalagens em Barueri"
 
 const CORPO_PRIMEIRO = "tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?"
