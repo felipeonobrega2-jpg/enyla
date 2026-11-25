@@ -160,6 +160,42 @@ function travaFirme(c: ContextoEnvio): string | null {
   return null
 }
 
+// ── Promessa de orçamento sem proposta real ──────────────────────────────────
+// "Segue o orçamento", "já te mando", "tô finalizando", "segue em anexo": só podem sair junto de um link /d/DIG-… de
+// pedido que existe ou de um PDF realmente anexado. Sem isso, a frase é trocada por "estou preparando" e a pendência
+// vai para o Felipe (alerta "decisao_sua"). "Vou preparar o seu orçamento" não promete envio nem anexo: continua válido.
+export const TEXTO_PREPARANDO_ORCAMENTO = "Vou preparar o seu orçamento."
+const PROMETE_ENVIO = new RegExp([
+  String.raw`\b(segue|seguem|aqui est[aá]|segue em anexo|em anexo|anexei|mandei|enviei)\b[^.!?\n]{0,40}\b(or[cç]amento|proposta|pdf|link|valor|anexo)`,
+  String.raw`\bsegue(m)? em anexo\b`,
+  String.raw`\b(te mand(o|ei)|te envio|te passo|te encaminho)\b[^.!?\n]{0,40}\b(or[cç]amento|proposta|pdf|link|valor)`,
+  String.raw`\bj[aá] te (mando|envio|passo|encaminho)\b`,
+  String.raw`\b(t[oô]|estou|to) finalizando\b`,
+  String.raw`\bvou (montar|finalizar|fechar)\b[^.!?\n]{0,40}\b(or[cç]amento|proposta)\b[^.!?\n]{0,40}\b(mand|envi|passo)`,
+  // Promessa em curto prazo (#110): "já monto o orçamento e te mando", "o orçamento já sai", "em instantes te envio o orçamento"
+  String.raw`\bj[aá] (monto|fa[cç]o|preparo|fecho)\b[^.!?\n]{0,30}\bor[cç]amento\b[^.!?\n]{0,30}\b(mand|envi|pass)`,
+  String.raw`\bor[cç]amento\b[^.!?\n]{0,20}\bj[aá] sai\b`,
+  String.raw`\bj[aá] sai\b[^.!?\n]{0,20}\bor[cç]amento\b`,
+  String.raw`\bor[cç]amento\b[^.!?\n]{0,20}\bsai (hoje|agora|em instantes|em minutos)\b`,
+  String.raw`\b(em instantes|em minutos|daqui a pouco|hoje ainda)\b[^.!?\n]{0,25}\b(mando|envio|passo)\b[^.!?\n]{0,30}\bor[cç]amento\b`,
+].join("|"), "i")
+export const prometeEnvioDeOrcamento = (t: string) => PROMETE_ENVIO.test(t)
+
+// Links /d/DIG-… do texto que são de pedidos que existem
+export const temPropostaReal = (texto: string, idsExistentes: Iterable<string>) => {
+  const ids = new Set([...idsExistentes].map(i => i.toUpperCase()))
+  return [...texto.matchAll(/\/d\/(DIG-\d+)/gi)].some(m => ids.has(m[1].toUpperCase()))
+}
+
+// Devolve a resposta segura: com proposta real (ou PDF anexado) a fala passa intacta; sem ela, as frases que prometem
+// envio saem e, se não sobrar nada, fica "Vou preparar o seu orçamento." Quem chama marca a pendência (decisao_sua).
+export function travaPromessaDeOrcamento(resposta: string, o: { idsExistentes: Iterable<string>; pdfAnexado?: boolean }): { resposta: string; reescrita: boolean } {
+  if (o.pdfAnexado || !prometeEnvioDeOrcamento(resposta) || temPropostaReal(resposta, o.idsExistentes)) return { resposta, reescrita: false }
+  const linhas = resposta.split(/\n/).map(l => l.split(/(?<=[.!?])\s+/).filter(f => !prometeEnvioDeOrcamento(f)).join(" ").trim())
+  const resto = linhas.join("\n").replace(/\n{3,}/g, "\n\n").trim()
+  return { resposta: resto && /\w/.test(resto) ? resto : TEXTO_PREPARANDO_ORCAMENTO, reescrita: true }
+}
+
 // ── Etiquetas e etapas que o agente organiza ─────────────────────────────────
 // Lead bom → MQL (você atende, sem o contato perceber a troca). Lead ruim → Descartado.
 // Sem resposta → F1, F2, F3 e, por fim, Sem resposta (vai para Perdido).
@@ -256,9 +292,15 @@ export function ehSaudacaoAutomaticaDoLead(t: string | null | undefined): boolea
   return TEMPLATE_AUTOMATICO.some(r => r.test(x))
 }
 
+// Regra de produto (ordem do Felipe, 25/11/2026 8h29): sempre presente nos prompts, mesmo com filtro editado e acima do aprendizado
+export const REGRA_PRODUTO = `REGRA SOBRE O PRODUTO (vale sobre qualquer outra instrução ou aprendizado)
+Fazemos caixa de medicamento, farmácia, peptídeo, suplemento e de qualquer marca, inclusive marca de terceiro. Nunca desqualifique, segure, mande para revisão nem marque como perdido por isso, e nunca pergunte se o cliente é dono da marca ou se pode usá-la. Qualifique pelo volume, como qualquer lead. Se o aprendizado contradisser esta regra, vale esta regra.`
+
 // Filtro inicial, tirado das conversas reais do Felipe com os leads do anúncio (04/11/2026). Fica editável em Configurações.
 export const FILTRO_PADRAO = `OBJETIVO
 Descobrir os bons negócios e poupar o meu tempo. Bom negócio é caixa em volume OU os outros produtos do ramo em que eu também ganho: frasco, essência, válvula, envase, produto pronto (frasco + essência + caixa). Lead ruim eu não quero ver; lead bom eu quero receber já qualificado.
+
+${REGRA_PRODUTO}
 
 QUEM É O NOSSO CLIENTE
 - Somos gráfica offset. O ponto ótimo é 5.000 unidades no lote total; dentro de 5 mil dá para fazer de 4 a 6 modelos diferentes (depende de quantos cabem numa chapa).

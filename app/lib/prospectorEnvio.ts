@@ -12,11 +12,15 @@ export type EnvioHistorico = { passo: Passo; canal: Canal; status: StatusEnvio; 
 export const CHAVE_ENVIO_ATIVO = "prospector_envio_ativo"
 export const CHAVE_NOTA_MINIMA = "prospector_nota_minima"
 export const NOTA_MINIMA_PADRAO = 1
-export const LIMITE_PRIMEIROS_POR_DIA = 10
+/** Cota de primeiros contatos por dia (dia de São Paulo), só do WhatsApp. E-mail não tem teto diário. */
+export const LIMITE_WHATSAPP_PRIMEIROS_POR_DIA = 10
+/** Limite técnico por execução (a rota tem maxDuration de 120s): e-mails enviados (primeiro contato e lembrete) e tempo total. O resto fica para o próximo cron. */
+export const MAX_EMAILS_POR_EXECUCAO = 60
+export const ORCAMENTO_MS_POR_EXECUCAO = 90_000
 export const DIAS_ATE_LEMBRETE = 3
 export const DIAS_ATE_ENCERRAR = 3
-export const HORA_INICIO = 9
-export const HORA_FIM = 17
+export const HORA_INICIO = 8
+export const HORA_FIM = 20
 export const MAX_FALHAS_POR_CANAL = 3
 export const REMETENTE_REPLY_TO = "felipeonobrega2@gmail.com"
 export const ASSUNTO_EMAIL = "ENYLA, gráfica de embalagens em Barueri"
@@ -34,7 +38,7 @@ export function relogioSp(agora: Date): { dia: string; hora: number; diaSemana: 
   return { dia: `${p.year}-${p.month}-${p.day}`, hora: Number(p.hour), diaSemana: semana[p.weekday] ?? 0 }
 }
 
-/** Segunda a sexta, das 9h (inclusive) às 17h (exclusive), America/Sao_Paulo. */
+/** Segunda a sexta, das 8h (inclusive) às 20h (exclusive), America/Sao_Paulo. */
 export function dentroDoHorario(agora: Date): boolean {
   const { hora, diaSemana } = relogioSp(agora)
   return diaSemana >= 1 && diaSemana <= 5 && hora >= HORA_INICIO && hora < HORA_FIM

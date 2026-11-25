@@ -141,6 +141,14 @@ export async function paraResolver(cfg: { grandesNegocios?: import("./grandesNeg
     for (const e of quemEspera((cvs ?? []) as never, agora, 30).filter(paraOFelipe).slice(0, 15))
       itens.push({ tipo: "esperando", titulo: e.nome, detalhe: `${e.rotulo} esperando há ${tempoEspera(e.minutos)}: “${e.mensagem}”`, valor: null, jid: e.jid, numero: null, desde: null, nivel: e.minutos >= 120 || e.peso >= 3 ? "perigo" : "alerta" })
   }
+  // Espera longa (24 h+): avisada hoje pelo vigia, com pedido primeiro. Interno: nada vai ao cliente.
+  {
+    const el = (cfg as { esperaLonga?: import("./esperaLongaServidor").EsperaLongaGravada }).esperaLonga
+    for (const e of (el?.itens ?? []).filter(x => x.avisadoEm && agora - new Date(x.avisadoEm).getTime() < DIA)) {
+      const h = e.horas >= 48 ? `${Math.floor(e.horas / 24)} dias` : `${e.horas} h`
+      itens.push({ tipo: "esperando", titulo: e.pedido ? `${e.nome} · ${e.pedido}` : e.nome, detalhe: `${e.pedido ? "cliente com pedido ativo" : "lead"} esperando a Enyla há ${h}`, valor: null, jid: e.jid, numero: e.pedido, desde: e.desde, nivel: e.pedido ? "perigo" : "alerta" })
+    }
+  }
   // Grande negócio com o próximo passo vencido (ou sem próximo passo): sobe logo depois do sistema
   const { precisaDeVoce } = await import("./grandesNegocios")
   for (const g of cfg.grandesNegocios ?? []) {

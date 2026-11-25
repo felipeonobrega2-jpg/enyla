@@ -239,3 +239,57 @@ describe("saudação automática do WhatsApp Business que o lead manda", () => {
     expect(semFollowUp(["F1", "MQL"])).not.toContain("F1")
   })
 })
+
+import { travaPromessaDeOrcamento, prometeEnvioDeOrcamento, TEXTO_PREPARANDO_ORCAMENTO } from "@/app/lib/agenteLeads"
+
+describe("promessa de orçamento sem proposta real", () => {
+  const sem = { idsExistentes: [] as string[] }
+  it("«segue o orçamento» e equivalentes sem link/PDF real: não passam", () => {
+    for (const f of ["Segue o orçamento!", "Tô finalizando, já te mando.", "Vou montar seu orçamento e já te mando", "Segue em anexo.", "Segue o orçamento: https://app.enyla.com.br/d/DIG-9999?t=x"]) {
+      expect(prometeEnvioDeOrcamento(f)).toBe(true)
+      const r = travaPromessaDeOrcamento(f, sem)
+      expect(r.reescrita).toBe(true)
+      expect(r.resposta).toBe(TEXTO_PREPARANDO_ORCAMENTO)
+    }
+  })
+  it("mantém o resto da fala quando só uma frase promete", () => {
+    expect(travaPromessaDeOrcamento("Anotei tudo. Segue o orçamento.", sem).resposta).toBe("Anotei tudo.")
+  })
+  it("com link de proposta existente ou PDF anexado: não impede a fala", () => {
+    const f = "Segue o orçamento: https://app.enyla.com.br/d/DIG-12?t=x"
+    expect(travaPromessaDeOrcamento(f, { idsExistentes: ["DIG-12"] })).toEqual({ resposta: f, reescrita: false })
+    expect(travaPromessaDeOrcamento("Segue em anexo.", { idsExistentes: [], pdfAnexado: true }).reescrita).toBe(false)
+  })
+  const CURTO_PRAZO = [
+    "eu já monto o orçamento e te mando", "Com isso o seu orçamento já sai.", "já te mando o orçamento", "tô finalizando, já te mando",
+    "Já faço o orçamento e te envio", "já fecho o orçamento e te passo", "Já sai o orçamento", "O orçamento sai hoje",
+    "O orçamento sai em minutos", "Em instantes te mando o orçamento", "Daqui a pouco envio o orçamento", "Hoje ainda te mando o orçamento",
+  ]
+  it("promessa de orçamento em curto prazo sem proposta: pega (#110)", () => {
+    for (const f of CURTO_PRAZO) {
+      expect(prometeEnvioDeOrcamento(f), f).toBe(true)
+      expect(travaPromessaDeOrcamento(f, sem).reescrita, f).toBe(true)
+    }
+  })
+  it("promessa de curto prazo com link existente ou PDF anexado passa intacta (#110)", () => {
+    for (const f of CURTO_PRAZO) {
+      const comLink = `${f} https://app.enyla.com.br/d/DIG-0001?t=x`
+      expect(travaPromessaDeOrcamento(comLink, { idsExistentes: ["DIG-0001"] }).reescrita, f).toBe(false)
+      expect(travaPromessaDeOrcamento(f, { idsExistentes: [], pdfAnexado: true }).reescrita, f).toBe(false)
+    }
+  })
+  it("frases condicionais ou de preparação sem prazo não disparam (#110)", () => {
+    for (const f of [
+      "Com essas respostas, a gente prepara o seu orçamento.", "Vou preparar o seu orçamento.", "Pra fechar o orçamento, me diz a quantidade.",
+      "Assim que você me mandar as medidas, eu preparo o orçamento.", "Pra eu fechar o valor certinho, só confirma uma coisa", "Você já tem a arte pronta?",
+    ]) {
+      expect(prometeEnvioDeOrcamento(f), f).toBe(false)
+      expect(travaPromessaDeOrcamento(f, sem), f).toEqual({ resposta: f, reescrita: false })
+    }
+  })
+  it("«vou preparar o seu orçamento» continua válido", () => {
+    const f = "Perfeito, vou preparar o seu orçamento."
+    expect(prometeEnvioDeOrcamento(f)).toBe(false)
+    expect(travaPromessaDeOrcamento(f, sem)).toEqual({ resposta: f, reescrita: false })
+  })
+})

@@ -11,7 +11,7 @@ import { evo } from "./evolution"
 import { enviarEmail } from "./email"
 import { aplicarOptOut, hojeSp, podeTransicionar, type EtapaFunil, type MudancaEtapa } from "./prospector"
 import {
-  ASSUNTO_EMAIL, CHAVE_ENVIO_ATIVO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, LIMITE_PRIMEIROS_POR_DIA, NOTA_MINIMA_PADRAO, REMETENTE_REPLY_TO,
+  ASSUNTO_EMAIL, CHAVE_ENVIO_ATIVO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, REMETENTE_REPLY_TO,
   canaisDisponiveis, canaisPendentes, celularWhatsapp, chaveTelefone, dentroDoHorario, ehRecusa, emailValido, enviosDoHistorico,
   passoIniciado, passoSaiu, passouDias, saiu, textoDoPasso,
   type Canal, type EnvioHistorico, type Passo,
@@ -75,12 +75,16 @@ async function gravarOptOut(l: Linha, em: string, motivo: string): Promise<Linha
 type Estado = {
   usados: Record<Passo, Record<Canal, Map<string, string>>>   // chave do telefone/e-mail → CNPJ que já recebeu
   bloqueadosTel: Set<string>; bloqueadosEmail: Set<string>      // quem pediu para sair (qualquer CNPJ com o mesmo contato)
+  emailsNestaExecucao: number; limiteAte: number                // limite técnico por execução (rota de 120s)
 }
 
 function novoEstado(): Estado {
   const m = () => ({ whatsapp: new Map<string, string>(), email: new Map<string, string>() })
-  return { usados: { primeiro_contato: m(), lembrete: m() }, bloqueadosTel: new Set(), bloqueadosEmail: new Set() }
+  return { usados: { primeiro_contato: m(), lembrete: m() }, bloqueadosTel: new Set(), bloqueadosEmail: new Set(), emailsNestaExecucao: 0, limiteAte: Date.now() + ORCAMENTO_MS_POR_EXECUCAO }
 }
+
+/** Esgotou o que cabe nesta execução: o que sobrar sai no próximo cron. */
+const semFolga = (est: Estado) => est.emailsNestaExecucao >= MAX_EMAILS_POR_EXECUCAO || Date.now() >= est.limiteAte
 
 const chaveCanal = (c: Canal, l: Linha) => (c === "whatsapp" ? chaveTelefone(celularWhatsapp(l.telefone)) : emailValido(l.email) ?? "")
 
@@ -153,6 +157,8 @@ async function mandarPasso(est: Estado, l: Linha, passo: Passo, canais: Canal[],
   let algumOk = false
   for (const canal of canais) {
     if (bloqueado(est, passo, canal, atual)) continue
+    if (semFolga(est)) break
+    if (canal === "email") est.emailsNestaExecucao++
     const r = await enviarCanal(est, atual, passo, canal, agora)
     if (!r) break
     atual = r.linha
@@ -212,15 +218,12 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
 
   await detectarRespostas(jaContatadas, agora, res)
 
-  // Primeiros contatos de hoje (para a cota): prospectos cujo primeiro envio começou hoje, em horário de São Paulo
+  // Cota só do WhatsApp: primeiros contatos por WhatsApp que começaram hoje, em horário de São Paulo. E-mail não tem teto diário.
   const hoje = hojeSp(agora)
-  const começouHoje = (l: Linha) => {
-    const primeiro = enviosDe(l).filter(e => e.passo === "primeiro_contato").map(e => e.em).sort()[0]
-    return !!primeiro && hojeSp(new Date(primeiro)) === hoje
-  }
-  let feitosHoje = [...jaContatadas, ...lista].filter(começouHoje).length
+  const zapHoje = (l: Linha) => enviosDe(l).some(e => e.passo === "primeiro_contato" && e.canal === "whatsapp" && saiu(e) && hojeSp(new Date(e.em)) === hoje)
+  let zapFeitosHoje = [...jaContatadas, ...lista].filter(zapHoje).length
 
-  // Lembrete e encerramento (fora da cota dos 10)
+  // Lembrete e encerramento (fora da cota do WhatsApp)
   for (const l0 of jaContatadas.filter(x => x.etapa === "abordado" && !x.opt_out)) {
     const l = l0
     const envios = enviosDe(l)
@@ -258,16 +261,20 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
     if (l.etapa === "qualificado") fila.push(l)
   }
 
-  // Primeiro contato, nota decrescente. Quem já começou e tem canal com falha só repete o canal (não gasta cota).
+  // Primeiro contato, nota decrescente. E-mail sai sem teto diário (só o limite técnico da execução); WhatsApp só com vaga na cota.
+  // Quem tem os dois canais: o e-mail sai mesmo com a cota do WhatsApp cheia; o WhatsApp fica pendente para o próximo dia com vaga.
   const abordadosComFalha = jaContatadas.filter(l => l.etapa === "abordado" && !l.opt_out && !passoIniciado(enviosDe(l), "lembrete"))
   for (const l0 of [...fila, ...abordadosComFalha].sort((a, b) => (b.nota ?? 0) - (a.nota ?? 0))) {
+    if (semFolga(est)) break
     const envios = enviosDe(l0)
     const iniciado = passoIniciado(envios, "primeiro_contato")
-    if (!iniciado && feitosHoje >= LIMITE_PRIMEIROS_POR_DIA) continue
-    const pendentes = canaisPendentes(envios, "primeiro_contato", canaisDisponiveis(l0)).filter(c => !bloqueado(est, "primeiro_contato", c, l0))
+    const pendentes = canaisPendentes(envios, "primeiro_contato", canaisDisponiveis(l0))
+      .filter(c => !bloqueado(est, "primeiro_contato", c, l0))
+      .filter(c => c !== "whatsapp" || zapFeitosHoje < LIMITE_WHATSAPP_PRIMEIROS_POR_DIA)
     if (!pendentes.length) continue
     const r = await mandarPasso(est, l0, "primeiro_contato", pendentes, agora, res)
-    if (!iniciado && passoIniciado(enviosDe(r.linha), "primeiro_contato")) feitosHoje++
+    const zapSaiu = enviosDe(r.linha).some(e => e.passo === "primeiro_contato" && e.canal === "whatsapp" && saiu(e)) && !envios.some(e => e.passo === "primeiro_contato" && e.canal === "whatsapp" && saiu(e))
+    if (zapSaiu) zapFeitosHoje++
     if (r.algumOk && !iniciado) res.primeiros++
   }
 

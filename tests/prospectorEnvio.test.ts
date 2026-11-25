@@ -50,7 +50,7 @@ vi.mock("@/app/lib/supabase", () => ({
 }))
 
 import { executarEnvio } from "@/app/lib/prospectorEnvioServidor"
-import { celularWhatsapp, dentroDoHorario, ehRecusa, textoPrimeiroContato, TEXTO_LEMBRETE } from "@/app/lib/prospectorEnvio"
+import { MAX_EMAILS_POR_EXECUCAO, celularWhatsapp, dentroDoHorario, ehRecusa, textoPrimeiroContato, TEXTO_LEMBRETE } from "@/app/lib/prospectorEnvio"
 
 // 2026-11-23 é segunda. São Paulo é UTC-3. Os deslocamentos em dias caem em dia útil (o horário é checado de verdade).
 const SEG_10H = new Date("2026-11-23T13:00:00Z")
@@ -106,9 +106,10 @@ describe("horário e dia útil", () => {
   it.each([
     ["sábado 10h", "2026-11-28T13:00:00Z"],
     ["domingo 10h", "2026-11-29T13:00:00Z"],
-    ["quarta 8h59", "2026-11-25T11:59:00Z"],
-    ["quarta 17h", "2026-11-25T20:00:00Z"],
+    ["quarta 7h59", "2026-11-25T10:59:00Z"],
+    ["quarta 20h", "2026-11-25T23:00:00Z"],
     ["quarta 22h", "2026-11-26T01:00:00Z"],
+    ["quarta 20h30", "2026-11-25T23:30:00Z"],
   ])("recusa %s", async (_n, iso) => {
     novo()
     const r = await rodar(new Date(iso))
@@ -117,9 +118,9 @@ describe("horário e dia útil", () => {
     expect(envios.evo).not.toHaveBeenCalled()
     expect(doBanco(mundo.prospectos[0]).etapa).toBe("qualificado")
   })
-  it("aceita 9h00 e 16h59 de segunda a sexta", () => {
-    expect(dentroDoHorario(new Date("2026-11-23T12:00:00Z"))).toBe(true)
-    expect(dentroDoHorario(new Date("2026-11-27T19:59:00Z"))).toBe(true)
+  it("aceita 8h00 e 19h59 de segunda a sexta", () => {
+    expect(dentroDoHorario(new Date("2026-11-23T11:00:00Z"))).toBe(true)
+    expect(dentroDoHorario(new Date("2026-11-27T22:59:00Z"))).toBe(true)
   })
 })
 
@@ -194,8 +195,8 @@ describe("qualificação", () => {
   })
 })
 
-describe("limite de 10 primeiros contatos por dia", () => {
-  it("manda 10 e para; nova execução no mesmo dia não manda mais; no dia seguinte manda os próximos", async () => {
+describe("cota por canal: WhatsApp 10 por dia; e-mail sem teto diário", () => {
+  it("WhatsApp: manda 10 e para; nova execução no mesmo dia não manda mais; no dia seguinte manda os próximos", async () => {
     for (let i = 0; i < 13; i++) novo({ nota: 100 - i })
     expect((await rodar(SEG_10H)).primeiros).toBe(10)
     expect((await rodar(dias(SEG_10H, 0))).primeiros).toBe(0)
@@ -203,6 +204,28 @@ describe("limite de 10 primeiros contatos por dia", () => {
     const dia2 = await rodar(dias(SEG_10H, 1))
     expect(dia2.primeiros).toBe(3)
     expect(envios.evo).toHaveBeenCalledTimes(13)
+  })
+  it("e-mail não tem teto diário: 15 só com e-mail saem no mesmo dia", async () => {
+    for (let i = 0; i < 15; i++) novo({ nota: 100 - i, telefone: null, email: `a${i}@gr.com.br` })
+    expect((await rodar(SEG_10H)).primeiros).toBe(15)
+    expect(envios.email).toHaveBeenCalledTimes(15)
+    expect(envios.evo).not.toHaveBeenCalled()
+  })
+  it("quem tem os dois canais: com a cota do WhatsApp cheia, o e-mail sai e o WhatsApp espera o dia seguinte", async () => {
+    for (let i = 0; i < 12; i++) novo({ nota: 100 - i, email: `b${i}@gr.com.br` })
+    const r = await rodar(SEG_10H)
+    expect(r.primeiros).toBe(12)
+    expect(envios.evo).toHaveBeenCalledTimes(10)
+    expect(envios.email).toHaveBeenCalledTimes(12)
+    await rodar(dias(SEG_10H, 1))
+    expect(envios.evo).toHaveBeenCalledTimes(12)
+    expect(envios.email).toHaveBeenCalledTimes(12)
+  })
+  it("limite técnico por execução: o que passa de MAX_EMAILS_POR_EXECUCAO fica para o próximo cron", async () => {
+    for (let i = 0; i < MAX_EMAILS_POR_EXECUCAO + 5; i++) novo({ nota: 200 - i, telefone: null, email: `c${i}@gr.com.br` })
+    expect((await rodar(SEG_10H)).primeiros).toBe(MAX_EMAILS_POR_EXECUCAO)
+    expect((await rodar(SEG_10H)).primeiros).toBe(5)
+    expect(envios.email).toHaveBeenCalledTimes(MAX_EMAILS_POR_EXECUCAO + 5)
   })
   it("lembretes não entram na cota", async () => {
     for (let i = 0; i < 10; i++) novo({ nota: 90 - i })

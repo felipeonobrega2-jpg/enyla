@@ -46,6 +46,19 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 28 | Porta externa: data de entrada em cada etapa da produção | COO | — | — | Claude Code | não | https://github.com/felipeonobrega2-jpg/enyla/pull/60 (na main, 95cc331) |
 | 29 | Porta externa: funil e custo por MQL por campanha para a CMO | CMO | — | — | Claude Code | não | https://github.com/felipeonobrega2-jpg/enyla/pull/61 (na main, 88ad864) |
 | 30 | Porta externa: diretor põe tarefa no "Depende de você" do Felipe (`acao=tarefa_felipe`) | CFO | — | — | Claude Code | não | https://github.com/felipeonobrega2-jpg/enyla/pull/65 (na main, 6311505) |
+| 31 | Medidor de IA por tipo de token e origem | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/21 (na main) |
+| 32 | Follow-up confere a cota da hora antes de chamar a IA | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/22 (na main) |
+| 33 | WhatsApp: sugestão só ao clicar em "Gerar sugestão" | CTO (custo de IA) | esta leva | — | Diego | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/23 (na main) |
+| 34 | Classificação inline só com mensagem nova do cliente (migração aditiva `classificacao_guardada` aplicada em produção em 24/11/2026) | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/28 (na main) |
+| 35 | Script de comparação do classificador Opus × Sonnet × Haiku (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | não | https://github.com/felipeonobrega2-jpg/enyla/pull/30 (na main) |
+| 36 | Script de comparação do follow-up Opus × Sonnet (só leitura, não executado) | CTO (custo de IA) | esta leva | — | Diego | liberado pelo Felipe em 24/11/2026 | https://github.com/felipeonobrega2-jpg/enyla/pull/37 (na main) |
+| 37 | Prospector: importador não trava quando a BrasilAPI falha (grava com os dados do arquivo, `falhasCadastro`) | operação | — | — | Claude Code | não (correção de erro) | (PR da issue #88) |
+| 38 | Atendente não responde sozinha a gráficas do Prospector | operação | — | — | Claude Code | não | (PR da issue #34) |
+| 39 | Prospector: janela de envio 8h–20h (seg-sex), cron `0 11-22 * * 1-5` | Felipe (decisão 24/11/2026, 17:56) | — | — | Claude Code | não | (PR da issue #99) |
+| 40 | Atendente: não dizer «segue o orçamento» sem link ou PDF real de proposta existente | Felipe | — | — | Claude Code | **NÃO JUNTAR sem o Aprovo do Felipe** (mexe na fala do Atendente com cliente) | (PR da issue #104) |
+| 41 | Porta: ordem a lead sai direto pelo agente; cliente A/B/C e indefinido seguem no Aprovo; `cancelar_ordem`; nível na leitura (`?o=perto`, detalhe comercial) | Felipe (regra de 25/11/2026, 7h51, confirmada 8h10) | — | — | Claude Code | **NÃO JUNTAR sem revisão do CTO** (mexe na trava que protege os clientes A, B e C) | (PR da issue #108) |
+| 42 | Prospector: e-mail sem teto diário; WhatsApp com teto de 10 por dia; limite técnico por execução; pausa e retry 429 na Resend | Felipe (decisão 25/11/2026, 8h28) | — | — | Claude Code | não | (PR da issue #112) |
+| 43 | Atendente: aceitar caixa de medicamento e de qualquer marca; quem nunca comprou é lead (nível) | Felipe (decisão 25/11/2026, 8h29) | — | — | Claude Code | não (ordem do Felipe) | (PR da issue #114) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -195,9 +208,9 @@ Precisa do Aprovo por causa de chaves, acessos e da contratação.
 
 **Status:** Diego (no mesmo PR da issue #11). **Aprovo:** o Felipe aprova o merge; o texto já está aprovado. **PR:** (PR da issue #11)
 
-**O que entra.** Qualificação, primeiro contato e um lembrete por WhatsApp (Evolution) e e-mail (Resend), rota `/api/prospector/enviar`, cron `0 12-20 * * 1-5`, migração aditiva das etapas `respondeu` e `encerrado_sem_resposta`. Detalhes e textos finais em [docs/prospector.md](prospector.md).
+**O que entra.** Qualificação, primeiro contato e um lembrete por WhatsApp (Evolution) e e-mail (Resend), rota `/api/prospector/enviar`, cron `0 11-22 * * 1-5`, migração aditiva das etapas `respondeu` e `encerrado_sem_resposta`. Detalhes e textos finais em [docs/prospector.md](prospector.md).
 
-**Regras.** Até 10 primeiros contatos por dia, segunda a sexta, 9h–17h America/Sao_Paulo (a rota recusa fora disso). Lembrete único 3 dias depois; depois encerra. Resposta para a cadência; recusa vira `opt_out`. Nenhuma resposta automática nova.
+**Regras.** Até 10 primeiros contatos por dia, segunda a sexta, 8h–20h America (decisão de 24/11/2026)/Sao_Paulo (a rota recusa fora disso). Lembrete único 3 dias depois; depois encerra. Resposta para a cadência; recusa vira `opt_out`. Nenhuma resposta automática nova.
 
 **Chave.** `prospector_envio_ativo` nasce desligada e este PR não a liga. Antes de ligar: rodar a migração no Supabase e conferir o Gmail do Felipe (resposta de e-mail não é lida pelo sistema).
 
@@ -314,3 +327,10 @@ O R$ 450,00 confirmado pelo Felipe é do verniz UV total (3.000 folhas 48 × 44 
 **Status:** Claude Code. **Aprovo:** não (o Felipe pediu a correção). **PR:** aberto pela issue #73, não juntar (o Felipe junta em lote).
 
 **O que faz.** Em `/parceiros` o parceiro marca o que faz e só então o preço daquilo aparece e é exigido: laminação (fosca, brilho, soft touch, dois lados), verniz (UV total) e hot stamping (dourado). O que não foi marcado não aparece, não é obrigatório e o preço não é gravado. Preço e nome dos fornecedores nossos seguem só na tela interna. Sem migração, sem preço nem unidade novos.
+
+## Custo de IA (24/11/2026)
+
+Objetivo: reduzir os tokens gastos com IA sem perder eficácia. Os itens 31 a 36 registram os PRs dessa frente.
+Os dois scripts de comparação (classificador e follow-up) só rodam com autorização do Felipe, porque gastam tokens.
+Nenhuma troca de modelo entra sem o Diego revisar o resultado da comparação.
+O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).

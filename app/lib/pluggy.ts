@@ -29,7 +29,7 @@ export async function pluggy<T>(caminho: string): Promise<{ ok: boolean; dados: 
   return { ok: true, dados: j }
 }
 
-export type ItemPluggy = { id: string; status: string; connector?: { name?: string }; lastUpdatedAt?: string; executionStatus?: string }
+export type ItemPluggy = { id: string; status: string; connector?: { name?: string }; lastUpdatedAt?: string; executionStatus?: string; error?: { code?: string; message?: string } | null }
 export type ContaPluggy = { id: string; type: "BANK" | "CREDIT"; subtype?: string; name?: string; number?: string; balance?: number; owner?: string; taxNumber?: string }
 
 export const item = (id: string) => pluggy<ItemPluggy>(`/items/${encodeURIComponent(id)}`)
@@ -48,11 +48,15 @@ export async function transacoes<T>(contaId: string, desde: string): Promise<{ o
   return { ok: true, lista }
 }
 
-// Pede à Pluggy para buscar no banco agora (roda em segundo plano; os dados novos chegam em alguns minutos)
-export async function atualizarItem(id: string): Promise<boolean> {
-  if (!pluggyConfigurada()) return false
+// Pede à Pluggy para buscar no banco agora (roda em segundo plano; os dados novos chegam em alguns minutos).
+// Devolve o motivo quando a Pluggy recusa (ex.: teste da conta vencido), para a tela não fingir que está tudo em dia.
+export async function atualizarItem(id: string): Promise<{ ok: boolean; erro?: string }> {
+  if (!pluggyConfigurada()) return { ok: false, erro: "Pluggy não configurada." }
   const chave = await chaveAcesso()
-  if (!chave) return false
+  if (!chave) return { ok: false, erro: "A Pluggy recusou as chaves." }
   const r = await fetch(`${BASE}/items/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "X-API-KEY": chave, "Content-Type": "application/json" }, body: "{}" }).catch(() => null)
-  return !!r?.ok
+  if (!r) return { ok: false, erro: "Sem conexão com a Pluggy." }
+  if (r.ok) return { ok: true }
+  const j = await r.json().catch(() => null) as { message?: string; codeDescription?: string } | null
+  return { ok: false, erro: j?.message ?? j?.codeDescription ?? `Pluggy respondeu ${r.status}.` }
 }

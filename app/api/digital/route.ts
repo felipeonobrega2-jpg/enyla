@@ -6,6 +6,8 @@ import { pedidoDeTeste, textoLinkPedido, opcoesDoPedido, trocarQuantidade, troca
 import { supabase } from "@/app/lib/supabase"
 import { mudarStatus, trocarFrete, restanteUnico, arteAtual, acertoDaSemana, PedidoComBriefing, StatusDigital, DIAS_VALIDADE_DIGITAL } from "@/app/lib/digital"
 import { mudarConfig } from "@/app/lib/configAtomica"
+import { lerSugestoes, decidirSugestao } from "@/app/lib/arteAprovadaServidor"
+import { auth } from "@/auth"
 
 type Dados = { pedidosDigitais?: PedidoComBriefing[]; digitalContatos?: ContatosDigital; digital?: import("@/app/lib/precoDigital").RegraDigital }
 
@@ -31,12 +33,14 @@ export async function GET() {
     negociacao: p.negociacao ?? null, termosAceitosEm: p.termos?.em ?? null,
   }))
   const acerto = acertoDaSemana(todos)
-  return NextResponse.json({ pedidos, contatos: d.digitalContatos ?? {}, acerto: { ids: acerto.itens.map(p => p.id), total: acerto.total } })
+  const sug = await lerSugestoes(todos)
+  const pedidosComSugestao = pedidos.map(p => ({ ...p, sugestaoArte: sug.find(x => x.pedido === p.id) ?? null }))
+  return NextResponse.json({ pedidos: pedidosComSugestao, contatos: d.digitalContatos ?? {}, acerto: { ids: acerto.itens.map(p => p.id), total: acerto.total } })
 }
 
 // POST { id, status } avança ou cancela · { id, acao } frete, arte, Villa, designer · { acertar: ids } · { contatos }
 export async function POST(req: NextRequest) {
-  const b = await req.json().catch(() => ({})) as { teste?: boolean; id?: string; status?: StatusDigital; acao?: string; frete?: number; quantidade?: number; enviar?: boolean; acertar?: string[]; contatos?: ContatosDigital; decisao?: "aprovar" | "recusar" | "eu"; total?: number; a?: number; l?: number; p?: number; salvar?: boolean; avisarCliente?: boolean }
+  const b = await req.json().catch(() => ({})) as { teste?: boolean; id?: string; status?: StatusDigital; acao?: string; frete?: number; quantidade?: number; enviar?: boolean; acertar?: string[]; contatos?: ContatosDigital; decisao?: "aprovar" | "recusar" | "eu" | "confirmar" | "descartar"; total?: number; a?: number; l?: number; p?: number; salvar?: boolean; avisarCliente?: boolean }
 
   // Pedido de teste: na sua conversa com você mesmo, com o link do pedido
   if (b.teste) {
@@ -54,6 +58,14 @@ export async function POST(req: NextRequest) {
     const c: ContatosDigital = { villa: num(b.contatos.villa), designer: num(b.contatos.designer), designerNome: (b.contatos.designerNome ?? "").trim().slice(0, 60) }
     await mudarConfig(() => ({ digitalContatos: c }))
     return NextResponse.json({ ok: true, contatos: c })
+  }
+  // Sugestão de "arte aprovada" (cliente aprovou no WhatsApp): só o clique de uma pessoa muda o pedido
+  if (b.acao === "arteSugestao") {
+    if (!b.id || (b.decisao !== "confirmar" && b.decisao !== "descartar")) return NextResponse.json({ erro: "Faltou o pedido ou a decisão." }, { status: 400 })
+    if (!(await auth().catch(() => null))) return NextResponse.json({ erro: "Entre no sistema para decidir." }, { status: 401 })
+    const { data } = await lerConfigLinha()
+    const r = await decidirSugestao(((data?.data ?? {}) as Dados).pedidosDigitais ?? [], b.id, b.decisao, "Painel (login do sistema)")
+    return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ erro: r.erro }, { status: 400 })
   }
   if (b.acertar?.length) {
     const ids = new Set(b.acertar)

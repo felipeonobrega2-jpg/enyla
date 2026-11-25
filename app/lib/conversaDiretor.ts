@@ -10,7 +10,9 @@ import { coletarContexto } from "./reuniaoDiretoria"
 import { lerConversa, gravarConversa, gravarPlano, pedirFerramenta, type AcaoConversa, type MsgConversa } from "./diretoriaServidor"
 import { lerCampos, mudarConfig } from "./configAtomica"
 import { COLUNAS_KANBAN } from "../types"
+import { ehComercial, ordenarComercial, comerciaisDoDiretor } from "./ordemComercial"
 import { detalheProducao } from "./etapasProducao"
+import { comDigital } from "./digitalProducao"
 import type { Rastreio } from "./prazoProducao"
 
 // Só leitura do histórico de etapas; se falhar, o detalhe sai sem as datas
@@ -22,6 +24,16 @@ async function lerRastreios(): Promise<Rastreio[]> {
   } catch { return [] }
 }
 
+// Só leitura dos pedidos digitais (mesmo array da configuração); se falhar, o detalhe sai sem eles
+async function lerDigitais(): Promise<Parameters<typeof comDigital>[1]> {
+  try {
+    const pedidos = (await lerCampos<{ pedidosDigitais?: (NonNullable<Parameters<typeof comDigital>[1]>[number] & { jid: string })[] }>(["pedidosDigitais"])).pedidosDigitais ?? []
+    const { lerSugestoes } = await import("./arteAprovadaServidor")
+    const sug = await lerSugestoes(pedidos)   // só leitura: nada é gravado
+    return pedidos.map(p => { const s = sug.find(x => x.pedido === p.id); return s ? { ...p, sugestaoArteAprovada: { trecho: s.trecho, em: s.em } } : p })
+  } catch { return [] }
+}
+
 const novoId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 
 function ferramentas(execIds: string[]): Anthropic.Beta.BetaTool[] {
@@ -30,8 +42,9 @@ function ferramentas(execIds: string[]): Anthropic.Beta.BetaTool[] {
       input_schema: { type: "object", properties: { area: { type: "string", enum: ["comercial", "producao", "financeiro", "marketing", "sistema"] } }, required: ["area"] } },
     ...(execIds.length ? [{ name: "ordenar_funcionario", description: "Manda um funcionário executar uma ordem que é falar com UM cliente. O funcionário escreve a mensagem com o histórico do cliente; ela aparece para o Felipe aprovar antes de enviar. Use só quando o Felipe concordar com a ação ou pedir.",
       input_schema: { type: "object", properties: {
-        funcionario: { type: "string", enum: execIds }, cliente: { type: "string", description: "Nome do cliente exatamente como nos dados" },
-        ordem: { type: "string", description: "A ordem com os fatos que ele precisa (pedido, valor, o que combinar)" } }, required: ["funcionario", "cliente", "ordem"] } } as Anthropic.Beta.BetaTool] : []),
+        funcionario: { type: "string", enum: execIds }, cliente: { type: "string", description: "Nome do cliente exatamente como nos dados (para Atendente, Follow-up e Reativação: nome do contato ou telefone do lead)" },
+        jid: { type: "string", description: "Só para Atendente, Follow-up e Reativação: o jid da conversa do lead, se souber (no lugar do nome)" },
+        ordem: { type: "string", description: "A ordem com os fatos que ele precisa (pedido, valor, o que combinar)" } }, required: ["funcionario", "ordem"] } } as Anthropic.Beta.BetaTool] : []),
     { name: "pedir_contratacao", description: "Pede ao RH a contratação de um funcionário (agente) para um trabalho recorrente da sua área que hoje ninguém faz ou cai no Felipe. O RH desenha a vaga e o onboarding; o Felipe contrata.",
       input_schema: { type: "object", properties: { cargo: { type: "string" }, funcao: { type: "string" }, motivo: { type: "string" } }, required: ["cargo", "funcao", "motivo"] } },
     { name: "pedir_ferramenta", description: "Pede uma ferramenta de conexão com a empresa (o sistema ganhar uma capacidade: ler algo, mexer em algo, integrar algo). Entra na lista do CTO; o Felipe aprova e depois é construída.",
@@ -44,11 +57,11 @@ function ferramentas(execIds: string[]): Anthropic.Beta.BetaTool[] {
 }
 
 type Ctx = Awaited<ReturnType<typeof coletarContexto>>
-function detalhe(ctx: Ctx, area: string, rastreios: Rastreio[] = []): string {
+function detalhe(ctx: Ctx, area: string, rastreios: Rastreio[] = [], digitais: Parameters<typeof comDigital>[1] = []): string {
   const h = (ctx.hoje ?? {}) as Record<string, unknown>
   const corta = (x: unknown) => JSON.stringify(x).slice(0, 7000)
   if (area === "comercial") return corta({ responder: h.responder, orcar: h.orcar, resolver: h.resolver, meta: h.meta })
-  if (area === "producao") return detalheProducao(ctx.kanban.filter(c => c.coluna >= 2 && c.coluna <= 8).map(c => ({ ...c, aguardandoPagamento: ctx.segurados[c.numero] ?? null })), rastreios, COLUNAS_KANBAN as unknown as string[])
+  if (area === "producao") return comDigital(detalheProducao(ctx.kanban.filter(c => c.coluna >= 2 && c.coluna <= 8).map(c => ({ ...c, aguardandoPagamento: ctx.segurados[c.numero] ?? null })), rastreios, COLUNAS_KANBAN as unknown as string[]), digitais)
   if (area === "financeiro") return corta(ctx.fin)
   if (area === "marketing") return corta({ anuncio: h.anuncio, marketing: h.marketing, gastos: h.gastos })
   return corta({ rotinas: ctx.rot?.rotinas, whatsapp: ctx.esc?.whatsapp, semCredito: ctx.esc?.semCredito, cota: ctx.esc?.cota, agentes: (ctx.esc?.mesas ?? []).map((m: { nome: string; estado: string }) => ({ nome: m.nome, estado: m.estado })) })
@@ -64,14 +77,19 @@ function resumoAcao(a: AcaoConversa): string {
 }
 
 // As ferramentas de um diretor: usadas na conversa com o Felipe e pela porta de acesso dos diretores na nuvem
-// (api/externo). Mensagem a cliente nunca sai daqui: fica esperando o Aprovo do Felipe.
-export async function executarFerramenta(diretor: IdDiretor, nome: string, x: Record<string, unknown>, op: { ctx: Foto; apiKey: string; grava: boolean }): Promise<{ saida: string; acao?: AcaoConversa }> {
+// (api/externo). Mensagem a cliente nunca sai daqui: fica esperando o Aprovo do Felipe. Só a porta externa (enviarLead)
+// deixa a ordem a LEAD sair direto pelo agente (ordemDireta); cliente A/B/C e indefinido sempre esperam o Aprovo.
+export async function executarFerramenta(diretor: IdDiretor, nome: string, x: Record<string, unknown>, op: { ctx: Foto; apiKey: string; grava: boolean; enviarLead?: boolean }): Promise<{ saida: string; acao?: AcaoConversa; status?: number; destino?: "enviado_direto" | "fila_aprovo"; motivo?: string; nivel?: string }> {
   const { ctx, grava } = op
   try {
     if (nome === "detalhar") return { saida: ctx.detalhes[String(x.area)] ?? "Área desconhecida." }
+    if (nome === "ordenar_funcionario" && ehComercial(x.funcionario)) {
+      return ordenarComercial(diretor, x, { apiKey: op.apiKey, cultura: ctx.cultura, novoId, enviarLead: op.enviarLead })
+    }
     if (nome === "ordenar_funcionario") {
       const func = ctx.exec.find(f => f.id === x.funcionario)
       if (!func) return { saida: "Funcionário não encontrado no quadro." }
+      if (!x.cliente) return { saida: "Falta o cliente." }
       const { redigirComoFuncionario } = await import("./funcionariosServidor")
       const r = await redigirComoFuncionario({ funcionario: func, cliente: String(x.cliente), ordem: String(x.ordem), apiKey: op.apiKey, conhecimento: (await lerCampos<{ conhecimentoAgente?: import("./agenteLeads").Conhecimento[] }>(["conhecimentoAgente"])).conhecimentoAgente, cultura: ctx.cultura })
       if (r.ok) return { acao: { id: novoId(), tipo: "mensagem", funcionario: func.nome, cliente: String(x.cliente), texto: r.texto, status: "aguardando" }, saida: `${func.nome} escreveu e a mensagem está esperando o Aprovo do Felipe: "${r.texto}"` }
@@ -114,8 +132,9 @@ let montando: Promise<Foto> | null = null
 async function montarFoto(salvar: boolean): Promise<Foto> {
   const ctx = await coletarContexto()
   const rastreios = await lerRastreios()
+  const digitais = await lerDigitais()
   const foto: Foto = { em: new Date().toISOString(), norte: ctx.norte, resultados: ctx.resultados, equipe: ctx.equipe, bloco: ctx.bloco, ferramentasTxt: ctx.ferramentasTxt,
-    cultura: ctx.cultura, exec: ctx.exec, decisoes: ctx.decisoesTodas, detalhes: Object.fromEntries(AREAS.map(a => [a, detalhe(ctx, a, rastreios)])) }
+    cultura: ctx.cultura, exec: ctx.exec, decisoes: ctx.decisoesTodas, detalhes: Object.fromEntries(AREAS.map(a => [a, detalhe(ctx, a, rastreios, digitais)])) }
   const { gravarFoto } = await import("./diretoriaServidor")
   if (salvar) await gravarFoto(foto).catch(() => null)
   return foto
@@ -202,7 +221,7 @@ ${blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")).j
 
   const acoes: AcaoConversa[] = []
   const cli = clienteClaude(cfg.apiKey, "diretoria")
-  const execIds = ctx.exec.map(f => f.id)
+  const execIds = [...ctx.exec.map(f => f.id), ...comerciaisDoDiretor(diretor).map(f => f.id)]
   let textoFinal = ""
   for (let volta = 0; volta < 8; volta++) {
     // Streaming: o texto sai enquanto é escrito (a tela mostra e a voz começa na primeira frase). Esforço baixo na voz
@@ -240,12 +259,12 @@ ${blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")).j
 export async function responderAcao(diretor: IdDiretor, acaoId: string, resposta: "aprovo" | "descartar", textoEditado?: string): Promise<MsgConversa[]> {
   const todas = await lerConversa(diretor)
   const acao = todas.flatMap(m => m.acoes ?? []).find(a => a.id === acaoId)
-  if (!acao || acao.tipo !== "mensagem" || acao.status === "enviado") return todas
+  if (!acao || acao.tipo !== "mensagem" || acao.status === "enviado" || acao.status === "cancelado") return todas
   if (resposta === "descartar") acao.status = "descartado"
   else {
     if (textoEditado?.trim()) acao.texto = textoEditado.trim().slice(0, 4000)
     const { enviarAoCliente } = await import("./enviarCliente")
-    const r = await enviarAoCliente(acao.cliente, acao.texto).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
+    const r = await enviarAoCliente(acao.cliente, acao.texto, acao.jid).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
     if (r.ok) { acao.status = "enviado"; acao.em = new Date().toISOString(); delete acao.erro }
     else { acao.status = "erro"; acao.erro = r.erro }
   }

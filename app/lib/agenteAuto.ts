@@ -23,12 +23,13 @@ import { lerRegistros, gravarRegistro, lerIdsAgente, guardarIdAgente, reservarTr
 import { garantirTelefone } from "./contatosServidor"
 import { textoAvisoReativacao } from "./reativacao"
 import {
-  AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, ehSaudacaoAutomaticaDoLead, TEXTO_SEM_IA, filtroEfetivo,
+  AgenteAuto, RegistroAgente, PerfilLead, travaDoEnvio, partesDaResposta, valoresEmReais, ehMensagemAutomaticaDoWhatsapp, ehSaudacaoAutomaticaDoLead, TEXTO_SEM_IA, filtroEfetivo, travaPromessaDeOrcamento,
   organizarLead, semFollowUp, ETIQUETA_PERFIL, ehQualificado, jaViuVitrine, VITRINE_PADRAO, textoAvisoMql, ehSemCredito, proximoFollowUp, horarioDeFollowUp, dentroDoHorario, ehEtiquetaDoAgente, COR_ETIQUETA_AGENTE, ETIQUETAS_AGENTE,
   marcar, marcosDoRegistro, Marcos, paradoParaRetomar,
 } from "./agenteLeads"
 import { corrigirCumprimento, type DadosPedido } from "./atendente"
 import { mudarConfig } from "./configAtomica"
+import { ehProspecto } from "./prospectorTrava"
 import { notificar, LINK_SISTEMA } from "./notificar"
 import { limparEmojis, leadEstaRindo } from "./estilo"
 import { escolherMidia, MidiaAgente } from "./midiaAgente"
@@ -423,7 +424,7 @@ export async function voceAtende(jid: string, cfg: CfgAgente, horas = 24) {
   return (data ?? []).some(m => !ids.has(m.id) && !ehMensagemAutomaticaDoWhatsapp(m.corpo, m.tipo))
 }
 
-async function voceNaConversa(jid: string, log: Registro[], cfg?: CfgAgente) {
+export async function voceNaConversa(jid: string, log: Registro[], cfg?: CfgAgente) {
   if (await conversaAssumida(jid)) return false
   const idsDoAgente = new Set([...log.flatMap(l => l.ids ?? []), ...(cfg?.agenteIds ?? [])])
   const desde = new Date(Date.now() - MINUTOS_VOCE_NA_CONVERSA * 60_000).toISOString()
@@ -455,6 +456,11 @@ async function aindaEhAUltima(msgId: string) {
   return ultima && ultima.id === msgId && !ultima.from_me ? msg.jid as string : null
 }
 
+async function jidDaMensagem(msgId: string) {
+  const { data } = await supabase.from("whatsapp_mensagens").select("jid").eq("id", msgId).maybeSingle()
+  return (data?.jid as string | undefined) ?? null
+}
+
 // 1ª etapa (no webhook): espera o lead terminar de escrever (costumam mandar 2–3 mensagens seguidas)
 export async function agendarResposta(msgId: string, origem: string) {
   const cfg = await lerCfg()
@@ -472,6 +478,8 @@ export async function agendarResposta(msgId: string, origem: string) {
     const pessoal = (cfg.agenteAuto as { avisoNumero?: string } | undefined)?.avisoNumero?.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "")
     if (pessoal && pessoal.length >= 10 && String(m?.jid ?? "").split("@")[0].replace(/^55(?=\d{10,11}$)/, "") === pessoal) return
   }
+  // Gráfica do Prospector que respondeu não é cliente: a Atendente não agenda (a mensagem já está gravada)
+  if (await ehProspecto(await jidDaMensagem(msgId))) return
   // Saudação automática do lead: segura e avisa o Felipe já, sem a espera nem a IA
   if (await segurarSaudacaoDoLead(cfg, msgId).catch(() => false)) return
   // Ritmo de gente (somado à 2ª etapa): de dia ~40 s a 1 min; de madrugada mais devagar (~1 a 1,5 min)
@@ -578,6 +586,8 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   if (!opts.atrasada) await espera(10, 25)
   const jid = await aindaEhAUltima(msgId)
   if (!jid) return
+  // Gráfica do Prospector (também na resposta atrasada, em assumir e continuar e em retomar parados): sem IA, sem envio
+  if (await ehProspecto(jid)) return
   // Cada mensagem do lead é respondida uma vez só (dois disparos ao mesmo tempo: só um passa)
   if (!await reservarMensagem(msgId) && !opts.atrasada) return
   // Atrasada passa por cima da reserva (a tentativa que falhou já reservou): trava própria de 10 min por mensagem,
@@ -741,6 +751,18 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
       if (pend) r.resposta = `${r.resposta.trim()}\n${linkPedido(pend.id)}`
       else if (segurouPelaFoto) r.resposta = TEXTO_PEDE_MEDIDA
       else { r.pode_enviar_sozinho = false; r.motivo_alerta = "falou do orçamento/link, mas nenhum orçamento saiu" }
+    }
+  }
+
+  // Trava dura (qualquer modo): promessa de orçamento ("segue o orçamento", "já te mando"…) só sai com link de pedido que
+  // existe. Sem ele, vira "vou preparar o seu orçamento" e a pendência vai para o Felipe (decisao_sua), sem envio novo.
+  {
+    const ids = [...(cfg.pedidosDigitais ?? []).map(p => p.id), ...(novoGrupo ?? (novoPedido ? [novoPedido] : [])).map(p => p.id)]
+    const t = travaPromessaDeOrcamento(r.resposta, { idsExistentes: ids })
+    if (t.reescrita) {
+      r.resposta = t.resposta
+      r.alerta = "decisao_sua"; r.pode_enviar_sozinho = false
+      r.motivo_alerta = "falou que mandava o orçamento, mas não há proposta pronta (sem link/PDF): preparar o orçamento"
     }
   }
 

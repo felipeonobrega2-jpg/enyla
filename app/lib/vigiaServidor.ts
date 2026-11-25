@@ -32,6 +32,8 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
   //     não for sua, as travas dele seguram); o que sobra vira aviso no seu WhatsApp (cada conversa no máximo a cada 3 h)
   out.fechadas = await fecharOObvio(agora).catch(e => String(e))
   out.esperando = await cuidarDeQuemEspera(cfg, agora, vagas, despachadas).catch(e => String(e))
+  // 1b2. Espera longa (24 h+): aviso interno ao Felipe, no máximo uma vez por dia por conversa (nada vai ao cliente)
+  out.esperaLonga = await import("./esperaLongaServidor").then(m => m.avisarEsperaLonga(cfg as never, agora)).catch(e => String(e))
   // 1e. Dinheiro do digital no Financeiro (linha separada): sinal, restante e custo da Villa; concilia o Pix
   out.digitalFinanceiro = await import("./digitalFinanceiro").then(m => m.sincronizarDigitalNoFinanceiro()).catch(e => String(e))
   // 1d. E-mails para o cliente (pedido aprovado, sinal, arte, arte aprovada, enviado): cada um uma vez só
@@ -65,9 +67,9 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
     await notificar("WhatsApp da Enyla desconectado", "Os leads não estão recebendo resposta. Abra Configurações → WhatsApp e leia o QR.", { prioridade: "alta", tags: ["rotating_light"], link: `${LINK_SISTEMA}/?aba=config` }).catch(() => null)
     out.whatsapp = "avisado"
   }
-  // Auditor de dados: conferência completa no máximo uma vez por hora
+  // Auditor de dados: conferência completa uma vez por noite (2h às 6h); quando pula, devolve o motivo
   const { talvezAuditar } = await import("./auditoriaServidor")
-  out.auditoria = await talvezAuditar(cfg as never).catch(e => String(e))
+  out.auditoria = await talvezAuditar(cfg as never).catch(e => `erro: ${String(e).slice(0, 140)}`)
   // Follow-up e retomada do agente também saem daqui (antes só pegavam carona nas mensagens do webhook e, de 20/11
   // em diante, morriam lá sem ninguém ver). A trava de cada uma (rodada na tabela leve) impede rodar em dobro.
   const agente = await import("./agenteAuto")
