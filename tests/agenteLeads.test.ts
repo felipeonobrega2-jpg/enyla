@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest"
-import { travaDoEnvio, valoresEmReais, partesDaResposta, ehMensagemAutomaticaDoWhatsapp, ehSaudacaoAutomaticaDoLead, ContextoEnvio, FILTRO_PADRAO } from "@/app/lib/agenteLeads"
+import { travaDoEnvio, valoresEmReais, partesDaResposta, ehMensagemAutomaticaDoWhatsapp, ehSaudacaoAutomaticaDoLead, ContextoEnvio, FILTRO_PADRAO, filtroDoModo, SECAO_DIGITAL, orientarTiragem } from "@/app/lib/agenteLeads"
+import { modelosPorChapa, type Ferramental } from "@/app/lib/producao"
+import { pedidoAtendente } from "@/app/lib/pedidoAtendente"
 
 const ok: ContextoEnvio = {
   ligado: true, resposta: "Oi, tudo bem? Que volume você precisa?", alerta: "nenhum", podeSozinho: true,
@@ -291,5 +293,45 @@ describe("promessa de orçamento sem proposta real", () => {
     const f = "Perfeito, vou preparar o seu orçamento."
     expect(prometeEnvioDeOrcamento(f)).toBe(false)
     expect(travaPromessaDeOrcamento(f, sem)).toEqual({ resposta: f, reescrita: false })
+  })
+})
+
+describe("mínimo pela tiragem e pelos modelos na chapa (25/11/2026)", () => {
+  const faca100ml: Ferramental = { id: "f1", tipo: "faca", cliente: "Marca X", produto: "Perfume 100 ml", blankLargura: 222.5, blankAltura: 202.75, cavidades: 4, custo: 0, data: "2026-11-25" }
+  const blank = { largura: 222.5, altura: 202.75 }
+
+  it("faca salva: usa o número salvo; sem faca, estima pela medida na Jerograf (4); sem medida, null", () => {
+    expect(modelosPorChapa(blank, [faca100ml])).toEqual({ modelos: 4, origem: "faca_salva" })
+    expect(modelosPorChapa(blank, [{ ...faca100ml, cavidades: 3 }], "marca x")).toEqual({ modelos: 3, origem: "faca_salva" })
+    expect(modelosPorChapa(blank)).toEqual({ modelos: 4, origem: "estimado" })
+    expect(modelosPorChapa(null)).toBeNull()
+    expect(modelosPorChapa({ largura: 600, altura: 600 })).toBeNull()
+  })
+  it("1.000 no total com 4 modelos na chapa: offset, 4 artes, sem preço", () => {
+    const m = modelosPorChapa(blank)!.modelos
+    const o = orientarTiragem(1000, 4, m)
+    expect(o).toMatchObject({ caminho: "offset", artesNoOffset: 4, acrescimoDigital: 0, decisaoSua: true })
+  })
+  it("até 200 e uma arte: digital vale, sem acréscimo; arte extra soma R$ 100", () => {
+    expect(orientarTiragem(200, 1, 4)).toMatchObject({ caminho: "digital", acrescimoDigital: 0 })
+    expect(orientarTiragem(150, 3, null)).toMatchObject({ caminho: "digital", artesExtras: 2, acrescimoDigital: 200 })
+    expect(SECAO_DIGITAL).toMatch(/R\$ 100 por arte/)
+  })
+  it("faixa intermediária não cota offset; sem encaixe conhecido não fala mínimo", () => {
+    expect(orientarTiragem(500, 2, 4)).toMatchObject({ caminho: "intermediaria", decisaoSua: true })
+    expect(orientarTiragem(1000, 4, null)).toMatchObject({ caminho: "precisa_faca", artesNoOffset: null })
+  })
+  it("o texto não traz «mínimo de 1.000 por arte» nem «1.000 de cada modelo» como regra", () => {
+    const pedido = pedidoAtendente({ modelo: "m", cfg: { agenteAuto: { pequenoParceiro: false } } as never, opts: {}, contexto: "", origem: "", historico: "", historicoAnterior: "", blocos: [], nomeConversa: null })
+    const texto = JSON.stringify(pedido) + FILTRO_PADRAO + SECAO_DIGITAL
+    expect(texto).not.toMatch(/m[ií]nimo de 1\.000 por arte/i)
+    expect(texto).not.toMatch(/1\.000 de cada modelo/i)
+    expect(FILTRO_PADRAO).toMatch(/quantos modelos cabem na chapa/)
+  })
+  it("filtroDoModo(FILTRO_PADRAO, false) ainda troca a seção e tira o contato do parceiro", () => {
+    const f = filtroDoModo(FILTRO_PADRAO, false)
+    expect(f).toContain("VENDEMOS EM IMPRESSÃO DIGITAL")
+    expect(f).not.toContain("96843-7324")
+    expect(filtroDoModo(FILTRO_PADRAO, true)).toContain("96843-7324")
   })
 })
