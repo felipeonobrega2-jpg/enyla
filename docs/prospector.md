@@ -85,7 +85,11 @@ Código: `app/lib/prospectorEnvio.ts` (textos, horário, canais e recusa, tudo p
 
 **Qualificação.** `encontrado` com nota maior ou igual a `prospector_nota_minima` (AppConfig, padrão 1) e celular ou e-mail válido vira `qualificado`, com linha no histórico. `descartado` e `opt_out` nunca são reabertos. A cada execução olha os 1000 de maior nota que têm telefone ou e-mail preenchido.
 
-**Fila.** `qualificado`, em ordem de nota decrescente. No máximo 10 *primeiros* contatos por dia (conta pelo dia de São Paulo em que o primeiro envio começou). Lembretes não entram nessa cota, mas só saem no mesmo horário.
+**Fila.** `qualificado`, em ordem de nota decrescente. Cota por canal (decisão do Felipe, 25/11/2026): **WhatsApp, no máximo 10 primeiros contatos por dia** (dia de São Paulo em que o envio saiu); **e-mail não tem teto diário**. Quem tem os dois canais: o e-mail sai mesmo com a cota do WhatsApp cheia; o WhatsApp só sai se ainda houver vaga (senão fica pendente para o próximo dia com vaga). Lembretes não entram na cota, mas só saem no mesmo horário.
+
+**Limite técnico por execução.** Sem teto diário não é um disparo só: cada execução manda no máximo `MAX_EMAILS_POR_EXECUCAO` (60) e-mails (primeiro contato e lembrete somados) e para depois de `ORCAMENTO_MS_POR_EXECUCAO` (90 s) dentro dos 120 s da rota (`maxDuration`). O restante sai no próximo cron (de hora em hora).
+
+**Limite da Resend.** A API aceita, por padrão, 10 requisições por segundo por time (compartilhado entre todas as chaves). `enviarEmail` (`app/lib/email.ts`) espera 350 ms entre chamadas (~3 por segundo, para sobrar para o resto do sistema) e, em resposta 429, respeita o `Retry-After` (mínimo 0,5 s, máximo 10 s) e tenta de novo até 3 vezes no total. Não há teto diário de e-mail definido por nós.
 
 **Cadência.**
 
