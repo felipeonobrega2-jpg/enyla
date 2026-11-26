@@ -63,6 +63,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 44 | Porta externa: leitura de parceiros (`?o=parceiros` e `?o=detalhe&area=parceiros`): cadastros de /parceiros e respostas do Prospector, só leitura, CCO e CMO | CCO | hoje | — | Claude Code | não | (PR da issue #144) |
 | 45 | WhatsApp: busca acha "Alisson" em "Allison" (sem acento, sem letra dobrada, por telefone) e acha conversas antigas fora das 1.000 da lista | Felipe | — | — | Claude Code | não (correção de erro) | https://github.com/felipeonobrega2-jpg/enyla/pull/149 |
 | 49 | Perfil diretor: login por usuário (admin/diretor), 7 interruptores de bloqueio desligados por padrão, auditoria (quem, quando, antes e depois) e tela de administração | Felipe (Aprovo 26/11/2026, 6h26 e 6h28) | — | — | Claude Code | **aprovado pelo Felipe** (cobre construir e juntar); migration aditiva `20261129_usuarios_acesso.sql` roda no SQL Editor | (PR da issue #214) |
+| 50 | Acompanhamento Digital usa prazo e arte gravados (`gravar_digital`) e guarda todas as edições (`edicoesAcomp`) | Felipe | urgente | — | Claude Code | não | (PR da issue #230) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -356,6 +357,10 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 
 **Status:** Claude Code. **Aprovo:** ordem do Felipe, 26/11/2026 9h18. Só tira envio. `FOLLOWUP_DIGITAL_LIGADO = false` em `app/lib/digital.ts`. Fora da fila do follow-up (F1, F2, F3, lembrete e `encerrar`): conversa com pedido Digital pendente e lead Digital sem pedido (critério já existente no `agenteAuto.ts`: etiqueta `Digital` ou último perfil do agente `pequeno`). A rota de reenvio (`varredura`, `acao=reenviar`) responde 409. Offset e demais leads seguem iguais. Código dos lembretes mantido. Teste: `tests/followUpDigitalDesligado.test.ts`.
 
-## 51. Prospector sem teto diário (issue #238)
+## 51. Fila: desfazer dispensa (issue #236)
+
+**Status:** Claude Code. **Aprovo:** pedido do Felipe na issue #236 (não envia nada). Aba "Dispensados" na Fila do WhatsApp com "Devolver à Fila" (um ou vários) e `POST /api/externo {acao:'restaurar_fila', ids}` (qualquer diretor, como o dispensar). Grava o mapa `filaDispensados` novo inteiro, sem as chaves devolvidas (por causa do `MANTER_SE_AUSENTE`), e registra autor e data em `filaRestaurados`. Id inexistente é ignorado. O dispensar da tela não guarda autor, então a lista mostra nome e data.
+
+## 52. Prospector sem teto diário (issue #238)
 
 **Status:** Claude Code. **Aprovo:** decisão do Felipe, 26/11/2026 ("o programa de parceiros não tem limite de envios"). Tira o teto de 10 primeiros contatos/dia e o teto diário de e-mail. Mantém janela 8h–20h, lista de exclusão, lembrete único após 3 dias; cria espaçamento de 20 a 60 s entre WhatsApps. Texto do primeiro contato: "gráfica de Barueri que faz qualquer material gráfico". Teste: `tests/prospectorEnvio.test.ts`.

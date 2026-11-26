@@ -9,7 +9,7 @@ import { EscritorioView } from "./components/EscritorioView"
 import { AuditoriaView } from "./components/AuditoriaView"
 import { signOut } from "next-auth/react"
 import WhatsAppView, { ConversaLateral } from "./components/WhatsAppView"
-import { podarDispensados } from "./lib/filaMensagens"
+import { podarDispensados, restaurarDispensados } from "./lib/filaMensagens"
 import { formDoAtendimento, DadosPedido } from "./lib/atendente"
 import { AvisoWhatsapp } from "./components/AvisoWhatsapp"
 import { EntregasView, PrefillEntrega } from "./components/EntregasView"
@@ -3059,6 +3059,7 @@ export default function Home() {
               avisos={config.avisosPedido} dispensados={config.filaDispensados}
               onAvisado={(k, a) => salvarConfigTudo({ ...config, avisosPedido: { ...(config.avisosPedido ?? {}), [k]: a } })}
               onDispensar={id => salvarConfigTudo({ ...config, filaDispensados: { ...podarDispensados(config.filaDispensados), [id]: new Date().toISOString() } })}
+              onRestaurar={ids => salvarConfigTudo({ ...config, filaDispensados: restaurarDispensados(config.filaDispensados, ids).mapa })}
               onCriarEtiqueta={e => salvarConfigTudo({ ...config, etiquetasWhatsapp: [...(config.etiquetasWhatsapp ?? []).filter(x => x.nome !== e.nome), e] })}
               onVincular={(jid, nome) => salvarConfigTudo({ ...config, vinculosWhatsapp: { ...(config.vinculosWhatsapp ?? {}), [jid]: nome ?? "" } })}
               onAbrirCliente={nome => { navigate("clientes"); setPerfilClienteExterno(nome) }}

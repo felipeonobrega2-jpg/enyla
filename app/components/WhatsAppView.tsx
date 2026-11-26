@@ -88,13 +88,14 @@ function TypingBubble() {
 
 export default function WhatsAppView({
   onCriarCard, kanban = [], lancamentos = [], vinculos, onVincular, onAbrirCliente, etiquetasDef = [], onCriarEtiqueta,
-  avisos, dispensados, onAvisado, onDispensar, abrirJid,
+  avisos, dispensados, onAvisado, onDispensar, onRestaurar, abrirJid,
 }: {
   abrirJid?: { jid: string; vez: number }   // vindo do aviso de mensagens: abre esta conversa
   avisos?: Record<string, AvisoPedido>
   dispensados?: Record<string, string>
   onAvisado?: (pedidoKey: string, aviso: AvisoPedido) => void
   onDispensar?: (id: string) => void
+  onRestaurar?: (ids: string[]) => void
   etiquetasDef?: EtiquetaDef[]
   onCriarEtiqueta?: (e: EtiquetaDef) => void
   onCriarCard: (nome: string, jid: string, dados?: DadosPedido) => void
@@ -364,7 +365,7 @@ export default function WhatsAppView({
   if (modo === "fila") return (
     <div className="flex flex-col h-full">{topo}<div className="flex-1 min-h-0 ds-troca-tela"><FilaMensagens conversas={conversas} kanban={kanban} lancamentos={lancamentos}
       vinculos={vinculos} avisos={avisos} dispensados={dispensados}
-      onAvisado={(k, a) => onAvisado?.(k, a)} onDispensar={id => onDispensar?.(id)}
+      onAvisado={(k, a) => onAvisado?.(k, a)} onDispensar={id => onDispensar?.(id)} onRestaurar={ids => onRestaurar?.(ids)}
       onAbrirConversa={jid => { const c = conversas.find(x => x.jid === jid); if (c) { setModo("lista"); abrirConversa(c) } }} /></div></div>
   )
 
