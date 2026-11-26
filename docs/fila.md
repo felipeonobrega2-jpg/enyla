@@ -360,3 +360,7 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 ## 51. Fila: desfazer dispensa (issue #236)
 
 **Status:** Claude Code. **Aprovo:** pedido do Felipe na issue #236 (não envia nada). Aba "Dispensados" na Fila do WhatsApp com "Devolver à Fila" (um ou vários) e `POST /api/externo {acao:'restaurar_fila', ids}` (qualquer diretor, como o dispensar). Grava o mapa `filaDispensados` novo inteiro, sem as chaves devolvidas (por causa do `MANTER_SE_AUSENTE`), e registra autor e data em `filaRestaurados`. Id inexistente é ignorado. O dispensar da tela não guarda autor, então a lista mostra nome e data.
+
+## 52. Prospector sem teto diário (issue #238)
+
+**Status:** Claude Code. **Aprovo:** decisão do Felipe, 26/11/2026 ("o programa de parceiros não tem limite de envios"). Tira o teto de 10 primeiros contatos/dia e o teto diário de e-mail. Mantém janela 8h–20h, lista de exclusão, lembrete único após 3 dias; cria espaçamento de 20 a 60 s entre WhatsApps. Texto do primeiro contato: "gráfica de Barueri que faz qualquer material gráfico". Teste: `tests/prospectorEnvio.test.ts`.
