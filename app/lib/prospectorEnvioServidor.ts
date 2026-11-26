@@ -19,13 +19,13 @@ import {
 } from "./prospectorEnvio"
 
 const TABELA = "prospectos_parceiros"
-export const COLUNAS = "id, cnpj, razao_social, nome_fantasia, cnae_principal, cnaes_secundarios, telefone, email, nota, etapa, opt_out, historico_etapas, atualizado_em"
-const REMETENTE = "ENYLA Embalagens <parceiros@enyla.com.br>"
+export const COLUNAS = "id, cnpj, razao_social, nome_fantasia, cnae_principal, cnaes_secundarios, telefone, email, whatsapp_verificado, nota, etapa, opt_out, historico_etapas, atualizado_em"
+export const REMETENTE = "ENYLA Embalagens <parceiros@enyla.com.br>"
 const ETAPAS_CONTATADAS = ["abordado", "respondeu", "encerrado_sem_resposta", "abriu", "cadastrou"]
 const LIMITE_ELEGIVEIS = 1000
 
 export type Linha = {
-  id: number; cnpj: string; razao_social: string | null; nome_fantasia: string | null; cnae_principal?: string | null; cnaes_secundarios?: string[] | null; telefone: string | null; email: string | null
+  id: number; cnpj: string; razao_social: string | null; nome_fantasia: string | null; cnae_principal?: string | null; cnaes_secundarios?: string[] | null; telefone: string | null; email: string | null; whatsapp_verificado?: boolean | null
   nota: number | null; etapa: string; opt_out: boolean; historico_etapas: unknown; atualizado_em: string
 }
 
@@ -102,7 +102,7 @@ function emailParado(est: Estado): boolean {
   return false
 }
 
-const chaveCanal = (c: Canal, l: Linha) => (c === "whatsapp" ? chaveTelefone(celularWhatsapp(l.telefone)) : emailValido(l.email) ?? "")
+const chaveCanal = (c: Canal, l: Linha) => (c === "whatsapp" ? chaveTelefone(celularWhatsapp(l.telefone, l.whatsapp_verificado === true)) : emailValido(l.email) ?? "")
 
 function registrarUsos(est: Estado, l: Linha) {
   for (const e of enviosDe(l)) if (saiu(e)) {
@@ -124,7 +124,7 @@ type ResultadoCanal = { ok: true; id?: string } | { ok: false; erro: string; cot
 
 async function enviarPeloCanal(canal: Canal, l: Linha, texto: string, token?: string): Promise<ResultadoCanal> {
   if (canal === "whatsapp") {
-    const numero = celularWhatsapp(l.telefone)
+    const numero = celularWhatsapp(l.telefone, l.whatsapp_verificado === true)
     if (!numero) return { ok: false, erro: "sem celular válido" }
     const r = await evo<{ key?: { id?: string } }>("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: numero, text: texto }) })
     return r.ok && r.corpo?.key?.id ? { ok: true } : { ok: false, erro: `WhatsApp não enviou (${r.status})` }
@@ -192,7 +192,7 @@ async function mandarPasso(est: Estado, l: Linha, passo: Passo, canais: Canal[],
 // ── Respostas ────────────────────────────────────────────────────────────────
 async function detectarRespostas(linhas: Linha[], agora: Date, res: ResultadoEnvio) {
   const alvos = linhas.filter(l => (l.etapa === "abordado" || l.etapa === "respondeu") && !l.opt_out)
-  const comZap = alvos.map(l => ({ l, chave: chaveTelefone(celularWhatsapp(l.telefone)), desde: passoSaiu(enviosDe(l), "primeiro_contato")?.em ?? "" }))
+  const comZap = alvos.map(l => ({ l, chave: chaveTelefone(celularWhatsapp(l.telefone, l.whatsapp_verificado === true)), desde: passoSaiu(enviosDe(l), "primeiro_contato")?.em ?? "" }))
     .filter(x => x.chave && x.desde && enviosDe(x.l).some(e => e.canal === "whatsapp" && saiu(e)))
   if (!comZap.length) return
   const desde = comZap.map(x => x.desde).sort()[0]
@@ -231,7 +231,7 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
   if (contatadas.error || elegiveis.error) return { ...res, ok: false, erro: (contatadas.error ?? elegiveis.error)!.message }
   const est = novoEstado()
   for (const s of (saidas.data ?? []) as { telefone: string | null; email: string | null }[]) {
-    const t = chaveTelefone(celularWhatsapp(s.telefone)); if (t) est.bloqueadosTel.add(t)
+    const t = chaveTelefone(celularWhatsapp(s.telefone, true)); if (t) est.bloqueadosTel.add(t)
     const e = emailValido(s.email); if (e) est.bloqueadosEmail.add(e)
   }
   // Teto diário de e-mail: conta no banco, de TODOS os prospectos (não só os elegíveis desta lista), os envios de e-mail do Prospector

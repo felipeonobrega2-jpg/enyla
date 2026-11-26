@@ -171,6 +171,7 @@ export type CadastroParceiro = {
   id: string
   em: string
   status: "novo" | "aprovado" | "recusado"
+  decisao?: { por: string; em: string; decisao: "aprovar" | "recusar"; motivo?: string }   // só quando decidido pela porta externa
   gerente: string
   // empresa
   nomeFantasia: string

@@ -25,7 +25,7 @@ export type EtapaFunil = (typeof ETAPAS_FUNIL)[number] | (typeof ETAPAS_ENVIO)[n
 // Ordem em que a etapa só anda para frente. Respondeu e encerrado ficam entre abordado e abriu.
 const ORDEM_ETAPAS: readonly EtapaFunil[] = ["encontrado", "qualificado", "abordado", "encerrado_sem_resposta", "respondeu", "abriu", "cadastrou"]
 
-export type MudancaEtapa = { etapa: EtapaFunil; em: string; motivo?: string; cadastroId?: string; envio?: unknown }
+export type MudancaEtapa = { etapa: EtapaFunil; em: string; motivo?: string; cadastroId?: string; envio?: unknown; por?: string; mensagem?: unknown }
 export type EstadoFunil = { etapa: EtapaFunil; optOut: boolean; historico: MudancaEtapa[] }
 
 /** Tudo que muda a nota está aqui. Os quatro tetos somam 100. */

@@ -151,12 +151,15 @@ export function textoDoPasso(passo: Passo, agora: Date): string {
   return passo === "primeiro_contato" ? textoPrimeiroContato(agora) : TEXTO_LEMBRETE
 }
 
-/** Celular brasileiro: DDD (2 dígitos) + 9 + 8 dígitos. Devolve o número com 55, ou null. */
-export function celularWhatsapp(telefone: string | null | undefined): string | null {
+/** Celular brasileiro: DDD (2 dígitos) + 9 + 8 dígitos. Devolve o número com 55, ou null.
+ *  `verificado` (whatsapp_verificado = true, checado na Evolution): aceita também o fixo, DDD + 8 dígitos. */
+export function celularWhatsapp(telefone: string | null | undefined, verificado = false): string | null {
   let d = (telefone ?? "").replace(/\D/g, "")
   if (d.length === 13 && d.startsWith("55")) d = d.slice(2)
+  if (verificado && d.length === 12 && d.startsWith("55")) d = d.slice(2)
   if (d.length === 12 && d.startsWith("55")) return null
   if (d.length === 11 && /^[1-9][1-9]9\d{8}$/.test(d)) return `55${d}`
+  if (verificado && d.length === 10 && /^[1-9][1-9]\d{8}$/.test(d)) return `55${d}`
   return null
 }
 
@@ -165,9 +168,9 @@ export function emailValido(email: string | null | undefined): string | null {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e) ? e : null
 }
 
-export function canaisDisponiveis(p: { telefone?: string | null; email?: string | null }): Canal[] {
+export function canaisDisponiveis(p: { telefone?: string | null; email?: string | null; whatsapp_verificado?: boolean | null }): Canal[] {
   const c: Canal[] = []
-  if (celularWhatsapp(p.telefone)) c.push("whatsapp")
+  if (celularWhatsapp(p.telefone, p.whatsapp_verificado === true)) c.push("whatsapp")
   if (emailValido(p.email)) c.push("email")
   return c
 }
