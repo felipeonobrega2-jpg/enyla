@@ -4,13 +4,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 const e = vi.hoisted(() => ({
   conversa: [] as { id?: string; acoes?: Record<string, unknown>[] }[], grava: null as unknown,
   nivel: { nivel: "lead", jaCliente: false, motivo: "" } as { nivel: string; jaCliente: boolean; motivo: string },
-  cfg: {} as Record<string, unknown>, enviar: vi.fn(), voce: false, redigir: vi.fn(), contador: 0,
+  aprovo: true, cfg: {} as Record<string, unknown>, enviar: vi.fn(), voce: false, redigir: vi.fn(), contador: 0,
   conversas: [{ jid: "5511999990001@s.whatsapp.net", nome: "Maria Perfumes", telefone: "5511999990001", ultima_at: "2026-11-24" }] as Record<string, unknown>[],
 }))
 const cadeia = (rows: unknown[]) => { const q: Record<string, unknown> = { then: (r: (v: unknown) => void) => r({ data: rows }), maybeSingle: async () => ({ data: rows[0] ?? null }) }; for (const m of ["select", "order", "limit", "eq", "ilike"]) q[m] = () => q; return q }
 vi.mock("@/app/lib/supabase", () => ({ supabase: { from: (t: string) => cadeia(t === "whatsapp_conversas" ? e.conversas : []) } }))
 vi.mock("@/app/lib/configAtomica", () => ({
-  lerCampos: vi.fn(async () => ({ guiaAtendimento: "guia" })),
+  lerCampos: vi.fn(async () => ({ guiaAtendimento: "guia", aprovoObrigatorio: e.aprovo })),
   mudarConfig: vi.fn(async (f: (d: Record<string, unknown>) => Record<string, unknown> | null) => {
     const d = { ordemDiretaDia: e.contador ? { cco: { dia: new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }), n: e.contador } } : {} }
     return f(d)
@@ -25,6 +25,8 @@ vi.mock("@/app/lib/agenteAuto", () => ({
   lerConversa: vi.fn(async (jid: string) => ({ jid, nome: "Maria Perfumes", telefone: "5511999990001", etiquetas: [], status_lead: null })),
 }))
 const enviarAoCliente = vi.hoisted(() => vi.fn())
+const saldo = vi.hoisted(() => vi.fn())
+vi.mock("@/app/lib/saldoCobranca", () => ({ conferirSaldoDaCobranca: saldo }))
 vi.mock("@/app/lib/enviarCliente", () => ({ enviarAoCliente, destinoDoCliente: vi.fn() }))
 vi.mock("@/app/lib/claude", () => ({ clienteClaude: vi.fn(), MODELO: "m" }))
 vi.mock("@/app/lib/gastosServidor", () => ({ registrarUsoIA: vi.fn() }))
@@ -40,7 +42,7 @@ const ordenar = (extra: Record<string, unknown> = {}, enviarLead = true) =>
 const ligado = { ligado: true, horario: { dias: [0, 1, 2, 3, 4, 5, 6], inicio: "00:00", fim: "24:00" } }
 
 beforeEach(() => {
-  e.conversa = []; e.grava = null; e.voce = false; e.contador = 0
+  e.conversa = []; e.grava = null; e.voce = false; e.contador = 0; e.aprovo = true
   e.nivel = { nivel: "lead", jaCliente: false, motivo: "" }
   e.cfg = { agenteAuto: ligado, pedidosDigitais: [], agenteLog: [] }
   e.enviar.mockReset(); e.enviar.mockResolvedValue({ ids: ["w1"] })
@@ -142,5 +144,62 @@ describe("cancelar_ordem", () => {
     expect((await cancelarOrdem("cco", { id: "zzz" })).status).toBe(404)
     expect((await cancelarOrdem("cco", {})).status).toBe(400)
     expect(e.grava).toBeNull()
+  })
+})
+
+describe("chave aprovoObrigatorio desligada: tudo sai direto", () => {
+  beforeEach(() => { e.aprovo = false; saldo.mockReset(); saldo.mockResolvedValue({ ok: true }); enviarAoCliente.mockResolvedValue({ ok: true, jid: "5511999990001@s.whatsapp.net" }) })
+  it.each(["A", "B", "C", "indefinido"])("cliente %s: sai direto, registrado como aprovo_desligado", async n => {
+    e.nivel = { nivel: n, jaCliente: true, motivo: "" }
+    const r = await ordenar()
+    expect(r.destino).toBe("enviado_direto"); expect(r.motivo).toBe("aprovo_desligado")
+    expect(r.acao).toMatchObject({ status: "enviado", direto: true, destino: "enviado_direto", motivo: "aprovo_desligado" })
+    expect(e.enviar).toHaveBeenCalledTimes(1)
+  })
+  it("chave ligada (true): cliente A vai para a fila como antes", async () => {
+    e.aprovo = true; e.nivel = { nivel: "A", jaCliente: true, motivo: "" }
+    const r = await ordenar()
+    expect(r.destino).toBe("fila_aprovo"); expect(e.enviar).not.toHaveBeenCalled()
+  })
+  it("fora do horário continua barrando (409)", async () => {
+    e.nivel = { nivel: "A", jaCliente: true, motivo: "" }
+    e.cfg = { agenteAuto: { ...ligado, ligado: false } }
+    const r = await ordenar()
+    expect(r.status).toBe(409); expect(r.acao).toBeUndefined(); expect(e.enviar).not.toHaveBeenCalled()
+  })
+  it("contato descartado (exclusão) continua barrando", async () => {
+    e.nivel = { nivel: "B", jaCliente: true, motivo: "" }
+    e.cfg = { agenteAuto: ligado, agenteLog: [{ jid: "5511999990001@s.whatsapp.net", perfil: "nao_lead" }] }
+    expect((await ordenar()).status).toBe(400); expect(e.enviar).not.toHaveBeenCalled()
+  })
+  it("limite diário continua valendo (429)", async () => {
+    e.nivel = { nivel: "C", jaCliente: true, motivo: "" }; e.contador = MAX_DIRETOS_DIA
+    expect((await ordenar()).status).toBe(429); expect(e.enviar).not.toHaveBeenCalled()
+  })
+  it("promete orçamento sem link real: 409 com o motivo, sem fila e sem envio", async () => {
+    e.nivel = { nivel: "A", jaCliente: true, motivo: "" }
+    e.redigir.mockResolvedValue({ ok: true, texto: "Oi Maria! Segue o orçamento do seu pedido." })
+    const r = await ordenar()
+    expect(r.status).toBe(409); expect(r.motivo).toBe("prometia orçamento sem proposta real"); expect(r.acao).toBeUndefined()
+    expect(e.enviar).not.toHaveBeenCalled()
+  })
+  const cobrar = () => executarFerramenta("cfo", "ordenar_funcionario", { funcionario: "cobranca", cliente: "Maria Perfumes", ordem: "cobrar", pedido: "P1" },
+    { ctx: { ...ctx, exec: [{ id: "cobranca", nome: "Cobrança", setor: "cfo" }] } as unknown as Foto, apiKey: "k", grava: true, enviarLead: true })
+  it("Cobrança com saldo igual: sai direto pelo envio normal", async () => {
+    e.redigir.mockResolvedValue({ ok: true, texto: "Pedido P1, no valor de R$ 100,00." })
+    const r = await cobrar()
+    expect(r.destino).toBe("enviado_direto"); expect(r.motivo).toBe("aprovo_desligado")
+    expect(enviarAoCliente).toHaveBeenCalledTimes(1); expect(saldo).toHaveBeenCalledWith("Pedido P1, no valor de R$ 100,00.", "P1")
+  })
+  it("Cobrança com saldo divergente: 409, nada enviado", async () => {
+    saldo.mockResolvedValue({ ok: false, motivo: "valor da mensagem diferente do saldo atual do pedido P1" })
+    e.redigir.mockResolvedValue({ ok: true, texto: "Pedido P1, no valor de R$ 90,00." })
+    const r = await cobrar()
+    expect(r.status).toBe(409); expect(r.acao).toBeUndefined(); expect(enviarAoCliente).not.toHaveBeenCalled()
+  })
+  it("Cobrança com a chave ligada: fila como antes", async () => {
+    e.aprovo = true
+    const r = await cobrar()
+    expect(r.acao).toMatchObject({ status: "aguardando" }); expect(enviarAoCliente).not.toHaveBeenCalled()
   })
 })

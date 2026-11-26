@@ -75,7 +75,10 @@ export async function ordenarComercial(diretor: IdDiretor, x: Record<string, unk
   // Só quem já comprou (A, B, C) precisa do Aprovo; na dúvida ("indefinido") conta como cliente. Sem enviarLead, tudo vai à fila.
   const { nivelDoDestinatario } = await import("./nivelCliente")
   const nv = op.enviarLead ? await nivelDoDestinatario(lead.jid) : { nivel: "indefinido" as const, jaCliente: false, motivo: "" }
-  const direto = op.enviarLead && nv.nivel === "lead"
+  // Aprovo desligado (padrão): quem ia para a fila (A, B, C, indefinido) sai direto, com as mesmas travas do lead
+  const { aprovoObrigatorio, MOTIVO_APROVO_DESLIGADO } = await import("./aprovoChave")
+  const semAprovo = !!op.enviarLead && nv.nivel !== "lead" && !(await aprovoObrigatorio())
+  const direto = op.enviarLead && (nv.nivel === "lead" || semAprovo)
   if (direto) {
     const { travasAntesDeRedigir } = await import("./ordemDireta")
     const t = await travasAntesDeRedigir(func, lead).catch(() => null)
@@ -100,12 +103,13 @@ export async function ordenarComercial(diretor: IdDiretor, x: Record<string, unk
     return fila(r.texto, motivo)
   }
   const { enviarAoLead } = await import("./ordemDireta")
-  const e = await enviarAoLead({ diretor, func, lead, texto: r.texto, novoId: op.novoId })
+  const e = await enviarAoLead({ diretor, func, lead, texto: r.texto, novoId: op.novoId, ...(semAprovo ? { semFila: true, motivoDireto: MOTIVO_APROVO_DESLIGADO } : {}) })
   if ("recusa" in e) return { saida: e.saida, status: e.status, motivo: e.motivo, nivel: nv.nivel }
   if ("fila" in e) {
     const p = (await lerConversa(diretor)).flatMap(m => m.acoes ?? []).filter(a => a.tipo === "mensagem" && a.status === "aguardando").length
     if (p >= MAX_PENDENTES) return { saida: `Já são ${p} mensagens esperando o Aprovo do Felipe (máximo ${MAX_PENDENTES} por diretor).`, status: 429, motivo: e.motivo, nivel: nv.nivel }
     return fila(e.texto ?? r.texto, e.motivo)
   }
+  if (semAprovo) return { acao: e.acao, saida: `${func.nome} enviou direto (Aprovo desligado): "${(e.acao as { texto: string }).texto}"`, destino: "enviado_direto", motivo: MOTIVO_APROVO_DESLIGADO, nivel: nv.nivel }
   return { acao: e.acao, saida: `${func.nome} enviou direto ao lead (sem compra, não precisa do Aprovo): "${(e.acao as { texto: string }).texto}"`, destino: "enviado_direto", motivo: `lead sem compra: enviado pelo ${func.nome}`, nivel: nv.nivel }
 }

@@ -360,3 +360,7 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 ## 51. Fila: desfazer dispensa (issue #236)
 
 **Status:** Claude Code. **Aprovo:** pedido do Felipe na issue #236 (não envia nada). Aba "Dispensados" na Fila do WhatsApp com "Devolver à Fila" (um ou vários) e `POST /api/externo {acao:'restaurar_fila', ids}` (qualquer diretor, como o dispensar). Grava o mapa `filaDispensados` novo inteiro, sem as chaves devolvidas (por causa do `MANTER_SE_AUSENTE`), e registra autor e data em `filaRestaurados`. Id inexistente é ignorado. O dispensar da tela não guarda autor, então a lista mostra nome e data.
+
+## 52. Aprovo desligado: chave `aprovoObrigatorio` (issue #244)
+
+**Status:** Claude Code. **Aprovo:** ordem do Felipe, 26/11/2026 9h44 ("tirem esse negócio de aprovo para tudo"). `AppConfig.aprovoObrigatorio` (padrão `false`): desligada, o que ia para a fila do Aprovo sai direto pelo funcionário indicado (`ordenar_funcionario` para A, B, C e indefinido, Cobrança). Mantém horário do agente, contato descartado, limite diário por diretor, espaçamento do envio e a trava do orçamento sem link (409 com o motivo, em vez de fila). Cobrança confere o saldo atual do pedido antes (diferente: 409). Registro: `destino: 'enviado_direto'`, `motivo: 'aprovo_desligado'`. Ligada (`true`), tudo como antes. Fila e cartões antigos ficam. Testes: `tests/ordemDiretaLead.test.ts`, `tests/saldoCobranca.test.ts`.

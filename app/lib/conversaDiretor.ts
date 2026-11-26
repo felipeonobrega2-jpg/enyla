@@ -78,6 +78,31 @@ function resumoAcao(a: AcaoConversa): string {
   return a.texto
 }
 
+type Saida = { saida: string; acao?: AcaoConversa; status?: number; destino?: "enviado_direto" | "fila_aprovo"; motivo?: string; nivel?: string }
+// Aprovo desligado: o funcionário (ex.: Cobrança) envia direto pelo envio normal (enviarAoCliente). Mantém o horário do
+// agente e o limite diário por diretor. Cobrança: confere o saldo atual do pedido antes (diferente: 409, erro registrado).
+async function enviarDiretoSemAprovo(diretor: IdDiretor, func: { id: string; nome: string }, cliente: string, texto: string, pedido?: unknown): Promise<Saida> {
+  const { MOTIVO_APROVO_DESLIGADO } = await import("./aprovoChave")
+  const recusa = (status: number, motivo: string, saida: string): Saida => ({ saida, status, motivo })
+  const { lerCfg } = await import("./agenteAuto")
+  const { dentroDoHorario } = await import("./agenteLeads")
+  const cfg = await lerCfg()
+  if (!cfg.agenteAuto?.ligado || !dentroDoHorario(cfg.agenteAuto.horario)) return recusa(409, "fora do horário do agente", "Nada foi enviado nem criado: fora do horário do agente. Tente de novo dentro do horário.")
+  if (func.id === "cobranca") {
+    const c = await (await import("./saldoCobranca")).conferirSaldoDaCobranca(texto, pedido).catch(e => ({ ok: false as const, motivo: `erro ao conferir o saldo: ${String(e).slice(0, 120)}` }))
+    if (!c.ok) {
+      await gravarConversa(diretor, [...await lerConversa(diretor), { id: novoId(), de: "diretor", texto: `Cobrança não enviada: ${c.motivo}.`, em: new Date().toISOString(), acoes: [{ id: novoId(), tipo: "falha", texto: `Cobrança não enviada: ${c.motivo}` }], nuvem: true }]).catch(() => null)
+      return recusa(409, c.motivo, `Nada foi enviado: ${c.motivo}.`)
+    }
+  }
+  const { reservarEnvioDireto, devolverEnvioDireto, MAX_DIRETOS_DIA } = await import("./ordemDireta")
+  if (!await reservarEnvioDireto(diretor)) return recusa(429, "limite diário", `Já foram ${MAX_DIRETOS_DIA} envios diretos hoje (máximo por diretor por dia). Nada foi enviado.`)
+  const { enviarAoCliente } = await import("./enviarCliente")
+  const r = await enviarAoCliente(cliente, texto).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
+  if (!r.ok) { await devolverEnvioDireto(diretor); return recusa(r.status >= 500 ? 503 : r.status, r.erro, `Não enviou: ${r.erro}. Nada foi para a fila.`) }
+  return { acao: { id: novoId(), tipo: "mensagem", funcionario: func.nome, cliente, jid: r.jid, texto, status: "enviado", em: new Date().toISOString(), direto: true, destino: "enviado_direto", motivo: MOTIVO_APROVO_DESLIGADO }, saida: `${func.nome} enviou direto (Aprovo desligado): "${texto}"`, destino: "enviado_direto", motivo: MOTIVO_APROVO_DESLIGADO }
+}
+
 // As ferramentas de um diretor: usadas na conversa com o Felipe e pela porta de acesso dos diretores na nuvem
 // (api/externo). Mensagem a cliente nunca sai daqui: fica esperando o Aprovo do Felipe. Só a porta externa (enviarLead)
 // deixa a ordem a LEAD sair direto pelo agente (ordemDireta); cliente A/B/C e indefinido sempre esperam o Aprovo.
@@ -94,6 +119,7 @@ export async function executarFerramenta(diretor: IdDiretor, nome: string, x: Re
       if (!x.cliente) return { saida: "Falta o cliente." }
       const { redigirComoFuncionario } = await import("./funcionariosServidor")
       const r = await redigirComoFuncionario({ funcionario: func, cliente: String(x.cliente), ordem: String(x.ordem), apiKey: op.apiKey, conhecimento: (await lerCampos<{ conhecimentoAgente?: import("./agenteLeads").Conhecimento[] }>(["conhecimentoAgente"])).conhecimentoAgente, cultura: ctx.cultura })
+      if (r.ok && op.enviarLead && !(await (await import("./aprovoChave")).aprovoObrigatorio())) return enviarDiretoSemAprovo(diretor, func, String(x.cliente), r.texto, x.pedido)
       if (r.ok) return { acao: { id: novoId(), tipo: "mensagem", funcionario: func.nome, cliente: String(x.cliente), texto: r.texto, status: "aguardando" }, saida: `${func.nome} escreveu e a mensagem está esperando o Aprovo do Felipe: "${r.texto}"` }
       return { acao: { id: novoId(), tipo: "falha", texto: r.erro }, saida: `Não deu: ${r.erro}` }
     }

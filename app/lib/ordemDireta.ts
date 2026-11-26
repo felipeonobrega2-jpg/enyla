@@ -18,6 +18,28 @@ export type Fila = { fila: true; motivo: string; texto?: string }
 
 const diaSP = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
 
+// Limite de envios diretos por dia e por diretor (reservado antes; devolvido se o envio falhar)
+type Dia = { ordemDiretaDia?: Record<string, { dia: string; n: number }> }
+export async function reservarEnvioDireto(diretor: string): Promise<boolean> {
+  const dia = diaSP()
+  let passou = false
+  await mudarConfig((d: Dia) => {
+    const atual = d.ordemDiretaDia?.[diretor]
+    const n = atual?.dia === dia ? atual.n : 0
+    if (n >= MAX_DIRETOS_DIA) return null
+    passou = true
+    return { ordemDiretaDia: { ...(d.ordemDiretaDia ?? {}), [diretor]: { dia, n: n + 1 } } }
+  })
+  return passou
+}
+export async function devolverEnvioDireto(diretor: string): Promise<void> {
+  const dia = diaSP()
+  await mudarConfig((d: Dia) => {
+    const x = d.ordemDiretaDia?.[diretor]
+    return x?.dia === dia && x.n > 0 ? { ordemDiretaDia: { ...d.ordemDiretaDia, [diretor]: { dia, n: x.n - 1 } } } : null
+  }).catch(() => null)
+}
+
 // Antes de gastar IA: agente ligado e no horário, e a conversa é de um lead individual
 export async function travasAntesDeRedigir(func: Pick<Funcionario, "id">, lead: Lead): Promise<Recusa | null> {
   const { lerCfg } = await import("./agenteAuto")
@@ -33,39 +55,31 @@ export async function travasAntesDeRedigir(func: Pick<Funcionario, "id">, lead: 
 }
 
 // Já com o texto redigido: últimas travas e envio. Devolve a ação "enviado" (direto), a fila ou a recusa.
-export async function enviarAoLead(a: { diretor: string; func: Pick<Funcionario, "id" | "nome">; lead: Lead; texto: string; novoId: () => string }): Promise<{ acao: AcaoConversa } | Fila | Recusa> {
+// semFila (Aprovo desligado): onde iria para a fila, recusa com 409 e o motivo (nada é criado nem enviado)
+export async function enviarAoLead(a: { diretor: string; func: Pick<Funcionario, "id" | "nome">; lead: Lead; texto: string; novoId: () => string; semFila?: boolean; motivoDireto?: string }): Promise<{ acao: AcaoConversa } | Fila | Recusa> {
   const { lerCfg, enviar, voceNaConversa, lerConversa } = await import("./agenteAuto")
   const { ehProspecto } = await import("./prospectorTrava")
   const cfg = await lerCfg()
   // Trava do "segue o orçamento" (#106): sem proposta real o texto vai reescrito para o Aprovo
   const t = travaPromessaDeOrcamento(a.texto, { idsExistentes: (cfg.pedidosDigitais ?? []).map(p => p.id) })
-  if (t.reescrita) return { fila: true, motivo: MOTIVO_PROMETIA_ORCAMENTO, texto: t.resposta }
-  if (await ehProspecto(a.lead.jid).catch(() => true)) return { fila: true, motivo: "gráfica do Prospector: o Felipe decide" }
+  const fila = (motivo: string, texto?: string): Fila | Recusa => a.semFila
+    ? { recusa: true, status: 409, motivo, saida: `Nada foi enviado nem criado: ${motivo}.` }
+    : { fila: true, motivo, ...(texto ? { texto } : {}) }
+  if (t.reescrita) return fila(MOTIVO_PROMETIA_ORCAMENTO, t.resposta)
+  if (await ehProspecto(a.lead.jid).catch(() => true)) return fila("gráfica do Prospector: o Felipe decide")
   // O Felipe escreveu há pouco nessa conversa: não entra por cima
-  if (await voceNaConversa(a.lead.jid, (cfg.agenteLog ?? []).filter(l => l.jid === a.lead.jid), cfg).catch(() => true)) return { fila: true, motivo: "o Felipe escreveu há pouco nessa conversa" }
+  if (await voceNaConversa(a.lead.jid, (cfg.agenteLog ?? []).filter(l => l.jid === a.lead.jid), cfg).catch(() => true)) return fila("o Felipe escreveu há pouco nessa conversa")
   const conversa = await lerConversa(a.lead.jid)
   if (!conversa) return { recusa: true, status: 404, motivo: "sem conversa", saida: "Conversa não encontrada: nada foi enviado." }
 
-  // Limite de envios diretos por dia e por diretor (reservado antes; devolvido se o envio falhar)
-  const dia = diaSP()
-  let passou = false
-  await mudarConfig((d: { ordemDiretaDia?: Record<string, { dia: string; n: number }> }) => {
-    const atual = d.ordemDiretaDia?.[a.diretor]
-    const n = atual?.dia === dia ? atual.n : 0
-    if (n >= MAX_DIRETOS_DIA) return null
-    passou = true
-    return { ordemDiretaDia: { ...(d.ordemDiretaDia ?? {}), [a.diretor]: { dia, n: n + 1 } } }
-  })
-  if (!passou) return { recusa: true, status: 429, motivo: "limite diário", saida: `Já foram ${MAX_DIRETOS_DIA} envios diretos hoje (máximo por diretor por dia). Nada foi enviado.` }
+  if (!await reservarEnvioDireto(a.diretor))
+    return { recusa: true, status: 429, motivo: "limite diário", saida: `Já foram ${MAX_DIRETOS_DIA} envios diretos hoje (máximo por diretor por dia). Nada foi enviado.` }
 
   const r = await enviar(conversa, t.resposta, undefined, { proativo: true }).catch(e => ({ ids: [] as string[], erro: String(e) }))
   if (r.erro) {
-    await mudarConfig((d: { ordemDiretaDia?: Record<string, { dia: string; n: number }> }) => {
-      const x = d.ordemDiretaDia?.[a.diretor]
-      return x?.dia === dia && x.n > 0 ? { ordemDiretaDia: { ...d.ordemDiretaDia, [a.diretor]: { dia, n: x.n - 1 } } } : null
-    }).catch(() => null)
+    await devolverEnvioDireto(a.diretor)
     const limite = /limite|cota/i.test(r.erro)
     return { recusa: true, status: limite ? 429 : 503, motivo: r.erro, saida: `Não enviou: ${r.erro}. Nada foi para a fila.` }
   }
-  return { acao: { id: a.novoId(), tipo: "mensagem", funcionario: a.func.nome, cliente: a.lead.nome, jid: a.lead.jid, texto: t.resposta, status: "enviado", em: new Date().toISOString(), direto: true } }
+  return { acao: { id: a.novoId(), tipo: "mensagem", funcionario: a.func.nome, cliente: a.lead.nome, jid: a.lead.jid, texto: t.resposta, status: "enviado", em: new Date().toISOString(), direto: true, ...(a.motivoDireto ? { destino: "enviado_direto" as const, motivo: a.motivoDireto } : {}) } }
 }
