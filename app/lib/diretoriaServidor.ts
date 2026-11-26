@@ -52,7 +52,7 @@ export async function decidirFerramenta(id: string, status: Ferramenta["status"]
 // ── Conversas do Felipe com cada diretor ─────────────────────────────────────────
 // acoes: o que o diretor fez na conversa (ordem a um funcionário com mensagem para aprovar, vaga, ferramenta, plano, lição)
 export type AcaoConversa =
-  | { id: string; tipo: "mensagem"; funcionario: string; cliente: string; jid?: string; texto: string; status: "aguardando" | "enviado" | "erro" | "descartado" | "cancelado"; erro?: string; em?: string; direto?: boolean; canceladoPor?: string; canceladoEm?: string }
+  | { id: string; tipo: "mensagem"; funcionario: string; cliente: string; jid?: string; texto: string; status: "aguardando" | "enviado" | "erro" | "descartado" | "cancelado"; erro?: string; em?: string; direto?: boolean; fornecedorId?: string; pedido?: string; canceladoPor?: string; canceladoEm?: string }
   | { id: string; tipo: "vaga"; vagaId: string; nome: string; resumo: string }
   | { id: string; tipo: "ferramenta"; ferramentaId: string; nome: string; resumo: string }
   | { id: string; tipo: "plano"; objetivo: string; passos: string[]; indicador: string }
@@ -68,3 +68,18 @@ export const apagarConversa = (diretor: IdDiretor) => apagar("diretoriaConversa"
 // ── Foto da empresa para as conversas com os diretores (montada em segundo plano; ver conversaDiretor) ──────────
 export const lerFoto = <T>() => ler<T>("diretoriaFoto", "atual")
 export const gravarFoto = (foto: unknown) => gravar("diretoriaFoto", "atual", foto)
+
+// ── Mensagens a fornecedores (porta externa, ordenar_fornecedor): histórico por fornecedor e por pedido, com o horário de envio ──
+export type MensagemFornecedor = {
+  id: string; fornecedorId: string; fornecedorNome: string; pedido: string; texto: string; anexos: string[]; diretor: IdDiretor
+  criadaEm: string; status: "aguardando" | "enviado" | "erro" | "descartado" | "cancelado"; enviadaEm?: string; erro?: string
+}
+export const gravarMensagemFornecedor = (m: MensagemFornecedor) => gravar("fornecedorMensagem", m.id, m)
+export async function atualizarMensagemFornecedor(id: string, parte: Partial<MensagemFornecedor>) {
+  const m = await ler<MensagemFornecedor>("fornecedorMensagem", id)
+  if (m) await gravar("fornecedorMensagem", id, { ...m, ...parte })
+}
+export async function listarMensagensFornecedor(fornecedorId: string, limite = 30): Promise<MensagemFornecedor[]> {
+  const { data } = await supabase.from("dados_sistema").select("dados").eq("colecao", "fornecedorMensagem").eq("dados->>fornecedorId", fornecedorId).limit(500)
+  return (data ?? []).map(r => r.dados as MensagemFornecedor).sort((a, b) => b.criadaEm.localeCompare(a.criadaEm)).slice(0, limite)
+}
