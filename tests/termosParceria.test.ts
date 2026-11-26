@@ -1,54 +1,101 @@
+// Termos de Parceria: caixa obrigatória no /parceiros, aceite gravado (versão, data, IP, user-agent), texto vindo da mesma
+// lista de serviços do formulário, aceite por token e a trava de distribuição (só quem veio de /parceiros e não aceitou).
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-const inseridos: Record<string, unknown>[] = []
-vi.mock("@/app/lib/supabase", () => ({
-  supabase: { from: (t: string) => ({
-    insert: (v: Record<string, unknown>) => { if (t === "termos_parceria_aceites") inseridos.push(v); return Promise.resolve({ error: null }) },
-    select: () => ({ lte: () => ({ order: () => ({ limit: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }) }) }),
-  }), storage: { from: () => ({ upload: async () => ({ error: null }), getPublicUrl: () => ({ data: { publicUrl: "x" } }) }) } },
+const estado = vi.hoisted(() => ({ cfg: {} as Record<string, unknown>, linhas: [] as Record<string, unknown>[] }))
+vi.mock("@/app/lib/configAtomica", () => ({
+  lerConfigLinha: vi.fn(async () => ({ data: { data: estado.cfg }, error: null })),
+  mudarConfig: vi.fn(async (mudar: (d: Record<string, unknown>) => Record<string, unknown> | null) => { estado.cfg = { ...estado.cfg, ...(mudar(estado.cfg) ?? {}) }; return estado.cfg }),
 }))
-vi.mock("@/app/lib/configAtomica", () => ({ lerConfigLinha: async () => ({ data: { data: {} } }), mudarConfig: async () => ({}) }))
-vi.mock("@/app/lib/notificar", () => ({ notificar: async () => null, LINK_SISTEMA: "x" }))
-vi.mock("@/app/lib/geocodificar", () => ({ enderecoPeloCep: async () => ({ erro: "x" }) }))
-vi.mock("@/app/lib/prospectorServidor", () => ({ registrarCadastroRecebido: async () => null }))
-vi.mock("@/app/lib/emailsServidor", () => ({ emailDoCadastro: async () => ({}) }))
-vi.mock("@/app/lib/evolution", () => ({ evo: async () => null }))
-vi.mock("@/app/lib/agenteAuto", () => ({ seuNumero: async () => null }))
+vi.mock("@/app/lib/supabase", () => {
+  const q = { select: () => q, lte: () => q, order: () => q, limit: async () => ({ data: estado.linhas, error: null }) }
+  return { supabase: { from: vi.fn(() => q), storage: { from: vi.fn() } } }
+})
+vi.mock("@/app/lib/notificar", () => ({ notificar: vi.fn(async () => null), LINK_SISTEMA: "https://exemplo.test" }))
+vi.mock("@/app/lib/geocodificar", () => ({ enderecoPeloCep: vi.fn(async () => ({ erro: "teste" })) }))
+vi.mock("@/app/lib/emailsServidor", () => ({ emailDoCadastro: vi.fn(async () => ({ tipo: "teste", ok: false })) }))
+vi.mock("@/app/lib/evolution", () => ({ evo: vi.fn(async () => null) }))
+vi.mock("@/app/lib/agenteAuto", () => ({ seuNumero: vi.fn(async () => "") }))
+vi.mock("@/app/lib/prospectorServidor", () => ({ registrarCadastroRecebido: vi.fn(async () => null) }))
 
 import { receberCadastro } from "@/app/lib/parceirosServidor"
-import { pendenteTermos, podeReceberPedido, registroDoAceite } from "@/app/lib/termosParceria"
+import { aceitarPorToken, garantirTokenTermos, lerTermosVigentes } from "@/app/lib/termosParceriaServidor"
+import { TERMOS_INICIAIS, renderTermos, statusTermos, podeReceberPedido, TEXTO_CAIXA_ACEITE } from "@/app/lib/termosParceria"
+import { SERVICOS_PARCEIRO, errosDaEtapa, ERRO_ACEITE_TERMOS, type CadastroParceiro } from "@/app/lib/parceiros"
 
-const dados = { nomeFantasia: "Gráfica Teste", tipoDocumento: "cnpj", documento: "11222333000181", cep: "01310100", rua: "Rua A", numero: "1", bairro: "B", cidade: "São Paulo", uf: "SP", responsavel: "Fulano", whatsapp: "11988887777", email: "a@b.com.br",
-  servicos: [{ id: "corteVinco", cobranca: "milheiro", valor: 38, prazoDias: 3, prazoVaria: false, precosExemplo: { corteVinco: 250 } }], aceite: true }
-const form = (termos?: string) => { const f = new FormData(); f.set("dados", JSON.stringify(dados)); if (termos) f.set("termos", termos); return f }
+const dados = { nomeFantasia: "Gráfica Exemplo", tipoDocumento: "cnpj", documento: "11222333000181", cep: "01310100", rua: "Rua Exemplo", numero: "10", bairro: "Centro", cidade: "São Paulo", uf: "SP", responsavel: "Fulano", whatsapp: "11988887777", email: "a@b.com.br", aceite: true,
+  servicos: [{ id: "corteVinco", cobranca: "milheiro", valor: 38, prazoDias: 3, prazoVaria: false, precosExemplo: { corteVinco: 250 } }] }
+const form = (extra: Record<string, unknown> = {}) => { const f = new FormData(); f.set("dados", JSON.stringify({ ...dados, ...extra })); return f }
+const cadastros = () => (estado.cfg.cadastrosParceiros ?? []) as CadastroParceiro[]
 
-describe("Termos de Parceria", () => {
-  beforeEach(() => { inseridos.length = 0 })
-  it("envio sem aceite dos termos falha e não grava nada", async () => {
-    const r = await receberCadastro(form())
+beforeEach(() => { estado.cfg = {}; estado.linhas = [] })
+
+describe("envio do cadastro", () => {
+  it("sem o aceite dos termos o envio falha, com mensagem no campo, e nada é gravado", async () => {
+    const r = await receberCadastro(form({ aceiteTermos: false }))
     expect(r.ok).toBe(false)
-    expect(!r.ok && r.campos?.termos).toBeTruthy()
-    expect(inseridos).toHaveLength(0)
+    expect(r.ok === false && r.campos?.aceiteTermos).toBe(ERRO_ACEITE_TERMOS)
+    expect(cadastros()).toHaveLength(0)
+    expect(errosDaEtapa({ aceite: true }, "final").aceiteTermos).toBe(ERRO_ACEITE_TERMOS)
   })
-  it("com aceite grava versão, data, IP e navegador", async () => {
-    const r = await receberCadastro(form("1"), { ip: "203.0.113.9", userAgent: "teste" })
+  it("com aceite grava versão, data, IP e user-agent (do servidor, não do navegador)", async () => {
+    const r = await receberCadastro(form({ aceiteTermos: true, termosVersao: "falsa", termosAceitosEm: "2000-01-01" }), { ip: "203.0.113.9", userAgent: "UA-teste" })
     expect(r.ok).toBe(true)
-    expect(inseridos).toHaveLength(1)
-    expect(inseridos[0]).toMatchObject({ status: "aceito", termos_versao: "rascunho-1", ip: "203.0.113.9", user_agent: "teste" })
-    expect(Number.isNaN(Date.parse(String(inseridos[0].termos_aceitos_em)))).toBe(false)
+    const c = cadastros()[0]
+    expect(c.termosVersao).toBe(TERMOS_INICIAIS.versao)
+    expect(Date.now() - new Date(c.termosAceitosEm!).getTime()).toBeLessThan(60_000)
+    expect(c.termosIp).toBe("203.0.113.9"); expect(c.termosUserAgent).toBe("UA-teste")
+    expect(statusTermos(c)).toBe("aceito")
   })
-  it("sem registro de aceite a parceira fica pendente", () => {
-    expect(pendenteTermos(null)).toBe(true)
-    expect(pendenteTermos({ status: "pendente_termos" })).toBe(true)
-    expect(pendenteTermos({ status: registroDoAceite("v1", { ip: null, userAgent: null }).status })).toBe(false)
+  it("o texto ao lado da caixa é o combinado com o Felipe", () => {
+    expect(TEXTO_CAIXA_ACEITE).toBe("Li e aceito os termos. Não vou contatar nem atender diretamente, por 24 meses após o último serviço, clientes que a ENYLA me encaminhar.")
   })
-  it("sem aceite, só cadastro via /parceiros fica sem pedido novo; fornecedor em operação não é bloqueado", () => {
-    expect(podeReceberPedido({ origem: "cadastro_parceiros", aceite: { status: "pendente_termos" } })).toBe(false)
-    expect(podeReceberPedido({ origem: "cadastro_parceiros", aceite: { status: "aceito" } })).toBe(true)
-    expect(podeReceberPedido({ origem: "fornecedor", aceite: null })).toBe(true)
+})
+
+describe("texto dos termos", () => {
+  it("toda opção de serviço do formulário aparece no item 1, e o item termina como o Felipe pediu", () => {
+    const t = renderTermos(TERMOS_INICIAIS.texto), item1 = t.split("\n")[0]
+    for (const s of SERVICOS_PARCEIRO) expect(item1.toLowerCase()).toContain(s.nome.toLowerCase())
+    expect(item1).toContain("e outros serviços informados no cadastro, como manuseio e montagem.")
+    expect(t).not.toContain("{servicos}")
   })
-  it("pedido já em produção não é afetado, mesmo sem aceite", () => {
-    expect(podeReceberPedido({ origem: "cadastro_parceiros", aceite: null, pedidoEmProducao: true })).toBe(true)
-    expect(podeReceberPedido({ origem: "fornecedor", aceite: { status: "pendente_termos" }, pedidoEmProducao: true })).toBe(true)
+  it("itens 5 e 6 com a redação final e título da versão 0.3", () => {
+    expect(TERMOS_INICIAIS.texto).toContain("somente para chave na mesma titularidade do CNPJ ou CPF do cadastro.")
+    expect(TERMOS_INICIAIS.texto).not.toContain("conferido o documento")
+    expect(TERMOS_INICIAIS.texto).toContain("Quando a Parceira presta o próprio serviço de transporte, segue as instruções do pedido.")
+    expect(TERMOS_INICIAIS.titulo).toBe("Termos de Parceria ENYLA, versão 0.3, aguardando revisão de advogado")
+    expect(TERMOS_INICIAIS.rascunho).toBe(true)
+  })
+  it("lê da tabela quando há registro (trocar o registro dispensa deploy) e cai na 0.3 sem ele", async () => {
+    expect((await lerTermosVigentes()).versao).toBe("0.3")
+    estado.linhas = [{ versao: "1.0", titulo: "Final", texto: "x", rascunho: false, vigente_desde: "2026-12-01T00:00:00Z" }]
+    const t = await lerTermosVigentes()
+    expect(t.versao).toBe("1.0"); expect(t.rascunho).toBe(false)
+  })
+})
+
+describe("quem já estava cadastrada", () => {
+  it("fica pendente_termos e aceita pelo token do link, sem mensagem automática", async () => {
+    estado.cfg = { cadastrosParceiros: [{ id: "PAR-1", nomeFantasia: "X" }] }
+    expect(statusTermos(cadastros()[0])).toBe("pendente_termos")
+    const token = await garantirTokenTermos("PAR-1")
+    expect(token!.length).toBeGreaterThanOrEqual(16)
+    expect(await garantirTokenTermos("PAR-1")).toBe(token)
+    expect((await aceitarPorToken("token-errado-qualquer", {})).ok).toBe(false)
+    expect(statusTermos(cadastros()[0])).toBe("pendente_termos")
+    expect((await aceitarPorToken(token!, { ip: "1.1.1.1", userAgent: "UA" })).ok).toBe(true)
+    expect(cadastros()[0].termosVersao).toBe("0.3"); expect(statusTermos(cadastros()[0])).toBe("aceito")
+  })
+})
+
+describe("trava da distribuição", () => {
+  const pend = { termosVersao: undefined, termosAceitosEm: undefined }
+  it("parceira do /parceiros sem aceite não recebe pedido novo; com aceite recebe", () => {
+    expect(podeReceberPedido({ ...pend, origem: "formulario" })).toBe(false)
+    expect(podeReceberPedido({ termosVersao: "0.3", termosAceitosEm: "2026-11-26T00:00:00Z", origem: "formulario" })).toBe(true)
+  })
+  it("fornecedor em operação e pedido em produção nunca são bloqueados", () => {
+    expect(podeReceberPedido({ ...pend, origem: "fornecedor_em_operacao" })).toBe(true)
+    expect(podeReceberPedido({ ...pend, origem: "formulario" }, { emProducao: true })).toBe(true)
   })
 })

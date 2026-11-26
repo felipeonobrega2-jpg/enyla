@@ -1,14 +1,11 @@
-// Aceite dos Termos de Parceria pela parceira já cadastrada (token do cadastro, sem login)
+// Aceite dos Termos de Parceria por quem já estava cadastrada (token do cadastro, sem login). Não envia mensagem.
 import { NextResponse } from "next/server"
-import { aceitarPorToken } from "@/app/lib/termosParceriaServidor"
-import { aceitouTermos, metaDaRequisicao, ERRO_TERMOS } from "@/app/lib/termosParceria"
+import { aceitarPorToken, metaDoPedido } from "@/app/lib/termosParceriaServidor"
 
 export const dynamic = "force-dynamic"
 
 export async function POST(req: Request) {
-  const b = await req.json().catch(() => null) as { token?: unknown; aceito?: unknown } | null
-  if (!b || typeof b.token !== "string") return NextResponse.json({ ok: false, erro: "Link inválido." }, { status: 400 })
-  if (!aceitouTermos(b.aceito)) return NextResponse.json({ ok: false, erro: ERRO_TERMOS }, { status: 400 })
-  const r = await aceitarPorToken(b.token, metaDaRequisicao(req))
+  const corpo = await req.json().catch(() => null) as { token?: string } | null
+  const r = await aceitarPorToken(String(corpo?.token ?? ""), metaDoPedido(req.headers))
   return NextResponse.json(r, { status: r.ok ? 200 : 400 })
 }

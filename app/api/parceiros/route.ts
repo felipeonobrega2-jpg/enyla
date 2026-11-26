@@ -4,11 +4,7 @@ import { listarCadastros, mudarStatus } from "@/app/lib/parceirosServidor"
 
 export const dynamic = "force-dynamic"
 
-// Cada cadastro sai com `termos` ("pendente_termos" ou "aceito"): pendência visível no painel, sem bloquear ninguém aqui
-export async function GET() {
-  const [lista, termos] = await Promise.all([listarCadastros(), import("@/app/lib/termosParceriaServidor").then(m => m.situacaoTermosPorCadastro())])
-  return NextResponse.json({ cadastros: lista.map(c => ({ ...c, termos: termos[c.id] ?? null })) })
-}
+export async function GET() { return NextResponse.json({ cadastros: await listarCadastros() }) }
 
 export async function POST(req: Request) {
   const b = await req.json().catch(() => ({})) as { id?: string; status?: string; fornecedorId?: string }

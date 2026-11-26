@@ -1,42 +1,59 @@
-import { randomBytes } from "crypto"
+// Termos de Parceria no servidor: lê o texto vigente da tabela, grava o aceite e gera o token do link de aceite.
+// Não envia mensagem a ninguém.
+import { randomBytes } from "node:crypto"
 import { supabase } from "./supabase"
-import { TERMOS_PROVISORIO, registroDoAceite, type MetaAceite, type Termos } from "./termosParceria"
+import { mudarConfig } from "./configAtomica"
+import { TERMOS_INICIAIS, type TermosParceria } from "./termosParceria"
+import type { CadastroParceiro } from "./parceiros"
 
-// Termos vigentes: o registro de maior vigente_desde que já começou. Sem tabela ou vazia, o texto provisório.
-export async function termosVigentes(): Promise<Termos> {
+type Cfg = Record<string, unknown> & { cadastrosParceiros?: CadastroParceiro[] }
+export type MetaAceite = { ip?: string; userAgent?: string }
+
+/** Versão vigente: a de maior vigente_desde que já começou. Sem tabela ou sem linha, usa a versão 0.3 embutida. */
+export async function lerTermosVigentes(): Promise<TermosParceria> {
   try {
-    const { data } = await supabase.from("termos_parceria").select("versao, texto, rascunho, vigente_desde").lte("vigente_desde", new Date().toISOString()).order("vigente_desde", { ascending: false }).limit(1).maybeSingle()
-    if (data?.versao && data.texto) return data as Termos
-  } catch { /* usa o provisório */ }
-  return TERMOS_PROVISORIO
+    const { data, error } = await supabase.from("termos_parceria").select("versao, titulo, texto, rascunho, vigente_desde")
+      .lte("vigente_desde", new Date().toISOString()).order("vigente_desde", { ascending: false }).limit(1)
+    const l = data?.[0] as { versao: string; titulo: string; texto: string; rascunho: boolean; vigente_desde: string } | undefined
+    if (!error && l?.versao && l.texto) return { versao: l.versao, titulo: l.titulo, texto: l.texto, rascunho: !!l.rascunho, vigenteDesde: l.vigente_desde }
+  } catch { /* tabela ainda não criada */ }
+  return TERMOS_INICIAIS
 }
 
-// Cadastro novo que aceitou no formulário: guarda versão, data, IP e navegador
-export async function gravarAceiteDoCadastro(cadastroId: string, versao: string, meta: MetaAceite) {
-  const { error } = await supabase.from("termos_parceria_aceites").insert({ cadastro_id: cadastroId, token: randomBytes(32).toString("hex"), ...registroDoAceite(versao, meta) })
-  return !error
+export const metaDoPedido = (h: Headers): MetaAceite => ({
+  ip: (h.get("x-forwarded-for")?.split(",")[0] ?? h.get("x-real-ip") ?? "").trim().slice(0, 64) || undefined,
+  userAgent: (h.get("user-agent") ?? "").slice(0, 300) || undefined,
+})
+
+export const registroDeAceite = (termos: TermosParceria, meta: MetaAceite = {}) => ({
+  termosVersao: termos.versao, termosAceitosEm: new Date().toISOString(), termosIp: meta.ip, termosUserAgent: meta.userAgent,
+})
+
+/** Aceite pelo link de quem já estava cadastrada (token do cadastro). Não reabre aceite já feito da mesma versão. */
+export async function aceitarPorToken(token: string, meta: MetaAceite): Promise<{ ok: boolean; erro?: string }> {
+  const t = (token ?? "").trim()
+  if (t.length < 16) return { ok: false, erro: "Link inválido." }
+  const termos = await lerTermosVigentes()
+  let achou = false
+  await mudarConfig((d: Cfg) => {
+    const lista = d.cadastrosParceiros ?? []
+    if (!lista.some(c => c.termosToken === t)) return null
+    achou = true
+    return { cadastrosParceiros: lista.map(c => c.termosToken === t ? { ...c, ...registroDeAceite(termos, meta) } : c) }
+  })
+  return achou ? { ok: true } : { ok: false, erro: "Link inválido." }
 }
 
-export async function aceitePorToken(token: string) {
-  if (!/^[a-f0-9]{32,64}$/.test(token)) return null
-  const { data } = await supabase.from("termos_parceria_aceites").select("cadastro_id, status, termos_versao, termos_aceitos_em").eq("token", token).maybeSingle()
-  return data as { cadastro_id: string; status: string; termos_versao: string | null; termos_aceitos_em: string | null } | null
-}
-
-// Parceira já cadastrada aceita pelo link com token
-export async function aceitarPorToken(token: string, meta: MetaAceite): Promise<{ ok: true; versao: string } | { ok: false; erro: string }> {
-  const a = await aceitePorToken(token)
-  if (!a) return { ok: false, erro: "Link inválido. Peça um novo à ENYLA." }
-  const t = await termosVigentes()
-  const { error } = await supabase.from("termos_parceria_aceites").update(registroDoAceite(t.versao, meta)).eq("token", token)
-  if (error) return { ok: false, erro: "Não consegui registrar agora. Tente de novo." }
-  return { ok: true, versao: t.versao }
-}
-
-// Situação dos termos de cada cadastro (para o painel: pendência visível). Sem a tabela, lista vazia (nada marcado).
-export async function situacaoTermosPorCadastro(): Promise<Record<string, string>> {
-  try {
-    const { data } = await supabase.from("termos_parceria_aceites").select("cadastro_id, status")
-    return Object.fromEntries((data ?? []).map((r: { cadastro_id: string; status: string }) => [r.cadastro_id, r.status]))
-  } catch { return {} }
+/** Gera (ou devolve) o token do link de aceite de um cadastro antigo. Uso interno; não envia nada. */
+export async function garantirTokenTermos(cadastroId: string): Promise<string | null> {
+  let token: string | null = null
+  await mudarConfig((d: Cfg) => {
+    const lista = d.cadastrosParceiros ?? []
+    const c = lista.find(x => x.id === cadastroId)
+    if (!c) return null
+    if (c.termosToken) { token = c.termosToken; return null }
+    token = randomBytes(18).toString("base64url")
+    return { cadastrosParceiros: lista.map(x => x.id === cadastroId ? { ...x, termosToken: token! } : x) }
+  })
+  return token
 }
