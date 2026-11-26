@@ -55,13 +55,14 @@ vi.mock("@/app/lib/supabase", () => ({
 }))
 
 import { executarEnvio } from "@/app/lib/prospectorEnvioServidor"
-import { MAX_EMAILS_POR_EXECUCAO, MAX_FALHAS_POR_CANAL, tetoEmailDia, ehErroDeCota, celularWhatsapp, dentroDoHorario, ehRecusa, textoPrimeiroContato, TEXTO_LEMBRETE } from "@/app/lib/prospectorEnvio"
+import { MAX_EMAILS_POR_EXECUCAO, MAX_FALHAS_POR_CANAL, tetoEmailDia, ehErroDeCota, celularWhatsapp, dentroDoHorario, ehRecusa, textoPrimeiroContato, TEXTO_LEMBRETE, PRIMEIRO_CONTATO_PAUSADO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA } from "@/app/lib/prospectorEnvio"
 
 // 2026-11-23 é segunda. São Paulo é UTC-3. Os deslocamentos em dias caem em dia útil (o horário é checado de verdade).
 const SEG_10H = new Date("2026-11-23T13:00:00Z")
 const SEG_15H = new Date("2026-11-23T18:00:00Z")
 const dias = (d: Date, n: number) => new Date(d.getTime() + n * 86_400_000)
-const rodar = (agora: Date) => executarEnvio({ agora: () => agora })
+const rodar = (agora: Date) => executarEnvio({ agora: () => agora, primeiroContatoPausado: false, limitePrimeirosPorDia: 0 })
+const rodarReal = (agora: Date) => executarEnvio({ agora: () => agora })
 
 let seq = 0
 function novo(p: Partial<Linha> = {}): Linha {
@@ -497,5 +498,38 @@ describe("teto diário de e-mail e cota da Resend", () => {
     expect(hist(m).some(h => h.envio?.status === "enviado")).toBe(false)   // falha comum continua descartando
     expect(ehErroDeCota(COTA)).toBe(true)
     expect(ehErroDeCota("Invalid `to`")).toBe(false)
+  })
+})
+
+describe("pausa do primeiro contato e limite de 10 por dia", () => {
+  it("padrão de produção: não está pausado e o limite de 10 por dia vale", async () => {
+    expect(PRIMEIRO_CONTATO_PAUSADO).toBe(false)
+    expect(LIMITE_PRIMEIROS_CONTATOS_POR_DIA).toBe(10)
+    for (let i = 0; i < 15; i++) novo({ nota: 100 - i, telefone: null, email: `p${i}@gr.com.br` })
+    const r = await rodarReal(SEG_10H)
+    expect(r.ok).toBe(true)
+    expect(r.primeiros).toBe(10)
+    expect(envios.email).toHaveBeenCalledTimes(10)
+    const msg = envios.email.mock.calls[0][1] as { html: string; texto: string }
+    expect(msg.html).toContain("Para ser parceira da ENYLA, cadastre a sua gráfica aqui: <a href=")
+    expect(msg.texto).toContain("Cadastrar minha gráfica: https://app.enyla.com.br/api/prospector/r/")
+    expect((await rodarReal(SEG_15H)).primeiros).toBe(0)
+  })
+  it("pausa ligada por parâmetro: nada sai, segue qualificado, sem erro", async () => {
+    const a = novo({ email: "p@gr.com.br" })
+    const r = await executarEnvio({ agora: () => SEG_10H, primeiroContatoPausado: true })
+    expect(r.primeiros).toBe(0)
+    expect(r.falhas).toBe(0)
+    expect(envios.email).not.toHaveBeenCalled()
+    expect(doBanco(a).etapa).toBe("qualificado")
+  })
+  it("limite de 10 por dia, entre execuções; no dia seguinte saem os próximos", async () => {
+    for (let i = 0; i < 25; i++) novo({ nota: 100 - i, telefone: null, email: `l${i}@gr.com.br` })
+    const lim = (d: Date) => executarEnvio({ agora: () => d, primeiroContatoPausado: false })
+    expect((await lim(SEG_10H)).primeiros).toBe(10)
+    expect((await lim(SEG_15H)).primeiros).toBe(0)
+    expect(envios.email).toHaveBeenCalledTimes(10)
+    expect((await lim(dias(SEG_10H, 1))).primeiros).toBe(10)
+    expect(envios.email).toHaveBeenCalledTimes(20)
   })
 })

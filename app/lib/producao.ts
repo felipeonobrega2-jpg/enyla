@@ -97,6 +97,8 @@ export type MovimentoFornecedor = {
   diasDescontados?: number   // dias úteis parados por algo do lado do cliente (arte, aprovação, pagamento): não contam para o fornecedor
   motivoDesconto?: string
   emailEm?: string            // quando o pedido foi avisado por e-mail ao fornecedor
+  rodadaId?: string           // rodada (ROD-001) em que o lote foi impresso junto com outros; só nos movimentos novos
+  posicoesNaFolha?: number    // posições que o pedido ocupa em cada folha da rodada
 }
 
 // Dias úteis que contam para o fornecedor (sem os descontados) e se ele atrasou de verdade
@@ -159,6 +161,8 @@ export type ConfigProducao = {
   ferramentalPadrao: { facaBase: number; facaPorCavidade: number; cliche: number; fotolito: number }
   ferramentais: Ferramental[]
   movimentos: MovimentoFornecedor[]
+  /** Rodadas de produção (pedidos impressos juntos). Só chave nova: cadastros antigos não têm. */
+  rodadas?: import("./rateioRodada").Rodada[]
   ocorrencias: Ocorrencia[]
   // Automações ao mover o pedido no quadro
   automacoes: { prazoEntrega: boolean; fornecedores: boolean }

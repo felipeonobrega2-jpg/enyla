@@ -37,6 +37,7 @@ export function caberFrasco(pad: { a: number; l: number; p: number }, frasco: st
 
 export const SINAL_DIGITAL = 0.5
 
+import type { SituacaoArte } from "./digitalPrazo"
 export type StatusDigital = "aguardando_sinal" | "sinal_pago" | "arte" | "producao" | "enviado" | "cancelado"
 export type LinkCartao = { v: number; orderNsu: string; url: string; valor: number; em: string }
 export type PedidoDigital = {
@@ -70,6 +71,8 @@ export type PedidoDigital = {
   email?: string                                             // do cliente (opcional, no aceite dos termos): comprovante, arte, envio
   restante?: number; restantePagoEm?: string; pagamentoFinal?: { txId: string; valor: number; data: string; nome: string | null }
   acertadoEm?: string
+  situacaoArte?: SituacaoArte; prazoEntregaEm?: string        // acompanhamento (#164): vazios nos pedidos antigos; data YYYY-MM-DD (a porta/tela chamam de prazoEntrega; o objeto prazoEntrega acima é o do #165)
+  edicaoAcomp?: { por: string; em: string; motivo: string; arteAprovadaAntes?: string | null }   // quem gravou os dois campos acima, quando (Brasília) e por quê
   lembreteDepois?: string; lembreteParado?: boolean           // lead adiou (espera) · você assumiu a conversa (sem lembrete)
   reenviadoEm?: string                                         // orçamento reenviado com os valores (varredura)
   documento?: string                                         // CPF/CNPJ (cobrança no Asaas e nota)

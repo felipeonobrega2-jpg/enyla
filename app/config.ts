@@ -106,7 +106,7 @@ export type Configuracoes = {
   avisosPedido?: Record<string, import("./lib/filaMensagens").AvisoPedido>  // último aviso de produção mandado por pedido
   filaDispensados?: Record<string, string>                 // itens da fila já enviados/dispensados (id → quando)
   ideias?: Ideia[]                                         // anotações para implementar depois
-  digital?: { arte: number; margem: number }               // impressão digital (Villa): preço = custo + arte + margem, por pedido
+  digital?: { arte: number; margem: number; prazoPadraoDiasUteis?: number | null }               // impressão digital (Villa): preço = custo + arte + margem, por pedido
   conciliacao?: import("./lib/conciliacao").MemoriaConciliacao  // quem paga por quem e entradas ignoradas
 }
 

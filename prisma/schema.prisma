@@ -82,3 +82,26 @@ model Contador {
   chave String @id
   valor Int    @default(0)
 }
+
+// Perfis de acesso (migration: supabase/migrations/20261129_usuarios_acesso.sql). O app lê e grava estas tabelas
+// pelo cliente do Supabase, não pelo Prisma Client: não rodar `prisma migrate` para elas.
+model Usuario {
+  id        String  @id
+  nome      String
+  usuario   String  @unique
+  senhaHash String
+  papel     String
+  ativo     Boolean @default(true)
+  criadoEm  String
+}
+
+model AuditoriaDiretor {
+  id      String @id
+  em      String
+  usuario String
+  papel   String
+  metodo  String
+  caminho String
+  antes   Json?
+  depois  Json?
+}
