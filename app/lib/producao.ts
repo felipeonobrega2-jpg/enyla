@@ -99,6 +99,9 @@ export type MovimentoFornecedor = {
   emailEm?: string            // quando o pedido foi avisado por e-mail ao fornecedor
   rodadaId?: string           // rodada (ROD-001) em que o lote foi impresso junto com outros; só nos movimentos novos
   posicoesNaFolha?: number    // posições que o pedido ocupa em cada folha da rodada
+  obs?: string                // observação de quem registrou pela porta externa
+  registradoPor?: string      // diretor que gravou pela porta externa (registrar_movimento_fornecedor)
+  registradoEm?: string       // instante ISO da gravação pela porta
 }
 
 // Dias úteis que contam para o fornecedor (sem os descontados) e se ele atrasou de verdade
