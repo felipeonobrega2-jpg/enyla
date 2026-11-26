@@ -23,6 +23,7 @@ import { acaoPendencia, lerPendenciasDaArea, renovarFotoDepois } from "@/app/lib
 import { acaoTarefaFelipe, tarefasDoDiretor } from "@/app/lib/tarefaFelipe"
 import { pedidoExterno } from "@/app/lib/pedidoExterno"
 import { lerPertoExterno, AJUDA_PERTO } from "@/app/lib/pertoExterno"
+import { lerPropostasExterno, AJUDA_PROPOSTAS } from "@/app/lib/propostasExterno"
 import { moverCardExterno } from "@/app/lib/moverCardExterno"
 import { gravarDigitalExterno } from "@/app/lib/gravarDigitalExterno"
 import { cancelarOrdem } from "@/app/lib/cancelarOrdem"
@@ -62,7 +63,7 @@ export async function GET(req: NextRequest) {
 
   if (!o) return NextResponse.json({
     voce: `${info.nome}, ${info.cargo} (${info.area})`,
-    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | ") + " | parceiros (só CCO e CMO)", ...(podeAcionarComercial(diretor) ? { "?o=parceiros": AJUDA_PARCEIROS } : { "?o=parceiros": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): cadastros de /parceiros e respostas do Prospector" }), "?o=historico_offset": AJUDA_HISTORICO_OFFSET, "?o=prazos_fornecedores": PODEM_LER_PRAZOS.includes(diretor) ? AJUDA_PRAZOS_FORNECEDORES : "SÓ PARA AS CHAVES DO COO E DO CTO (as outras recebem 403): prazos cadastrais dos fornecedores de produção", "?o=conversa": "o que você e o Felipe conversaram", ...(podeAcionarComercial(diretor) ? { "?o=perto": AJUDA_PERTO } : { "?o=perto": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): a lista 'Perto de você'" }), ...(diretor === "cfo" ? AJUDA_FINANCEIRO : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa" }), ...(diretor === "cmo" ? { "?o=meta_ads": "Meta Ads ao vivo (só leitura): conta, campanhas, conjuntos e anúncios; hoje, 7 e 30 dias; cache de 3 min; bloco funil por campanha (7 e 30 dias: leads, mql, orçamentos, pedidos, vendido, gasto, custo por lead e por MQL) e previsaoSaldoDias" } : {}) },
+    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | ") + " | parceiros (só CCO e CMO)", ...(podeAcionarComercial(diretor) ? { "?o=parceiros": AJUDA_PARCEIROS } : { "?o=parceiros": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): cadastros de /parceiros e respostas do Prospector" }), "?o=historico_offset": AJUDA_HISTORICO_OFFSET, "?o=prazos_fornecedores": PODEM_LER_PRAZOS.includes(diretor) ? AJUDA_PRAZOS_FORNECEDORES : "SÓ PARA AS CHAVES DO COO E DO CTO (as outras recebem 403): prazos cadastrais dos fornecedores de produção", "?o=conversa": "o que você e o Felipe conversaram", ...(podeAcionarComercial(diretor) ? { "?o=propostas": AJUDA_PROPOSTAS } : { "?o=propostas": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): propostas Offset em JSON paginado" }), ...(podeAcionarComercial(diretor) ? { "?o=perto": AJUDA_PERTO } : { "?o=perto": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): a lista 'Perto de você'" }), ...(diretor === "cfo" ? AJUDA_FINANCEIRO : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa" }), ...(diretor === "cmo" ? { "?o=meta_ads": "Meta Ads ao vivo (só leitura): conta, campanhas, conjuntos e anúncios; hoje, 7 e 30 dias; cache de 3 min; bloco funil por campanha (7 e 30 dias: leads, mql, orçamentos, pedidos, vendido, gasto, custo por lead e por MQL) e previsaoSaldoDias" } : {}) },
     escrita: { "POST {acao:'relatar', texto}": "manda algo ao Felipe",
       "POST {acao:'dispensar_pendencia', chave, motivo, ate?}": "QUALQUER DIRETOR. Dispensa uma pendência (a chave vem em ?o=empresa, campo pendencias) com motivo obrigatório (sem motivo: 400); ate (AAAA-MM-DD) opcional: depois dessa data ela volta. Não apaga nada",
       "POST {acao:'tarefa_felipe', titulo, detalhe?, prazo? (AAAA-MM-DD)}": "QUALQUER DIRETOR. Põe uma tarefa na lista 'Depende de você' do Felipe (pedido por você, com data e prazo). titulo obrigatório (até 140 caracteres); no máximo 10 abertas por diretor (a 11ª volta 429). Suas tarefas (abertas e feitas nos últimos 7 dias) estão em ?o=empresa, campo tarefasParaFelipe. {acao:'tarefa_felipe', operacao:'cancelar', id} cancela só as suas. Não manda mensagem a ninguém",
@@ -81,7 +82,7 @@ export async function GET(req: NextRequest) {
       } : {}),
       ...(comerciaisDoDiretor(diretor).length ? { "POST {acao:'ordenar_funcionario', funcionario:'atendente'|'followup'|'reativacao', cliente | jid, ordem}": "SÓ CCO e CMO (as outras recebem 403). O agente do Comercial escreve a mensagem para UM lead com o histórico do WhatsApp; REGRA (25/11): só 'cliente' (quem já comprou, nível A, B ou C) precisa do Aprovo do Felipe. Para LEAD (nunca comprou; cadastro sem compra e orçamento aberto não contam) a mensagem SAI DIRETO pelo agente indicado, só com o agente ligado e dentro do horário dele (senão 409 'fora do horário do agente', nada é criado), no máximo 20 envios diretos por dia por diretor (a 21ª volta 429). Cliente A, B, C ou nível 'indefinido' (já comprou sem curva, compra antiga, só digital, ligação fraca com quem comprou, erro de leitura) vai para a fila do Aprovo, no máximo 20 esperando por diretor (a 21ª volta 429). Texto que promete orçamento sem link real, Felipe escrevendo na conversa e gráfica do Prospector também vão para a fila. Lead sem WhatsApp: 404. Resposta: { ok, resultado, destino: 'enviado_direto'|'fila_aprovo', motivo, nivel, id }; leia o nível antes em ?o=perto ou ?o=detalhe&area=comercial" } : {}),
       "POST {acao:'mover_card', numero | loteNumero, coluna, motivo}": "QUALQUER DIRETOR. Avança um pedido de etapa na produção. numero (ORC-...) ou loteNumero (move os cards do lote); coluna de 2 (Arte/Dieline) a 8 (Expedição); motivo obrigatório (até 300 caracteres). Só avança (destino maior que a coluna atual) e só de cards já Fechados (coluna 1 em diante); nunca volta, nunca vai a 0, 9 (Entregue) ou 10 (Perdido): 400 com o motivo e nada é alterado. Só muda a coluna (preço, quantidade, sinal e opcoes ficam como estão). Registra no Tracking quem moveu (seu nome) e o motivo. Não manda mensagem nem e-mail ao cliente. Resposta: { ok, resultado, movidos: [{numero, de, para}] }",
-      "POST {acao:'gravar_digital', id, situacaoArte?, prazoEntrega?, motivo}": "QUALQUER DIRETOR. Grava no pedido Digital (id DIG-0000) só a situação da arte (sem arte | enviada | ajustes pedidos | aprovada | prova autorizada) e/ou o prazo de entrega (YYYY-MM-DD; vazio limpa e volta a 'a confirmar'). Informe ao menos um dos dois; motivo obrigatório (até 300 caracteres). Registra no pedido quem gravou (seu nome), quando (Brasília) e o motivo. Não mexe em pagamento, status, custo nem mensagem, e não manda nada ao cliente. 400 com o motivo e nada alterado se algo estiver inválido; 404 se o pedido não existe. Resposta: { ok, id, situacaoArte, prazoEntrega }",
+      "POST {acao:'gravar_digital', id, situacaoArte?, prazoEntrega?, arteAprovadaEm?, motivo}": "QUALQUER DIRETOR (arteAprovadaEm: só CTO e COO). Grava no pedido Digital (id DIG-0000) só a situação da arte (sem arte | enviada | ajustes pedidos | aprovada | prova autorizada) e/ou o prazo de entrega (YYYY-MM-DD; vazio limpa e volta a 'a confirmar'). arteAprovadaEm (opcional): instante ISO com fuso, ex. 2026-11-13T14:00:00.000Z, no passado e não anterior à criação do pedido; é a data de que o acompanhamento parte para prever a entrega (use nos pedidos cuja arte foi aprovada no WhatsApp antes do gravador automático); outras chaves recebem 403 e nada é gravado. Informe ao menos um dos três; motivo obrigatório (até 300 caracteres). Registra no pedido quem gravou (seu nome), quando (Brasília), o motivo e o valor anterior de arteAprovadaEm (null se não havia). Não mexe em pagamento, status, custo nem mensagem, e não manda nada ao cliente. 400 com o motivo e nada alterado se algo estiver inválido; 403 se arteAprovadaEm vier de quem não é CTO/COO; 404 se o pedido não existe. Resposta: { ok, id, situacaoArte, prazoEntrega, arteAprovadaEm }",
       "POST {acao:'cancelar_ordem', id}": "QUALQUER DIRETOR. Cancela uma ordem SUA (id do cartão, devolvido por ordenar_funcionario) que ainda está esperando o Aprovo (status aguardando). Só marca como cancelada (canceladoPor, canceladoEm): nunca apaga nada e nada é enviado. Ordem de outro diretor ou que não existe: 404; já enviada, descartada, com erro ou cancelada: 409. A tela da diretoria mostra 'Cancelada' e não oferece o Aprovo. Resposta: { ok, resultado, id }",
       ...Object.fromEntries(FERRAMENTAS.map(f => [`POST {acao:'${f}', ...}`, "ferramenta (ver instruções)"])) },
     limitePorHora: LIMITE_POR_HORA,
@@ -106,6 +107,12 @@ export async function GET(req: NextRequest) {
 
   if (o === "prazos_fornecedores") {
     const l = await lerPrazosFornecedores(diretor)
+    return NextResponse.json(l.corpo, { status: l.status })
+  }
+
+  if (o === "propostas") {
+    const q = req.nextUrl.searchParams
+    const l = await lerPropostasExterno(diretor, { pagina: q.get("pagina"), limite: q.get("limite"), status: q.get("status"), estrela: q.get("estrela") })
     return NextResponse.json(l.corpo, { status: l.status })
   }
 
@@ -180,7 +187,7 @@ export async function GET(req: NextRequest) {
       outrasAreas: blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")),
     })
   }
-  return NextResponse.json({ erro: "o: empresa, detalhe, conversa, perto, historico_offset, prazos_fornecedores (só COO e CTO), parceiros (CCO e CMO) ou financeiro (só CFO)" }, { status: 400 })
+  return NextResponse.json({ erro: "o: empresa, detalhe, conversa, perto, historico_offset, prazos_fornecedores (só COO e CTO), propostas, parceiros (CCO e CMO) ou financeiro (só CFO)" }, { status: 400 })
 }
 
 export async function POST(req: NextRequest) {
@@ -257,7 +264,7 @@ export async function POST(req: NextRequest) {
   } else if (b.acao === "gravar_digital") {
     const r = await gravarDigitalExterno(diretor, b)
     if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
-    return NextResponse.json({ ok: true, id: r.id, situacaoArte: r.situacaoArte, prazoEntrega: r.prazoEntrega })
+    return NextResponse.json({ ok: true, id: r.id, situacaoArte: r.situacaoArte, prazoEntrega: r.prazoEntrega, arteAprovadaEm: r.arteAprovadaEm })
   } else if (b.acao === "meta_ads") {
     const r = await acaoMetaAds(diretor, b)
     return NextResponse.json(r.corpo, { status: r.status })
