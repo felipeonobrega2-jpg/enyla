@@ -6,9 +6,11 @@ type Linha = Record<string, unknown>
 const mundo = vi.hoisted(() => ({
   prospectos: [] as Linha[], conversas: [] as Linha[], mensagens: [] as Linha[], apelidos: {} as Record<string, string>,
   atender: vi.fn(async (..._a: unknown[]) => ({ ok: false as const, erro: "x", status: 500 })),
+  parceiro: vi.fn(async (..._a: unknown[]) => ({ enviou: true, motivo: "respondeu", texto: "oi" })),
   evo: vi.fn(async (..._a: unknown[]) => ({ ok: true, status: 200, corpo: {} })),
 }))
 
+vi.mock("@/app/lib/atendenteParceiro", () => ({ responderParceiro: mundo.parceiro }))
 vi.mock("@/app/lib/evolution", () => ({ evo: mundo.evo }))
 vi.mock("@/app/lib/atendenteServidor", () => ({
   atender: mundo.atender,
@@ -28,6 +30,9 @@ vi.mock("@/app/lib/supabase", () => ({
       const q: Record<string, unknown> = {}
       q.select = () => q
       q.eq = (c: string, v: unknown) => { filtros.push(r => r[c] === v); return q }
+      q.gte = () => q
+      q.insert = async () => ({ error: null })
+      q.upsert = async () => ({ error: null })
       q.order = () => q
       q.limit = () => q
       q.range = (a: number, b: number) => { ini = a; fim = b + 1; return q }
@@ -47,13 +52,14 @@ const fetchSpy = vi.fn(async (..._a: unknown[]) => ({ ok: true }))
 beforeEach(() => {
   vi.useFakeTimers()
   vi.stubGlobal("fetch", fetchSpy)
-  fetchSpy.mockClear(); mundo.atender.mockClear(); mundo.evo.mockClear()
-  mundo.prospectos = [{ telefone: "(11) 98765-4321" }]
+  fetchSpy.mockClear(); mundo.atender.mockClear(); mundo.evo.mockClear(); mundo.parceiro.mockClear()
+  mundo.prospectos = [{ id: 1, telefone: "(11) 98765-4321", etapa: "abordado", opt_out: false }]
   mundo.conversas = []; mundo.apelidos = {}
   mundo.mensagens = []
 })
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
 
+const conv = (jid: string) => ({ jid, nome: "Gráfica Teste", telefone: jid.split("@")[0], etiquetas: [], status_lead: null })
 const msg = (id: string, jid: string) => ({ id, jid, from_me: false, ts: "2026-11-24T12:00:00Z", corpo: "oi", tipo: "text" })
 const agendar = async (id: string) => { const p = agendarResposta(id, "http://x"); await vi.runAllTimersAsync(); await p }
 
@@ -84,32 +90,30 @@ describe("ehProspecto", () => {
   })
 })
 
-describe("Atendente com gráfica do Prospector", () => {
-  it.each(["5511987654321@s.whatsapp.net", "551187654321@s.whatsapp.net"])("agendarResposta não agenta %s: sem responder, sem IA, sem envio", async jid => {
-    mundo.mensagens = [msg("M1", jid)]
+describe("Modo parceiro DESLIGADO (#242): mensagem de telefone de parceiro não gera envio", () => {
+  it.each(["5511987654321@s.whatsapp.net", "551187654321@s.whatsapp.net"])("%s: nada agenda, nada responde, nada sai", async jid => {
+    mundo.mensagens = [msg("M1", jid)]; mundo.conversas = [conv(jid)]
     await agendar("M1")
+    const p = responderSozinho("M1"); await vi.runAllTimersAsync(); await p
+    await responderSozinho("M1", { atrasada: true })
     expect(fetchSpy).not.toHaveBeenCalled()
+    expect(mundo.parceiro).not.toHaveBeenCalled()
     expect(mundo.atender).not.toHaveBeenCalled()
     expect(mundo.evo).not.toHaveBeenCalled()
   })
-  it("responderSozinho (atrasada, assumir, retomar) também não chama a IA nem envia", async () => {
-    mundo.mensagens = [msg("M2", "5511987654321@s.whatsapp.net")]
-    await responderSozinho("M2", { atrasada: true })
-    const p = responderSozinho("M2"); await vi.runAllTimersAsync(); await p
-    expect(mundo.atender).not.toHaveBeenCalled()
-    expect(mundo.evo).not.toHaveBeenCalled()
-  })
-  it("@lid ligado ao prospecto: não responde", async () => {
+  it("@lid ligado ao prospecto: também não responde", async () => {
     mundo.apelidos = { "123@lid": "5511987654321@s.whatsapp.net" }
-    mundo.mensagens = [msg("M3", "123@lid")]
+    mundo.mensagens = [msg("M3", "123@lid")]; mundo.conversas = [conv("123@lid")]
     await agendar("M3")
     await responderSozinho("M3", { atrasada: true })
     expect(fetchSpy).not.toHaveBeenCalled()
-    expect(mundo.atender).not.toHaveBeenCalled()
+    expect(mundo.parceiro).not.toHaveBeenCalled()
   })
-  it("contato comum: o fluxo atual segue", async () => {
+  it("contato comum: o fluxo atual segue, sem o modo parceiro", async () => {
     mundo.mensagens = [msg("M4", "5521999998888@s.whatsapp.net")]
     await agendar("M4")
     expect(fetchSpy).toHaveBeenCalledTimes(1)
+    await responderSozinho("M4", { atrasada: true })
+    expect(mundo.parceiro).not.toHaveBeenCalled()
   })
 })

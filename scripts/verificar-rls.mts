@@ -16,7 +16,7 @@ const TABELAS = new Set([
   "LancamentoFinanceiro", "Lote", "NegocioParceiro", "Parceiro",
   "agente_mensagens", "agente_registro", "agente_tratadas", "banco_transacoes",
   "cartuxo_chapa_lugares", "cartuxo_chapas", "cartuxo_config", "cartuxo_facas", "cartuxo_pedidos",
-  "dados_sistema", "fretes", "pedido_arquivos", "prospectos_parceiros", "quick_replies",
+  "dados_sistema", "fretes", "pedido_arquivos", "prospectos_parceiros", "termos_parceria", "quick_replies",
   "whatsapp_conversas", "whatsapp_mensagens",
 ])
 

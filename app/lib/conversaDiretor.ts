@@ -94,6 +94,12 @@ export async function executarFerramenta(diretor: IdDiretor, nome: string, x: Re
       if (!x.cliente) return { saida: "Falta o cliente." }
       const { redigirComoFuncionario } = await import("./funcionariosServidor")
       const r = await redigirComoFuncionario({ funcionario: func, cliente: String(x.cliente), ordem: String(x.ordem), apiKey: op.apiKey, conhecimento: (await lerCampos<{ conhecimentoAgente?: import("./agenteLeads").Conhecimento[] }>(["conhecimentoAgente"])).conhecimentoAgente, cultura: ctx.cultura })
+      if (r.ok && op.enviarLead && !await (await import("./aprovoDesligado")).lerAprovoObrigatorio()) {
+        // Chave aprovoObrigatorio=false (só pela porta externa): sai direto, com as travas e o registro de auditoria
+        const e = await (await import("./aprovoDesligado")).enviarFuncionarioDireto({ diretor, func, cliente: String(x.cliente), pedido: x.pedido ? String(x.pedido) : undefined, texto: r.texto, novoId })
+        if ("recusa" in e) return { saida: e.saida, status: e.status, motivo: e.motivo }
+        return { acao: e.acao, saida: `${func.nome} enviou direto (aprovo_desligado): "${(e.acao as { texto: string }).texto}"`, destino: "enviado_direto", motivo: "aprovo_desligado" }
+      }
       if (r.ok) return { acao: { id: novoId(), tipo: "mensagem", funcionario: func.nome, cliente: String(x.cliente), texto: r.texto, status: "aguardando" }, saida: `${func.nome} escreveu e a mensagem está esperando o Aprovo do Felipe: "${r.texto}"` }
       return { acao: { id: novoId(), tipo: "falha", texto: r.erro }, saida: `Não deu: ${r.erro}` }
     }

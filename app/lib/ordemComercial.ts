@@ -11,6 +11,7 @@ import { chaveTelefone } from "./vinculoWhatsapp"
 import type { IdDiretor } from "./diretoria"
 import type { Funcionario } from "./rh"
 import type { Conhecimento } from "./agenteLeads"
+import { MOTIVO_APROVO_DESLIGADO } from "./aprovoDesligado"
 
 export const MAX_PENDENTES = 20
 export const DIRETORES_COMERCIAIS: IdDiretor[] = ["cco", "cmo"]
@@ -70,12 +71,20 @@ export async function ordenarComercial(diretor: IdDiretor, x: Record<string, unk
   if (!podeAcionarComercial(diretor)) return { saida: `${func.nome} só atende ordens da CCO e da CMO.`, status: 403 }
   const ordem = String(x.ordem ?? "").trim()
   if (!ordem) return { saida: "Falta a ordem (o que o agente deve dizer ao lead).", status: 400 }
+  // Gráfica do Prospector (prospectos_parceiros): sai direto, sem Aprovo e sem exigir conversa anterior (regra de 26/11/2026).
+  // Só pela porta externa (enviarLead) e só se o nível é "lead": cliente A, B, C ou indefinido segue na fila.
+  if (op.enviarLead) {
+    const p = await ordenarProspecto(diretor, func, x, ordem, op).catch(() => null)
+    if (p) return p
+  }
   const lead = await acharLead({ cliente: x.cliente as string | undefined, jid: x.jid as string | undefined })
   if (!lead.ok) return { saida: lead.erro, status: 404 }
   // Só quem já comprou (A, B, C) precisa do Aprovo; na dúvida ("indefinido") conta como cliente. Sem enviarLead, tudo vai à fila.
   const { nivelDoDestinatario } = await import("./nivelCliente")
   const nv = op.enviarLead ? await nivelDoDestinatario(lead.jid) : { nivel: "indefinido" as const, jaCliente: false, motivo: "" }
-  const direto = op.enviarLead && nv.nivel === "lead"
+  // Chave aprovoObrigatorio (padrão false): desligada, cliente A/B/C e indefinido também saem direto (as travas continuam); ligada, é a regra de antes
+  const aprovoDesligado = !!op.enviarLead && !(await (await import("./aprovoDesligado")).lerAprovoObrigatorio())
+  const direto = op.enviarLead && (nv.nivel === "lead" || aprovoDesligado)
   if (direto) {
     const { travasAntesDeRedigir } = await import("./ordemDireta")
     const t = await travasAntesDeRedigir(func, lead).catch(() => null)
@@ -100,12 +109,41 @@ export async function ordenarComercial(diretor: IdDiretor, x: Record<string, unk
     return fila(r.texto, motivo)
   }
   const { enviarAoLead } = await import("./ordemDireta")
-  const e = await enviarAoLead({ diretor, func, lead, texto: r.texto, novoId: op.novoId })
+  const e = await enviarAoLead({ diretor, func, lead, texto: r.texto, novoId: op.novoId, aprovoDesligado, nivel: nv.nivel })
   if ("recusa" in e) return { saida: e.saida, status: e.status, motivo: e.motivo, nivel: nv.nivel }
   if ("fila" in e) {
     const p = (await lerConversa(diretor)).flatMap(m => m.acoes ?? []).filter(a => a.tipo === "mensagem" && a.status === "aguardando").length
     if (p >= MAX_PENDENTES) return { saida: `Já são ${p} mensagens esperando o Aprovo do Felipe (máximo ${MAX_PENDENTES} por diretor).`, status: 429, motivo: e.motivo, nivel: nv.nivel }
     return fila(e.texto ?? r.texto, e.motivo)
   }
-  return { acao: e.acao, saida: `${func.nome} enviou direto ao lead (sem compra, não precisa do Aprovo): "${(e.acao as { texto: string }).texto}"`, destino: "enviado_direto", motivo: `lead sem compra: enviado pelo ${func.nome}`, nivel: nv.nivel }
+  return { acao: e.acao, saida: `${func.nome} enviou direto ao lead (sem Aprovo): "${(e.acao as { texto: string }).texto}"`, destino: "enviado_direto", motivo: nv.nivel === "lead" ? `lead sem compra: enviado pelo ${func.nome}` : `${MOTIVO_APROVO_DESLIGADO}: enviado pelo ${func.nome}`, nivel: nv.nivel }
+}
+
+// jid candidato da ordem: o jid mandado ou, se o "cliente" é um telefone, o número no WhatsApp
+function jidDaOrdem(x: Record<string, unknown>): string | null {
+  const jid = typeof x.jid === "string" ? x.jid.trim() : ""
+  if (jid) return /^\d{10,13}$/.test(jid) ? `${jid.length <= 11 ? "55" + jid : jid}@s.whatsapp.net` : jid
+  const d = String(x.cliente ?? "").replace(/\D/g, "")
+  return d.length >= 10 && d.length <= 13 && !/[a-z]/i.test(String(x.cliente ?? "")) ? `${d.length <= 11 ? "55" + d : d}@s.whatsapp.net` : null
+}
+
+// null = não é gráfica do Prospector (ou não dá para saber): segue o caminho de sempre, que só enfileira ou envia a lead.
+async function ordenarProspecto(diretor: IdDiretor, func: Funcionario, x: Record<string, unknown>, ordem: string, op: { apiKey: string; cultura?: string[]; novoId: () => string }): Promise<Pronto | null> {
+  const jid = jidDaOrdem(x)
+  if (!jid) return null
+  const { prospectoDoJid } = await import("./prospectorTrava")
+  const prospecto = await prospectoDoJid(jid)
+  if (!prospecto) return null
+  const { nivelDoDestinatario } = await import("./nivelCliente")
+  const nv = await nivelDoDestinatario(jid)
+  if (nv.nivel !== "lead") return null   // já comprou (A, B, C) ou indefinido: fila do Aprovo
+  const { travasDoProspecto, enviarAoProspecto } = await import("./ordemProspecto")
+  const t = travasDoProspecto(prospecto)
+  if (t) return t
+  const cfg = await lerCampos<{ guiaAtendimento?: string; conhecimentoAgente?: Conhecimento[] }>(["guiaAtendimento", "conhecimentoAgente"])
+  const { redigirComoFuncionario } = await import("./funcionariosServidor")
+  const nome = prospecto.nome_fantasia || prospecto.razao_social || String(x.cliente ?? jid)
+  const r = await redigirComoFuncionario({ funcionario: func, cliente: nome, jid, ordem, apiKey: op.apiKey, conhecimento: cfg.conhecimentoAgente, cultura: op.cultura, guia: cfg.guiaAtendimento?.trim() || undefined })
+  if (!r.ok) return { saida: `Não deu: ${r.erro}`, acao: { id: op.novoId(), tipo: "falha", texto: r.erro }, status: 422 }
+  return enviarAoProspecto({ diretor, func, prospecto, jid, texto: r.texto, novoId: op.novoId })
 }

@@ -2,7 +2,7 @@
 // Cada serviço tem as perguntas técnicas que a operação precisa (formato da máquina, materiais, tipos), o jeito de
 // cobrar e o tempo médio de entrega (ou "não consigo mensurar"). O endereço vem pelo CEP e vira a base dele no
 // mapa (de onde levamos e buscamos material). Puro: tipos, opções e validação (formulário e servidor usam os mesmos).
-import type { FornecedorProducao, Servico } from "./producao"
+import type { FornecedorProducao, RegraCobranca, Servico } from "./producao"
 import type { Endereco } from "./frete"
 
 export type IdServicoParceiro =
@@ -11,7 +11,7 @@ export type IdServicoParceiro =
 
 export const SERVICOS_PARCEIRO: { id: IdServicoParceiro; nome: string; dica: string; servico?: Servico }[] = [
   { id: "impressaoOffset", nome: "Impressão offset", dica: "Folhas impressas em máquina offset", servico: "impressao" },
-  { id: "impressaoDigital", nome: "Impressão digital", dica: "Tiragens curtas, cartão e adesivo" },
+  { id: "impressaoDigital", nome: "Impressão digital", dica: "Tiragens curtas, cartão e adesivo", servico: "impressao" },
   { id: "laminacao", nome: "Laminação", dica: "Fosca, brilho, soft touch", servico: "laminacao" },
   { id: "verniz", nome: "Verniz", dica: "UV total, localizado, com relevo", servico: "verniz" },
   { id: "hotStamping", nome: "Hot stamping", dica: "Dourado, prata, holográfico", servico: "hotStamping" },
@@ -167,6 +167,15 @@ export const ROTULO_PRECO_CENARIO: Record<string, string> = { "arte-unitaria": "
 export const cobraPorAcertoMilheiro = (id: IdServicoParceiro) => id === "impressaoOffset" || id === "impressaoDigital"
 const formatoOk = (f: unknown) => !!f && typeof f === "object" && Number((f as Formato).l) > 0 && Number((f as Formato).a) > 0
 
+export type ModoParceira = "tabela" | "orcamento_por_pedido"
+/** `tabela`: todo serviço com preço (valor ou exemplo) e prazo médio. Qualquer falta (ou "varia") vira `orcamento_por_pedido`. */
+export function modoDaParceira(servicos: Pick<ServicoCadastrado, "valor" | "precosExemplo" | "prazoDias" | "prazoVaria" | "cobranca">[]): ModoParceira {
+  if (!servicos.length) return "orcamento_por_pedido"
+  const temPreco = (s: typeof servicos[number]) => s.cobranca !== "varia" && (Number(s.valor) > 0 || Object.values(s.precosExemplo ?? {}).some(v => Number(v) > 0))
+  const temPrazo = (s: typeof servicos[number]) => !s.prazoVaria && Number(s.prazoDias) > 0
+  return servicos.every(s => temPreco(s) && temPrazo(s)) ? "tabela" : "orcamento_por_pedido"
+}
+
 export type CadastroParceiro = {
   id: string
   em: string
@@ -200,11 +209,26 @@ export type CadastroParceiro = {
   maquinas?: string
   arquivos: { nome: string; url: string }[]
   comoConheceu?: string
+  /** Canal de origem (utm do link do Prospector). Gravado pelo servidor; cadastro sem utm não tem. */
+  utmSource?: string
+  utmMedium?: string
   aceite: boolean
+  /** Entrada do formulário: caixa "Li e aceito os Termos de Parceria". Sem ela o envio não conclui. */
+  aceiteTermos?: boolean
+  /** Aceite gravado pelo servidor (nunca vem do navegador): versão, data/hora, IP e user-agent. Sem isso a parceira está pendente_termos. */
+  termosVersao?: string
+  termosAceitosEm?: string
+  termosIp?: string
+  termosUserAgent?: string
+  /** Token do link de aceite (/parceiros/termos?aceite=1&t=...), para quem se cadastrou antes dos termos. */
+  termosToken?: string
+  /** Como a parceira entra na distribuição de pedidos (só registro; a distribuição vem em outro PR). */
+  modo?: ModoParceira
   fornecedorId?: string
   emails?: { tipo: "recebido" | "aprovado"; em: string; ok: boolean; erro?: string }[]
 }
 
+export const ERRO_ACEITE_TERMOS = "Marque a caixa para aceitar os Termos de Parceria e enviar"
 export const GERENTE_PADRAO = "Felipe"
 
 const soDigitos = (s: string) => (s ?? "").replace(/\D/g, "")
@@ -277,6 +301,7 @@ export function errosDaEtapa(c: Partial<CadastroParceiro>, etapa: Etapa): Record
     if (!s.prazoVaria && !(s.prazoDias && s.prazoDias > 0 && s.prazoDias <= 120)) e[`${s.id}.prazo`] = "Informe o prazo médio ou marque que varia"
   }
   if (etapa === "final" && !c.aceite) e.aceite = "Precisa concordar para enviar"
+  if (etapa === "final" && !c.aceiteTermos) e.aceiteTermos = ERRO_ACEITE_TERMOS
   return e
 }
 export const errosDoCadastro = (c: Partial<CadastroParceiro>) => ETAPAS_IDS.reduce((t, et) => ({ ...t, ...errosDaEtapa(c, et) }), {} as Record<string, string>)
@@ -312,10 +337,18 @@ function limparExemplos(s: Partial<ServicoCadastrado> & { id: IdServicoParceiro 
   return { ...(Object.keys(precos).length ? { precosExemplo: precos } : {}), ...(Object.keys(versoes).length ? { cenarioVersoes: versoes } : {}) }
 }
 
-export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParceiro, "id" | "em" | "status" | "gerente" | "arquivos" | "base"> {
+export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParceiro, "id" | "em" | "status" | "gerente" | "arquivos" | "base"> & { modo: ModoParceira } {
   const t = (s: unknown, max = 200) => String(s ?? "").replace(/\s+/g, " ").trim().slice(0, max)
   const n = (v: unknown, max: number) => { const k = Number(v); return Number.isFinite(k) && k > 0 && k <= max ? Math.round(k * 100) / 100 : null }
   const ids = new Set(SERVICOS_PARCEIRO.map(s => s.id)), formas = new Set(FORMAS_COBRANCA.map(f => f.id))
+  const servicos = (x.servicos ?? []).filter(s => ids.has(s.id)).slice(0, 20).map(s => ({
+      id: s.id, qual: s.id === "outro" ? t(s.qual, 80) : undefined, tecnico: limparTecnico(s.id, s.tecnico),
+      cobranca: cobraPorAcertoMilheiro(s.id) ? "acertoMilheiro" as const : s.cobranca && formas.has(s.cobranca) ? s.cobranca : null,
+      valor: n(s.valor, 1_000_000), acerto: n(s.acerto, 1_000_000),
+      prazoDias: s.prazoVaria ? null : n(s.prazoDias, 120), prazoVaria: !!s.prazoVaria,
+      minimo: t(s.minimo, 120) || undefined, obs: t(s.obs, 600) || undefined,
+      ...limparExemplos(s),
+    }))
   return {
     nomeFantasia: t(x.nomeFantasia, 120), razaoSocial: t(x.razaoSocial, 160) || undefined,
     tipoDocumento: x.tipoDocumento === "cpf" ? "cpf" : "cnpj", documento: soDigitos(x.documento ?? "").slice(0, 14),
@@ -323,16 +356,9 @@ export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParce
     bairro: t(x.bairro, 80), cidade: t(x.cidade, 80), uf: t(x.uf, 2).toUpperCase(), referencia: t(x.referencia, 200) || undefined,
     responsavel: t(x.responsavel, 100), whatsapp: soDigitos(x.whatsapp ?? "").slice(-13), email: t(x.email, 160).toLowerCase(),
     contatoProducao: t(x.contatoProducao, 160) || undefined,
-    servicos: (x.servicos ?? []).filter(s => ids.has(s.id)).slice(0, 20).map(s => ({
-      id: s.id, qual: s.id === "outro" ? t(s.qual, 80) : undefined, tecnico: limparTecnico(s.id, s.tecnico),
-      cobranca: cobraPorAcertoMilheiro(s.id) ? "acertoMilheiro" as const : s.cobranca && formas.has(s.cobranca) ? s.cobranca : null,
-      valor: n(s.valor, 1_000_000), acerto: n(s.acerto, 1_000_000),
-      prazoDias: s.prazoVaria ? null : n(s.prazoDias, 120), prazoVaria: !!s.prazoVaria,
-      minimo: t(s.minimo, 120) || undefined, obs: t(s.obs, 600) || undefined,
-      ...limparExemplos(s),
-    })),
+    servicos, modo: modoDaParceira(servicos),
     capacidade: t(x.capacidade, 300) || undefined, horario: t(x.horario, 160) || undefined, maquinas: t(x.maquinas, 600) || undefined,
-    comoConheceu: t(x.comoConheceu, 200) || undefined, aceite: !!x.aceite,
+    comoConheceu: t(x.comoConheceu, 200) || undefined, aceite: !!x.aceite, aceiteTermos: !!x.aceiteTermos,
   }
 }
 
@@ -362,18 +388,104 @@ export const textoTecnico = (s: ServicoCadastrado) =>
 export const textoEndereco = (c: Pick<CadastroParceiro, "rua" | "numero" | "complemento" | "bairro" | "cidade" | "uf" | "cep">) =>
   `${c.rua}, ${c.numero}${c.complemento ? ` (${c.complemento})` : ""} · ${c.bairro} · ${c.cidade}/${c.uf} · CEP ${mascaraCep(c.cep)}`
 
-// Aprovado: vira fornecedor de produção (prazo, contato, base no mapa e a máquina de impressão, se informada)
+// ── Aprovado: vira fornecedor de produção ────────────────────────────────────────────────────────────────────
+// Cada serviço marcado vai para `servicos` (a estrutura RegraCobranca que o motor lê), na etapa certa. O que o motor não
+// tem (faca, papel, relevo, outro) e o transporte (logística é sempre interna da ENYLA) ficam só no texto `obs`.
+type Base = { folhas: number; m2: number | null; unidades: number }
+// O que cada cenário-exemplo descreve (ver cenariosParceiros.ts): serve para virar o preço do exemplo em preço unitário.
+const BASE_EXEMPLO: Record<string, Base> = {
+  "laminacao-fosca": { folhas: 3000, m2: 633.6, unidades: 3000 }, "laminacao-brilho": { folhas: 3000, m2: 633.6, unidades: 3000 },
+  "laminacao-soft": { folhas: 3000, m2: 633.6, unidades: 3000 }, "laminacao-dois-lados": { folhas: 3000, m2: 633.6, unidades: 3000 },
+  "arte-unitaria": { folhas: 1, m2: null, unidades: 1 }, "arte-pacote3": { folhas: 3, m2: null, unidades: 3 }, fechamento: { folhas: 1, m2: null, unidades: 1 },
+}
+const BASE_PADRAO: Base = { folhas: 3000, m2: null, unidades: 3000 }
+const TIPO_POR_COBRANCA: Partial<Record<FormaCobranca, RegraCobranca["tipo"]>> = {
+  acertoMilheiro: "acerto_milheiro", milheiro: "acerto_milheiro", folha: "por_folha", unidade: "por_unidade", m2: "por_m2", trabalho: "por_trabalho",
+}
+const TIPO_DO_EXEMPLO: Record<string, string> = { "laminacao-fosca": "Fosca", "laminacao-brilho": "Brilho", "laminacao-soft": "Soft touch", verniz: "UV total" }
+const r4 = (n: number) => Math.round(n * 10_000) / 10_000
+
+/** Preço unitário a partir do preço do exemplo (o parceiro respondeu o total do cenário), ou null se a unidade não tem como converter. */
+function unitarioDoExemplo(tipo: RegraCobranca["tipo"], cid: string, preco: number): number | null {
+  const b = BASE_EXEMPLO[cid] ?? BASE_PADRAO
+  if (tipo === "por_trabalho") return r4(preco)
+  if (tipo === "por_folha") return r4(preco / b.folhas)
+  if (tipo === "por_unidade") return r4(preco / b.unidades)
+  if (tipo === "por_m2") return b.m2 ? r4(preco / b.m2) : null
+  if (tipo === "acerto_milheiro") return r4(preco / (b.folhas / 1000))
+  return null
+}
+
+/** Regra de cobrança do serviço no motor. Sem preço aproveitável: regra sem valor e `orcarPorPedido` (nunca inventa número). */
+export function regraDoServico(s: ServicoCadastrado): RegraCobranca | null {
+  const serv = SERVICOS_PARCEIRO.find(x => x.id === s.id)
+  if (!serv?.servico) return null
+  const valor = Number(s.valor) > 0 ? Number(s.valor) : 0, acerto = Number(s.acerto) > 0 ? Number(s.acerto) : 0
+  const orcar = (tipo: RegraCobranca["tipo"]): RegraCobranca => ({ tipo, ...(acerto ? { acerto } : {}), orcarPorPedido: true })
+  if (cobraPorAcertoMilheiro(s.id)) {
+    return valor && acerto && !s.prazoVaria ? { tipo: "acerto_milheiro", acerto, milheiro: valor } : valor && acerto ? { tipo: "acerto_milheiro", acerto, milheiro: valor, orcarPorPedido: true } : orcar("acerto_milheiro")
+  }
+  const tipo = s.cobranca === "varia" ? undefined : TIPO_POR_COBRANCA[s.cobranca as FormaCobranca]
+  const exemplos = Object.entries(s.precosExemplo ?? {}).filter(([, v]) => Number(v) > 0)
+  // Sem forma de cobrança que escale (tabela, varia, kg, hora…): laminação e verniz caem na estimativa do motor; os demais pedem orçamento.
+  if (!tipo) return orcar(serv.servico === "laminacao" || serv.servico === "verniz" ? "por_folha" : "por_trabalho")
+  const base: RegraCobranca = { tipo, ...(acerto ? { acerto } : {}) }
+  const porTipo: Record<string, number> = {}
+  if (serv.servico === "laminacao" || serv.servico === "verniz") {
+    for (const [cid, v] of exemplos) { const t = TIPO_DO_EXEMPLO[cid], u = t ? unitarioDoExemplo(tipo === "acerto_milheiro" ? "por_folha" : tipo, cid, Number(v)) : null; if (t && u != null) porTipo[t] = u }
+  }
+  if (Object.keys(porTipo).length) return { ...base, precosPorTipo: porTipo, ...(valor ? { valor } : {}), ...(s.prazoVaria ? { orcarPorPedido: true } : {}) }
+  let v = valor
+  if (!v && exemplos.length) {
+    const unit = exemplos.map(([cid, p]) => unitarioDoExemplo(tipo, cid, Number(p))).filter((x): x is number => x != null)
+    if (unit.length) v = Math.min(...unit)
+  }
+  if (!v) return orcar(tipo)
+  if (tipo === "acerto_milheiro") return { tipo, ...(acerto ? { acerto } : {}), milheiro: v, ...(s.prazoVaria ? { orcarPorPedido: true } : {}) }
+  return { ...base, valor: v, ...(s.prazoVaria ? { orcarPorPedido: true } : {}) }
+}
+
+/** `servicos` do fornecedor de produção: só o que o motor conhece. Impressão: offset tem prioridade sobre digital. */
+export function servicosDoCadastro(c: Pick<CadastroParceiro, "servicos">): Partial<Record<Servico, RegraCobranca>> {
+  const out: Partial<Record<Servico, RegraCobranca>> = {}
+  const ordem = [...c.servicos].sort((a, b) => (a.id === "impressaoOffset" ? 0 : 1) - (b.id === "impressaoOffset" ? 0 : 1))
+  for (const s of ordem) {
+    const sv = SERVICOS_PARCEIRO.find(x => x.id === s.id)?.servico
+    if (!sv || out[sv]) continue
+    const r = regraDoServico(s)
+    if (r) out[sv] = r
+  }
+  return out
+}
+
+function maquinaDoCadastro(c: Pick<CadastroParceiro, "servicos">): FornecedorProducao["maquina"] | undefined {
+  const imp = c.servicos.find(s => s.id === "impressaoOffset") ?? c.servicos.find(s => s.id === "impressaoDigital")
+  const fmax = imp?.tecnico?.formatoMax as Formato | undefined
+  if (!imp || !fmax) return undefined
+  return { nome: `${String(imp.tecnico?.cores ?? (imp.id === "impressaoOffset" ? "Offset" : "Digital"))} ${fmax.l}×${fmax.a}`, largura: Math.round(fmax.l * 10), altura: Math.round(fmax.a * 10), pinca: 10, margem: 5 }
+}
+
 export function paraFornecedor(c: CadastroParceiro, id: string): FornecedorProducao {
-  const prazos = c.servicos.map(s => s.prazoDias).filter((d): d is number => !!d)
+  const producao = c.servicos.filter(s => s.id !== "transporte")
+  const prazos = producao.map(s => s.prazoDias).filter((d): d is number => !!d)
   const resumo = c.servicos.map(s => [`${nomeServico(s)}: ${textoCobranca(s)} · ${textoPrazo(s)}${s.minimo ? ` · mínimo ${s.minimo}` : ""}${textoExemplos(s)}`, textoTecnico(s)].filter(Boolean).join(" · ")).join(" | ")
-  const offset = c.servicos.find(s => s.id === "impressaoOffset")
-  const fmax = offset?.tecnico?.formatoMax as Formato | undefined
+  const logistica = c.servicos.some(s => s.id === "transporte") ? " | Transporte informado no cadastro: não vira frete do fornecedor (a logística é da ENYLA)." : ""
+  const maquinas = c.maquinas ? ` | Máquinas (texto do cadastro): ${c.maquinas}` : ""
+  const maquina = maquinaDoCadastro(c)
   return {
-    id, nome: c.nomeFantasia, ativo: true, servicos: {}, frete: 0,
+    id, nome: c.nomeFantasia, ativo: true, servicos: servicosDoCadastro(c), frete: 0,
     prazoDias: prazos.length ? Math.max(...prazos) : 5,
-    obs: `Cadastro Parceiros ENYLA (${new Date(c.em).toLocaleDateString("pt-BR")}): ${resumo}`.slice(0, 2000),
+    obs: `Cadastro Parceiros ENYLA (${new Date(c.em).toLocaleDateString("pt-BR")}): ${resumo}${logistica}${maquinas}`.slice(0, 2000),
     contato: c.contatoProducao || c.responsavel, telefone: c.whatsapp, email: c.email,
     ...(c.base ? { endereco: c.base } : {}),
-    ...(fmax ? { maquina: { nome: `${String(offset?.tecnico?.cores ?? "Offset")} ${fmax.l}×${fmax.a}`, largura: Math.round(fmax.l * 10), altura: Math.round(fmax.a * 10), pinca: 10, margem: 5 } } : {}),
+    ...(maquina ? { maquina } : {}),
   }
+}
+
+/** Reprocessa um fornecedor já gerado: só acrescenta os serviços que faltam. Id, contato, endereço, máquina, prazo e obs ficam como estão. Idempotente. */
+export function completarFornecedor(atual: FornecedorProducao, c: CadastroParceiro): FornecedorProducao {
+  const novos = servicosDoCadastro(c)
+  const servicos = { ...novos, ...(atual.servicos ?? {}) }   // o que já está no fornecedor (inclusive editado à mão) prevalece
+  const maquina = atual.maquina ?? maquinaDoCadastro(c)
+  return { ...atual, servicos, ...(maquina ? { maquina } : {}) }
 }
