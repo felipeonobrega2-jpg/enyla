@@ -26,6 +26,7 @@ export type RegraCobranca = {
   valor?: number                   // fixo_chapa / por_folha / por_m2 / por_unidade / por_trabalho
   proporcionalCavidades?: boolean  // fixo_chapa: chapa de 2 numa máquina de 4 = metade
   precosPorTipo?: Record<string, number> // laminação/verniz: valor por tipo (substitui `valor`)
+  orcarPorPedido?: boolean         // parceira sem preço (ou prazo que varia): entra na etapa, mas o pedido avisa para orçar
 }
 
 export type Servico = "arte" | "fechamento" | "impressao" | "laminacao" | "verniz" | "hotStamping" | "corteVinco" | "colagem"
@@ -539,7 +540,8 @@ function fornecedorDaEtapa(
   const ativos = e.producao.fornecedores.filter(f => f.ativo)
   const escolhido = e.opcoes.fornecedores?.[etapa] ?? e.producao.padroes[etapa]
   const f = ativos.find(x => x.id === escolhido && x.servicos[servico])
-  return f ?? ativos.find(x => x.servicos[servico]) ?? null
+  // Quem tem preço cadastrado vem antes de quem precisa de orçamento por pedido
+  return f ?? ativos.find(x => x.servicos[servico] && !x.servicos[servico]!.orcarPorPedido) ?? ativos.find(x => x.servicos[servico]) ?? null
 }
 
 // Valor da faca digitado: é o preço da faca deste pedido e vale igual em todas as quantidades (uma faca só serve
@@ -782,6 +784,15 @@ export function calcularRotas(e: EntradaRotas): ResultadoRotas {
       alertas.push(i.etapa === "hotStamping"
         ? `${etapa}: sem preço cadastrado. Cadastre no fornecedor ou digite o valor na coluna Hot Stamping da tabela.`
         : `${etapa}${i.etapa === "laminacao" || i.etapa === "verniz" ? ` (${i.descricao.split(" ").slice(1).join(" ")})` : ""}: sem preço cadastrado. Informe uma estimativa por folha ou cadastre a tabela do fornecedor.`)
+    }
+  }
+  if (amostra) {
+    const avisados = new Set<string>()
+    for (const i of amostra.itens) {
+      const f = i.fornecedorId ? e.producao.fornecedores.find(x => x.id === i.fornecedorId) : undefined
+      if (!f || !f.servicos[i.etapa as Servico]?.orcarPorPedido || avisados.has(`${f.id}:${i.etapa}`)) continue
+      avisados.add(`${f.id}:${i.etapa}`)
+      alertas.push(`${f.nome}: ${i.etapa} sem preço fixo cadastrado. Peça orçamento a este parceiro para este pedido.`)
     }
   }
   return { porQuantidade, alertas, facaRegistrada }
