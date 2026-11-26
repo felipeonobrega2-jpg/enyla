@@ -84,5 +84,13 @@ describe("?o=custo_lote", () => {
     expect(sem.orcada).toBeNull()
   })
 
+  it("separa por categoria com nome (frete/materiais/sem categoria), sem somar numa faixa só", async () => {
+    const l = (await (await ler("o=custo_lote&lote=L1")).json()).lotes[0]
+    expect(l.categorias).toHaveLength(3)
+    expect(l.categorias).toEqual(expect.arrayContaining([
+      { id: "sem_categoria", nome: "(sem categoria)", valor: 250 }, { id: "materiais", nome: "Materiais", valor: 250 }, { id: "servicos", nome: "Serviços", valor: 100 },
+    ]))
+  })
+
   it("só leitura", async () => { await ler(); expect(estado.escritas).toBe(0) })
 })

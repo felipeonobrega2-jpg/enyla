@@ -6,7 +6,7 @@
 import { randomUUID } from "crypto"
 import { supabase } from "./supabase"
 import { lerCampos, mudarConfig } from "./configAtomica"
-import type { Fornecedor } from "@/app/config"
+import { CATS_DESPESA_PADRAO, type CategoriaFinanceira, type Fornecedor } from "@/app/config"
 
 export type Pedido = Record<string, unknown>
 export type Fatia = { lancamentoId: string; loteId: string; loteNumero: string | null; valor: number }
@@ -16,7 +16,7 @@ export type Gravada = {
   hash: string
   autor: string; em: string; emIso: string
   payload: unknown
-  despesa?: { id: string; descricao: string; fornecedorId: string; total: number; status: string; dataVencimento: string; dataPagamento?: string }
+  despesa?: { id: string; descricao: string; categoria?: string; fornecedorId: string; total: number; status: string; dataVencimento: string; dataPagamento?: string }
   rateio?: Fatia[]
 }
 export type Resultado =
@@ -34,6 +34,13 @@ export function centavos(v: unknown): number | null {
   return Math.abs(v * 100 - c) < 1e-6 && c > 0 ? c : null
 }
 const reais = (c: number) => c / 100
+// Categoria de despesa: grava o ID de uma categoria cadastrada e ativa (AppConfig.categoriasDespesa, ou o padrão), nunca nome livre
+export function categoriaCadastrada(cats: CategoriaFinanceira[] | undefined, v: unknown): { ok: true; id: string } | { ok: false; erro: string } {
+  const id = typeof v === "string" ? v.trim() : ""
+  const lista = cats?.length ? cats : CATS_DESPESA_PADRAO
+  const c = lista.find(x => x.id === id && x.ativa !== false)
+  return c ? { ok: true, id: c.id } : { ok: false, erro: `categoria: use o id de uma categoria de despesa cadastrada e ativa (${lista.filter(x => x.ativa !== false).map(x => x.id).join(", ")}).` }
+}
 const texto = (v: unknown) => typeof v === "string" ? v.trim() : ""
 
 type Item = { loteId: string; loteNumero: string; centavos: number }
@@ -57,6 +64,7 @@ export async function lancarDespesaExterno(diretor: string, b: Pedido): Promise<
     dataPagamento = b.dataPagamento
   }
   if (b.status === "pago" && !dataPagamento) dataPagamento = b.dataVencimento
+  if (b.categoria !== undefined && !texto(b.categoria)) return { ok: false, status: 400, erro: "categoria: id de uma categoria de despesa cadastrada (ou omita)." }
   if (!Array.isArray(b.rateio) || !b.rateio.length) return { ok: false, status: 400, erro: "rateio: lista [{ loteNumero | loteId, valor }] com ao menos um lote." }
 
   const pedidos: { ref: string; porId: boolean; centavos: number }[] = []
@@ -73,13 +81,15 @@ export async function lancarDespesaExterno(diretor: string, b: Pedido): Promise<
   if (soma !== total) return { ok: false, status: 400, erro: `rateio: a soma (${soma} centavos) não é igual ao total (${total} centavos). Nada foi gravado; o residual não é acertado automaticamente.` }
 
   // O hash cobre só o que o chamador mandou (já normalizado), então reenvio idêntico dá o mesmo hash
+  const categoria = b.categoria === undefined ? undefined : texto(b.categoria)
   const payload = {
+    ...(categoria ? { categoria } : {}),
     fornecedorId, descricao, totalCentavos: total, dataVencimento: b.dataVencimento, status: b.status, dataPagamento: dataPagamento ?? null,
     rateio: pedidos.map(p => ({ [p.porId ? "loteId" : "loteNumero"]: p.ref, centavos: p.centavos })).sort((a, c) => JSON.stringify(a).localeCompare(JSON.stringify(c))),
   }
   const hash = JSON.stringify(payload)
 
-  const { fornecedores, despesasPorta } = await lerCampos<{ fornecedores?: Fornecedor[]; despesasPorta?: Record<string, Gravada> }>(["fornecedores", "despesasPorta"])
+  const { fornecedores, despesasPorta, categoriasDespesa } = await lerCampos<{ fornecedores?: Fornecedor[]; despesasPorta?: Record<string, Gravada>; categoriasDespesa?: CategoriaFinanceira[] }>(["fornecedores", "despesasPorta", "categoriasDespesa"])
   const anterior = despesasPorta?.[chave]
   const repetida = (g: Gravada): Resultado => g.hash !== hash
     ? { ok: false, status: 409, erro: "chaveIdempotencia já usada com outro payload. Nada foi gravado; use uma chave nova para outra despesa." }
@@ -88,6 +98,7 @@ export async function lancarDespesaExterno(diretor: string, b: Pedido): Promise<
   if (anterior && !(anterior.estado === "falhou" && anterior.hash === hash)) return repetida(anterior)
 
   if (!(fornecedores ?? []).some(f => f.id === fornecedorId)) return { ok: false, status: 404, erro: `Fornecedor ${fornecedorId} não encontrado em AppConfig.fornecedores.` }
+  if (categoria) { const c = categoriaCadastrada(categoriasDespesa, categoria); if (!c.ok) return { ok: false, status: 400, erro: c.erro } }
   const itens: Item[] = []
   for (const p of pedidos) {
     const { data } = await supabase.from("KanbanCard").select("id, loteId, loteNumero").eq(p.porId ? "loteId" : "loteNumero", p.ref)
@@ -112,7 +123,7 @@ export async function lancarDespesaExterno(diretor: string, b: Pedido): Promise<
   const marca = `[rateio ${grupo}; lançado por ${diretor} em ${em}]`
   const linhas = itens.map(i => ({
     id: randomUUID(), tipo: "despesa", descricao, valor: reais(i.centavos), dataVencimento: b.dataVencimento, status: b.status,
-    ...(dataPagamento ? { dataPagamento } : {}), fornecedorId, loteId: i.loteId, loteNumero: i.loteNumero,
+    ...(dataPagamento ? { dataPagamento } : {}), fornecedorId, ...(categoria ? { categoria } : {}), loteId: i.loteId, loteNumero: i.loteNumero,
     criadoEm: agora.toLocaleString("pt-BR"), obs: marca,
   }))
   const falhar = async (erro: string): Promise<Resultado> => {
@@ -124,7 +135,7 @@ export async function lancarDespesaExterno(diretor: string, b: Pedido): Promise<
   if (ins.error) ins = await supabase.from("LancamentoFinanceiro").insert(linhas)
   if (ins.error) return falhar(ins.error.message)
 
-  const despesa = { id: grupo, descricao, fornecedorId, total: reais(total), status: b.status as string, dataVencimento: b.dataVencimento as string, ...(dataPagamento ? { dataPagamento } : {}) }
+  const despesa = { id: grupo, descricao, ...(categoria ? { categoria } : {}), fornecedorId, total: reais(total), status: b.status as string, dataVencimento: b.dataVencimento as string, ...(dataPagamento ? { dataPagamento } : {}) }
   const rateio: Fatia[] = linhas.map(l => ({ lancamentoId: l.id, loteId: l.loteId, loteNumero: l.loteNumero || null, valor: l.valor }))
   try {
     await mudarConfig<{ despesasPorta?: Record<string, Gravada> }>(cfg => ({ despesasPorta: { ...(cfg.despesasPorta ?? {}), [chave]: { estado: "gravada", hash, autor: diretor, em, emIso, payload, despesa, rateio } } }))
