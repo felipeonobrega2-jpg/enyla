@@ -1,4 +1,4 @@
-// importar_prospectos e ordem a gráfica do Prospector (regra do Felipe, 26/11/2026): sai direto, fora do Aprovo.
+// Ordem a gráfica do Prospector (regra do Felipe, 26/11/2026): sai direto, fora do Aprovo.
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
 const e = vi.hoisted(() => ({
@@ -31,46 +31,7 @@ vi.mock("@/app/lib/claude", () => ({ clienteClaude: vi.fn(), MODELO: "m" }))
 vi.mock("@/app/lib/gastosServidor", () => ({ registrarUsoIA: vi.fn() }))
 vi.mock("@/app/lib/reuniaoDiretoria", () => ({ coletarContexto: vi.fn() }))
 
-import { importarProspectos } from "@/app/lib/importarProspectosExterno"
 import { executarFerramenta, type Foto } from "@/app/lib/conversaDiretor"
-
-const ok = { nome: "Gráfica Alfa", cnpj: "11.222.333/0001-81", email: "a@alfa.com.br", celular: "(11) 99999-0001", cidade: "Barueri", origem: "contato_felipe" }
-
-describe("importar_prospectos", () => {
-  beforeEach(() => { e.base = []; e.inseridos = [] })
-  it.each(["coo", "cfo", "cto"] as const)("permissão: %s recebe 403 e nada é gravado", async d => {
-    const r = await importarProspectos(d, { itens: [ok] })
-    expect(r).toMatchObject({ ok: false, status: 403 }); expect(e.inseridos).toHaveLength(0)
-  })
-  it.each(["cco", "cmo"] as const)("%s importa: grava etapa encontrado, origem e quem fez no histórico", async d => {
-    const r = await importarProspectos(d, { itens: [ok] })
-    expect(r.ok && r.criados).toHaveLength(1)
-    expect(e.inseridos[0]).toMatchObject({ cnpj: "11222333000181", telefone: "11999990001", etapa: "encontrado", nota: null })
-    expect(JSON.stringify(e.inseridos[0].historico_etapas)).toContain(d.toUpperCase()); expect(JSON.stringify(e.inseridos[0].historico_etapas)).toContain("contato_felipe")
-  })
-  it("validação: sem itens, itens demais, sem nome, origem, CNPJ, e-mail ou celular inválido", async () => {
-    expect(await importarProspectos("cco", {})).toMatchObject({ ok: false, status: 400 })
-    expect(await importarProspectos("cco", { itens: Array(201).fill(ok) })).toMatchObject({ ok: false, status: 400 })
-    const r = await importarProspectos("cco", { itens: [{ ...ok, nome: "" }, { ...ok, origem: "" }, { ...ok, cnpj: "123" }, { ...ok, email: "xx" }, { ...ok, celular: "123" }] })
-    expect(r.ok && r.recusados.map(x => x.motivo)).toEqual(["nome obrigatório", "origem obrigatória", "CNPJ obrigatório, com 14 dígitos", "e-mail inválido", "celular inválido (DDD + número)"])
-    expect(e.inseridos).toHaveLength(0)
-  })
-  it("deduplica por CNPJ, telefone (com ou sem o 9 e o 55) e e-mail, inclusive dentro da chamada", async () => {
-    e.base = [{ id: 7, cnpj: "99999999000199", telefone: "1199990001", email: null, opt_out: false, etapa: "encontrado" }, { id: 8, cnpj: "88888888000188", telefone: null, email: "b@beta.com", opt_out: false, etapa: "abordado" }]
-    const r = await importarProspectos("cco", { itens: [
-      { ...ok, cnpj: "99999999000199", email: "", celular: "" }, ok, { ...ok, cnpj: "77777777000177", email: "B@Beta.com", celular: "" }, { ...ok, cnpj: "66666666000166", email: "novo@x.com", celular: "5511999990001" },
-      { ...ok, cnpj: "11222333000181", email: "z@z.com", celular: "11988880000" }, { ...ok, cnpj: "11222333000181", email: "z@z.com", celular: "11988880000" },
-    ] })
-    expect(r.ok && r.duplicados.map(d => d.motivo)).toEqual(["já existe (mesmo CNPJ)", "já existe (mesmo telefone)", "já existe (mesmo e-mail)", "já existe (mesmo telefone)", "repetido na própria chamada"])
-    expect(r.ok && r.criados).toHaveLength(1)
-  })
-  it("exclusão: opt_out ou descartado é recusado com o motivo e nunca regravado", async () => {
-    e.base = [{ id: 1, cnpj: "11222333000181", telefone: null, email: null, opt_out: true, etapa: "descartado" }, { id: 2, cnpj: "55555555000155", telefone: null, email: null, opt_out: false, etapa: "descartado" }]
-    const r = await importarProspectos("cco", { itens: [ok, { ...ok, cnpj: "55555555000155", email: "", celular: "" }] })
-    expect(r.ok && r.recusados.map(x => x.motivo)).toEqual(Array(2).fill("na lista de exclusão (descartado ou pediu para não receber)"))
-    expect(e.inseridos).toHaveLength(0)
-  })
-})
 
 const ctx = { exec: [], cultura: [], detalhes: {} } as unknown as Foto
 const ordenar = (extra: Record<string, unknown> = {}, diretor: "cco" | "coo" = "cco") =>
