@@ -65,7 +65,8 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 49 | Perfil diretor: login por usuário (admin/diretor), 7 interruptores de bloqueio desligados por padrão, auditoria (quem, quando, antes e depois) e tela de administração | Felipe (Aprovo 26/11/2026, 6h26 e 6h28) | — | — | Claude Code | **aprovado pelo Felipe** (cobre construir e juntar); migration aditiva `20261129_usuarios_acesso.sql` roda no SQL Editor | (PR da issue #214) |
 | 50 | Acompanhamento Digital usa prazo e arte gravados (`gravar_digital`) e guarda todas as edições (`edicoesAcomp`) | Felipe | urgente | — | Claude Code | não | (PR da issue #230) |
 | 51 | Porta externa: `acao=importar_prospectos` e ordem direta a gráfica do Prospector, sem Aprovo, só 8h–20h e fora da exclusão (regra do Felipe de 26/11/2026, 9h44; 1º PR da issue #242; verificar_whatsapp, responder_prospecto e decidir_cadastro_parceiro vêm depois) | CCO | urgente | — | Claude Code | não | (PR da issue #242) |
-| 52 | Chave `aprovoObrigatorio` (padrão false): sem o Aprovo, a mensagem sai direto pelo funcionário, com as travas, conferência do a receber ao centavo e histórico (`aprovoDesligadoLog`) | Felipe (ordem de 26/11/2026, 9h44) | urgente | — | Claude Code | não (ordem do Felipe) | (PR da issue #244) |
+| 53 | Chave `aprovoObrigatorio` (padrão false): sem o Aprovo, a mensagem sai direto pelo funcionário, com as travas, conferência do a receber ao centavo e histórico (`aprovoDesligadoLog`) | Felipe (ordem de 26/11/2026, 9h44) | urgente | — | Claude Code | não (ordem do Felipe) | (PR da issue #244) |
+| 52 | `/parceiros`: nova capa da rede de gráficas parceiras, sem "embalagem" nos textos (só texto) | Felipe | — | — | Claude Code | não (só texto) | (PR da issue #241) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
