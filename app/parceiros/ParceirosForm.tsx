@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Printer, Layers, Sparkles, Stamp, Mountain, Scissors, Package, Shapes, FileStack, Palette, FileCheck, Truck, Plus, Check, ChevronLeft, ArrowRight, Paperclip, X, Clock, BarChart3, ShieldCheck, Handshake, Loader2, MessageCircle, MapPin, Zap, Banknote, Wallet, Camera, Globe } from "lucide-react"
+import { TEXTO_CAIXA_TERMOS, ERRO_TERMOS, LINK_TERMOS } from "../lib/termosParceria"
 import type { CenarioPublico } from "../lib/cenariosParceiros"
 import {
   SERVICOS_PARCEIRO, FORMAS_COBRANCA, PERGUNTAS, ROTULO_PRECO_CENARIO, cobraPorAcertoMilheiro, cenarioAtivo, ETAPAS_IDS, errosDaEtapa, mascaraDocumento, mascaraTelefone, mascaraCep, GERENTE_PADRAO,
@@ -111,6 +112,7 @@ function Rodape({ whatsappGerente }: { whatsappGerente: string | null }) {
 export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { whatsappGerente: string | null; cenarios?: CenarioPublico[] }) {
   const [passo, setPasso] = useState(-1)          // -1 = boas-vindas; 0..N-1 = etapas; N = enviado
   const [d, setD] = useState<Dados>(VAZIO)
+  const [termos, setTermos] = useState(false)   // desmarcado por padrão e nunca guardado no rascunho
   const [erros, setErros] = useState<Record<string, string>>({})
   const [arquivos, setArquivos] = useState<File[]>([])
   const [enviando, setEnviando] = useState(false)
@@ -196,6 +198,7 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
     let e = errosDaEtapa(d, et)
     // Detalhes: confere só o serviço da tela e vai para o próximo
     if (et === "detalhes") { const atual = escolhidos[sub]?.id; e = Object.fromEntries(Object.entries(e).filter(([k]) => k.startsWith(`${atual}.`))) }
+    if (et === "final" && !termos) e = { ...e, termos: ERRO_TERMOS }
     setErros(e)
     if (Object.keys(e).length) { mostrarErro(); return }
     if (et === "detalhes" && sub < escolhidos.length - 1) { irPara(passo, sub + 1); return }
@@ -207,7 +210,7 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
   async function enviar() {
     setEnviando(true); setErroEnvio(null)
     const f = new FormData()
-    f.set("dados", JSON.stringify(d)); f.set("site", site.current?.value ?? "")
+    f.set("dados", JSON.stringify(d)); f.set("termos", termos ? "1" : ""); f.set("site", site.current?.value ?? "")
     for (const a of arquivos) f.append("arquivos", a)
     try {
       const r = await fetch("/api/parceiros/cadastro", { method: "POST", body: f }).then(x => x.json())
@@ -561,6 +564,11 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
             <span className="text-[14px] text-[#4a4658] leading-snug">Concordo que a ENYLA registre o tempo e a qualidade das entregas, e que as informações deste cadastro estão corretas.</span>
           </button>
           {E("aceite") && <p className="text-[13px] text-[#d33a3c] font-medium -mt-3 par-surge">{E("aceite")}</p>}
+          <div data-erro={marca("termos")} className="flex gap-3 items-start">
+            <button type="button" aria-label="Aceitar os Termos de Parceria" role="checkbox" aria-checked={termos} onClick={() => { setTermos(v => !v); setErros(e => { const n = { ...e }; delete n.termos; return n }) }} className={`mt-0.5 w-6 h-6 rounded-lg border-2 grid place-items-center shrink-0 transition ${termos ? "text-white" : E("termos") ? "border-[#d33a3c]" : "border-[#cfcbdb]"}`} style={termos ? { background: ROXO, borderColor: ROXO } : undefined}>{termos && <Check className="w-4 h-4 ds-pop" strokeWidth={3} />}</button>
+            <span className="text-[14px] text-[#4a4658] leading-snug">{TEXTO_CAIXA_TERMOS} <a href={LINK_TERMOS} target="_blank" rel="noopener noreferrer" className="font-semibold underline" style={{ color: ROXO }}>Ler os Termos de Parceria</a></span>
+          </div>
+          {E("termos") && <p className="text-[13px] text-[#d33a3c] font-medium -mt-3 par-surge">{E("termos")}</p>}
           <input ref={site} name="site" tabIndex={-1} autoComplete="off" className="absolute -left-[9999px] w-px h-px opacity-0" aria-hidden />
           {erroEnvio && <p className="rounded-xl bg-[#fff1f1] text-[#c92f31] text-[13.5px] font-medium px-4 py-3 par-surge">{erroEnvio}</p>}
         </>}

@@ -14,6 +14,8 @@ export default auth(async (req) => {
     pathname.startsWith("/aprovar") ||
     pathname === "/parceiros" ||                // cadastro público Parceiros ENYLA
     pathname === "/api/parceiros/cadastro" ||
+    pathname === "/parceiros/termos" ||         // Termos de Parceria (leitura e aceite por token)
+    pathname === "/api/parceiros/termos" ||
 
     pathname.startsWith("/d/") ||               // pedido digital (link assinado)
     pathname.startsWith("/api/d/") ||
