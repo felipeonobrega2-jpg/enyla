@@ -138,7 +138,7 @@ async function enviarPeloCanal(canal: Canal, l: Linha, texto: string, token?: st
 
 /** Reserva, envia e fecha um canal de um passo. Devolve se saiu, se falhou, ou null se não reservou (alguém foi mais rápido). */
 async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, agora: Date): Promise<{ linha: Linha; ok: boolean } | null> {
-  const texto = textoDoPasso(passo, agora)
+  const texto = textoDoPasso(passo, canal)
   const em = agora.toISOString()
   // Só o primeiro contato por e-mail leva o link rastreado; o token nasce na reserva e fica no histórico (sem dado do prospecto).
   const token = passo === "primeiro_contato" && canal === "email" ? randomBytes(12).toString("base64url") : undefined

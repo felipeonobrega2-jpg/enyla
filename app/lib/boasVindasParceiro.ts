@@ -3,14 +3,14 @@
 // histórico, gravada antes do envio e comparando atualizado_em), só dentro da janela 8h–20h, respeitando opt_out/descartado.
 import { supabase } from "./supabase"
 import { evo } from "./evolution"
-import { celularWhatsapp, dentroDoHorario, URL_CADASTRO_PARCEIROS } from "./prospectorEnvio"
+import { celularWhatsapp, dentroDoHorario, linkCadastro } from "./prospectorEnvio"
 import { prospectoDoJid, type ProspectoDoJid } from "./prospectorTrava"
 import { prospectoExcluido } from "./ordemProspecto"
 
 export const MARCA_BOAS_VINDAS = "boas_vindas_fixa"
 
 export const TEXTO_BOAS_VINDAS =
-  `Olá! Que bom ter o seu retorno. Para fazer parte da rede de gráficas parceiras da ENYLA, o cadastro leva uns 5 minutos: ${URL_CADASTRO_PARCEIROS}\n\n` +
+  `Olá! Que bom ter o seu retorno. Para fazer parte da rede de gráficas parceiras da ENYLA, o cadastro leva uns 5 minutos: ${linkCadastro("boasvindas")}\n\n` +
   `Os Termos de Parceria aparecem no próprio cadastro, para você ler e aceitar antes de concluir. O pagamento é 50% antes do serviço e 50% na retirada, por PIX.\n\n` +
   `Equipe ENYLA`
 

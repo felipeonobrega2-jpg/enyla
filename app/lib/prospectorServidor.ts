@@ -9,6 +9,7 @@ const TABELA = "prospectos_parceiros"
 const LIMITE_LEITURA = 300
 const LIMITE_LISTA = 100
 
+export const AVISO_SEM_WEBHOOK = "O webhook da Resend não está configurado (falta RESEND_WEBHOOK_SECRET). A contagem de “Abriram” vem só do pixel do e-mail e do clique no link, então fica abaixo do real."
 export const AVISO_SEM_TABELA = "A tabela do prospector ainda não existe. Rode supabase/migrations/20261124_prospectos_parceiros.sql no SQL Editor do Supabase."
 
 export type ItemQualificado = {
@@ -24,6 +25,8 @@ export type FunilProspector = {
   contagem: Record<(typeof ETAPAS_FUNIL)[number], number>
   qualificados: ItemQualificado[]
   aviso?: string
+  /** Webhook da Resend sem segredo: "abriu" vem só do pixel e do clique. */
+  avisoAbriu?: string
 }
 
 type Linha = {
@@ -73,7 +76,9 @@ export async function lerFunil(): Promise<FunilProspector> {
     const nome = (row.nome_fantasia || row.razao_social || "Sem nome").trim() || "Sem nome"
     return { cnpj: row.cnpj, nome, municipio: row.municipio, uf: row.uf, nota, servicos }
   }).sort((a, b) => b.nota - a.nota || a.nome.localeCompare(b.nome, "pt-BR")).slice(0, LIMITE_LISTA)
-  return { contagem: Object.fromEntries(contagens) as FunilProspector["contagem"], qualificados }
+  // Sem o segredo, o webhook da Resend recusa (503) e o "abriu" só vem do pixel e do clique. Mostra isso no painel.
+  const avisoAbriu = process.env.RESEND_WEBHOOK_SECRET ? undefined : AVISO_SEM_WEBHOOK
+  return { contagem: Object.fromEntries(contagens) as FunilProspector["contagem"], qualificados, ...(avisoAbriu ? { avisoAbriu } : {}) }
 }
 
 function cnpjDe(documento: string, tipo: "cnpj" | "cpf"): string | null {
