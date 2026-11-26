@@ -1,5 +1,7 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, beforeAll } from "vitest"
 import { linkAcompanhamento, linkPedido, tokenDigital, tokenDigitalValido } from "../app/lib/digitalLink"
+
+beforeAll(() => { process.env.NEXTAUTH_SECRET = "segredo-de-teste" })
 
 describe("link de acompanhamento (#230)", () => {
   it("usa o mesmo token do link de fechamento, em rota separada", () => {
