@@ -13,7 +13,7 @@ type Cfg = Record<string, unknown> & { cadastrosParceiros?: CadastroParceiro[]; 
 const TIPOS = /^(application\/pdf|image\/(png|jpe?g|webp|heic|heif)|application\/vnd\.(ms-excel|openxmlformats-officedocument\.(spreadsheetml\.sheet|wordprocessingml\.document))|text\/csv)$/
 const MAX_BYTES = 10 * 1024 * 1024
 
-export async function receberCadastro(form: FormData): Promise<{ ok: true; id: string } | { ok: false; erro: string; campos?: Record<string, string> }> {
+export async function receberCadastro(form: FormData, req?: { headers: { get(n: string): string | null } } | null): Promise<{ ok: true; id: string } | { ok: false; erro: string; campos?: Record<string, string> }> {
   if (String(form.get("site") ?? "").trim()) return { ok: true, id: "ok" }   // robô (campo escondido preenchido)
   let bruto: Partial<CadastroParceiro>
   try { bruto = JSON.parse(String(form.get("dados") ?? "{}")) } catch { return { ok: false, erro: "Dados inválidos." } }
@@ -54,8 +54,13 @@ export async function receberCadastro(form: FormData): Promise<{ ok: true; id: s
       base = { ...partes, texto: textoParaMotorista(partes), lat: g.lat, lng: g.lng }
     }
   } catch { /* sem coordenada: você ajusta na aprovação */ }
-  const cadastro: CadastroParceiro = { ...dados, id, em: new Date().toISOString(), status: "novo", gerente: GERENTE_PADRAO, arquivos, base }
+  // Aceite dos Termos: versão vigente agora, data/hora, ip e user-agent (o checkbox já foi exigido acima)
+  const { lerTermoVigente, aceiteAgora, registrarAceite } = await import("./termosServidor")
+  const termos = aceiteAgora(await lerTermoVigente(), req)
+  const cadastro: CadastroParceiro = { ...dados, id, em: new Date().toISOString(), status: "novo", gerente: GERENTE_PADRAO, arquivos, base, termos }
   await mudarConfig((d: Cfg) => ({ cadastrosParceiros: [cadastro, ...(d.cadastrosParceiros ?? [])].slice(0, 500) }))
+
+  await registrarAceite("parceiros", id, termos, cadastro.documento)
 
   // Mesmo CNPJ de um prospecto: só registra no histórico do prospecto (a etapa muda na aprovação do Felipe).
   // Não mexe no cadastro e não envia mensagem.

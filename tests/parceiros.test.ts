@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { cnpjValido, cpfValido, errosDaEtapa, errosDoCadastro, limparCadastro, paraFornecedor, textoCobranca, mascaraDocumento, mascaraTelefone, modoDaParceira } from "@/app/lib/parceiros"
 
 const ok = { nomeFantasia: "Gráfica Exemplo", tipoDocumento: "cnpj" as const, documento: "11222333000181", cep: "01310100", rua: "Avenida Paulista", numero: "1000", bairro: "Bela Vista", cidade: "São Paulo", uf: "SP", responsavel: "Marcos", whatsapp: "11988887777", email: "a@b.com.br",
-  servicos: [{ id: "corteVinco" as const, cobranca: "milheiro" as const, valor: 38, prazoDias: 3, prazoVaria: false, precosExemplo: { corteVinco: 250 } as Record<string, number> }, { id: "colagem" as const, cobranca: "varia" as const, prazoDias: null, prazoVaria: true, precosExemplo: { colagem: 300 } as Record<string, number> }], aceite: true }
+  servicos: [{ id: "corteVinco" as const, cobranca: "milheiro" as const, valor: 38, prazoDias: 3, prazoVaria: false, precosExemplo: { corteVinco: 250 } as Record<string, number> }, { id: "colagem" as const, cobranca: "varia" as const, prazoDias: null, prazoVaria: true, precosExemplo: { colagem: 300 } as Record<string, number> }], aceite: true, termosAceitos: true }
 
 describe("Parceiros ENYLA", () => {
   it("valida CNPJ e CPF", () => {

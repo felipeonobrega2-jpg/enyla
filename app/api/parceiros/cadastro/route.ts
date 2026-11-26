@@ -8,6 +8,6 @@ export const maxDuration = 60
 export async function POST(req: Request) {
   const form = await req.formData().catch(() => null)
   if (!form) return NextResponse.json({ ok: false, erro: "Envio inválido." }, { status: 400 })
-  const r = await receberCadastro(form)
+  const r = await receberCadastro(form, req)
   return NextResponse.json(r, { status: r.ok ? 200 : 400 })
 }

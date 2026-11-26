@@ -3,6 +3,7 @@
 // Parceiros ENYLA: cadastro de quem presta serviço. Em etapas curtas (empresa, base, contato, serviços, detalhes
 // técnicos/preço/prazo, operação), gostoso no celular e no computador. O rascunho fica no aparelho.
 
+import { TEXTO_CAIXA } from "@/app/lib/termosParceria"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Printer, Layers, Sparkles, Stamp, Mountain, Scissors, Package, Shapes, FileStack, Palette, FileCheck, Truck, Plus, Check, ChevronLeft, ArrowRight, Paperclip, X, Clock, BarChart3, ShieldCheck, Handshake, Loader2, MessageCircle, MapPin, Zap, Banknote, Wallet, Camera, Globe } from "lucide-react"
 import type { CenarioPublico } from "../lib/cenariosParceiros"
@@ -127,7 +128,7 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
   // Convite do Captador (?c=…): marca que abriu e acompanha até o envio
 
   // Rascunho no aparelho (volta de onde parou)
-  useEffect(() => { try { const r = JSON.parse(localStorage.getItem(RASCUNHO) ?? "null"); if (r?.d) { setD({ ...VAZIO, ...r.d }); if (typeof r.passo === "number" && r.passo >= 0 && r.passo < N) { setPasso(r.passo); if (typeof r.sub === "number") setSub(r.sub) } } } catch { /* sem rascunho */ } }, [])
+  useEffect(() => { try { const r = JSON.parse(localStorage.getItem(RASCUNHO) ?? "null"); if (r?.d) { setD({ ...VAZIO, ...r.d, termosAceitos: false }); if (typeof r.passo === "number" && r.passo >= 0 && r.passo < N) { setPasso(r.passo); if (typeof r.sub === "number") setSub(r.sub) } } } catch { /* sem rascunho */ } }, [])
   useEffect(() => { if (passo >= 0 && passo < N) try { localStorage.setItem(RASCUNHO, JSON.stringify({ d, passo, sub })) } catch { /* sem storage */ } }, [d, passo, sub])
 
   // Troca de etapa: a atual sai (160 ms), a página volta ao topo e a próxima entra pelo lado certo
@@ -561,6 +562,11 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
             <span className="text-[14px] text-[#4a4658] leading-snug">Concordo que a ENYLA registre o tempo e a qualidade das entregas, e que as informações deste cadastro estão corretas.</span>
           </button>
           {E("aceite") && <p className="text-[13px] text-[#d33a3c] font-medium -mt-3 par-surge">{E("aceite")}</p>}
+          <div data-erro={marca("termos")} className="flex gap-3 items-start">
+            <button type="button" role="checkbox" aria-checked={!!d.termosAceitos} aria-label="Aceito os Termos de Parceria" onClick={() => set("termosAceitos", !d.termosAceitos)} className={`mt-0.5 w-6 h-6 rounded-lg border-2 grid place-items-center shrink-0 transition ${d.termosAceitos ? "text-white" : E("termos") ? "border-[#d33a3c]" : "border-[#cfcbdb]"}`} style={d.termosAceitos ? { background: ROXO, borderColor: ROXO } : undefined}>{d.termosAceitos && <Check className="w-4 h-4 ds-pop" strokeWidth={3} />}</button>
+            <span className="text-[14px] text-[#4a4658] leading-snug">{TEXTO_CAIXA} <a href="/parceiros/termos" target="_blank" rel="noopener noreferrer" className="underline font-semibold" style={{ color: ROXO }}>Ler os Termos de Parceria</a></span>
+          </div>
+          {E("termos") && <p className="text-[13px] text-[#d33a3c] font-medium -mt-3 par-surge">{E("termos")}</p>}
           <input ref={site} name="site" tabIndex={-1} autoComplete="off" className="absolute -left-[9999px] w-px h-px opacity-0" aria-hidden />
           {erroEnvio && <p className="rounded-xl bg-[#fff1f1] text-[#c92f31] text-[13.5px] font-medium px-4 py-3 par-surge">{erroEnvio}</p>}
         </>}

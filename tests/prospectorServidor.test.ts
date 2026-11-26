@@ -37,7 +37,7 @@ const CNPJ = "11222333000181"
 const dados = {
   nomeFantasia: "Gráfica Exemplo", tipoDocumento: "cnpj", documento: CNPJ, cep: "01310100", rua: "Avenida Paulista", numero: "1000",
   bairro: "Bela Vista", cidade: "São Paulo", uf: "SP", responsavel: "Marcos", whatsapp: "11988887777", email: "a@b.com.br",
-  servicos: [{ id: "corteVinco", cobranca: "milheiro", valor: 38, prazoDias: 3, prazoVaria: false, precosExemplo: { corteVinco: 250 } as Record<string, number> }], aceite: true,
+  servicos: [{ id: "corteVinco", cobranca: "milheiro", valor: 38, prazoDias: 3, prazoVaria: false, precosExemplo: { corteVinco: 250 } as Record<string, number> }], aceite: true, termosAceitos: true,
 }
 function formulario() {
   const f = new FormData()
