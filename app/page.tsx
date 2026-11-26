@@ -2692,6 +2692,7 @@ export default function Home() {
               kanban={kanban}
               historico={historico}
               lancamentos={lancamentosOffset}
+              rodadas={config.producao?.rodadas}
               onDetalhes={card => setDetalheModal({ tipo: "kanban", card })}
               onNovoLancamento={prefill => setModalLancPedidos(prefill)}
               onEditarLancamento={l => setModalLancPedidos(l)}
