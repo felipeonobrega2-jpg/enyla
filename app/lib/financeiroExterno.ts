@@ -34,7 +34,7 @@ export const AJUDA_FINANCEIRO: Record<string, string> = {
 
 type Cfg = Configuracoes & { pluggy?: { itens?: unknown[] }; pluggyStatus?: StatusPluggy } & Record<string, unknown>
 type Negocio = { comissaoValor: number; status: string }
-type Dados = { kanban: KanbanCard[]; lancamentos: LancamentoFinanceiro[]; negocios: Negocio[]; cfg: Cfg }
+export type Dados = { kanban: KanbanCard[]; lancamentos: LancamentoFinanceiro[]; negocios: Negocio[]; cfg: Cfg }
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 const soma = (ls: { valor: number }[]) => r2(ls.reduce((s, l) => s + l.valor, 0))
@@ -50,7 +50,7 @@ export function intervalo(nome: PeriodoNome, hojeIso = hoje()): Intervalo {
   return { from: new Date(a, 0, 1, 12), to: null }
 }
 
-async function carregar(): Promise<Dados> {
+export async function carregarFinanceiro(): Promise<Dados> {
   const [kanban, lancamentos, negocios, cfg] = await Promise.all([
     supabase.from("KanbanCard").select("*").order("createdAt", { ascending: false }),
     supabase.from("LancamentoFinanceiro").select("*").order("dataVencimento", { ascending: false }),
@@ -175,7 +175,7 @@ export async function leituraFinanceira(params: URLSearchParams): Promise<Leitur
   const incluirEstornados = ie !== null
   const per = intervalo(pn as PeriodoNome), hj = hoje()
   const periodo = { nome: pn, de: per.from ? per.from.toLocaleDateString("sv-SE") : null, ate: per.to ? per.to.toLocaleDateString("sv-SE") : null, fuso: "America/Sao_Paulo" }
-  const d = await carregar()
+  const d = await carregarFinanceiro()
   if (!incluirEstornados) d.lancamentos = d.lancamentos.filter(l => !l.estornadoEm)
 
   if (!parte) {
