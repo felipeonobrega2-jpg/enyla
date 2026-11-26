@@ -125,29 +125,29 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
     const b = p.briefing
     const Linha = ({ rotulo, valor }: { rotulo: string; valor?: string | null }) => valor ? (
       <div className="py-2.5 border-t border-[rgba(60,60,67,0.07)] first:border-t-0">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">{rotulo}</p>
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[#8E8E93]">{rotulo}</p>
         <p className="text-[14px] text-[#191625] mt-0.5 whitespace-pre-wrap break-words">{valor}</p>
       </div>
     ) : null
     const situacao = p.arteAprovadaEm ? "Arte aprovada pelo cliente: pode imprimir" : p.arteEnviadaEm ? "Arte com o cliente, esperando aprovar" : p.ajustes.length && !p.arteEnviadaEm && p.arte ? "Cliente pediu ajuste" : p.arte ? "Arte ainda não foi para o cliente" : "Arte a fazer"
     return (
-      <Tela rodape="Enyla × Villa Gráfica · pedido de produção" parceria>
+      <Tela rodape="Enyla × Villa Gráfica · pedido de produção" parceria numero={p.id}>
         <div className="text-center">
-          <p className="text-[12px] font-semibold text-[#898892]">{p.id}</p>
+          <p className="text-[12px] font-semibold text-[#8E8E93]">{p.id}</p>
           <h1 className="text-[22px] font-bold text-[#191625] mt-1 leading-tight">Pedido de arte e produção</h1>
           <p className="text-[13px] text-[#5e5c68] mt-1">{situacao}</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] py-5 flex flex-col items-center">
+        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] py-5 flex flex-col items-center">
           <Caixa3D largura={p.medidas.l} altura={p.medidas.a} profundidade={p.medidas.p} material="Triplex 300g" laminacao={b.laminacao === "brilho" ? "brilho" : "fosca"} tamanho={125} />
-          <p className="text-[13px] font-semibold text-[#191625] mt-4">{cm(p.medidas.a)} × {cm(p.medidas.l)} × {cm(p.medidas.p)} cm <span className="font-normal text-[#898892]">(A × L × P)</span></p>
+          <p className="text-[13px] font-semibold text-[#191625] mt-4">{cm(p.medidas.a)} × {cm(p.medidas.l)} × {cm(p.medidas.p)} cm <span className="font-normal text-[#8E8E93]">(A × L × P)</span></p>
           <p className="text-[12.5px] text-[#5e5c68] mt-2 text-center px-6">
             {p.quantidade.toLocaleString("pt-BR")} caixas · folha {p.folha} · triplex 300g · laminação {b.laminacao === "brilho" ? "brilho" : "fosca"}
             {p.ml ? ` · frasco de ${p.ml} ml` : ""}
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
+        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5">
           <p className="text-[15px] font-bold text-[#191625] mb-1">Briefing do cliente</p>
           {!(b.marca || b.cores || b.referencias || b.arquivos.length) && <p className="text-[13px] text-[#c57800] mt-1">O cliente ainda não preencheu. Assim que ele mandar, você recebe no WhatsApp.</p>}
           <Linha rotulo="Marca" valor={b.marca} />
@@ -155,7 +155,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
           <Linha rotulo="O que vai na caixa e referências" valor={b.referencias} />
           {b.arquivos.length > 0 && (
             <div className="pt-2.5 border-t border-[rgba(60,60,67,0.07)]">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">Arquivos do cliente ({b.arquivos.length})</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#8E8E93]">Arquivos do cliente ({b.arquivos.length})</p>
               <div className="mt-2 grid grid-cols-3 gap-2">
                 {b.arquivos.map((a, i) => (
                   <a key={a.url} href={a.url} target="_blank" rel="noreferrer" download className="block rounded-xl overflow-hidden ds-borda bg-[#f5f5f7] aspect-square">
@@ -166,12 +166,12 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
                   </a>
                 ))}
               </div>
-              <p className="text-[11px] text-[#898892] mt-1.5">Toque para abrir em tamanho real e baixar.</p>
+              <p className="text-[11px] text-[#8E8E93] mt-1.5">Toque para abrir em tamanho real e baixar.</p>
             </div>
           )}
         </div>
 
-        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
+        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5">
           <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Palette className="w-4 h-4 text-[#8456e8]" />Arte</p>
           {p.ajustes.length > 0 && (
             <div className="mt-3 rounded-xl bg-[#c57800]/[0.08] px-3.5 py-2.5 space-y-1">
@@ -193,7 +193,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
             )}
           </>)}
         </div>
-        {aviso && <p className="text-[12.5px] text-[#5e5c68] bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] px-4 py-3">{aviso}</p>}
+        {aviso && <p className="text-[12.5px] text-[#5e5c68] bg-white rounded-xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] px-4 py-3">{aviso}</p>}
       </Tela>
     )
   }
@@ -203,17 +203,17 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
   const oque = p.ml ? `para frasco de ${p.ml} ml` : p.produto ? `para ${p.produto}` : ""
 
   return (
-    <Tela>
+    <Tela numero={p.id}>
       <div className="text-center">
-        <p className="text-[12px] font-semibold text-[#898892]">{p.id}{p.nome ? ` · ${p.nome}` : ""}</p>
+        <p className="text-[12px] font-semibold text-[#8E8E93]">{p.id}{p.nome ? ` · ${p.nome}` : ""}</p>
         <h1 className="text-[22px] font-bold text-[#191625] mt-1 leading-tight">Suas caixinhas personalizadas</h1>
         <p className="text-[13px] text-[#5e5c68] mt-1">Impressão digital {oque}, arte inclusa</p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] py-5 flex flex-col items-center">
+      <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] py-5 flex flex-col items-center">
         {(() => { const mm = rascunhoMedida ?? p.medidas; return (<>
         <Caixa3D largura={mm.l} altura={mm.a} profundidade={mm.p} material="Triplex 300g" laminacao="fosca" tamanho={pago ? 95 : 115} />
-        <p className="text-[13px] font-semibold text-[#191625] mt-4">{cm(mm.a)} × {cm(mm.l)} × {cm(mm.p)} cm <span className="font-normal text-[#898892]">(A × L × P){rascunhoMedida ? " · prévia" : ""}</span></p>
+        <p className="text-[13px] font-semibold text-[#191625] mt-4">{cm(mm.a)} × {cm(mm.l)} × {cm(mm.p)} cm <span className="font-normal text-[#8E8E93]">(A × L × P){rascunhoMedida ? " · prévia" : ""}</span></p>
         </>) })()}
         <ul className="mt-3 space-y-1 text-[12.5px] text-[#5e5c68] text-center px-6">
           <li>Triplex 300g com laminação fosca ou brilhante</li>
@@ -226,7 +226,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
       </div>
 
       {pago ? (
-        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
+        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5">
           <p className="text-[15px] font-bold text-[#191625]">{p.quantidade.toLocaleString("pt-BR")} caixinhas{p.designer ? "" : ` · ${brl(p.total)}`}</p>
           {!p.designer && <p className="text-[12.5px] text-[#009351] font-semibold mt-1 flex items-center gap-1.5"><Check className="w-4 h-4 ds-pop" />Sinal de {brl(p.sinal)} recebido</p>}
           <div className="mt-4 grid grid-cols-4 gap-1.5">
@@ -235,14 +235,14 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
                 <div className="h-1.5 rounded-full bg-[rgba(116,116,128,0.15)] overflow-hidden">
                   {i <= etapa && <div className="h-full rounded-full bg-[#009351] ds-cresce-x" style={{ animationDelay: `${i * 120}ms` }} />}
                 </div>
-                <p className={`text-[11px] mt-1.5 ${i <= etapa ? "font-semibold text-[#191625]" : "text-[#898892]"}`}>{nome}</p>
+                <p className={`text-[11px] mt-1.5 ${i <= etapa ? "font-semibold text-[#191625]" : "text-[#8E8E93]"}`}>{nome}</p>
               </div>
             ))}
           </div>
         </div>
       ) : (<>
-        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-          <p className="px-5 pt-4 pb-2 text-[11px] font-bold uppercase tracking-wider text-[#898892]">Quantidade</p>
+        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] overflow-hidden">
+          <p className="px-5 pt-4 pb-2 text-[11px] font-bold uppercase tracking-wider text-[#8E8E93]">Quantidade</p>
           {p.opcoes.map(o => {
             const sel = o.quantidade === p.quantidade
             const rec = o.quantidade === 100
@@ -258,7 +258,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
                 </span>
                 <span className="text-right">
                   <span className="block text-[15px] font-bold text-[#191625] ds-num">{brl(o.total)}</span>
-                  <span className="block text-[11.5px] text-[#898892] ds-num">{brl(o.unit)} a unidade</span>
+                  <span className="block text-[11.5px] text-[#8E8E93] ds-num">{brl(o.unit)} a unidade</span>
                 </span>
               </button>
             )
@@ -272,7 +272,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
 
 
       {p.designer && (
-        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
+        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5">
           <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Palette className="w-4 h-4 text-[#8456e8]" />Arte</p>
           <p className="text-[12.5px] text-[#5e5c68] mt-1">Folha {p.folha} · {cm(p.medidas.a)} × {cm(p.medidas.l)} × {cm(p.medidas.p)} cm · laminação {p.briefing.laminacao === "brilho" ? "brilho" : "fosca"}. O briefing do cliente está logo abaixo.</p>
           {p.ajustes.length > 0 && (
@@ -299,7 +299,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
       )}
 
       {!p.designer && p.arte && (p.aprovar || p.arteAprovadaEm) && (
-        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
+        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5">
           <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Palette className="w-4 h-4 text-[#8456e8]" />{p.arteAprovadaEm ? "Sua arte (aprovada)" : "Sua arte ficou pronta"}</p>
           <ArtePreview arte={p.arte} />
           {p.aprovar && (ajuste == null ? (
@@ -309,7 +309,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
                 {ocupado === "aprovar" ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}Aprovar a arte
               </button>
               <button onClick={() => setAjuste("")} className="w-full h-11 rounded-xl text-[14px] font-semibold text-[#5e5c68] bg-[rgba(116,116,128,0.08)]">Quero mudar alguma coisa</button>
-              <p className="text-[11.5px] text-[#898892] text-center">Confira nomes, textos e cores: depois de aprovada, vai direto para a impressão.</p>
+              <p className="text-[11.5px] text-[#8E8E93] text-center">Confira nomes, textos e cores: depois de aprovada, vai direto para a impressão.</p>
             </div>
           ) : (
             <div className="mt-3 space-y-2">
@@ -319,7 +319,7 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
                 className="w-full h-11 rounded-xl bg-[#191625] text-white text-[14px] font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
                 {ocupado === "ajuste" && <Loader2 className="w-4 h-4 animate-spin" />}Mandar o pedido de ajuste
               </button>
-              <button onClick={() => setAjuste(null)} className="w-full text-[12.5px] text-[#898892]">Voltar</button>
+              <button onClick={() => setAjuste(null)} className="w-full text-[12.5px] text-[#8E8E93]">Voltar</button>
             </div>
           ))}
         </div>
@@ -328,21 +328,21 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
       {!p.designer && p.acompanhamento && <AcompanhamentoDigital a={p.acompanhamento} />}
 
       {!p.designer && p.restante != null && !p.restantePagoEm && !p.prontoEm && (
-        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
+        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5">
           <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Wallet className="w-4 h-4 text-[#8456e8]" />Restante</p>
           <p className="text-[13px] text-[#5e5c68] mt-1 leading-snug">Suas caixinhas estão em produção. Quando ficarem prontas, a gente te avisa e você paga o restante de <strong className="text-[#191625]">{brl(p.restante)}</strong>{p.frete ? " (com o frete)" : ""} para o envio.</p>
         </div>
       )}
       {!p.designer && p.restante != null && (p.prontoEm || p.restantePagoEm) && (
         p.restantePagoEm
-          ? <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5"><p className="text-[13px] text-[#009351] font-semibold flex items-center gap-1.5"><Check className="w-4 h-4" />Restante de {brl(p.restante)} recebido. Pedido quitado.</p></div>
+          ? <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5"><p className="text-[13px] text-[#009351] font-semibold flex items-center gap-1.5"><Check className="w-4 h-4" />Restante de {brl(p.restante)} recebido. Pedido quitado.</p></div>
           : <Pagamento p={p} titulo="Restante" valor={p.restante} txid={`${p.id}F`} descricao={`Restante ${p.id}`}
               sub={p.frete ? `Suas caixinhas estão prontas · ${brl(p.restante - p.frete)} + frete ${brl(p.frete)}` : "Suas caixinhas estão prontas: o envio sai assim que o restante cair"}
               post={post} setP={setP} onConferir={() => acao("conferir", { acao: "conferir" })} conferindo={ocupado === "conferir"} />
       )}
 
       {!p.designer && p.arteAprovadaEm && !p.restantePagoEm && (
-        <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
+        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5">
           <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Truck className="w-4 h-4 text-[#8456e8]" />Entrega</p>
           {p.entrega ? (
             <p className="text-[13px] text-[#5e5c68] mt-1">{p.entrega.endereco} · CEP {p.entrega.cep.replace(/(\d{5})(\d{3})/, "$1-$2")}</p>
@@ -359,9 +359,9 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
           </>)}
         </div>
       )}
-      {aviso && <p className="text-[12.5px] text-[#5e5c68] bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] px-4 py-3">{aviso}</p>}
+      {aviso && <p className="text-[12.5px] text-[#5e5c68] bg-white rounded-xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] px-4 py-3">{aviso}</p>}
 
-      {!p.arteAprovadaEm && !p.arteEnviadaEm && <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
+      {!p.arteAprovadaEm && !p.arteEnviadaEm && <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5">
         <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Sparkles className="w-4 h-4 text-[#8456e8]" />Como você quer a sua arte</p>
         <p className="text-[12.5px] text-[#5e5c68] mt-1">{pago ? "O sinal já caiu e a sua arte está na fila." : "A arte começa assim que o sinal cair."} Quanto mais você contar, mais rápido fica do seu jeito.</p>
         <label className="block mt-4 text-[12px] font-semibold text-[#191625]">Nome da marca</label>
@@ -420,10 +420,10 @@ function AceiteTermos({ p, marcado, setMarcado, email, setEmail }: { p: Pedido; 
   const [aberto, setAberto] = useState(false)
   return (
     <div className="self-stretch text-left mt-4 rounded-xl bg-[rgba(116,116,128,0.06)] px-3.5 py-3">
-      <label className="block text-[12.5px] text-[#5e5c68] mb-1.5">Seu e-mail <span className="text-[#9a98a3]">(opcional)</span></label>
+      <label className="block text-[12.5px] text-[#5e5c68] mb-1.5">Seu e-mail <span className="text-[#8E8E93]">(opcional)</span></label>
       <input type="email" inputMode="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} maxLength={120} placeholder="voce@exemplo.com"
         className="w-full h-11 rounded-xl px-3.5 text-[14px] text-[#191625] bg-white outline-none focus:ring-2 focus:ring-[#8456e8]/20" />
-      <p className="text-[11.5px] text-[#9a98a3] mt-1 mb-3 leading-snug">Você recebe o comprovante, a arte para aprovar e o aviso de envio.</p>
+      <p className="text-[11.5px] text-[#8E8E93] mt-1 mb-3 leading-snug">Você recebe o comprovante, a arte para aprovar e o aviso de envio.</p>
       <label className="flex items-start gap-2.5 cursor-pointer select-none">
         <input type="checkbox" checked={marcado} onChange={e => setMarcado(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#8456e8] shrink-0" />
         <span className="text-[13px] text-[#191625] leading-snug">Li e aceito os <button type="button" onClick={e => { e.preventDefault(); setAberto(a => !a) }} className="text-[#8456e8] font-semibold underline underline-offset-2">termos do pedido</button></span>
@@ -435,7 +435,7 @@ function AceiteTermos({ p, marcado, setMarcado, email, setEmail }: { p: Pedido; 
 function TermosAceitos({ p }: { p: Pedido }) {
   const [aberto, setAberto] = useState(false)
   return (
-    <div className={aberto ? "bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5" : ""}>
+    <div className={aberto ? "bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5" : ""}>
       <p className="text-[12px] text-[#5e5c68] text-center flex items-center justify-center gap-1.5">
         <Check className="w-3.5 h-3.5 text-[#009351]" />Termos do pedido aceitos em {new Date(p.termosAceitosEm!).toLocaleDateString("pt-BR")}
         <button onClick={() => setAberto(a => !a)} className="text-[#8456e8] underline underline-offset-2">{aberto ? "fechar" : "ver"}</button>
@@ -445,19 +445,24 @@ function TermosAceitos({ p }: { p: Pedido }) {
   )
 }
 
-function Tela({ children, rodape = "Enyla Embalagens · dúvidas, é só responder no WhatsApp", parceria = false }: { children: React.ReactNode; rodape?: string; parceria?: boolean }) {
+function Tela({ children, rodape = "Enyla Embalagens · dúvidas, é só responder no WhatsApp", parceria = false, numero }: { children: React.ReactNode; rodape?: string; parceria?: boolean; numero?: string }) {
   return (
     <div className="min-h-[100dvh] bg-[#F2F2F7]">
-      <div className="max-w-md mx-auto px-4 py-6 space-y-4">
-        <div className="flex justify-center"><Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1335} height={328} className="h-5 w-auto" priority /></div>
+      <div className="bg-white border-b border-[rgba(60,60,67,0.12)] sticky top-0 z-10">
+        <div className="max-w-md mx-auto px-5 h-14 flex items-center gap-3">
+          <Image src="/brand/enyla-wordmark-dark.png" alt="Enyla" width={1335} height={328} className="h-5 w-auto" priority />
+          {numero && <span className="ml-auto text-[10px] font-bold text-[#8456e8] bg-[#8456e8]/10 border border-[#8456e8]/20 px-2.5 py-1 rounded-full font-mono">{numero}</span>}
+        </div>
+      </div>
+      <div className="max-w-md mx-auto px-4 py-5 pb-10 space-y-4">
         {parceria && (
-          <div className="flex flex-col items-center gap-1.5 -mt-1">
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#898892]">em parceria com</p>
+          <div className="flex flex-col items-center gap-1.5">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#8E8E93]">em parceria com</p>
             <Image src="/brand/villa-grafica.png" alt="Villa Gráfica" width={480} height={201} className="h-9 w-auto mix-blend-multiply" priority />
           </div>
         )}
         {children}
-        <p className="text-center text-[11px] text-[#898892] pt-2">{rodape}</p>
+        <p className="text-center text-[11px] text-[#8E8E93] pt-2">{rodape}</p>
       </div>
     </div>
   )
@@ -516,10 +521,10 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
   // Pix sem pedir documento (ou cobrança já gerada) e termos ainda não aceitos: o aceite vem antes do QR
   if (faltaTermos && !(p.asaas && !semAsaas && !p.cobranca))
     return (
-      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5 flex flex-col items-center text-center">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">{titulo}</p>
+      <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5 flex flex-col items-center text-center">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[#8E8E93]">{titulo}</p>
         <p className="text-[28px] font-bold text-[#191625] ds-num mt-1">{brl(valor)}</p>
-        <p className="text-[12px] text-[#898892]">{sub}</p>
+        <p className="text-[12px] text-[#8E8E93]">{sub}</p>
         <AceiteTermos p={p} marcado={marcado} setMarcado={setMarcado} email={email} setEmail={setEmail} />
         <button onClick={async () => { setGerando(true); setErro(null); try { await aceitar() } catch (e) { setErro((e as Error).message) } setGerando(false) }} disabled={!marcado || gerando}
           className="ds-toque mt-3 w-full h-12 rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40">
@@ -534,10 +539,10 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
       aviso="Assim que o Pix cair, a confirmação chega no seu WhatsApp." onConferir={onConferir} conferindo={conferindo} />
   if (precisa)
     return (
-      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5 flex flex-col items-center text-center">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">{titulo}</p>
+      <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5 flex flex-col items-center text-center">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-[#8E8E93]">{titulo}</p>
         <p className="text-[28px] font-bold text-[#191625] ds-num mt-1">{brl(valor)}</p>
-        <p className="text-[12px] text-[#898892]">{sub}</p>
+        <p className="text-[12px] text-[#8E8E93]">{sub}</p>
         {p.documento && !doc ? <p className="self-stretch text-left mt-4 text-[12.5px] text-[#5e5c68]">No nome do CPF/CNPJ {p.documento}. <button className="text-[#8456e8] font-semibold" onClick={() => setDoc(" ")}>Trocar</button></p> : <>
         <label className="self-stretch text-left mt-4 text-[12px] font-semibold text-[#191625]">CPF ou CNPJ de quem vai pagar</label>
         <input value={doc.trim() ? doc : ""} autoFocus={!!p.documento} onChange={e => setDoc(e.target.value)} inputMode="numeric" maxLength={18} placeholder="000.000.000-00"
@@ -548,7 +553,7 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
           {gerando ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Gerar o Pix
         </button>
         {cartao}
-        <p className="text-[11.5px] text-[#898892] mt-2">O CPF/CNPJ é para o Pix sair no seu nome. No cartão, os dados são pedidos na página segura da InfinitePay.</p>
+        <p className="text-[11.5px] text-[#8E8E93] mt-2">O CPF/CNPJ é para o Pix sair no seu nome. No cartão, os dados são pedidos na página segura da InfinitePay.</p>
         {erro && <p className="text-[12px] text-[#d33a3c] mt-2">{erro}</p>}
       </div>
     )
@@ -562,10 +567,10 @@ function PixBloco({ titulo, valor, txid, descricao, sub, onConferir, conferindo,
   useEffect(() => { if (!pronto?.imagem) QRCode.toDataURL(payload, { width: 220, margin: 1, color: { dark: "#191625", light: "#ffffff" } }).then(setQr).catch(() => setQr(null)) }, [payload, pronto?.imagem])
   const qr = pronto?.imagem ? `data:image/png;base64,${pronto.imagem}` : qrGerado
   return (
-    <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5 flex flex-col items-center text-center">
-      <p className="text-[11px] font-bold uppercase tracking-wider text-[#898892]">{titulo}</p>
+    <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5 flex flex-col items-center text-center">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-[#8E8E93]">{titulo}</p>
       <p className="text-[28px] font-bold text-[#191625] ds-num mt-1">{brl(valor)}</p>
-      <p className="text-[12px] text-[#898892]">{sub}</p>
+      <p className="text-[12px] text-[#8E8E93]">{sub}</p>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       {qr && <img src={qr} alt="QR Code do Pix" width={200} height={200} className="mt-4 rounded-xl" />}
       <button onClick={() => navigator.clipboard.writeText(payload).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000) })}
@@ -573,7 +578,7 @@ function PixBloco({ titulo, valor, txid, descricao, sub, onConferir, conferindo,
         {copiado ? <><Check className="w-5 h-5" />Código copiado</> : <><Copy className="w-5 h-5" />Copiar Pix copia e cola</>}
       </button>
       {cartao}
-      <p className="text-[11.5px] text-[#898892] mt-2">{aviso ?? `Pague exatamente ${brl(valor)}: é por esse valor que o sistema reconhece o seu pedido.`}</p>
+      <p className="text-[11.5px] text-[#8E8E93] mt-2">{aviso ?? `Pague exatamente ${brl(valor)}: é por esse valor que o sistema reconhece o seu pedido.`}</p>
       <button onClick={onConferir} disabled={conferindo}
         className="mt-3 w-full h-11 rounded-xl text-[14px] font-semibold text-[#8456e8] bg-[#8456e8]/[0.08] hover:bg-[#8456e8]/[0.14] disabled:opacity-60 flex items-center justify-center gap-2 transition-colors">
         {conferindo ? <><Loader2 className="w-4 h-4 animate-spin" />Conferindo…</> : "Já paguei"}
@@ -632,7 +637,7 @@ function MudarMedidaCliente({ id, t, p, onPedido, onRascunho }: { id: string; t:
     <div className="mt-4 self-stretch mx-5 rounded-2xl bg-[rgba(116,116,128,0.05)] px-4 py-4 space-y-3 ds-entrada">
       <p className="text-[14px] font-semibold text-[#191625]">Medida da caixa, em cm</p>
       <div className="grid grid-cols-3 gap-2">{campo("a", "Altura")}{campo("l", "Largura")}{campo("p", "Profundidade")}</div>
-      <p className="text-[11.5px] text-[#898892] leading-snug">É a medida da caixa por dentro. Se você mediu o frasco, some uns 3 mm em cada medida para ele entrar folgado.</p>
+      <p className="text-[11.5px] text-[#8E8E93] leading-snug">É a medida da caixa por dentro. Se você mediu o frasco, some uns 3 mm em cada medida para ele entrar folgado.</p>
       {erro && <p className="text-[12.5px] text-[#d33a3c]">{erro}</p>}
       {previa && !mesmas && (
         <p className={`text-[13px] rounded-xl px-3 py-2.5 leading-snug ${mudou ? "bg-[#c57800]/[0.08] text-[#8a5300]" : "bg-[#009351]/[0.07] text-[#0b7a45]"}`}>
