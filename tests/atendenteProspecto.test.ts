@@ -90,41 +90,24 @@ describe("ehProspecto", () => {
   })
 })
 
-describe("Atendente com gráfica do Prospector (modo parceiro)", () => {
-  it.each(["5511987654321@s.whatsapp.net", "551187654321@s.whatsapp.net"])("agendarResposta agenda a resposta de %s em vez de voltar calado", async jid => {
-    mundo.mensagens = [msg("M1", jid)]
+describe("Modo parceiro DESLIGADO (#242): mensagem de telefone de parceiro não gera envio", () => {
+  it.each(["5511987654321@s.whatsapp.net", "551187654321@s.whatsapp.net"])("%s: nada agenda, nada responde, nada sai", async jid => {
+    mundo.mensagens = [msg("M1", jid)]; mundo.conversas = [conv(jid)]
     await agendar("M1")
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
-  })
-  it("responderSozinho responde pelo modo parceiro, sem o fluxo de venda (atender)", async () => {
-    mundo.mensagens = [msg("M2", "5511987654321@s.whatsapp.net")]; mundo.conversas = [conv("5511987654321@s.whatsapp.net")]
-    const p = responderSozinho("M2"); await vi.runAllTimersAsync(); await p
-    expect(mundo.parceiro).toHaveBeenCalledTimes(1)
-    expect(mundo.atender).not.toHaveBeenCalled()
-  })
-  it("resposta atrasada (vigia, assumir, retomar) também usa o modo parceiro", async () => {
-    mundo.mensagens = [msg("M5", "5511987654321@s.whatsapp.net")]; mundo.conversas = [conv("5511987654321@s.whatsapp.net")]
-    await responderSozinho("M5", { atrasada: true })
-    expect(mundo.parceiro).toHaveBeenCalledTimes(1)
-    expect(mundo.atender).not.toHaveBeenCalled()
-  })
-  it("@lid ligado ao prospecto: responde pelo modo parceiro", async () => {
-    mundo.apelidos = { "123@lid": "5511987654321@s.whatsapp.net" }
-    mundo.mensagens = [msg("M3", "123@lid")]; mundo.conversas = [conv("123@lid")]
-    await agendar("M3")
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
-    await responderSozinho("M3", { atrasada: true })
-    expect(mundo.parceiro).toHaveBeenCalledTimes(1)
-  })
-  it.each([{ opt_out: true, etapa: "descartado" }, { opt_out: false, etapa: "descartado" }])("excluído (%o): nada agenda, nada responde", async ex => {
-    mundo.prospectos = [{ id: 1, telefone: "(11) 98765-4321", ...ex }]
-    mundo.mensagens = [msg("M6", "5511987654321@s.whatsapp.net")]
-    await agendar("M6")
-    await responderSozinho("M6", { atrasada: true })
+    const p = responderSozinho("M1"); await vi.runAllTimersAsync(); await p
+    await responderSozinho("M1", { atrasada: true })
     expect(fetchSpy).not.toHaveBeenCalled()
     expect(mundo.parceiro).not.toHaveBeenCalled()
     expect(mundo.atender).not.toHaveBeenCalled()
     expect(mundo.evo).not.toHaveBeenCalled()
+  })
+  it("@lid ligado ao prospecto: também não responde", async () => {
+    mundo.apelidos = { "123@lid": "5511987654321@s.whatsapp.net" }
+    mundo.mensagens = [msg("M3", "123@lid")]; mundo.conversas = [conv("123@lid")]
+    await agendar("M3")
+    await responderSozinho("M3", { atrasada: true })
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(mundo.parceiro).not.toHaveBeenCalled()
   })
   it("contato comum: o fluxo atual segue, sem o modo parceiro", async () => {
     mundo.mensagens = [msg("M4", "5521999998888@s.whatsapp.net")]
