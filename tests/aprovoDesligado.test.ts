@@ -23,7 +23,9 @@ vi.mock("@/app/lib/configAtomica", () => ({
 vi.mock("@/app/lib/diretoriaServidor", () => ({ lerConversa: vi.fn(async () => e.conversa), gravarConversa: vi.fn() }))
 vi.mock("@/app/lib/funcionariosServidor", () => ({ redigirComoFuncionario: e.redigir }))
 vi.mock("@/app/lib/nivelCliente", () => ({ nivelDoDestinatario: vi.fn(async () => e.nivel) }))
-vi.mock("@/app/lib/prospectorTrava", () => ({ ehProspecto: vi.fn(async () => e.prospecto) }))
+vi.mock("@/app/lib/prospectorTrava", () => ({ prospectoDoJid: vi.fn(async () => e.prospecto ? { id: "p1", telefone: "5511999990001", opt_out: false, etapa: "novo" } : null), ehProspecto: vi.fn(async () => e.prospecto) }))
+const prospEnviar = vi.hoisted(() => vi.fn())
+vi.mock("@/app/lib/ordemProspecto", () => ({ travasDoProspecto: vi.fn(() => null), enviarAoProspecto: prospEnviar }))
 vi.mock("@/app/lib/financeiroExterno", () => ({ aReceberDosPedidos: vi.fn(async () => e.receber) }))
 vi.mock("@/app/lib/agenteAuto", () => ({
   lerCfg: vi.fn(async () => e.cfg), enviar: e.enviar, voceNaConversa: vi.fn(async () => e.voce),
@@ -46,7 +48,7 @@ const ordenar = (extra: Record<string, unknown> = {}) =>
 const ligado = { ligado: true, horario: { dias: [0, 1, 2, 3, 4, 5, 6], inicio: "00:00", fim: "24:00" } }
 
 beforeEach(() => {
-  e.conversa = []; e.voce = false; e.contador = 0; e.log = []; e.obrigatorio = undefined; e.prospecto = false
+  e.conversa = []; e.voce = false; e.contador = 0; e.log = []; e.obrigatorio = undefined; e.prospecto = false; prospEnviar.mockReset()
   e.nivel = { nivel: "A", jaCliente: true, motivo: "" }
   e.cfg = { agenteAuto: ligado, pedidosDigitais: [], agenteLog: [] }
   e.receber = [{ numero: "1001", cliente: "Cliente Teste", aReceber: 400 }]
@@ -97,10 +99,11 @@ describe("as outras travas continuam", () => {
     const r = await ordenar()
     expect(r.status).toBe(400); expect(e.enviar).not.toHaveBeenCalled()
   })
-  it("gráfica do Prospector: 409, não vai para a fila", async () => {
-    e.prospecto = true
+  it("gráfica do Prospector (nível lead): sai direto pelo caminho do Prospector, sem 409 e sem fila", async () => {
+    e.prospecto = true; e.nivel = { nivel: "lead", jaCliente: false, motivo: "" }
+    prospEnviar.mockResolvedValue({ saida: "enviado", destino: "enviado_direto", motivo: "prospector", nivel: "lead" })
     const r = await ordenar()
-    expect(r.status).toBe(409); expect(r.acao).toBeUndefined(); expect(e.enviar).not.toHaveBeenCalled()
+    expect(r.destino).toBe("enviado_direto"); expect(r.status).toBeUndefined(); expect(prospEnviar).toHaveBeenCalled()
   })
   it("promete orçamento sem link real: 409 com o motivo, em vez de fila", async () => {
     e.redigir.mockResolvedValue({ ok: true, texto: "Segue o orçamento em anexo." })
