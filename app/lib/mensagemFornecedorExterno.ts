@@ -1,8 +1,9 @@
 // Porta externa, ação mensagem_fornecedor (só a chave do COO): texto exato a um fornecedor em operação.
-// Destino só do cadastro AppConfig.fornecedores (ativo, celular válido); nunca prospectos_parceiros e nunca cliente.
+// Destino só de AppConfig.fornecedores ou AppConfig.producao.fornecedores (ativo, celular válido); nunca prospectos_parceiros e nunca cliente.
 // Janela 8h–20h (Brasília), trava de duplicado (mesmo texto, mesmo fornecedor, 10 min) e histórico que só acrescenta
 // em AppConfig.mensagensFornecedor (chave JSON aditiva). Não mexe em cobrança e não apaga nada.
 import type { Fornecedor } from "@/app/config"
+import type { FornecedorProducao } from "./producao"
 import { lerCampos, mudarConfig } from "./configAtomica"
 import { celularWhatsapp } from "./prospectorEnvio"
 import { supabase } from "./supabase"
@@ -40,8 +41,10 @@ export async function mensagemFornecedorExterno(diretor: string, b: Record<strin
   if (!fid) return { ok: false, status: 400, erro: "fornecedor: id do cadastro de fornecedores." }
   if (!texto) return { ok: false, status: 400, erro: "texto: obrigatório." }
   if (texto.length > 4000) return { ok: false, status: 400, erro: "texto: no máximo 4000 caracteres." }
-  const { fornecedores } = await lerCampos<{ fornecedores?: Fornecedor[] }>(["fornecedores"])
-  const f = (fornecedores ?? []).find(x => x.id === fid)
+  // Duas listas: primeiro a antiga (fornecedores), depois producao.fornecedores (cadastrar_fornecedor e aprovação de parceiros)
+  const { fornecedores, producao } = await lerCampos<{ fornecedores?: Fornecedor[]; producao?: { fornecedores?: FornecedorProducao[] } }>(["fornecedores", "producao"])
+  const f: { nome: string; ativo?: boolean; telefone?: string } | undefined =
+    (fornecedores ?? []).find(x => x.id === fid) ?? (producao?.fornecedores ?? []).find(x => x.id === fid)
   if (!f || !f.ativo) return { ok: false, status: 404, erro: `Fornecedor ${fid} não encontrado ou inativo no cadastro.` }
   const numero = celularWhatsapp(f.telefone)
   if (!numero) return { ok: false, status: 400, erro: `${f.nome} não tem celular de WhatsApp válido no cadastro.` }

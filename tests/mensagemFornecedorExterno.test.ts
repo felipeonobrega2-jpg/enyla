@@ -49,6 +49,30 @@ beforeEach(() => {
   ] }
 })
 
+describe("mensagem_fornecedor: producao.fornecedores", () => {
+  beforeEach(() => {
+    estado.cfg = { fornecedores: [], producao: { fornecedores: [
+      { id: "P1", nome: "Produção Fictícia", ativo: true, telefone: "(11) 95555-6666", servicos: {}, frete: 0, prazoDias: 1 },
+      { id: "P2", nome: "Produção Inativa", ativo: false, telefone: "11 97777-8888", servicos: {}, frete: 0, prazoDias: 1 },
+    ] } }
+  })
+  it("id só em producao.fornecedores e ativo é encontrado e recebe a mensagem", async () => {
+    const r = await pedir({ ...ordem, fornecedor: "P1" })
+    expect(r.status).toBe(200)
+    expect(estado.envios).toEqual([{ number: "5511955556666", text: ordem.texto }])
+  })
+  it("inativo e inexistente continuam 404", async () => {
+    expect((await pedir({ ...ordem, fornecedor: "P2" })).status).toBe(404)
+    expect((await pedir({ ...ordem, fornecedor: "XX" })).status).toBe(404)
+    expect(estado.envios).toEqual([])
+  })
+  it("lista antiga tem prioridade quando o id existe nas duas", async () => {
+    estado.cfg = { fornecedores: [{ id: "P1", nome: "Antigo", categoria: "x", telefone: "(11) 91111-2222", ativo: true }], producao: { fornecedores: [{ id: "P1", nome: "Novo", ativo: true, telefone: "11 95555-6666" }] } }
+    expect((await pedir({ ...ordem, fornecedor: "P1" })).status).toBe(200)
+    expect(estado.envios).toEqual([{ number: "5511911112222", text: ordem.texto }])
+  })
+})
+
 describe("mensagem_fornecedor", () => {
   it("envia o texto exato ao telefone do cadastro e registra quem, texto e hora", async () => {
     const r = await pedir(ordem); const j = await r.json()
