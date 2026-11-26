@@ -26,6 +26,8 @@ export type DadosPedido = {
   referencia?: string | null
   acabamento?: string | null
   modelos?: number | null
+  // Ficha Offset (roteiro da CCO): só preenchida em lead de Offset; ver offsetRoteiro.ts
+  offset?: import("./offsetRoteiro").FichaOffsetIA | null
   resumo: string
 }
 

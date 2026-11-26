@@ -14,6 +14,8 @@ import { transcreverPendentes } from "./transcricao"
 import { obterMidia } from "./midiaWhatsapp"
 import { Conhecimento } from "./agenteAprende"
 import { type EstiloFelipe } from "./estilo"
+import { ehLeadOffset, faltaParaFichaOffset, temEstrelaPerto, travaOffset } from "./offsetRoteiro"
+import { PREFIXO_PERTO } from "./perto"
 import { arquivosDoCliente, contextoDaConversa, historicoDaConversa, pedidoAtendente, type Bloco } from "./pedidoAtendente"
 
 
@@ -39,9 +41,29 @@ export async function lerConfigAtendente(): Promise<Cfg> {
   return (data?.data ?? {}) as Cfg
 }
 
+// Trava 2 (roteiro Offset): conversa com a estrela do Felipe no "Perto de você" (marca "perto|<jid>|<nota>" na tabela leve
+// agente_tratadas; as sugestões da semana não são marca). Só leitura.
+export async function conversaComEstrela(jid: string): Promise<boolean> {
+  const { data } = await supabase.from("agente_tratadas").select("id").like("id", `${PREFIXO_PERTO}${jid}|%`).limit(20)
+  return temEstrelaPerto((data ?? []).map(r => r.id as string), jid)
+}
+
 export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boolean; followUp?: 1 | 2 | 3; outra?: boolean; reativar?: { dias: number; motivo: string }; coletandoMql?: string; atrasoMin?: number; assumir?: boolean } = {}): Promise<{ ok: true; r: ResultadoAtendente; conversa: ConversaLida } | { ok: false; erro: string; status: number }> {
   const cfg = opts.cfg ?? await lerConfigAtendente()
   if (!cfg.apiKey) return { ok: false, erro: "Chave da IA não configurada (Configurações).", status: 400 }
+
+  // Conversa com estrela do Felipe: o Atendente não entra (sem resposta, sem IA, sem envio). Vale para tela, automático,
+  // follow-up e retomada, porque todos passam por aqui.
+  if (await conversaComEstrela(jid).catch(() => false)) {
+    const { data: ult } = await supabase.from("whatsapp_mensagens").select("id").eq("jid", jid).order("ts", { ascending: false }).limit(1).maybeSingle()
+    const vazio: ResultadoAtendente = {
+      resposta: "", etapa: "outro", alerta: "decisao_sua", motivo_alerta: "Conversa com estrela no Perto de você: fica com o Felipe.", sugere_video: false,
+      dados: { itens: [], produto: "", volume_ml: null, caixa_cm: null, frasco_cm: null, quantidade: null, tem_arte: null, referencia: null, acabamento: null, modelos: null, resumo: "" },
+      lead: { perfil: "indefinido", quantidade_total: null, motivo: "Conversa com estrela (Perto de você).", fornecedor: false },
+      pode_enviar_sozinho: false, ultimaId: (ult?.id as string | undefined) ?? "",
+    }
+    return { ok: true, r: vazio, conversa: { nome: null, clienteCadastrado: false, primeiraEm: null, mensagens: [] } }
+  }
 
   // Áudios recentes sem transcrição: transcreve antes (você fala muito por áudio; sem isso a IA fica cega)
   const { data: recentes } = await supabase.from("whatsapp_mensagens").select("id, tipo, corpo").eq("jid", jid).order("ts", { ascending: false }).limit(12)
@@ -108,6 +130,11 @@ export async function atender(jid: string, opts: { cfg?: Cfg; automatico?: boole
   let a: Omit<ResultadoAtendente, "ultimaId">
   try { a = JSON.parse(texto) } catch { return { ok: false, erro: "A IA respondeu fora do formato. Tente de novo.", status: 502 } }
   if (a.resposta) a.resposta = corrigirCumprimento(a.resposta)
+  // Lead de Offset: nunca preço, prazo, "1.000 por arte" nem pedir cidade/CEP/frete (o orçamento é do Felipe)
+  if (a.resposta && a.lead && ehLeadOffset(a.lead)) {
+    const t = travaOffset(a.resposta, { fichaCompleta: !faltaParaFichaOffset(a.dados) })
+    if (t.reescrita) { a.resposta = t.resposta; a.alerta = "decisao_sua"; a.pode_enviar_sozinho = false; a.motivo_alerta = `Offset: resposta corrigida (${t.motivos.join(", ")}); o Felipe revisa` }
+  }
   const resultado: ResultadoAtendente = { ...a, ultimaId, uso: { entrada: r.usage.input_tokens, cache: r.usage.cache_read_input_tokens ?? 0, gravouCache: r.usage.cache_creation_input_tokens ?? 0, saida: r.usage.output_tokens } }
   // Guarda para reaproveitar enquanto não chegar mensagem nova (follow-up e retomada não: são outra pergunta)
   if (!outraPergunta) await supabase.from("whatsapp_conversas").update({ proxima_acao: JSON.stringify({ assinatura, ultimaId, auto: !!opts.automatico, em: new Date().toISOString(), r: { ...resultado, uso: undefined } }) }).eq("jid", jid)

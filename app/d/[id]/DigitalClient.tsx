@@ -9,6 +9,8 @@ import QRCode from "qrcode"
 import { Check, Copy, Loader2, Upload, FileText, AlertCircle, Sparkles, Palette, Truck, Send, CreditCard, Wallet } from "lucide-react"
 import { Caixa3D } from "@/app/components/Caixa3D"
 import { gerarPixPayload } from "@/app/lib/pix"
+import type { Acompanhamento } from "@/app/lib/acompanhamentoDigital"
+import { AcompanhamentoDigital } from "./AcompanhamentoDigital"
 
 type Opcao = { quantidade: number; total: number; unit: number }
 type Pedido = {
@@ -25,6 +27,7 @@ type Pedido = {
   asaas: boolean; documento: string | null
   cobranca: { parte: "sinal" | "restante"; payload: string; imagem: string; fatura: string } | null
   cartao?: boolean
+  acompanhamento?: Acompanhamento | null
 }
 const ehPdf = (u: string) => /\.pdf($|\?)/i.test(u)
 
@@ -33,7 +36,9 @@ const cm = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 }
 const ETAPAS = [["sinal_pago", "Sinal pago"], ["arte", "Arte"], ["producao", "Produção"], ["enviado", "Enviado"]] as const
 
 export default function DigitalClient({ id, t, dz = "" }: { id: string; t: string; dz?: string }) {
-  const [p, setP] = useState<Pedido | null>(null)
+  const [p, setPedido] = useState<Pedido | null>(null)
+  // As respostas das ações não trazem o acompanhamento (só o GET): mantém o último
+  const setP = (x: Pedido) => setPedido(ant => ({ ...x, acompanhamento: x.acompanhamento ?? ant?.acompanhamento }))
   const [erro, setErro] = useState<string | null>(null)
   const [mudando, setMudando] = useState<number | null>(null)
   const [conferindo, setConferindo] = useState(false)
@@ -319,6 +324,8 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
           ))}
         </div>
       )}
+
+      {!p.designer && p.acompanhamento && <AcompanhamentoDigital a={p.acompanhamento} />}
 
       {!p.designer && p.restante != null && !p.restantePagoEm && !p.prontoEm && (
         <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
