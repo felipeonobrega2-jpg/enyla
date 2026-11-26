@@ -56,7 +56,9 @@ export type FornecedorProducao = {
   ativo: boolean
   fornecedorId?: string            // vínculo com o cadastro financeiro
   maquina?: Maquina                // só para quem imprime
-  servicos: Partial<Record<Servico, RegraCobranca>>
+  servicos: Partial<Record<Servico, RegraCobranca>> & {
+    impressaoFrenteVerso?: RegraCobranca   // tabela própria de frente e verso; sem ela, a impressão dobra
+  }
   frete: number                    // custo de levar o material até ele
   prazoDias: number                // prazo combinado (para medir atraso)
   obs?: string
@@ -556,7 +558,8 @@ function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaEx
   const p = e.producao
   const itens: ItemCusto[] = []
   const imp = base.impressor
-  const regraImp = imp.servicos.impressao!
+  const regraFV = e.frenteVerso ? imp.servicos.impressaoFrenteVerso : undefined
+  const regraImp = regraFV ?? imp.servicos.impressao!
 
   // Papel e folhas
   const pecasLiquidas = Math.ceil(qtd / base.pecasPorPeca)
@@ -584,10 +587,10 @@ function custear(e: EntradaRotas, base: RotaBase, k: number, qtd: number, facaEx
     }) - fixo
     custoImp += fixo * jogos + variavel
   }
-  if (e.frenteVerso) custoImp *= 2
+  if (e.frenteVerso && !regraFV) custoImp *= 2
   itens.push({
     etapa: "impressao", fornecedor: imp.nome, fornecedorId: imp.id,
-    descricao: `${passadas.map(ps => ps.cavidades).join(" + ")} cavidades${jogos > 1 ? ` · ${jogos} jogos de chapa` : ""}${e.frenteVerso ? " · frente e verso" : ""}`,
+    descricao: `${passadas.map(ps => ps.cavidades).join(" + ")} cavidades${jogos > 1 ? ` · ${jogos} jogos de chapa` : ""}${e.frenteVerso ? (regraFV ? ` · frente e verso (tabela própria: ${descreverRegra(regraFV)})` : " · frente e verso (dobro)") : ""}`,
     valor: custoImp, estimado: false,
   })
 
