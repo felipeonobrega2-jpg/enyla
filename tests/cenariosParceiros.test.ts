@@ -25,7 +25,7 @@ import { LinhaExemplo } from "@/app/components/CadastrosParceirosCard"
 import { LinhaMercado } from "@/app/components/CenariosParceirosEditor"
 
 const base = { nomeFantasia: "Gráfica Exemplo", tipoDocumento: "cnpj" as const, documento: "11222333000181", cep: "01310100", rua: "Avenida Paulista", numero: "1000", bairro: "Bela Vista", cidade: "São Paulo", uf: "SP", responsavel: "Marcos", whatsapp: "11988887777", email: "a@b.com.br", aceite: true }
-const serv = (extra = {}) => ({ id: "verniz" as const, cobranca: "folha" as const, prazoDias: 3, prazoVaria: false, tecnico: { tipos: ["UV total"] }, ...extra })
+const serv = (extra = {}) => ({ id: "verniz" as const, cobranca: "unidade" as const, valor: 2, prazoDias: 3, prazoVaria: false, tecnico: { tipos: ["UV total"], buscaEntrega: true }, ...extra })
 const imp = (extra = {}) => ({ id: "impressaoOffset" as const, cobranca: null, prazoDias: 3, prazoVaria: false, tecnico: { formatoMax: { l: 66, a: 96 } }, acerto: 300, valor: 120, ...extra })
 const NOMES = CENARIOS_PADRAO.flatMap(c => c.referencias.map(r => r.fornecedorNome)).filter(Boolean) as string[]
 const cad = (servicos: unknown[]) => ({ servicos }) as Pick<CadastroParceiro, "servicos">
@@ -89,10 +89,10 @@ describe("preço do exemplo é obrigatório nos serviços com cenário", () => {
     expect(errosDaEtapa({ ...base, servicos: [serv()] }, "detalhes")["verniz.preco.verniz"]).toBeTruthy()
     expect(errosDaEtapa({ ...base, servicos: [serv({ precosExemplo: { verniz: 0 } })] }, "detalhes")["verniz.preco.verniz"]).toBeTruthy()
     expect(errosDaEtapa({ ...base, servicos: [serv({ precosExemplo: { verniz: 450 } })] }, "detalhes")).toEqual({})
-    expect(errosDaEtapa({ ...base, servicos: [{ id: "outro", qual: "X", cobranca: "varia", prazoDias: null, prazoVaria: true }] }, "detalhes")).toEqual({})
+    expect(errosDaEtapa({ ...base, servicos: [{ id: "outro", qual: "Serviço extra", cobranca: "varia", prazoDias: null, prazoVaria: true }] }, "detalhes")).toEqual({})
   })
   it("laminação grava os quatro preços e exige todos", async () => {
-    const lam = (precosExemplo: Record<string, number>) => ({ id: "laminacao" as const, cobranca: "folha" as const, prazoDias: 3, prazoVaria: false, precosExemplo, tecnico: { tipos: ["Fosca", "Brilho", "Soft touch"], lados: "Os dois lados" } })
+    const lam = (precosExemplo: Record<string, number>) => ({ id: "laminacao" as const, cobranca: "unidade" as const, valor: 2, prazoDias: 3, prazoVaria: false, precosExemplo, tecnico: { tipos: ["Fosca", "Brilho", "Soft touch"], lados: "Os dois lados", buscaEntrega: true } })
     const quatro = { "laminacao-fosca": 700, "laminacao-brilho": 650, "laminacao-soft": 900, "laminacao-dois-lados": 1300 }
     expect(errosDaEtapa({ ...base, servicos: [lam({ "laminacao-fosca": 700 })] }, "detalhes")).toEqual({
       "laminacao.preco.laminacao-brilho": expect.any(String), "laminacao.preco.laminacao-soft": expect.any(String), "laminacao.preco.laminacao-dois-lados": expect.any(String),
@@ -121,7 +121,7 @@ describe("preço do exemplo é obrigatório nos serviços com cenário", () => {
 })
 
 describe("experiência guiada: só o que o parceiro marcou pede preço", () => {
-  const lamT = (tecnico?: Record<string, unknown>, precosExemplo: Record<string, number> = {}) => ({ id: "laminacao" as const, cobranca: "m2" as const, prazoDias: 3, prazoVaria: false, tecnico, precosExemplo } as never)
+  const lamT = (tecnico?: Record<string, unknown>, precosExemplo: Record<string, number> = {}) => ({ id: "laminacao" as const, cobranca: "unidade" as const, valor: 2, prazoDias: 3, prazoVaria: false, tecnico: { buscaEntrega: true, ...tecnico }, precosExemplo } as never)
   it("laminação sem variante marcada não pede preço nenhum", () => {
     expect(errosDaEtapa({ ...base, servicos: [lamT()] }, "detalhes")).toEqual({})
   })
@@ -132,9 +132,9 @@ describe("experiência guiada: só o que o parceiro marcou pede preço", () => {
     expect(cenariosAtivosIds({ id: "laminacao", tecnico: { tipos: ["Soft touch"] } })).toEqual(["laminacao-soft"])
   })
   it("verniz só pede preço do UV total se marcado; hot stamping só se faz dourado", () => {
-    expect(errosDaEtapa({ ...base, servicos: [serv({ tecnico: { tipos: ["Base água"] } })] }, "detalhes")).toEqual({})
-    expect(errosDaEtapa({ ...base, servicos: [serv({ tecnico: undefined })] }, "detalhes")).toEqual({})
-    const hot = (tecnico?: Record<string, unknown>) => ({ id: "hotStamping" as const, cobranca: "folha" as const, prazoDias: 3, prazoVaria: false, tecnico } as never)
+    expect(errosDaEtapa({ ...base, servicos: [serv({ tecnico: { tipos: ["Base água"], buscaEntrega: true } })] }, "detalhes")).toEqual({})
+    expect(errosDaEtapa({ ...base, servicos: [serv({ tecnico: { buscaEntrega: true } })] }, "detalhes")).toEqual({})
+    const hot = (tecnico?: Record<string, unknown>) => ({ id: "hotStamping" as const, cobranca: "unidade" as const, valor: 2, prazoDias: 3, prazoVaria: false, tecnico: { buscaEntrega: true, ...tecnico } } as never)
     expect(errosDaEtapa({ ...base, servicos: [hot({ fitas: ["Prata"] })] }, "detalhes")).toEqual({})
     expect(Object.keys(errosDaEtapa({ ...base, servicos: [hot({ fitas: ["Dourado"] })] }, "detalhes"))).toEqual(["hotStamping.preco.hotStamping"])
   })
@@ -143,7 +143,7 @@ describe("experiência guiada: só o que o parceiro marcou pede preço", () => {
     expect(c.servicos[0].precosExemplo).toEqual({ "laminacao-brilho": 600 })
   })
   it("serviços sem variante (colagem, corte e vinco) seguem pedindo o exemplo quando marcados", () => {
-    expect(Object.keys(errosDaEtapa({ ...base, servicos: [{ id: "colagem", cobranca: "folha", prazoDias: 3, prazoVaria: false }] }, "detalhes"))).toEqual(["colagem.preco.colagem"])
+    expect(Object.keys(errosDaEtapa({ ...base, servicos: [{ id: "colagem", cobranca: "unidade", valor: 2, prazoDias: 3, prazoVaria: false, tecnico: { buscaEntrega: true } }] }, "detalhes"))).toEqual(["colagem.preco.colagem"])
   })
 })
 

@@ -4,21 +4,23 @@
 // técnicos/preço/prazo, operação), gostoso no celular e no computador. O rascunho fica no aparelho.
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Printer, Layers, Sparkles, Stamp, Mountain, Scissors, Package, Shapes, FileStack, Palette, FileCheck, Truck, Plus, Check, ChevronLeft, ArrowRight, Paperclip, X, Clock, BarChart3, ShieldCheck, Handshake, Loader2, MessageCircle, MapPin, Zap, Banknote, Wallet, Camera, Globe } from "lucide-react"
+import { Printer, Layers, Sparkles, Stamp, Mountain, Scissors, Package, Shapes, FileStack, Palette, FileCheck, Truck, Plus, Check, ChevronLeft, ArrowRight, Paperclip, X, Clock, BarChart3, ShieldCheck, Handshake, Loader2, MessageCircle, MapPin, Zap, Banknote, Wallet, Camera, Globe, Hand, Boxes } from "lucide-react"
 import type { CenarioPublico } from "../lib/cenariosParceiros"
+import { exemploDaEtapa, EXEMPLO_CADASTRO_TITULO, EXEMPLO_CADASTRO_VAZIO } from "../lib/exemploCadastro"
 import {
-  SERVICOS_PARCEIRO, FORMAS_COBRANCA, PERGUNTAS, ROTULO_PRECO_CENARIO, cobraPorAcertoMilheiro, cenarioAtivo, ETAPAS_IDS, errosDaEtapa, mascaraDocumento, mascaraTelefone, mascaraCep, GERENTE_PADRAO,
+  SERVICOS_PARCEIRO, GRUPOS_PARCEIRO, GRUPO_DO_SERVICO, servicosDosGrupos, cobraPorUnidadeOuHora, FORMAS_UNIDADE_OU_HORA, type GrupoServico, FORMAS_COBRANCA, PERGUNTAS, ROTULO_PRECO_CENARIO, cobraPorAcertoMilheiro, cenarioAtivo, ETAPAS_IDS, errosDaEtapa, mascaraDocumento, mascaraTelefone, mascaraCep, cnpjValido, EQUIPAMENTOS_PARCEIRO, GERENTE_PADRAO,
   type CadastroParceiro, type ServicoCadastrado, type IdServicoParceiro, type Pergunta, type Resposta, type Formato,
 } from "../lib/parceiros"
 
 const ICONE: Record<IdServicoParceiro, typeof Printer> = {
   impressaoOffset: Printer, impressaoDigital: Printer, laminacao: Layers, verniz: Sparkles, hotStamping: Stamp, relevo: Mountain,
-  corteVinco: Scissors, colagem: Package, faca: Shapes, papel: FileStack, arte: Palette, fechamento: FileCheck, transporte: Truck, outro: Plus,
+  corteVinco: Scissors, colagem: Package, manuseio: Hand, montagem: Boxes, faca: Shapes, papel: FileStack, arte: Palette, fechamento: FileCheck, transporte: Truck, outro: Plus,
 }
 const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ")
-const NOMES_ETAPA: Record<(typeof ETAPAS_IDS)[number], string> = { empresa: "Empresa", endereco: "Endereço", contato: "Contato", servicos: "Serviços", detalhes: "Detalhes", final: "Operação" }
+const NOMES_ETAPA: Record<(typeof ETAPAS_IDS)[number], string> = { atuacao: "O que vocês fazem", empresa: "Empresa", endereco: "Endereço", contato: "Contato", servicos: "Serviços", detalhes: "Detalhes", final: "Operação" }
 const N = ETAPAS_IDS.length
-const RASCUNHO = "parceiros:rascunho"
+const RASCUNHO = "parceiros:rascunho2"   // 2: a primeira etapa agora é "o que vocês fazem"
+const ORIGEM_LINK = "parceiros:origem"
 const ROXO = "#7c4ee4"
 
 type Dados = Partial<CadastroParceiro> & { servicos: ServicoCadastrado[] }
@@ -117,6 +119,7 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
   const [erroEnvio, setErroEnvio] = useState<string | null>(null)
   const [buscandoCep, setBuscandoCep] = useState(false)
   const [cepAchado, setCepAchado] = useState<boolean | null>(null)
+  const [cnpjInfo, setCnpjInfo] = useState<{ situacao: string; ativa: boolean } | "nao_achou" | "buscando" | null>(null)
   const site = useRef<HTMLInputElement>(null)
   const conteudo = useRef<HTMLDivElement>(null)
   const numeroRef = useRef<HTMLInputElement>(null)
@@ -124,7 +127,14 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
   const [sub, setSub] = useState(0)                // Detalhes: um serviço por vez
   const trocando = useRef(false)
 
-  // Convite do Captador (?c=…): marca que abriu e acompanha até o envio
+  // Link da prospecção (?o=prospector&p=id): guarda a origem no aparelho para o envio, mesmo se a pessoa sair e voltar
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search), o = (q.get("o") ?? "").slice(0, 20)
+      if (o) localStorage.setItem(ORIGEM_LINK, JSON.stringify({ o, p: (q.get("p") ?? "").replace(/\D/g, "").slice(0, 12) }))
+    } catch { /* sem a origem: cadastro direto */ }
+  }, [])
+  const origemDoLink = (): { o: string; p: string } => { try { const v = JSON.parse(localStorage.getItem(ORIGEM_LINK) ?? "null"); return { o: String(v?.o ?? ""), p: String(v?.p ?? "") } } catch { return { o: "", p: "" } } }
 
   // Rascunho no aparelho (volta de onde parou)
   useEffect(() => { try { const r = JSON.parse(localStorage.getItem(RASCUNHO) ?? "null"); if (r?.d) { setD({ ...VAZIO, ...r.d }); if (typeof r.passo === "number" && r.passo >= 0 && r.passo < N) { setPasso(r.passo); if (typeof r.sub === "number") setSub(r.sub) } } } catch { /* sem rascunho */ } }, [])
@@ -168,12 +178,18 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
     setD(x => ({ ...x, servicos: x.servicos.map(s => s.id === id ? { ...s, ...m } : s) }))
     setErros(e => { const n = { ...e }; for (const k of Object.keys(n)) if (k.startsWith(`${id}.`)) delete n[k]; return n })
   }
-  const mudarTecnico = (id: IdServicoParceiro, pid: string, v: Resposta | undefined) => setD(x => ({ ...x, servicos: x.servicos.map(s => {
+  const atuacao = d.atuacao ?? []
+  const alternarGrupo = (g: GrupoServico) => {
+    const sai = atuacao.includes(g)
+    setD(x => ({ ...x, atuacao: sai ? atuacao.filter(a => a !== g) : [...atuacao, g], servicos: sai ? x.servicos.filter(s => GRUPO_DO_SERVICO[s.id] !== g) : x.servicos }))
+    setErros(e => { const n = { ...e }; delete n.atuacao; return n })
+  }
+  const mudarTecnico = (id: IdServicoParceiro, pid: string, v: Resposta | undefined) => (setErros(e => { const n = { ...e }; delete n[`${id}.${pid}`]; return n }), setD(x => ({ ...x, servicos: x.servicos.map(s => {
     if (s.id !== id) return s
     const t = { ...(s.tecnico ?? {}) }
     if (v === undefined) delete t[pid]; else t[pid] = v
     return { ...s, tecnico: t }
-  }) }))
+  }) })))
 
   // CEP: busca rua, bairro, cidade e UF (ViaCEP) e leva o cursor para o número
   async function buscarCep(cep: string) {
@@ -189,6 +205,20 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
       setTimeout(() => numeroRef.current?.focus(), 80)
     } catch { setCepAchado(null) }
     finally { setBuscandoCep(false) }
+  }
+
+  // CNPJ: confere na Receita (BrasilAPI) e preenche razão social, nome e endereço que ainda estão vazios
+  async function buscarCnpj(doc: string) {
+    setCnpjInfo("buscando")
+    try {
+      const r = await fetch(`/api/parceiros/cnpj?c=${doc}`).then(x => x.json()) as { ok: boolean; dados?: { razaoSocial: string; nomeFantasia: string; situacao: string; ativa: boolean; cep: string; rua: string; numero: string; complemento: string; bairro: string; cidade: string; uf: string } }
+      if (!r.ok || !r.dados) { setCnpjInfo("nao_achou"); return }
+      const x = r.dados
+      setD(a => ({ ...a, razaoSocial: a.razaoSocial || x.razaoSocial, nomeFantasia: a.nomeFantasia || x.nomeFantasia || x.razaoSocial,
+        cep: a.cep || x.cep, rua: a.rua || x.rua, numero: a.numero || x.numero, complemento: a.complemento || x.complemento, bairro: a.bairro || x.bairro, cidade: a.cidade || x.cidade, uf: a.uf || x.uf }))
+      setErros(e => { const n = { ...e }; for (const k of ["nomeFantasia", "documento"]) delete n[k]; return n })
+      setCnpjInfo({ situacao: x.situacao, ativa: x.ativa })
+    } catch { setCnpjInfo(null) }   // sem consulta: o cadastro segue, a validação do dígito é local
   }
 
   function avancar() {
@@ -208,11 +238,12 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
     setEnviando(true); setErroEnvio(null)
     const f = new FormData()
     f.set("dados", JSON.stringify(d)); f.set("site", site.current?.value ?? "")
+    const origem = origemDoLink(); f.set("o", origem.o); f.set("p", origem.p)
     for (const a of arquivos) f.append("arquivos", a)
     try {
       const r = await fetch("/api/parceiros/cadastro", { method: "POST", body: f }).then(x => x.json())
       if (!r.ok) { setErroEnvio(r.erro ?? "Não deu certo. Tente de novo."); if (r.campos) { setErros(r.campos); mostrarErro() } return }
-      try { localStorage.removeItem(RASCUNHO) } catch { /* ok */ }
+      try { localStorage.removeItem(RASCUNHO); localStorage.removeItem(ORIGEM_LINK) } catch { /* ok */ }
       window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior })
       setPasso(N)
     } catch { setErroEnvio("Sem conexão. Confira a internet e tente de novo.") }
@@ -352,7 +383,29 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
         <div className="h-1 bg-[#efedf5]"><div className="h-full transition-all duration-500" style={{ width: `${progresso}%`, background: ROXO }} /></div>
       </div>
 
-      <div ref={conteudo} onKeyDown={aoTeclar} className={`max-w-[640px] mx-auto px-5 pt-6 pb-36 space-y-6 par-${anim}`} key={`${passo}-${sub}`}>
+      <div className="max-w-[640px] lg:max-w-[1000px] mx-auto lg:grid lg:grid-cols-[minmax(0,640px)_1fr] lg:gap-8 lg:items-start">
+      <div ref={conteudo} onKeyDown={aoTeclar} className={`px-5 pt-6 pb-36 space-y-6 par-${anim}`} key={`${passo}-${sub}`}>
+        {et === "atuacao" && <>
+          <div>
+            <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">O que vocês fazem?</h2>
+            <p className="text-[14px] text-[#6b6878] mt-1.5">Marque tudo o que a sua empresa faz. Com isso a gente só pergunta o que importa para o seu tipo de serviço.</p>
+          </div>
+          <div className="grid gap-2.5" data-erro={marca("atuacao")}>
+            {GRUPOS_PARCEIRO.map(g => {
+              const on = atuacao.includes(g.id)
+              return (
+                <button key={g.id} type="button" onClick={() => alternarGrupo(g.id)} aria-pressed={on}
+                  className={`relative text-left rounded-2xl p-4 pr-12 border-2 transition-all duration-200 active:scale-[0.98] ${on ? "bg-[#7c4ee4]/[0.07]" : "bg-white border-[#ece9f4]"}`} style={on ? { borderColor: ROXO } : undefined}>
+                  <span className="block text-[16px] font-semibold text-[#1d1a29] leading-tight">{g.nome}</span>
+                  <span className="block text-[13px] text-[#8a8796] leading-snug mt-0.5">{g.dica}</span>
+                  {on && <span className="absolute top-1/2 -translate-y-1/2 right-4 w-6 h-6 rounded-full grid place-items-center text-white ds-pop" style={{ background: ROXO }}><Check className="w-4 h-4" strokeWidth={3} /></span>}
+                </button>
+              )
+            })}
+          </div>
+          {E("atuacao") && <p className="text-[13px] text-[#d33a3c] font-medium">{E("atuacao")}</p>}
+        </>}
+
         {et === "empresa" && <>
           <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Conta um pouco da sua empresa</h2>
           <div data-erro={marca("nomeFantasia")}><Campo rotulo="Nome da empresa" dica="Como vocês são conhecidos no mercado" erro={E("nomeFantasia")}>
@@ -362,7 +415,9 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
             <div className="flex p-1 rounded-xl bg-[#f1eff7] w-fit mb-2">
               {(["cnpj", "cpf"] as const).map(t => <button key={t} type="button" onClick={() => { set("tipoDocumento", t); set("documento", "") }} className={`h-9 px-4 rounded-lg text-[13.5px] font-semibold transition ${d.tipoDocumento === t ? "bg-white shadow-sm text-[#1d1a29]" : "text-[#6b6878]"}`}>{t === "cnpj" ? "Tenho CNPJ" : "Ainda não tenho CNPJ"}</button>)}
             </div>
-            <input enterKeyHint="next" className={inputCls(E("documento"))} inputMode="numeric" value={mascaraDocumento(d.documento ?? "", d.tipoDocumento ?? "cnpj")} onChange={e => set("documento", e.target.value.replace(/\D/g, ""))} placeholder={d.tipoDocumento === "cpf" ? "000.000.000-00" : "00.000.000/0000-00"} />
+            <input enterKeyHint="next" className={inputCls(E("documento"))} inputMode="numeric" value={mascaraDocumento(d.documento ?? "", d.tipoDocumento ?? "cnpj")} onChange={e => { const v = e.target.value.replace(/\D/g, ""); set("documento", v); setCnpjInfo(null); if (d.tipoDocumento === "cnpj" && v.length === 14 && cnpjValido(v)) void buscarCnpj(v) }} placeholder={d.tipoDocumento === "cpf" ? "000.000.000-00" : "00.000.000/0000-00"} />
+            {d.tipoDocumento === "cnpj" && cnpjInfo === "buscando" && <span className="mt-2 inline-flex items-center gap-1.5 text-[12.5px] text-[#6b6878]"><Loader2 className="w-3.5 h-3.5 animate-spin" />Conferindo o CNPJ…</span>}
+            {d.tipoDocumento === "cnpj" && cnpjInfo && typeof cnpjInfo === "object" && <span className={`mt-2 flex items-center gap-1.5 text-[12.5px] font-medium par-surge ${cnpjInfo.ativa ? "text-[#13a06f]" : "text-[#b26a00]"}`}>{cnpjInfo.ativa ? <Check className="w-3.5 h-3.5" /> : null}CNPJ encontrado · situação {cnpjInfo.situacao.toLowerCase() || "não informada"}{cnpjInfo.ativa ? "" : ". Confira se é o CNPJ certo."}</span>}
           </Campo></div>
           {d.tipoDocumento === "cnpj" && <Campo rotulo="Razão social" opcional>
             <input enterKeyHint="next" className={inputCls()} value={d.razaoSocial ?? ""} onChange={e => set("razaoSocial", e.target.value)} placeholder="Como está no CNPJ" />
@@ -413,10 +468,10 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
         {et === "servicos" && <>
           <div>
             <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Vocês prestam qual serviço?</h2>
-            <p className="text-[14px] text-[#6b6878] mt-1.5">Marque tudo o que fazem. Na próxima etapa a gente entende cada um.</p>
+            <p className="text-[14px] text-[#6b6878] mt-1.5">Dentro do que você marcou, escolha tudo o que fazem. Na próxima etapa a gente entende cada um.</p>
           </div>
           <div className="grid grid-cols-2 gap-2.5" data-erro={marca("servicos")}>
-            {SERVICOS_PARCEIRO.map(s => {
+            {servicosDosGrupos(atuacao).map(s => {
               const on = !!servico(s.id), I = ICONE[s.id]
               return (
                 <button key={s.id} type="button" onClick={() => alternarServico(s.id)} aria-pressed={on}
@@ -443,7 +498,8 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
             const forma = FORMAS_COBRANCA.find(f => f.id === s.cobranca)
             const temErro = Object.keys(erros).some(k => k.startsWith(`${sv.id}.`))
             const perguntas = PERGUNTAS[sv.id] ?? []
-            const cenariosDoServico = cenarios.filter(x => x.servicoId === sv.id && cenarioAtivo(x.id, s.tecnico)), porAcerto = cobraPorAcertoMilheiro(sv.id)
+            const simples = cobraPorUnidadeOuHora(sv.id), porAcerto = cobraPorAcertoMilheiro(sv.id)
+            const cenariosDoServico = cenarios.filter(x => x.servicoId === sv.id && cenarioAtivo(x.id, s.tecnico))
             return (
               <section key={sv.id} className={`rounded-3xl bg-white p-5 border ${temErro ? "border-[#d33a3c]/40" : "border-[#ece9f4]"} shadow-[0_2px_10px_rgba(40,20,90,0.04)] space-y-5`}>
                 <div className="flex items-center gap-3">
@@ -452,9 +508,11 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
                 </div>
                 {sv.id === "outro" && <div data-erro={marca(`${sv.id}.qual`)}><Campo rotulo="Qual serviço?" erro={E(`${sv.id}.qual`)}><input enterKeyHint="next" className={inputCls(E(`${sv.id}.qual`))} value={s.qual ?? ""} onChange={e => mudarServico(sv.id, { qual: e.target.value })} /></Campo></div>}
 
-                {perguntas.map(p => porAcerto && p.id === "formatoMax"
+                {perguntas.filter(p => porAcerto || p.id !== "formatoMax").map(p => porAcerto && p.id === "formatoMax"
                   ? <div key={p.id} data-erro={marca(`${sv.id}.formatoMax`)}><Campo rotulo="Formato da máquina" dica="A maior folha que a máquina aceita, em cm" erro={E(`${sv.id}.formatoMax`)}><CampoFormato v={s.tecnico?.formatoMax as Formato | undefined} onChange={v => mudarTecnico(sv.id, p.id, v)} /></Campo></div>
-                  : <PerguntaTecnica key={p.id} p={p} v={s.tecnico?.[p.id]} onChange={v => mudarTecnico(sv.id, p.id, v)} />)}
+                  : p.id === "buscaEntrega"
+                    ? <div key={p.id} data-erro={marca(`${sv.id}.buscaEntrega`)}><PerguntaTecnica p={p} v={s.tecnico?.[p.id]} onChange={v => mudarTecnico(sv.id, p.id, v)} />{E(`${sv.id}.buscaEntrega`) && <p className="text-[12.5px] text-[#d33a3c] mt-1.5 font-medium par-surge">{E(`${sv.id}.buscaEntrega`)}</p>}</div>
+                    : <PerguntaTecnica key={p.id} p={p} v={s.tecnico?.[p.id]} onChange={v => mudarTecnico(sv.id, p.id, v)} />)}
 
                 {perguntas.length > 0 && <div className="h-px bg-[#efedf5]" />}
                 {cenariosDoServico.map(cenario => {
@@ -480,13 +538,13 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
                   </div>
                 )}
                 {!porAcerto && <div data-erro={marca(`${sv.id}.cobranca`)}><Campo rotulo="Como você cobra?" erro={E(`${sv.id}.cobranca`)}>
-                  <div className="flex flex-wrap gap-2">{FORMAS_COBRANCA.map(f => <Chip key={f.id} on={s.cobranca === f.id} onClick={() => mudarServico(sv.id, { cobranca: f.id })}>{f.nome}</Chip>)}</div>
+                  <div className="flex flex-wrap gap-2">{FORMAS_COBRANCA.filter(f => !simples || (FORMAS_UNIDADE_OU_HORA as readonly string[]).includes(f.id)).map(f => <Chip key={f.id} on={s.cobranca === f.id} onClick={() => mudarServico(sv.id, { cobranca: f.id })}>{f.nome}</Chip>)}</div>
                 </Campo></div>}
                 {!porAcerto && forma?.unidade && (
-                  <div key={s.cobranca} className={`grid gap-3 par-surge ${s.cobranca === "acertoMilheiro" ? "grid-cols-2" : "grid-cols-1"}`}>
+                  <div key={s.cobranca} data-erro={marca(`${sv.id}.valor`)} className={`grid gap-3 par-surge ${s.cobranca === "acertoMilheiro" ? "grid-cols-2" : "grid-cols-1"}`}>
                     {s.cobranca === "acertoMilheiro" && <Campo rotulo="Acerto (R$)" opcional><input enterKeyHint="next" className={inputCls()} inputMode="decimal" value={s.acerto ?? ""} onChange={e => mudarServico(sv.id, { acerto: Number(e.target.value.replace(",", ".")) || null })} placeholder="0,00" /></Campo>}
-                    <Campo rotulo={`Valor ${forma.unidade} (R$)`} dica={s.cobranca === "acertoMilheiro" ? undefined : "Um valor médio de referência"} opcional>
-                      <input enterKeyHint="next" className={inputCls()} inputMode="decimal" value={s.valor ?? ""} onChange={e => mudarServico(sv.id, { valor: Number(e.target.value.replace(",", ".")) || null })} placeholder="0,00" />
+                    <Campo rotulo={`Valor ${forma.unidade} (R$)`} dica={s.cobranca === "acertoMilheiro" ? undefined : "Um valor médio de referência"} opcional={!simples} erro={E(`${sv.id}.valor`)}>
+                      <input enterKeyHint="next" className={inputCls(E(`${sv.id}.valor`))} inputMode="decimal" value={s.valor ?? ""} onChange={e => mudarServico(sv.id, { valor: Number(e.target.value.replace(",", ".")) || null })} placeholder="0,00" />
                     </Campo>
                   </div>
                 )}
@@ -524,7 +582,10 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
 
         {et === "final" && <>
           <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Sua operação</h2>
-          <Campo rotulo="Outras máquinas e equipamentos" dica="Marca e modelo ajudam (ex.: Heidelberg Speedmaster, Bobst SP 102)" opcional>
+          <Campo rotulo="Equipamentos" dica="Marque o que vocês têm. Pode marcar mais de um">
+            <div className="flex flex-wrap gap-2">{EQUIPAMENTOS_PARCEIRO.map(q => { const xs = d.equipamentos ?? []; return <Chip key={q} on={xs.includes(q)} onClick={() => set("equipamentos", xs.includes(q) ? xs.filter(x => x !== q) : [...xs, q])}>{q}</Chip> })}</div>
+          </Campo>
+          <Campo rotulo="Outros equipamentos" dica="Só se não estiver na lista. Marca e modelo ajudam (ex.: Heidelberg Speedmaster, Bobst SP 102)" opcional>
             <textarea className={`${inputCls()} h-24 py-3 resize-none`} value={d.maquinas ?? ""} onChange={e => set("maquinas", e.target.value)} />
           </Campo>
           <Campo rotulo="Capacidade" dica="Quanto vocês conseguem por dia ou semana" opcional>
@@ -564,6 +625,12 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
           <input ref={site} name="site" tabIndex={-1} autoComplete="off" className="absolute -left-[9999px] w-px h-px opacity-0" aria-hidden />
           {erroEnvio && <p className="rounded-xl bg-[#fff1f1] text-[#c92f31] text-[13.5px] font-medium px-4 py-3 par-surge">{erroEnvio}</p>}
         </>}
+      </div>
+      {/* Espaço do exemplo de cadastro bem preenchido (o texto vem do marketing, ver exemploCadastro.ts) */}
+      <aside className="hidden lg:block sticky top-[88px] mt-6 rounded-3xl border border-dashed border-[#d9d4e8] bg-white p-5" aria-label={EXEMPLO_CADASTRO_TITULO}>
+        <p className="text-[12px] font-bold uppercase tracking-[0.12em]" style={{ color: ROXO }}>{EXEMPLO_CADASTRO_TITULO}</p>
+        <p className="mt-2 text-[13.5px] text-[#4a4658] leading-relaxed whitespace-pre-line">{exemploDaEtapa(et) ?? EXEMPLO_CADASTRO_VAZIO}</p>
+      </aside>
       </div>
 
       <div className="fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t border-[#efedf5]" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>

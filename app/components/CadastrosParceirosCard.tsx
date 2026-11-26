@@ -42,7 +42,7 @@ const doc = (c: CadastroParceiro) => c.tipoDocumento === "cnpj"
   : c.documento.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4")
 
 export function CadastrosParceirosCard({ onAprovar }: { onAprovar: (f: FornecedorProducao) => void }) {
-  const [lista, setLista] = React.useState<CadastroParceiro[] | null>(null)
+  const [lista, setLista] = React.useState<(CadastroParceiro & { faltando?: string[] })[] | null>(null)
   const [aberto, setAberto] = React.useState<string | null>(null)
   const [copiado, setCopiado] = React.useState(false)
   const [verTodos, setVerTodos] = React.useState(false)
@@ -90,6 +90,7 @@ export function CadastrosParceirosCard({ onAprovar }: { onAprovar: (f: Fornecedo
                     <span className="flex items-center gap-2 flex-wrap">
                       <span className="text-[13.5px] font-semibold text-[#191625]">{c.nomeFantasia}</span>
                       <span className={`text-[10.5px] font-semibold rounded-full px-1.5 py-0.5 ${c.status === "novo" ? "bg-[#8456e8]/10 text-[#8456e8]" : c.status === "aprovado" ? "bg-[#009351]/10 text-[#009351]" : "bg-[rgba(116,116,128,0.1)] text-[#898892]"}`}>{c.status === "novo" ? "Novo" : c.status === "aprovado" ? "Aprovado" : "Recusado"}</span>
+                      {c.status === "novo" && !!c.faltando?.length && <span title={`Falta: ${c.faltando.join(", ")}`} className="text-[10.5px] font-semibold rounded-full px-1.5 py-0.5 bg-[#ff9500]/10 text-[#c77700]">Incompleto · falta {c.faltando.join(", ")}</span>}
                     </span>
                     <span className="block text-[12px] text-[#898892] truncate">{c.cidade}/{c.uf} · {c.servicos.map(nomeServico).join(", ")}</span>
                   </span>

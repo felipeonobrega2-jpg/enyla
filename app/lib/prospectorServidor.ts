@@ -1,7 +1,7 @@
 // Leitura do funil e o gancho do cadastro. Não envia mensagem e não altera o cadastro do parceiro.
 import { supabase } from "./supabase"
 import {
-  aoCadastrarComCnpj, etapaConhecida, notaDoProspect, registrarCadastroRecebido as registrarNoHistorico, ETAPAS_FUNIL,
+  aoCadastrarComCnpj, aoCadastroDaProspeccao, etapaConhecida, notaDoProspect, registrarCadastroRecebido as registrarNoHistorico, ETAPAS_FUNIL,
   type EstadoFunil, type EtapaFunil, type MudancaEtapa,
 } from "./prospector"
 
@@ -84,9 +84,9 @@ function cnpjDe(documento: string, tipo: "cnpj" | "cpf"): string | null {
 
 // Lê o prospecto, calcula o próximo estado e grava com trava otimista: o update só vale se a etapa
 // ainda é a que foi lida. Se mudou no meio, não grava (quem mudou ganha). Falha quieta.
-async function mudarProspecto(cnpj: string, proximo: (estado: EstadoFunil, em: string) => EstadoFunil | null): Promise<boolean> {
+async function mudarProspecto(chave: string | { id: number | string }, proximo: (estado: EstadoFunil, em: string) => EstadoFunil | null): Promise<boolean> {
   try {
-    const { data, error } = await supabase.from(TABELA).select("id, etapa, opt_out, historico_etapas").eq("cnpj", cnpj).maybeSingle()
+    const { data, error } = await supabase.from(TABELA).select("id, etapa, opt_out, historico_etapas").eq(typeof chave === "string" ? "cnpj" : "id", typeof chave === "string" ? chave : chave.id).maybeSingle()
     if (error || !data || !etapaConhecida(data.etapa)) return false
     const em = new Date().toISOString()
     const novo = proximo({
@@ -111,6 +111,12 @@ export async function registrarCadastroRecebido(documento: string, tipo: "cnpj" 
   const cnpj = cnpjDe(documento, tipo)
   if (!cnpj) return false
   return mudarProspecto(cnpj, (estado, em) => registrarNoHistorico(estado, em, cadastroId))
+}
+
+// Cadastro de quem veio da prospecção (telefone ou CNPJ conferem): etapa para "respondeu" (se ainda antes) e "cadastrou", com o id do cadastro no histórico.
+// Trava otimista como as outras. Falha quieta; o cadastro já está salvo.
+export async function avancarProspectoPeloCadastro(prospectoId: number | string, cadastroId: string): Promise<boolean> {
+  return mudarProspecto({ id: prospectoId }, (estado, em) => aoCadastroDaProspeccao(estado, em, cadastroId))
 }
 
 // O Felipe aprovou o cadastro do parceiro (tela Fornecedores): a etapa vai para "cadastrou" quando a regra deixa.

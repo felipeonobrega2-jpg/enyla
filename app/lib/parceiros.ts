@@ -7,7 +7,7 @@ import type { Endereco } from "./frete"
 
 export type IdServicoParceiro =
   | "impressaoOffset" | "impressaoDigital" | "laminacao" | "verniz" | "hotStamping" | "relevo"
-  | "corteVinco" | "colagem" | "faca" | "papel" | "arte" | "fechamento" | "transporte" | "outro"
+  | "corteVinco" | "colagem" | "manuseio" | "montagem" | "faca" | "papel" | "arte" | "fechamento" | "transporte" | "outro"
 
 export const SERVICOS_PARCEIRO: { id: IdServicoParceiro; nome: string; dica: string; servico?: Servico }[] = [
   { id: "impressaoOffset", nome: "Impressão offset", dica: "Folhas impressas em máquina offset", servico: "impressao" },
@@ -18,6 +18,8 @@ export const SERVICOS_PARCEIRO: { id: IdServicoParceiro; nome: string; dica: str
   { id: "relevo", nome: "Relevo / baixo-relevo", dica: "Seco ou americano" },
   { id: "corteVinco", nome: "Corte e vinco", dica: "Corte com faca e vinco", servico: "corteVinco" },
   { id: "colagem", nome: "Colagem", dica: "Manual ou em coladeira", servico: "colagem" },
+  { id: "manuseio", nome: "Manuseio", dica: "Separar, contar, embalar, conferir" },
+  { id: "montagem", nome: "Montagem", dica: "Montar caixas, kits e displays" },
   { id: "faca", nome: "Fabricação de faca", dica: "Facas de corte e vinco" },
   { id: "papel", nome: "Papel e cartão", dica: "Venda de papel, cartão, kraft" },
   { id: "arte", nome: "Criação de arte", dica: "Design de embalagem", servico: "arte" },
@@ -25,6 +27,31 @@ export const SERVICOS_PARCEIRO: { id: IdServicoParceiro; nome: string; dica: str
   { id: "transporte", nome: "Transporte / frete", dica: "Leva e traz material" },
   { id: "outro", nome: "Outro serviço", dica: "Conta pra gente qual" },
 ]
+
+// ── O que a gráfica faz (primeira pergunta do cadastro, pode marcar mais de um) ──
+// Impressão cobra acerto + milheiro e pede o formato máximo da máquina. Acabamento, manuseio e montagem cobram por unidade
+// ou por hora e perguntam se buscam e entregam. "Outros" guarda o que não é nenhum dos quatro (papel, faca, arte, transporte…).
+export type GrupoServico = "impressao" | "acabamento" | "manuseio" | "montagem" | "outros"
+export const GRUPOS_PARCEIRO: { id: GrupoServico; nome: string; dica: string }[] = [
+  { id: "impressao", nome: "Impressão", dica: "Offset ou digital" },
+  { id: "acabamento", nome: "Acabamento", dica: "Laminação, verniz, hot stamping, relevo, corte e vinco" },
+  { id: "manuseio", nome: "Manuseio", dica: "Separar, contar, embalar, conferir" },
+  { id: "montagem", nome: "Montagem", dica: "Colar e montar caixas, kits e displays" },
+  { id: "outros", nome: "Outro tipo de serviço", dica: "Papel, faca, arte, fechamento, transporte…" },
+]
+export const GRUPO_DO_SERVICO: Record<IdServicoParceiro, GrupoServico> = {
+  impressaoOffset: "impressao", impressaoDigital: "impressao",
+  laminacao: "acabamento", verniz: "acabamento", hotStamping: "acabamento", relevo: "acabamento", corteVinco: "acabamento",
+  manuseio: "manuseio", colagem: "montagem", montagem: "montagem",
+  faca: "outros", papel: "outros", arte: "outros", fechamento: "outros", transporte: "outros", outro: "outros",
+}
+export const GRUPOS_IDS = GRUPOS_PARCEIRO.map(g => g.id)
+export const gruposDosServicos = (servicos: { id: IdServicoParceiro }[] | undefined): GrupoServico[] =>
+  GRUPOS_IDS.filter(g => (servicos ?? []).some(s => GRUPO_DO_SERVICO[s.id] === g))
+export const servicosDosGrupos = (grupos: GrupoServico[]) => SERVICOS_PARCEIRO.filter(s => grupos.includes(GRUPO_DO_SERVICO[s.id]))
+/** Acabamento, manuseio e montagem: preço por unidade ou por hora, prazo médio e se busca e entrega (sem formato nem acerto). */
+export const cobraPorUnidadeOuHora = (id: IdServicoParceiro) => ["acabamento", "manuseio", "montagem"].includes(GRUPO_DO_SERVICO[id])
+export const FORMAS_UNIDADE_OU_HORA = ["unidade", "hora"] as const
 
 // ── Perguntas técnicas por serviço (todas opcionais: quanto mais, melhor a gente encaixa os pedidos) ──
 export type TipoPergunta = "multi" | "um" | "simnao" | "numero" | "formato"
@@ -34,6 +61,8 @@ export type Resposta = string | string[] | number | boolean | Formato
 
 const CLICHE = ["Eu faço o clichê", "Uso o que mandarem", "Mando fazer fora"]
 const FORMATO_MAX = (rotulo = "Qual o maior formato?", dica = "A maior folha que a máquina aceita, em cm"): Pergunta => ({ id: "formatoMax", rotulo, dica, tipo: "formato" })
+
+const BUSCA_ENTREGA: Pergunta = { id: "buscaEntrega", rotulo: "Vocês buscam e entregam o material?", dica: "Na ENYLA ou onde a gente indicar", tipo: "simnao" }
 
 export const PERGUNTAS: Record<IdServicoParceiro, Pergunta[]> = {
   impressaoOffset: [
@@ -85,6 +114,14 @@ export const PERGUNTAS: Record<IdServicoParceiro, Pergunta[]> = {
     { id: "tipos", rotulo: "Tipos de caixa que cola", tipo: "multi", opcoes: ["Cartucho (cola lateral)", "Fundo automático", "Fundo 4 ou 6 pontos", "Berço / interno", "Com visor (janela)", "Display"] },
     { id: "porDia", rotulo: "Quantas caixas por dia, em média", tipo: "numero", unidade: "caixas/dia", max: 10_000_000 },
   ],
+  manuseio: [
+    { id: "tipos", rotulo: "O que fazem", tipo: "multi", opcoes: ["Separar e contar", "Embalar", "Conferir (qualidade)", "Dobrar", "Etiquetar", "Encaixotar para envio"] },
+    { id: "porDia", rotulo: "Quantas peças por dia, em média", tipo: "numero", unidade: "peças/dia", max: 10_000_000 },
+  ],
+  montagem: [
+    { id: "tipos", rotulo: "O que montam", tipo: "multi", opcoes: ["Caixas", "Kits", "Displays", "Berço / interno"] },
+    { id: "porDia", rotulo: "Quantas peças por dia, em média", tipo: "numero", unidade: "peças/dia", max: 10_000_000 },
+  ],
   faca: [
     { id: "arquivos", rotulo: "Arquivos que recebe", tipo: "multi", opcoes: ["DXF", "PDF", "AI", "CDR"] },
     { id: "tipo", rotulo: "Tipo de faca", tipo: "um", opcoes: ["Plana (lâmina em madeira)", "Rotativa", "As duas"] },
@@ -111,6 +148,16 @@ export const PERGUNTAS: Record<IdServicoParceiro, Pergunta[]> = {
   ],
   outro: [],
 }
+
+// Equipamentos: o parceiro marca em vez de escrever (o que não estiver na lista vai em "maquinas", texto livre e opcional)
+export const EQUIPAMENTOS_PARCEIRO = [
+  "Offset 2 cores", "Offset 4 cores", "Offset 5 ou mais cores", "Impressora digital", "Plotter de corte", "Laminadora",
+  "Máquina de verniz UV", "Hot stamping", "Corte e vinco plana (Minerva)", "Corte e vinco automática", "Coladeira automática",
+  "Guilhotina", "Dobradeira", "Refiladeira", "Máquina de relevo", "Veículo próprio para entrega",
+] as const
+
+// Acabamento, manuseio e montagem sempre perguntam se buscam e entregam (última pergunta)
+for (const id of Object.keys(PERGUNTAS) as IdServicoParceiro[]) if (cobraPorUnidadeOuHora(id)) PERGUNTAS[id] = [...PERGUNTAS[id], BUSCA_ENTREGA]
 
 export type FormaCobranca = "milheiro" | "folha" | "unidade" | "m2" | "acertoMilheiro" | "trabalho" | "hora" | "kg" | "tabela" | "varia"
 export const FORMAS_COBRANCA: { id: FormaCobranca; nome: string; unidade: string | null }[] = [
@@ -147,7 +194,7 @@ export type ServicoCadastrado = {
 export const CENARIOS_IDS: Record<IdServicoParceiro, string[]> = {
   impressaoOffset: [], impressaoDigital: [], laminacao: ["laminacao-fosca", "laminacao-brilho", "laminacao-soft", "laminacao-dois-lados"],
   verniz: ["verniz"], hotStamping: ["hotStamping"], relevo: ["relevo"], corteVinco: ["corteVinco"], colagem: ["colagem"], faca: ["faca"],
-  papel: ["papel"], arte: ["arte-unitaria", "arte-pacote3"], fechamento: ["fechamento"], transporte: ["transporte"], outro: [],
+  manuseio: [], montagem: [], papel: ["papel"], arte: ["arte-unitaria", "arte-pacote3"], fechamento: ["fechamento"], transporte: ["transporte"], outro: [],
 }
 // Experiência guiada: o parceiro marca o que faz (variantes) e só o marcado pede preço. Serviço sem regra aqui
 // pede o(s) exemplo(s) do serviço inteiro (marcar o serviço já é dizer que faz). Sem preço nem nome de fornecedor.
@@ -181,6 +228,10 @@ export type CadastroParceiro = {
   em: string
   status: "novo" | "aprovado" | "recusado"
   gerente: string
+  // de onde veio: "prospector" quando o telefone ou o CNPJ é de um prospecto (ou o link trazia ?o=prospector); sem valor = direto
+  origem?: "prospector" | "direto"
+  prospectoId?: number | string
+  atuacao?: GrupoServico[]         // o que a gráfica faz (primeira pergunta)
   // empresa
   nomeFantasia: string
   razaoSocial?: string
@@ -206,7 +257,8 @@ export type CadastroParceiro = {
   // operação
   capacidade?: string
   horario?: string
-  maquinas?: string
+  maquinas?: string                // outros equipamentos (texto livre)
+  equipamentos?: string[]          // marcados na lista EQUIPAMENTOS_PARCEIRO
   arquivos: { nome: string; url: string }[]
   comoConheceu?: string
   aceite: boolean
@@ -234,6 +286,18 @@ export function cpfValido(v: string): boolean {
   const dv = (n: number) => { const s = c.slice(0, n).split("").reduce((t, d, i) => t + Number(d) * (n + 1 - i), 0) * 10 % 11; return s === 10 ? 0 : s }
   return dv(9) === Number(c[9]) && dv(10) === Number(c[10])
 }
+// Texto de enchimento ("aaa", "xxxx", "123", "asdf", "..."): menos de 3 letras, um caractere só, só números/símbolos,
+// uma sílaba repetida ("ababab") ou palavra de teste. Serve para nomes e endereços, não para número da casa nem e-mail.
+const SEM_ACENTO = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+const PALAVRAS_DE_TESTE = new Set(["teste", "testes", "test", "asdf", "asdfg", "qwerty", "qwe", "abc", "abcd", "xxx", "nada", "nao tem", "n a", "na", "sem nome", "nome", "fulano", "ciclano", "aaa", "bbb"])
+export function textoEnchimento(v: unknown): boolean {
+  const t = SEM_ACENTO(String(v ?? "")).replace(/\s+/g, " ").trim()
+  const letras = t.replace(/[^a-z]/g, "")
+  if (letras.length < 3) return true                       // vazio, "ab", "123", "---"
+  if (new Set(letras).size === 1) return true              // "aaaa"
+  if (/^(.{1,3})\1{2,}$/.test(letras)) return true         // "ababab", "kkkkk"
+  return PALAVRAS_DE_TESTE.has(t.replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim())
+}
 export const emailValido = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((e ?? "").trim())
 export const whatsappValido = (w: string) => { const d = soDigitos(w).replace(/^55(?=\d{10,11}$)/, ""); return d.length === 10 || d.length === 11 }
 export const cepValido = (c: string) => soDigitos(c).length === 8
@@ -253,31 +317,37 @@ export function mascaraTelefone(v: string) {
 }
 export const mascaraCep = (v: string) => soDigitos(v).slice(0, 8).replace(/^(\d{5})(\d)/, "$1-$2")
 
-export const ETAPAS_IDS = ["empresa", "endereco", "contato", "servicos", "detalhes", "final"] as const
+export const ETAPAS_IDS = ["atuacao", "empresa", "endereco", "contato", "servicos", "detalhes", "final"] as const
 export type Etapa = typeof ETAPAS_IDS[number]
 export function errosDaEtapa(c: Partial<CadastroParceiro>, etapa: Etapa): Record<string, string> {
   const e: Record<string, string> = {}
+  if (etapa === "atuacao" && !(c.atuacao?.length) && !gruposDosServicos(c.servicos).length) e.atuacao = "Marque o que vocês fazem"
   if (etapa === "empresa") {
-    if (!c.nomeFantasia?.trim()) e.nomeFantasia = "Como sua empresa é conhecida?"
+    if (textoEnchimento(c.nomeFantasia)) e.nomeFantasia = "Informe o nome real da empresa"
     if (c.tipoDocumento === "cpf" ? !cpfValido(c.documento ?? "") : !cnpjValido(c.documento ?? "")) e.documento = c.tipoDocumento === "cpf" ? "Confira o CPF" : "Confira o CNPJ"
   }
   if (etapa === "endereco") {
     if (!cepValido(c.cep ?? "")) e.cep = "CEP com 8 números"
-    if (!c.rua?.trim()) e.rua = "Qual a rua?"
+    if (textoEnchimento(c.rua)) e.rua = "Qual a rua?"
     if (!c.numero?.trim()) e.numero = "Número (ou s/n)"
-    if (!c.bairro?.trim()) e.bairro = "Qual o bairro?"
-    if (!c.cidade?.trim()) e.cidade = "Qual a cidade?"
+    if (textoEnchimento(c.bairro)) e.bairro = "Qual o bairro?"
+    if (textoEnchimento(c.cidade)) e.cidade = "Qual a cidade?"
     if (!/^[A-Za-z]{2}$/.test(c.uf ?? "")) e.uf = "UF"
   }
   if (etapa === "contato") {
-    if (!c.responsavel?.trim()) e.responsavel = "Com quem a gente fala?"
+    if (textoEnchimento(c.responsavel)) e.responsavel = "Informe o nome de quem fala com a gente"
     if (!whatsappValido(c.whatsapp ?? "")) e.whatsapp = "WhatsApp com DDD"
     if (!emailValido(c.email ?? "")) e.email = "Confira o e-mail"
   }
   if (etapa === "servicos" && !(c.servicos?.length)) e.servicos = "Escolha pelo menos um serviço"
   if (etapa === "detalhes") for (const s of c.servicos ?? []) {
-    if (s.id === "outro" && !s.qual?.trim()) e[`${s.id}.qual`] = "Qual serviço?"
-    if (cobraPorAcertoMilheiro(s.id)) {
+    if (s.id === "outro" && textoEnchimento(s.qual)) e[`${s.id}.qual`] = "Qual serviço?"
+    if (cobraPorUnidadeOuHora(s.id)) {
+      if (!(FORMAS_UNIDADE_OU_HORA as readonly string[]).includes(s.cobranca ?? "")) e[`${s.id}.cobranca`] = "Escolha por unidade ou por hora"
+      if (!(Number(s.valor) > 0)) e[`${s.id}.valor`] = "Informe o valor"
+      if (typeof s.tecnico?.buscaEntrega !== "boolean") e[`${s.id}.buscaEntrega`] = "Diga se vocês buscam e entregam"
+      for (const cid of cenariosAtivosIds(s)) if (!(Number(s.precosExemplo?.[cid]) > 0)) e[`${s.id}.preco.${cid}`] = "Informe o preço para este exemplo"
+    } else if (cobraPorAcertoMilheiro(s.id)) {
       if (!formatoOk(s.tecnico?.formatoMax)) e[`${s.id}.formatoMax`] = "Informe o formato da máquina"
       if (!(Number(s.acerto) > 0)) e[`${s.id}.acerto`] = "Informe o acerto"
       if (!(Number(s.valor) > 0)) e[`${s.id}.valor`] = "Informe o valor do milheiro"
@@ -291,6 +361,22 @@ export function errosDaEtapa(c: Partial<CadastroParceiro>, etapa: Etapa): Record
   return e
 }
 export const errosDoCadastro = (c: Partial<CadastroParceiro>) => ETAPAS_IDS.reduce((t, et) => ({ ...t, ...errosDaEtapa(c, et) }), {} as Record<string, string>)
+
+// Mínimo para a análise (responsável, CNPJ/CPF, cidade, telefone, ao menos um serviço, e o resto do endereço, nome e e-mail):
+// as mesmas regras das etapas do formulário, sem os detalhes de preço/prazo e sem o aceite. Cadastro antigo que não passa
+// aqui é "incompleto" e o Atendente pede só esses itens pelo WhatsApp.
+const ROTULO_FALTA: Record<string, string> = {
+  nomeFantasia: "nome da empresa", documento: "CNPJ ou CPF válido", cep: "CEP", rua: "rua", numero: "número", bairro: "bairro", cidade: "cidade", uf: "UF",
+  responsavel: "nome do responsável", whatsapp: "WhatsApp com DDD", email: "e-mail", servicos: "pelo menos um serviço",
+}
+export function faltaDoCadastro(c: Partial<CadastroParceiro>): string[] {
+  const e = (["empresa", "endereco", "contato", "servicos"] as const).reduce((t, et) => ({ ...t, ...errosDaEtapa(c, et) }), {} as Record<string, string>)
+  return Object.keys(e).map(k => ROTULO_FALTA[k] ?? k)
+}
+
+export type CadastroComFalta = CadastroParceiro & { faltando: string[] }
+/** Cadastros com a lista do que falta, calculada na leitura (nada é gravado nem sobrescrito). Vazia = completo. */
+export const comFalta = (lista: CadastroParceiro[]): CadastroComFalta[] => lista.map(x => ({ ...x, faltando: faltaDoCadastro(x) }))
 
 // Respostas técnicas: só as perguntas que existem, dentro das opções e de tamanhos razoáveis
 export function limparTecnico(id: IdServicoParceiro, t: unknown): Record<string, Resposta> | undefined {
@@ -323,13 +409,15 @@ function limparExemplos(s: Partial<ServicoCadastrado> & { id: IdServicoParceiro 
   return { ...(Object.keys(precos).length ? { precosExemplo: precos } : {}), ...(Object.keys(versoes).length ? { cenarioVersoes: versoes } : {}) }
 }
 
-export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParceiro, "id" | "em" | "status" | "gerente" | "arquivos" | "base"> & { modo: ModoParceira } {
+export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParceiro, "id" | "em" | "status" | "gerente" | "arquivos" | "base" | "origem" | "prospectoId"> & { modo: ModoParceira } {
   const t = (s: unknown, max = 200) => String(s ?? "").replace(/\s+/g, " ").trim().slice(0, max)
   const n = (v: unknown, max: number) => { const k = Number(v); return Number.isFinite(k) && k > 0 && k <= max ? Math.round(k * 100) / 100 : null }
   const ids = new Set(SERVICOS_PARCEIRO.map(s => s.id)), formas = new Set(FORMAS_COBRANCA.map(f => f.id))
   const servicos = (x.servicos ?? []).filter(s => ids.has(s.id)).slice(0, 20).map(s => ({
       id: s.id, qual: s.id === "outro" ? t(s.qual, 80) : undefined, tecnico: limparTecnico(s.id, s.tecnico),
-      cobranca: cobraPorAcertoMilheiro(s.id) ? "acertoMilheiro" as const : s.cobranca && formas.has(s.cobranca) ? s.cobranca : null,
+      cobranca: cobraPorAcertoMilheiro(s.id) ? "acertoMilheiro" as const
+        : cobraPorUnidadeOuHora(s.id) ? ((FORMAS_UNIDADE_OU_HORA as readonly string[]).includes(s.cobranca ?? "") ? s.cobranca! : null)
+        : s.cobranca && formas.has(s.cobranca) ? s.cobranca : null,
       valor: n(s.valor, 1_000_000), acerto: n(s.acerto, 1_000_000),
       prazoDias: s.prazoVaria ? null : n(s.prazoDias, 120), prazoVaria: !!s.prazoVaria,
       minimo: t(s.minimo, 120) || undefined, obs: t(s.obs, 600) || undefined,
@@ -343,7 +431,9 @@ export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParce
     responsavel: t(x.responsavel, 100), whatsapp: soDigitos(x.whatsapp ?? "").slice(-13), email: t(x.email, 160).toLowerCase(),
     contatoProducao: t(x.contatoProducao, 160) || undefined,
     servicos, modo: modoDaParceira(servicos),
+    atuacao: gruposDosServicos((x.servicos ?? []).filter(s => ids.has(s.id))).concat((Array.isArray(x.atuacao) ? x.atuacao : []).filter((g): g is GrupoServico => GRUPOS_IDS.includes(g))).filter((g, i, l) => l.indexOf(g) === i),
     capacidade: t(x.capacidade, 300) || undefined, horario: t(x.horario, 160) || undefined, maquinas: t(x.maquinas, 600) || undefined,
+    equipamentos: (Array.isArray(x.equipamentos) ? x.equipamentos : []).map(String).filter(e => (EQUIPAMENTOS_PARCEIRO as readonly string[]).includes(e)).slice(0, EQUIPAMENTOS_PARCEIRO.length),
     comoConheceu: t(x.comoConheceu, 200) || undefined, aceite: !!x.aceite,
   }
 }

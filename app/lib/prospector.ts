@@ -286,3 +286,18 @@ export function aoCadastrarComCnpj(estado: EstadoFunil, em: string, cadastroId?:
   historico[historico.length - 1] = { ...historico[historico.length - 1], cadastroId }
   return { ...foi, historico }
 }
+
+export const MOTIVO_CADASTRO_DA_PROSPECCAO = "cadastro recebido de quem veio da prospecção (telefone ou CNPJ conferem)"
+
+/** Cadastro em /parceiros de quem veio da prospecção: o funil vai para "respondeu" (se ainda estava antes) e para "cadastrou",
+ *  com uma linha de histórico por etapa e o id do cadastro. Descartado, opt-out, já em "cadastrou" ou o mesmo cadastro
+ *  já registrado: nada a fazer (null). Só anda para frente; nunca apaga nada. */
+export function aoCadastroDaProspeccao(estado: EstadoFunil, em: string, cadastroId: string): EstadoFunil | null {
+  if (!cadastroId || estado.historico.some(h => h.cadastroId === cadastroId && h.etapa === "cadastrou")) return null
+  let atual: EstadoFunil | null = estado
+  if (podeTransicionar(atual.etapa, "respondeu", atual.optOut)) atual = transicionar(atual, "respondeu", em, MOTIVO_CADASTRO_DA_PROSPECCAO)
+  const foi: EstadoFunil | null = atual ? transicionar(atual, "cadastrou", em, MOTIVO_CADASTRO_DA_PROSPECCAO) : null
+  if (!foi) return null
+  const historico = foi.historico.map((h, i) => i >= estado.historico.length ? { ...h, cadastroId } : h)
+  return { ...foi, historico }
+}

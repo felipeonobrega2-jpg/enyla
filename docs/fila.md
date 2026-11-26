@@ -364,6 +364,19 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 
 **Status:** Claude Code. **Aprovo:** pedido do Felipe na issue #236 (não envia nada). Aba "Dispensados" na Fila do WhatsApp com "Devolver à Fila" (um ou vários) e `POST /api/externo {acao:'restaurar_fila', ids}` (qualquer diretor, como o dispensar). Grava o mapa `filaDispensados` novo inteiro, sem as chaves devolvidas (por causa do `MANTER_SE_AUSENTE`), e registra autor e data em `filaRestaurados`. Id inexistente é ignorado. O dispensar da tela não guarda autor, então a lista mostra nome e data.
 
+## 53. Cadastro /parceiros: validação e cadastro incompleto (issue #252, acréscimo)
+
+**Status:** Claude Code. **Aprovo:** pedido do Felipe na issue #252. Sem migração. `textoEnchimento` barra nome, responsável, rua, bairro, cidade e "outro serviço" com menos de 3 letras, repetição, só números/símbolos ou palavra de teste. Equipamentos viram opções (`equipamentos`); `maquinas` fica como "outros". Consulta de CNPJ (BrasilAPI, `/api/parceiros/cnpj`) preenche razão social, nome e endereço vazios e mostra a situação; se cair, o cadastro segue. `faltaDoCadastro`/`comFalta` marcam cadastro sem o mínimo como incompleto na leitura (nada é gravado nem apagado); o Atendente do modo parceiro pede só esses itens, sem link, e a etapa só vai a `cadastrou` quando completo. Nunca aprova. Código em `app/lib/parceiros.ts`, `cnpjConsulta.ts`, `atendenteParceiro.ts`; testes em `tests/parceiros.test.ts`, `cnpjConsulta.test.ts`, `atendenteParceiro.test.ts`.
+
+## 54. Parceiros: origem do cadastro e formulário por tipo (issue #252, comentário de 26/11/2026)
+
+**Status:** Claude Code. **Aprovo:** não (pedido do Felipe). **PR:** da issue #252. Sem migração.
+
+**Origem.** O link do Atendente (modo parceiro) e o da ordem direta levam `?o=prospector&p={id do prospecto}`; o link rastreado do e-mail leva `?o=prospector`. Ao gravar um cadastro em `/parceiros`, telefone (sem 55 e sem o 9 extra) ou CNPJ que batem com `prospectos_parceiros` marcam `origem: "prospector"` e `prospectoId`, e a etapa vai para `cadastrou` (passando por `respondeu` se ainda estava antes), com uma linha de `historico_etapas` por etapa e o id do cadastro. O id do link sozinho só marca a origem e liga ao prospecto; não anda a etapa. Opt-out e descartado não mudam. Código em `app/lib/origemCadastroServidor.ts`; testes em `tests/origemCadastro.test.ts`.
+
+**Correção retroativa.** `POST /api/parceiros/origem` (só a equipe, atrás do login), `{ "simular": true }` só conta. Só acrescenta origem e `prospectoId`, anda o funil e não apaga nem troca nada; cadastro recusado ganha a origem mas não move o funil.
+
+**Formulário por tipo.** Primeira etapa "O que vocês fazem?" (impressão, acabamento, manuseio, montagem, outro tipo; mais de um). Formato máximo, acerto e milheiro só para impressão. Acabamento, manuseio e montagem pedem valor por unidade ou por hora, prazo médio e se buscam e entregam; serviços novos `manuseio` e `montagem`. O espaço do exemplo de cadastro fica ao lado dos campos (telas largas); o texto do marketing entra em `app/lib/exemploCadastro.ts`. Testes em `tests/parceirosPorTipo.test.ts`.
 ## 52. Parceira sem preço fixo: modo `tabela` / `orcamento_por_pedido` (issue #252)
 
 **Status:** Claude Code. **Aprovo:** decisão do Felipe na issue #252. Só registro e texto; a distribuição e o aviso de pedido às parceiras ficam para um PR seguinte. `modoDaParceira` (`app/lib/parceiros.ts`) grava `modo` no cadastro: `tabela` se todo serviço tem preço e prazo médio; senão `orcamento_por_pedido`. No modo parceiro do Atendente (`atendenteParceiro.ts`), se a gráfica diz que não tem preço fixo, a IA explica a prioridade de quem cadastra preço e prazo, pergunta se ela passa um preço de referência e o prazo médio, e o histórico do prospecto registra `modo_parceira`. Nunca cita valor da ENYLA nem promete volume. Testes em `tests/parceiros.test.ts` e `tests/atendenteParceiro.test.ts`.

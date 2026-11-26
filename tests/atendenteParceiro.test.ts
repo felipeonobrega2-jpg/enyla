@@ -84,7 +84,7 @@ describe("resposta da IA à gráfica do Prospector", () => {
   it("link: o www vira o oficial e não repete quando já foi enviado", async () => {
     mundo.ia.mockResolvedValue({ texto: "Cadastre em https://www.enyla.com.br/parceiros ok", enviar_link: true, perguntas_sem_resposta: [] })
     await responderParceiro(prosp(), JID, deps())
-    expect(enviar.mock.calls[0][0]).toBe(`Cadastre em ${LINK_PARCEIROS} ok`)
+    expect(enviar.mock.calls[0][0]).toBe(`Cadastre em ${LINK_PARCEIROS}?o=prospector&p=1 ok`)
     mundo.mensagens = [nossa(`Cadastre em ${LINK_PARCEIROS}`), dela("E o pagamento?", "2026-11-25T14:59:30Z")]
     mundo.ia.mockResolvedValue({ texto: `Pagamos 50% antes e 50% na retirada. ${LINK_PARCEIROS}`, enviar_link: true, perguntas_sem_resposta: [] })
     enviar.mockClear()
@@ -92,7 +92,7 @@ describe("resposta da IA à gráfica do Prospector", () => {
     expect(enviar.mock.calls[0][0]).not.toContain("enyla.com.br")
   })
   it("cadastro já feito com o mesmo telefone: não manda o link e marca cadastrou", async () => {
-    mundo.cfg.cadastrosParceiros = [{ id: "c1", status: "novo", whatsapp: "11987654321", documento: "" }]
+    mundo.cfg.cadastrosParceiros = [{ id: "c1", status: "novo", whatsapp: "11987654321", documento: "11222333000181", tipoDocumento: "cnpj", nomeFantasia: "Gráfica Exemplo", cep: "01310100", rua: "Avenida Paulista", numero: "1000", bairro: "Bela Vista", cidade: "São Paulo", uf: "SP", responsavel: "Marcos", email: "a@b.com.br", servicos: [{ id: "corteVinco" }] }]
     await responderParceiro(prosp(), JID, deps())
     expect(enviar.mock.calls[0][0]).not.toContain("enyla.com.br")
     expect(mundo.prospectos[0].etapa).toBe("cadastrou")
@@ -207,5 +207,28 @@ describe("ajustarLink", () => {
   })
   it("com permissão e sem link no texto: acrescenta o oficial", () => {
     expect(ajustarLink("Faça o cadastro.", { pode: true, quer: true })).toBe(`Faça o cadastro.\n\n${LINK_PARCEIROS}`)
+  })
+})
+
+describe("cadastro incompleto: a IA pede só o que falta", () => {
+  const cadastro = (extra: Linha = {}) => ({ id: "PAR-1", status: "novo", whatsapp: "11987654321", documento: "11222333000181", tipoDocumento: "cnpj", nomeFantasia: "Gráfica Exemplo", cep: "01310100", rua: "Avenida Paulista", numero: "1000", bairro: "Bela Vista", cidade: "São Paulo", uf: "SP", responsavel: "Marcos", email: "a@b.com.br", servicos: [{ id: "corteVinco" }], ...extra })
+  it("manda a lista do que falta no prompt, sem link, sem mudar o cadastro e sem etapa cadastrou", async () => {
+    mundo.cfg.cadastrosParceiros = [cadastro({ cidade: "xx", responsavel: "" })]
+    const antes = structuredClone(mundo.cfg.cadastrosParceiros)
+    mundo.ia.mockResolvedValue({ texto: "Obrigado! Pra o Felipe analisar, qual é a cidade e o nome do responsável?", enviar_link: true, perguntas_sem_resposta: [] })
+    const r = await responderParceiro(prosp(), JID, deps())
+    expect(r.enviou).toBe(true)
+    const sistema = String((mundo.ia.mock.calls[0][0] as { system: string }).system)
+    expect(sistema).toContain("INCOMPLETO")
+    expect(sistema).toContain("cidade; nome do responsável")
+    expect(enviar.mock.calls[0][0] as string).not.toContain(LINK_PARCEIROS)
+    expect(mundo.prospectos[0].etapa).toBe("respondeu")
+    expect(mundo.cfg.cadastrosParceiros).toEqual(antes)
+  })
+  it("cadastro completo: não pede nada e vai para cadastrou", async () => {
+    mundo.cfg.cadastrosParceiros = [cadastro()]
+    await responderParceiro(prosp(), JID, deps())
+    expect(String((mundo.ia.mock.calls[0][0] as { system: string }).system)).not.toContain("INCOMPLETO")
+    expect(mundo.prospectos[0].etapa).toBe("cadastrou")
   })
 })

@@ -4,9 +4,10 @@ import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
 import { notificar, LINK_SISTEMA } from "./notificar"
-import { limparCadastro, errosDoCadastro, nomeServico, textoPrazo, textoEndereco, GERENTE_PADRAO, type CadastroParceiro } from "./parceiros"
+import { limparCadastro, errosDoCadastro, comFalta, type CadastroComFalta, nomeServico, textoPrazo, textoEndereco, GERENTE_PADRAO, type CadastroParceiro } from "./parceiros"
 import { textoEndereco as textoParaMotorista, type Endereco } from "./frete"
 
+import { origemDoCadastro, listarProspectosParaCasar } from "./origemCadastroServidor"
 import { CENARIOS_PADRAO, mesclarCenarios, limparCenario, cenariosPublicos, type CenarioParceiro, type CenarioPublico } from "./cenariosParceiros"
 
 type Cfg = Record<string, unknown> & { cadastrosParceiros?: CadastroParceiro[]; cenariosParceiros?: CenarioParceiro[]; agenteAuto?: { avisoNumero?: string } }
@@ -54,10 +55,23 @@ export async function receberCadastro(form: FormData): Promise<{ ok: true; id: s
       base = { ...partes, texto: textoParaMotorista(partes), lat: g.lat, lng: g.lng }
     }
   } catch { /* sem coordenada: você ajusta na aprovação */ }
-  const cadastro: CadastroParceiro = { ...dados, id, em: new Date().toISOString(), status: "novo", gerente: GERENTE_PADRAO, arquivos, base }
+  // Origem: telefone ou CNPJ de um prospecto (ou o id do link ?o=prospector&p=, se o prospecto existe) = prospector
+  const dica = { origem: String(form.get("o") ?? "").slice(0, 20), prospectoId: String(form.get("p") ?? "").replace(/\D/g, "").slice(0, 12) }
+  let ligacao: ReturnType<typeof origemDoCadastro> = null
+  try { ligacao = origemDoCadastro(dados, await listarProspectosParaCasar(), dica) } catch { /* sem a tabela: fica direto */ }
+  const origem = ligacao ? { origem: "prospector" as const, prospectoId: ligacao.prospecto.id } : { origem: "direto" as const }
+  const cadastro: CadastroParceiro = { ...dados, id, em: new Date().toISOString(), status: "novo", gerente: GERENTE_PADRAO, arquivos, base, ...origem }
   await mudarConfig((d: Cfg) => ({ cadastrosParceiros: [cadastro, ...(d.cadastrosParceiros ?? [])].slice(0, 500) }))
 
-  // Mesmo CNPJ de um prospecto: só registra no histórico do prospecto (a etapa muda na aprovação do Felipe).
+  // Veio da prospecção (telefone ou CNPJ conferem): o funil vai para "cadastrou" (e "respondeu", se ainda antes). Não envia mensagem.
+  if (ligacao?.avanca) {
+    try {
+      const { avancarProspectoPeloCadastro } = await import("./prospectorServidor")
+      await avancarProspectoPeloCadastro(ligacao.prospecto.id, cadastro.id)
+    } catch { /* o cadastro já está salvo; o funil não pode desfazer isso */ }
+  }
+
+  // Mesmo CNPJ de um prospecto que ainda não avançou (opt-out, descartado): só registra no histórico do prospecto.
   // Não mexe no cadastro e não envia mensagem.
   try {
     const { registrarCadastroRecebido } = await import("./prospectorServidor")
@@ -87,9 +101,9 @@ export async function receberCadastro(form: FormData): Promise<{ ok: true; id: s
   return { ok: true, id }
 }
 
-export async function listarCadastros(): Promise<CadastroParceiro[]> {
+export async function listarCadastros(): Promise<CadastroComFalta[]> {
   const { data: c } = await lerConfigLinha()
-  return ((c?.data ?? {}) as Cfg).cadastrosParceiros ?? []
+  return comFalta(((c?.data ?? {}) as Cfg).cadastrosParceiros ?? [])
 }
 
 export async function mudarStatus(id: string, status: CadastroParceiro["status"], fornecedorId?: string) {
