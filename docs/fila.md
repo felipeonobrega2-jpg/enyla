@@ -340,6 +340,7 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 | 44 | Prospector: teto diário de e-mail (`PROSPECTOR_TETO_EMAIL_DIA`, padrão 80) e respeito à cota da Resend | Felipe (issue #136) | urgente | — | Claude Code | não | (PR da issue #136) |
 | 45 | Porta externa: canal dos diretores até o Claude Code (`acao=perguntar_claude`, `?o=claude`, `?o=claude&id=`) | Felipe (25/11/2026, 20h11) | — | — | Claude Code | não (precisa do token `GITHUB_DIRETORES_TOKEN`, que o Felipe cria) | (PR da issue #154) |
 | 46 | Despesa em vários lotes: perguntar se o valor é o total (ratear por quantidade ou igual) ou o custo de cada lote, com prévia por lote. Não mexe em lançamentos antigos | Felipe | — | — | Claude Code | não | (PR da issue #161) |
+| 47 | Prospector: segurar primeiro contato (`PRIMEIRO_CONTATO_PAUSADO`) e limite de 10 primeiros contatos por dia útil. PR 0 da issue #208; o template novo com link de cadastro (A/B, lembrete, descadastro) vem em PR separado e troca a pausa para `false` | Felipe (issue #208) | urgente | antes do cron de 26/11 | Claude Code | não | (PR da issue #208) |
 
 ## 44. Porta externa: leitura de parceiros
 
