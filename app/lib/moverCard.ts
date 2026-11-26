@@ -6,10 +6,10 @@ import { COLUNAS_KANBAN, COL_FECHADO } from "@/app/types"
 
 const hoje = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
 
-export async function moverCard(card: { id: string; numero: string }, novaColuna: number, quem?: { por: string; motivo: string }): Promise<{ ok: true } | { ok: false }> {
+export async function moverCard(card: { id: string; numero: string }, novaColuna: number, quem?: { por: string; motivo: string; perdido?: boolean }): Promise<{ ok: true } | { ok: false }> {
   const dataFechamento = novaColuna === COL_FECHADO ? hoje() : undefined
   const { error } = await supabase.from("KanbanCard")
-    .update({ coluna: novaColuna, ...(dataFechamento ? { dataFechamento } : {}) })
+    .update({ coluna: novaColuna, ...(dataFechamento ? { dataFechamento } : {}), ...(quem?.perdido ? { motivoPerdido: quem.motivo } : {}) })
     .eq("id", card.id)
   if (error) return { ok: false }
 
