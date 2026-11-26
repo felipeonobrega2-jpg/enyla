@@ -1,11 +1,17 @@
-// Ação lancamento da porta externa (só a chave do CFO): criar, editar, desativar e estornar lançamentos financeiros
+// Ação lancamento da porta externa: criar, desativar e estornar só na chave do CFO; editar só na chave do CTO (quem confere não edita).
+// Cada edição grava um registro por campo (quem, quando em Brasília, campo, antes e depois) em AppConfig.edicoesLancamento (chave JSON aditiva).
+// Lançamentos financeiros
 // (inclui contas a pagar: despesa não paga). Nunca apaga a linha: desativar e estornar são lógicos (estornadoEm/estornadoPor,
 // colunas aditivas da migração 20261126_lancamento_estorno.sql). Marcar como pago é só baixa no livro; não dispara pagamento.
 import { randomUUID } from "crypto"
 import { supabase } from "./supabase"
+import { mudarConfig, lerCampos } from "./configAtomica"
+import { brasilia } from "./lancarDespesaExterno"
+import { COMPONENTES } from "./calibragem"
+import { CATS_DESPESA_PADRAO, CATS_RECEITA_PADRAO, type CategoriaFinanceira } from "@/app/config"
 
 export type Pedido = Record<string, unknown>
-export type Resultado = { ok: true; resultado: string; lancamento: Record<string, unknown> } | { ok: false; status: 400 | 404 | 500; erro: string }
+export type Resultado = { ok: true; resultado: string; lancamento: Record<string, unknown>; registro?: RegistroEdicao[] } | { ok: false; status: 400 | 404 | 500; erro: string }
 
 const TIPOS = ["receita", "despesa"], STATUS = ["pendente", "pago", "atrasado"]
 const FORMAS = ["pix", "boleto", "cartao_credito", "cartao_debito", "dinheiro", "transferencia", "outro", "conta"]
@@ -51,7 +57,17 @@ export async function estornarLogico(id: string, por: string, motivo: string): P
   return r.error ? { ok: false, erro: r.error.message } : { ok: true }
 }
 
-export async function lancamento(b: Pedido): Promise<Resultado> {
+export type RegistroEdicao = { autor: string; em: string; emIso: string; lancamentoId: string; campo: string; antes: unknown; depois: unknown }
+const LIMITE_REGISTROS = 2000
+
+// Categoria gravada é o id de uma categoria cadastrada e ativa (despesa: cadastro ou padrão, mais impressao/frete etc. da calibragem).
+export function categoriaValida(id: string, tipo: unknown, cfg: { categoriasDespesa?: CategoriaFinanceira[]; categoriasReceita?: CategoriaFinanceira[] }): boolean {
+  const lista = tipo === "receita" ? (cfg.categoriasReceita?.length ? cfg.categoriasReceita : CATS_RECEITA_PADRAO) : (cfg.categoriasDespesa?.length ? cfg.categoriasDespesa : CATS_DESPESA_PADRAO)
+  if (lista.some(c => c.id === id && c.ativa !== false)) return true
+  return tipo !== "receita" && COMPONENTES.some(c => c.id === id && c.id !== "semCategoria")
+}
+
+export async function lancamento(b: Pedido, autor = "cfo"): Promise<Resultado> {
   const op = b.operacao
   if (op !== "criar" && op !== "editar" && op !== "desativar" && op !== "estornar") return { ok: false, status: 400, erro: "operacao: criar, editar, desativar ou estornar." }
   const id = typeof b.id === "string" ? b.id.trim() : ""
@@ -61,7 +77,7 @@ export async function lancamento(b: Pedido): Promise<Resultado> {
   if (op === "criar" && (c.v.tipo === undefined || c.v.descricao === undefined || c.v.valor === undefined || c.v.dataVencimento === undefined))
     return { ok: false, status: 400, erro: "criar exige tipo, descricao, valor (> 0) e dataVencimento." }
   const em = new Date().toISOString()
-  const marca = ` [alterado por cfo em ${em}]`
+  const marca = ` [alterado por ${autor} em ${em}]`
 
   if (op === "desativar" || op === "estornar") {
     const { data: l } = await supabase.from("LancamentoFinanceiro").select("*").eq("id", id).maybeSingle()
@@ -80,10 +96,23 @@ export async function lancamento(b: Pedido): Promise<Resultado> {
 
   const { data: l } = await supabase.from("LancamentoFinanceiro").select("*").eq("id", id).maybeSingle()
   if (!l) return { ok: false, status: 404, erro: `Lançamento ${id} não encontrado.` }
-  const atual = l as { obs?: string | null; descricao: string }
+  const atual = l as Record<string, unknown> & { obs?: string | null; descricao: string }
   if (Object.keys(c.v).length === 0) return { ok: false, status: 400, erro: "editar: mande ao menos um campo para mudar." }
+  if (c.v.categoria !== undefined) {
+    const cfg = await lerCategorias()
+    if (!categoriaValida(String(c.v.categoria), c.v.tipo ?? atual.tipo, cfg)) return { ok: false, status: 400, erro: "categoria: mande o id de uma categoria cadastrada e ativa (não um nome livre)." }
+  }
   const mudanca = { ...c.v, obs: `${(c.v.obs as string | undefined) ?? atual.obs ?? ""}${marca}`.trim() }
+  const registro: RegistroEdicao[] = Object.keys(c.v).filter(k => (atual[k] ?? null) !== c.v[k])
+    .map(k => ({ autor, em: brasilia(new Date(em)), emIso: em, lancamentoId: id, campo: k, antes: atual[k] ?? null, depois: c.v[k] }))
+  try {
+    if (registro.length) await mudarConfig<{ edicoesLancamento?: RegistroEdicao[] }>(cfg => ({ edicoesLancamento: [...(cfg.edicoesLancamento ?? []), ...registro].slice(-LIMITE_REGISTROS) }))
+  } catch (e) { return { ok: false, status: 500, erro: `Não gravou (registro da edição falhou, o lançamento não foi alterado): ${e instanceof Error ? e.message : "erro"}` } }
   const { error } = await supabase.from("LancamentoFinanceiro").update(mudanca).eq("id", id)
   if (error) return { ok: false, status: 500, erro: `Não gravou: ${error.message}` }
-  return { ok: true, resultado: `Lançamento "${(c.v.descricao as string | undefined) ?? atual.descricao}" atualizado.`, lancamento: { ...(l as object), ...mudanca, alteradoPor: "cfo", alteradoEm: em } }
+  return { ok: true, resultado: `Lançamento "${(c.v.descricao as string | undefined) ?? atual.descricao}" atualizado.`, lancamento: { ...(l as object), ...mudanca, alteradoPor: autor, alteradoEm: em }, registro }
+}
+
+async function lerCategorias() {
+  return lerCampos<{ categoriasDespesa?: CategoriaFinanceira[]; categoriasReceita?: CategoriaFinanceira[] }>(["categoriasDespesa", "categoriasReceita"])
 }

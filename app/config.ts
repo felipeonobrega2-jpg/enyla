@@ -116,7 +116,7 @@ export type Ideia = { id: string; texto: string; status: StatusIdeia; criadaEm: 
 // Cliente de confiança: recebe antes de quitar; o saldo é esperado alguns dias após a entrega
 export type ClienteRelacionamento = { nome: string; diasAposEntrega: number }
 
-const CATS_RECEITA_PADRAO: CategoriaFinanceira[] = [
+export const CATS_RECEITA_PADRAO: CategoriaFinanceira[] = [
   { id: "pedido",      nome: "Pedido" },
   { id: "sinal",       nome: "Sinal" },
   { id: "saldo-final", nome: "Saldo final" },
@@ -124,7 +124,7 @@ const CATS_RECEITA_PADRAO: CategoriaFinanceira[] = [
   { id: "outros",      nome: "Outros" },
 ]
 
-const CATS_DESPESA_PADRAO: CategoriaFinanceira[] = [
+export const CATS_DESPESA_PADRAO: CategoriaFinanceira[] = [
   { id: "aluguel",    nome: "Aluguel" },
   { id: "fornecedor", nome: "Fornecedor" },
   { id: "materiais",  nome: "Materiais" },
