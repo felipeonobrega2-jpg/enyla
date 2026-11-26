@@ -209,6 +209,9 @@ export type CadastroParceiro = {
   maquinas?: string
   arquivos: { nome: string; url: string }[]
   comoConheceu?: string
+  /** Canal de origem (utm do link do Prospector). Gravado pelo servidor; cadastro sem utm não tem. */
+  utmSource?: string
+  utmMedium?: string
   aceite: boolean
   /** Entrada do formulário: caixa "Li e aceito os Termos de Parceria". Sem ela o envio não conclui. */
   aceiteTermos?: boolean
