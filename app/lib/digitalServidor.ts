@@ -15,6 +15,7 @@ import {
 } from "./digital"
 import { sincronizar } from "./bancoServidor"
 import { pluggyConfigurada, atualizarItem } from "./pluggy"
+import { openiConfigurada } from "./openi"
 import { asaas, asaasConfigurado, PAGO, CobrancaAsaas } from "./asaas"
 import { facaAberta, folhaDaFaca, custoReal } from "./precoDigital"
 import { soNumeros, documentoValido } from "./documento"
@@ -70,9 +71,9 @@ export async function conferirSinais(opts: { forcar?: boolean } = {}): Promise<{
   const bancoHa = cfg.digitalBancoEm ? agora - new Date(cfg.digitalBancoEm).getTime() : Infinity
   await gravarCfg(() => ({ digitalConferidoEm: new Date().toISOString(), ...(bancoHa > 20 * 60_000 ? { digitalBancoEm: new Date().toISOString() } : {}) } as Partial<CfgAgente>))
 
-  if (pluggyConfigurada()) {
+  if (pluggyConfigurada() || openiConfigurada()) {
     // A Pluggy busca no banco em segundo plano: o Pix aparece numa das próximas conferências
-    if (bancoHa > 20 * 60_000) for (const it of cfg.pluggy?.itens ?? []) await atualizarItem(it.id).catch(() => null)
+    if (bancoHa > 20 * 60_000) if (cfg.bankFeedSource !== "openi") for (const it of cfg.pluggy?.itens ?? []) await atualizarItem(it.id).catch(() => null)
     await sincronizar().catch(() => null)
   }
   const menorDia = [...pendentes.map(p => p.em.slice(0, 10)), ...restantes.map(p => p.arteAprovadaEm!.slice(0, 10))].sort()[0]
