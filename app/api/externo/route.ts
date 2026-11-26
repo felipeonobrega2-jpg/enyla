@@ -30,6 +30,7 @@ import { moverCardExterno } from "@/app/lib/moverCardExterno"
 import { gravarDigitalExterno } from "@/app/lib/gravarDigitalExterno"
 import { cancelarOrdem } from "@/app/lib/cancelarOrdem"
 import { niveisDosLeads } from "@/app/lib/nivelNoDetalhe"
+import { ordenarFornecedor, lerConversaFornecedor } from "@/app/lib/fornecedorCanal"
 import { lerHistoricoOffset, AJUDA_HISTORICO_OFFSET } from "@/app/lib/historicoOffsetExterno"
 import { leituraParceiros, AJUDA_PARCEIROS } from "@/app/lib/parceirosExterno"
 import { lerPrazosFornecedores, AJUDA_PRAZOS_FORNECEDORES, PODEM_LER_PRAZOS } from "@/app/lib/prazosFornecedoresExterno"
@@ -83,6 +84,7 @@ export async function GET(req: NextRequest) {
         "POST {acao:'lancar_despesa', chaveIdempotencia, fornecedorId, descricao, valor, dataVencimento, dataPagamento, status:'pago'|'pendente', rateio:[{loteNumero | loteId, valor}]}": "SÓ A CHAVE DO CTO (CFO e as outras recebem 403; o CFO só confere por leitura em ?o=financeiro). Lança UMA despesa (total em valor, reais) rateada por lote: cada item do rateio leva a fatia do lote (> 0, no máximo 2 casas); a soma tem de ser igual ao total, comparada em centavos (senão 400 e nada é gravado; o residual não é acertado). Lote repetido: 400; lote ou fornecedor inexistente: 404. Grava uma linha por lote com a fatia e um id de grupo (nunca o total em cada lote): custo direto, a pagar, caixa e DRE contam o total uma vez. chaveIdempotencia obrigatória (400 sem): a mesma chave com o mesmo payload devolve o resultado original sem duplicar; com payload diferente: 409. status 'pago' é só baixa no livro (dataPagamento opcional, padrão = dataVencimento): não dispara pagamento, não chama Asaas, Pluggy nem banco. Registra quem, quando (Brasília) e o payload. Resposta: { ok, resultado, despesa, rateio, registro }",
         "POST {acao:'renomear_fornecedor', id, nome}": "SÓ A CHAVE DO CTO (as outras, inclusive a do CFO, recebem 403). Troca só o nome exibido do fornecedor (AppConfig.fornecedores); o id e os vínculos continuam. id inexistente: 404; nome vazio: 400. Registra quem, quando (Brasília), id, nome anterior e novo. Resposta: { ok, resultado, fornecedor, registro }",
       } : {}),
+      "POST {acao:'ordenar_fornecedor', fornecedor, pedido, texto, anexos?}": "QUALQUER DIRETOR. Repassa ajuste de arte ou briefing a um FORNECEDOR do cadastro (fornecedor = id do cadastro; pedido ex.: DIG-0159; anexos = [{nome, url, mime?}] só de arquivos que já estão no armazenamento da Enyla). O número vem do cadastro de fornecedores ou da conversa de WhatsApp ligada a ele; número de cliente ou de lead é recusado (409). A mensagem vai para a fila do Aprovo do Felipe (marcada fornecedor) e só sai pelo WhatsApp depois do Aprovo; o horário do envio fica no histórico. Máximo 20 esperando por diretor. Resposta: { ok, resultado, destino: 'fila_aprovo', id } (cancele com cancelar_ordem). Leitura: GET ?o=fornecedor_conversa&fornecedor=<id> traz as últimas mensagens e as ordens",
       ...(comerciaisDoDiretor(diretor).length ? { "POST {acao:'ordenar_funcionario', funcionario:'atendente'|'followup'|'reativacao', cliente | jid, ordem}": "SÓ CCO e CMO (as outras recebem 403). O agente do Comercial escreve a mensagem para UM lead com o histórico do WhatsApp; REGRA (25/11): só 'cliente' (quem já comprou, nível A, B ou C) precisa do Aprovo do Felipe. Para LEAD (nunca comprou; cadastro sem compra e orçamento aberto não contam) a mensagem SAI DIRETO pelo agente indicado, só com o agente ligado e dentro do horário dele (senão 409 'fora do horário do agente', nada é criado), no máximo 20 envios diretos por dia por diretor (a 21ª volta 429). Cliente A, B, C ou nível 'indefinido' (já comprou sem curva, compra antiga, só digital, ligação fraca com quem comprou, erro de leitura) vai para a fila do Aprovo, no máximo 20 esperando por diretor (a 21ª volta 429). Texto que promete orçamento sem link real, Felipe escrevendo na conversa e gráfica do Prospector também vão para a fila. Lead sem WhatsApp: 404. Resposta: { ok, resultado, destino: 'enviado_direto'|'fila_aprovo', motivo, nivel, id }; leia o nível antes em ?o=perto ou ?o=detalhe&area=comercial" } : {}),
       "POST {acao:'mover_card', numero | loteNumero, coluna, motivo}": "QUALQUER DIRETOR. Avança um pedido de etapa na produção. numero (ORC-...) ou loteNumero (move os cards do lote); coluna de 2 (Arte/Dieline) a 8 (Expedição); motivo obrigatório (até 300 caracteres). Só avança (destino maior que a coluna atual) e só de cards já Fechados (coluna 1 em diante); nunca volta, nunca vai a 0, 9 (Entregue) ou 10 (Perdido): 400 com o motivo e nada é alterado. Só muda a coluna (preço, quantidade, sinal e opcoes ficam como estão). Registra no Tracking quem moveu (seu nome) e o motivo. Não manda mensagem nem e-mail ao cliente. Resposta: { ok, resultado, movidos: [{numero, de, para}] }",
       "POST {acao:'gravar_digital', id, situacaoArte?, prazoEntrega?, arteAprovadaEm?, motivo}": "QUALQUER DIRETOR (arteAprovadaEm: só CTO e COO). Grava no pedido Digital (id DIG-0000) só a situação da arte (sem arte | enviada | ajustes pedidos | aprovada | prova autorizada) e/ou o prazo de entrega (YYYY-MM-DD; vazio limpa e volta a 'a confirmar'). arteAprovadaEm (opcional): instante ISO com fuso, ex. 2026-11-13T14:00:00.000Z, no passado e não anterior à criação do pedido; é a data de que o acompanhamento parte para prever a entrega (use nos pedidos cuja arte foi aprovada no WhatsApp antes do gravador automático); outras chaves recebem 403 e nada é gravado. Informe ao menos um dos três; motivo obrigatório (até 300 caracteres). Registra no pedido quem gravou (seu nome), quando (Brasília), o motivo e o valor anterior de arteAprovadaEm (null se não havia). Não mexe em pagamento, status, custo nem mensagem, e não manda nada ao cliente. 400 com o motivo e nada alterado se algo estiver inválido; 403 se arteAprovadaEm vier de quem não é CTO/COO; 404 se o pedido não existe. Resposta: { ok, id, situacaoArte, prazoEntrega, arteAprovadaEm }",
@@ -139,6 +141,11 @@ export async function GET(req: NextRequest) {
       if (e instanceof ErroMeta) return NextResponse.json({ erro: e.message, codigo: e.codigo }, { status: e.status })
       return NextResponse.json({ erro: "Falha ao ler a Meta Ads." }, { status: 500 })
     }
+  }
+
+  if (o === "fornecedor_conversa") {
+    const l = await lerConversaFornecedor(req.nextUrl.searchParams.get("fornecedor")?.trim() ?? "")
+    return NextResponse.json(l.corpo, { status: l.status })
   }
 
   if (o === "conversa") {
@@ -198,7 +205,7 @@ export async function GET(req: NextRequest) {
       outrasAreas: blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")),
     })
   }
-  return NextResponse.json({ erro: "o: empresa, detalhe, conversa, perto, historico_offset, prazos_fornecedores (só COO e CTO), propostas, parceiros (CCO e CMO) ou financeiro ou custo_lote (só CFO)" }, { status: 400 })
+  return NextResponse.json({ erro: "o: empresa, detalhe, conversa, fornecedor_conversa, perto, historico_offset, prazos_fornecedores (só COO e CTO), propostas, parceiros (CCO e CMO) ou financeiro ou custo_lote (só CFO)" }, { status: 400 })
 }
 
 export async function POST(req: NextRequest) {
@@ -258,6 +265,12 @@ export async function POST(req: NextRequest) {
     msg = { id: novoId(), de: "diretor", texto: String(r.corpo.resultado), em: new Date().toISOString(), nuvem: true }
     await gravarConversa(diretor, [...await lerConversa(diretor), msg])
     return NextResponse.json(r.corpo)
+  } else if (b.acao === "ordenar_fornecedor") {
+    const r = await ordenarFornecedor(diretor, b, novoId)
+    if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
+    msg = { id: novoId(), de: "diretor", texto: r.resultado, em: new Date().toISOString(), acoes: [r.acao], nuvem: true }
+    await gravarConversa(diretor, [...await lerConversa(diretor), msg])
+    return NextResponse.json({ ok: true, resultado: r.resultado, destino: r.destino, id: r.id })
   } else if (b.acao === "cancelar_ordem") {
     const r = await cancelarOrdem(diretor, b)
     return NextResponse.json(r.corpo, { status: r.status })
@@ -294,7 +307,7 @@ export async function POST(req: NextRequest) {
       await gravarConversa(diretor, [...await lerConversa(diretor), msg])
       return NextResponse.json({ ok: true, resultado: saida, destino: r.destino, motivo: r.motivo, nivel: r.nivel, id: r.acao.id })
     }
-  } else return NextResponse.json({ erro: `acao: relatar, lancar_despesa, renomear_fornecedor, mover_card, gravar_digital, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, restaurar_fila, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
+  } else return NextResponse.json({ erro: `acao: relatar, ordenar_fornecedor, lancar_despesa, renomear_fornecedor, mover_card, gravar_digital, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, restaurar_fila, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
   await gravarConversa(diretor, [...await lerConversa(diretor), msg])
   return NextResponse.json({ ok: true, resultado: saida })
 }
