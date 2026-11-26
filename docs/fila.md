@@ -1,6 +1,7 @@
 # Fila de construção
 
 Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude Code via GitHub Action `@claude`) e o Felipe com o Claude Code. O trabalho entra por aqui. Quem não está nesta fila não começa.
+| 52 | Prospector: trava de idempotência no envio (um destino + uma campanha + um canal = um envio só; `Idempotency-Key` em `ordenar_funcionario`; migração aditiva `20261201_prospector_envios_idem.sql`, a aplicar antes do deploy) | Felipe (issue #249) | — | — | Claude Code | não | (PR da issue #249) |
 
 ## Regras
 

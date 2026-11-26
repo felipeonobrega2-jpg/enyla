@@ -6,6 +6,7 @@
 import { mudarConfig } from "./configAtomica"
 import { supabase } from "./supabase"
 import { evo } from "./evolution"
+import { MOTIVO_JA_ENVIADO, campanhaDa, liberarEnvio, reservarEnvio } from "./envioIdem"
 import { celularWhatsapp, chaveTelefone, dentroDoHorario } from "./prospectorEnvio"
 import type { ProspectoDoJid } from "./prospectorTrava"
 import type { AcaoConversa } from "./diretoriaServidor"
@@ -57,16 +58,28 @@ async function registrar(p: ProspectoDoJid, entrada: Record<string, unknown>): P
 }
 
 /** Com o texto já redigido: reserva a vez, confere de novo a exclusão, envia pela Evolution e registra no histórico. */
-export async function enviarAoProspecto(a: { diretor: string; func: Pick<Funcionario, "nome">; prospecto: ProspectoDoJid; jid: string; texto: string; novoId: () => string; agora?: Date }): Promise<SaidaProspecto> {
+export async function enviarAoProspecto(a: { diretor: string; func: Pick<Funcionario, "nome">; prospecto: ProspectoDoJid; jid: string; texto: string; novoId: () => string; agora?: Date; campanha?: string }): Promise<SaidaProspecto> {
   const trava = travasDoProspecto(a.prospecto, a.agora)
   if (trava) return trava
   const numero = celularWhatsapp(a.prospecto.telefone) ?? (/^\d{10,13}$/.test(a.jid.split("@")[0]) && a.jid.endsWith("@s.whatsapp.net") ? a.jid.split("@")[0] : null)
   if (!numero || chaveTelefone(numero).length < 10) return { saida: "Prospecto sem número de WhatsApp válido: nada foi enviado.", status: 400, motivo: "sem número", nivel: "lead" }
+  // Idempotência (#249): reserva antes de qualquer envio. Quem não reservou não envia e a tentativa fica registrada.
+  const campanha = a.campanha || campanhaDa({}, a.texto)
+  if (!(await reservarEnvio(a.prospecto.id, "whatsapp", campanha))) {
+    await registrar(a.prospecto, { motivo: `envio barrado (${MOTIVO_JA_ENVIADO}) por ${a.diretor.toUpperCase()}`, barrado: { canal: "whatsapp", campanha, por: a.diretor, em: new Date().toISOString() } }).catch(() => null)
+    return { saida: `Nada foi enviado: ${MOTIVO_JA_ENVIADO}.`, status: 409, motivo: MOTIVO_JA_ENVIADO, nivel: "lead" }
+  }
   const espera = await reservarVez()
-  if (espera == null) return { saida: "Muitos envios seguidos ao Prospector: espere alguns segundos. Nada foi enviado.", status: 429, motivo: "espaçamento", nivel: "lead" }
+  if (espera == null) {
+    await liberarEnvio(a.prospecto.id, "whatsapp", campanha).catch(() => null)
+    return { saida: "Muitos envios seguidos ao Prospector: espere alguns segundos. Nada foi enviado.", status: 429, motivo: "espaçamento", nivel: "lead" }
+  }
   await dormir(espera)
   const r = await evo<{ key?: { id?: string } }>("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: numero, text: a.texto }) })
-  if (!r.ok || !r.corpo?.key?.id) return { saida: `Não enviou (WhatsApp ${r.status}). Nada foi para a fila.`, status: 503, motivo: `WhatsApp não enviou (${r.status})`, nivel: "lead" }
+  if (!r.ok || !r.corpo?.key?.id) {
+    await liberarEnvio(a.prospecto.id, "whatsapp", campanha).catch(() => null)   // nada saiu: a nova tentativa pode sair
+    return { saida: `Não enviou (WhatsApp ${r.status}). Nada foi para a fila.`, status: 503, motivo: `WhatsApp não enviou (${r.status})`, nivel: "lead" }
+  }
   const em = new Date().toISOString()
   await registrar(a.prospecto, { motivo: `mensagem enviada por ${a.diretor.toUpperCase()} (${a.func.nome}, ordem pela porta externa)`, mensagem: { direcao: "enviada", canal: "whatsapp", por: a.diretor, funcionario: a.func.nome, texto: a.texto, em } }).catch(() => null)
   const nome = a.prospecto.nome_fantasia || a.prospecto.razao_social || a.jid
