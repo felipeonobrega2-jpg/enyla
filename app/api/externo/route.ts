@@ -25,6 +25,7 @@ import { moverCardExterno } from "@/app/lib/moverCardExterno"
 import { cancelarOrdem } from "@/app/lib/cancelarOrdem"
 import { niveisDosLeads } from "@/app/lib/nivelNoDetalhe"
 import { leituraParceiros, AJUDA_PARCEIROS } from "@/app/lib/parceirosExterno"
+import { leituraExtrato } from "@/app/lib/extratoServidor"
 
 // Porta de acesso dos diretores na nuvem (ex.: Grok Bot). Pública no proxy, mas cada chamada exige a chave do diretor
 // (Authorization: Bearer enyla_<diretor>_...). Leitura da empresa e as mesmas ferramentas da conversa com o Felipe;
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
 
   if (!o) return NextResponse.json({
     voce: `${info.nome}, ${info.cargo} (${info.area})`,
-    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | ") + " | parceiros (só CCO e CMO)", ...(podeAcionarComercial(diretor) ? { "?o=parceiros": AJUDA_PARCEIROS } : { "?o=parceiros": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): cadastros de /parceiros e respostas do Prospector" }), "?o=conversa": "o que você e o Felipe conversaram", ...(podeAcionarComercial(diretor) ? { "?o=perto": AJUDA_PERTO } : { "?o=perto": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): a lista 'Perto de você'" }), ...(diretor === "cfo" ? AJUDA_FINANCEIRO : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa" }), ...(diretor === "cmo" ? { "?o=meta_ads": "Meta Ads ao vivo (só leitura): conta, campanhas, conjuntos e anúncios; hoje, 7 e 30 dias; cache de 3 min; bloco funil por campanha (7 e 30 dias: leads, mql, orçamentos, pedidos, vendido, gasto, custo por lead e por MQL) e previsaoSaldoDias" } : {}) },
+    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | ") + " | parceiros (só CCO e CMO)", ...(podeAcionarComercial(diretor) ? { "?o=parceiros": AJUDA_PARCEIROS } : { "?o=parceiros": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): cadastros de /parceiros e respostas do Prospector" }), "?o=conversa": "o que você e o Felipe conversaram", ...(podeAcionarComercial(diretor) ? { "?o=perto": AJUDA_PERTO } : { "?o=perto": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): a lista 'Perto de você'" }), ...(diretor === "cfo" ? { ...AJUDA_FINANCEIRO, "?o=extrato&de=AAAA-MM-DD&ate=AAAA-MM-DD": "SÓ A CHAVE DO CFO. Só leitura. Extrato OFX do Santander importado no painel (data, valor, tipo credito|debito, descricao, fitId, conta, arquivoOrigem, importadoEm) e sugestoesDeCasamento: para cada despesa paga, débito de mesmo valor e data em até ±3 dias. Só sugestão, nada é gravado" } : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa" }), ...(diretor === "cmo" ? { "?o=meta_ads": "Meta Ads ao vivo (só leitura): conta, campanhas, conjuntos e anúncios; hoje, 7 e 30 dias; cache de 3 min; bloco funil por campanha (7 e 30 dias: leads, mql, orçamentos, pedidos, vendido, gasto, custo por lead e por MQL) e previsaoSaldoDias" } : {}) },
     escrita: { "POST {acao:'relatar', texto}": "manda algo ao Felipe",
       "POST {acao:'dispensar_pendencia', chave, motivo, ate?}": "QUALQUER DIRETOR. Dispensa uma pendência (a chave vem em ?o=empresa, campo pendencias) com motivo obrigatório (sem motivo: 400); ate (AAAA-MM-DD) opcional: depois dessa data ela volta. Não apaga nada",
       "POST {acao:'tarefa_felipe', titulo, detalhe?, prazo? (AAAA-MM-DD)}": "QUALQUER DIRETOR. Põe uma tarefa na lista 'Depende de você' do Felipe (pedido por você, com data e prazo). titulo obrigatório (até 140 caracteres); no máximo 10 abertas por diretor (a 11ª volta 429). Suas tarefas (abertas e feitas nos últimos 7 dias) estão em ?o=empresa, campo tarefasParaFelipe. {acao:'tarefa_felipe', operacao:'cancelar', id} cancela só as suas. Não manda mensagem a ninguém",
@@ -80,6 +81,12 @@ export async function GET(req: NextRequest) {
   if (o === "financeiro") {
     if (diretor !== "cfo") return NextResponse.json({ erro: "?o=financeiro é só para a chave do CFO." }, { status: 403 })
     const l = await leituraFinanceira(req.nextUrl.searchParams)
+    return NextResponse.json(l.corpo, { status: l.status })
+  }
+
+  if (o === "extrato") {
+    if (diretor !== "cfo") return NextResponse.json({ erro: "?o=extrato é só para a chave do CFO." }, { status: 403 })
+    const l = await leituraExtrato(req.nextUrl.searchParams)
     return NextResponse.json(l.corpo, { status: l.status })
   }
 
