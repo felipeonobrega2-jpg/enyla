@@ -41,3 +41,28 @@ export async function ehProspecto(jid: string | null | undefined): Promise<boole
   const chaves = await chavesDosProspectos()
   return [...candidatos].some(k => chaves.has(k))
 }
+
+export type ProspectoDoJid = {
+  id: number; razao_social: string | null; nome_fantasia: string | null; telefone: string | null
+  etapa: string; opt_out: boolean; historico_etapas: unknown; atualizado_em: string
+}
+
+/** A linha do prospecto dono desse jid (mesma casa de números de ehProspecto), ou null. Só lê. */
+export async function prospectoDoJid(jid: string | null | undefined): Promise<ProspectoDoJid | null> {
+  if (!jid) return null
+  const candidatos = new Set<string>()
+  const juntar = (j: string | null | undefined) => { if (j && j.endsWith("@s.whatsapp.net")) candidatos.add(chaveTelefone(j.split("@")[0])) }
+  juntar(jid)
+  if (jid.endsWith("@lid")) juntar(await lerApelidos().then(a => a[jid]).catch(() => undefined))
+  candidatos.delete("")
+  if (![...candidatos].some(k => k.length >= 10)) return null
+  for (let p = 0; p < MAX_PAGINAS; p++) {
+    const { data, error } = await supabase.from("prospectos_parceiros")
+      .select("id, razao_social, nome_fantasia, telefone, etapa, opt_out, historico_etapas, atualizado_em").range(p * POR_PAGINA, (p + 1) * POR_PAGINA - 1)
+    if (error || !data) return null
+    const achou = (data as ProspectoDoJid[]).find(r => candidatos.has(chaveTelefone(r.telefone)))
+    if (achou) return achou
+    if (data.length < POR_PAGINA) break
+  }
+  return null
+}
