@@ -363,3 +363,7 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 ## 51. Fila: desfazer dispensa (issue #236)
 
 **Status:** Claude Code. **Aprovo:** pedido do Felipe na issue #236 (não envia nada). Aba "Dispensados" na Fila do WhatsApp com "Devolver à Fila" (um ou vários) e `POST /api/externo {acao:'restaurar_fila', ids}` (qualquer diretor, como o dispensar). Grava o mapa `filaDispensados` novo inteiro, sem as chaves devolvidas (por causa do `MANTER_SE_AUSENTE`), e registra autor e data em `filaRestaurados`. Id inexistente é ignorado. O dispensar da tela não guarda autor, então a lista mostra nome e data.
+
+## 52. Parceira sem preço fixo: modo `tabela` / `orcamento_por_pedido` (issue #252)
+
+**Status:** Claude Code. **Aprovo:** decisão do Felipe na issue #252. Só registro e texto; a distribuição e o aviso de pedido às parceiras ficam para um PR seguinte. `modoDaParceira` (`app/lib/parceiros.ts`) grava `modo` no cadastro: `tabela` se todo serviço tem preço e prazo médio; senão `orcamento_por_pedido`. No modo parceiro do Atendente (`atendenteParceiro.ts`), se a gráfica diz que não tem preço fixo, a IA explica a prioridade de quem cadastra preço e prazo, pergunta se ela passa um preço de referência e o prazo médio, e o histórico do prospecto registra `modo_parceira`. Nunca cita valor da ENYLA nem promete volume. Testes em `tests/parceiros.test.ts` e `tests/atendenteParceiro.test.ts`.
