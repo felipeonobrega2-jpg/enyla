@@ -17,6 +17,7 @@ import {
 import { brl, num } from "../utils"
 import { ratearValor, type ModoRateio } from "../lib/ratearLotes"
 import { CategoriaFinanceira, ContaBancaria, Configuracoes } from "../config"
+import { DigitalReceberLista } from "./DigitalReceberLista"
 import { ContasTab } from "./financeiro/ContasTab"
 import { BancoTab } from "./financeiro/BancoTab"
 import { FixasTab } from "./financeiro/FixasTab"
@@ -190,7 +191,7 @@ const DEFAULT_CATS_REC: CategoriaFinanceira[] = [
 
 function statusEfetivo(l: LancamentoFinanceiro): StatusLancamento {
   if (l.status === "pago") return "pago"
-  if (l.dataVencimento < hoje()) return "atrasado"
+  if (l.dataVencimento && l.dataVencimento < hoje()) return "atrasado"   // vencimento vazio (restante do Digital sem material pronto) não atrasa
   return "pendente"
 }
 
@@ -1549,7 +1550,7 @@ export function FinanceiroView({
           const verLanc = (tipo: TipoLancamento | "", status: StatusLancamento | "") => {
             setFiltroTipo(tipo); setFiltroStatus(status); setFiltroCategoria(""); setFiltroRevisar(false); irAba("lancamentos")
           }
-          const proximos = lancamentos.filter(l => isReceitaPendenteValida(l)).sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento)).slice(0, 8)
+          const proximos = lancamentos.filter(l => isReceitaPendenteValida(l) && !!l.dataVencimento).sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento)).slice(0, 8)
           const mesAtual = monthlyData12m[11]?.receita ?? 0
           const mesAnterior = monthlyData12m[10]?.receita ?? 0
           const variacao = mesAnterior > 0 ? (mesAtual - mesAnterior) / mesAnterior * 100 : null
@@ -1828,8 +1829,10 @@ export function FinanceiroView({
         })()}
 
         {/* ── A RECEBER ── */}
-        {tab === "receber" && (
+        {tab === "receber" && linha === "digital" && <DigitalReceberLista />}
+        {tab === "receber" && linha !== "digital" && (
           <div className="space-y-2">
+            {linha === "todas" && <div className="mb-4"><DigitalReceberLista /></div>}
             <p className="text-[11.5px] text-[#8E8E93] mb-3">
               Pedidos fechados ou em produção, e ganhos de parcerias pendentes.
             </p>
