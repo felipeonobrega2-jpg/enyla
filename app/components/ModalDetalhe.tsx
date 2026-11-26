@@ -9,6 +9,7 @@ import {
 import type { FormData, Calculo, PropostaCustom, KanbanCard, LancamentoFinanceiro, PedidoArquivo, ProjecaoCustos, PrazoEtapas } from "../types"
 import { COLUNAS_KANBAN, COL_FECHADO, COL_EXPEDICAO, COL_PERDIDO, COL_HOT } from "../types"
 import type { Pedido } from "../lib/negocio"
+import { nomeConfere } from "../lib/perdido"
 import { brl, num } from "../utils"
 import { enviarFotoProducao } from "../lib/imagem"
 import { Botao, Selo, Tom } from "./ds"
@@ -196,10 +197,33 @@ function BotaoCopiar({ rotulo, icone, obterUrl, variante = "secundario", titulo 
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
 
+function ExcluirDefinitivo({ nomeCliente, onConfirmar }: { nomeCliente: string; onConfirmar: () => void }) {
+  const [aberto, setAberto] = useState(false)
+  const [digitado, setDigitado] = useState("")
+  return (
+    <div className="shrink-0 px-8 py-3 border-t border-[rgba(60,60,67,0.08)]">
+      {!aberto ? (
+        <button onClick={() => setAberto(true)} className="text-[11.5px] font-medium text-[#d33a3c] hover:underline">Excluir definitivamente</button>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-[12px] text-[#5e5c68]">Apaga o pedido de vez, sem volta. Digite o nome do cliente (<b>{nomeCliente}</b>) para confirmar.</p>
+          <div className="flex gap-2">
+            <input value={digitado} onChange={e => setDigitado(e.target.value)} placeholder="Nome do cliente"
+              className="flex-1 text-[12px] border border-[rgba(0,0,0,0.12)] rounded-lg px-2.5 py-1.5 focus:outline-none cursor-text select-text" />
+            <button onClick={() => { setAberto(false); setDigitado("") }} className="px-3 text-[12px] text-[#8E8E93]">Cancelar</button>
+            <button disabled={!nomeConfere(digitado, nomeCliente)} onClick={onConfirmar}
+              className="px-3 py-1.5 text-[12px] font-bold text-white rounded-lg disabled:opacity-40" style={{ background: "#d33a3c" }}>Excluir definitivamente</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ModalDetalhe({
   data, parcFator, onClose, onEditar, onEditarHistorico, onPersonalizarHistorico,
   onSaveDelivery, onSaveDeliveryReal, onSaveCloseDate,
-  onRegistrarSobra, onSaveFornecedor, onEmitirOS, onSaveCardExtras, onSaveProjecao, onSavePrazos, onMoveEtapa, onSavePreco, lancamentos, pedido,
+  onRegistrarSobra, onSaveFornecedor, onEmitirOS, onSaveCardExtras, onSaveProjecao, onSavePrazos, onMoveEtapa, onSavePreco, onExcluirDefinitivo, lancamentos, pedido,
 }: {
   data: DetalheData
   parcFator: number
@@ -218,6 +242,7 @@ export function ModalDetalhe({
   onSavePrazos?: (cardId: string, prazos: PrazoEtapas) => void
   onMoveEtapa?: (cardId: string, coluna: number) => void
   onSavePreco?: (cardId: string, preco: number) => void
+  onExcluirDefinitivo?: (cardId: string) => void   // só admin; confirma digitando o nome do cliente
   lancamentos?: LancamentoFinanceiro[]
   pedido?: Pedido   // pedido completo (lote inteiro) da camada canônica
 }) {
@@ -786,6 +811,7 @@ export function ModalDetalhe({
               )}
             </div>
           </div>
+          {onExcluirDefinitivo && <ExcluirDefinitivo nomeCliente={card.nomeCliente} onConfirmar={() => onExcluirDefinitivo(card.id)} />}
         </>) : (<>
           {/* ── Orçamento do histórico / proposta personalizada (sem card) ── */}
           <div className="flex-1 min-h-0 flex">

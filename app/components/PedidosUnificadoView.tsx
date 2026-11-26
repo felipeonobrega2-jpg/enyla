@@ -91,7 +91,7 @@ type Props = {
   onCopiarPedido?: (entry: OrderEntry) => void
   // kanban passthrough
   onMove: (id: string, coluna: number) => void
-  onDelete: (id: string) => void
+  onMarcarPerdido: (id: string, motivo: string) => void
   onSetMotivo: (id: string, motivo: string) => void
   onFechamento: (id: string, opcao: KanbanOpcao) => void
   onHotOpcao?: (id: string, opcao: KanbanOpcao) => void
@@ -124,7 +124,7 @@ export function PedidosUnificadoView(props: Props) {
   const {
     kanban, historico, lancamentos, isDark,
     onDetalhes, onNovoLancamento, onSalvarData, onSavePrazos, onSalvarPrazoRecebimentoInterno,
-    onMove, onDelete, onSetMotivo, onFechamento, onHotOpcao, onKanbanDetalhes,
+    onMove, onMarcarPerdido, onSetMotivo, onFechamento, onHotOpcao, onKanbanDetalhes,
     rodadas, lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge, onLoteRename,
     negocios, onUpdateNegocio, onAddLancamento, onBulkUpdate, onCopiarPedido,
     onChamarFrete, fretesVersao, onLancamentosRemovidos, onEditarLancamento,
@@ -351,7 +351,7 @@ export function PedidosUnificadoView(props: Props) {
               isDark={isDark}
               cards={kanbanFiltrado}
               onMove={onMove}
-              onDelete={onDelete}
+              onMarcarPerdido={onMarcarPerdido}
               onSetMotivo={onSetMotivo}
               onFechamento={onFechamento}
               onHotOpcao={onHotOpcao}
