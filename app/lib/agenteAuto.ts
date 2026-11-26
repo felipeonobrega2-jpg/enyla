@@ -31,7 +31,8 @@ import {
 } from "./agenteLeads"
 import { corrigirCumprimento, type DadosPedido } from "./atendente"
 import { mudarConfig } from "./configAtomica"
-import { ehProspecto } from "./prospectorTrava"
+import { prospectoDoJid } from "./prospectorTrava"
+import { prospectoExcluido } from "./ordemProspecto"
 import { notificar, LINK_SISTEMA } from "./notificar"
 import { limparEmojis, leadEstaRindo } from "./estilo"
 import { escolherMidia, MidiaAgente } from "./midiaAgente"
@@ -483,8 +484,9 @@ export async function agendarResposta(msgId: string, origem: string) {
     const pessoal = (cfg.agenteAuto as { avisoNumero?: string } | undefined)?.avisoNumero?.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "")
     if (pessoal && pessoal.length >= 10 && String(m?.jid ?? "").split("@")[0].replace(/^55(?=\d{10,11}$)/, "") === pessoal) return
   }
-  // Gráfica do Prospector que respondeu não é cliente: a Atendente não agenda (a mensagem já está gravada)
-  if (await ehProspecto(await jidDaMensagem(msgId))) return
+  // Gráfica do Prospector que respondeu não é cliente: atendida no modo parceiro (responderSozinho). Excluída (opt-out/descartada): nada.
+  const prospectoDaMsg = await prospectoDoJid(await jidDaMensagem(msgId))
+  if (prospectoDaMsg && prospectoExcluido(prospectoDaMsg)) return
   // Saudação automática do lead: segura e avisa o Felipe já, sem a espera nem a IA
   if (await segurarSaudacaoDoLead(cfg, msgId).catch(() => false)) return
   // Ritmo de gente (somado à 2ª etapa): de dia ~40 s a 1 min; de madrugada mais devagar (~1 a 1,5 min)
@@ -578,6 +580,25 @@ export function comDesculpa(texto: string): string {
   return `${saudacao}Desculpa a demora pra te responder! ${resto}`.trim()
 }
 
+async function responderProspectoParceiro(cfg: CfgAgente, msgId: string, jid: string, prospecto: NonNullable<Awaited<ReturnType<typeof prospectoDoJid>>>, opts: { atrasada?: boolean }) {
+  if (prospectoExcluido(prospecto)) return
+  // As mesmas travas de uma resposta por mensagem
+  if (!await reservarMensagem(msgId) && !opts.atrasada) return
+  if (opts.atrasada && !await reservarAtrasada(msgId)) return
+  const c = await lerConversa(jid)
+  if (!c) return
+  const log = (cfg.agenteLog ?? []).filter(l => l.jid === jid)
+  if (await voceNaConversa(jid, log, cfg)) return   // o Felipe escreveu há pouco: não entra por cima
+  const { responderParceiro } = await import("./atendenteParceiro")
+  const avisar = async (texto: string) => {
+    const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
+    if (destino) await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: texto }) })
+  }
+  const r = await responderParceiro(prospecto, jid, { enviar: t => enviar(c, t), avisar }).catch(e => ({ enviou: false, motivo: `erro: ${String(e).slice(0, 120)}`, texto: undefined as string | undefined }))
+  if (!r.enviou && opts.atrasada) await liberarTratada(chaveAtrasada(msgId)).catch(() => null)
+  return registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: "indefinido", enviou: r.enviou, texto: r.texto ?? "", motivo: `prospecto parceiro: ${r.motivo}` })
+}
+
 // atrasada: resposta que não saiu na hora (ex.: IA sem crédito). Sai já, sem a espera, mesmo que a mensagem já
 // tenha sido "reservada" pela tentativa que falhou, e começa pedindo desculpa pela demora. As travas são as de sempre
 // (cliente antigo, conversa sua, MQL, limites): só muda o tempo e a primeira frase.
@@ -595,8 +616,10 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     if (opts.atrasada) await mudarConfig((d: { vigiaTentouV3?: string[] }) => ({ vigiaTentouV3: (d.vigiaTentouV3 ?? []).filter(x => x !== msgId) })).catch(() => null)
     return
   }
-  // Gráfica do Prospector (também na resposta atrasada, em assumir e continuar e em retomar parados): sem IA, sem envio
-  if (await ehProspecto(jid)) return
+  // Gráfica do Prospector (também na resposta atrasada, em assumir e continuar e em retomar parados): modo parceiro,
+  // com prompt próprio (não orça, não é cliente A/B/C). Excluída (opt-out/descartada): nada sai.
+  const prospecto = await prospectoDoJid(jid)
+  if (prospecto) return responderProspectoParceiro(cfg, msgId, jid, prospecto, opts)
   // Cada mensagem do lead é respondida uma vez só (dois disparos ao mesmo tempo: só um passa)
   if (!await reservarMensagem(msgId) && !opts.atrasada) return
   // Atrasada passa por cima da reserva (a tentativa que falhou já reservou): trava própria de 10 min por mensagem,
