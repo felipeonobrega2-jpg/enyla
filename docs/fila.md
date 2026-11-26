@@ -63,7 +63,8 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 44 | Porta externa: leitura de parceiros (`?o=parceiros` e `?o=detalhe&area=parceiros`): cadastros de /parceiros e respostas do Prospector, só leitura, CCO e CMO | CCO | hoje | — | Claude Code | não | (PR da issue #144) |
 | 45 | WhatsApp: busca acha "Alisson" em "Allison" (sem acento, sem letra dobrada, por telefone) e acha conversas antigas fora das 1.000 da lista | Felipe | — | — | Claude Code | não (correção de erro) | https://github.com/felipeonobrega2-jpg/enyla/pull/149 |
 | 49 | Perfil diretor: login por usuário (admin/diretor), 7 interruptores de bloqueio desligados por padrão, auditoria (quem, quando, antes e depois) e tela de administração | Felipe (Aprovo 26/11/2026, 6h26 e 6h28) | — | — | Claude Code | **aprovado pelo Felipe** (cobre construir e juntar); migration aditiva `20261129_usuarios_acesso.sql` roda no SQL Editor | (PR da issue #214) |
-| 50 | WhatsApp Fila: passo de confirmação (destinatário e texto; Cancelar/Confirmar envio) antes de "Enviar mesmo assim". Não muda envio, fila nem Aprovo | CCO | — | — | Claude Code | **NÃO JUNTAR sem o Aprovo do Felipe** (mexe no fluxo de envio a cliente) | (PR da issue #225) |
+| 50 | Acompanhamento Digital usa prazo e arte gravados (`gravar_digital`) e guarda todas as edições (`edicoesAcomp`) | Felipe | urgente | — | Claude Code | não | (PR da issue #230) |
+| 51 | WhatsApp Fila: passo de confirmação (destinatário e texto; Cancelar/Confirmar envio) antes de "Enviar mesmo assim". Não muda envio, fila nem Aprovo | CCO | — | — | Claude Code | **NÃO JUNTAR sem o Aprovo do Felipe** (mexe no fluxo de envio a cliente) | (PR da issue #225) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -345,9 +346,18 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 | 46 | Despesa em vários lotes: perguntar se o valor é o total (ratear por quantidade ou igual) ou o custo de cada lote, com prévia por lote. Não mexe em lançamentos antigos | Felipe | — | — | Claude Code | não | (PR da issue #161) |
 | 48 | Pós-venda acha o WhatsApp de pedido Digital (DIG-xxxx): pedido, cadastro, conversa; erro com motivo (`sem_jid`, `pedido_sem_jid`, `pedido_nao_encontrado`). Não muda o Aprovo | Felipe | — | — | Claude Code | não (correção de erro) | (PR da issue #206) |
 | 47 | Prospector: liberar primeiro contato (`PRIMEIRO_CONTATO_PAUSADO = false`, com a linha do link "Cadastrar minha gráfica") e limite de 10 primeiros contatos por dia útil. PR 0 da issue #208; o template novo com link de cadastro (A/B, lembrete, descadastro) vem em PR separado e troca a pausa para `false` | Felipe (issue #208) | urgente | antes do cron de 26/11 | Claude Code | não | (PR da issue #208) |
+| 49 | Página `/d/[id]`: datas em pt-BR (previsão de entrega) e fuso de Brasília; parte (a) da issue #205 (a parte (b), helper + doc + CI, vem em outro PR) | Felipe | urgente | — | Claude Code | não (só formatação) | (PR da issue #205) |
 
 ## 44. Porta externa: leitura de parceiros
 
 **Status:** Claude Code. **Aprovo:** não. **PR:** issue #144. Só leitura, sem migração.
 
 `GET /api/externo?o=parceiros` e `?o=detalhe&area=parceiros` (mesmo conteúdo; só chaves do CCO e da CMO, as outras recebem 403). `cadastros`: até 100, mais novos primeiro (`id`, `nome`, `empresa`, `data`, `origem` prospector/direto, `status`, `etapaProspector`, e-mail mascarado `ma***@dominio.com`, telefone `***1234`). Nunca documento nem endereço. `respostas`: prospectos na etapa `respondeu` e, se a tabela `prospectos_emails_recebidos` (#132) existir, as últimas 50 respostas com os 300 primeiros caracteres; sem a tabela, só pela etapa, sem erro. `funil`: contagem por etapa. Código em `app/lib/parceirosExterno.ts`; testes em `tests/parceirosExterno.test.ts`.
+
+## 50. Follow-up automático da Digital desligado (issue #232)
+
+**Status:** Claude Code. **Aprovo:** ordem do Felipe, 26/11/2026 9h18. Só tira envio. `FOLLOWUP_DIGITAL_LIGADO = false` em `app/lib/digital.ts`. Fora da fila do follow-up (F1, F2, F3, lembrete e `encerrar`): conversa com pedido Digital pendente e lead Digital sem pedido (critério já existente no `agenteAuto.ts`: etiqueta `Digital` ou último perfil do agente `pequeno`). A rota de reenvio (`varredura`, `acao=reenviar`) responde 409. Offset e demais leads seguem iguais. Código dos lembretes mantido. Teste: `tests/followUpDigitalDesligado.test.ts`.
+
+## 51. Fila: desfazer dispensa (issue #236)
+
+**Status:** Claude Code. **Aprovo:** pedido do Felipe na issue #236 (não envia nada). Aba "Dispensados" na Fila do WhatsApp com "Devolver à Fila" (um ou vários) e `POST /api/externo {acao:'restaurar_fila', ids}` (qualquer diretor, como o dispensar). Grava o mapa `filaDispensados` novo inteiro, sem as chaves devolvidas (por causa do `MANTER_SE_AUSENTE`), e registra autor e data em `filaRestaurados`. Id inexistente é ignorado. O dispensar da tela não guarda autor, então a lista mostra nome e data.

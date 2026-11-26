@@ -3,13 +3,14 @@
 // Acompanhamento do pedido Digital, no visual do /track da Offset (hero da etapa, previsão de entrega, pagamento, linha do tempo).
 // Só mostra o que a API entrega (lista fechada, sem dado sensível). O pagamento vem do "a receber"; fora dele, "em conferência".
 import type { Acompanhamento } from "@/app/lib/acompanhamentoDigital"
+import { formatarData } from "@/app/lib/formato"
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-const dataBR = (iso: string | null) => iso ? iso.slice(0, 10).split("-").reverse().join("/") : null
+const dataBR = (iso: string | null) => iso ? formatarData(iso, "completo") : null
 const cm = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
-const ARTE = { aprovada: "Arte aprovada", esperando_cliente: "Arte esperando a sua aprovação", nao_enviada: "Arte ainda não enviada" } as const
+const ARTE = { aprovada: "Arte aprovada", ajustes_pedidos: "Ajustes na arte em andamento", esperando_cliente: "Arte esperando a sua aprovação", nao_enviada: "Arte ainda não enviada" } as const
 
-export function AcompanhamentoDigital({ a }: { a: Acompanhamento }) {
+export function AcompanhamentoDigital({ a, resumo = true }: { a: Acompanhamento; resumo?: boolean }) {
   const fim = a.etapaAtual.chave === "enviado"
   const pg = a.pagamento
   const pagoPct = pg.situacao === "ok" && a.valorTotal > 0 ? Math.min(100, Math.round(pg.pago / a.valorTotal * 100)) : 0
@@ -48,23 +49,31 @@ export function AcompanhamentoDigital({ a }: { a: Acompanhamento }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
+      {resumo && <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5">
         <p className="text-[10.5px] uppercase tracking-wide font-bold text-[#8E8E93] mb-2">Resumo do pedido</p>
         <p className="text-[13px] text-[#191625]">{a.quantidade.toLocaleString("pt-BR")} caixinhas · {cm(a.medida.altura)} × {cm(a.medida.largura)} × {cm(a.medida.profundidade)} cm</p>
-        <p className="text-[12.5px] text-[#5e5c68] mt-0.5">{a.tipo}</p>
-        <p className="text-[12.5px] text-[#5e5c68] mt-2">Valor total <strong className="text-[#191625]">{brl(a.valorTotal)}</strong> · sinal de 50% <strong className="text-[#191625]">{brl(a.sinal)}</strong></p>
-      </div>
+        <p className="text-[12.5px] text-[#8E8E93] mt-0.5">{a.tipo}</p>
+        <p className="text-[12.5px] text-[#8E8E93] mt-2">Valor total <strong className="text-[#191625]">{brl(a.valorTotal)}</strong> · sinal de 50% <strong className="text-[#191625]">{brl(a.sinal)}</strong></p>
+      </div>}
 
-      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
-        <p className="text-[10.5px] uppercase tracking-wide font-bold text-[#8E8E93] mb-3">Detalhes do progresso</p>
-        <ol className="space-y-2.5">
+      <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-[rgba(60,60,67,0.06)]">
+          <p className="text-[10.5px] uppercase tracking-wide font-bold text-[#8E8E93]">Detalhes do progresso</p>
+        </div>
+        <ol className="px-5 py-4">
           {a.historico.map((e, i) => {
             const atual = i === a.historico.length - 1 && !fim
+            const ultimo = i === a.historico.length - 1
             return (
-              <li key={e.chave} className="flex items-center gap-3">
-                <span className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] shrink-0" style={{ background: atual ? "#8456e8" : "#009351" }}>{atual ? "•" : "✓"}</span>
-                <span className={`flex-1 text-[13px] ${atual ? "font-semibold text-[#191625]" : "text-[#5e5c68]"}`}>{e.rotulo}</span>
-                {e.em && <span className="text-[11.5px] text-[#898892] tabular-nums">{dataBR(e.em)}</span>}
+              <li key={e.chave} className="flex gap-3.5">
+                <div className="flex flex-col items-center">
+                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[11px] shrink-0 shadow-sm" style={{ background: atual ? "#8456e8" : "#009351" }}>{atual ? "•" : "✓"}</span>
+                  {!ultimo && <span className="w-0.5 flex-1 my-1 min-h-[16px] rounded-full" style={{ background: "rgba(52,199,89,0.5)" }} />}
+                </div>
+                <div className={`flex-1 min-w-0 flex items-start justify-between gap-2 min-h-[24px] ${ultimo ? "" : "pb-3.5"}`}>
+                  <span className={`text-[13px] leading-tight pt-1 ${atual ? "font-semibold text-[#1C1C1E]" : "font-semibold text-[#009351]"}`}>{e.rotulo}</span>
+                  {e.em && <span className="text-[10px] text-[#8E8E93] tabular-nums shrink-0 pt-1.5">{dataBR(e.em)}</span>}
+                </div>
               </li>
             )
           })}
