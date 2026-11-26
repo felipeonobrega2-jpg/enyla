@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Sparkles, SendHorizontal, Video, Image as ImageIcon, X, MessageCircle, Inbox, Clock3 } from "lucide-react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
-import { montarFila, dentroDaJanela, ItemFila, AvisoPedido, ConversaFila, JANELA } from "../lib/filaMensagens"
+import { montarFila, listarDispensados, dentroDaJanela, ItemFila, AvisoPedido, ConversaFila, JANELA } from "../lib/filaMensagens"
 import type { Vinculos } from "../lib/vinculoWhatsapp"
 import { Selo, Botao, Vazio, Tom } from "./ds"
 import EnsinarIA, { enviarLicao } from "./EnsinarIA"
@@ -19,7 +19,7 @@ const ROTULO: Record<ItemFila["tipo"], { nome: string; tom: Tom }> = {
   cobranca: { nome: "Cobrança", tom: "alerta" },
 }
 
-export function FilaMensagens({ conversas, kanban, lancamentos, vinculos, avisos, dispensados, onAvisado, onDispensar, onAbrirConversa }: {
+export function FilaMensagens({ conversas, kanban, lancamentos, vinculos, avisos, dispensados, onAvisado, onDispensar, onRestaurar, onAbrirConversa }: {
   conversas: ConversaFila[]
   kanban: KanbanCard[]
   lancamentos: LancamentoFinanceiro[]
@@ -28,12 +28,17 @@ export function FilaMensagens({ conversas, kanban, lancamentos, vinculos, avisos
   dispensados?: Record<string, string>
   onAvisado: (pedidoKey: string, aviso: AvisoPedido) => void
   onDispensar: (id: string) => void
+  onRestaurar?: (ids: string[]) => void
   onAbrirConversa: (jid: string) => void
 }) {
   const itens = useMemo(() => montarFila({ conversas, kanban, lancamentos, vinculos, avisos, dispensados }), [conversas, kanban, lancamentos, vinculos, avisos, dispensados])
   const [selId, setSelId] = useState<string | null>(null)
   const sel = itens.find(i => i.id === selId) ?? itens[0] ?? null
+  const [verDispensados, setVerDispensados] = useState(false)
+  const lista = useMemo(() => listarDispensados(dispensados, conversas), [dispensados, conversas])
   const contagem = (t: ItemFila["tipo"]) => itens.filter(i => i.tipo === t).length
+
+  if (verDispensados) return <Dispensados lista={lista} onVoltar={() => setVerDispensados(false)} onRestaurar={ids => onRestaurar?.(ids)} />
 
   return (
     <div className="flex h-full min-h-0 flex-col md:flex-row" style={{ background: "var(--bg-page)" }}>
@@ -44,6 +49,7 @@ export function FilaMensagens({ conversas, kanban, lancamentos, vinculos, avisos
             {[[contagem("followup"), "follow-up", "follow-ups"], [contagem("producao") + contagem("pronto"), "aviso de produção", "avisos de produção"], [contagem("cobranca"), "cobrança", "cobranças"]]
               .filter(([n]) => n).map(([n, um, varios]) => `${n} ${n === 1 ? um : varios}`).join(" · ")}
           </p>
+          <button onClick={() => setVerDispensados(true)} className="text-[11.5px] mt-1 underline" style={{ color: "var(--text-faint)" }}>Dispensados ({lista.length})</button>
         </div>
         <div className="flex-1 overflow-y-auto max-h-[40vh] md:max-h-none">
           {!itens.length && <Vazio icone={<Inbox className="w-7 h-7" />} titulo="Nada para mandar agora" sub="Follow-ups, avisos de produção e cobranças aparecem aqui quando for a hora." />}
@@ -63,6 +69,34 @@ export function FilaMensagens({ conversas, kanban, lancamentos, vinculos, avisos
         {sel && <Editor key={sel.id} item={sel} onAbrirConversa={onAbrirConversa}
           onFeito={() => { if (sel.pedidoKey) onAvisado(sel.pedidoKey, sel.tipo as AvisoPedido); else onDispensar(sel.id) }} />}
       </div>
+    </div>
+  )
+}
+
+// Itens dispensados: "Devolver à Fila" só tira a marca de dispensado; não envia nada.
+function Dispensados({ lista, onVoltar, onRestaurar }: { lista: ReturnType<typeof listarDispensados>; onVoltar: () => void; onRestaurar: (ids: string[]) => void }) {
+  const [marcados, setMarcados] = useState<Set<string>>(new Set())
+  const alternar = (id: string) => setMarcados(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const devolver = (ids: string[]) => { onRestaurar(ids); setMarcados(new Set()) }
+  const quando = (em: string) => new Date(em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+  return (
+    <div className="h-full overflow-y-auto p-4 md:p-6 max-w-[760px] space-y-3" style={{ background: "var(--bg-page)" }}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <Botao variante="fantasma" onClick={onVoltar}>← Voltar à Fila</Botao>
+        <span className="text-[13px] font-semibold" style={{ color: "var(--text-main)" }}>{lista.length} {lista.length === 1 ? "dispensado" : "dispensados"}</span>
+        {marcados.size > 0 && <Botao className="ml-auto" onClick={() => devolver([...marcados])}>Devolver {marcados.size} à Fila</Botao>}
+      </div>
+      {!lista.length && <Vazio icone={<Inbox className="w-7 h-7" />} titulo="Nenhum item dispensado" sub="O que você dispensar na Fila aparece aqui por 60 dias." />}
+      {lista.map(i => (
+        <div key={i.id} className="flex items-center gap-3 rounded-xl px-3.5 py-2.5" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+          <input type="checkbox" checked={marcados.has(i.id)} onChange={() => alternar(i.id)} aria-label={`Marcar ${i.nome}`} />
+          <div className="min-w-0">
+            <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-main)" }}>{i.nome}</p>
+            <p className="text-[11.5px]" style={{ color: "var(--text-faint)" }}>Dispensado em {quando(i.em)}</p>
+          </div>
+          <Botao variante="fantasma" className="ml-auto" onClick={() => devolver([i.id])}>Devolver à Fila</Botao>
+        </div>
+      ))}
     </div>
   )
 }

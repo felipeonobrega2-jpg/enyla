@@ -21,10 +21,11 @@ type Pedido = {
   status: StatusDigital; sinalPagoEm: string | null; statusEm: string | null
   vistoEm: string | null; ultimaVista: string | null; vistas: number; lembretes: { nivel: number; em: string }[]
   briefing: { marca: string; cores: string; referencias: string; laminacao: string; arquivos: number } | null
-  vence: string; link: string; linkDesigner: string
+  vence: string; link: string; linkAcompanhamento: string; linkDesigner: string
   arteAtual: { url: string; nome: string; em: string } | null; versoes: number; arteEnviadaEm: string | null; arteAprovadaEm: string | null
   ajustes: { texto: string; em: string }[]; designerAvisadoEm: string | null; villaEnviadoEm: string | null
   frete: number | null; restante: number | null; restantePagoEm: string | null; prontoEm?: string | null; entrega: { cep: string; endereco: string } | null; acertadoEm: string | null
+  situacaoArte?: string | null; prazoEntrega?: string | null; prazoCalculado?: string; edicaoAcomp?: { por: string; em: string; motivo: string } | null
   teste?: boolean
   sugestaoArte?: SugestaoArte | null
 }
@@ -327,11 +328,18 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
               </div>
             )}
 
+            {sel.sinalPagoEm && !sel.teste && <AcompanhamentoPedido key={sel.id} p={sel} ocupado={!!ocupado} gravar={corpo => acao("acomp", { id: sel.id, acao: "acomp", ...corpo })} />}
+
             <div className="flex gap-3 flex-wrap">
               <a href={sel.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12px] text-[#8456e8] hover:underline">Ver a página do pedido <ExternalLink className="w-3 h-3" /></a>
               <button onClick={() => copiar(sel.link)} className="inline-flex items-center gap-1 text-[12px] text-[#8456e8] hover:underline">
                 {copiado === "link" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} Copiar link
               </button>
+              {sel.sinalPagoEm && (
+                <button onClick={() => copiar(sel.linkAcompanhamento, "acompanhamento")} className="inline-flex items-center gap-1 text-[12px] text-[#8456e8] hover:underline">
+                  {copiado === "acompanhamento" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} Copiar link de acompanhamento
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -423,6 +431,33 @@ function MudarMedidas({ pedido, onFeito }: { pedido: Pedido; onFeito: () => Prom
         </Botao>
       </div>
       {pedido.versoes > 0 && <p className="text-[11px] text-[#898892]">A arte já feita volta para ajuste, com a anotação das medidas novas na página do Leandro.</p>}
+    </div>
+  )
+}
+
+// Situação da arte e prazo de entrega (editáveis; ficam gravados com quem, quando e o motivo). Nada é enviado ao cliente.
+const SITUACOES = ["sem arte", "enviada", "ajustes pedidos", "aprovada", "prova autorizada"]
+function AcompanhamentoPedido({ p, ocupado, gravar }: { p: Pedido; ocupado: boolean; gravar: (c: { situacaoArte: string; prazoEntrega: string; motivo: string }) => Promise<void> }) {
+  const [arte, setArte] = useState(p.situacaoArte ?? "")
+  const [prazo, setPrazo] = useState(p.prazoEntrega ?? "")
+  const [motivo, setMotivo] = useState("")
+  const mudou = arte !== (p.situacaoArte ?? "") || prazo !== (p.prazoEntrega ?? "")
+  const campo = "h-8 rounded-lg px-2.5 text-[12.5px] text-[#191625] bg-white ds-borda focus:outline-none"
+  return (
+    <div className="rounded-xl bg-[rgba(116,116,128,0.06)] px-3.5 py-3 space-y-2">
+      <p className="text-[12px] font-semibold text-[#191625]">Acompanhamento <span className="font-normal text-[#898892]">· prazo para o cliente: {p.prazoEntrega || p.prazoCalculado || "a confirmar"}</span></p>
+      <div className="flex gap-2 flex-wrap items-center">
+        <select value={arte} onChange={e => setArte(e.target.value)} className={campo}>
+          <option value="">Situação da arte (vazio)</option>
+          {SITUACOES.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <input type="date" value={prazo} onChange={e => setPrazo(e.target.value)} className={campo} title="Prazo de entrega (vazio = a confirmar)" />
+      </div>
+      <div className="flex gap-2 items-center">
+        <input value={motivo} onChange={e => setMotivo(e.target.value.slice(0, 300))} placeholder="Motivo (obrigatório)" className={`${campo} flex-1`} />
+        <Botao disabled={ocupado || !mudou || !motivo.trim()} onClick={() => { void gravar({ ...(arte ? { situacaoArte: arte } : {}), prazoEntrega: prazo, motivo } as never).then(() => setMotivo("")) }}>Gravar</Botao>
+      </div>
+      {p.edicaoAcomp && <p className="text-[11px] text-[#898892]">Última gravação: {p.edicaoAcomp.por} · {p.edicaoAcomp.em.replace("T", " ")} · {p.edicaoAcomp.motivo}</p>}
     </div>
   )
 }
