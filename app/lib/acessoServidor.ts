@@ -81,12 +81,13 @@ export async function gravarInterruptor(id: InterruptorId, ligado: boolean): Pro
 // ── Auditoria: toda escrita de diretor (quem, quando, antes, depois) ─────────
 export type RegistroAuditoria = { usuario: string; papel: Papel; metodo: string; caminho: string; antes: unknown; depois: unknown; status?: number | null }
 export async function registrarAuditoria(r: RegistroAuditoria): Promise<void> {
-  try {
-    await supabase.from("AuditoriaDiretor").insert({
-      id: crypto.randomUUID(), em: new Date().toISOString(), usuario: r.usuario, papel: r.papel,
-      metodo: r.metodo, caminho: r.caminho, antes: r.antes ?? null, depois: r.depois ?? null,
-    })
-  } catch { /* auditoria nunca derruba a operação */ }
+  // Sem registro, sem alteração: o insert devolve { error } (não lança), então conferimos e lançamos.
+  // O proxy trata a falha com 503 e a escrita do diretor não passa.
+  const { error } = await supabase.from("AuditoriaDiretor").insert({
+    id: crypto.randomUUID(), em: new Date().toISOString(), usuario: r.usuario, papel: r.papel,
+    metodo: r.metodo, caminho: r.caminho, antes: r.antes ?? null, depois: r.depois ?? null,
+  })
+  if (error) throw new Error(`auditoria: ${error.message}`)
 }
 
 export async function lerAuditoria(limite = 100) {

@@ -1,6 +1,10 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { INTERRUPTORES, classificar, decidir, type InterruptorId, type Interruptores } from "../app/lib/acesso"
 import { avaliarGuarda, enxugar, TAMANHO_MAX_AUDITORIA } from "../app/lib/guardaAcesso"
+
+const insert = vi.fn()
+vi.mock("../app/lib/supabase", () => ({ supabase: { from: () => ({ insert }) } }))
+vi.mock("../app/lib/configAtomica", () => ({ lerCampos: vi.fn(), gravarCampos: vi.fn() }))
 
 const desligados: Interruptores = {}
 const ligado = (id: InterruptorId): Interruptores => ({ [id]: true })
@@ -100,5 +104,35 @@ describe("auditoria do diretor", () => {
     const g = enxugar({ x: "a".repeat(TAMANHO_MAX_AUDITORIA + 10) }) as { _cortado?: boolean }
     expect(g._cortado).toBe(true)
     expect(enxugar(undefined)).toBeNull()
+  })
+  it("mascara segredos em qualquer nível, sem diferenciar maiúsculas", () => {
+    const corpo = { groqKey: "gsk_abc", metaToken: "EAAB123", nome: "ok", conexao: { SENHA: "x1", itens: [{ Password: "p", vazio: 1 }] }, apiSecret: "", chave: null }
+    const j = enxugar(corpo) as Record<string, unknown>
+    expect(j.groqKey).toBe("(definida)")
+    expect(j.metaToken).toBe("(definida)")
+    expect(j.nome).toBe("ok")
+    expect(j.apiSecret).toBe("(vazia)")
+    expect(j.chave).toBe("(vazia)")
+    expect(j.conexao).toEqual({ SENHA: "(definida)", itens: [{ Password: "(definida)", vazio: 1 }] })
+    const txt = JSON.stringify(j)
+    for (const puro of ["gsk_abc", "EAAB123", "x1"]) expect(txt).not.toContain(puro)
+  })
+  it("segredo não vaza no corte de corpo grande", () => {
+    const g = enxugar({ metaToken: "SEGREDO", lixo: "a".repeat(TAMANHO_MAX_AUDITORIA) })
+    expect(JSON.stringify(g)).not.toContain("SEGREDO")
+  })
+})
+
+describe("registrarAuditoria: falha de gravação não é silêncio", () => {
+  const reg = { usuario: "d", papel: "diretor" as const, metodo: "PUT", caminho: "/api/kanban/1", antes: null, depois: { a: 1 } }
+  it("lança quando o insert devolve { error } (o proxy responde 503 e a escrita não passa)", async () => {
+    const { registrarAuditoria } = await import("../app/lib/acessoServidor")
+    insert.mockResolvedValueOnce({ error: { message: "tabela ausente" } })
+    await expect(registrarAuditoria(reg)).rejects.toThrow(/auditoria/)
+  })
+  it("grava normalmente quando não há erro", async () => {
+    const { registrarAuditoria } = await import("../app/lib/acessoServidor")
+    insert.mockResolvedValueOnce({ error: null })
+    await expect(registrarAuditoria(reg)).resolves.toBeUndefined()
   })
 })

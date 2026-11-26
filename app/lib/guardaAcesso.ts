@@ -16,9 +16,20 @@ const escrita = (m: string) => !["GET", "HEAD", "OPTIONS"].includes(m.toUpperCas
 const ehConfig = (c: string) => /^\/api\/config\/?$/.test(c)
 
 export const TAMANHO_MAX_AUDITORIA = 4000
-// Corpo grande não entra inteiro na auditoria (cortado, com a marca)
-export function enxugar(v: unknown): unknown {
-  if (v === undefined) return null
+// Campo cujo nome parece segredo: o valor nunca vai para o log, só a marca de que existe ou não
+const NOME_SEGREDO = /senha|password|hash|key|token|secret|segredo|chave/i
+export function mascararSegredos(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(mascararSegredos)
+  if (v && typeof v === "object") {
+    return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) =>
+      [k, NOME_SEGREDO.test(k) ? (x === null || x === undefined || x === "" ? "(vazia)" : "(definida)") : mascararSegredos(x)]))
+  }
+  return v
+}
+// Corpo grande não entra inteiro na auditoria (cortado, com a marca). Segredos são mascarados antes de cortar.
+export function enxugar(bruto: unknown): unknown {
+  if (bruto === undefined) return null
+  const v = mascararSegredos(bruto)
   const s = JSON.stringify(v)
   if (s.length <= TAMANHO_MAX_AUDITORIA) return v
   return { _cortado: true, inicio: s.slice(0, TAMANHO_MAX_AUDITORIA) }
