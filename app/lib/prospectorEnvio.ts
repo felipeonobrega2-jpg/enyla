@@ -66,16 +66,14 @@ export const NOTA_MINIMA_SO_SECUNDARIO = 2
 export const TERMOS_FORA_DO_RAMO: readonly string[] = ["inflavel", "inflaveis", "balao", "baloes", "figurinha", "brinquedo", "festa"]
 /** Único CNAE da lista que, sozinho, não qualifica: encadernação e plastificação (1822-9/01). */
 const CNAE_SO_ENCADERNACAO = "1822901"
-/** Cota de primeiros contatos por dia (dia de São Paulo), só do WhatsApp. E-mail não tem teto diário. */
-export const LIMITE_WHATSAPP_PRIMEIROS_POR_DIA = 10
-/** Teto diário de e-mails do Prospector (primeiro contato + lembrete), PROSPECTOR_TETO_EMAIL_DIA. Padrão 80: cota Free da Resend (100/dia) menos 20 de reserva
- *  para o que não é prospecção (transacional a cliente e resposta da diretoria, que não entram neste teto). 0 = sem teto (plano pago). Vazio ou inválido = padrão. */
-export const TETO_EMAIL_DIA_PADRAO = 80
-export function tetoEmailDia(valor: string | null | undefined = process.env.PROSPECTOR_TETO_EMAIL_DIA): number {
-  const v = (valor ?? "").trim()
-  return /^\d+$/.test(v) ? Number(v) : TETO_EMAIL_DIA_PADRAO
+/** Espera aleatória entre um WhatsApp e o próximo (20 a 60 s), para o número da operação não parecer disparo em massa. E-mail não espera. */
+export const ESPACO_WHATSAPP_MIN_MS = 20_000
+export const ESPACO_WHATSAPP_MAX_MS = 60_000
+export function espacoWhatsappMs(sorteio: number = Math.random()): number {
+  const s = Number.isFinite(sorteio) ? Math.min(Math.max(sorteio, 0), 1) : 0
+  return Math.round(ESPACO_WHATSAPP_MIN_MS + s * (ESPACO_WHATSAPP_MAX_MS - ESPACO_WHATSAPP_MIN_MS))
 }
-export type MotivoParada = "teto_diario" | "cota_resend" | "limite_execucao"
+export type MotivoParada = "cota_resend" | "limite_execucao"
 /** Erro de cota da Resend (já gravado no histórico): não é culpa do lead e não conta para MAX_FALHAS_POR_CANAL. */
 export const ehErroDeCota = (erro: string | null | undefined) => /(daily|monthly)\b.*\bquota|quota_exceeded/i.test(erro ?? "")
 /** Limite técnico por execução (a rota tem maxDuration de 120s): e-mails enviados (primeiro contato e lembrete) e tempo total. O resto fica para o próximo cron. */
@@ -92,11 +90,9 @@ export const DIAS_ATE_ENCERRAR = 3
 export const LEMBRETE_EMAIL_ATIVO = false
 /**
  * Segura todo primeiro contato (e-mail e WhatsApp): ninguém novo é abordado, quem está `qualificado` continua `qualificado`, sem erro.
- * Desligada (`false`) com o link de cadastro rastreado no e-mail; o limite diário abaixo continua valendo. Lembrete e leitura de respostas não são afetados.
+ * Desligada (`false`) com o link de cadastro rastreado no e-mail. Não há teto diário de envio. Lembrete e leitura de respostas não são afetados.
  */
 export const PRIMEIRO_CONTATO_PAUSADO = false
-/** Máximo de primeiros contatos novos por dia útil (America/Sao_Paulo), somando todas as execuções e canais. Vale também depois da pausa. */
-export const LIMITE_PRIMEIROS_CONTATOS_POR_DIA = 10
 export const HORA_INICIO = 8
 export const HORA_FIM = 20
 export const MAX_FALHAS_POR_CANAL = 3
