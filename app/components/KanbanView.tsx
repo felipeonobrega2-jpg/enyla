@@ -6,6 +6,7 @@ import { estaSegurado, textoSegurado, type MapaSegurados } from "../lib/pedidoSe
 import { KanbanCard, KanbanOpcao, Lote, LancamentoFinanceiro, NegocioParceiro, StatusLoteParceiro, COLUNAS_KANBAN, COL_FECHADO, COL_EXPEDICAO, COL_ENTREGUE, COL_PERDIDO, COL_HOT } from "../types"
 import { brl, num } from "../utils"
 import { COL_COLORS } from "./kanban-colors"
+import { podeExcluirCard, confirmacaoExcluirCard, TITULO_EXCLUIR_CARD } from "../lib/excluirCard"
 import { MOTIVOS_PERDA, CategoriaPerda, textoMotivo } from "../lib/coleta"
 
 // HOT é renderizado entre col 0 e col 1, mas usa índice 11 para não deslocar os existentes no DB
@@ -218,6 +219,14 @@ export function KanbanView({
   segurados?: MapaSegurados                                 // pedidos aguardando pagamento do cliente
   onSegurar?: (numero: string, segurar: boolean) => void
 }) {
+  // Só o admin vê o X de excluir; enquanto o papel não é lido (ou se falhar), fica escondido
+  const [papel, setPapel] = useState<string | null>(null)
+  useEffect(() => {
+    let vivo = true
+    fetch("/api/auth/session").then(r => r.json()).then(d => { if (vivo) setPapel(d?.papel ?? null) }).catch(() => {})
+    return () => { vivo = false }
+  }, [])
+  const podeExcluir = podeExcluirCard(papel)
   const [dragId, setDragId]       = useState<string | null>(null)
   const [overCol, setOverCol]     = useState<number | null>(null)
   const [modal, setModal]         = useState<ModalFechamento | null>(null)
@@ -539,6 +548,7 @@ export function KanbanView({
                       onDragStart={handleDragStart}
                       onDragEnd={handleDragEnd}
                       onDelete={onDelete}
+                      podeExcluir={podeExcluir}
                       onMove={tentarMover}
                       onSetMotivo={onSetMotivo}
                       onDetalhes={onDetalhes}
@@ -658,7 +668,7 @@ function fmt(iso?: string) {
 }
 
 function KanbanCardItem({
-  card, colIdx, prevCol, nextCol, isDragging, colors, onDragStart, onDragEnd, onDelete, onMove, onSetMotivo, onDetalhes,
+  card, colIdx, prevCol, nextCol, isDragging, colors, onDragStart, onDragEnd, onDelete, podeExcluir, onMove, onSetMotivo, onDetalhes,
   lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge, onLoteRename, negocios, onUpdateNegocio, allCards,
   onAddLancamento, isDark, isSelected, onSelectCard, segurado, onSegurar,
 }: {
@@ -671,6 +681,7 @@ function KanbanCardItem({
   onDragStart: (e: React.DragEvent, id: string) => void
   onDragEnd: () => void
   onDelete: (id: string) => void
+  podeExcluir: boolean
   onMove: (id: string, col: number) => void
   onSetMotivo: (id: string, motivo: string) => void
   onDetalhes?: (card: KanbanCard) => void
@@ -858,11 +869,13 @@ function KanbanCardItem({
             )
           })()}
           <div className="flex-1" />
-          <button onClick={e => { e.stopPropagation(); if (confirm(`Remover "${card.nomeCliente}" do quadro?`)) onDelete(card.id) }}
-            title="Remover do quadro"
-            className="w-6 h-6 flex items-center justify-center rounded-md text-[#c7c7cc] hover:text-[#d33a3c] hover:bg-[#d33a3c]/[0.06] transition-all opacity-0 group-hover/card:opacity-100 shrink-0">
-            <X className="w-3.5 h-3.5" />
-          </button>
+          {podeExcluir && (
+            <button onClick={e => { e.stopPropagation(); if (confirm(confirmacaoExcluirCard(card.nomeCliente))) onDelete(card.id) }}
+              title={TITULO_EXCLUIR_CARD} aria-label={TITULO_EXCLUIR_CARD}
+              className="w-6 h-6 flex items-center justify-center rounded-md text-[#c7c7cc] hover:text-[#d33a3c] hover:bg-[#d33a3c]/[0.06] transition-all opacity-0 group-hover/card:opacity-100 shrink-0">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
           <button onClick={e => { e.stopPropagation(); setIsOpen(v => !v) }} title="Ações"
             className={`w-6 h-6 flex items-center justify-center rounded-md hover:bg-[rgba(116,116,128,0.1)] transition-all shrink-0 ${isOpen ? "opacity-100" : "opacity-0 group-hover/card:opacity-100"}`}>
             <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} style={{ color: sub }} />

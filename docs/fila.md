@@ -62,6 +62,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 44 | Porta externa: leitura de parceiros (`?o=parceiros` e `?o=detalhe&area=parceiros`): cadastros de /parceiros e respostas do Prospector, só leitura, CCO e CMO | CCO | hoje | — | Claude Code | não | (PR da issue #144) |
 | 45 | WhatsApp: busca acha "Alisson" em "Allison" (sem acento, sem letra dobrada, por telefone) e acha conversas antigas fora das 1.000 da lista | Felipe | — | — | Claude Code | não (correção de erro) | https://github.com/felipeonobrega2-jpg/enyla/pull/149 |
 | 49 | Perfil diretor: login por usuário (admin/diretor), 7 interruptores de bloqueio desligados por padrão, auditoria (quem, quando, antes e depois) e tela de administração | Felipe (Aprovo 26/11/2026, 6h26 e 6h28) | — | — | Claude Code | **aprovado pelo Felipe** (cobre construir e juntar); migration aditiva `20261129_usuarios_acesso.sql` roda no SQL Editor | (PR da issue #214) |
+| 50 | Kanban: o X de fora vira "Excluir definitivamente" (confirmação clara, só admin; diretor não vê) | Felipe (issue #218) | — | — | Claude Code | não | (PR da issue #218) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
