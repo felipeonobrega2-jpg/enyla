@@ -8,13 +8,16 @@ import { normalizarProducao } from "../lib/producao"
 import React, { useState, useMemo, useEffect, useRef } from "react"
 import { CheckCircle2, Factory, TrendingUp, TrendingDown, DollarSign, Clock, AlertTriangle, Landmark, Plus, ChevronLeft, ChevronRight, ChevronDown, Search } from "lucide-react"
 import { montarPedidos, recebiveis, pixExpirado, Pedido } from "../lib/negocio"
+import { receberDigital, juntarPedidos, type PedidoParaReceber } from "../lib/receberDigital"
 import { CabecalhoPagina, Segmentado, Selo, Botao, Cartao, TituloCartao, Kpi, GradeKpis, LinhaLista, Vazio, ColunasDuplas } from "./ds"
 import {
   LancamentoFinanceiro, TipoLancamento, StatusLancamento,
   FormaPagamento, KanbanCard, COL_EXPEDICAO, COL_PERDIDO, NegocioParceiro, Lote,
 } from "../types"
 import { brl, num } from "../utils"
+import { ratearValor, type ModoRateio } from "../lib/ratearLotes"
 import { CategoriaFinanceira, ContaBancaria, Configuracoes } from "../config"
+import { DigitalReceberLista } from "./DigitalReceberLista"
 import { ContasTab } from "./financeiro/ContasTab"
 import { BancoTab } from "./financeiro/BancoTab"
 import { FixasTab } from "./financeiro/FixasTab"
@@ -188,7 +191,7 @@ const DEFAULT_CATS_REC: CategoriaFinanceira[] = [
 
 function statusEfetivo(l: LancamentoFinanceiro): StatusLancamento {
   if (l.status === "pago") return "pago"
-  if (l.dataVencimento < hoje()) return "atrasado"
+  if (l.dataVencimento && l.dataVencimento < hoje()) return "atrasado"   // vencimento vazio (restante do Digital sem material pronto) não atrasa
   return "pendente"
 }
 
@@ -349,6 +352,7 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
         numero: cards[0].loteNumero ?? loteId,
         nomeCliente: cards[0].nomeCliente,
         valor: cards.reduce((s, c) => s + c.preco, 0),
+        quantidade: cards.reduce((s, c) => s + (Number(c.quantidade) || 0), 0),
         loteId,
         loteNumero: cards[0].loteNumero,
       })
@@ -359,6 +363,7 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
         numero: c.numero,
         nomeCliente: c.nomeCliente,
         valor: c.preco,
+        quantidade: Number(c.quantidade) || 0,
         cardId: c.id,
         cardNumero: c.numero,
       })
@@ -379,9 +384,16 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
     }
   }
 
+  const [modoRateio, setModoRateio] = useState<ModoRateio | "">("")
+  const itensVinc = vinculoKeys.filter(k => k).map(k => vinculaveis.find(x => x.key === k)).filter((x): x is VinculoItem => !!x)
+  const varios = itensVinc.length > 1
+  const previaRateio = varios && modoRateio && parseFloat(valor) > 0
+    ? ratearValor(parseFloat(valor), itensVinc.map(x => x.quantidade ?? 0), modoRateio) : null
+
   function salvar(partes?: { nome: string; valor: number }[] | "junto") {
     const v = parseFloat(valor)
     if (!descricao.trim() || !v || !dataVenc) return
+    if (vinculoKeys.filter(k => k).length > 1 && !modoRateio) return
     if (!partes && tipo === "despesa" && !(temSubs && subcategoria) && vinculoKeys.filter(k => k).length <= 1 && abrirDivisao(descricao, v)) return
     const base = {
       tipo,
@@ -417,10 +429,12 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
       }))
     } else {
       const now = Date.now()
+      const valores = ratearValor(v, activeKeys.map(k => vinculaveis.find(x => x.key === k)?.quantidade ?? 0), modoRateio || "cada")
       for (let i = 0; i < activeKeys.length; i++) {
         const vinSel = vinculaveis.find(x => x.key === activeKeys[i])
         onSave({
           ...base,
+          valor:       valores[i],
           id:          `${now}-${i}`,
           cardId:      vinSel?.cardId || undefined,
           cardNumero:  vinSel?.cardNumero,
@@ -554,10 +568,32 @@ export function ModalLancamento({ inicial, kanban, categoriasReceita, categorias
                   </button>
                 )}
               </div>
-              {vinculoKeys.filter(k => k).length > 1 && (
-                <p className="text-[10.5px] text-[#8456e8] mt-1.5 font-medium">
-                  {vinculoKeys.filter(k => k).length} despesas serão criadas, uma por lote
-                </p>
+              {varios && (
+                <div className="mt-1.5 space-y-1.5">
+                  <p className="text-[10.5px] text-[#8456e8] font-medium">
+                    {itensVinc.length} despesas serão criadas, uma por lote. O valor informado é:
+                  </p>
+                  {([["quantidade", "Total da nota, rateado por quantidade"], ["igual", "Total da nota, dividido igualmente"], ["cada", "Custo de cada lote (repete o valor)"]] as [ModoRateio, string][]).map(([m, rot]) => (
+                    <label key={m} className="flex items-center gap-2 text-[11px] text-[#5e5c68] cursor-pointer">
+                      <input type="radio" name="modoRateio" checked={modoRateio === m} onChange={() => setModoRateio(m)} />
+                      {rot}
+                    </label>
+                  ))}
+                  {!modoRateio && <p className="text-[10.5px] text-rose-600">Escolha como tratar o valor para salvar.</p>}
+                  {previaRateio && (
+                    <ul className="text-[11px] text-[#191625] bg-[#F5F3FA] rounded-lg px-2.5 py-1.5 space-y-0.5">
+                      {itensVinc.map((it, i) => (
+                        <li key={it.key} className="flex justify-between">
+                          <span>{it.loteId ? "Lote" : "Pedido"} {it.numero}{it.quantidade ? ` · ${it.quantidade} un` : ""}</span>
+                          <span className="font-semibold">{brl(previaRateio[i])}</span>
+                        </li>
+                      ))}
+                      <li className="flex justify-between border-t border-[rgba(60,60,67,0.12)] pt-0.5">
+                        <span>Total lançado</span><span className="font-semibold">{brl(previaRateio.reduce((s, x) => s + x, 0))}</span>
+                      </li>
+                    </ul>
+                  )}
+                </div>
               )}
             </Field>
           )}
@@ -702,6 +738,7 @@ type VinculoItem = {
   numero: string
   nomeCliente: string
   valor: number
+  quantidade?: number
   loteId?: string
   loteNumero?: string
   cardId?: string
@@ -1070,7 +1107,7 @@ const PERIODO_LABEL: Record<Periodo, string> = {
 
 const SEM_CARDS: KanbanCard[] = []
 type Linha = "offset" | "digital" | "todas"
-const ABAS_DIGITAL: FinTab[] = ["dash", "lancamentos", "dre"]
+const ABAS_DIGITAL: FinTab[] = ["dash", "receber", "lancamentos", "dre"]
 const CADASTROS: { v: FinTab; nome: string }[] = [
   { v: "contas", nome: "Contas" }, { v: "fixas", nome: "Gastos fixos" }, { v: "fornecedores", nome: "Fornecedores" }, { v: "config", nome: "Categorias" },
 ]
@@ -1234,7 +1271,9 @@ export function FinanceiroView({
 
   // Pedidos e recebíveis canônicos (mesma conta do Painel e de Pedidos)
   const pedidosLista = useMemo(() => montarPedidos(kanban, lancamentos), [kanban, lancamentos])
-  const rec = useMemo(() => recebiveis(pedidosLista, lancamentos), [pedidosLista, lancamentos])
+  // Digital entra no mesmo "a receber" (Offset não muda): lista só os DIG na linha Digital, e os dois em Juntas
+  const pedidosReceber = useMemo(() => juntarPedidos(pedidosLista, receberDigital((config as { pedidosDigitais?: PedidoParaReceber[] } | undefined)?.pedidosDigitais, lancamentos)), [pedidosLista, lancamentos, config])
+  const rec = useMemo(() => recebiveis(pedidosReceber, lancamentos), [pedidosReceber, lancamentos])
 
   const kpis = useMemo(() => {
     const semConta = (l: LancamentoFinanceiro) => l.formaPagamento !== "conta"
@@ -1391,7 +1430,7 @@ export function FinanceiroView({
 
 
   const abas: { v: FinTab; nome: string; conta?: number }[] = linha !== "offset"
-    ? [{ v: "dash", nome: "Visão geral" }, { v: "lancamentos", nome: "Lançamentos" }, { v: "dre", nome: "DRE" }]
+    ? [{ v: "dash", nome: "Visão geral" }, { v: "receber", nome: "A receber" }, { v: "lancamentos", nome: "Lançamentos" }, { v: "dre", nome: "DRE" }]
     : [
       { v: "dash", nome: "Visão geral" },
       { v: "receber", nome: "A receber", conta: vencidos.length },
@@ -1511,7 +1550,7 @@ export function FinanceiroView({
           const verLanc = (tipo: TipoLancamento | "", status: StatusLancamento | "") => {
             setFiltroTipo(tipo); setFiltroStatus(status); setFiltroCategoria(""); setFiltroRevisar(false); irAba("lancamentos")
           }
-          const proximos = lancamentos.filter(l => isReceitaPendenteValida(l)).sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento)).slice(0, 8)
+          const proximos = lancamentos.filter(l => isReceitaPendenteValida(l) && !!l.dataVencimento).sort((a, b) => a.dataVencimento.localeCompare(b.dataVencimento)).slice(0, 8)
           const mesAtual = monthlyData12m[11]?.receita ?? 0
           const mesAnterior = monthlyData12m[10]?.receita ?? 0
           const variacao = mesAnterior > 0 ? (mesAtual - mesAnterior) / mesAnterior * 100 : null
@@ -1790,8 +1829,10 @@ export function FinanceiroView({
         })()}
 
         {/* ── A RECEBER ── */}
-        {tab === "receber" && (
+        {tab === "receber" && linha === "digital" && <DigitalReceberLista />}
+        {tab === "receber" && linha !== "digital" && (
           <div className="space-y-2">
+            {linha === "todas" && <div className="mb-4"><DigitalReceberLista /></div>}
             <p className="text-[11.5px] text-[#8E8E93] mb-3">
               Pedidos fechados ou em produção, e ganhos de parcerias pendentes.
             </p>
@@ -1883,14 +1924,14 @@ export function FinanceiroView({
             {negociosPendentes.length > 0 && pedidosElegiveis.length > 0 && (
               <p className="text-[10.5px] text-[#8E8E93] font-semibold mb-2">Pedidos</p>
             )}
-            {pedidosLista.length === 0 ? (
+            {pedidosReceber.length === 0 ? (
               <Empty msg="Nenhum pedido fechado ainda." />
             ) : (() => {
               // Pedidos da camada canônica: lote e pedido avulso no mesmo cartão
               const q = buscaReceber.toLowerCase().trim()
               const hj = hoje()
               const pagamentos = (p: Pedido) => p.receitas.filter(l => l.categoria !== "sobra" && !pixExpirado(l, hj))
-              const lista = pedidosLista
+              const lista = pedidosReceber
                 .filter(p => !q || p.nomeCliente.toLowerCase().includes(q) || p.numero.toLowerCase().includes(q) || p.cards.some(c => c.numero.toLowerCase().includes(q)))
                 .filter(p => filtroReceber === "todos" ? true
                   : filtroReceber === "aberto" ? p.aReceber > 0.5
@@ -2803,10 +2844,12 @@ function CartaoReceber({ p, pagamentos, nomeLote, onRegistrarSobra, onReceber, o
           <div className="flex items-center gap-2">
             <span className="font-semibold text-[#191625] text-[14px] leading-tight truncate">{nomeLote ?? p.nomeCliente}</span>
             <span className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded-full bg-[#8456e8]/10 text-[#8456e8] shrink-0">{p.numero}</span>
+            {p.digital && <Selo tom="info" className="shrink-0">Digital</Selo>}
             {completo && <CheckCircle2 className="w-3.5 h-3.5 text-[#009351] shrink-0" />}
           </div>
           <p className="text-[11.5px] text-[#898892] mt-0.5">
-            {p.cards.length} {p.cards.length > 1 ? "produtos" : "produto"} · {p.etapa}
+            {p.digital ? "Digital" : `${p.cards.length} ${p.cards.length > 1 ? "produtos" : "produto"}`} · {p.etapa}
+            {p.digital && (p.aReceber > 0.5 ? ` · ${p.digital.vencimento ? `vence ${fmtDate(p.digital.vencimento)}` : "vence quando ficar pronto"}` : "")}
             {p.sobras > 0 && ` · +${brl(p.sobras)} sobras`}
             {completo ? " · quitado" : <> · {brl(p.venda - p.aReceber)} recebido · <span className="text-[#c57800] font-medium">{brl(p.aReceber)} falta</span></>}
           </p>
@@ -2816,7 +2859,7 @@ function CartaoReceber({ p, pagamentos, nomeLote, onRegistrarSobra, onReceber, o
           {onRegistrarSobra && podeSobra && (
             <button onClick={() => onRegistrarSobra(p.cards[0])} className="h-7 px-2.5 text-[11px] font-medium text-[#c57800] bg-[#c57800]/[0.08] hover:bg-[#c57800]/[0.14] rounded-lg transition-colors">Sobras</button>
           )}
-          {!completo && (
+          {!completo && !p.digital && (
             <button onClick={onReceber} className="h-7 px-3 text-[11px] font-semibold text-white bg-[#009351] hover:bg-[#007f45] rounded-lg transition-colors">Receber</button>
           )}
         </div>
@@ -2842,7 +2885,7 @@ function CartaoReceber({ p, pagamentos, nomeLote, onRegistrarSobra, onReceber, o
               {l.dataPagamento ? fmtDate(l.dataPagamento) : `vence ${fmtDate(l.dataVencimento)}`}{l.formaPagamento ? ` · ${FORMAS.find(f => f.value === l.formaPagamento)?.label ?? l.formaPagamento}` : ""}
             </p>
             <p className={`text-[12px] font-semibold ds-num ${l.status === "pago" ? "text-[#009351]" : "text-[#c57800]"}`}>{brl(l.valor)}</p>
-            {l.status !== "pago" && (
+            {l.status !== "pago" && !p.digital && (
               <button onClick={() => onMarcarRecebido(l)} className="h-6 px-2.5 text-[10.5px] font-semibold text-white bg-[#009351] hover:bg-[#007f45] rounded-lg transition-colors">Recebido</button>
             )}
           </div>

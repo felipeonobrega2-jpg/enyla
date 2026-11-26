@@ -1,12 +1,14 @@
 // Dinheiro do digital no Financeiro, como LINHA SEPARADA (unidade "digital"): a margem do Offset não se mistura.
-// Cada pedido gera até 3 lançamentos, com id fixo (sincronizar de novo não duplica):
+// Cada pedido gera até 4 lançamentos (o restante pendente vira recebido quando cai), com id fixo (sincronizar de novo não duplica):
 //   sinal recebido (receita) · restante recebido (receita) · custo da Villa (despesa; paga no acerto da semana)
 // O Pix que o sistema achou no extrato já fica conciliado com o lançamento.
 import type { LancamentoFinanceiro } from "../types"
+import { SEM_VENCIMENTO } from "./receberDigital"
 
 type Pedido = {
   id: string; nome: string | null; status: string; teste?: boolean; custo: number; sinal: number; restante?: number; total: number
   sinalPagoEm?: string; restantePagoEm?: string; villaEnviadoEm?: string; acertadoEm?: string
+  prontoEm?: string
   pagamento?: { txId: string; valor: number; data: string } | null; pagamentoFinal?: { txId: string; valor: number; data: string } | null
 }
 export type LancamentoDigital = LancamentoFinanceiro & { unidade: "digital"; txBanco?: string | null }
@@ -31,6 +33,12 @@ export function lancamentosDoPedido(p: Pedido, criadoEm = new Date().toLocaleStr
   if (p.restantePagoEm) out.push({ ...base, id: `dig-${p.id}-restante`, tipo: "receita", categoria: "saldo-final", descricao: `Restante ${p.id} — ${nome}`,
     valor: p.pagamentoFinal?.valor ?? p.restante ?? Math.max(0, p.total - p.sinal), dataVencimento: dia(p.restantePagoEm), dataPagamento: dia(p.pagamentoFinal?.data ?? p.restantePagoEm), status: "pago",
     formaPagamento: forma(p.pagamentoFinal?.txId), obs: `digital:${p.id}:restante`, txBanco: doBanco(p.pagamentoFinal?.txId) })
+  // Saldo pendente: o sinal caiu e o restante não. Só vence quando o material fica pronto (antes disso, sem vencimento = não atrasa)
+  if (p.sinalPagoEm && !p.restantePagoEm && p.status !== "cancelado") {
+    const valor = p.restante ?? Math.max(0, p.total - p.sinal)
+    if (valor > 0) out.push({ ...base, id: `dig-${p.id}-restante`, tipo: "receita", categoria: "saldo-final", descricao: `Restante ${p.id} — ${nome}`,
+      valor, dataVencimento: p.prontoEm ? dia(p.prontoEm) : SEM_VENCIMENTO, status: "pendente", obs: `digital:${p.id}:restante` })
+  }
   if (p.villaEnviadoEm && p.status !== "cancelado" && p.custo > 0) out.push({ ...base, id: `dig-${p.id}-villa`, tipo: "despesa", categoria: "fornecedor", descricao: `Villa · ${p.id} — ${nome}`,
     valor: p.custo, dataVencimento: segundaDoAcerto(p.villaEnviadoEm), ...(p.acertadoEm ? { dataPagamento: dia(p.acertadoEm) } : {}), status: p.acertadoEm ? "pago" : "pendente",
     obs: `digital:${p.id}:villa` })
@@ -39,6 +47,8 @@ export function lancamentosDoPedido(p: Pedido, criadoEm = new Date().toLocaleStr
 // O que mudou num lançamento que já existe (só os campos que o digital controla)
 export const mudou = (a: Partial<LancamentoFinanceiro>, b: Partial<LancamentoFinanceiro>) =>
   a.valor !== b.valor || a.status !== b.status || (a.dataPagamento ?? null) !== (b.dataPagamento ?? null)
+  // vencimento do saldo muda quando o material fica pronto (e deixa de ser a data-sentinela quando é pago)
+  || (b.categoria === "saldo-final" && (a.dataVencimento ?? null) !== (b.dataVencimento ?? null))
 
 // Servidor: cria o que falta, atualiza o que mudou (custo da Villa acertado) e concilia o Pix com o banco
 export async function sincronizarDigitalNoFinanceiro(): Promise<{ criados: number; atualizados: number; conciliados: number } | string> {
@@ -47,7 +57,7 @@ export async function sincronizarDigitalNoFinanceiro(): Promise<{ criados: numbe
   const cfg = await lerConfig<{ pedidosDigitais?: Pedido[] }>()
   const desejados = (cfg.pedidosDigitais ?? []).flatMap(p => lancamentosDoPedido(p))
   if (!desejados.length) return { criados: 0, atualizados: 0, conciliados: 0 }
-  const { data: existentes, error } = await supabase.from("LancamentoFinanceiro").select("id, valor, status, dataPagamento").like("id", "dig-%").limit(5000)
+  const { data: existentes, error } = await supabase.from("LancamentoFinanceiro").select("id, valor, status, dataPagamento, dataVencimento").like("id", "dig-%").limit(5000)
   if (error) return `erro: ${error.message}`
   const ja = new Map((existentes ?? []).map(e => [e.id as string, e as Partial<LancamentoFinanceiro>]))
   let criados = 0, atualizados = 0, conciliados = 0
@@ -59,7 +69,7 @@ export async function sincronizarDigitalNoFinanceiro(): Promise<{ criados: numbe
       if (er) return `erro ao lançar ${l.id}: ${er.message}`
       criados++
     } else if (mudou(e, l)) {
-      await supabase.from("LancamentoFinanceiro").update({ valor: l.valor, status: l.status, dataPagamento: l.dataPagamento ?? null }).eq("id", l.id)
+      await supabase.from("LancamentoFinanceiro").update({ valor: l.valor, status: l.status, dataPagamento: l.dataPagamento ?? null, ...(l.categoria === "saldo-final" ? { dataVencimento: l.dataVencimento } : {}) }).eq("id", l.id)
       atualizados++
     }
     // Pix achado no extrato: o movimento do banco fica conciliado com este lançamento
