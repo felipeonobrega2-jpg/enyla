@@ -48,6 +48,8 @@ export type EnvioHistorico = {
   resendId?: string
   /** E-mail do primeiro contato: token aleatório do link rastreado (/api/prospector/r/[token]). Não tem dado do prospecto. */
   token?: string
+  /** Id da versão do texto (biblioteca prospectorTextos) usada neste envio. Ausente quando valeu o texto padrão do código. */
+  textoId?: string
   /** Último desfecho de entrega informado pela Resend. Não muda `status`: quem já saiu nunca é reenviado. */
   entrega?: "entregue" | "bounce"
   /** Primeira abertura (pixel) e primeiro clique (link), ISO. */
@@ -123,7 +125,6 @@ export function textoPlanoDoPrimeiroContato(texto: string, token?: string): stri
 }
 export const ASSUNTO_EMAIL = "ENYLA, gráfica de embalagens em Barueri"
 
-const CORPO_PRIMEIRO = "tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?"
 export const TEXTO_LEMBRETE = "Oi, tudo bem? Aqui é da ENYLA, de Barueri, de novo. Só para saber se vocês fazem serviços de terceirização para outras gráficas."
 
 const fmt = (agora: Date) => new Intl.DateTimeFormat("en-CA", {
@@ -140,15 +141,6 @@ export function relogioSp(agora: Date): { dia: string; hora: number; diaSemana: 
 export function dentroDoHorario(agora: Date): boolean {
   const { hora, diaSemana } = relogioSp(agora)
   return diaSemana >= 1 && diaSemana <= 5 && hora >= HORA_INICIO && hora < HORA_FIM
-}
-
-/** "Bom dia" antes das 12h, "Boa tarde" depois (America/Sao_Paulo). */
-export function textoPrimeiroContato(agora: Date): string {
-  return `${relogioSp(agora).hora < 12 ? "Bom dia" : "Boa tarde"}, ${CORPO_PRIMEIRO}`
-}
-
-export function textoDoPasso(passo: Passo, agora: Date): string {
-  return passo === "primeiro_contato" ? textoPrimeiroContato(agora) : TEXTO_LEMBRETE
 }
 
 /** Celular brasileiro: DDD (2 dígitos) + 9 + 8 dígitos. Devolve o número com 55, ou null. */
@@ -188,6 +180,7 @@ export function envioDe(x: unknown): EnvioHistorico | null {
   return {
     passo: e.passo, canal: e.canal, status: e.status, em: String(e.em ?? ""), ...(e.texto ? { texto: e.texto } : {}), ...(e.erro ? { erro: e.erro } : {}),
     ...(e.resendId ? { resendId: e.resendId } : {}), ...(e.token ? { token: e.token } : {}),
+    ...(typeof e.textoId === "string" && e.textoId ? { textoId: e.textoId } : {}),
     ...(e.entrega === "entregue" || e.entrega === "bounce" ? { entrega: e.entrega } : {}),
     ...(e.abriuEm ? { abriuEm: e.abriuEm } : {}), ...(e.cliqueEm ? { cliqueEm: e.cliqueEm } : {}),
   }
