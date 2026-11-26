@@ -5,6 +5,7 @@ import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
 import { notificar, LINK_SISTEMA } from "./notificar"
 import { limparCadastro, errosDoCadastro, nomeServico, textoPrazo, textoEndereco, GERENTE_PADRAO, type CadastroParceiro } from "./parceiros"
+import { lerTermosVigentes, gravarAceite, type ContextoAceite } from "./termosParceria"
 import { textoEndereco as textoParaMotorista, type Endereco } from "./frete"
 
 import { CENARIOS_PADRAO, mesclarCenarios, limparCenario, cenariosPublicos, type CenarioParceiro, type CenarioPublico } from "./cenariosParceiros"
@@ -13,7 +14,7 @@ type Cfg = Record<string, unknown> & { cadastrosParceiros?: CadastroParceiro[]; 
 const TIPOS = /^(application\/pdf|image\/(png|jpe?g|webp|heic|heif)|application\/vnd\.(ms-excel|openxmlformats-officedocument\.(spreadsheetml\.sheet|wordprocessingml\.document))|text\/csv)$/
 const MAX_BYTES = 10 * 1024 * 1024
 
-export async function receberCadastro(form: FormData): Promise<{ ok: true; id: string } | { ok: false; erro: string; campos?: Record<string, string> }> {
+export async function receberCadastro(form: FormData, ctx: ContextoAceite = {}): Promise<{ ok: true; id: string } | { ok: false; erro: string; campos?: Record<string, string> }> {
   if (String(form.get("site") ?? "").trim()) return { ok: true, id: "ok" }   // robô (campo escondido preenchido)
   let bruto: Partial<CadastroParceiro>
   try { bruto = JSON.parse(String(form.get("dados") ?? "{}")) } catch { return { ok: false, erro: "Dados inválidos." } }
@@ -54,8 +55,12 @@ export async function receberCadastro(form: FormData): Promise<{ ok: true; id: s
       base = { ...partes, texto: textoParaMotorista(partes), lat: g.lat, lng: g.lng }
     }
   } catch { /* sem coordenada: você ajusta na aprovação */ }
-  const cadastro: CadastroParceiro = { ...dados, id, em: new Date().toISOString(), status: "novo", gerente: GERENTE_PADRAO, arquivos, base }
+  const termos = await lerTermosVigentes()
+  const aceitoEm = new Date().toISOString()
+  const cadastro: CadastroParceiro = { ...dados, id, em: aceitoEm, status: "novo", gerente: GERENTE_PADRAO, arquivos, base, termosVersao: termos.versao, termosAceitosEm: aceitoEm }
   await mudarConfig((d: Cfg) => ({ cadastrosParceiros: [cadastro, ...(d.cadastrosParceiros ?? [])].slice(0, 500) }))
+
+  await gravarAceite(id, cadastro.documento, termos.versao, aceitoEm, ctx)
 
   // Mesmo CNPJ de um prospecto: só registra no histórico do prospecto (a etapa muda na aprovação do Felipe).
   // Não mexe no cadastro e não envia mensagem.

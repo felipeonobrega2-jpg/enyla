@@ -210,6 +210,10 @@ export type CadastroParceiro = {
   arquivos: { nome: string; url: string }[]
   comoConheceu?: string
   aceite: boolean
+  /** Aceite dos Termos de Parceria (issue #256). Versão e data só o servidor grava. Sem versão = pendente_termos. */
+  aceiteTermos?: boolean
+  termosVersao?: string
+  termosAceitosEm?: string
   /** Como a parceira entra na distribuição de pedidos (só registro; a distribuição vem em outro PR). */
   modo?: ModoParceira
   fornecedorId?: string
@@ -288,6 +292,7 @@ export function errosDaEtapa(c: Partial<CadastroParceiro>, etapa: Etapa): Record
     if (!s.prazoVaria && !(s.prazoDias && s.prazoDias > 0 && s.prazoDias <= 120)) e[`${s.id}.prazo`] = "Informe o prazo médio ou marque que varia"
   }
   if (etapa === "final" && !c.aceite) e.aceite = "Precisa concordar para enviar"
+  if (etapa === "final" && !c.aceiteTermos) e.aceiteTermos = "Para enviar, marque que leu e aceita os Termos de Parceria."
   return e
 }
 export const errosDoCadastro = (c: Partial<CadastroParceiro>) => ETAPAS_IDS.reduce((t, et) => ({ ...t, ...errosDaEtapa(c, et) }), {} as Record<string, string>)
@@ -344,9 +349,12 @@ export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParce
     contatoProducao: t(x.contatoProducao, 160) || undefined,
     servicos, modo: modoDaParceira(servicos),
     capacidade: t(x.capacidade, 300) || undefined, horario: t(x.horario, 160) || undefined, maquinas: t(x.maquinas, 600) || undefined,
-    comoConheceu: t(x.comoConheceu, 200) || undefined, aceite: !!x.aceite,
+    comoConheceu: t(x.comoConheceu, 200) || undefined, aceite: !!x.aceite, aceiteTermos: x.aceiteTermos === true,
   }
 }
+
+/** Cadastro sem aceite dos termos: pendente_termos. A distribuição de pedidos (PR futuro da #252) não envia a quem está pendente. */
+export const pendenteTermos = (c: Pick<CadastroParceiro, "termosVersao">) => !c.termosVersao
 
 export const nomeServico = (s: ServicoCadastrado) => s.id === "outro" ? (s.qual || "Outro") : SERVICOS_PARCEIRO.find(x => x.id === s.id)?.nome ?? s.id
 export const textoPrazo = (s: ServicoCadastrado) => s.prazoVaria ? "varia muito (sem média)" : s.prazoDias ? `${s.prazoDias} ${s.prazoDias === 1 ? "dia útil" : "dias úteis"}` : "—"

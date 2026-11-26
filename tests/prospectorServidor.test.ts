@@ -28,6 +28,7 @@ vi.mock("@/app/lib/prospectorServidor", async orig => {
   }
 })
 
+vi.mock("@/app/lib/termosParceria", () => ({ lerTermosVigentes: vi.fn(async () => ({ versao: "teste-1", texto: "", rascunho: true, vigenteDesde: "2026-12-01T00:00:00Z" })), gravarAceite: vi.fn(async () => true) }))
 import { supabase } from "@/app/lib/supabase"
 import { receberCadastro, mudarStatus } from "@/app/lib/parceirosServidor"
 import * as prospector from "@/app/lib/prospectorServidor"
@@ -37,7 +38,7 @@ const CNPJ = "11222333000181"
 const dados = {
   nomeFantasia: "Gráfica Exemplo", tipoDocumento: "cnpj", documento: CNPJ, cep: "01310100", rua: "Avenida Paulista", numero: "1000",
   bairro: "Bela Vista", cidade: "São Paulo", uf: "SP", responsavel: "Marcos", whatsapp: "11988887777", email: "a@b.com.br",
-  servicos: [{ id: "corteVinco", cobranca: "milheiro", valor: 38, prazoDias: 3, prazoVaria: false, precosExemplo: { corteVinco: 250 } as Record<string, number> }], aceite: true,
+  servicos: [{ id: "corteVinco", cobranca: "milheiro", valor: 38, prazoDias: 3, prazoVaria: false, precosExemplo: { corteVinco: 250 } as Record<string, number> }], aceite: true, aceiteTermos: true,
 }
 function formulario() {
   const f = new FormData()

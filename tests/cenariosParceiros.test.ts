@@ -17,6 +17,8 @@ vi.mock("@/app/lib/evolution", () => ({ evo: vi.fn(async () => null) }))
 vi.mock("@/app/lib/agenteAuto", () => ({ seuNumero: vi.fn(async () => "") }))
 vi.mock("@/app/lib/prospectorServidor", () => ({ registrarCadastroRecebido: vi.fn(async () => null), marcarProspectCadastrou: vi.fn(async () => null) }))
 
+vi.mock("@/app/lib/termosParceria", () => ({ lerTermosVigentes: vi.fn(async () => ({ versao: "teste-1", texto: "", rascunho: true, vigenteDesde: "2026-12-01T00:00:00Z" })), gravarAceite: vi.fn(async () => true) }))
+
 import { cenariosAtivosIds, errosDaEtapa, limparCadastro, paraFornecedor, CENARIOS_IDS, type CadastroParceiro } from "@/app/lib/parceiros"
 import { CENARIOS_PADRAO, cenariosPublicos, compararExemplo, estatisticaCenario, mesclarCenarios, temCenario } from "@/app/lib/cenariosParceiros"
 import { receberCadastro, lerCenariosPublicos, salvarCenarios } from "@/app/lib/parceirosServidor"
@@ -24,7 +26,7 @@ import ParceirosForm from "@/app/parceiros/ParceirosForm"
 import { LinhaExemplo } from "@/app/components/CadastrosParceirosCard"
 import { LinhaMercado } from "@/app/components/CenariosParceirosEditor"
 
-const base = { nomeFantasia: "Gráfica Exemplo", tipoDocumento: "cnpj" as const, documento: "11222333000181", cep: "01310100", rua: "Avenida Paulista", numero: "1000", bairro: "Bela Vista", cidade: "São Paulo", uf: "SP", responsavel: "Marcos", whatsapp: "11988887777", email: "a@b.com.br", aceite: true }
+const base = { nomeFantasia: "Gráfica Exemplo", tipoDocumento: "cnpj" as const, documento: "11222333000181", cep: "01310100", rua: "Avenida Paulista", numero: "1000", bairro: "Bela Vista", cidade: "São Paulo", uf: "SP", responsavel: "Marcos", whatsapp: "11988887777", email: "a@b.com.br", aceite: true, aceiteTermos: true }
 const serv = (extra = {}) => ({ id: "verniz" as const, cobranca: "folha" as const, prazoDias: 3, prazoVaria: false, tecnico: { tipos: ["UV total"] }, ...extra })
 const imp = (extra = {}) => ({ id: "impressaoOffset" as const, cobranca: null, prazoDias: 3, prazoVaria: false, tecnico: { formatoMax: { l: 66, a: 96 } }, acerto: 300, valor: 120, ...extra })
 const NOMES = CENARIOS_PADRAO.flatMap(c => c.referencias.map(r => r.fornecedorNome)).filter(Boolean) as string[]

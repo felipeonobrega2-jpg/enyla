@@ -127,7 +127,7 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
   // Convite do Captador (?c=…): marca que abriu e acompanha até o envio
 
   // Rascunho no aparelho (volta de onde parou)
-  useEffect(() => { try { const r = JSON.parse(localStorage.getItem(RASCUNHO) ?? "null"); if (r?.d) { setD({ ...VAZIO, ...r.d }); if (typeof r.passo === "number" && r.passo >= 0 && r.passo < N) { setPasso(r.passo); if (typeof r.sub === "number") setSub(r.sub) } } } catch { /* sem rascunho */ } }, [])
+  useEffect(() => { try { const r = JSON.parse(localStorage.getItem(RASCUNHO) ?? "null"); if (r?.d) { setD({ ...VAZIO, ...r.d, aceiteTermos: false }); if (typeof r.passo === "number" && r.passo >= 0 && r.passo < N) { setPasso(r.passo); if (typeof r.sub === "number") setSub(r.sub) } } } catch { /* sem rascunho */ } }, [])
   useEffect(() => { if (passo >= 0 && passo < N) try { localStorage.setItem(RASCUNHO, JSON.stringify({ d, passo, sub })) } catch { /* sem storage */ } }, [d, passo, sub])
 
   // Troca de etapa: a atual sai (160 ms), a página volta ao topo e a próxima entra pelo lado certo
@@ -561,6 +561,13 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
             <span className="text-[14px] text-[#4a4658] leading-snug">Concordo que a ENYLA registre o tempo e a qualidade das entregas, e que as informações deste cadastro estão corretas.</span>
           </button>
           {E("aceite") && <p className="text-[13px] text-[#d33a3c] font-medium -mt-3 par-surge">{E("aceite")}</p>}
+          <div data-erro={marca("aceiteTermos")}>
+            <label className="flex gap-3 items-start cursor-pointer">
+              <input type="checkbox" checked={!!d.aceiteTermos} onChange={e => set("aceiteTermos", e.target.checked)} aria-invalid={!!E("aceiteTermos")} className="mt-0.5 w-6 h-6 shrink-0 accent-[#7c4ee4]" />
+              <span className="text-[14px] text-[#4a4658] leading-snug">Li e aceito os <a href="/parceiros/termos" target="_blank" rel="noopener noreferrer" className="underline font-semibold" style={{ color: ROXO }}>Termos de Parceria</a>.</span>
+            </label>
+            {E("aceiteTermos") && <p className="text-[13px] text-[#d33a3c] font-medium mt-2 par-surge">{E("aceiteTermos")}</p>}
+          </div>
           <input ref={site} name="site" tabIndex={-1} autoComplete="off" className="absolute -left-[9999px] w-px h-px opacity-0" aria-hidden />
           {erroEnvio && <p className="rounded-xl bg-[#fff1f1] text-[#c92f31] text-[13.5px] font-medium px-4 py-3 par-surge">{erroEnvio}</p>}
         </>}
