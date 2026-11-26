@@ -15,6 +15,7 @@ import {
   ConfigProducao, FornecedorProducao, RegraCobranca, Servico, SERVICOS, TipoRegra, Ferramental, TipoFerramental,
   MovimentoFornecedor, Ocorrencia, TIPOS_OCORRENCIA, TipoOcorrencia, normalizarProducao, descreverRegra, etapaDosServicos, nomeServicos,
   diasNoFornecedor, atrasouNoFornecedor,
+  prazoCadastral, normalizarEstadoPrazo, ROTULO_NAO_CONFIRMADO,
 } from "../lib/producao"
 import { somarDiasUteis, diasUteisEntre } from "../lib/diasUteis"
 import { montarPedidos, pedidoEntregue } from "../lib/negocio"
@@ -157,6 +158,7 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
       fornecedorId: hist.fornecedorId, etapa: etapaDosServicos(hist.servicos), servicos: hist.servicos,
       enviadoEm: hist.enviadoEm, recebidoEm: hist.recebidoEm,
       prazoPrevisto: forn?.prazoDias ? somarDias(hist.enviadoEm, forn.prazoDias) : undefined,
+      prazoConfirmado: forn ? prazoCadastral(forn, etapaDosServicos(hist.servicos)).estado.confirmado : false,
       historico: true,
       ...(hist.diasDescontados ? { diasDescontados: Math.max(0, Math.round(hist.diasDescontados)), motivoDesconto: hist.motivoDesconto?.trim() || undefined } : {}),
     }
@@ -185,6 +187,8 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
       servicos: envio.servicos,
       enviadoEm,
       prazoPrevisto: envio.prazoPrevisto || (forn?.prazoDias ? somarDias(enviadoEm, forn.prazoDias) : undefined),
+      // data digitada à mão não é confirmação do fornecedor; a do cadastro herda o estado dele
+      prazoConfirmado: !envio.prazoPrevisto && !!forn && prazoCadastral(forn, etapaDosServicos(envio.servicos ?? [])).estado.confirmado,
     }
     const novo = { ...producao, movimentos: [...producao.movimentos, mov] }
     salvar(novo)
@@ -397,7 +401,7 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
                   </div>
                   <div className="flex items-center justify-between sm:justify-end gap-3">
                   <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ds-num whitespace-nowrap ${atrasado ? "bg-[#e5484d]/10 text-[#e5484d]" : "bg-[rgba(116,116,128,0.08)] text-[#5e5c68]"}`}>
-                    {dias} {dias === 1 ? "dia útil" : "dias úteis"}{m.prazoPrevisto ? ` · prazo ${dataBR(m.prazoPrevisto).slice(0, 5)}` : ""}
+                    {dias} {dias === 1 ? "dia útil" : "dias úteis"}{m.prazoPrevisto ? ` · prazo ${dataBR(m.prazoPrevisto).slice(0, 5)}${m.prazoConfirmado ? "" : ` (${ROTULO_NAO_CONFIRMADO})`}` : ""}
                   </span>
                   <button onClick={() => setRecebendo(aqui ? null : { id: m.id, dias: 0, motivo: "" })}
                     className="h-9 px-3 rounded-lg text-[12.5px] font-semibold text-[#009351] hover:bg-[#009351]/[0.08] transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0" style={border}>
@@ -451,7 +455,7 @@ function Desempenho({ producao, pedidosOpcoes, todosPedidos, salvar }: {
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
                   {[
-                    { l: "Prazo médio", v: s.prazoMedio != null ? `${num(s.prazoMedio, 1)} d` : "—", sub: s.forn.prazoDias ? `dias úteis · combinado ${s.forn.prazoDias}` : "dias úteis" },
+                    { l: "Prazo médio", v: s.prazoMedio != null ? `${num(s.prazoMedio, 1)} d` : "—", sub: s.forn.prazoDias ? `dias úteis · cadastral ${s.forn.prazoDias}${prazoCadastral(s.forn).estado.confirmado ? "" : ` (${ROTULO_NAO_CONFIRMADO})`}` : "dias úteis" },
                     { l: "Atrasos", v: s.atrasoPct != null ? `${num(s.atrasoPct, 0)}%` : "—", alerta: (s.atrasoPct ?? 0) >= 25 },
                     { l: "Pedidos", v: num(s.pedidos), sub: s.abertos.length ? `${s.abertos.length} em andamento` : undefined },
                     { l: "Ocorrências", v: num(s.ocorrencias.length), sub: s.prejuizo > 0 ? brl(s.prejuizo) : undefined, alerta: s.ocorrencias.length > 0 },
@@ -643,7 +647,11 @@ function Cadastro({ draft, setDraft, fornecedoresFin }: {
                     </select>
                   </Campo>
                   <Campo label="Frete até ele (R$)"><Num value={f.frete} onChange={v => upd(f.id, { frete: v })} step={0.01} /></Campo>
-                  <Campo label="Prazo combinado (dias úteis)"><Num value={f.prazoDias} onChange={v => upd(f.id, { prazoDias: v })} /></Campo>
+                  <Campo label="Prazo cadastral (dias úteis)">
+                    <Num value={f.prazoDias} onChange={v => upd(f.id, { prazoDias: v })} />
+                    {(() => { const e = normalizarEstadoPrazo(f.prazoEstado); return <p className={`text-[11px] mt-1 font-medium ${e.confirmado ? "text-[#009351]" : "text-[#c26a0a]"}`}>{e.confirmado ? "confirmado" : ROTULO_NAO_CONFIRMADO} · origem: {e.origem}</p> })()}
+                    {Object.entries(f.prazosPorEtapa ?? {}).map(([et, d]) => { const e = normalizarEstadoPrazo(f.prazosPorEtapaEstado?.[et]); return <p key={et} className="text-[11px] text-[#898892]">{et}: {d} d · {e.confirmado ? "confirmado" : ROTULO_NAO_CONFIRMADO} ({e.origem})</p> })}
+                  </Campo>
                 </div>
 
                 <div className="rounded-lg p-3.5 bg-[rgba(116,116,128,0.04)] space-y-2.5">

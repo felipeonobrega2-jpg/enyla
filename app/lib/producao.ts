@@ -49,6 +49,18 @@ export type Maquina = {
   margem: number   // mm — demais bordas
 }
 
+// De onde vem um prazo do cadastro. Os prazoDias antigos foram preenchidos sem critério: valem como sem_dado e NÃO confirmado.
+export type OrigemPrazo = "medido" | "confirmado_fornecedor" | "sem_dado"
+export type EstadoPrazo = { confirmado: boolean; origem: OrigemPrazo }
+export const ESTADO_PRAZO_SEM_DADO: EstadoPrazo = { confirmado: false, origem: "sem_dado" }
+export const ROTULO_NAO_CONFIRMADO = "não confirmado"
+
+// Estado normalizado: sem registro (ou incoerente: confirmado sem origem) = não confirmado / sem_dado
+export function normalizarEstadoPrazo(e?: Partial<EstadoPrazo> | null): EstadoPrazo {
+  const origem: OrigemPrazo = e?.origem === "medido" || e?.origem === "confirmado_fornecedor" ? e.origem : "sem_dado"
+  return origem === "sem_dado" ? ESTADO_PRAZO_SEM_DADO : { confirmado: e?.confirmado === true, origem }
+}
+
 export type FornecedorProducao = {
   id: string
   nome: string
@@ -57,7 +69,10 @@ export type FornecedorProducao = {
   maquina?: Maquina                // só para quem imprime
   servicos: Partial<Record<Servico, RegraCobranca>>
   frete: number                    // custo de levar o material até ele
-  prazoDias: number                // prazo combinado (para medir atraso)
+  prazoDias: number                // prazo cadastral (para medir atraso); só vale como combinado se prazoEstado.confirmado
+  prazoEstado?: EstadoPrazo        // estado do prazoDias; ausente = não confirmado / sem_dado
+  prazosPorEtapa?: Partial<Record<string, number>>        // aditivo: prazo por etapa (dias úteis); sem ele vale prazoDias
+  prazosPorEtapaEstado?: Partial<Record<string, EstadoPrazo>>
   obs?: string
   endereco?: import("./frete").Endereco   // para a Lalamove (página Entregas)
   contato?: string                 // quem entrega/recebe a mercadoria lá
@@ -93,10 +108,23 @@ export type MovimentoFornecedor = {
   enviadoEm: string     // ISO yyyy-mm-dd
   recebidoEm?: string
   prazoPrevisto?: string
+  prazoConfirmado?: boolean   // o prazoPrevisto saiu de prazo confirmado? ausente/false = não confirmado
   historico?: boolean   // registrado depois, a partir de pedidos antigos
   diasDescontados?: number   // dias úteis parados por algo do lado do cliente (arte, aprovação, pagamento): não contam para o fornecedor
   motivoDesconto?: string
   emailEm?: string            // quando o pedido foi avisado por e-mail ao fornecedor
+}
+
+// Prazo cadastral efetivo de um fornecedor (da etapa, se houver; senão o geral) com o seu estado
+export function prazoCadastral(f: FornecedorProducao, etapa?: string): { dias: number; estado: EstadoPrazo; deEtapa: boolean } {
+  const da = etapa ? f.prazosPorEtapa?.[etapa] : undefined
+  if (etapa && da != null) return { dias: da, estado: normalizarEstadoPrazo(f.prazosPorEtapaEstado?.[etapa]), deEtapa: true }
+  return { dias: f.prazoDias, estado: normalizarEstadoPrazo(f.prazoEstado), deEtapa: false }
+}
+
+// Soma de cadeia: só é confirmada se TODOS os prazos somados forem confirmados
+export function somarPrazosCadeia(itens: { dias: number; estado: EstadoPrazo }[]): { dias: number; confirmado: boolean } {
+  return { dias: itens.reduce((t, i) => t + i.dias, 0), confirmado: itens.length > 0 && itens.every(i => i.estado.confirmado) }
 }
 
 // Dias úteis que contam para o fornecedor (sem os descontados) e se ele atrasou de verdade
@@ -812,10 +840,12 @@ export function movimentosPorEtapa(
   servicosAcabamento: Servico[] = ["corteVinco", "colagem"],
 ): MovimentoFornecedor[] | null {
   const forn = (id?: string | null) => p.fornecedores.find(f => f.id === id && f.ativo)
-  const prazo = (fornecedorId: string) => {
+  const prazo = (fornecedorId: string, etapa: EtapaPedido) => {
     const f = forn(fornecedorId)
-    if (!f?.prazoDias) return undefined
-    return somarDiasUteis(hojeIso, f.prazoDias)
+    if (!f) return undefined
+    const c = prazoCadastral(f, etapa)
+    if (!c.dias) return undefined
+    return { prazoPrevisto: somarDiasUteis(hojeIso, c.dias), prazoConfirmado: c.estado.confirmado }
   }
   let movs = p.movimentos
   const aberto = (etapa: EtapaPedido) => movs.find(m => m.pedidoKey === pedidoKey && m.etapa === etapa && !m.recebidoEm)
@@ -826,7 +856,7 @@ export function movimentosPorEtapa(
     if (!fornecedorId || !forn(fornecedorId) || aberto(etapa) || movs.some(m => m.pedidoKey === pedidoKey && m.etapa === etapa)) return
     movs = [...movs, {
       id: `auto-${pedidoKey}-${etapa}-${hojeIso}`, pedidoKey, pedidoLabel, fornecedorId, etapa, servicos,
-      enviadoEm: hojeIso, prazoPrevisto: prazo(fornecedorId),
+      enviadoEm: hojeIso, ...prazo(fornecedorId, etapa),
     }]
   }
   if (coluna === 2) {

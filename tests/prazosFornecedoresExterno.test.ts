@@ -8,7 +8,7 @@ vi.mock("@/app/lib/configAtomica", () => ({
 vi.mock("@/app/lib/supabase", () => ({ supabase: { from: () => { est.escritas.push("supabase"); return {} } } }))
 
 import { lerPrazosFornecedores, montarPrazosFornecedores, AJUDA_PRAZOS_FORNECEDORES } from "@/app/lib/prazosFornecedoresExterno"
-import { normalizarProducao } from "@/app/lib/producao"
+import { normalizarProducao, prazoCadastral, normalizarEstadoPrazo, somarPrazosCadeia, movimentosPorEtapa } from "@/app/lib/producao"
 
 beforeEach(() => {
   est.escritas = []
@@ -34,9 +34,9 @@ describe("?o=prazos_fornecedores", () => {
       expect(fs[1].servicos).toEqual(["corteVinco", "colagem"])
       expect(fs[1].prazosPorEtapa).toEqual({ colagem: 2 })
       expect(fs[0].prazosPorEtapa).toBeUndefined()
-      const pe = corpo.porEtapa as { etapa: string; prazoCadastralDias: number; origem: string }[]
-      expect(pe.find(e => e.etapa === "colagem")).toMatchObject({ prazoCadastralDias: 2, origem: "etapa" })
-      expect(pe.find(e => e.etapa === "corteVinco")).toMatchObject({ prazoCadastralDias: 4, origem: "fornecedor" })
+      const pe = corpo.porEtapa as { etapa: string; prazoCadastralDias: number; deOnde: string }[]
+      expect(pe.find(e => e.etapa === "colagem")).toMatchObject({ prazoCadastralDias: 2, deOnde: "etapa" })
+      expect(pe.find(e => e.etapa === "corteVinco")).toMatchObject({ prazoCadastralDias: 4, deOnde: "fornecedor" })
       expect(pe.find(e => e.etapa === "arte")).toMatchObject({ fornecedorId: "f1", prazoCadastralDias: 5 })
     }
   })
@@ -60,5 +60,42 @@ describe("?o=prazos_fornecedores", () => {
     const r = montarPrazosFornecedores(normalizarProducao(null))
     expect(r.fornecedores.length).toBeGreaterThan(0)
     expect(AJUDA_PRAZOS_FORNECEDORES).toMatch(/COO E DO CTO/)
+  })
+
+  it("prazo antigo sai como não confirmado / sem_dado; estado gravado é respeitado", async () => {
+    const prod = est.producao as { fornecedores: Record<string, unknown>[] }
+    prod.fornecedores[1].prazoEstado = { confirmado: true, origem: "confirmado_fornecedor" }
+    prod.fornecedores[1].prazosPorEtapaEstado = { colagem: { confirmado: true, origem: "medido" } }
+    const { corpo } = await lerPrazosFornecedores("coo")
+    const fs = corpo.fornecedores as { confirmado: boolean; origem: string; rotulo: string; estadoPorEtapa?: Record<string, { confirmado: boolean; origem: string }> }[]
+    expect(fs[0]).toMatchObject({ confirmado: false, origem: "sem_dado", rotulo: "não confirmado" })
+    expect(fs[1]).toMatchObject({ confirmado: true, origem: "confirmado_fornecedor", rotulo: "confirmado" })
+    expect(fs[1].estadoPorEtapa?.colagem).toMatchObject({ confirmado: true, origem: "medido" })
+    const pe = corpo.porEtapa as { etapa: string; confirmado: boolean; origem: string; rotulo: string }[]
+    expect(pe.find(e => e.etapa === "colagem")).toMatchObject({ confirmado: true, origem: "medido" })
+    expect(pe.find(e => e.etapa === "arte")).toMatchObject({ confirmado: false, origem: "sem_dado", rotulo: "não confirmado" })
+  })
+})
+
+describe("prazo cadastral e cadeia", () => {
+  const f = { id: "f", nome: "F", ativo: true, servicos: {}, frete: 0, prazoDias: 5, prazosPorEtapa: { colagem: 2 }, prazosPorEtapaEstado: { colagem: { confirmado: true, origem: "medido" as const } } }
+  it("etapa usa o seu prazo e estado; sem etapa cai no geral não confirmado", () => {
+    expect(prazoCadastral(f, "colagem")).toMatchObject({ dias: 2, deEtapa: true, estado: { confirmado: true } })
+    expect(prazoCadastral(f, "arte")).toMatchObject({ dias: 5, deEtapa: false, estado: { confirmado: false, origem: "sem_dado" } })
+  })
+  it("estado incoerente (confirmado sem origem) vale como não confirmado", () => {
+    expect(normalizarEstadoPrazo({ confirmado: true, origem: "sem_dado" })).toEqual({ confirmado: false, origem: "sem_dado" })
+  })
+  it("cadeia só é confirmada se todos os prazos forem", () => {
+    const a = prazoCadastral(f, "colagem"), b = prazoCadastral(f, "arte")
+    expect(somarPrazosCadeia([a, a])).toEqual({ dias: 4, confirmado: true })
+    expect(somarPrazosCadeia([a, b])).toEqual({ dias: 7, confirmado: false })
+  })
+  it("prazoPrevisto automático herda o estado do prazo usado", () => {
+    const p = normalizarProducao({ fornecedores: [{ ...f, servicos: { colagem: { tipo: "acerto_milheiro", acerto: 1, milheiro: 1 } } }], padroes: { acabamento: "f" } } as never)
+    const movs = movimentosPorEtapa(p, "k", "K", 6, null, "2026-11-23", ["colagem"])
+    expect(movs?.[0]).toMatchObject({ etapa: "acabamento", prazoConfirmado: false })
+    const p2 = normalizarProducao({ fornecedores: [{ ...f, servicos: { colagem: {} } }], padroes: { arte: "f" } } as never)
+    expect(movimentosPorEtapa(p2, "k", "K", 2, null, "2026-11-23")?.[0]).toMatchObject({ etapa: "arte", prazoConfirmado: false })
   })
 })
