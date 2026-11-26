@@ -6,15 +6,17 @@ import { somarDiasUteis } from "./diasUteis"
 import { prazoDigital } from "./prazoDigital"
 import { diaDe, type PedidoDig } from "./digitalProducao"
 import { esperandoAprovacao } from "./digital"
+import { prazoDoPedido, arteAprovada } from "./digitalPrazo"
 import type { PedidoReceberDigital } from "./receberDigital"
 
 export type PedidoAcompanhamento = PedidoDig & {
   nome?: string | null; medidas: { a: number; l: number; p: number }; quantidade: number; total: number; sinal: number
   artes?: unknown[]; briefing?: { laminacao?: "fosca" | "brilho" }
+  situacaoArte?: string | null; prazoEntregaEm?: string | null   // gravados pela porta (gravar_digital) e pela tela
 }
 
 export type EtapaCliente = { chave: string; rotulo: string; em: string | null }
-export type SituacaoArte = "aprovada" | "esperando_cliente" | "nao_enviada"
+export type SituacaoArte = "aprovada" | "ajustes_pedidos" | "esperando_cliente" | "nao_enviada"
 export type PagamentoCliente =
   | { situacao: "conferencia"; mensagem: string }
   | { situacao: "ok"; pago: number; pagoEm: string | null; saldo: number; vencimento: string | null }
@@ -26,12 +28,18 @@ export type Acompanhamento = {
   valorTotal: number; sinal: number; pagamento: PagamentoCliente
 }
 
+// Data para o cliente: dd/mm/aaaa
+const dataBR = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/")
+
+// Etapa "Em produção": a data da Villa ou, sem ela, o mesmo sinal do painel Digital (status "producao")
+const emProducao = (p: PedidoDig) => p.villaEnviadoEm ?? (p.status === "producao" ? (p.statusEm ?? "") : undefined)
+
 const ORDEM: { chave: string; rotulo: string; data: (p: PedidoDig) => string | undefined }[] = [
   { chave: "sinal_pago", rotulo: "Sinal pago", data: p => p.sinalPagoEm },
   { chave: "arte_preparo", rotulo: "Arte em preparação", data: p => p.sinalPagoEm ? (p.designerAvisadoEm ?? p.sinalPagoEm) : undefined },
   { chave: "arte_aprovacao", rotulo: "Arte para aprovação", data: p => p.arteEnviadaEm },
-  { chave: "arte_aprovada", rotulo: "Arte aprovada (fila de produção)", data: p => p.arteAprovadaEm },
-  { chave: "producao", rotulo: "Em produção", data: p => p.villaEnviadoEm },
+  { chave: "arte_aprovada", rotulo: "Arte aprovada (fila de produção)", data: p => p.arteAprovadaEm ?? (arteAprovada((p as PedidoAcompanhamento).situacaoArte) ? "" : undefined) },
+  { chave: "producao", rotulo: "Em produção", data: emProducao },
   { chave: "pronto", rotulo: "Pronto", data: p => p.prontoEm },
   { chave: "enviado", rotulo: "Enviado", data: p => p.status === "enviado" ? (p.statusEm ?? "") : undefined },
 ]
@@ -40,10 +48,16 @@ export function acompanhamentoDigital(p: PedidoAcompanhamento, receber?: PedidoR
   if (!p.sinalPagoEm || p.status === "aguardando_sinal" || p.status === "cancelado") return null
   const historico = ORDEM.flatMap(e => { const d = e.data(p); return d !== undefined ? [{ chave: e.chave, rotulo: e.rotulo, em: d ? diaDe(d) : null }] : [] })
   const etapaAtual = historico[historico.length - 1]
-  const arte: SituacaoArte = p.arteAprovadaEm ? "aprovada" : esperandoAprovacao(p as never) ? "esperando_cliente" : "nao_enviada"
+  const sit = p.situacaoArte
+  const arte: SituacaoArte = sit === "aprovada" || sit === "prova autorizada" ? "aprovada"
+    : sit === "ajustes pedidos" ? "ajustes_pedidos" : sit === "enviada" ? "esperando_cliente" : sit === "sem arte" ? "nao_enviada"
+    : p.arteAprovadaEm ? "aprovada" : esperandoAprovacao(p as never) ? "esperando_cliente" : "nao_enviada"
   const prazo = prazoDigital(p.quantidade)
   let prazoEntrega: Acompanhamento["prazoEntrega"]
-  if (p.arteAprovadaEm) {
+  const gravado = prazoDoPedido(p)   // prazo gravado na mão vale mais que o calculado
+  if (gravado.origem === "gravado" && gravado.data) {
+    prazoEntrega = { previstoDe: gravado.data, previstoAte: gravado.data, texto: `Entrega prevista até ${dataBR(gravado.data)}.` }
+  } else if (p.arteAprovadaEm) {
     const base = [diaDe(p.sinalPagoEm), diaDe(p.arteAprovadaEm)].sort().at(-1)!   // conta depois do sinal E da arte aprovada
     const de = somarDiasUteis(base, prazo.min), ate = somarDiasUteis(base, prazo.max)
     prazoEntrega = { previstoDe: de, previstoAte: ate, texto: `Entrega prevista ${de === ate ? `até ${ate}` : `entre ${de} e ${ate}`} (${prazo.texto} depois do sinal pago e da arte aprovada).` }
