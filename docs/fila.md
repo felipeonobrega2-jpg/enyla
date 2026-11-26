@@ -360,3 +360,4 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 ## 51. Fila: desfazer dispensa (issue #236)
 
 **Status:** Claude Code. **Aprovo:** pedido do Felipe na issue #236 (não envia nada). Aba "Dispensados" na Fila do WhatsApp com "Devolver à Fila" (um ou vários) e `POST /api/externo {acao:'restaurar_fila', ids}` (qualquer diretor, como o dispensar). Grava o mapa `filaDispensados` novo inteiro, sem as chaves devolvidas (por causa do `MANTER_SE_AUSENTE`), e registra autor e data em `filaRestaurados`. Id inexistente é ignorado. O dispensar da tela não guarda autor, então a lista mostra nome e data.
+| 43 | Porta externa: `importar_prospectos` e ordem direta a gráfica do Prospector (`ordenar_funcionario`, sem Aprovo; 8h–20h, exclusão 409, espaçamento) | CCO/CMO (regra do Felipe, 26/11/2026, 9h44) | urgente | — | Claude Code | não | (PR da issue #242) |
