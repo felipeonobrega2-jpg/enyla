@@ -11,17 +11,19 @@ import { COLUNAS_KANBAN } from "@/app/types"
 export type EnvioFornecedor = { fornecedorId: string; enviadoEm?: string; ordemId?: string }
 export type EtapaGravada = {
   previsto?: string; real?: string
+  previstoConfirmado?: boolean        // só true quando o fornecedor confirmou a data; ausente/false = "não confirmado"
   envioFornecedor?: EnvioFornecedor   // gancho para #180 (ordenar_fornecedor): o envio pode ser ligado à etapa
-  historico: { autor: string; emIso: string; previsto?: string; real?: string; envioFornecedor?: EnvioFornecedor }[]
+  historico: { autor: string; emIso: string; previsto?: string; previstoConfirmado?: boolean; real?: string; envioFornecedor?: EnvioFornecedor }[]
 }
 export type CronogramaGravado = Record<string, Record<string, EtapaGravada>>
-export type EtapaLida = { etapa: string; coluna: number; previsto: string | null; real: string | null; atrasada: boolean; diasAtraso: number; envioFornecedor: EnvioFornecedor | null }
+export type EtapaLida = { etapa: string; coluna: number; previsto: string | null; confirmado: boolean; rotuloPrevisto: string | null; real: string | null; atrasada: boolean; diasAtraso: number; envioFornecedor: EnvioFornecedor | null }
 export type LoteLido = { loteNumero: string; pedidos: number; etapaAtual: string | null; etapas: EtapaLida[]; atrasos: number }
-export type ResultadoLeitura = { status: 200; corpo: { hoje: string; lotes: LoteLido[]; atrasadas: { loteNumero: string; etapa: string; diasAtraso: number }[] } }
+export type ResultadoLeitura = { status: 200; corpo: { hoje: string; lotes: LoteLido[]; atrasadas: { loteNumero: string; etapa: string; diasAtraso: number; confirmado: boolean; rotuloPrevisto: string | null }[] } }
 export type ResultadoGravacao =
   | { ok: true; resultado: string; loteNumero: string; etapa: string; gravado: EtapaGravada }
   | { ok: false; status: 400 | 404; erro: string }
 
+export const ROTULO_NAO_CONFIRMADO = "não confirmado"
 export const ETAPAS_CRONOGRAMA = [2, 3, 4, 5, 6, 7, 8]
 const DATA = /^\d{4}-\d{2}-\d{2}$/
 const dataOk = (v: unknown): v is string => typeof v === "string" && DATA.test(v) && !Number.isNaN(Date.parse(v))
@@ -46,12 +48,13 @@ export function montarCronograma(cards: CardLote[], grav: CronogramaGravado, hoj
     const etapas = ETAPAS_CRONOGRAMA.map<EtapaLida>(coluna => {
       const e = g[String(coluna)]
       const previsto = e?.previsto ?? null, real = e?.real ?? null
-      return { etapa: COLUNAS_KANBAN[coluna], coluna, previsto, real, ...atraso(previsto, real, hoje), envioFornecedor: e?.envioFornecedor ?? null }
+      const confirmado = !!previsto && e?.previstoConfirmado === true   // padrão seguro: prazo de fornecedor não combinado nunca vira data firme
+      return { etapa: COLUNAS_KANBAN[coluna], coluna, previsto, confirmado, rotuloPrevisto: previsto ? (confirmado ? "confirmado" : ROTULO_NAO_CONFIRMADO) : null, real, ...atraso(previsto, real, hoje), envioFornecedor: e?.envioFornecedor ?? null }
     }).filter(e => e.previsto || e.real || e.envioFornecedor)
     const atual = cs.length ? Math.min(...cs.map(c => c.coluna)) : null
     return { loteNumero, pedidos: cs.length, etapaAtual: atual != null ? COLUNAS_KANBAN[atual] ?? String(atual) : null, etapas, atrasos: etapas.filter(e => e.atrasada).length }
   })
-  const atrasadas = lotes.flatMap(l => l.etapas.filter(e => e.atrasada).map(e => ({ loteNumero: l.loteNumero, etapa: e.etapa, diasAtraso: e.diasAtraso }))).sort((a, b) => b.diasAtraso - a.diasAtraso)
+  const atrasadas = lotes.flatMap(l => l.etapas.filter(e => e.atrasada).map(e => ({ loteNumero: l.loteNumero, etapa: e.etapa, diasAtraso: e.diasAtraso, confirmado: e.confirmado, rotuloPrevisto: e.rotuloPrevisto }))).sort((a, b) => b.diasAtraso - a.diasAtraso)
   return { hoje, lotes, atrasadas }
 }
 
@@ -68,12 +71,15 @@ export async function gravarCronograma(diretor: string, b: Record<string, unknow
   if (!loteNumero) return { ok: false, status: 400, erro: "loteNumero: obrigatório." }
   const coluna = b.etapa
   if (typeof coluna !== "number" || !ETAPAS_CRONOGRAMA.includes(coluna)) return { ok: false, status: 400, erro: "etapa: número de 2 (Arte/Dieline) a 8 (Expedição)." }
-  const mudanca: Partial<Pick<EtapaGravada, "previsto" | "real" | "envioFornecedor">> = {}
+  const mudanca: Partial<Pick<EtapaGravada, "previsto" | "previstoConfirmado" | "real" | "envioFornecedor">> = {}
   for (const k of ["previsto", "real"] as const) {
     if (b[k] === undefined) continue
     if (!dataOk(b[k])) return { ok: false, status: 400, erro: `${k}: data AAAA-MM-DD (datas gravadas não se apagam, só se corrigem).` }
     mudanca[k] = b[k] as string
   }
+  if (b.previstoConfirmado !== undefined && typeof b.previstoConfirmado !== "boolean") return { ok: false, status: 400, erro: "previstoConfirmado: true ou false." }
+  if (b.previstoConfirmado === true && !mudanca.previsto) return { ok: false, status: 400, erro: "previstoConfirmado: true exige mandar o previsto junto (a data confirmada pelo fornecedor)." }
+  if (mudanca.previsto) mudanca.previstoConfirmado = b.previstoConfirmado === true   // data nova entra "não confirmada" até alguém confirmar
   if (b.envioFornecedor !== undefined) {
     const e = (b.envioFornecedor && typeof b.envioFornecedor === "object" ? b.envioFornecedor : {}) as Record<string, unknown>
     const fornecedorId = texto(e.fornecedorId)
@@ -94,4 +100,4 @@ export async function gravarCronograma(diretor: string, b: Record<string, unknow
   return { ok: true, resultado: `Cronograma do lote ${loteNumero}, etapa ${COLUNAS_KANBAN[coluna]}: gravado.`, loteNumero, etapa: COLUNAS_KANBAN[coluna], gravado }
 }
 
-export const AJUDA_CRONOGRAMA = "Cronograma de produção Offset por lote e etapa (Arte/Dieline a Expedição): previsto, real, atrasada e diasAtraso (data real, ou hoje se ainda não houve retorno, depois da prevista), envioFornecedor se houver, e a lista atrasadas. Sem dado pessoal de cliente"
+export const AJUDA_CRONOGRAMA = "Cronograma de produção Offset por lote e etapa (Arte/Dieline a Expedição): previsto (com confirmado e rotuloPrevisto: 'não confirmado' enquanto o fornecedor não confirmar; prazo cadastral de fornecedor não é data firme), real, atrasada e diasAtraso (data real, ou hoje se ainda não houve retorno, depois da prevista), envioFornecedor se houver, e a lista atrasadas. Sem dado pessoal de cliente"

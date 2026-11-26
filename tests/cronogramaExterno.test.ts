@@ -40,11 +40,29 @@ describe("leitura", () => {
     const lote = l.corpo.lotes[0]
     expect(lote).toMatchObject({ loteNumero: "L-900", pedidos: 2, etapaAtual: "Impressão", atrasos: 1 })
     expect(lote.etapas.map(e => [e.coluna, e.atrasada])).toEqual([[5, true], [6, false]])
-    expect(l.corpo.atrasadas).toEqual([{ loteNumero: "L-900", etapa: "Impressão", diasAtraso: 3 }])
+    expect(l.corpo.atrasadas).toEqual([{ loteNumero: "L-900", etapa: "Impressão", diasAtraso: 3, confirmado: false, rotuloPrevisto: "não confirmado" }])
     expect(JSON.stringify(l.corpo)).not.toMatch(/Fulano|nomeCliente/)
   })
   it("lote sem cronograma aparece sem etapas", () => {
     expect(montarCronograma(cards as never, {}, "2026-11-13").lotes[0].etapas).toEqual([])
+  })
+})
+
+describe("não confirmado", () => {
+  it("previsto sem confirmação do fornecedor sai rotulado e não firme; confirmado só com previstoConfirmado", async () => {
+    estado.cfg = { cronogramaOffset: { "L-900": { "5": { previsto: "2026-11-10", historico: [] }, "6": { previsto: "2026-11-20", previstoConfirmado: true, historico: [] } } } }
+    const l = await leituraCronograma("2026-11-13")
+    expect(l.corpo.lotes[0].etapas.map(e => [e.coluna, e.confirmado, e.rotuloPrevisto])).toEqual([[5, false, "não confirmado"], [6, true, "confirmado"]])
+    expect(l.corpo.atrasadas[0]).toMatchObject({ etapa: "Impressão", confirmado: false, rotuloPrevisto: "não confirmado" })
+  })
+  it("data gravada entra não confirmada; confirmar exige a data", async () => {
+    const a = await gravarCronograma("cto", { loteNumero: "L-900", etapa: 5, previsto: "2026-11-20" })
+    expect(a.ok && a.gravado.previstoConfirmado).toBe(false)
+    expect(await gravarCronograma("cto", { loteNumero: "L-900", etapa: 5, previstoConfirmado: true })).toMatchObject({ ok: false, status: 400 })
+    const b = await gravarCronograma("cto", { loteNumero: "L-900", etapa: 5, previsto: "2026-11-22", previstoConfirmado: true })
+    expect(b.ok && b.gravado.previstoConfirmado).toBe(true)
+    const c = await gravarCronograma("cto", { loteNumero: "L-900", etapa: 5, previsto: "2026-11-25" })
+    expect(c.ok && c.gravado.previstoConfirmado).toBe(false)
   })
 })
 
