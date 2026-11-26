@@ -355,3 +355,7 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 ## 50. Follow-up automático da Digital desligado (issue #232)
 
 **Status:** Claude Code. **Aprovo:** ordem do Felipe, 26/11/2026 9h18. Só tira envio. `FOLLOWUP_DIGITAL_LIGADO = false` em `app/lib/digital.ts`. Fora da fila do follow-up (F1, F2, F3, lembrete e `encerrar`): conversa com pedido Digital pendente e lead Digital sem pedido (critério já existente no `agenteAuto.ts`: etiqueta `Digital` ou último perfil do agente `pequeno`). A rota de reenvio (`varredura`, `acao=reenviar`) responde 409. Offset e demais leads seguem iguais. Código dos lembretes mantido. Teste: `tests/followUpDigitalDesligado.test.ts`.
+
+## 51. Fila: desfazer dispensa (issue #236)
+
+**Status:** Claude Code. **Aprovo:** pedido do Felipe na issue #236 (não envia nada). Aba "Dispensados" na Fila do WhatsApp com "Devolver à Fila" (um ou vários) e `POST /api/externo {acao:'restaurar_fila', ids}` (qualquer diretor, como o dispensar). Grava o mapa `filaDispensados` novo inteiro, sem as chaves devolvidas (por causa do `MANTER_SE_AUSENTE`), e registra autor e data em `filaRestaurados`. Id inexistente é ignorado. O dispensar da tela não guarda autor, então a lista mostra nome e data.
