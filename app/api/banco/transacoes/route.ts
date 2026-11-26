@@ -2,6 +2,7 @@ import { lerConfigLinha } from "../../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { pluggyConfigurada } from "@/app/lib/pluggy"
+import { openiConfigurada } from "@/app/lib/openi"
 
 // Extrato do banco para a aba Banco (sem o JSON bruto). ?estado=pendente|vinculada|criada|ignorada|todas
 export async function GET(req: NextRequest) {
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
   const { count: pendentes } = await supabase.from("banco_transacoes").select("id", { count: "exact", head: true }).eq("estado", "pendente")
   const { data: cfgRow } = await lerConfigLinha()
   return NextResponse.json({
-    configurada: pluggyConfigurada(),
+    configurada: (cfgRow?.data as { bankFeedSource?: unknown } | null)?.bankFeedSource === "openi" ? openiConfigurada() : pluggyConfigurada(),
     tabela: !error || !/relation|does not exist/i.test(error.message),
     erro: error?.message ?? null,
     status: (cfgRow?.data as { pluggyStatus?: unknown } | null)?.pluggyStatus ?? null,
