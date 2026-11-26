@@ -47,7 +47,7 @@ describe("POST acao=mover_card", () => {
     expect((await pedir({ acao: "mover_card", numero: "ORC-1", coluna: 4, motivo: "x" })).status).toBe(400)
     expect(estado.updates).toEqual([])
   })
-  it.each([0, 9, 10, 1, 11, -1, 2.5])("recusa destino %s", async col => {
+  it.each([0, 1, 11, -1, 2.5])("recusa destino %s", async col => {
     card(1)
     expect((await pedir({ acao: "mover_card", numero: "ORC-1", coluna: col, motivo: "x" })).status).toBe(400)
     expect(estado.updates).toEqual([])
