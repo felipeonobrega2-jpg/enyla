@@ -345,3 +345,7 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 **Status:** Claude Code. **Aprovo:** não. **PR:** issue #144. Só leitura, sem migração.
 
 `GET /api/externo?o=parceiros` e `?o=detalhe&area=parceiros` (mesmo conteúdo; só chaves do CCO e da CMO, as outras recebem 403). `cadastros`: até 100, mais novos primeiro (`id`, `nome`, `empresa`, `data`, `origem` prospector/direto, `status`, `etapaProspector`, e-mail mascarado `ma***@dominio.com`, telefone `***1234`). Nunca documento nem endereço. `respostas`: prospectos na etapa `respondeu` e, se a tabela `prospectos_emails_recebidos` (#132) existir, as últimas 50 respostas com os 300 primeiros caracteres; sem a tabela, só pela etapa, sem erro. `funil`: contagem por etapa. Código em `app/lib/parceirosExterno.ts`; testes em `tests/parceirosExterno.test.ts`.
+
+## 45. Página /d/[id]: datas em pt-BR e padrão visual fixo
+
+**Status:** Claude Code. **Aprovo:** não. **PR:** issue #205. Só formatação e visual. A previsão de entrega mostrava a data ISO; agora sai "25/11 a 30/11". Helper `app/lib/formato.ts`, `docs/padrao-visual.md` e teste de CI `tests/padraoLocale.test.ts`. Não muda prazo, links nem tokens.

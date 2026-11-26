@@ -3,11 +3,20 @@
 // Acompanhamento do pedido Digital, no visual do /track da Offset (hero da etapa, previsão de entrega, pagamento, linha do tempo).
 // Só mostra o que a API entrega (lista fechada, sem dado sensível). O pagamento vem do "a receber"; fora dele, "em conferência".
 import type { Acompanhamento } from "@/app/lib/acompanhamentoDigital"
+import { formatarData, formatarIntervaloDatas, formatarMoeda } from "@/app/lib/formato"
 
-const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-const dataBR = (iso: string | null) => iso ? iso.slice(0, 10).split("-").reverse().join("/") : null
+const brl = formatarMoeda
+const dataBR = (iso: string | null) => iso ? formatarData(iso, { ano: true }) : null
 const cm = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
 const ARTE = { aprovada: "Arte aprovada", esperando_cliente: "Arte esperando a sua aprovação", nao_enviada: "Arte ainda não enviada" } as const
+
+// Datas da previsão em pt-BR ("25/11 a 30/11"); a regra do prazo vem de acompanhamentoDigital, aqui só se formata.
+function prazoTexto(a: Acompanhamento): string {
+  const { previstoDe: de, previstoAte: ate } = a.prazoEntrega
+  if (!de || !ate) return a.prazoEntrega.texto
+  const dias = a.prazoEntrega.texto.match(/\(([^)]*)\)/)?.[1]
+  return `Entrega prevista ${de === ate ? `até ${formatarData(ate)}` : `entre ${formatarIntervaloDatas(de, ate).replace(" a ", " e ")}`}${dias ? ` (${dias})` : ""}.`
+}
 
 export function AcompanhamentoDigital({ a }: { a: Acompanhamento }) {
   const fim = a.etapaAtual.chave === "enviado"
@@ -27,7 +36,7 @@ export function AcompanhamentoDigital({ a }: { a: Acompanhamento }) {
         </div>
         <div className="mx-4 mb-3 rounded-xl px-4 py-3 bg-white/10">
           <p className="text-[10px] font-bold uppercase tracking-wide text-white/60">Previsão de entrega</p>
-          <p className="text-white font-semibold text-[13px] mt-0.5 leading-snug">{a.prazoEntrega.texto}</p>
+          <p className="text-white font-semibold text-[13px] mt-0.5 leading-snug">{prazoTexto(a)}</p>
         </div>
         <div className="mx-4 mb-4 rounded-xl px-4 py-3 bg-white/10">
           {pg.situacao === "ok" ? (<>
