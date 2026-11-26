@@ -3,10 +3,11 @@
 // Fila de mensagens sugeridas: o sistema prepara (follow-up, aviso de produção, cobrança), você revisa e manda.
 // "Escrever com IA" reescreve no seu tom (guia de atendimento + conversa). Follow-up combina com vídeo de produção.
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Sparkles, SendHorizontal, Video, Image as ImageIcon, X, MessageCircle, Inbox, Clock3 } from "lucide-react"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarFila, dentroDaJanela, ItemFila, AvisoPedido, ConversaFila, JANELA } from "../lib/filaMensagens"
+import { criarConfirmacaoEnvio } from "../lib/confirmarEnvio"
 import type { Vinculos } from "../lib/vinculoWhatsapp"
 import { Selo, Botao, Vazio, Tom } from "./ds"
 import EnsinarIA, { enviarLicao } from "./EnsinarIA"
@@ -72,6 +73,9 @@ function Editor({ item, onFeito, onAbrirConversa }: { item: ItemFila; onFeito: (
   const [sugerido, setSugerido] = useState<string | null>(null)   // o que a IA escreveu (se você mudar antes de enviar, ela aprende)
   const [escrevendo, setEscrevendo] = useState(false)
   const [enviando, setEnviando] = useState(false)
+  const confirmacao = useRef(criarConfirmacaoEnvio())   // confirmação antes de "Enviar mesmo assim"
+  const [confirmando, setConfirmandoEstado] = useState(false)
+  const setConfirmando = (v: boolean) => { if (!v) confirmacao.current.cancelar(); setConfirmandoEstado(v) }
   const [erro, setErro] = useState<string | null>(null)
   const [midia, setMidia] = useState<Midia | null>(null)
   const [escolhendo, setEscolhendo] = useState(false)
@@ -152,11 +156,32 @@ function Editor({ item, onFeito, onAbrirConversa }: { item: ItemFila; onFeito: (
       <div className="flex items-center gap-2 flex-wrap">
         <Botao icone={<Sparkles className="w-4 h-4" />} onClick={escreverComIA} disabled={escrevendo}>{escrevendo ? "Escrevendo no seu tom…" : "Escrever com IA"}</Botao>
         <Botao variante="fantasma" onClick={onFeito}>{item.pedidoKey ? "Já avisei" : "Dispensar"}</Botao>
-        <button onClick={enviar} disabled={enviando || escrevendo || semDestino || (!texto.trim() && !midia)}
+        <button onClick={() => { if (janela) void enviar(); else { confirmacao.current.pedir({ destinatario: item.titulo, texto }); setConfirmandoEstado(true) } }} disabled={enviando || escrevendo || semDestino || (!texto.trim() && !midia)}
           className="ml-auto h-10 px-5 rounded-xl text-white text-[13.5px] font-semibold flex items-center gap-2 disabled:opacity-50" style={{ background: "#25a35a" }}>
           <SendHorizontal className="w-4 h-4" />{enviando ? "Enviando…" : janela ? "Enviar" : "Enviar mesmo assim"}
         </button>
       </div>
+
+      {confirmando && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)" }}
+          role="dialog" aria-modal="true" aria-label="Confirmar envio"
+          onKeyDown={e => { if (e.key === "Escape") setConfirmando(false) }}>
+          <div className="w-full max-w-[460px] rounded-2xl p-5 space-y-3" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+            <p className="text-[15px] font-semibold" style={{ color: "var(--text-main)" }}>Confirmar envio ao cliente?</p>
+            <p className="text-[12.5px]" style={{ color: "var(--text-faint)" }}>Para: <strong style={{ color: "var(--text-main)" }}>{item.titulo}</strong></p>
+            <div className="rounded-xl px-3 py-2 text-[13px] whitespace-pre-wrap max-h-[40vh] overflow-y-auto" style={{ background: "var(--bg-page)", color: "var(--text-main)", border: "1px solid var(--border)" }}>
+              {texto.trim() || "(só o vídeo/foto anexado)"}
+              {midia && <span className="block mt-1 text-[11.5px]" style={{ color: "var(--text-faint)" }}>+ {midia.tipo === "video" ? "vídeo" : "foto"} anexado</span>}
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <button autoFocus onClick={() => setConfirmando(false)}
+                className="h-10 px-4 rounded-xl text-[13.5px] font-semibold" style={{ border: "1px solid var(--border)", color: "var(--text-main)" }}>Cancelar</button>
+              <button onClick={() => { setConfirmandoEstado(false); void confirmacao.current.confirmar(enviar) }}
+                className="h-10 px-4 rounded-xl text-white text-[13.5px] font-semibold" style={{ background: "#25a35a" }}>Confirmar envio</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
