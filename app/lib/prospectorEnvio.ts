@@ -107,6 +107,8 @@ export function replyToDoProspector(env: string | undefined = process.env.PROSPE
 }
 /** Destino final do link rastreado do e-mail (formulário de cadastro de parceiros). */
 export const URL_CADASTRO_PARCEIROS = "https://app.enyla.com.br/parceiros"
+/** O mesmo destino com a origem: o formulário marca o cadastro como vindo da prospecção. */
+export const URL_CADASTRO_DA_PROSPECCAO = `${URL_CADASTRO_PARCEIROS}?o=prospector`
 export const URL_BASE_APP = "https://app.enyla.com.br"
 export const urlRastreada = (token: string) => `${URL_BASE_APP}/api/prospector/r/${token}`
 /** Linha do link no primeiro contato. O texto do link não mostra endereço (mostrar um e apontar para outro é marcado como spam). */

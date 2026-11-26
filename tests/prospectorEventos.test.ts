@@ -34,7 +34,7 @@ vi.mock("@/app/lib/configAtomica", () => ({ lerCampos: async () => ({}) }))
 vi.mock("@/app/lib/evolution", () => ({ evo: async () => ({ ok: false, status: 500 }) }))
 
 import { processarEventoEmail, registrarCliquePorToken } from "@/app/lib/prospectorEventosServidor"
-import { envioDe, htmlDoPrimeiroContato, textoPlanoDoPrimeiroContato, URL_CADASTRO_PARCEIROS } from "@/app/lib/prospectorEnvio"
+import { envioDe, htmlDoPrimeiroContato, textoPlanoDoPrimeiroContato, URL_CADASTRO_DA_PROSPECCAO } from "@/app/lib/prospectorEnvio"
 import { GET } from "@/app/api/prospector/r/[token]/route"
 
 const AGORA = new Date("2026-11-26T14:00:00Z")
@@ -114,7 +114,7 @@ describe("link rastreado", () => {
   it("token válido marca clique e redireciona 302 ao formulário", async () => {
     const res = await GET(new Request("https://x") as never, { params: Promise.resolve({ token: "tokenabc12345" }) })
     expect(res.status).toBe(302)
-    expect(res.headers.get("location")).toBe(URL_CADASTRO_PARCEIROS)
+    expect(res.headers.get("location")).toBe(URL_CADASTRO_DA_PROSPECCAO)
     expect(mundo.prospectos[0].etapa).toBe("abriu")
     expect(envioDo(mundo.prospectos[0]).cliqueEm).toBeTruthy()
   })
@@ -122,7 +122,7 @@ describe("link rastreado", () => {
     for (const token of ["naoexiste12345", "x", "a/b"]) {
       const res = await GET(new Request("https://x") as never, { params: Promise.resolve({ token }) })
       expect(res.status).toBe(302)
-      expect(res.headers.get("location")).toBe(URL_CADASTRO_PARCEIROS)
+      expect(res.headers.get("location")).toBe(URL_CADASTRO_DA_PROSPECCAO)
     }
     expect(mundo.prospectos[0].etapa).toBe("abordado")
     expect(await registrarCliquePorToken("x")).toBe(false)

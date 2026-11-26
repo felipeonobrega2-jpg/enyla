@@ -15,6 +15,8 @@ import type { ProspectoDoJid } from "./prospectorTrava"
 import { faltaDoCadastro, type CadastroParceiro } from "./parceiros"
 
 export const LINK_PARCEIROS = "https://app.enyla.com.br/parceiros"
+/** Link do cadastro com a origem (e o id do prospecto): o /parceiros marca o cadastro como vindo da prospecção. */
+export const linkParceiros = (prospectoId?: number | string | null) => `${LINK_PARCEIROS}?o=prospector${prospectoId != null && prospectoId !== "" ? `&p=${encodeURIComponent(String(prospectoId))}` : ""}`
 export const POR_ATENDENTE = "atendente_auto"
 export const TEXTO_OPT_OUT = "Tudo bem, retiramos o seu contato e não vamos mais te enviar mensagens. Obrigado pela atenção!"
 export const PAGAMENTO = "pagamos 50% antes do serviço e 50% na retirada, por PIX"
@@ -83,17 +85,18 @@ async function cadastroDoProspecto(p: ProspectoDoJid): Promise<{ faltando: strin
 }
 
 /** Troca qualquer link da ENYLA que a IA escreveu pelo oficial (só se pode mandar) ou tira; nunca www, nunca repetido. */
-export function ajustarLink(texto: string, a: { pode: boolean; quer: boolean }): string {
+export function ajustarLink(texto: string, a: { pode: boolean; quer: boolean; link?: string }): string {
+  const oficial = a.link ?? LINK_PARCEIROS
   const re = /(?:https?:\/\/)?(?:www\.|app\.)?enyla\.com\.br\S*/gi
   const tinha = re.test(texto)
   let usado = false
   let t = texto.replace(re, () => {
     if (!a.pode || usado) return a.pode ? "" : "o link que já te enviei"
     usado = true
-    return LINK_PARCEIROS
+    return oficial
   })
   t = t.replace(/[ \t]+\n/g, "\n").replace(/ {2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim()
-  if (a.pode && a.quer && !tinha) t = `${t}\n\n${LINK_PARCEIROS}`
+  if (a.pode && a.quer && !tinha) t = `${t}\n\n${oficial}`
   return t
 }
 
@@ -161,7 +164,7 @@ export async function responderParceiro(p: ProspectoDoJid, jid: string, deps: De
     await deps.avisar(`⏸️ *Segurei a resposta à gráfica ${nome}* (Prospector)\nMotivo: a IA citou valor em reais.\nIa mandar:\n${bruto}`).catch(() => null)
     return { enviou: false, motivo: "segurou: a IA citou valor em reais" }
   }
-  const texto = ajustarLink(bruto, { pode: !jaMandouLink && !cadastrou, quer: saida.enviar_link === true })
+  const texto = ajustarLink(bruto, { pode: !jaMandouLink && !cadastrou, quer: saida.enviar_link === true, link: linkParceiros(p.id) })
   // As três perguntas sem resposta oficial: a regra deterministica e a IA se somam
   const pendentes = [...new Set([...perguntasSemResposta(dela), ...((saida.perguntas_sem_resposta ?? []).filter((x): x is TemaPendente => x in ROTULO))])]
 

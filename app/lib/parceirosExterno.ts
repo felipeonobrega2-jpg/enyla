@@ -33,7 +33,7 @@ export function montarCadastros(lista: CadastroParceiro[], prospectos: Pick<Pros
     const etapa = doc ? porCnpj.get(doc) : undefined
     return {
       id: c.id, nome: c.nomeFantasia, empresa: c.razaoSocial ?? null, data: c.em,
-      origem: etapa ? "prospector" : "direto", status: c.status,
+      origem: c.origem === "prospector" || etapa ? "prospector" : "direto", status: c.status,
       ...(etapa ? { etapaProspector: etapa } : {}),
       email: mascararEmail(c.email), telefone: mascararTelefone(c.whatsapp),
     }

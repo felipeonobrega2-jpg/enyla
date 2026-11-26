@@ -84,7 +84,7 @@ describe("resposta da IA à gráfica do Prospector", () => {
   it("link: o www vira o oficial e não repete quando já foi enviado", async () => {
     mundo.ia.mockResolvedValue({ texto: "Cadastre em https://www.enyla.com.br/parceiros ok", enviar_link: true, perguntas_sem_resposta: [] })
     await responderParceiro(prosp(), JID, deps())
-    expect(enviar.mock.calls[0][0]).toBe(`Cadastre em ${LINK_PARCEIROS} ok`)
+    expect(enviar.mock.calls[0][0]).toBe(`Cadastre em ${LINK_PARCEIROS}?o=prospector&p=1 ok`)
     mundo.mensagens = [nossa(`Cadastre em ${LINK_PARCEIROS}`), dela("E o pagamento?", "2026-11-25T14:59:30Z")]
     mundo.ia.mockResolvedValue({ texto: `Pagamos 50% antes e 50% na retirada. ${LINK_PARCEIROS}`, enviar_link: true, perguntas_sem_resposta: [] })
     enviar.mockClear()

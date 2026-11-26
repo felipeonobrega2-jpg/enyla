@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { cnpjValido, cpfValido, errosDaEtapa, errosDoCadastro, limparCadastro, paraFornecedor, textoCobranca, mascaraDocumento, mascaraTelefone, textoEnchimento, faltaDoCadastro, comFalta } from "@/app/lib/parceiros"
 
 const ok = { nomeFantasia: "Gráfica Exemplo", tipoDocumento: "cnpj" as const, documento: "11222333000181", cep: "01310100", rua: "Avenida Paulista", numero: "1000", bairro: "Bela Vista", cidade: "São Paulo", uf: "SP", responsavel: "Marcos", whatsapp: "11988887777", email: "a@b.com.br",
-  servicos: [{ id: "corteVinco" as const, cobranca: "milheiro" as const, valor: 38, prazoDias: 3, prazoVaria: false, precosExemplo: { corteVinco: 250 } as Record<string, number> }, { id: "colagem" as const, cobranca: "varia" as const, prazoDias: null, prazoVaria: true, precosExemplo: { colagem: 300 } as Record<string, number> }], aceite: true }
+  servicos: [{ id: "corteVinco" as const, cobranca: "unidade" as const, valor: 0.38, prazoDias: 3, prazoVaria: false, tecnico: { buscaEntrega: true } as Record<string, boolean>, precosExemplo: { corteVinco: 250 } as Record<string, number> }, { id: "colagem" as const, cobranca: "hora" as const, valor: 45, prazoDias: null, prazoVaria: true, tecnico: { buscaEntrega: false } as Record<string, boolean>, precosExemplo: { colagem: 300 } as Record<string, number> }], aceite: true }
 
 describe("Parceiros ENYLA", () => {
   it("valida CNPJ e CPF", () => {
@@ -13,7 +13,7 @@ describe("Parceiros ENYLA", () => {
   })
   it("cadastro completo passa; prazo vazio só passa marcando que varia", () => {
     expect(errosDoCadastro(ok)).toEqual({})
-    const semPrazo = { ...ok, servicos: [{ id: "colagem" as const, cobranca: "folha" as const, prazoDias: null, prazoVaria: false, precosExemplo: { colagem: 300 } as Record<string, number> }] }
+    const semPrazo = { ...ok, servicos: [{ id: "colagem" as const, cobranca: "unidade" as const, valor: 1, prazoDias: null, prazoVaria: false, tecnico: { buscaEntrega: true }, precosExemplo: { colagem: 300 } as Record<string, number> }] }
     expect(errosDaEtapa(semPrazo, "detalhes")["colagem.prazo"]).toBeTruthy()
   })
   it("limpa o que veio do formulário", () => {
@@ -23,7 +23,7 @@ describe("Parceiros ENYLA", () => {
   it("aprovado vira fornecedor com prazo e resumo", () => {
     const f = paraFornecedor({ ...limparCadastro(ok), id: "PAR-1", em: "2026-11-18T12:00:00Z", status: "novo", gerente: "Felipe", arquivos: [] }, "f-1")
     expect(f.prazoDias).toBe(3); expect(f.obs).toContain("Corte e vinco"); expect(f.telefone).toBe("11988887777")
-    expect(textoCobranca(ok.servicos[0])).toContain("por mil")
+    expect(textoCobranca(ok.servicos[0])).toContain("por unidade")
   })
   it("endereço é obrigatório e completo (é a base para o frete)", () => {
     const e = errosDaEtapa({ ...ok, cep: "0131", numero: "" }, "endereco")

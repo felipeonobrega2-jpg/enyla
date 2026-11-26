@@ -41,6 +41,12 @@ async function reservarVez(): Promise<number | null> {
   return espera
 }
 
+/** Link do cadastro de parceiros num texto da ordem direta: leva ?o=prospector e o id do prospecto, para o /parceiros saber a origem.
+ *  Troca o link do /parceiros (com ou sem www, com ou sem parâmetros) pelo marcado; texto sem o link fica igual. */
+export function marcarLinkDoCadastro(texto: string, prospectoId: number | string): string {
+  return texto.replace(/(?:https?:\/\/)?(?:www\.|app\.)?enyla\.com\.br\/parceiros\/?(?:\?\S*)?/gi, `https://app.enyla.com.br/parceiros?o=prospector&p=${encodeURIComponent(String(prospectoId))}`)
+}
+
 /** Registra no histórico do prospecto, com quem fez. Não usa a chave `envio` (que é da cadência e mexeria nela). */
 export async function registrar(p: ProspectoDoJid, entrada: Record<string, unknown>, campos: Record<string, unknown> = {}): Promise<boolean> {
   let atual = p
@@ -61,18 +67,19 @@ export async function registrar(p: ProspectoDoJid, entrada: Record<string, unkno
 export async function enviarAoProspecto(a: { diretor: string; func: Pick<Funcionario, "nome">; prospecto: ProspectoDoJid; jid: string; texto: string; novoId: () => string; agora?: Date }): Promise<SaidaProspecto> {
   const trava = travasDoProspecto(a.prospecto, a.agora)
   if (trava) return trava
+  const texto = marcarLinkDoCadastro(a.texto, a.prospecto.id)
   const numero = celularWhatsapp(a.prospecto.telefone) ?? (/^\d{10,13}$/.test(a.jid.split("@")[0]) && a.jid.endsWith("@s.whatsapp.net") ? a.jid.split("@")[0] : null)
   if (!numero || chaveTelefone(numero).length < 10) return { saida: "Prospecto sem número de WhatsApp válido: nada foi enviado.", status: 400, motivo: "sem número", nivel: "lead" }
   const espera = await reservarVez()
   if (espera == null) return { saida: "Muitos envios seguidos ao Prospector: espere alguns segundos. Nada foi enviado.", status: 429, motivo: "espaçamento", nivel: "lead" }
   await dormir(espera)
-  const r = await evo<{ key?: { id?: string } }>("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: numero, text: a.texto }) })
+  const r = await evo<{ key?: { id?: string } }>("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: numero, text: texto }) })
   if (!r.ok || !r.corpo?.key?.id) return { saida: `Não enviou (WhatsApp ${r.status}). Nada foi para a fila.`, status: 503, motivo: `WhatsApp não enviou (${r.status})`, nivel: "lead" }
   const em = new Date().toISOString()
-  await registrar(a.prospecto, { motivo: `mensagem enviada por ${a.diretor.toUpperCase()} (${a.func.nome}, ordem pela porta externa)`, mensagem: { direcao: "enviada", canal: "whatsapp", por: a.diretor, funcionario: a.func.nome, texto: a.texto, em } }).catch(() => null)
+  await registrar(a.prospecto, { motivo: `mensagem enviada por ${a.diretor.toUpperCase()} (${a.func.nome}, ordem pela porta externa)`, mensagem: { direcao: "enviada", canal: "whatsapp", por: a.diretor, funcionario: a.func.nome, texto, em } }).catch(() => null)
   const nome = a.prospecto.nome_fantasia || a.prospecto.razao_social || a.jid
   return {
-    acao: { id: a.novoId(), tipo: "mensagem", funcionario: a.func.nome, cliente: nome, jid: a.jid, texto: a.texto, status: "enviado", em, direto: true },
-    saida: `${a.func.nome} enviou direto à gráfica do Prospector (sem Aprovo): "${a.texto}"`, destino: "enviado_direto", motivo: `gráfica do Prospector: enviado pelo ${a.func.nome}`, nivel: "lead",
+    acao: { id: a.novoId(), tipo: "mensagem", funcionario: a.func.nome, cliente: nome, jid: a.jid, texto, status: "enviado", em, direto: true },
+    saida: `${a.func.nome} enviou direto à gráfica do Prospector (sem Aprovo): "${texto}"`, destino: "enviado_direto", motivo: `gráfica do Prospector: enviado pelo ${a.func.nome}`, nivel: "lead",
   }
 }
