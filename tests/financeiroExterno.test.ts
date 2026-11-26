@@ -97,6 +97,22 @@ describe("?o=financeiro", () => {
     estado.diretor = "cmo"
     expect(JSON.stringify((await (await ler()).json()).leitura)).not.toContain("parte=banco")
   })
+  it("margem: pedido com rodada traz rodadaId, custo rateado e margem da rodada (valores fictícios)", async () => {
+    // Rodada FICTÍCIA só de teste: k1 e k2 impressos juntos, 1 posição cada
+    estado.cfg = { ...estado.cfg, producao: { rodadas: [{ id: "ROD-001", ficticio: true, folhas: 10, posicoesPorFolha: 2, custoTerceiro: { papel: 200, impressao: 100 },
+      pedidos: [{ pedidoKey: "card-k1", posicoes: 1, puxador: true, custoProprio: { cliche: 50 } }, { pedidoKey: "card-k2", posicoes: 1, custoProprio: { cliche: 50 } }] }] } }
+    estado.tabelas.KanbanCard.push({ id: "k2", numero: "101", nomeCliente: "Cliente B", coluna: 1, preco: 600, quantidade: 50, data: "01/11/2026, 10:00:00" })
+    const mar = await (await ler("o=financeiro&parte=margem&periodo=tudo")).json()
+    const k1 = mar.pedidos.find((p: { numero: string }) => p.numero === "100")
+    expect(k1).toMatchObject({ rodadaId: "ROD-001", custoProprio: 50, custoRateado: 150, custo: 200, margem: 800, margemRodada: 1000 + 600 - 300 - 100, puxador: true, rodadaVermelha: false })
+    // pedido sem rodada não ganha campo de rodada
+    estado.cfg = { ...estado.cfg, producao: { rodadas: [] } }
+    const sem = await (await ler("o=financeiro&parte=margem&periodo=tudo")).json()
+    expect(sem.pedidos).toEqual([])   // sem rodada e sem custo ligado ao pedido: fora da lista, como hoje
+    expect(JSON.stringify(sem)).not.toContain("rodadaId")
+    expect(JSON.stringify((await (await ler()).json()).leitura)).toContain("rodadaId")
+    expect(estado.escritas).toBe(0)
+  })
   it("resumo traz a lista das partes", async () => {
     const j = await (await ler("o=financeiro")).json()
     expect(j.partes).toEqual(PARTES)

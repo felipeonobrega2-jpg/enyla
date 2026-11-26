@@ -21,6 +21,7 @@
  */
 
 import { estaSegurado, type MapaSegurados } from "./pedidoSegurado"
+import { resultadoDaRodada, type Rodada } from "./rateioRodada"
 import {
   KanbanCard, LancamentoFinanceiro,
   COL_FECHADO, COL_EXPEDICAO, COL_ENTREGUE, COL_PERDIDO, COL_HOT, COLUNAS_KANBAN,
@@ -134,15 +135,37 @@ export type Pedido = {
   semCobranca: number
   /** Custos diretos lançados (pagos ou na conta do fornecedor). */
   custoDireto: number
+  /** Só em pedido ligado a uma rodada de produção (rateio da tiragem). Sem rodada, fica de fora e vale custoDireto. */
+  rodada?: PedidoRodada
   /** Só nos pedidos Digital (receberDigital.ts): sinal, data do último pagamento e vencimento do saldo. */
   digital?: { id: string; sinal: number; pagoEm: string | null; vencimento: string | null }
+}
+
+export type PedidoRodada = {
+  rodadaId: string
+  /** Custos que ficam com o pedido (fora do rateio). */
+  custoProprio: number
+  /** Fração da tiragem (R$) que cabe ao pedido, com a sobra se for o puxador. */
+  custoRateado: number
+  /** custoProprio + custoRateado: o custo a usar na margem do pedido. */
+  custoTotal: number
+  fracao: number
+  puxador: boolean
+  /** venda − custoTotal */
+  margem: number
+  /** Só vermelho sozinho se a venda não cobre custo próprio + fração. */
+  vermelho: boolean
+  margemRodada: number
+  margemRodadaPct: number | null
+  /** Alerta vermelho da rodada inteira. */
+  rodadaVermelha: boolean
 }
 
 // Link Pix que venceu sem pagamento: era só um meio de cobrança, não conta como dívida
 export const pixExpirado = (l: LancamentoFinanceiro, hojeIso: string) =>
   l.categoria === "pix_link" && l.status !== "pago" && l.dataVencimento < hojeIso
 
-export function montarPedidos(kanban: KanbanCard[], lancamentos: LancamentoFinanceiro[]): Pedido[] {
+export function montarPedidos(kanban: KanbanCard[], lancamentos: LancamentoFinanceiro[], rodadas?: Rodada[]): Pedido[] {
   const ganhos = kanban.filter(isGanho)
   const grupos = new Map<string, KanbanCard[]>()
   for (const c of ganhos) {
@@ -212,7 +235,26 @@ export function montarPedidos(kanban: KanbanCard[], lancamentos: LancamentoFinan
         .reduce((s, l) => s + l.valor, 0),
     })
   }
-  return pedidos
+  return rodadas?.length ? aplicarRodadas(pedidos, rodadas) : pedidos
+}
+
+/** Passo extra: pedidos que estão numa rodada ganham `rodada` (custo rateado e margens). Os demais voltam iguais. */
+export function aplicarRodadas(pedidos: Pedido[], rodadas: Rodada[]): Pedido[] {
+  const vendas = Object.fromEntries(pedidos.map(p => [p.key, p.venda]))
+  const diretos = Object.fromEntries(pedidos.map(p => [p.key, p.custoDireto]))
+  const porPedido = new Map<string, PedidoRodada>()
+  for (const r of rodadas) {
+    const rr = resultadoDaRodada(r, vendas, diretos)
+    for (const x of rr.pedidos) {
+      if (!(x.pedidoKey in vendas) || porPedido.has(x.pedidoKey)) continue
+      porPedido.set(x.pedidoKey, {
+        rodadaId: r.id, custoProprio: x.custoProprio, custoRateado: x.custoRateado, custoTotal: x.custoTotal, fracao: x.fracao,
+        puxador: x.puxador, margem: x.margem, vermelho: x.vermelho,
+        margemRodada: rr.margem, margemRodadaPct: rr.margemPct, rodadaVermelha: rr.vermelho,
+      })
+    }
+  }
+  return pedidos.map(p => porPedido.has(p.key) ? { ...p, rodada: porPedido.get(p.key) } : p)
 }
 
 export const pedidoEmProducao = (p: Pedido) => p.coluna >= COL_FECHADO && p.coluna < COL_ENTREGUE
