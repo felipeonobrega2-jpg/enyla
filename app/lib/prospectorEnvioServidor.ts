@@ -20,6 +20,7 @@ import {
 import { CHAVE_REMETENTE, REMETENTE_PADRAO, classificarResposta, escolherTexto, montarTexto, type EscolhaTexto, type TextoProspector } from "./prospectorTextos"
 import { lerTextosProspector } from "./prospectorTextosServidor"
 import { nomeParaChamar } from "./nomeDePessoa"
+import { campanhaDoPasso, liberarReserva, reservarEnvio } from "./prospectorReserva"
 
 const TABELA = "prospectos_parceiros"
 export const COLUNAS = "id, cnpj, razao_social, nome_fantasia, cnae_principal, cnaes_secundarios, telefone, email, nota, etapa, opt_out, historico_etapas, atualizado_em"
@@ -166,8 +167,11 @@ async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, ag
   const assunto = escolhido?.assunto
   const para = canal === "email" ? emailValido(l.email) : null
   const envio: EnvioHistorico = { passo, canal, status: "reservado", em, texto, ...(para ? { para, assunto: assunto || ASSUNTO_EMAIL } : {}), ...(token ? { token } : {}), ...(textoId ? { textoId } : {}) }
+  // E-mail: trava atômica no banco (prospecto + canal + campanha) ANTES de qualquer coisa. Barrado = não envia.
+  const trava = canal === "email" ? { prospectoId: l.id, canal, campanha: campanhaDoPasso(passo) } as const : null
+  if (trava && !(await reservarEnvio(trava)).reservado) return null
   const reservada = await gravar(l, { historico_etapas: [...historicoDe(l), { etapa: l.etapa as EtapaFunil, em, motivo: `${passo} (${canal}): reservado`, envio }] })
-  if (!reservada) return null
+  if (!reservada) { if (trava) await liberarReserva(trava); return null }
   const k = chaveCanal(canal, l)
   if (k) est.usados[passo][canal].set(k, l.cnpj)
   let r: ResultadoCanal
@@ -175,6 +179,7 @@ async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, ag
   // Cota da Resend esgotada: o e-mail para pelo resto do dia. A linha fica "falhou" com a mensagem de cota, que não conta como falha do lead.
   if (!r.ok && canal === "email" && (r.cota || ehErroDeCota(r.erro))) est.cotaEsgotada = true
   // Fecha a reserva. Se a trava perder (outra gravação no meio), relê e tenta de novo; a reserva já protege contra duplicata.
+  if (!r.ok && trava) await liberarReserva(trava)   // nada saiu: libera a trava; só "falhou" permite nova tentativa
   let atual: Linha | null = reservada
   for (let i = 0; i < 4 && atual; i++) {
     const h = historicoDe(atual).map(x => {

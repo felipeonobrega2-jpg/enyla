@@ -1,6 +1,7 @@
 // Envio automático do Prospector: chave, horário, cota, cadência, resposta/opt-out e idempotência.
 // Supabase, Evolution e Resend são simulados: nenhum teste envia nada de verdade.
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import { reservasFalsas, tabelaDeReservas } from "./helpers/reservasFalsas"
 
 type Linha = Record<string, unknown>
 const mundo = vi.hoisted(() => ({ cfg: {} as Record<string, unknown>, prospectos: [] as Record<string, unknown>[], mensagens: [] as Record<string, unknown>[], consultas: 0 }))
@@ -17,6 +18,7 @@ vi.mock("@/app/lib/email", () => ({ enviarEmail: envios.email }))
 vi.mock("@/app/lib/supabase", () => ({
   supabase: {
     from: (tabela: string) => {
+      const reserva = tabelaDeReservas(tabela); if (reserva) return reserva
       mundo.consultas++
       const fonte = tabela === "prospectos_parceiros" ? mundo.prospectos : mundo.mensagens
       const filtros: ((r: Linha) => boolean)[] = []
@@ -86,6 +88,7 @@ beforeEach(() => {
   mundo.prospectos = []
   mundo.mensagens = []
   mundo.consultas = 0
+  reservasFalsas.limpar()
   envios.evo.mockClear()
   envios.email.mockClear()
   envios.email.mockImplementation(async () => ({ ok: true as const, id: "e1" }))
@@ -598,5 +601,72 @@ describe("e-mail: saúde, teto 200, registro e descadastro", () => {
     await rodar(SEG_10H)
     expect(emailsEnviados()).toBe(0)
     expect(hist(fora)).toHaveLength(0)
+  })
+})
+
+describe("trava de idempotência do e-mail (prospecto + canal + campanha)", () => {
+  it("reservarEnvio: duas chamadas ao mesmo tempo = uma reserva, a outra barrada e registrada", async () => {
+    const { reservarEnvio } = await import("@/app/lib/prospectorReserva")
+    const p = { prospectoId: 7, canal: "email", campanha: "primeiro_contato" } as const
+    const rs = await Promise.all([reservarEnvio(p), reservarEnvio(p)])
+    expect(rs.filter(r => r.reservado)).toHaveLength(1)
+    expect(rs.find(r => !r.reservado)).toMatchObject({ reservado: false, motivo: "duplicado" })
+    expect(reservasFalsas.reservas).toHaveLength(1)
+    expect(reservasFalsas.barrados).toEqual([{ prospecto_id: 7, canal: "email", campanha: "primeiro_contato", motivo: "duplicado" }])
+  })
+
+  it("campanhas e canais diferentes não se barram", async () => {
+    const { reservarEnvio } = await import("@/app/lib/prospectorReserva")
+    const a = await reservarEnvio({ prospectoId: 1, canal: "email", campanha: "primeiro_contato" })
+    const b = await reservarEnvio({ prospectoId: 1, canal: "email", campanha: "lembrete" })
+    const c = await reservarEnvio({ prospectoId: 1, canal: "whatsapp", campanha: "primeiro_contato" })
+    expect([a, b, c].every(r => r.reservado)).toBe(true)
+    expect(reservasFalsas.barrados).toHaveLength(0)
+  })
+
+  it("banco fora do ar ao reservar: barra (não envia) e registra o erro", async () => {
+    const { reservarEnvio } = await import("@/app/lib/prospectorReserva")
+    reservasFalsas.falhar = true
+    expect(await reservarEnvio({ prospectoId: 1, canal: "email", campanha: "primeiro_contato" })).toMatchObject({ reservado: false, motivo: "erro" })
+  })
+
+  it("duas execuções do cron ao mesmo tempo = um e-mail só", async () => {
+    const l = novo({ telefone: null, email: "contato@grafica.com.br" })
+    await Promise.all([rodar(SEG_10H), rodar(SEG_10H)])
+    expect(envios.email).toHaveBeenCalledTimes(1)
+    expect(reservasFalsas.reservas).toHaveLength(1)
+    expect(hist(l).filter(h => h.envio?.canal === "email" && h.envio.status === "enviado")).toHaveLength(1)
+  })
+
+  it("reserva já existente (outra execução na frente, mesmo com o histórico ainda vazio): não envia e registra a barrada", async () => {
+    const l = novo({ telefone: null, email: "contato@grafica.com.br" })
+    reservasFalsas.reservas.push({ prospecto_id: l.id, canal: "email", campanha: "primeiro_contato" })
+    await rodar(SEG_10H)
+    expect(envios.email).not.toHaveBeenCalled()
+    expect(reservasFalsas.barrados).toHaveLength(1)
+    expect(reservasFalsas.barrados[0]).toMatchObject({ prospecto_id: l.id, canal: "email", motivo: "duplicado" })
+  })
+
+  it("banco de reservas fora do ar: o e-mail não sai", async () => {
+    novo({ telefone: null, email: "contato@grafica.com.br" })
+    reservasFalsas.falhar = true
+    await rodar(SEG_10H)
+    expect(envios.email).not.toHaveBeenCalled()
+  })
+
+  it("e-mail que falhou libera a reserva e a próxima execução tenta de novo", async () => {
+    const l = novo({ telefone: null, email: "contato@grafica.com.br" })
+    envios.email.mockImplementationOnce(async () => ({ ok: false as const, erro: "erro temporário" }))
+    await rodar(SEG_10H)
+    expect(reservasFalsas.reservas).toHaveLength(0)
+    await rodar(SEG_10H)
+    expect(envios.email).toHaveBeenCalledTimes(2)
+    expect(reservasFalsas.reservas).toHaveLength(1)
+    expect(hist(l).some(h => h.envio?.status === "enviado")).toBe(true)
+  })
+
+  it("assunto A/B é a mesma campanha: a chave da reserva não leva o assunto", async () => {
+    const { campanhaDoPasso } = await import("@/app/lib/prospectorReserva")
+    expect(campanhaDoPasso("primeiro_contato")).toBe("primeiro_contato")
   })
 })

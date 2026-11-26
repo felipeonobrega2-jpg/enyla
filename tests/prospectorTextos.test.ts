@@ -1,6 +1,7 @@
 // Biblioteca de textos do Prospector (teste A/B): sorteio, fallback, nome só de gente, versão gravada no envio e contagem por versão.
 // Supabase, Evolution e Resend são simulados: nada é enviado de verdade.
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import { reservasFalsas, tabelaDeReservas } from "./helpers/reservasFalsas"
 import { ativosDaEtapa, classificarResposta, CORPO_EMAIL_PADRAO, textoDe, contarPorVersao, escolherTexto, montarTexto, novaVersao, sortearTexto, textoPrimeiroContato, TEXTOS_PADRAO, type TextoProspector } from "@/app/lib/prospectorTextos"
 
 type Linha = Record<string, unknown>
@@ -17,6 +18,7 @@ vi.mock("@/app/lib/email", () => ({ enviarEmail: envios.email }))
 vi.mock("@/app/lib/supabase", () => ({
   supabase: {
     from: (tabela: string) => {
+      const reserva = tabelaDeReservas(tabela); if (reserva) return reserva
       const fonte = tabela === "prospectos_parceiros" ? mundo.prospectos : tabela === "dados_sistema" ? mundo.textos : []
       const filtros: ((r: Linha) => boolean)[] = []
       let patch: Linha | null = null
@@ -162,7 +164,7 @@ describe("nome no envio: nomeDePessoa decide", () => {
     return l
   }
   const saidas = () => envios.evo.mock.calls.map(c => (JSON.parse((c[1] as { body: string }).body) as { text: string }).text)
-  beforeEach(() => { seq = 0; mundo.cfg = { prospector_envio_ativo: true }; mundo.prospectos = []; mundo.textos = []; envios.evo.mockClear(); envios.email.mockClear() })
+  beforeEach(() => { reservasFalsas.limpar(); seq = 0; mundo.cfg = { prospector_envio_ativo: true }; mundo.prospectos = []; mundo.textos = []; envios.evo.mockClear(); envios.email.mockClear() })
   const rodar = () => executarEnvio({ agora: () => SEG_10H, primeiroContatoPausado: false, limitePrimeirosPorDia: 0 })
 
   it("nome de gente entra; nome de empresa sai junto com a vírgula", async () => {
