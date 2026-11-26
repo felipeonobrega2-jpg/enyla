@@ -1,0 +1,89 @@
+// Porta externa: importar_prospectos (só CCO e CMO) e ordem a gráfica do Prospector (sempre fila do Aprovo).
+import { describe, it, expect, vi, beforeEach } from "vitest"
+
+const e = vi.hoisted(() => ({
+  base: [] as Record<string, unknown>[], gravados: [] as Record<string, unknown>[], prospecto: true, enviadoDireto: vi.fn(), redigir: vi.fn(),
+}))
+vi.mock("@/app/lib/supabase", () => ({
+  supabase: { from: (t: string) => {
+    if (t === "prospectos_parceiros") return {
+      select: () => ({ range: async () => ({ data: e.base, error: null }) }),
+      upsert: (l: Record<string, unknown>) => ({ select: async () => { e.gravados.push(l); return { data: [{ id: 100 + e.gravados.length }], error: null } } }),
+    }
+    const q: Record<string, unknown> = { then: (r: (v: unknown) => void) => r({ data: [] }) }
+    for (const m of ["select", "order", "limit", "eq", "ilike"]) q[m] = () => q
+    return q
+  } },
+}))
+vi.mock("@/app/lib/configAtomica", () => ({ lerCampos: vi.fn(async () => ({})), mudarConfig: vi.fn() }))
+vi.mock("@/app/lib/diretoriaServidor", () => ({ lerConversa: vi.fn(async () => []), gravarConversa: vi.fn() }))
+vi.mock("@/app/lib/funcionariosServidor", () => ({ redigirComoFuncionario: e.redigir }))
+vi.mock("@/app/lib/prospectorTrava", () => ({ ehProspecto: vi.fn(async () => e.prospecto) }))
+vi.mock("@/app/lib/nivelCliente", () => ({ nivelDoDestinatario: vi.fn(async () => ({ nivel: "lead", jaCliente: false, motivo: "" })) }))
+vi.mock("@/app/lib/ordemDireta", () => ({ travasAntesDeRedigir: vi.fn(async () => null), enviarAoLead: e.enviadoDireto }))
+
+import { importarProspectosExterno } from "@/app/lib/importarProspectosExterno"
+import { ordenarComercial } from "@/app/lib/ordemComercial"
+
+const CNPJ = "11222333000181"   // CNPJ válido de teste (sintético)
+const item = (o: Record<string, unknown> = {}) => ({ nome: "Gráfica Teste", cnpj: CNPJ, origem: "contato_felipe", ...o })
+
+beforeEach(() => { e.base = []; e.gravados = []; e.prospecto = true; e.enviadoDireto.mockReset(); e.redigir.mockReset(); e.redigir.mockResolvedValue({ ok: true, texto: "Oi!" }) })
+
+describe("importar_prospectos", () => {
+  it("só CCO e CMO: COO, CFO e CTO recebem 403 e nada é gravado", async () => {
+    for (const d of ["coo", "cfo", "cto"] as const) expect(await importarProspectosExterno({ itens: [item()] }, d)).toMatchObject({ ok: false, status: 403 })
+    expect(e.gravados).toHaveLength(0)
+  })
+  it("valida o corpo: sem itens, lista vazia e mais de 200 são 400", async () => {
+    expect(await importarProspectosExterno({}, "cco")).toMatchObject({ ok: false, status: 400 })
+    expect(await importarProspectosExterno({ itens: [] }, "cco")).toMatchObject({ ok: false, status: 400 })
+    expect(await importarProspectosExterno({ itens: Array(201).fill(item()) }, "cmo")).toMatchObject({ ok: false, status: 400 })
+  })
+  it("cria, normaliza o telefone e registra quem importou e a origem", async () => {
+    const r = await importarProspectosExterno({ itens: [item({ celular: "(11) 99999-0001", email: "A@B.com", cidade: "Barueri" })] }, "cco")
+    expect(r).toMatchObject({ ok: true, criados: [{ indice: 0 }], duplicados: [], recusados: [] })
+    expect(e.gravados[0]).toMatchObject({ cnpj: CNPJ, telefone: "11999990001", email: "a@b.com", municipio: "Barueri", etapa: "encontrado" })
+    expect(JSON.stringify(e.gravados[0].historico_etapas)).toContain("CCO")
+    expect(JSON.stringify(e.gravados[0].historico_etapas)).toContain("contato_felipe")
+  })
+  it("recusa item sem nome, sem origem, sem CNPJ, CNPJ, telefone ou e-mail inválido", async () => {
+    const r = await importarProspectosExterno({ itens: [item({ nome: "" }), item({ origem: "" }), item({ cnpj: "" }), item({ cnpj: "11111111111111" }), item({ celular: "123" }), item({ email: "xx" })] }, "cmo")
+    expect(r.ok && r.recusados.map(x => x.motivo)).toEqual(["sem nome", "sem origem", "sem CNPJ (a base do Prospector exige CNPJ)", "CNPJ inválido", "telefone inválido", "e-mail inválido"])
+    expect(e.gravados).toHaveLength(0)
+  })
+  it("deduplica por CNPJ, telefone (com e sem o 9) e e-mail, também dentro do mesmo lote", async () => {
+    e.base = [{ cnpj: "00000000000191", telefone: "551199990002", email: "x@x.com", etapa: "abordado", opt_out: false }]
+    const r = await importarProspectosExterno({ itens: [item({ cnpj: "00000000000191" }), item({ celular: "1199990002" }), item({ celular: "11999990002" }), item({ email: "X@x.com" }), item({ celular: "11988887777" }), item({ celular: "(11) 98888-7777" })] }, "cco")
+    expect(r.ok && r.duplicados.map(d => d.indice)).toEqual([0, 1, 2, 3, 5])
+    expect(r.ok && r.criados).toHaveLength(1)
+  })
+  it("respeita a lista de exclusão: opt-out e descartado são recusados, não duplicados", async () => {
+    e.base = [{ cnpj: CNPJ, telefone: null, email: null, etapa: "descartado", opt_out: true }, { cnpj: "00000000000191", telefone: null, email: null, etapa: "descartado", opt_out: false }]
+    const r = await importarProspectosExterno({ itens: [item(), item({ cnpj: "00000000000191" })] }, "cco")
+    expect(r.ok && r.recusados.map(x => x.motivo)).toEqual(["lista de exclusão (pediu para não receber)", "descartado antes (lista de exclusão)"])
+    expect(r.ok && r.criados).toHaveLength(0)
+    expect(e.gravados).toHaveLength(0)
+  })
+})
+
+describe("ordenar_funcionario para gráfica do Prospector", () => {
+  const op = { apiKey: "k", novoId: () => "id1", enviarLead: true }
+  it("telefone do Prospector sem conversa no WhatsApp: fila do Aprovo, sem 404 e sem envio", async () => {
+    const r = await ordenarComercial("cco", { funcionario: "atendente", jid: "5511977776666@s.whatsapp.net", ordem: "apresentar a rede" }, op)
+    expect(r).toMatchObject({ destino: "fila_aprovo", acao: { tipo: "mensagem", status: "aguardando", jid: "5511977776666@s.whatsapp.net" } })
+    expect(r.status).toBeUndefined()
+    expect(e.enviadoDireto).not.toHaveBeenCalled()
+  })
+  it("mesmo com nível 'lead', gráfica do Prospector nunca sai direto (CCO e CMO, jid ou telefone)", async () => {
+    for (const d of ["cco", "cmo"] as const) for (const x of [{ jid: "5511977776666@s.whatsapp.net" }, { cliente: "(11) 97777-6666" }]) {
+      const r = await ordenarComercial(d, { funcionario: "followup", ordem: "retomar", ...x }, op)
+      expect(r.destino).toBe("fila_aprovo")
+    }
+    expect(e.enviadoDireto).not.toHaveBeenCalled()
+  })
+  it("número que não é do Prospector e sem conversa continua 404", async () => {
+    e.prospecto = false
+    expect(await ordenarComercial("cco", { funcionario: "atendente", jid: "5511977776666@s.whatsapp.net", ordem: "x" }, op)).toMatchObject({ status: 404 })
+  })
+})

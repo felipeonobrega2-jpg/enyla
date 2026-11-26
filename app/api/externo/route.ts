@@ -28,6 +28,7 @@ import { lerPertoExterno, AJUDA_PERTO } from "@/app/lib/pertoExterno"
 import { lerPropostasExterno, AJUDA_PROPOSTAS } from "@/app/lib/propostasExterno"
 import { moverCardExterno } from "@/app/lib/moverCardExterno"
 import { gravarDigitalExterno } from "@/app/lib/gravarDigitalExterno"
+import { importarProspectosExterno, MAX_ITENS_IMPORTAR } from "@/app/lib/importarProspectosExterno"
 import { cancelarOrdem } from "@/app/lib/cancelarOrdem"
 import { niveisDosLeads } from "@/app/lib/nivelNoDetalhe"
 import { lerHistoricoOffset, AJUDA_HISTORICO_OFFSET } from "@/app/lib/historicoOffsetExterno"
@@ -72,6 +73,7 @@ export async function GET(req: NextRequest) {
       "POST {acao:'tarefa_felipe', titulo, detalhe?, prazo? (AAAA-MM-DD)}": "QUALQUER DIRETOR. Põe uma tarefa na lista 'Depende de você' do Felipe (pedido por você, com data e prazo). titulo obrigatório (até 140 caracteres); no máximo 10 abertas por diretor (a 11ª volta 429). Suas tarefas (abertas e feitas nos últimos 7 dias) estão em ?o=empresa, campo tarefasParaFelipe. {acao:'tarefa_felipe', operacao:'cancelar', id} cancela só as suas. Não manda mensagem a ninguém",
       "POST {acao:'reabrir_pendencia', chave}": "QUALQUER DIRETOR. Tira a dispensa e a pendência volta na hora (?o=empresa lista as dispensadas à parte)",
       ...(diretor === "cmo" ? { "POST {acao:'meta_ads', operacao:'ligar'|'pausar'|'ajustar_verba', campanhaId | conjuntoId, verbaDiaria}": "SÓ A CHAVE DA CMO. Só em campanha ou conjunto que já existe (conjuntoId substitui campanhaId, nunca os dois; campanha ABO tem a verba no conjunto, campanha CBO se ajusta na campanha: conjunto CBO recebe 400): ligar (ACTIVE), pausar (PAUSED) ou ajustar a verba diária (verbaDiaria em reais, só em ajustar_verba). Mudança de verba de no máximo 20% sobre a atual e nunca acima de R$ 200 por campanha ou por conjunto: fora disso, 400 e nada é alterado (não corta). Criar campanha, conjunto ou anúncio e publicar são do Felipe. Resposta: { ok, registro } com antes e depois; cada ação e recusa fica registrada" } : {}),
+      ...(podeAcionarComercial(diretor) ? { "POST {acao:'importar_prospectos', itens:[{nome, cnpj, email?, celular?, cidade?, origem}]}": `SÓ CCO e CMO (as outras recebem 403). Grava na base do Prospector (etapa 'encontrado'), no máximo ${MAX_ITENS_IMPORTAR} itens por chamada. nome, cnpj (válido; a base exige CNPJ) e origem (livre, ex. 'acabadora_coo') obrigatórios. Mesma normalização de telefone e deduplicação por CNPJ, telefone e e-mail do importador; quem está na lista de exclusão (pediu para não receber ou foi descartado) é recusado. Nada é enviado. Resposta: { ok, criados, duplicados, recusados } com o motivo de cada um; fica no histórico do prospecto quem importou` } : {}),
       "POST {acao:'lead', operacao:'perdido'|'orcado'|'reabrir', jid | cliente, motivo}": "SÓ AS CHAVES DO CCO E DO COO (as outras recebem 403). perdido exige motivo (400 sem); orcado é manual, para quando a detecção do orçamento enviado pelo Felipe falhar; reabrir volta o lead ao normal. Nada é apagado (fica no histórico) e nada é enviado ao cliente. Resposta: { ok, resultado, jid }",
       "POST {acao:'gasto_fixo', operacao:'criar'|'editar'|'desativar', id, nome, valor, diaVencimento, categoriaId, contaId, obs}": "SÓ A CHAVE DO CFO (as outras recebem 403). Cadastra, edita ou desativa um gasto fixo (Financeiro → Cadastros → Gastos fixos). criar exige nome e valor (reais, > 0); editar e desativar exigem id; diaVencimento 1 a 31; a conta de pagamento é contaId e anotações como 'cartão 7150' vão em obs. Desativar só põe ativa:false, nunca apaga. Resposta: { ok, resultado, gasto } com o item gravado",
       ...(diretor === "cfo" ? {
@@ -245,6 +247,13 @@ export async function POST(req: NextRequest) {
     msg = { id: novoId(), de: "diretor", texto: r.resultado, em: new Date().toISOString(), nuvem: true }
     await gravarConversa(diretor, [...await lerConversa(diretor), msg])
     return NextResponse.json({ ok: true, resultado: r.resultado, jid: r.jid })
+  } else if (b.acao === "importar_prospectos") {
+    const r = await importarProspectosExterno(b, diretor)
+    if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
+    const resumo = `Importação de prospectos (${diretor.toUpperCase()}): ${r.criados.length} criados, ${r.duplicados.length} duplicados, ${r.recusados.length} recusados.`
+    msg = { id: novoId(), de: "diretor", texto: resumo, em: new Date().toISOString(), nuvem: true }
+    await gravarConversa(diretor, [...await lerConversa(diretor), msg])
+    return NextResponse.json({ ok: true, resultado: resumo, criados: r.criados, duplicados: r.duplicados, recusados: r.recusados })
   } else if (b.acao === "dispensar_pendencia" || b.acao === "reabrir_pendencia") {
     const r = await acaoPendencia(diretor, b)
     if (r.status === 200) after(renovarFotoDepois)
@@ -294,7 +303,7 @@ export async function POST(req: NextRequest) {
       await gravarConversa(diretor, [...await lerConversa(diretor), msg])
       return NextResponse.json({ ok: true, resultado: saida, destino: r.destino, motivo: r.motivo, nivel: r.nivel, id: r.acao.id })
     }
-  } else return NextResponse.json({ erro: `acao: relatar, lancar_despesa, renomear_fornecedor, mover_card, gravar_digital, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, restaurar_fila, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
+  } else return NextResponse.json({ erro: `acao: relatar, importar_prospectos, lancar_despesa, renomear_fornecedor, mover_card, gravar_digital, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, restaurar_fila, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
   await gravarConversa(diretor, [...await lerConversa(diretor), msg])
   return NextResponse.json({ ok: true, resultado: saida })
 }

@@ -70,12 +70,30 @@ export async function ordenarComercial(diretor: IdDiretor, x: Record<string, unk
   if (!podeAcionarComercial(diretor)) return { saida: `${func.nome} só atende ordens da CCO e da CMO.`, status: 403 }
   const ordem = String(x.ordem ?? "").trim()
   if (!ordem) return { saida: "Falta a ordem (o que o agente deve dizer ao lead).", status: 400 }
-  const lead = await acharLead({ cliente: x.cliente as string | undefined, jid: x.jid as string | undefined })
-  if (!lead.ok) return { saida: lead.erro, status: 404 }
+  const achado = await acharLead({ cliente: x.cliente as string | undefined, jid: x.jid as string | undefined })
+  // Gráfica do Prospector (telefone em prospectos_parceiros): SEMPRE fila do Aprovo, nunca envio direto e nunca 404,
+  // mesmo sem conversa anterior no WhatsApp. Esta checagem vem antes do nível do cliente.
+  const { ehProspecto } = await import("./prospectorTrava")
+  const bruto = String(x.jid ?? x.cliente ?? "").trim()
+  const dig = bruto.replace(/\D/g, "")
+  const jidDoTelefone = !bruto.includes("@") || bruto.endsWith("@s.whatsapp.net") ? (dig.length >= 10 && dig.length <= 13 ? `${dig.length <= 11 ? "55" + dig : dig}@s.whatsapp.net` : null) : null
+  let prospecto = false
+  const jidParaChecar = achado.ok ? achado.jid : jidDoTelefone
+  if (jidParaChecar) prospecto = await ehProspecto(jidParaChecar).catch(() => false)
+  if (!prospecto && achado.ok && jidDoTelefone && jidDoTelefone !== achado.jid) prospecto = await ehProspecto(jidDoTelefone).catch(() => false)
+  let lead: { ok: true; jid: string; nome: string }
+  if (prospecto) {
+    const jidP = achado.ok ? achado.jid : jidDoTelefone!
+    lead = { ok: true, jid: jidP, nome: achado.ok ? achado.nome : (typeof x.cliente === "string" && x.cliente.trim() && !/^[\d\s()+-]+$/.test(x.cliente) ? x.cliente.trim() : dig) }
+  } else {
+    if (!achado.ok) return { saida: achado.erro, status: 404 }
+    lead = achado
+  }
   // Só quem já comprou (A, B, C) precisa do Aprovo; na dúvida ("indefinido") conta como cliente. Sem enviarLead, tudo vai à fila.
   const { nivelDoDestinatario } = await import("./nivelCliente")
-  const nv = op.enviarLead ? await nivelDoDestinatario(lead.jid) : { nivel: "indefinido" as const, jaCliente: false, motivo: "" }
-  const direto = op.enviarLead && nv.nivel === "lead"
+  const nv = prospecto ? { nivel: "indefinido" as const, jaCliente: false, motivo: "" }
+    : op.enviarLead ? await nivelDoDestinatario(lead.jid) : { nivel: "indefinido" as const, jaCliente: false, motivo: "" }
+  const direto = !prospecto && op.enviarLead && nv.nivel === "lead"
   if (direto) {
     const { travasAntesDeRedigir } = await import("./ordemDireta")
     const t = await travasAntesDeRedigir(func, lead).catch(() => null)
@@ -96,7 +114,7 @@ export async function ordenarComercial(diretor: IdDiretor, x: Record<string, unk
     saida: `${func.nome} escreveu e a mensagem está esperando o Aprovo do Felipe: "${texto}"`, destino: "fila_aprovo", motivo, nivel: nv.nivel,
   })
   if (!direto) {
-    const motivo = !op.enviarLead ? "ordem pela conversa com o Felipe: espera o Aprovo" : nv.nivel === "indefinido" ? "nível indefinido: fila por segurança" : `cliente ${nv.nivel}: precisa do Aprovo do Felipe`
+    const motivo = prospecto ? "gráfica do Prospector: sempre pelo Aprovo do Felipe" : !op.enviarLead ?"ordem pela conversa com o Felipe: espera o Aprovo" : nv.nivel === "indefinido" ? "nível indefinido: fila por segurança" : `cliente ${nv.nivel}: precisa do Aprovo do Felipe`
     return fila(r.texto, motivo)
   }
   const { enviarAoLead } = await import("./ordemDireta")
