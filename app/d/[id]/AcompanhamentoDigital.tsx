@@ -8,9 +8,9 @@ import { formatarData } from "@/app/lib/formato"
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 const dataBR = (iso: string | null) => iso ? formatarData(iso, "completo") : null
 const cm = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
-const ARTE = { aprovada: "Arte aprovada", esperando_cliente: "Arte esperando a sua aprovação", nao_enviada: "Arte ainda não enviada" } as const
+const ARTE = { aprovada: "Arte aprovada", ajustes_pedidos: "Ajustes na arte em andamento", esperando_cliente: "Arte esperando a sua aprovação", nao_enviada: "Arte ainda não enviada" } as const
 
-export function AcompanhamentoDigital({ a }: { a: Acompanhamento }) {
+export function AcompanhamentoDigital({ a, resumo = true }: { a: Acompanhamento; resumo?: boolean }) {
   const fim = a.etapaAtual.chave === "enviado"
   const pg = a.pagamento
   const pagoPct = pg.situacao === "ok" && a.valorTotal > 0 ? Math.min(100, Math.round(pg.pago / a.valorTotal * 100)) : 0
@@ -49,12 +49,12 @@ export function AcompanhamentoDigital({ a }: { a: Acompanhamento }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5">
+      {resumo && <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5">
         <p className="text-[10.5px] uppercase tracking-wide font-bold text-[#8E8E93] mb-2">Resumo do pedido</p>
         <p className="text-[13px] text-[#191625]">{a.quantidade.toLocaleString("pt-BR")} caixinhas · {cm(a.medida.altura)} × {cm(a.medida.largura)} × {cm(a.medida.profundidade)} cm</p>
         <p className="text-[12.5px] text-[#8E8E93] mt-0.5">{a.tipo}</p>
         <p className="text-[12.5px] text-[#8E8E93] mt-2">Valor total <strong className="text-[#191625]">{brl(a.valorTotal)}</strong> · sinal de 50% <strong className="text-[#191625]">{brl(a.sinal)}</strong></p>
-      </div>
+      </div>}
 
       <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] overflow-hidden">
         <div className="px-5 py-3.5 border-b border-[rgba(60,60,67,0.06)]">

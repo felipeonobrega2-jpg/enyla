@@ -34,8 +34,8 @@ describe("POST acao=gravar_digital", () => {
     expect(p.edicaoAcomp).toMatchObject({ motivo: "Felipe, 25/11", por: expect.any(String) })
     expect(p.edicaoAcomp.em).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
     const { situacaoArte, prazoEntregaEm, edicaoAcomp, ...resto } = p
-    void situacaoArte; void prazoEntregaEm; void edicaoAcomp
-    expect(resto).toEqual(original)
+    void situacaoArte; void prazoEntregaEm
+    expect(resto).toEqual({ ...original, edicoesAcomp: [edicaoAcomp] })
   })
   it("grava só um dos campos e deixa o outro como estava", async () => {
     const r = await pedir({ acao: "gravar_digital", id: "DIG-0001", situacaoArte: "enviada", motivo: "x" })

@@ -2,6 +2,7 @@
 // Não mexe em pagamento, status, custo nem mensagem. Não manda nada ao cliente.
 import { DIRETORES } from "./diretoria"
 import { SITUACOES_ARTE, dataValida, type SituacaoArte } from "./digitalPrazo"
+import type { EdicaoAcomp } from "./digital"
 
 export type ResultadoGravarDigital =
   | { ok: true; resultado: string; id: string; situacaoArte: string | null; prazoEntrega: string | null; arteAprovadaEm: string | null }
@@ -37,6 +38,12 @@ export function validarGravarDigital(b: Record<string, unknown>): { erro: string
   return { id, situacaoArte, prazoEntrega, arteAprovadaEm, motivo }
 }
 
+/** Acumula a edição (nunca apaga): a primeira gravação de um pedido que só tem edicaoAcomp copia esse registro para a lista antes de acrescentar. */
+export function registrarEdicao(p: { edicaoAcomp?: EdicaoAcomp; edicoesAcomp?: EdicaoAcomp[] }, e: EdicaoAcomp) {
+  const antes = p.edicoesAcomp ?? (p.edicaoAcomp ? [p.edicaoAcomp] : [])
+  return { edicaoAcomp: e, edicoesAcomp: [...antes, e] }
+}
+
 export async function gravarDigitalExterno(diretor: string, b: Record<string, unknown>): Promise<ResultadoGravarDigital> {
   if (b.arteAprovadaEm !== undefined && !PODEM_GRAVAR_ARTE_APROVADA.includes(diretor)) return { ok: false, status: 403, erro: "arteAprovadaEm: só o CTO e o COO podem gravar. Nada foi alterado." }
   const v = validarGravarDigital(b)
@@ -55,7 +62,10 @@ export async function gravarDigitalExterno(diretor: string, b: Record<string, un
     ...(v.situacaoArte !== undefined ? { situacaoArte: v.situacaoArte } : {}),
     ...(v.prazoEntrega !== undefined ? (v.prazoEntrega ? { prazoEntregaEm: v.prazoEntrega } : { prazoEntregaEm: undefined }) : {}),
     ...(v.arteAprovadaEm !== undefined ? { arteAprovadaEm: v.arteAprovadaEm } : {}),
-    edicaoAcomp: { por, em: agoraBrasilia(), motivo: v.motivo, ...(v.arteAprovadaEm !== undefined ? { arteAprovadaAntes: p.arteAprovadaEm ?? null } : {}) },
+    ...registrarEdicao(p, { por, em: agoraBrasilia(), motivo: v.motivo,
+      ...(v.arteAprovadaEm !== undefined ? { arteAprovadaAntes: p.arteAprovadaEm ?? null } : {}),
+      ...(v.situacaoArte !== undefined ? { situacaoArteAntes: p.situacaoArte ?? null } : {}),
+      ...(v.prazoEntrega !== undefined ? { prazoEntregaAntes: p.prazoEntregaEm ?? null } : {}) }),
   }))
   if (!novo) return { ok: false, status: 500, erro: `Erro ao gravar ${v.id}.` }
   return { ok: true, id: v.id, situacaoArte: novo.situacaoArte ?? null, prazoEntrega: novo.prazoEntregaEm ?? null, arteAprovadaEm: novo.arteAprovadaEm ?? null,

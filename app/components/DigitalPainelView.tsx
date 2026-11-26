@@ -21,7 +21,7 @@ type Pedido = {
   status: StatusDigital; sinalPagoEm: string | null; statusEm: string | null
   vistoEm: string | null; ultimaVista: string | null; vistas: number; lembretes: { nivel: number; em: string }[]
   briefing: { marca: string; cores: string; referencias: string; laminacao: string; arquivos: number } | null
-  vence: string; link: string; linkDesigner: string
+  vence: string; link: string; linkAcompanhamento: string; linkDesigner: string
   arteAtual: { url: string; nome: string; em: string } | null; versoes: number; arteEnviadaEm: string | null; arteAprovadaEm: string | null
   ajustes: { texto: string; em: string }[]; designerAvisadoEm: string | null; villaEnviadoEm: string | null
   frete: number | null; restante: number | null; restantePagoEm: string | null; prontoEm?: string | null; entrega: { cep: string; endereco: string } | null; acertadoEm: string | null
@@ -335,6 +335,11 @@ export default function DigitalPainelView({ onAbrirConversa }: { onAbrirConversa
               <button onClick={() => copiar(sel.link)} className="inline-flex items-center gap-1 text-[12px] text-[#8456e8] hover:underline">
                 {copiado === "link" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} Copiar link
               </button>
+              {sel.sinalPagoEm && (
+                <button onClick={() => copiar(sel.linkAcompanhamento, "acompanhamento")} className="inline-flex items-center gap-1 text-[12px] text-[#8456e8] hover:underline">
+                  {copiado === "acompanhamento" ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} Copiar link de acompanhamento
+                </button>
+              )}
             </div>
           </div>
         )}
