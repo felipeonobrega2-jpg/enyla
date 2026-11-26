@@ -5,16 +5,17 @@ import { Caixa3DArte } from "./Caixa3DArte"
 import { dimsDoFormulario } from "../lib/artePrevia"
 import { brl, num } from "../utils"
 import { isGanho, isPerdido, isExpirado, parseData } from "../lib/negocio"
+import { antigaSemCard, precoHist, precoProposta } from "../lib/orcamentosFiltro"
 import { Copy, Sparkles, MessageCircle, FileDown, FileText, Trash2, PencilLine, Search } from "lucide-react"
 import { Selo, Tom, Vazio } from "./ds"
 
 export type OrdemHistorico = "recente" | "antigo" | "maior" | "menor" | "nome"
-export type SituacaoOrc = "todos" | "aberto" | "fechado" | "recusado" | "semResposta"
+export type SituacaoOrc = "todos" | "aberto" | "fechado" | "recusado" | "semResposta" | "antigasSemCard"
 
 export type HistItem = { form: FormData; calculo: Calculo; data: string; numero?: string }
 
 // Situação de um orçamento pelo card do quadro (mesmas regras de lib/negocio)
-export function situacaoDoCard(card?: KanbanCard): { id: Exclude<SituacaoOrc, "todos">; nome: string; tom: Tom } {
+export function situacaoDoCard(card?: KanbanCard): { id: Exclude<SituacaoOrc, "todos" | "antigasSemCard">; nome: string; tom: Tom } {
   if (!card) return { id: "aberto", nome: "Sem card", tom: "neutro" }
   if (isGanho(card)) return { id: "fechado", nome: "Fechado", tom: "sucesso" }
   if (isPerdido(card)) return { id: "recusado", nome: "Recusado", tom: "perigo" }
@@ -55,21 +56,11 @@ export function HistoricoView({
   const tempo = (d: string) => parseData(d)?.getTime() ?? 0
   const numeroInt = (n?: string) => parseInt(n?.replace(/\D/g, "") ?? "0", 10)
 
-  const precoItem = (item: HistItem) => {
-    const ideal = item.calculo.tabela.find(l => l.quantidade === item.calculo.sweetSpotIdealQtd) ?? item.calculo.tabela[0]
-    return { preco: item.form.comFaca ? (ideal?.precoComFaca ?? 0) : (ideal?.precoSemFaca ?? 0), qtd: ideal?.quantidade ?? 0 }
-  }
-  const precoProposta = (p: PropostaCustom) => {
-    const ativas = p.linhas.filter(l => l.ativa && l.quantidade > 0)
-    const ideal = ativas.find(l => l.isIdeal) ?? ativas[ativas.length - 1]
-    return { preco: ideal ? ideal.unitario * ideal.quantidade : 0, qtd: ideal?.quantidade ?? 0 }
-  }
-
   const q = busca.trim().toLowerCase()
   const todos: ListItem[] = [
     ...historico.map((item, idx) => ({
       tipo: "hist" as const, item, originalIndex: idx, data: item.data, numero: item.numero ?? "",
-      ...precoItem(item), nome: item.form.nomeCliente || "", card: porNumero.get(item.numero ?? ""),
+      ...precoHist(item), nome: item.form.nomeCliente || "", card: porNumero.get(item.numero ?? ""),
     })),
     ...propostasCustom.map(p => ({
       tipo: "proposta" as const, item: p, data: p.data, numero: p.numero,
@@ -79,7 +70,12 @@ export function HistoricoView({
 
   const lista = todos
     .filter(e => !q || e.nome.toLowerCase().includes(q) || e.numero.toLowerCase().includes(q) || e.data.includes(q))
-    .filter(e => situacao === "todos" || situacaoDoCard(e.card).id === situacao)
+    .filter(e => {
+      if (situacao === "todos") return true
+      const antiga = antigaSemCard(e)
+      if (situacao === "antigasSemCard") return antiga
+      return !antiga && situacaoDoCard(e.card).id === situacao
+    })
     .sort((a, b) => {
       if (ordem === "recente") return (tempo(b.data) - tempo(a.data)) || (numeroInt(b.numero) - numeroInt(a.numero))
       if (ordem === "antigo")  return (tempo(a.data) - tempo(b.data)) || (numeroInt(a.numero) - numeroInt(b.numero))

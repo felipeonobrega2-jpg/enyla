@@ -350,3 +350,7 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 **Status:** Claude Code. **Aprovo:** não. **PR:** issue #144. Só leitura, sem migração.
 
 `GET /api/externo?o=parceiros` e `?o=detalhe&area=parceiros` (mesmo conteúdo; só chaves do CCO e da CMO, as outras recebem 403). `cadastros`: até 100, mais novos primeiro (`id`, `nome`, `empresa`, `data`, `origem` prospector/direto, `status`, `etapaProspector`, e-mail mascarado `ma***@dominio.com`, telefone `***1234`). Nunca documento nem endereço. `respostas`: prospectos na etapa `respondeu` e, se a tabela `prospectos_emails_recebidos` (#132) existir, as últimas 50 respostas com os 300 primeiros caracteres; sem a tabela, só pela etapa, sem erro. `funil`: contagem por etapa. Código em `app/lib/parceirosExterno.ts`; testes em `tests/parceirosExterno.test.ts`.
+
+## 49. Orçamentos: filtro "Em aberto" esconde antigas sem card e sem valor
+
+**Status:** Claude Code. **Aprovo:** não. **PR:** issue #223. Só exibição, sem migração, nada muda no banco. Proposta sem card, sem valor e com mais de 60 dias sai de "Em aberto" e aparece na aba "Antigas sem card". Critério em `app/lib/orcamentosFiltro.ts`; teste em `tests/orcamentosFiltro.test.ts`. Os totais de "Em aberto" vêm dos cards do quadro e já não contam propostas sem card.

@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import { KanbanCard, PropostaCustom } from "../types"
 import { conversao, orcamentosDoPeriodo, nomeChave, isAberto, isGanho, isPerdido, isExpirado, parseData, SEM_PERIODO } from "../lib/negocio"
+import { antigaSemCard, precoHist, precoProposta } from "../lib/orcamentosFiltro"
 import { brl, num } from "../utils"
 import { HistoricoView, HistItem, OrdemHistorico, SituacaoOrc, situacaoDoCard } from "./HistoricoView"
 import { CabecalhoPagina, Kpi, GradeKpis, Segmentado, Botao, Cartao, TituloCartao, Colunas, ListaBarras, Gaveta, LinhaLista, Vazio, Selo } from "./ds"
@@ -50,6 +51,14 @@ export function OrcamentosView(props: Props) {
   const fechados = base.filter(isGanho)
   const recusados = base.filter(isPerdido)
   const semResposta = base.filter(isExpirado)
+
+  // Antigas sem card (sem card, sem valor, > 60 dias): saem de "Em aberto", seguem visíveis na aba própria
+  const qtdAntigasSemCard = useMemo(() => {
+    const porNumero = new Set(kanban.map(c => c.numero))
+    const porId = new Set(kanban.map(c => c.id))
+    return historico.filter(h => !porNumero.has(h.numero ?? "") && antigaSemCard({ preco: precoHist(h).preco, data: h.data })).length
+      + propostasCustom.filter(p => !porId.has(p.cardId) && !porNumero.has(p.numero) && antigaSemCard({ preco: precoProposta(p).preco, data: p.data })).length
+  }, [historico, propostasCustom, kanban])
 
   const filtrar = (s: SituacaoOrc) => {
     setSituacao(atual => atual === s ? "todos" : s)
@@ -102,6 +111,7 @@ export function OrcamentosView(props: Props) {
                 { v: "fechado", nome: `Fechados ${fechados.length}` },
                 { v: "recusado", nome: `Recusados ${recusados.length}` },
                 { v: "semResposta", nome: `Sem resposta ${semResposta.length}` },
+                { v: "antigasSemCard", nome: `Antigas sem card ${qtdAntigasSemCard}` },
               ]} />
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#898892] pointer-events-none" />
