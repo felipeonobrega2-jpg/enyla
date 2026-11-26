@@ -55,9 +55,9 @@ const hist = () => (mundo.prospectos[0].historico_etapas as Linha[])
 beforeEach(() => {
   mundo.prospectos = [{ id: 1, razao_social: "Gráfica Teste", nome_fantasia: "Teste", telefone: "(11) 98765-4321", etapa: "abordado", opt_out: false, historico_etapas: [], atualizado_em: "2026-11-25T10:00:00Z" }]
   mundo.mensagens = [nossa("Oi! Somos a ENYLA, queremos você como parceira."), dela("Como funciona?")]
-  mundo.cfg = { apiKey: "k", conhecimentoAgente: [{ id: "felipe-1", tema: "processo", texto: "Cadastro de parceiro leva uns 5 minutos e o Felipe chama no WhatsApp.", em: "x" }], cadastrosParceiros: [] }
+  mundo.cfg = { apiKey: "k", conhecimentoAgente: [{ id: "felipe-1", tema: "processo", texto: "Cadastro de parceiro leva uns 5 minutos.", em: "x" }], cadastrosParceiros: [] }
   mundo.ia.mockReset()
-  mundo.ia.mockResolvedValue({ texto: "O cadastro leva uns 5 minutos. Depois o Felipe analisa e chama você aqui.", enviar_link: true, perguntas_sem_resposta: [] })
+  mundo.ia.mockResolvedValue({ texto: "O cadastro leva uns 5 minutos. Depois é só aguardar a ativação.", enviar_link: true, perguntas_sem_resposta: [] })
   enviar = vi.fn(async () => ({ ids: ["W1"] })); avisar = vi.fn(async () => undefined)
 })
 
@@ -120,17 +120,17 @@ describe("resposta da IA à gráfica do Prospector", () => {
 describe("perguntas sem resposta oficial", () => {
   it.each([["Tem algum custo para entrar?", "custo"], ["Vocês pedem exclusividade?", "exclusividade"], ["Qual o volume de serviço por mês?", "volume"]])("%s", async (pergunta, tema) => {
     mundo.mensagens = [nossa("Oi!"), dela(pergunta)]
-    mundo.ia.mockResolvedValue({ texto: "O cadastro leva uns 5 minutos. Esse ponto o Felipe confirma com você.", enviar_link: false, perguntas_sem_resposta: [] })
+    mundo.ia.mockResolvedValue({ texto: "O cadastro leva uns 5 minutos. Seguimos com o cadastro.", enviar_link: false, perguntas_sem_resposta: [] })
     const r = await responderParceiro(prosp(), JID, deps())
     expect(r.enviou).toBe(true)   // a conversa não trava
-    expect(enviar.mock.calls[0][0]).toBe("O cadastro leva uns 5 minutos. Esse ponto o Felipe confirma com você.")   // texto da IA, sem acréscimo inventado
+    expect(enviar.mock.calls[0][0]).toBe("O cadastro leva uns 5 minutos. Seguimos com o cadastro.")   // texto da IA, sem acréscimo inventado
     const p = hist().find(h => h.pergunta_pendente)?.pergunta_pendente as Linha
     expect(p).toMatchObject({ tema, texto: pergunta })
     expect(avisar).toHaveBeenCalledTimes(1)
     expect(String(avisar.mock.calls[0][0])).toContain(pergunta)
   })
   it("a IA também pode apontar o tema", async () => {
-    mundo.ia.mockResolvedValue({ texto: "O Felipe confirma.", enviar_link: false, perguntas_sem_resposta: ["exclusividade"] })
+    mundo.ia.mockResolvedValue({ texto: "Seguimos com o cadastro.", enviar_link: false, perguntas_sem_resposta: ["exclusividade"] })
     await responderParceiro(prosp(), JID, deps())
     expect(hist().some(h => (h.pergunta_pendente as Linha | undefined)?.tema === "exclusividade")).toBe(true)
   })
@@ -183,5 +183,30 @@ describe("ajustarLink", () => {
   })
   it("com permissão e sem link no texto: acrescenta o oficial", () => {
     expect(ajustarLink("Faça o cadastro.", { pode: true, quer: true })).toBe(`Faça o cadastro.\n\n${LINK_PARCEIROS}`)
+  })
+})
+
+describe("o modo parceiro nunca empurra para o Felipe nem fala de busca e entrega", () => {
+  const PROIBIDAS = ["Felipe analisa", "Felipe confirma", "Felipe entra em contato", "buscam e entregam"]
+  it("o prompt não manda dizer isso e carrega o conhecimento guardado com prioridade", async () => {
+    mundo.cfg.conhecimentoAgente = [{ id: "x", tema: "preco", texto: "Preço varia por pedido: quem cadastra prazo médio e preço de referência tem prioridade; quem não cadastra cota cada pedido junto com outras parceiras. Peça só prazo médio e CNPJ.", em: "x" }]
+    await responderParceiro(prosp(), JID, deps())
+    const sistema = JSON.stringify(mundo.ia.mock.calls[0])
+    expect(sistema).toContain("prazo médio e preço de referência")
+    expect(sistema).toContain("PRIORIDADE")
+    expect(sistema).toMatch(/NUNCA pergunte sobre busca e entrega/)
+  })
+  it.each(PROIBIDAS)("resposta da IA com '%s' não sai; a segunda tentativa limpa sai", async frase => {
+    mundo.ia.mockResolvedValueOnce({ texto: `Perfeito. ${frase} depois.`, enviar_link: true, perguntas_sem_resposta: [] })
+    mundo.ia.mockResolvedValueOnce({ texto: "Perfeito, faça o cadastro e informe prazo médio e CNPJ.", enviar_link: true, perguntas_sem_resposta: [] })
+    const r = await responderParceiro(prosp(), JID, deps())
+    expect(r.enviou).toBe(true)
+    for (const f of PROIBIDAS) expect(String(enviar.mock.calls[0][0])).not.toMatch(new RegExp(f, "i"))
+  })
+  it.each(PROIBIDAS)("se a IA insistir em '%s', nada sai", async frase => {
+    mundo.ia.mockResolvedValue({ texto: `Certo, ${frase}.`, enviar_link: true, perguntas_sem_resposta: [] })
+    const r = await responderParceiro(prosp(), JID, deps())
+    expect(r.enviou).toBe(false)
+    expect(enviar).not.toHaveBeenCalled()
   })
 })
