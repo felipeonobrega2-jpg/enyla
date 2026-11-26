@@ -14,9 +14,12 @@ import { CNAES_PROSPECTO, aplicarOptOut, hojeSp, podeTransicionar, type EtapaFun
 import {
   ASSUNTO_EMAIL, htmlDoPrimeiroContato, textoPlanoDoPrimeiroContato, CHAVE_ENVIO_ATIVO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA, PRIMEIRO_CONTATO_PAUSADO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector,
   canaisDisponiveis, canaisPendentes, celularWhatsapp, chaveTelefone, dentroDoHorario, ehRecusa, emailValido, enviosDoHistorico,
-  motivoNaoQualifica, passoIniciado, passoSaiu, passouDias, saiu, textoDoPasso,
+  motivoNaoQualifica, passoIniciado, passoSaiu, passouDias, saiu, TEXTO_LEMBRETE,
   type Canal, type EnvioHistorico, type MotivoParada, type Passo,
 } from "./prospectorEnvio"
+import { CHAVE_REMETENTE, REMETENTE_PADRAO, classificarResposta, escolherTexto, montarTexto, type EscolhaTexto, type TextoProspector } from "./prospectorTextos"
+import { lerTextosProspector } from "./prospectorTextosServidor"
+import { nomeParaChamar } from "./nomeDePessoa"
 
 const TABELA = "prospectos_parceiros"
 export const COLUNAS = "id, cnpj, razao_social, nome_fantasia, cnae_principal, cnaes_secundarios, telefone, email, nota, etapa, opt_out, historico_etapas, atualizado_em"
@@ -40,7 +43,7 @@ export const historicoDe = (l: Linha): MudancaEtapa[] => (Array.isArray(l.histor
 const enviosDe = (l: Linha) => enviosDoHistorico(historicoDe(l))
 
 /** `primeiroContatoPausado` e `limitePrimeirosPorDia` (0 = sem limite) existem só para teste; em produção valem as constantes. */
-type Deps = { agora?: () => Date; primeiroContatoPausado?: boolean; limitePrimeirosPorDia?: number }
+type Deps = { agora?: () => Date; primeiroContatoPausado?: boolean; limitePrimeirosPorDia?: number; aleatorio?: () => number }
 
 /** Grava com trava otimista (id + atualizado_em lido + sem opt-out). Devolve a linha nova ou null se alguém mudou antes. */
 export async function gravar(l: Linha, campos: Record<string, unknown>): Promise<Linha | null> {
@@ -81,11 +84,12 @@ type Estado = {
   emailsNestaExecucao: number; limiteAte: number                // limite técnico por execução (rota de 120s)
   emailsFeitosHoje: number; teto: number                        // e-mails do Prospector já enviados hoje (antes desta execução) e o teto diário (0 = sem)
   cotaEsgotada: boolean; motivoParada?: MotivoParada
+  textos: TextoProspector[]; remetente: string; aleatorio: () => number   // biblioteca de textos (A/B), nome que assina e sorteio
 }
 
 function novoEstado(): Estado {
   const m = () => ({ whatsapp: new Map<string, string>(), email: new Map<string, string>() })
-  return { usados: { primeiro_contato: m(), lembrete: m() }, bloqueadosTel: new Set(), bloqueadosEmail: new Set(), emailsNestaExecucao: 0, limiteAte: Date.now() + ORCAMENTO_MS_POR_EXECUCAO, emailsFeitosHoje: 0, teto: 0, cotaEsgotada: false }
+  return { usados: { primeiro_contato: m(), lembrete: m() }, bloqueadosTel: new Set(), bloqueadosEmail: new Set(), emailsNestaExecucao: 0, limiteAte: Date.now() + ORCAMENTO_MS_POR_EXECUCAO, emailsFeitosHoje: 0, teto: 0, cotaEsgotada: false, textos: [], remetente: REMETENTE_PADRAO, aleatorio: Math.random }
 }
 
 /** Esgotou o que cabe nesta execução: o que sobrar sai no próximo cron. */
@@ -136,12 +140,21 @@ async function enviarPeloCanal(canal: Canal, l: Linha, texto: string, token?: st
 }
 
 /** Reserva, envia e fecha um canal de um passo. Devolve se saiu, se falhou, ou null se não reservou (alguém foi mais rápido). */
-async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, agora: Date): Promise<{ linha: Linha; ok: boolean } | null> {
-  const texto = textoDoPasso(passo, agora)
+/** Primeiro contato: versão da biblioteca (sorteio, ou a que este contato já recebeu em outro canal) ou o texto do código; `{nome}` só com nome de gente. Lembrete: texto fixo. */
+function textoDoContato(est: Estado, l: Linha, passo: Passo): { texto: string; textoId?: string } {
+  if (passo !== "primeiro_contato") return { texto: TEXTO_LEMBRETE }
+  const jaUsado = enviosDe(l).find(e => e.passo === "primeiro_contato" && e.textoId && saiu(e))?.textoId
+  const escolha: EscolhaTexto = escolherTexto(est.textos, "primeira", est.aleatorio, jaUsado)
+  const nome = nomeParaChamar(l.nome_fantasia) || nomeParaChamar(l.razao_social)
+  return { texto: montarTexto(escolha.corpo, { nome, remetente: est.remetente }), ...(escolha.textoId ? { textoId: escolha.textoId } : {}) }
+}
+
+async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, agora: Date, escolhido: { texto: string; textoId?: string }): Promise<{ linha: Linha; ok: boolean } | null> {
+  const { texto, textoId } = escolhido
   const em = agora.toISOString()
   // Só o primeiro contato por e-mail leva o link rastreado; o token nasce na reserva e fica no histórico (sem dado do prospecto).
   const token = passo === "primeiro_contato" && canal === "email" ? randomBytes(12).toString("base64url") : undefined
-  const envio: EnvioHistorico = { passo, canal, status: "reservado", em, texto, ...(token ? { token } : {}) }
+  const envio: EnvioHistorico = { passo, canal, status: "reservado", em, texto, ...(token ? { token } : {}), ...(textoId ? { textoId } : {}) }
   const reservada = await gravar(l, { historico_etapas: [...historicoDe(l), { etapa: l.etapa as EtapaFunil, em, motivo: `${passo} (${canal}): reservado`, envio }] })
   if (!reservada) return null
   const k = chaveCanal(canal, l)
@@ -176,12 +189,13 @@ async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, ag
 async function mandarPasso(est: Estado, l: Linha, passo: Passo, canais: Canal[], agora: Date, res: ResultadoEnvio): Promise<{ linha: Linha; algumOk: boolean }> {
   let atual = l
   let algumOk = false
+  const escolhido = textoDoContato(est, l, passo)   // um sorteio por contato: e-mail e WhatsApp levam a mesma versão
   for (const canal of canais) {
     if (bloqueado(est, passo, canal, atual)) continue
     if (semFolga(est)) break
     if (canal === "email" && emailParado(est)) continue
     if (canal === "email") est.emailsNestaExecucao++
-    const r = await enviarCanal(est, atual, passo, canal, agora)
+    const r = await enviarCanal(est, atual, passo, canal, agora, escolhido)
     if (!r) break
     atual = r.linha
     if (r.ok) algumOk = true; else res.falhas++
@@ -206,7 +220,8 @@ async function detectarRespostas(linhas: Linha[], agora: Date, res: ResultadoEnv
       const g = await gravarOptOut(l, em, "recusa por WhatsApp (não quero receber)")
       if (g) { l.etapa = "descartado"; l.opt_out = true; l.historico_etapas = g.historico_etapas; l.atualizado_em = g.atualizado_em; res.optOuts++ }
     } else if (l.etapa === "abordado") {
-      const g = await gravar(l, { etapa: "respondeu", historico_etapas: [...historicoDe(l), { etapa: "respondeu", em, motivo: "respondeu no WhatsApp" }] })
+      const resposta = dele.map(m => classificarResposta(m.corpo)).find(r => r !== "outra") ?? "outra"   // só para a contagem do teste A/B
+      const g = await gravar(l, { etapa: "respondeu", historico_etapas: [...historicoDe(l), { etapa: "respondeu", em, motivo: "respondeu no WhatsApp", resposta }] })
       if (g) { l.etapa = "respondeu"; l.historico_etapas = g.historico_etapas; l.atualizado_em = g.atualizado_em; res.responderam++ }
     }
   }
@@ -215,7 +230,7 @@ async function detectarRespostas(linhas: Linha[], agora: Date, res: ResultadoEnv
 // ── Execução ─────────────────────────────────────────────────────────────────
 export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
   const res = vazio()
-  const cfg = await lerCampos<Record<string, unknown>>([CHAVE_ENVIO_ATIVO, CHAVE_NOTA_MINIMA])
+  const cfg = await lerCampos<Record<string, unknown>>([CHAVE_ENVIO_ATIVO, CHAVE_NOTA_MINIMA, CHAVE_REMETENTE])
   if (cfg[CHAVE_ENVIO_ATIVO] !== true) return { ...res, ativo: false, motivo: "envio desligado (prospector_envio_ativo)" }
   const agora = (deps.agora ?? (() => new Date()))()
   const minimo = typeof cfg[CHAVE_NOTA_MINIMA] === "number" && Number.isFinite(cfg[CHAVE_NOTA_MINIMA]) ? (cfg[CHAVE_NOTA_MINIMA] as number) : NOTA_MINIMA_PADRAO
@@ -230,6 +245,9 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
   ])
   if (contatadas.error || elegiveis.error) return { ...res, ok: false, erro: (contatadas.error ?? elegiveis.error)!.message }
   const est = novoEstado()
+  est.aleatorio = deps.aleatorio ?? Math.random
+  est.remetente = typeof cfg[CHAVE_REMETENTE] === "string" && (cfg[CHAVE_REMETENTE] as string).trim() ? (cfg[CHAVE_REMETENTE] as string).trim() : REMETENTE_PADRAO
+  est.textos = await lerTextosProspector()   // falha de leitura = lista vazia = texto do código
   for (const s of (saidas.data ?? []) as { telefone: string | null; email: string | null }[]) {
     const t = chaveTelefone(celularWhatsapp(s.telefone)); if (t) est.bloqueadosTel.add(t)
     const e = emailValido(s.email); if (e) est.bloqueadosEmail.add(e)

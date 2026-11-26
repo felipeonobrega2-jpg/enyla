@@ -55,7 +55,8 @@ vi.mock("@/app/lib/supabase", () => ({
 }))
 
 import { executarEnvio } from "@/app/lib/prospectorEnvioServidor"
-import { MAX_EMAILS_POR_EXECUCAO, MAX_FALHAS_POR_CANAL, tetoEmailDia, ehErroDeCota, celularWhatsapp, dentroDoHorario, ehRecusa, textoPrimeiroContato, TEXTO_LEMBRETE, PRIMEIRO_CONTATO_PAUSADO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA } from "@/app/lib/prospectorEnvio"
+import { textoPrimeiroContato } from "@/app/lib/prospectorTextos"
+import { MAX_EMAILS_POR_EXECUCAO, MAX_FALHAS_POR_CANAL, tetoEmailDia, ehErroDeCota, celularWhatsapp, dentroDoHorario, ehRecusa, TEXTO_LEMBRETE, PRIMEIRO_CONTATO_PAUSADO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA } from "@/app/lib/prospectorEnvio"
 
 // 2026-11-23 é segunda. São Paulo é UTC-3. Os deslocamentos em dias caem em dia útil (o horário é checado de verdade).
 const SEG_10H = new Date("2026-11-23T13:00:00Z")
@@ -136,11 +137,11 @@ describe("primeiro contato", () => {
   it("texto exato, bom dia/boa tarde, sem link nem opt-out, e a etapa vai para abordado", async () => {
     const a = novo()
     await rodar(SEG_10H)
-    expect(saidasZap()[0]).toEqual({ number: `55${a.telefone}`, text: "Bom dia, tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?" })
+    expect(saidasZap()[0]).toEqual({ number: `55${a.telefone}`, text: "Oi, tudo bem? Aqui é o Felipe, da ENYLA. Vocês pegam serviço terceirizado de outra gráfica?" })
     expect(doBanco(a).etapa).toBe("abordado")
     expect(hist(a).some(h => h.envio?.status === "enviado" && h.envio.canal === "whatsapp" && h.envio.passo === "primeiro_contato" && h.envio.texto)).toBe(true)
-    expect(textoPrimeiroContato(SEG_15H)).toBe("Boa tarde, tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?")
-    expect(textoPrimeiroContato(SEG_10H)).not.toMatch(/https?:|www\.|\.com/)
+    expect(textoPrimeiroContato()).toBe("Oi, tudo bem? Aqui é o Felipe, da ENYLA. Vocês pegam serviço terceirizado de outra gráfica?")
+    expect(textoPrimeiroContato()).not.toMatch(/https?:|www\.|\.com|caixinha|papel cart|perfumaria/i)
   })
   it("usa os dois canais no mesmo dia, e-mail com assunto discreto, remetente e Reply-To do Prospector", async () => {
     novo({ email: "contato@grafica.com.br" })
@@ -150,7 +151,7 @@ describe("primeiro contato", () => {
     const [para, msg, anexos, opcoes] = envios.email.mock.calls[0] as [string, { assunto: string; texto: string }, unknown[], { de: string; responderPara: string }]
     expect(para).toBe("contato@grafica.com.br")
     expect(msg.assunto).toBe("ENYLA, gráfica de embalagens em Barueri")
-    expect(msg.texto.startsWith("Boa tarde, tudo bem?")).toBe(true)
+    expect(msg.texto.startsWith("Oi, tudo bem?")).toBe(true)
     expect(anexos).toEqual([])
     expect(opcoes).toEqual({ de: "ENYLA Embalagens <parceiros@enyla.com.br>", responderPara: "felipeonobrega2@gmail.com" })
   })
