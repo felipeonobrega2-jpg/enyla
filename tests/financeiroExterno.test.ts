@@ -16,7 +16,7 @@ vi.mock("@/app/lib/gastosServidor", () => ({ gastosAtuais: vi.fn(async () => ({ 
 vi.mock("@/app/lib/supabase", () => {
   const consulta = (t: string) => {
     const q: Record<string, unknown> = {}
-    for (const m of ["select", "eq", "order", "limit", "neq", "in"]) q[m] = () => q
+    for (const m of ["select", "eq", "order", "limit", "neq", "in", "not"]) q[m] = () => q
     for (const m of ["insert", "update", "delete", "upsert"]) q[m] = () => { estado.escritas++; return q }
     q.then = (ok: (v: unknown) => unknown) => ok({ data: estado.tabelas[t] ?? [], count: (estado.tabelas[t] ?? []).length, error: null })
     return q
@@ -28,7 +28,7 @@ import { GET, POST } from "@/app/api/externo/route"
 import { NextRequest } from "next/server"
 
 const ler = (q = "") => GET(new NextRequest(`http://x/api/externo?${q}`, { headers: { authorization: "Bearer k" } }))
-const PARTES = ["receber", "pagar", "banco", "saldos", "gastos", "margem", "depende"]
+const PARTES = ["receber", "pagar", "banco", "saldos", "gastos", "margem", "depende", "asaas"]
 const mes = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 7)
 
 beforeEach(() => {
@@ -36,7 +36,13 @@ beforeEach(() => {
   estado.cfg = { contas: [{ id: "c1", nome: "Itaú", banco: "Itaú", tipo: "corrente", cor: "#000", saldo: 1500, ativa: true }, { id: "c2", nome: "Cartão", banco: "X", tipo: "credito", cor: "#000", saldo: 300, ativa: true }],
     gastosFixos: [{ id: "g1", nome: "Railway", categoriaId: "servicos", valor: 100, diaVencimento: 5, ativa: true }],
     pluggyStatus: { em: "2026-11-01", novas: 0, contas: [{ id: "p1", nome: "Itaú", banco: "Itaú", saldo: 1500 }] },
-    pluggy: { itens: [{ id: "i", token: "SEGREDO" }] }, groqKey: "SEGREDO-GROQ" }
+    pluggy: { itens: [{ id: "i", token: "SEGREDO" }] }, groqKey: "SEGREDO-GROQ",
+    pedidosDigitais: [
+      { id: "DIG-0001", nome: "Digital Um", jid: "5511988887777@s.whatsapp.net", email: "dig@cliente.com", documento: "98765432100", status: "producao", total: 1000.37, sinal: 500.13, restante: 500.24, sinalPagoEm: "2026-11-10T12:00:00Z",
+        pagamento: { txId: "asaas:pay_sinal1", valor: 500.13, data: "2026-11-10" }, asaas: { sinal: { id: "pay_sinal1" }, restante: { id: "pay_rest1" } } },
+      { id: "DIG-0002", nome: "Digital Dois", status: "arte", total: 800.5, sinal: 400.25, restante: 400.25, sinalPagoEm: "2026-11-12T12:00:00Z", pagamento: { txId: "tx-pluggy-9", valor: 400.25, data: "2026-11-12" } },
+      { id: "DIG-0003", nome: "Digital Teste", status: "arte", teste: true, total: 10, sinal: 5, sinalPagoEm: "2026-11-12T12:00:00Z" },
+    ] }
   estado.tabelas = {
     KanbanCard: [{ id: "k1", numero: "100", nomeCliente: "Cliente A", telefone: "11999990000", email: "a@cliente.com", cnpj: "12.345.678/0001-90", coluna: 1, preco: 1000, quantidade: 100, data: "01/11/2026, 10:00:00" }],
     LancamentoFinanceiro: [
@@ -50,6 +56,28 @@ beforeEach(() => {
     NegocioParceiro: [], HistoricoItem: [],
     banco_transacoes: [{ id: "t1", conta_id: "c1", conta_nome: "Itaú", data: "2026-11-02", valor: 50, tipo: "saida", descricao: "Pix", contraparte_nome: "Fulano", contraparte_doc: "123.456.789-00", bruto: { x: 1 }, categoria_pluggy: null, estado: "pendente", lancamento_ids: [], sugestao: null }],
   }
+})
+
+describe("Digital em ?o=financeiro", () => {
+  it("parte=receber traz o bloco digital: sinal sem vínculo em conferência, saldo exato, vencimento vazio", async () => {
+    const j = await (await ler("o=financeiro&parte=receber")).json()
+    expect(j.digital.pedidos.map((p: { id: string }) => p.id)).toEqual(["DIG-0001", "DIG-0002"])
+    expect(j.digital.pedidos[0]).toMatchObject({ pago: 500.13, emConferencia: 0, saldo: 500.24, vencimentoSaldo: null, atrasado: false })
+    expect(j.digital.pedidos[1]).toMatchObject({ pago: 0, emConferencia: 400.25, saldo: 400.25 })
+    expect(j.pedidos.map((p: { numero: string }) => p.numero)).toEqual(["100"])   // o Offset segue como era
+  })
+  it("parte=asaas: por pedido, só leitura, sem dado pessoal e sem teste; com vínculo bancário vira confirmado", async () => {
+    let j = await (await ler("o=financeiro&parte=asaas")).json()
+    expect(j.pedidos.map((p: { id: string }) => p.id)).toEqual(["DIG-0001", "DIG-0002"])
+    expect(j.pedidos[0].sinal).toEqual({ cobrancaAsaas: "pay_sinal1", valor: 500.13, status: "confirmado pelo Asaas", recebidoEm: "2026-11-10" })
+    expect(j.pedidos[0].restante).toMatchObject({ cobrancaAsaas: "pay_rest1", status: "aguardando pagamento" })
+    expect(j.pedidos[1].sinal).toMatchObject({ cobrancaAsaas: null, status: "em conferência", recebidoEm: null })
+    expect(JSON.stringify(j)).not.toMatch(/Digital Um|Digital Dois|5511988887777|dig@cliente|98765432100|jid|documento/)
+    estado.tabelas.banco_transacoes = [{ id: "t9", lancamento_ids: ["dig-DIG-0002-sinal"], data: "2026-11-13" }]
+    j = await (await ler("o=financeiro&parte=asaas")).json()
+    expect(j.pedidos[1].sinal).toMatchObject({ status: "confirmado pelo banco", recebidoEm: "2026-11-13" })
+    expect(estado.escritas).toBe(0)
+  })
 })
 
 describe("?o=financeiro", () => {

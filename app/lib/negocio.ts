@@ -137,6 +137,8 @@ export type Pedido = {
   custoDireto: number
   /** Só em pedido ligado a uma rodada de produção (rateio da tiragem). Sem rodada, fica de fora e vale custoDireto. */
   rodada?: PedidoRodada
+  /** Só nos pedidos Digital (receberDigital.ts): sinal, data do último pagamento e vencimento do saldo. */
+  digital?: { id: string; sinal: number; pagoEm: string | null; vencimento: string | null }
 }
 
 export type PedidoRodada = {

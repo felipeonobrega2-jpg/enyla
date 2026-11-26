@@ -58,7 +58,9 @@ export function dentroDoHorario(h: HorarioAgente | null | undefined, d = new Dat
 }
 
 // Aviso de lead bom, mandado no seu WhatsApp: quem é, o que quer e o link para abrir a conversa
-export function textoAvisoMql(a: { nome: string | null; telefone: string | null; perfil: PerfilLead; quantidade: number | null; motivo: string; resumo?: string; dados?: DadosPedido }) {
+export function textoAvisoMql(a: { nome: string | null; telefone: string | null; perfil: PerfilLead; quantidade: number | null; motivo: string; resumo?: string; dados?: DadosPedido; fichaOffset?: string }) {
+  // Ficha Offset (roteiro da CCO): o texto já vem montado por offsetRoteiro.textoFichaOffset
+  if (a.fichaOffset) return [a.fichaOffset, a.telefone ? `wa.me/${a.telefone}` : null].filter(Boolean).join("\n")
   const rotulo = a.perfil === "icp" ? "ICP" : a.perfil === "oportunidade" ? "Oportunidade" : "Lead médio"
   // Com os dados: o agente levantou tudo e o orçamento é com você (a ficha vai junto)
   const d = a.dados
