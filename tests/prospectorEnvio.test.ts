@@ -133,14 +133,16 @@ describe("horário e dia útil", () => {
 })
 
 describe("primeiro contato", () => {
-  it("texto exato, bom dia/boa tarde, sem link nem opt-out, e a etapa vai para abordado", async () => {
+  it("texto fixo com link e utm por canal, e a etapa vai para abordado", async () => {
     const a = novo()
     await rodar(SEG_10H)
-    expect(saidasZap()[0]).toEqual({ number: `55${a.telefone}`, text: "Bom dia, tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?" })
+    expect(saidasZap()[0]).toEqual({ number: `55${a.telefone}`, text: "Oi, tudo bem? Sou da ENYLA. A gente recebe pedidos de embalagens e impressos do Brasil todo e passa para gráficas parceiras os serviços que elas fazem. Se vocês pegam serviço de terceiro, o cadastro é gratuito e leva uns 5 minutos: https://app.enyla.com.br/parceiros?utm_source=whatsapp&utm_medium=prospector" })
     expect(doBanco(a).etapa).toBe("abordado")
     expect(hist(a).some(h => h.envio?.status === "enviado" && h.envio.canal === "whatsapp" && h.envio.passo === "primeiro_contato" && h.envio.texto)).toBe(true)
-    expect(textoPrimeiroContato(SEG_15H)).toBe("Boa tarde, tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?")
-    expect(textoPrimeiroContato(SEG_10H)).not.toMatch(/https?:|www\.|\.com/)
+    expect(textoPrimeiroContato("email")).toBe("Oi, tudo bem? Sou da ENYLA. A gente recebe pedidos de embalagens e impressos do Brasil todo e passa para gráficas parceiras os serviços que elas fazem. Se vocês pegam serviço de terceiro, o cadastro é gratuito e leva uns 5 minutos: https://app.enyla.com.br/parceiros?utm_source=email&utm_medium=prospector")
+    expect(textoPrimeiroContato("whatsapp")).toContain("utm_source=whatsapp&utm_medium=prospector")
+    expect(textoPrimeiroContato("email") + TEXTO_LEMBRETE).not.toContain("Barueri")
+    expect(textoPrimeiroContato("whatsapp")).not.toContain("www.")
   })
   it("usa os dois canais no mesmo dia, e-mail com assunto discreto, remetente e Reply-To do Prospector", async () => {
     novo({ email: "contato@grafica.com.br" })
@@ -149,8 +151,8 @@ describe("primeiro contato", () => {
     expect(envios.email).toHaveBeenCalledTimes(1)
     const [para, msg, anexos, opcoes] = envios.email.mock.calls[0] as [string, { assunto: string; texto: string }, unknown[], { de: string; responderPara: string }]
     expect(para).toBe("contato@grafica.com.br")
-    expect(msg.assunto).toBe("ENYLA, gráfica de embalagens em Barueri")
-    expect(msg.texto.startsWith("Boa tarde, tudo bem?")).toBe(true)
+    expect(msg.assunto).toBe("Parceria ENYLA: serviços para gráficas")
+    expect(msg.texto.startsWith("Oi, tudo bem? Sou da ENYLA.")).toBe(true)
     expect(anexos).toEqual([])
     expect(opcoes).toEqual({ de: "ENYLA Embalagens <parceiros@enyla.com.br>", responderPara: "felipeonobrega2@gmail.com" })
   })
