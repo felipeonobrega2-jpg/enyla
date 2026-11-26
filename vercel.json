@@ -14,7 +14,7 @@
     },
     {
       "path": "/api/prospector/enviar",
-      "schedule": "*/2 11-22 * * 1-5"
+      "schedule": "* 11-22 * * 1-5"
     }
   ]
 }
