@@ -34,7 +34,7 @@ vi.mock("@/app/lib/configAtomica", () => ({ lerCampos: async () => ({}) }))
 vi.mock("@/app/lib/evolution", () => ({ evo: async () => ({ ok: false, status: 500 }) }))
 
 import { processarEventoEmail, registrarCliquePorToken } from "@/app/lib/prospectorEventosServidor"
-import { envioDe, htmlDoPrimeiroContato, textoPlanoDoPrimeiroContato, URL_CADASTRO_PARCEIROS } from "@/app/lib/prospectorEnvio"
+import { envioDe, htmlDoPrimeiroContato, textoPlanoDoPrimeiroContato, textoPrimeiroContato, linkCadastro } from "@/app/lib/prospectorEnvio"
 import { GET } from "@/app/api/prospector/r/[token]/route"
 import { GET as GET_PIXEL } from "@/app/api/prospector/o/[token]/route"
 
@@ -95,27 +95,27 @@ describe("eventos da Resend", () => {
 })
 
 describe("link rastreado", () => {
-  it("o HTML leva o link só com token, e o texto comercial segue igual", () => {
-    expect(htmlDoPrimeiroContato("Oi & tudo bem?")).toBe("<p>Oi &amp; tudo bem?</p>")
-    const h = htmlDoPrimeiroContato("Oi", "tokenabc12345")
-    expect(h).toContain("https://app.enyla.com.br/api/prospector/r/tokenabc12345")
-    expect(h).not.toContain("/api/d/")
-    expect(h).toContain('Para ser parceira da ENYLA, cadastre a sua gráfica aqui: <a href="https://app.enyla.com.br/api/prospector/r/tokenabc12345">Cadastrar minha gráfica</a>')
+  it("o HTML troca o link do texto pelo rastreado; sem token, leva o link direto com utm", () => {
+    const texto = `Oi & tudo bem? ${textoPrimeiroContato("email")}`
+    const h = htmlDoPrimeiroContato(texto, "tokenabc12345")
+    expect(h).toContain('<a href="https://app.enyla.com.br/api/prospector/r/tokenabc12345">')
+    expect(h).not.toContain("utm_source")
+    expect(h).toContain('<img src="https://app.enyla.com.br/api/prospector/o/tokenabc12345"')
+    expect(h).toContain("Oi &amp; tudo bem?")
+    expect(htmlDoPrimeiroContato(texto)).toContain('href="https://app.enyla.com.br/parceiros?utm_source=email&amp;utm_medium=prospector"')
+    expect(htmlDoPrimeiroContato("Oi")).toBe("<p>Oi</p>")
   })
-  it("o texto do link não mostra endereço nenhum", () => {
-    const h = htmlDoPrimeiroContato("Oi", "tokenabc12345")
-    const textoDoLink = h.match(/<a [^>]*>([^<]*)<\/a>/)![1]
-    expect(textoDoLink).toBe("Cadastrar minha gráfica")
-    expect(textoDoLink).not.toMatch(/https?:|www\.|\.com|\.br|\//)
-  })
-  it("texto puro: `Cadastrar minha gráfica: {link}` só com token", () => {
-    expect(textoPlanoDoPrimeiroContato("Oi")).toBe("Oi")
-    expect(textoPlanoDoPrimeiroContato("Oi", "tokenabc12345")).toContain("Cadastrar minha gráfica: https://app.enyla.com.br/api/prospector/r/tokenabc12345")
+  it("texto puro: o link do texto vira o rastreado só com token", () => {
+    const texto = textoPrimeiroContato("email")
+    expect(textoPlanoDoPrimeiroContato(texto)).toBe(texto)
+    const p = textoPlanoDoPrimeiroContato(texto, "tokenabc12345")
+    expect(p).toContain("https://app.enyla.com.br/api/prospector/r/tokenabc12345")
+    expect(p).not.toContain("utm_source")
   })
   it("token válido marca clique e redireciona 302 ao formulário", async () => {
     const res = await GET(new Request("https://x") as never, { params: Promise.resolve({ token: "tokenabc12345" }) })
     expect(res.status).toBe(302)
-    expect(res.headers.get("location")).toBe(`${URL_CADASTRO_PARCEIROS}?utm_source=email&utm_medium=prospector`)
+    expect(res.headers.get("location")).toBe(linkCadastro("email"))
     expect(mundo.prospectos[0].etapa).toBe("abriu")
     expect(envioDo(mundo.prospectos[0]).cliqueEm).toBeTruthy()
   })
@@ -137,7 +137,7 @@ describe("link rastreado", () => {
     for (const token of ["naoexiste12345", "x", "a/b"]) {
       const res = await GET(new Request("https://x") as never, { params: Promise.resolve({ token }) })
       expect(res.status).toBe(302)
-      expect(res.headers.get("location")).toBe(`${URL_CADASTRO_PARCEIROS}?utm_source=email&utm_medium=prospector`)
+      expect(res.headers.get("location")).toBe(linkCadastro("email"))
     }
     expect(mundo.prospectos[0].etapa).toBe("abordado")
     expect(await registrarCliquePorToken("x")).toBe(false)

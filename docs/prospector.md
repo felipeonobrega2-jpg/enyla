@@ -122,19 +122,17 @@ Nada é apagado: quem não serve fica na base em `encontrado`, não vira `qualif
 **Migração.** `supabase/migrations/20261125_prospectos_envio_etapas.sql`: solta e recria a constraint de etapa com `respondeu` e `encerrado_sem_resposta`. Só aditiva, sem apagar nem alterar dado. O Felipe roda uma vez no SQL Editor **antes** de ligar a chave.
 
 ### Textos finais
-
-Primeiro contato, até 12h (America/Sao_Paulo):
+Primeiro contato (texto fixo, sem IA, igual em qualquer horário):
 
 ```
-Bom dia, tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?
+Oi, tudo bem? Sou da ENYLA. A gente recebe pedidos de embalagens e impressos do Brasil todo e passa para gráficas parceiras os serviços que elas fazem. Se vocês pegam serviço de terceiro, o cadastro é gratuito e leva uns 5 minutos: https://app.enyla.com.br/parceiros?utm_source={email|whatsapp}&utm_medium=prospector
 ```
-
-Depois das 12h: o mesmo texto com "Boa tarde". Assunto do e-mail: `ENYLA, gráfica de embalagens em Barueri`. Sem preço, sem volume, sem linha de saída. **Link (26/11/2026):** o HTML do primeiro contato por e-mail (só ele; lembrete e WhatsApp não) ganha, depois do texto, uma linha com o link rastreado `https://app.enyla.com.br/api/prospector/r/[token]`, que registra o clique e encaminha (302) a `https://app.enyla.com.br/parceiros`. A linha é `Para ser parceira da ENYLA, cadastre a sua gráfica aqui: <a>Cadastrar minha gráfica</a>` (o texto do link nunca mostra endereço, para não ser marcado como spam); no texto puro vai `Cadastrar minha gráfica: {link}`. O texto comercial não muda. O primeiro contato está liberado (`PRIMEIRO_CONTATO_PAUSADO = false`), com o limite de 10 por dia útil. O texto completo da CMO (etapas, A/B de assunto, lembrete) vem em PR posterior.
+Assunto do e-mail: `Parceria ENYLA: serviços para gráficas`. No e-mail, o link do texto é trocado pelo link rastreado `/api/prospector/r/[token]` (o HTML leva também o pixel de abertura `/api/prospector/o/[token]`), que registra o clique e encaminha (302) a `/parceiros?utm_source=email&utm_medium=prospector`. No WhatsApp o link leva `utm_source=whatsapp`. O primeiro contato está liberado (`PRIMEIRO_CONTATO_PAUSADO = false`), com o limite de 10 por dia útil.
 
 Lembrete único, 3 dias depois, sem resposta:
 
 ```
-Oi, tudo bem? Aqui é da ENYLA, de Barueri, de novo. Só para saber se vocês fazem serviços de terceirização para outras gráficas.
+Oi, tudo bem? Sou da ENYLA, falei com vocês há pouco. Só para saber se vocês pegam serviço de terceiro de outras gráficas.
 ```
 
 ### Textos de referência (só para o atendimento humano; nada disto sai sozinho)

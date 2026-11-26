@@ -128,22 +128,26 @@ export const URL_BASE_APP = "https://app.enyla.com.br"
 export const urlRastreada = (token: string) => `${URL_BASE_APP}/api/prospector/r/${token}`
 /** Pixel próprio de abertura (GIF 1x1). Marca `abriu` sem depender do webhook da Resend. Não tem dado do prospecto. */
 export const urlPixelAbertura = (token: string) => `${URL_BASE_APP}/api/prospector/o/${token}`
-/** Linha do link no primeiro contato. O texto do link não mostra endereço (mostrar um e apontar para outro é marcado como spam). */
-export const LINHA_LINK_CADASTRO = "Para ser parceira da ENYLA, cadastre a sua gráfica aqui:"
-export const TEXTO_LINK_CADASTRO = "Cadastrar minha gráfica"
-/** HTML do e-mail do primeiro contato: o texto comercial intacto, mais a linha com o link rastreado. Sem token, só o texto. */
-export function htmlDoPrimeiroContato(texto: string, token?: string): string {
-  const esc = texto.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
-  return `<p>${esc}</p>` + (token ? `<p>${LINHA_LINK_CADASTRO} <a href="${urlRastreada(token)}">${TEXTO_LINK_CADASTRO}</a></p><img src="${urlPixelAbertura(token)}" width="1" height="1" alt="" style="display:none" />` : "")
-}
-/** Versão em texto puro do primeiro contato: o texto e, com token, `Cadastrar minha gráfica: {link}`. */
-export function textoPlanoDoPrimeiroContato(texto: string, token?: string): string {
-  return token ? `${texto}\n\n${LINHA_LINK_CADASTRO}\n${TEXTO_LINK_CADASTRO}: ${urlRastreada(token)}` : texto
-}
-export const ASSUNTO_EMAIL = "ENYLA, gráfica de embalagens em Barueri"
+export const ASSUNTO_EMAIL = "Parceria ENYLA: serviços para gráficas"
 
-const CORPO_PRIMEIRO = "tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?"
-export const TEXTO_LEMBRETE = "Oi, tudo bem? Aqui é da ENYLA, de Barueri, de novo. Só para saber se vocês fazem serviços de terceirização para outras gráficas."
+/** Texto fixo do primeiro contato (sem IA). O link é o do cadastro; no e-mail, é trocado pelo link rastreado. */
+const CORPO_PRIMEIRO = "Oi, tudo bem? Sou da ENYLA. A gente recebe pedidos de embalagens e impressos do Brasil todo e passa para gráficas parceiras os serviços que elas fazem. Se vocês pegam serviço de terceiro, o cadastro é gratuito e leva uns 5 minutos:"
+export const TEXTO_LEMBRETE = "Oi, tudo bem? Sou da ENYLA, falei com vocês há pouco. Só para saber se vocês pegam serviço de terceiro de outras gráficas."
+
+/** HTML do e-mail do primeiro contato: o link do texto vira o link rastreado (que redireciona ao destino com utm). Sem token, o link direto com utm. */
+export function htmlDoPrimeiroContato(texto: string, token?: string): string {
+  const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
+  const link = linkCadastro("email")
+  const i = texto.indexOf(link)
+  const href = token ? urlRastreada(token) : link
+  const pixel = token ? `<img src="${urlPixelAbertura(token)}" width="1" height="1" alt="" style="display:none" />` : ""
+  if (i < 0) return `<p>${esc(texto)}</p>${pixel}`
+  return `<p>${esc(texto.slice(0, i))}<a href="${esc(href)}">${esc(href)}</a>${esc(texto.slice(i + link.length))}</p>${pixel}`
+}
+/** Versão em texto puro: com token, o link do texto vira o link rastreado. */
+export function textoPlanoDoPrimeiroContato(texto: string, token?: string): string {
+  return token ? texto.replace(linkCadastro("email"), urlRastreada(token)) : texto
+}
 
 const fmt = (agora: Date) => new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Sao_Paulo", hourCycle: "h23", weekday: "short", hour: "2-digit", minute: "2-digit", year: "numeric", month: "2-digit", day: "2-digit",
@@ -161,13 +165,12 @@ export function dentroDoHorario(agora: Date): boolean {
   return diaSemana >= 1 && diaSemana <= 5 && hora >= HORA_INICIO && hora < HORA_FIM
 }
 
-/** "Bom dia" antes das 12h, "Boa tarde" depois (America/Sao_Paulo). */
-export function textoPrimeiroContato(agora: Date): string {
-  return `${relogioSp(agora).hora < 12 ? "Bom dia" : "Boa tarde"}, ${CORPO_PRIMEIRO}`
+export function textoPrimeiroContato(canal: Canal): string {
+  return `${CORPO_PRIMEIRO} ${linkCadastro(canal)}`
 }
 
-export function textoDoPasso(passo: Passo, agora: Date): string {
-  return passo === "primeiro_contato" ? textoPrimeiroContato(agora) : TEXTO_LEMBRETE
+export function textoDoPasso(passo: Passo, canal: Canal): string {
+  return passo === "primeiro_contato" ? textoPrimeiroContato(canal) : TEXTO_LEMBRETE
 }
 
 /** Celular brasileiro: DDD (2 dígitos) + 9 + 8 dígitos. Devolve o número com 55, ou null. */
