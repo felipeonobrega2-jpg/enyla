@@ -79,6 +79,13 @@ export const DIAS_ATE_ENCERRAR = 3
  * Quem foi abordado só por WhatsApp não é afetado: a detecção de resposta do WhatsApp já para a cadência.
  */
 export const LEMBRETE_EMAIL_ATIVO = false
+/**
+ * Segura todo primeiro contato (e-mail e WhatsApp): ninguém novo é abordado, quem está `qualificado` continua `qualificado`, sem erro.
+ * O PR do template novo (com link de cadastro) troca para `false`. Lembrete e leitura de respostas não são afetados.
+ */
+export const PRIMEIRO_CONTATO_PAUSADO = true
+/** Máximo de primeiros contatos novos por dia útil (America/Sao_Paulo), somando todas as execuções e canais. Vale também depois da pausa. */
+export const LIMITE_PRIMEIROS_CONTATOS_POR_DIA = 10
 export const HORA_INICIO = 8
 export const HORA_FIM = 20
 export const MAX_FALHAS_POR_CANAL = 3
