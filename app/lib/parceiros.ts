@@ -210,6 +210,15 @@ export type CadastroParceiro = {
   arquivos: { nome: string; url: string }[]
   comoConheceu?: string
   aceite: boolean
+  /** Entrada do formulário: caixa "Li e aceito os Termos de Parceria". Sem ela o envio não conclui. */
+  aceiteTermos?: boolean
+  /** Aceite gravado pelo servidor (nunca vem do navegador): versão, data/hora, IP e user-agent. Sem isso a parceira está pendente_termos. */
+  termosVersao?: string
+  termosAceitosEm?: string
+  termosIp?: string
+  termosUserAgent?: string
+  /** Token do link de aceite (/parceiros/termos?aceite=1&t=...), para quem se cadastrou antes dos termos. */
+  termosToken?: string
   /** Como a parceira entra na distribuição de pedidos (só registro; a distribuição vem em outro PR). */
   modo?: ModoParceira
   fornecedorId?: string
@@ -220,6 +229,7 @@ export type CadastroParceiro = {
   faltando?: string[]              // o que ainda falta (vazio/ausente = completo); o status segue "novo": a IA nunca aprova
 }
 
+export const ERRO_ACEITE_TERMOS = "Marque a caixa para aceitar os Termos de Parceria e enviar"
 export const GERENTE_PADRAO = "Felipe"
 
 const soDigitos = (s: string) => (s ?? "").replace(/\D/g, "")
@@ -292,6 +302,7 @@ export function errosDaEtapa(c: Partial<CadastroParceiro>, etapa: Etapa): Record
     if (!s.prazoVaria && !(s.prazoDias && s.prazoDias > 0 && s.prazoDias <= 120)) e[`${s.id}.prazo`] = "Informe o prazo médio ou marque que varia"
   }
   if (etapa === "final" && !c.aceite) e.aceite = "Precisa concordar para enviar"
+  if (etapa === "final" && !c.aceiteTermos) e.aceiteTermos = ERRO_ACEITE_TERMOS
   return e
 }
 export const errosDoCadastro = (c: Partial<CadastroParceiro>) => ETAPAS_IDS.reduce((t, et) => ({ ...t, ...errosDaEtapa(c, et) }), {} as Record<string, string>)
@@ -348,7 +359,7 @@ export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParce
     contatoProducao: t(x.contatoProducao, 160) || undefined,
     servicos, modo: modoDaParceira(servicos),
     capacidade: t(x.capacidade, 300) || undefined, horario: t(x.horario, 160) || undefined, maquinas: t(x.maquinas, 600) || undefined,
-    comoConheceu: t(x.comoConheceu, 200) || undefined, aceite: !!x.aceite,
+    comoConheceu: t(x.comoConheceu, 200) || undefined, aceite: !!x.aceite, aceiteTermos: !!x.aceiteTermos,
   }
 }
 

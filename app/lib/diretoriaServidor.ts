@@ -52,7 +52,7 @@ export async function decidirFerramenta(id: string, status: Ferramenta["status"]
 // ── Conversas do Felipe com cada diretor ─────────────────────────────────────────
 // acoes: o que o diretor fez na conversa (ordem a um funcionário com mensagem para aprovar, vaga, ferramenta, plano, lição)
 export type AcaoConversa =
-  | { id: string; tipo: "mensagem"; funcionario: string; cliente: string; jid?: string; texto: string; status: "aguardando" | "enviado" | "erro" | "descartado" | "cancelado"; erro?: string; em?: string; direto?: boolean; canceladoPor?: string; canceladoEm?: string }
+  | { id: string; tipo: "mensagem"; funcionario: string; cliente: string; jid?: string; texto: string; status: "aguardando" | "enviado" | "erro" | "descartado" | "cancelado"; erro?: string; em?: string; direto?: boolean; destino?: "enviado_direto"; motivo?: string; diretor?: string; canceladoPor?: string; canceladoEm?: string }
   | { id: string; tipo: "vaga"; vagaId: string; nome: string; resumo: string }
   | { id: string; tipo: "ferramenta"; ferramentaId: string; nome: string; resumo: string }
   | { id: string; tipo: "plano"; objetivo: string; passos: string[]; indicador: string }
