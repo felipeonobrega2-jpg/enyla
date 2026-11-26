@@ -30,7 +30,8 @@ export default auth((req) => {
     pathname === "/api/externo" ||               // diretores na nuvem (exige a chave do diretor na própria rota)
     pathname === "/api/prospector/enviar" ||     // agendador da Vercel (mesma regra; chave prospector_envio_ativo desligada por padrão)
     pathname === "/api/prospector/importar" ||   // agendador da Vercel (exige CRON_SECRET, ou o agendador, na própria rota)
-    pathname === "/api/prospector/inbound" ||    // webhook da Resend (email.received; exige assinatura Svix na própria rota)
+    pathname === "/api/prospector/inbound" ||    // webhook da Resend (email.received e eventos do envio; exige assinatura Svix na própria rota)
+    pathname.startsWith("/api/prospector/r/") || // link rastreado do e-mail do Prospector (token aleatório; só redireciona ao /parceiros)
     pathname === "/api/whatsapp/verificar" ||    // agendador da Vercel (mesma regra)     // agendador da Vercel (exige CRON_SECRET na própria rota)
     pathname.startsWith("/api/track") ||
     pathname.startsWith("/brand/") ||
