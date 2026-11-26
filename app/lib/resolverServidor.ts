@@ -3,7 +3,7 @@
 // gravando em whatsapp_conversas.kanban_card_id. Só roda no servidor.
 import { lerSegurados } from "./pedidoSeguradoServidor"
 import { estaSegurado } from "./pedidoSegurado"
-import { prazoDigital } from "./prazoDigital"
+import { prazoDoPedido } from "./prazoDigital"
 import { supabase } from "./supabase"
 import { COL_FECHADO, COL_HOT, COL_ENTREGUE, COL_PERDIDO } from "../types"
 import type { AprovacaoOnline } from "./aprovacao"
@@ -66,8 +66,8 @@ export function digitalParado(pedidos: PedDig[], agora = Date.now()): ItemResolv
       if (d >= PRAZO_DIGITAL.arteCliente) out.push({ ...base, tipo: "digital", detalhe: `arte com o cliente há ${d} dias sem aprovar: dê um toque`, desde: p.arteEnviadaEm, nivel: "info" })
     } else if (p.status === "producao") {
       const d = desde(p.arteAprovadaEm ?? p.statusEm)
-      const limite = p.quantidade ? prazoDigital(p.quantidade).max : PRAZO_DIGITAL.producao
-      if (d >= limite) out.push({ ...base, tipo: "digital", detalhe: `em produção há ${d} dias (Villa; prazo ${p.quantidade ? prazoDigital(p.quantidade).texto : `${limite} dias`}): confira quando sai`, desde: p.arteAprovadaEm ?? p.statusEm ?? null, nivel: "alerta" })
+      const limite = p.quantidade ? prazoDoPedido({ ...p, quantidade: p.quantidade! }).max : PRAZO_DIGITAL.producao
+      if (d >= limite) out.push({ ...base, tipo: "digital", detalhe: `em produção há ${d} dias (Villa; prazo ${p.quantidade ? prazoDoPedido({ ...p, quantidade: p.quantidade! }).texto : `${limite} dias`}): confira quando sai`, desde: p.arteAprovadaEm ?? p.statusEm ?? null, nivel: "alerta" })
     }
   }
   return out
