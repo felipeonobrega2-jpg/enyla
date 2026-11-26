@@ -25,6 +25,7 @@ import { pedidoExterno } from "@/app/lib/pedidoExterno"
 import { lerPertoExterno, AJUDA_PERTO } from "@/app/lib/pertoExterno"
 import { moverCardExterno } from "@/app/lib/moverCardExterno"
 import { cancelarOrdem } from "@/app/lib/cancelarOrdem"
+import { ordenarFornecedor, leituraFornecedorConversa } from "@/app/lib/fornecedorExterno"
 import { niveisDosLeads } from "@/app/lib/nivelNoDetalhe"
 import { leituraParceiros, AJUDA_PARCEIROS } from "@/app/lib/parceirosExterno"
 
@@ -78,6 +79,8 @@ export async function GET(req: NextRequest) {
       } : {}),
       ...(comerciaisDoDiretor(diretor).length ? { "POST {acao:'ordenar_funcionario', funcionario:'atendente'|'followup'|'reativacao', cliente | jid, ordem}": "SÓ CCO e CMO (as outras recebem 403). O agente do Comercial escreve a mensagem para UM lead com o histórico do WhatsApp; REGRA (25/11): só 'cliente' (quem já comprou, nível A, B ou C) precisa do Aprovo do Felipe. Para LEAD (nunca comprou; cadastro sem compra e orçamento aberto não contam) a mensagem SAI DIRETO pelo agente indicado, só com o agente ligado e dentro do horário dele (senão 409 'fora do horário do agente', nada é criado), no máximo 20 envios diretos por dia por diretor (a 21ª volta 429). Cliente A, B, C ou nível 'indefinido' (já comprou sem curva, compra antiga, só digital, ligação fraca com quem comprou, erro de leitura) vai para a fila do Aprovo, no máximo 20 esperando por diretor (a 21ª volta 429). Texto que promete orçamento sem link real, Felipe escrevendo na conversa e gráfica do Prospector também vão para a fila. Lead sem WhatsApp: 404. Resposta: { ok, resultado, destino: 'enviado_direto'|'fila_aprovo', motivo, nivel, id }; leia o nível antes em ?o=perto ou ?o=detalhe&area=comercial" } : {}),
       "POST {acao:'mover_card', numero | loteNumero, coluna, motivo}": "QUALQUER DIRETOR. Avança um pedido de etapa na produção. numero (ORC-...) ou loteNumero (move os cards do lote); coluna de 2 (Arte/Dieline) a 8 (Expedição); motivo obrigatório (até 300 caracteres). Só avança (destino maior que a coluna atual) e só de cards já Fechados (coluna 1 em diante); nunca volta, nunca vai a 0, 9 (Entregue) ou 10 (Perdido): 400 com o motivo e nada é alterado. Só muda a coluna (preço, quantidade, sinal e opcoes ficam como estão). Registra no Tracking quem moveu (seu nome) e o motivo. Não manda mensagem nem e-mail ao cliente. Resposta: { ok, resultado, movidos: [{numero, de, para}] }",
+      "POST {acao:'ordenar_fornecedor', fornecedor, pedido, texto, anexos}": "QUALQUER DIRETOR. Mensagem ao fornecedor do cadastro de fornecedores (fornecedor = id do cadastro, pedido = DIG-0159, texto, anexos opcionais = até 10 referências a arquivos que já estão no sistema). Entra na fila do Aprovo do Felipe, marcada 'fornecedor', e só sai pelo WhatsApp do painel depois do Aprovo; fica gravada no histórico do fornecedor e do pedido, com o horário de envio. Recusa (422) número que seja de cliente ou de lead; fornecedor fora do cadastro: 404; máximo 20 esperando por diretor (429). Nada é enviado nesta chamada. Cancele com cancelar_ordem. Resposta: { ok, resultado, destino:'fila_aprovo', id }",
+      "GET ?o=fornecedor_conversa&fornecedor=<id>": "QUALQUER DIRETOR. Últimas mensagens do WhatsApp com o fornecedor (de: 'fornecedor'|'enyla') e o que a diretoria mandou, com status e horário de envio, para conferir se ele respondeu.",
       "POST {acao:'cancelar_ordem', id}": "QUALQUER DIRETOR. Cancela uma ordem SUA (id do cartão, devolvido por ordenar_funcionario) que ainda está esperando o Aprovo (status aguardando). Só marca como cancelada (canceladoPor, canceladoEm): nunca apaga nada e nada é enviado. Ordem de outro diretor ou que não existe: 404; já enviada, descartada, com erro ou cancelada: 409. A tela da diretoria mostra 'Cancelada' e não oferece o Aprovo. Resposta: { ok, resultado, id }",
       ...Object.fromEntries(FERRAMENTAS.map(f => [`POST {acao:'${f}', ...}`, "ferramenta (ver instruções)"])) },
     limitePorHora: LIMITE_POR_HORA,
@@ -107,6 +110,11 @@ export async function GET(req: NextRequest) {
       if (e instanceof ErroMeta) return NextResponse.json({ erro: e.message, codigo: e.codigo }, { status: e.status })
       return NextResponse.json({ erro: "Falha ao ler a Meta Ads." }, { status: 500 })
     }
+  }
+
+  if (o === "fornecedor_conversa") {
+    const l = await leituraFornecedorConversa(req.nextUrl.searchParams.get("fornecedor") ?? "")
+    return NextResponse.json(l.corpo, { status: l.status })
   }
 
   if (o === "conversa") {
@@ -223,6 +231,9 @@ export async function POST(req: NextRequest) {
     msg = { id: novoId(), de: "diretor", texto: String(r.corpo.resultado), em: new Date().toISOString(), nuvem: true }
     await gravarConversa(diretor, [...await lerConversa(diretor), msg])
     return NextResponse.json(r.corpo)
+  } else if (b.acao === "ordenar_fornecedor") {
+    const r = await ordenarFornecedor(diretor, b)
+    return NextResponse.json(r.corpo, { status: r.status })
   } else if (b.acao === "cancelar_ordem") {
     const r = await cancelarOrdem(diretor, b)
     return NextResponse.json(r.corpo, { status: r.status })
@@ -255,7 +266,7 @@ export async function POST(req: NextRequest) {
       await gravarConversa(diretor, [...await lerConversa(diretor), msg])
       return NextResponse.json({ ok: true, resultado: saida, destino: r.destino, motivo: r.motivo, nivel: r.nivel, id: r.acao.id })
     }
-  } else return NextResponse.json({ erro: `acao: relatar, lancar_despesa, renomear_fornecedor, mover_card, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
+  } else return NextResponse.json({ erro: `acao: relatar, ordenar_fornecedor, lancar_despesa, renomear_fornecedor, mover_card, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
   await gravarConversa(diretor, [...await lerConversa(diretor), msg])
   return NextResponse.json({ ok: true, resultado: saida })
 }

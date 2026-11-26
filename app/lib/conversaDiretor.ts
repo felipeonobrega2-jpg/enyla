@@ -264,9 +264,15 @@ export async function responderAcao(diretor: IdDiretor, acaoId: string, resposta
   else {
     if (textoEditado?.trim()) acao.texto = textoEditado.trim().slice(0, 4000)
     const { enviarAoCliente } = await import("./enviarCliente")
-    const r = await enviarAoCliente(acao.cliente, acao.texto, acao.jid).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
+    const r = acao.fornecedorId
+      ? await (await import("./fornecedorExterno")).enviarAoFornecedor(acao.fornecedorId, acao.texto).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
+      : await enviarAoCliente(acao.cliente, acao.texto, acao.jid).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
     if (r.ok) { acao.status = "enviado"; acao.em = new Date().toISOString(); delete acao.erro }
     else { acao.status = "erro"; acao.erro = r.erro }
+  }
+  if (acao.fornecedorId) {
+    const { atualizarMensagemFornecedor } = await import("./diretoriaServidor")
+    await atualizarMensagemFornecedor(acao.id, { status: acao.status, ...(acao.status === "enviado" ? { enviadaEm: acao.em, texto: acao.texto } : {}), ...(acao.erro ? { erro: acao.erro } : {}) }).catch(() => null)
   }
   await gravarConversa(diretor, todas)
   return todas
