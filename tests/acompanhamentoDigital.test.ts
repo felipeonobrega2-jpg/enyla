@@ -70,3 +70,10 @@ describe("link do cliente", () => {
     expect(tokenDigitalValido("DIG-0007", null)).toBe(false)
   })
 })
+
+describe("previsão de entrega em pt-BR", () => {
+  it("texto usa dd/mm, nunca a data ISO", () => {
+    const t = acompanhamentoDigital({ ...base, arteAprovadaEm: "2026-11-13" } as never)!.prazoEntrega.texto
+    expect(t).toMatch(/\d{2}\/\d{2}/); expect(t).not.toMatch(/\d{4}-\d{2}-\d{2}/)
+  })
+})

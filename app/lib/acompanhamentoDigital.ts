@@ -4,6 +4,7 @@
 // (receberDigital); sem o pedido lá, o cliente vê "em conferência", nunca um saldo calculado de total - sinal.
 import { somarDiasUteis } from "./diasUteis"
 import { prazoDigital } from "./prazoDigital"
+import { formatarData } from "./formato"
 import { diaDe, type PedidoDig } from "./digitalProducao"
 import { esperandoAprovacao } from "./digital"
 import type { PedidoReceberDigital } from "./receberDigital"
@@ -46,7 +47,7 @@ export function acompanhamentoDigital(p: PedidoAcompanhamento, receber?: PedidoR
   if (p.arteAprovadaEm) {
     const base = [diaDe(p.sinalPagoEm), diaDe(p.arteAprovadaEm)].sort().at(-1)!   // conta depois do sinal E da arte aprovada
     const de = somarDiasUteis(base, prazo.min), ate = somarDiasUteis(base, prazo.max)
-    prazoEntrega = { previstoDe: de, previstoAte: ate, texto: `Entrega prevista ${de === ate ? `até ${ate}` : `entre ${de} e ${ate}`} (${prazo.texto} depois do sinal pago e da arte aprovada).` }
+    prazoEntrega = { previstoDe: de, previstoAte: ate, texto: `Entrega prevista ${de === ate ? `até ${formatarData(ate)}` : `entre ${formatarData(de)} e ${formatarData(ate)}`} (${prazo.texto} depois do sinal pago e da arte aprovada).` }
   } else {
     prazoEntrega = { previstoDe: null, previstoAte: null, texto: `A data de entrega sai depois da aprovação da arte (${prazo.texto} depois dela).` }
   }
