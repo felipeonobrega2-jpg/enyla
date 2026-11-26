@@ -385,3 +385,4 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 
 **Regra para o mesmo PR: ordem de serviço.** A ordem de serviço enviada à parceira NUNCA inclui nome, telefone, e-mail, endereço ou CNPJ do cliente final: só o código do pedido ENYLA e o necessário para o serviço. O PR da distribuição deve ter teste que barra esses campos (lista em `CAMPOS_PROIBIDOS_NA_ORDEM`).
 | 55 | Prospector: com o modo parceiro desligado, a 1ª resposta da gráfica recebe uma mensagem fixa (sem IA) com `https://app.enyla.com.br/parceiros` e os termos; uma vez, 8h–20h, sem opt-out, nunca cliente A/B/C | Felipe (26/11/2026) | — | — | Claude Code | não | (PR da issue #242) |
+| 56 | Prospector: cron de `/api/prospector/enviar` a cada minuto (`* 11-22 * * 1-5`); espaçamento de 72 s mantido | Felipe (26/11/2026) | — | — | Claude Code | não | (PR da issue #262) |
