@@ -12,7 +12,7 @@ import { randomBytes } from "node:crypto"
 import { enviarEmail } from "./email"
 import { CNAES_PROSPECTO, aplicarOptOut, hojeSp, podeTransicionar, type EtapaFunil, type MudancaEtapa } from "./prospector"
 import {
-  ASSUNTO_EMAIL, htmlDoPrimeiroContato, CHAVE_ENVIO_ATIVO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA, PRIMEIRO_CONTATO_PAUSADO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector,
+  ASSUNTO_EMAIL, htmlDoPrimeiroContato, textoPlanoDoPrimeiroContato, CHAVE_ENVIO_ATIVO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA, PRIMEIRO_CONTATO_PAUSADO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector,
   canaisDisponiveis, canaisPendentes, celularWhatsapp, chaveTelefone, dentroDoHorario, ehRecusa, emailValido, enviosDoHistorico,
   motivoNaoQualifica, passoIniciado, passoSaiu, passouDias, saiu, textoDoPasso,
   type Canal, type EnvioHistorico, type MotivoParada, type Passo,
@@ -131,7 +131,7 @@ async function enviarPeloCanal(canal: Canal, l: Linha, texto: string, token?: st
   }
   const para = emailValido(l.email)
   if (!para) return { ok: false, erro: "e-mail inválido" }
-  const r = await enviarEmail(para, { assunto: ASSUNTO_EMAIL, texto, html: htmlDoPrimeiroContato(texto, token) }, [], { de: REMETENTE, responderPara: replyToDoProspector() })
+  const r = await enviarEmail(para, { assunto: ASSUNTO_EMAIL, texto: textoPlanoDoPrimeiroContato(texto, token), html: htmlDoPrimeiroContato(texto, token) }, [], { de: REMETENTE, responderPara: replyToDoProspector() })
   return r.ok ? { ok: true, id: r.id } : { ok: false, erro: r.erro, ...(r.cota ? { cota: true as const } : {}) }
 }
 

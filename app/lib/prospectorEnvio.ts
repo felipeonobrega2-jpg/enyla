@@ -92,9 +92,9 @@ export const DIAS_ATE_ENCERRAR = 3
 export const LEMBRETE_EMAIL_ATIVO = false
 /**
  * Segura todo primeiro contato (e-mail e WhatsApp): ninguém novo é abordado, quem está `qualificado` continua `qualificado`, sem erro.
- * O PR do template novo (com link de cadastro) troca para `false`. Lembrete e leitura de respostas não são afetados.
+ * Desligada (`false`) com o link de cadastro rastreado no e-mail; o limite diário abaixo continua valendo. Lembrete e leitura de respostas não são afetados.
  */
-export const PRIMEIRO_CONTATO_PAUSADO = true
+export const PRIMEIRO_CONTATO_PAUSADO = false
 /** Máximo de primeiros contatos novos por dia útil (America/Sao_Paulo), somando todas as execuções e canais. Vale também depois da pausa. */
 export const LIMITE_PRIMEIROS_CONTATOS_POR_DIA = 10
 export const HORA_INICIO = 8
@@ -109,10 +109,17 @@ export function replyToDoProspector(env: string | undefined = process.env.PROSPE
 export const URL_CADASTRO_PARCEIROS = "https://app.enyla.com.br/parceiros"
 export const URL_BASE_APP = "https://app.enyla.com.br"
 export const urlRastreada = (token: string) => `${URL_BASE_APP}/api/prospector/r/${token}`
-/** HTML do e-mail do primeiro contato: o texto comercial intacto, mais uma linha com o link rastreado. Sem token, só o texto. */
+/** Linha do link no primeiro contato. O texto do link não mostra endereço (mostrar um e apontar para outro é marcado como spam). */
+export const LINHA_LINK_CADASTRO = "Para ser parceira da ENYLA, cadastre a sua gráfica aqui:"
+export const TEXTO_LINK_CADASTRO = "Cadastrar minha gráfica"
+/** HTML do e-mail do primeiro contato: o texto comercial intacto, mais a linha com o link rastreado. Sem token, só o texto. */
 export function htmlDoPrimeiroContato(texto: string, token?: string): string {
   const esc = texto.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
-  return `<p>${esc}</p>` + (token ? `<p>Se tiver interesse, o cadastro de parceiros é por aqui: <a href="${urlRastreada(token)}">app.enyla.com.br/parceiros</a></p>` : "")
+  return `<p>${esc}</p>` + (token ? `<p>${LINHA_LINK_CADASTRO} <a href="${urlRastreada(token)}">${TEXTO_LINK_CADASTRO}</a></p>` : "")
+}
+/** Versão em texto puro do primeiro contato: o texto e, com token, `Cadastrar minha gráfica: {link}`. */
+export function textoPlanoDoPrimeiroContato(texto: string, token?: string): string {
+  return token ? `${texto}\n\n${LINHA_LINK_CADASTRO}\n${TEXTO_LINK_CADASTRO}: ${urlRastreada(token)}` : texto
 }
 export const ASSUNTO_EMAIL = "ENYLA, gráfica de embalagens em Barueri"
 

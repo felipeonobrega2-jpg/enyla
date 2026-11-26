@@ -127,7 +127,7 @@ Primeiro contato, até 12h (America/Sao_Paulo):
 Bom dia, tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?
 ```
 
-Depois das 12h: o mesmo texto com "Boa tarde". Assunto do e-mail: `ENYLA, gráfica de embalagens em Barueri`. Sem preço, sem volume, sem linha de saída. **Link (26/11/2026):** o HTML do primeiro contato por e-mail (só ele; lembrete e WhatsApp não) ganha, depois do texto, uma linha com o link rastreado `https://app.enyla.com.br/api/prospector/r/[token]`, que registra o clique e encaminha (302) a `https://app.enyla.com.br/parceiros`. O texto comercial não muda; a versão em texto puro segue sem link. **A CMO revisa essa linha no PR.**
+Depois das 12h: o mesmo texto com "Boa tarde". Assunto do e-mail: `ENYLA, gráfica de embalagens em Barueri`. Sem preço, sem volume, sem linha de saída. **Link (26/11/2026):** o HTML do primeiro contato por e-mail (só ele; lembrete e WhatsApp não) ganha, depois do texto, uma linha com o link rastreado `https://app.enyla.com.br/api/prospector/r/[token]`, que registra o clique e encaminha (302) a `https://app.enyla.com.br/parceiros`. A linha é `Para ser parceira da ENYLA, cadastre a sua gráfica aqui: <a>Cadastrar minha gráfica</a>` (o texto do link nunca mostra endereço, para não ser marcado como spam); no texto puro vai `Cadastrar minha gráfica: {link}`. O texto comercial não muda. O primeiro contato está liberado (`PRIMEIRO_CONTATO_PAUSADO = false`), com o limite de 10 por dia útil. O texto completo da CMO (etapas, A/B de assunto, lembrete) vem em PR posterior.
 
 Lembrete único, 3 dias depois, sem resposta:
 
