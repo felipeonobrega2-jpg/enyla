@@ -14,7 +14,8 @@ import {
 } from "../types"
 import { brl, num } from "../utils"
 import { custoFixoPeriodo, rateioPorPedido } from "../lib/metrics"
-import { montarPedidos, margemContribuicao, Pedido } from "../lib/negocio"
+import { montarPedidos, margemContribuicao, Pedido, type PedidoRodada } from "../lib/negocio"
+import type { Rodada } from "../lib/rateioRodada"
 import { KanbanView } from "./KanbanView"
 import { FretesDoPedido, PedidoFrete } from "./FreteLalamove"
 import { CabecalhoPagina, Kpi, GradeKpis, Segmentado, Selo, Cartao, TituloCartao, ListaBarras, Colunas, Gaveta, LinhaLista, Vazio } from "./ds"
@@ -72,6 +73,8 @@ export type OrderEntry = {
   precoTotal: number; sobras: number; totalPago: number; totalDespesa: number
   aReceber: number; cobrado: number; vencido: number; semCobranca: number
   specs: string; qtdTotal: number
+  /** Só quando o pedido foi impresso numa rodada: custo rateado e alerta pela rodada inteira. */
+  rodada?: PedidoRodada
 }
 
 type Props = {
@@ -93,6 +96,8 @@ type Props = {
   onFechamento: (id: string, opcao: KanbanOpcao) => void
   onHotOpcao?: (id: string, opcao: KanbanOpcao) => void
   onKanbanDetalhes?: (card: KanbanCard) => void
+  /** Rodadas de produção (config.producao.rodadas): pedidos impressos juntos dividem o custo da tiragem. */
+  rodadas?: Rodada[]
   lotes?: Lote[]
   onLoteCreate?: (nomeCliente: string) => Promise<{ id: string; numero: string }>
   onLoteAssign?: (cardId: string, loteId: string, loteNumero: string) => void
@@ -120,7 +125,7 @@ export function PedidosUnificadoView(props: Props) {
     kanban, historico, lancamentos, isDark,
     onDetalhes, onNovoLancamento, onSalvarData, onSavePrazos, onSalvarPrazoRecebimentoInterno,
     onMove, onDelete, onSetMotivo, onFechamento, onHotOpcao, onKanbanDetalhes,
-    lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge, onLoteRename,
+    rodadas, lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge, onLoteRename,
     negocios, onUpdateNegocio, onAddLancamento, onBulkUpdate, onCopiarPedido,
     onChamarFrete, fretesVersao, onLancamentosRemovidos, onEditarLancamento,
   } = props
@@ -178,7 +183,7 @@ export function PedidosUnificadoView(props: Props) {
     }
 
     // Agrupamento, etapa e valores vêm da camada canônica (lib/negocio)
-    return montarPedidos(kanban, lancamentos).map(p => ({
+    return montarPedidos(kanban, lancamentos, rodadas).map(p => ({
       key: p.key, tipo: p.tipo, numero: p.numero, nomeCliente: p.nomeCliente, cards: p.cards, coluna: p.coluna,
       dataPedido: p.dataFechamento ?? "",
       dataFechamento: p.dataFechamento,
@@ -187,11 +192,11 @@ export function PedidosUnificadoView(props: Props) {
       prazoRecebimentoInterno: p.cards.find(c => c.prazoRecebimentoInterno)?.prazoRecebimentoInterno,
       receitas: p.receitas, despesas: p.despesas,
       precoTotal: p.venda, sobras: p.sobras, qtdTotal: p.quantidade,
-      totalPago: p.recebido, totalDespesa: p.custoDireto,
+      totalPago: p.recebido, totalDespesa: p.custoDireto, rodada: p.rodada,
       aReceber: p.aReceber, cobrado: p.cobrado, vencido: p.vencido, semCobranca: p.semCobranca,
       specs: buildSpecs(p.cards),
     }))
-  }, [kanban, lancamentos, histMap])
+  }, [kanban, lancamentos, histMap, rodadas])
 
   const { custoFixoTotal, receitaTotal } = useMemo(() => ({
     custoFixoTotal: custoFixoPeriodo(lancamentos, null, null),
@@ -763,7 +768,9 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
       {lista.map(entry => {
         const stage = STAGE[entry.coluna] ?? { color: "#8E8E93", bg: "rgba(142,142,147,0.1)", label: COLUNAS_KANBAN[entry.coluna] ?? "—" }
         const resultado = entry.totalPago - entry.totalDespesa
-        const margemPct = entry.precoTotal > 0 ? ((entry.precoTotal - entry.totalDespesa) / entry.precoTotal) * 100 : null
+        // Pedido de rodada: custo = próprio + fração da tiragem; o vermelho olha a rodada inteira. Sem rodada, igual a antes
+        const custoMargem = entry.rodada ? entry.rodada.custoTotal : entry.totalDespesa
+        const margemPct = entry.precoTotal > 0 ? ((entry.precoTotal - custoMargem) / entry.precoTotal) * 100 : null
         const rateioFixo = rateioPorPedido(entry.precoTotal, receitaTotal, custoFixoTotal)
         const lucroLiq = resultado - rateioFixo
         const margemLiqPct = entry.precoTotal > 0 ? (lucroLiq / entry.precoTotal) * 100 : null
@@ -856,9 +863,9 @@ function ListaTab({ lista, busca, expanded, concluidos, hoje, receitaTotal, cust
                         <SmallKpi label="Recebido" value={brl(entry.totalPago)} color="#009351" sub={`${num(percPago, 0)}% pago`} />
                         <SmallKpi label="Custos lançados" value={brl(entry.totalDespesa)} color={entry.totalDespesa > 0 ? "#d33a3c" : sub}
                           sub={entry.totalDespesa > 0 ? `${entry.despesas.filter(l => l.status === "pago" || l.formaPagamento === "conta").length} lançamentos` : "nenhum ainda"} />
-                        <SmallKpi label="Margem de contribuição" value={margemPct != null && entry.totalDespesa > 0 ? `${num(margemPct, 1)}%` : "—"}
-                          color={margemPct == null || entry.totalDespesa <= 0 ? sub : margemPct >= 45 ? "#009351" : margemPct >= 30 ? "#c57800" : "#d33a3c"}
-                          sub={entry.totalDespesa > 0 ? brl(entry.precoTotal - entry.totalDespesa) : "lance os custos para ver"} />
+                        <SmallKpi label="Margem de contribuição" value={margemPct != null && custoMargem > 0 ? `${num(margemPct, 1)}%` : "—"}
+                          color={margemPct == null || custoMargem <= 0 ? sub : entry.rodada ? (entry.rodada.vermelho || entry.rodada.rodadaVermelha ? "#d33a3c" : margemPct >= 45 ? "#009351" : "#c57800") : margemPct >= 45 ? "#009351" : margemPct >= 30 ? "#c57800" : "#d33a3c"}
+                          sub={entry.rodada ? `${brl(entry.precoTotal - custoMargem)} · rodada ${entry.rodada.rodadaId}: ${brl(entry.rodada.margemRodada)}` : entry.totalDespesa > 0 ? brl(entry.precoTotal - entry.totalDespesa) : "lance os custos para ver"} />
                         {custoFixoTotal > 0 && entry.totalDespesa > 0 ? (
                           <SmallKpi label="Lucro líquido" value={margemLiqPct != null ? `${num(margemLiqPct, 1)}%` : "—"}
                             color={lucroLiq >= 0 ? "#009351" : "#d33a3c"} sub={`${brl(lucroLiq)} após custo fixo`} />
