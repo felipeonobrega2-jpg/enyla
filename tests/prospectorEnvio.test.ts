@@ -153,7 +153,7 @@ describe("primeiro contato", () => {
     expect(msg.assunto).toBe("Vocês pegam serviço terceirizado?")
     expect(msg.texto.startsWith("Oi, tudo bem?")).toBe(true)
     expect(anexos).toEqual([])
-    expect(opcoes).toEqual({ de: "ENYLA Embalagens <parceiros@enyla.com.br>", responderPara: "felipeonobrega2@gmail.com" })
+    expect(opcoes).toMatchObject({ de: "ENYLA Embalagens <parceiros@enyla.com.br>", responderPara: "felipeonobrega2@gmail.com" })
   })
   it("WhatsApp só para celular brasileiro com 9 dígitos depois do DDD", async () => {
     expect(celularWhatsapp("11987654321")).toBe("5511987654321")
@@ -431,14 +431,14 @@ const comEmail = (p: Partial<Linha> = {}) => novo({ telefone: null, email: `g${s
 const enviadoHoje = (em: string, status = "enviado") => ({ etapa: "abordado", em, motivo: "x", envio: { passo: "primeiro_contato", canal: "email", status, em } })
 
 describe("teto diário de e-mail e cota da Resend", () => {
-  it("PROSPECTOR_TETO_EMAIL_DIA: padrão 80, 0 sem teto, inválido volta ao padrão", () => {
-    expect(tetoEmailDia(undefined)).toBe(80)
-    expect(tetoEmailDia("")).toBe(80)
+  it("PROSPECTOR_TETO_EMAIL_DIA: padrão 200, 0 sem teto, inválido volta ao padrão", () => {
+    expect(tetoEmailDia(undefined)).toBe(200)
+    expect(tetoEmailDia("")).toBe(200)
     expect(tetoEmailDia("0")).toBe(0)
     expect(tetoEmailDia("50")).toBe(50)
-    expect(tetoEmailDia("abc")).toBe(80)
-    expect(tetoEmailDia("-5")).toBe(80)
-    expect(tetoEmailDia("1.5")).toBe(80)
+    expect(tetoEmailDia("abc")).toBe(200)
+    expect(tetoEmailDia("-5")).toBe(200)
+    expect(tetoEmailDia("1.5")).toBe(200)
   })
   it("respeita o teto somando os envios do dia de outros prospectos e de execuções anteriores", async () => {
     vi.stubEnv("PROSPECTOR_TETO_EMAIL_DIA", "5")
@@ -534,5 +534,69 @@ describe("pausa do primeiro contato e limite de 10 por dia", () => {
     expect(envios.email).toHaveBeenCalledTimes(10)
     expect((await lim(dias(SEG_10H, 1))).primeiros).toBe(10)
     expect(envios.email).toHaveBeenCalledTimes(20)
+  })
+})
+
+describe("e-mail: saúde, teto 200, registro e descadastro", () => {
+  const AT = "2026-11-23T12:00:00.000Z"
+  const comId = (i: number, entrega?: string) => comEmail({ etapa: "abordado", atualizado_em: AT, historico_etapas: [{ etapa: "abordado", em: AT, motivo: "x", envio: { passo: "primeiro_contato", canal: "email", status: "enviado", em: "2026-11-22T12:00:00.000Z", resendId: `re_${i}`, ...(entrega ? { entrega } : {}) } }] })
+  const emailsEnviados = () => envios.email.mock.calls.length
+
+  it("devolução acima de 2% (com amostra mínima) para o e-mail", async () => {
+    for (let i = 0; i < 20; i++) comId(i, i === 0 ? "bounce" : "entregue")   // 5%
+    comEmail()
+    const r = await rodar(SEG_10H)
+    expect(emailsEnviados()).toBe(0)
+    expect(r.motivoParada).toBe("devolucao_alta")
+  })
+  it("devolução de exatamente 2% segue; amostra pequena não para", async () => {
+    for (let i = 0; i < 50; i++) comId(i, i < 1 ? "bounce" : "entregue")   // 2%
+    comEmail()
+    expect((await rodar(SEG_10H)).motivoParada).toBeUndefined()
+    expect(emailsEnviados()).toBe(1)
+    mundo.prospectos = []; envios.email.mockClear()
+    for (let i = 0; i < 5; i++) comId(i, "bounce")   // 100%, mas só 5 envios
+    comEmail()
+    await rodar(SEG_10H)
+    expect(emailsEnviados()).toBe(1)
+  })
+  it("uma reclamação de spam para o e-mail, mas o WhatsApp segue", async () => {
+    comId(1, "spam")
+    comEmail(); const zap = novo({ nota: 60 })
+    const r = await rodar(SEG_10H)
+    expect(emailsEnviados()).toBe(0)
+    expect(r.motivoParada).toBe("reclamacao_spam")
+    expect(saidasZap()).toHaveLength(1)
+    expect(hist(zap).some(h => h.envio?.canal === "whatsapp")).toBe(true)
+  })
+  it("teto padrão de 200 por dia", async () => {
+    for (let i = 0; i < 200; i++) comId(i)
+    for (const l of mundo.prospectos) (l.historico_etapas as { envio: { em: string } }[])[0].envio.em = "2026-11-23T12:00:00.000Z"
+    comEmail()
+    const r = await rodar(SEG_10H)
+    expect(r.tetoEmailDia).toBe(200)
+    expect(r.motivoParada).toBe("teto_diario")
+    expect(emailsEnviados()).toBe(0)
+  })
+  it("registra destino, assunto, hora e id da Resend; leva link de descadastro e cabeçalho", async () => {
+    envios.email.mockImplementation(async () => ({ ok: true as const, id: "re_abc" }))
+    const l = comEmail()
+    await rodar(SEG_10H)
+    const e = (hist(l).map(h => h.envio).find(x => x?.canal === "email") as unknown) as { para: string; assunto: string; em: string; resendId: string; token: string }
+    expect(e).toMatchObject({ para: l.email, resendId: "re_abc", em: SEG_10H.toISOString() })
+    expect(e.assunto).toBeTruthy()
+    const [para, msg, , opc] = envios.email.mock.calls[0] as [string, { texto: string; html: string }, unknown, { cabecalhos: Record<string, string> }]
+    expect(para).toBe(l.email)
+    const url = `https://app.enyla.com.br/api/prospector/sair/${e.token}`
+    expect(msg.html).toContain(`href="${url}"`)
+    expect(msg.texto).toContain(url)
+    expect(opc.cabecalhos["List-Unsubscribe"]).toBe(`<${url}>`)
+  })
+  it("quem está na lista de exclusão (opt-out) não recebe e-mail", async () => {
+    const fora = comEmail({ etapa: "descartado", opt_out: true, email: "fora@gr.com.br" })
+    comEmail({ email: "fora@gr.com.br" })
+    await rodar(SEG_10H)
+    expect(emailsEnviados()).toBe(0)
+    expect(hist(fora)).toHaveLength(0)
   })
 })

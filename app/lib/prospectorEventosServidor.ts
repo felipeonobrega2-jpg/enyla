@@ -4,11 +4,11 @@
 import { supabase } from "./supabase"
 import { podeTransicionar, type EtapaFunil, type MudancaEtapa } from "./prospector"
 import { envioDe, type EnvioHistorico } from "./prospectorEnvio"
-import { COLUNAS, gravar, historicoDe, reler, type Linha } from "./prospectorEnvioServidor"
+import { COLUNAS, gravar, gravarOptOut, historicoDe, reler, type Linha } from "./prospectorEnvioServidor"
 
-export type Sinal = "entregue" | "bounce" | "abriu" | "clique"
+export type Sinal = "entregue" | "bounce" | "abriu" | "clique" | "spam"
 export const EVENTOS_EMAIL: Readonly<Record<string, Sinal>> = {
-  "email.delivered": "entregue", "email.bounced": "bounce", "email.opened": "abriu", "email.clicked": "clique",
+  "email.delivered": "entregue", "email.bounced": "bounce", "email.opened": "abriu", "email.clicked": "clique", "email.complained": "spam",
 }
 export type EventoEmail = { type?: string; data?: { email_id?: string } }
 export type ResultadoEvento = { ok: boolean; status: number; motivo?: string; atualizado?: boolean }
@@ -19,6 +19,7 @@ const ETAPAS_QUE_ABREM: readonly string[] = ["abordado", "encerrado_sem_resposta
 /** Pura: devolve o envio com o sinal aplicado, ou null se nada muda (evento repetido). */
 export function envioComSinal(e: EnvioHistorico, sinal: Sinal, em: string): EnvioHistorico | null {
   if (sinal === "entregue") return e.entrega ? null : { ...e, entrega: "entregue" }
+  if (sinal === "spam") return e.entrega === "spam" ? null : { ...e, entrega: "spam" }
   if (sinal === "bounce") return e.entrega === "bounce" ? null : { ...e, entrega: "bounce" }
   if (sinal === "abriu") return e.abriuEm ? null : { ...e, abriuEm: em }
   if (e.cliqueEm) return null
@@ -57,7 +58,11 @@ export async function processarEventoEmail(evento: EventoEmail, agora: Date = ne
   // E-mail que não é do Prospector (proposta, aprovação...) também dispara estes eventos: 200 e segue.
   if (!linhas.length) return { ok: true, status: 200, motivo: "sem envio do Prospector com este id" }
   let atualizado = false
-  for (const l of linhas) if (await aplicarSinal(l, e => e.resendId === emailId, sinal, agora.toISOString())) atualizado = true
+  for (const l of linhas) {
+    if (await aplicarSinal(l, e => e.resendId === emailId, sinal, agora.toISOString())) atualizado = true
+    // Reclamação de spam: quem marcou nunca mais recebe (lista de exclusão).
+    if (sinal === "spam") await gravarOptOut((await reler(l.id)) ?? l, agora.toISOString(), "marcou o e-mail como spam")
+  }
   return { ok: true, status: 200, atualizado }
 }
 
@@ -72,5 +77,17 @@ export async function registrarCliquePorToken(token: string, agora: Date = new D
     let ok = false
     for (const l of (data ?? []) as Linha[]) if (await aplicarSinal(l, e => e.token === token, "clique", agora.toISOString())) ok = true
     return ok
+  } catch { return false }
+}
+
+/** Descadastro pelo link do e-mail: grava a exclusão (opt-out) do prospecto dono do token. Token inválido ou desconhecido: false. Idempotente. */
+export async function descadastrarPorToken(token: string, agora: Date = new Date()): Promise<boolean> {
+  if (!TOKEN_VALIDO.test(token)) return false
+  try {
+    const { data, error } = await supabase.from("prospectos_parceiros").select(COLUNAS).contains("historico_etapas", [{ envio: { token } }]).limit(5)
+    if (error) return false
+    const linhas = (data ?? []) as Linha[]
+    for (const l of linhas) if (!l.opt_out) await gravarOptOut(l, agora.toISOString(), "descadastro pelo link do e-mail")
+    return linhas.length > 0
   } catch { return false }
 }

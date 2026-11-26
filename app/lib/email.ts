@@ -30,7 +30,7 @@ export function ehCotaEsgotada(j: { name?: string; message?: string }): boolean 
 
 export const emailConfigurado = () => !!process.env.RESEND_API_KEY
 
-export async function enviarEmail(para: string, e: Email, anexos: { nome: string; base64: string }[] = [], opcoes: { de?: string; responderPara?: string } = {}): Promise<{ ok: true; id: string } | { ok: false; erro: string; cota?: true }> {
+export async function enviarEmail(para: string, e: Email, anexos: { nome: string; base64: string }[] = [], opcoes: { de?: string; responderPara?: string; cabecalhos?: Record<string, string> } = {}): Promise<{ ok: true; id: string } | { ok: false; erro: string; cota?: true }> {
   const chave = process.env.RESEND_API_KEY
   if (!chave) return { ok: false, erro: "e-mail ainda não configurado (falta a chave da Resend)" }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(para)) return { ok: false, erro: "e-mail inválido" }
@@ -38,7 +38,7 @@ export async function enviarEmail(para: string, e: Email, anexos: { nome: string
   // opcoes.responderPara vale só para quem pede (Prospector); as demais mensagens seguem com EMAIL_RESPONDER_PARA
   const responder = opcoes.responderPara || process.env.EMAIL_RESPONDER_PARA
   try {
-    const corpo = JSON.stringify({ from: de, to: [para], subject: e.assunto, html: e.html, text: e.texto, ...(responder ? { reply_to: responder } : {}), ...(anexos.length ? { attachments: anexos.map(a => ({ filename: a.nome, content: a.base64 })) } : {}) })
+    const corpo = JSON.stringify({ from: de, to: [para], subject: e.assunto, html: e.html, text: e.texto, ...(responder ? { reply_to: responder } : {}), ...(opcoes.cabecalhos ? { headers: opcoes.cabecalhos } : {}), ...(anexos.length ? { attachments: anexos.map(a => ({ filename: a.nome, content: a.base64 })) } : {}) })
     let r: Response
     for (let tentativa = 1; ; tentativa++) {
       await esperarVez()

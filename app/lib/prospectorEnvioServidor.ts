@@ -12,7 +12,7 @@ import { randomBytes } from "node:crypto"
 import { enviarEmail } from "./email"
 import { CNAES_PROSPECTO, aplicarOptOut, hojeSp, podeTransicionar, type EtapaFunil, type MudancaEtapa } from "./prospector"
 import {
-  ASSUNTO_EMAIL, htmlDoEmailComLink, htmlDoPrimeiroContato, urlRastreada, textoPlanoDoPrimeiroContato, CHAVE_ENVIO_ATIVO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA, PRIMEIRO_CONTATO_PAUSADO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector,
+  ASSUNTO_EMAIL, htmlDoEmailComLink, textoPlanoDoEmailComLink, urlDescadastro, motivoParadaPorSaude, JANELA_SAUDE_EMAIL_DIAS, htmlDoPrimeiroContato, urlRastreada, textoPlanoDoPrimeiroContato, CHAVE_ENVIO_ATIVO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA, PRIMEIRO_CONTATO_PAUSADO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector,
   canaisDisponiveis, canaisPendentes, celularWhatsapp, chaveTelefone, dentroDoHorario, ehRecusa, emailValido, enviosDoHistorico,
   motivoNaoQualifica, passoIniciado, passoSaiu, passouDias, saiu, TEXTO_LEMBRETE,
   type Canal, type EnvioHistorico, type MotivoParada, type Passo,
@@ -84,6 +84,7 @@ type Estado = {
   emailsNestaExecucao: number; limiteAte: number                // limite técnico por execução (rota de 120s)
   emailsFeitosHoje: number; teto: number                        // e-mails do Prospector já enviados hoje (antes desta execução) e o teto diário (0 = sem)
   cotaEsgotada: boolean; motivoParada?: MotivoParada
+  saude?: MotivoParada                                          // devolução > 2% ou reclamação de spam na janela: o e-mail para
   textos: TextoProspector[]; remetente: string; aleatorio: () => number   // biblioteca de textos (A/B), nome que assina e sorteio
 }
 
@@ -101,6 +102,7 @@ const semFolga = (est: Estado) => {
 
 /** E-mail parado pelo resto do dia: a Resend recusou por cota, ou o teto diário do Prospector foi atingido. Só o e-mail para; o WhatsApp segue. */
 function emailParado(est: Estado): boolean {
+  if (est.saude) { est.motivoParada = est.saude; return true }
   if (est.cotaEsgotada) { est.motivoParada = "cota_resend"; return true }
   if (est.teto > 0 && est.emailsFeitosHoje + est.emailsNestaExecucao >= est.teto) { est.motivoParada ??= "teto_diario"; return true }
   return false
@@ -135,9 +137,10 @@ async function enviarPeloCanal(canal: Canal, l: Linha, texto: string, token?: st
   }
   const para = emailValido(l.email)
   if (!para) return { ok: false, erro: "e-mail inválido" }
+  const cabecalhos = token ? { "List-Unsubscribe": `<${urlDescadastro(token)}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } : undefined
   const r = await enviarEmail(para, linkNoCorpo
-    ? { assunto: assunto || ASSUNTO_EMAIL, texto, html: htmlDoEmailComLink(texto) }
-    : { assunto: assunto || ASSUNTO_EMAIL, texto: textoPlanoDoPrimeiroContato(texto, token), html: htmlDoPrimeiroContato(texto, token) }, [], { de: REMETENTE, responderPara: replyToDoProspector() })
+    ? { assunto: assunto || ASSUNTO_EMAIL, texto: textoPlanoDoEmailComLink(texto, token), html: htmlDoEmailComLink(texto, token) }
+    : { assunto: assunto || ASSUNTO_EMAIL, texto: textoPlanoDoPrimeiroContato(texto, token), html: htmlDoPrimeiroContato(texto, token) }, [], { de: REMETENTE, responderPara: replyToDoProspector(), ...(cabecalhos ? { cabecalhos } : {}) })
   return r.ok ? { ok: true, id: r.id } : { ok: false, erro: r.erro, ...(r.cota ? { cota: true as const } : {}) }
 }
 
@@ -161,7 +164,8 @@ async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, ag
     : TEXTO_LEMBRETE
   const textoId = escolhido?.textoId
   const assunto = escolhido?.assunto
-  const envio: EnvioHistorico = { passo, canal, status: "reservado", em, texto, ...(token ? { token } : {}), ...(textoId ? { textoId } : {}) }
+  const para = canal === "email" ? emailValido(l.email) : null
+  const envio: EnvioHistorico = { passo, canal, status: "reservado", em, texto, ...(para ? { para, assunto: assunto || ASSUNTO_EMAIL } : {}), ...(token ? { token } : {}), ...(textoId ? { textoId } : {}) }
   const reservada = await gravar(l, { historico_etapas: [...historicoDe(l), { etapa: l.etapa as EtapaFunil, em, motivo: `${passo} (${canal}): reservado`, envio }] })
   if (!reservada) return null
   const k = chaveCanal(canal, l)
@@ -264,21 +268,26 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
   est.teto = tetoEmailDia()
   res.tetoEmailDia = est.teto
   const hoje = hojeSp(agora)
-  if (est.teto > 0) {
-    // Todo envio grava atualizado_em, então só as linhas tocadas hoje (SP, UTC-3) interessam. O PostgREST corta em 1000 linhas por
+  {
+    // Todo envio grava atualizado_em, então só as linhas tocadas na janela de saúde (7 dias; o teto olha só hoje, SP, UTC-3) interessam. O PostgREST corta em 1000 linhas por
     // chamada (max-rows): pagina com range até vir página incompleta. Falha em qualquer página: o e-mail não sai nesta execução.
-    const inicioDoDia = new Date(`${hoje}T00:00:00-03:00`).toISOString()
+    const inicioDaJanela = new Date(agora.getTime() - JANELA_SAUDE_EMAIL_DIAS * 86_400_000).toISOString()
     const PAGINA = 1000
     let feitos = 0
+    const daJanela: EnvioHistorico[] = []
     for (let de = 0; ; de += PAGINA) {
       const { data, error } = await supabase.from(TABELA).select("id, historico_etapas").contains("historico_etapas", [{ envio: { canal: "email" } }])
-        .gte("atualizado_em", inicioDoDia).order("id", { ascending: true }).range(de, de + PAGINA - 1)
+        .gte("atualizado_em", inicioDaJanela).order("id", { ascending: true }).range(de, de + PAGINA - 1)
       if (error) return { ...res, ok: false, erro: `não consegui contar os e-mails de hoje: ${error.message}` }
       const pagina = (data ?? []) as Linha[]
-      feitos += pagina.reduce((n, l) => n + enviosDe(l).filter(e => e.canal === "email" && saiu(e) && hojeSp(new Date(e.em)) === hoje).length, 0)
+      for (const l of pagina) for (const e of enviosDe(l)) if (e.canal === "email") {
+        if (saiu(e) && hojeSp(new Date(e.em)) === hoje) feitos++
+        if (Date.parse(e.em) >= Date.parse(inicioDaJanela)) daJanela.push(e)
+      }
       if (pagina.length < PAGINA) break
     }
     est.emailsFeitosHoje = feitos
+    est.saude = motivoParadaPorSaude(daJanela) ?? undefined
   }
   const jaContatadas = (contatadas.data ?? []) as Linha[]
   const lista = (elegiveis.data ?? []) as Linha[]

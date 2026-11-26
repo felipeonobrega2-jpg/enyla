@@ -218,7 +218,7 @@ describe("nome no envio: nomeDePessoa decide", () => {
     expect(envios.email).toHaveBeenCalledTimes(1)
     const [, msg] = envios.email.mock.calls[0] as [string, { assunto: string; texto: string; html: string }]
     expect(msg.assunto).toBe("assunto A")
-    expect(msg.texto).toMatch(/^Mail A\n\nCadastro: https:\/\/app\.enyla\.com\.br\/api\/prospector\/r\/[\w-]+$/)
+    expect(msg.texto).toMatch(/^Mail A\n\nCadastro: https:\/\/app\.enyla\.com\.br\/api\/prospector\/r\/[\w-]+\n\nNão quer mais receber nossos e-mails[^\n]*\/api\/prospector\/sair\/[\w-]+$/)
     expect(msg.html).toMatch(/<a href="https:\/\/app\.enyla\.com\.br\/api\/prospector\/r\/[\w-]+">/)
     const ids = (mundo.prospectos.find(x => x.id === a.id)!.historico_etapas as { envio?: { canal: string; textoId?: string } }[]).filter(x => x.envio).map(x => `${x.envio!.canal}:${x.envio!.textoId}`)
     expect([...new Set(ids)].sort()).toEqual(["email:txt_e", "whatsapp:txt_w"])
