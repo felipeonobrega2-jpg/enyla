@@ -351,3 +351,7 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 **Status:** Claude Code. **Aprovo:** não. **PR:** issue #144. Só leitura, sem migração.
 
 `GET /api/externo?o=parceiros` e `?o=detalhe&area=parceiros` (mesmo conteúdo; só chaves do CCO e da CMO, as outras recebem 403). `cadastros`: até 100, mais novos primeiro (`id`, `nome`, `empresa`, `data`, `origem` prospector/direto, `status`, `etapaProspector`, e-mail mascarado `ma***@dominio.com`, telefone `***1234`). Nunca documento nem endereço. `respostas`: prospectos na etapa `respondeu` e, se a tabela `prospectos_emails_recebidos` (#132) existir, as últimas 50 respostas com os 300 primeiros caracteres; sem a tabela, só pela etapa, sem erro. `funil`: contagem por etapa. Código em `app/lib/parceirosExterno.ts`; testes em `tests/parceirosExterno.test.ts`.
+
+## 50. Follow-up automático da Digital desligado (issue #232)
+
+**Status:** Claude Code. **Aprovo:** ordem do Felipe, 26/11/2026 9h18. Só tira envio. `FOLLOWUP_DIGITAL_LIGADO = false` em `app/lib/digital.ts`. Fora da fila do follow-up (F1, F2, F3, lembrete e `encerrar`): conversa com pedido Digital pendente e lead Digital sem pedido (critério já existente no `agenteAuto.ts`: etiqueta `Digital` ou último perfil do agente `pequeno`). A rota de reenvio (`varredura`, `acao=reenviar`) responde 409. Offset e demais leads seguem iguais. Código dos lembretes mantido. Teste: `tests/followUpDigitalDesligado.test.ts`.
