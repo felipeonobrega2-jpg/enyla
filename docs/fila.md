@@ -338,6 +338,7 @@ Nenhuma troca de modelo entra sem o Diego revisar o resultado da comparação.
 O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 | 43 | Porta externa: ação `mover_card` para avançar etapa de produção (só avança, 1→2..8, motivo obrigatório) | Felipe | — | — | Claude Code | não | (PR da issue #137) |
 | 44 | Prospector: teto diário de e-mail (`PROSPECTOR_TETO_EMAIL_DIA`, padrão 80) e respeito à cota da Resend | Felipe (issue #136) | urgente | — | Claude Code | não | (PR da issue #136) |
+| 45 | Porta externa: canal dos diretores até o Claude Code (`acao=perguntar_claude`, `?o=claude`, `?o=claude&id=`) | Felipe (25/11/2026, 20h11) | — | — | Claude Code | não (precisa do token `GITHUB_DIRETORES_TOKEN`, que o Felipe cria) | (PR da issue #154) |
 | 48 | Prospector: gravar o id da Resend, tratar `delivered/bounced/opened/clicked` e link rastreado `/api/prospector/r/[token]` (etapa `abriu`) | Felipe (issue #208) | — | — | Claude Code | não (a CMO revisa a linha do link no PR) | (PR da issue #208) |
 | 46 | Despesa em vários lotes: perguntar se o valor é o total (ratear por quantidade ou igual) ou o custo de cada lote, com prévia por lote. Não mexe em lançamentos antigos | Felipe | — | — | Claude Code | não | (PR da issue #161) |
 | 48 | Pós-venda acha o WhatsApp de pedido Digital (DIG-xxxx): pedido, cadastro, conversa; erro com motivo (`sem_jid`, `pedido_sem_jid`, `pedido_nao_encontrado`). Não muda o Aprovo | Felipe | — | — | Claude Code | não (correção de erro) | (PR da issue #206) |
