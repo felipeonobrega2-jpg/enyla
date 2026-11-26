@@ -9,6 +9,7 @@ import QRCode from "qrcode"
 import { Check, Copy, Loader2, Upload, FileText, AlertCircle, Sparkles, Palette, Truck, Send, CreditCard, Wallet } from "lucide-react"
 import { Caixa3D } from "@/app/components/Caixa3D"
 import { gerarPixPayload } from "@/app/lib/pix"
+import { formatarData } from "@/app/lib/formato"
 import type { Acompanhamento } from "@/app/lib/acompanhamentoDigital"
 import { AcompanhamentoDigital } from "./AcompanhamentoDigital"
 
@@ -437,7 +438,7 @@ function TermosAceitos({ p }: { p: Pedido }) {
   return (
     <div className={aberto ? "bg-white rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5" : ""}>
       <p className="text-[12px] text-[#5e5c68] text-center flex items-center justify-center gap-1.5">
-        <Check className="w-3.5 h-3.5 text-[#009351]" />Termos do pedido aceitos em {new Date(p.termosAceitosEm!).toLocaleDateString("pt-BR")}
+        <Check className="w-3.5 h-3.5 text-[#009351]" />Termos do pedido aceitos em {formatarData(p.termosAceitosEm, "completo")}
         <button onClick={() => setAberto(a => !a)} className="text-[#8456e8] underline underline-offset-2">{aberto ? "fechar" : "ver"}</button>
       </p>
       {aberto && <ListaTermos p={p} />}

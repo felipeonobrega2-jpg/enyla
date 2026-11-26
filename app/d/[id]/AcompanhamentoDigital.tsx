@@ -3,9 +3,10 @@
 // Acompanhamento do pedido Digital, no visual do /track da Offset (hero da etapa, previsão de entrega, pagamento, linha do tempo).
 // Só mostra o que a API entrega (lista fechada, sem dado sensível). O pagamento vem do "a receber"; fora dele, "em conferência".
 import type { Acompanhamento } from "@/app/lib/acompanhamentoDigital"
+import { formatarData } from "@/app/lib/formato"
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-const dataBR = (iso: string | null) => iso ? iso.slice(0, 10).split("-").reverse().join("/") : null
+const dataBR = (iso: string | null) => iso ? formatarData(iso, "completo") : null
 const cm = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
 const ARTE = { aprovada: "Arte aprovada", esperando_cliente: "Arte esperando a sua aprovação", nao_enviada: "Arte ainda não enviada" } as const
 

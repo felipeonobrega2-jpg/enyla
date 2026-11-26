@@ -339,6 +339,7 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 | 43 | Porta externa: ação `mover_card` para avançar etapa de produção (só avança, 1→2..8, motivo obrigatório) | Felipe | — | — | Claude Code | não | (PR da issue #137) |
 | 44 | Prospector: teto diário de e-mail (`PROSPECTOR_TETO_EMAIL_DIA`, padrão 80) e respeito à cota da Resend | Felipe (issue #136) | urgente | — | Claude Code | não | (PR da issue #136) |
 | 46 | Despesa em vários lotes: perguntar se o valor é o total (ratear por quantidade ou igual) ou o custo de cada lote, com prévia por lote. Não mexe em lançamentos antigos | Felipe | — | — | Claude Code | não | (PR da issue #161) |
+| 47 | Página `/d/[id]`: datas em pt-BR (previsão de entrega) e fuso de Brasília; parte (a) da issue #205 (a parte (b), helper + doc + CI, vem em outro PR) | Felipe | urgente | — | Claude Code | não (só formatação) | (PR da issue #205) |
 
 ## 44. Porta externa: leitura de parceiros
 
