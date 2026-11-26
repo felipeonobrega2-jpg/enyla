@@ -53,6 +53,8 @@ export type EnvioHistorico = {
   /** Primeira abertura (pixel) e primeiro clique (link), ISO. */
   abriuEm?: string
   cliqueEm?: string
+  /** Id da versão do texto (biblioteca prospectorTextos) usada neste envio. Ausente = texto do código. */
+  textoId?: string
 }
 
 export const CHAVE_ENVIO_ATIVO = "prospector_envio_ativo"
@@ -187,7 +189,7 @@ export function envioDe(x: unknown): EnvioHistorico | null {
   if (e.status !== "reservado" && e.status !== "enviado" && e.status !== "falhou") return null
   return {
     passo: e.passo, canal: e.canal, status: e.status, em: String(e.em ?? ""), ...(e.texto ? { texto: e.texto } : {}), ...(e.erro ? { erro: e.erro } : {}),
-    ...(e.resendId ? { resendId: e.resendId } : {}), ...(e.token ? { token: e.token } : {}),
+    ...(e.resendId ? { resendId: e.resendId } : {}), ...(e.token ? { token: e.token } : {}), ...(e.textoId ? { textoId: e.textoId } : {}),
     ...(e.entrega === "entregue" || e.entrega === "bounce" ? { entrega: e.entrega } : {}),
     ...(e.abriuEm ? { abriuEm: e.abriuEm } : {}), ...(e.cliqueEm ? { cliqueEm: e.cliqueEm } : {}),
   }

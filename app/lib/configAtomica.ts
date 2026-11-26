@@ -40,6 +40,7 @@ export const COLECOES: Record<string, Colecao> = {
   fechadasPelaIA: lista(x => `${x.jid}|${x.em}`, porEm),
   licoesBanco: lista(x => String(x.id)),
   cadastrosParceiros: lista(x => String(x.id), porEm),
+  prospectorTextos: lista(x => String(x.id), porEm),
   agenteMarcos: mapa, apelidosWhatsapp: mapa, esperaAvisada: mapa, agenteFollowupTentados: mapa, proximosPassos: mapa,
   mqlEsperandoAvisado: mapa, visitasProposta: mapa, propostaLidaEm: mapa,
   agenteRetomadas: conjunto, vigiaTentou: conjunto, vigiaTentouV2: conjunto, vigiaTentouV3: conjunto,

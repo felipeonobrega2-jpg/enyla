@@ -12,11 +12,13 @@ import { randomBytes } from "node:crypto"
 import { enviarEmail } from "./email"
 import { CNAES_PROSPECTO, aplicarOptOut, hojeSp, podeTransicionar, type EtapaFunil, type MudancaEtapa } from "./prospector"
 import {
-  ASSUNTO_EMAIL, htmlDoPrimeiroContato, textoPlanoDoPrimeiroContato, CHAVE_ENVIO_ATIVO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA, PRIMEIRO_CONTATO_PAUSADO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector,
+  ASSUNTO_EMAIL, htmlDoPrimeiroContato, textoPlanoDoPrimeiroContato, CHAVE_ENVIO_ATIVO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA, PRIMEIRO_CONTATO_PAUSADO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector, URL_CADASTRO_PARCEIROS, urlRastreada,
   canaisDisponiveis, canaisPendentes, celularWhatsapp, chaveTelefone, dentroDoHorario, ehRecusa, emailValido, enviosDoHistorico,
   motivoNaoQualifica, passoIniciado, passoSaiu, passouDias, saiu, textoDoPasso,
   type Canal, type EnvioHistorico, type MotivoParada, type Passo,
 } from "./prospectorEnvio"
+import { ehSim, preencherTexto, sortearTexto, type TextoProspector } from "./prospectorTextos"
+import { lerTextosProspector } from "./prospectorTextosServidor"
 
 const TABELA = "prospectos_parceiros"
 export const COLUNAS = "id, cnpj, razao_social, nome_fantasia, cnae_principal, cnaes_secundarios, telefone, email, nota, etapa, opt_out, historico_etapas, atualizado_em"
@@ -81,11 +83,12 @@ type Estado = {
   emailsNestaExecucao: number; limiteAte: number                // limite técnico por execução (rota de 120s)
   emailsFeitosHoje: number; teto: number                        // e-mails do Prospector já enviados hoje (antes desta execução) e o teto diário (0 = sem)
   cotaEsgotada: boolean; motivoParada?: MotivoParada
+  textos: TextoProspector[]                                     // biblioteca de versões (teste A/B); vazia = texto do código
 }
 
 function novoEstado(): Estado {
   const m = () => ({ whatsapp: new Map<string, string>(), email: new Map<string, string>() })
-  return { usados: { primeiro_contato: m(), lembrete: m() }, bloqueadosTel: new Set(), bloqueadosEmail: new Set(), emailsNestaExecucao: 0, limiteAte: Date.now() + ORCAMENTO_MS_POR_EXECUCAO, emailsFeitosHoje: 0, teto: 0, cotaEsgotada: false }
+  return { usados: { primeiro_contato: m(), lembrete: m() }, bloqueadosTel: new Set(), bloqueadosEmail: new Set(), emailsNestaExecucao: 0, limiteAte: Date.now() + ORCAMENTO_MS_POR_EXECUCAO, emailsFeitosHoje: 0, teto: 0, cotaEsgotada: false, textos: [] }
 }
 
 /** Esgotou o que cabe nesta execução: o que sobrar sai no próximo cron. */
@@ -136,12 +139,13 @@ async function enviarPeloCanal(canal: Canal, l: Linha, texto: string, token?: st
 }
 
 /** Reserva, envia e fecha um canal de um passo. Devolve se saiu, se falhou, ou null se não reservou (alguém foi mais rápido). */
-async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, agora: Date): Promise<{ linha: Linha; ok: boolean } | null> {
-  const texto = textoDoPasso(passo, agora)
+async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, agora: Date, versao: TextoProspector | null = null): Promise<{ linha: Linha; ok: boolean } | null> {
   const em = agora.toISOString()
   // Só o primeiro contato por e-mail leva o link rastreado; o token nasce na reserva e fica no histórico (sem dado do prospecto).
   const token = passo === "primeiro_contato" && canal === "email" ? randomBytes(12).toString("base64url") : undefined
-  const envio: EnvioHistorico = { passo, canal, status: "reservado", em, texto, ...(token ? { token } : {}) }
+  // Versão da biblioteca (teste A/B): {link} é o link rastreado (e-mail) ou o formulário direto (WhatsApp). Sem versão, o texto do código.
+  const texto = versao ? preencherTexto(versao.corpo, { nome: l.nome_fantasia || l.razao_social, link: token ? urlRastreada(token) : URL_CADASTRO_PARCEIROS }) : textoDoPasso(passo, agora)
+  const envio: EnvioHistorico = { passo, canal, status: "reservado", em, texto, ...(token ? { token } : {}), ...(versao ? { textoId: versao.id } : {}) }
   const reservada = await gravar(l, { historico_etapas: [...historicoDe(l), { etapa: l.etapa as EtapaFunil, em, motivo: `${passo} (${canal}): reservado`, envio }] })
   if (!reservada) return null
   const k = chaveCanal(canal, l)
@@ -176,12 +180,18 @@ async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, ag
 async function mandarPasso(est: Estado, l: Linha, passo: Passo, canais: Canal[], agora: Date, res: ResultadoEnvio): Promise<{ linha: Linha; algumOk: boolean }> {
   let atual = l
   let algumOk = false
+  // Primeiro contato: o prospecto que já recebeu uma versão (outro canal) segue na mesma; senão sorteia com peso igual entre as ativas.
+  let versao: TextoProspector | null = null
+  if (passo === "primeiro_contato") {
+    const jaUsada = enviosDe(l).find(e => e.passo === passo && e.textoId && saiu(e))?.textoId
+    versao = (jaUsada ? est.textos.find(t => t.id === jaUsada) : undefined) ?? sortearTexto(est.textos, "primeira")
+  }
   for (const canal of canais) {
     if (bloqueado(est, passo, canal, atual)) continue
     if (semFolga(est)) break
     if (canal === "email" && emailParado(est)) continue
     if (canal === "email") est.emailsNestaExecucao++
-    const r = await enviarCanal(est, atual, passo, canal, agora)
+    const r = await enviarCanal(est, atual, passo, canal, agora, versao)
     if (!r) break
     atual = r.linha
     if (r.ok) algumOk = true; else res.falhas++
@@ -206,7 +216,8 @@ async function detectarRespostas(linhas: Linha[], agora: Date, res: ResultadoEnv
       const g = await gravarOptOut(l, em, "recusa por WhatsApp (não quero receber)")
       if (g) { l.etapa = "descartado"; l.opt_out = true; l.historico_etapas = g.historico_etapas; l.atualizado_em = g.atualizado_em; res.optOuts++ }
     } else if (l.etapa === "abordado") {
-      const g = await gravar(l, { etapa: "respondeu", historico_etapas: [...historicoDe(l), { etapa: "respondeu", em, motivo: "respondeu no WhatsApp" }] })
+      const sim = dele.some(m => ehSim(m.corpo))
+      const g = await gravar(l, { etapa: "respondeu", historico_etapas: [...historicoDe(l), { etapa: "respondeu", em, motivo: "respondeu no WhatsApp", ...(sim ? { sim: true } : {}) }] })
       if (g) { l.etapa = "respondeu"; l.historico_etapas = g.historico_etapas; l.atualizado_em = g.atualizado_em; res.responderam++ }
     }
   }
@@ -230,6 +241,7 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
   ])
   if (contatadas.error || elegiveis.error) return { ...res, ok: false, erro: (contatadas.error ?? elegiveis.error)!.message }
   const est = novoEstado()
+  est.textos = await lerTextosProspector()
   for (const s of (saidas.data ?? []) as { telefone: string | null; email: string | null }[]) {
     const t = chaveTelefone(celularWhatsapp(s.telefone)); if (t) est.bloqueadosTel.add(t)
     const e = emailValido(s.email); if (e) est.bloqueadosEmail.add(e)
