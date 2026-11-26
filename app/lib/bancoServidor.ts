@@ -8,6 +8,7 @@ import { contas as contasPluggy, item as itemPluggy, transacoes, pluggyConfigura
 import { daPluggy, sugerir, aprender, aprenderConta, completarSugestao as completar, regrasDoHistorico, paresDeDevolucao, FOI_E_VOLTOU, regraConfiavel, regraDaTx, aceitouSemMudar, zerarConfianca, vinculosPorSoma, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
 import { montarPedidos, pedidoEntregue, nomeChave, type Pedido } from "./negocio"
 import { previstosEmAberto, pedidoDoCusto, type PrevistoPedido } from "./calibragem"
+import { fonteDoExtrato, openiConfigurada, lerContasOpeni, contaValeNaData, transacoesOpeni, daOpeni, type TxOpeni } from "./openi"
 import { MARCA } from "./conciliacao"
 import { clienteClaude, FALLBACK, MODELO } from "./claude"
 import type { LancamentoFinanceiro, KanbanCard } from "../types"
@@ -44,7 +45,36 @@ const COLUNAS_LANC = ["id", "tipo", "descricao", "valor", "dataVencimento", "dat
 const linhaLanc = (l: Partial<LancamentoFinanceiro>) => Object.fromEntries(COLUNAS_LANC.map(k => [k, (l as Record<string, unknown>)[k] ?? null]))
 
 // ── Sincronizar ──────────────────────────────────────────────────────────────
+// Extrato da Openi (bankFeedSource = 'openi'). Só insere o que ainda não existe (id = "openi:<id externo>"):
+// nada que já está no banco é alterado, então estado, vínculo e histórico ficam como estão.
+export async function sincronizarOpeni(): Promise<{ ok: boolean; novas: number; sugeridas: number; restantes?: number; erro?: string }> {
+  if (!openiConfigurada()) return { ok: false, novas: 0, sugeridas: 0, erro: "Openi não configurada (OPENI_API_KEY na Vercel)." }
+  const contas = lerContasOpeni()
+  if (!contas.length) return { ok: false, novas: 0, sugeridas: 0, erro: "Nenhuma conta da Openi configurada (OPENI_CONTAS)." }
+  const cfg = await lerConfig()
+  const desde = cfg.pluggy?.dataCorte ?? hojeSP()
+  let erro: string | null = null
+  const linhas: Record<string, unknown>[] = []
+  for (const c of contas) {
+    const t = await transacoesOpeni(c.item, c.conta)
+    if (!t.ok) { erro = t.erro ?? "Falha na Openi."; continue }
+    for (const x of t.lista as TxOpeni[]) {
+      const m = daOpeni(x, c.conta, `Openi · ${c.conta.slice(-4)}`)
+      if (!m || m.data < desde || !contaValeNaData(c, m.data)) continue
+      linhas.push({ ...m, bruto: x })
+    }
+  }
+  let novas = 0
+  for (let i = 0; i < linhas.length; i += 500) {
+    const { data } = await supabase.from("banco_transacoes").upsert(linhas.slice(i, i + 500), { onConflict: "id", ignoreDuplicates: true }).select("id")
+    novas += (data ?? []).length
+  }
+  const s = await sugerirPendentes(40_000)
+  return { ok: !erro, novas, sugeridas: s.feitas, restantes: s.restantes, erro: erro ?? undefined }
+}
+
 export async function sincronizar(): Promise<{ ok: boolean; novas: number; sugeridas: number; restantes?: number; erro?: string }> {
+  if (fonteDoExtrato((await lerConfig()).bankFeedSource) === "openi") return sincronizarOpeni()
   if (!pluggyConfigurada()) return { ok: false, novas: 0, sugeridas: 0, erro: "Pluggy não configurada (chaves na Vercel)." }
   const cfg = await lerConfig()
   const conf = cfg.pluggy ?? {}
