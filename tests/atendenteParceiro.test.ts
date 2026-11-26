@@ -38,7 +38,7 @@ vi.mock("@/app/lib/supabase", () => ({
   },
 }))
 
-import { responderParceiro, pediuParaNaoReceber, perguntasSemResposta, ajustarLink, LINK_PARCEIROS, TEXTO_OPT_OUT } from "@/app/lib/atendenteParceiro"
+import { responderParceiro, dizSemPrecoFixo, pediuParaNaoReceber, perguntasSemResposta, ajustarLink, LINK_PARCEIROS, TEXTO_OPT_OUT } from "@/app/lib/atendenteParceiro"
 import type { ProspectoDoJid } from "@/app/lib/prospectorTrava"
 
 const JID = "5511987654321@s.whatsapp.net"
@@ -114,6 +114,30 @@ describe("resposta da IA à gráfica do Prospector", () => {
     Object.assign(mundo.prospectos[0], ex)
     expect((await responderParceiro(prosp(), JID, deps())).enviou).toBe(false)
     expect(enviar).not.toHaveBeenCalled(); expect(mundo.ia).not.toHaveBeenCalled()
+  })
+})
+
+describe("parceira sem preço fixo (orcamento_por_pedido)", () => {
+  it.each(["Nosso preço varia de pedido para pedido", "Depende do pedido", "Não temos tabela de preço", "Cada serviço tem um valor"])("reconhece %s", t => expect(dizSemPrecoFixo([t])).toBe(true))
+  it.each(["Como funciona?", "Qual o prazo de pagamento?"])("não confunde %s", t => expect(dizSemPrecoFixo([t])).toBe(false))
+  it("explica as duas regras no prompt, registra o modo e não cita valor da ENYLA", async () => {
+    mundo.mensagens = [nossa("Oi!"), dela("Nosso preço varia de pedido para pedido")]
+    mundo.ia.mockResolvedValue({ texto: "Entendi! Quem cadastra preço e prazo médio recebe prioridade; sem isso, avisamos a cada pedido para você orçar. Prefere passar um preço de referência e o prazo médio?", enviar_link: false, perguntas_sem_resposta: [] })
+    const r = await responderParceiro(prosp(), JID, deps())
+    expect(r.enviou).toBe(true)
+    const sistema = String((mundo.ia.mock.calls[0][0] as { system: string }).system)
+    expect(sistema).toContain("recebe prioridade"); expect(sistema).toContain("preço de referência e o prazo médio"); expect(sistema).toMatch(/sem citar valor da ENYLA nem prometer volume/)
+    expect(hist().some(h => h.modo_parceira === "orcamento_por_pedido")).toBe(true)
+  })
+  it("sem a frase, o prompt não traz a regra e nada é registrado", async () => {
+    await responderParceiro(prosp(), JID, deps())
+    expect(String((mundo.ia.mock.calls[0][0] as { system: string }).system)).not.toContain("recebe prioridade")
+    expect(hist().some(h => h.modo_parceira)).toBe(false)
+  })
+  it("opt-out continua valendo", async () => {
+    mundo.mensagens = [nossa("Oi!"), dela("Varia de pedido para pedido, mas não tenho interesse")]
+    await responderParceiro(prosp(), JID, deps())
+    expect(enviar).toHaveBeenCalledWith(TEXTO_OPT_OUT); expect(mundo.ia).not.toHaveBeenCalled()
   })
 })
 

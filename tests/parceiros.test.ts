@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { cnpjValido, cpfValido, errosDaEtapa, errosDoCadastro, limparCadastro, paraFornecedor, textoCobranca, mascaraDocumento, mascaraTelefone, textoEnchimento, faltaDoCadastro, comFalta } from "@/app/lib/parceiros"
+import { cnpjValido, cpfValido, errosDaEtapa, errosDoCadastro, limparCadastro, paraFornecedor, textoCobranca, mascaraDocumento, mascaraTelefone, textoEnchimento, faltaDoCadastro, comFalta, modoDaParceira } from "@/app/lib/parceiros"
 
 const ok = { nomeFantasia: "Gráfica Exemplo", tipoDocumento: "cnpj" as const, documento: "11222333000181", cep: "01310100", rua: "Avenida Paulista", numero: "1000", bairro: "Bela Vista", cidade: "São Paulo", uf: "SP", responsavel: "Marcos", whatsapp: "11988887777", email: "a@b.com.br",
   servicos: [{ id: "corteVinco" as const, cobranca: "unidade" as const, valor: 0.38, prazoDias: 3, prazoVaria: false, tecnico: { buscaEntrega: true } as Record<string, boolean>, precosExemplo: { corteVinco: 250 } as Record<string, number> }, { id: "colagem" as const, cobranca: "hora" as const, valor: 45, prazoDias: null, prazoVaria: true, tecnico: { buscaEntrega: false } as Record<string, boolean>, precosExemplo: { colagem: 300 } as Record<string, number> }], aceite: true }
@@ -36,6 +36,17 @@ describe("Parceiros ENYLA", () => {
     expect(f.maquina).toMatchObject({ largura: 660, altura: 960 })
     expect(f.endereco?.lat).toBe(-23.56)
     expect(f.obs).toContain("66 × 96 cm")
+  })
+  it("modo da parceira: tabela só com preço e prazo médio em todo serviço; senão orcamento_por_pedido", () => {
+    expect(limparCadastro(ok).modo).toBe("orcamento_por_pedido")   // colagem varia
+    const completo = limparCadastro({ ...ok, servicos: [ok.servicos[0]] })
+    expect(completo.modo).toBe("tabela")
+    expect(modoDaParceira([{ cobranca: "milheiro", valor: 38, prazoDias: null, prazoVaria: true }])).toBe("orcamento_por_pedido")
+    expect(modoDaParceira([{ cobranca: "varia", valor: null, prazoDias: 3, prazoVaria: false }])).toBe("orcamento_por_pedido")
+    expect(modoDaParceira([])).toBe("orcamento_por_pedido")
+  })
+  it("modo vindo do formulário é ignorado: sempre calculado", () => {
+    expect(limparCadastro({ ...ok, modo: "tabela" } as never).modo).toBe("orcamento_por_pedido")
   })
   it("máscaras", () => {
     expect(mascaraDocumento("11222333000181", "cnpj")).toBe("11.222.333/0001-81")

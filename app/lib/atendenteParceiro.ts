@@ -39,6 +39,10 @@ const PERGUNTAS: Record<TemaPendente, RegExp> = {
   volume: /(\bvolume\b|quantos\s+(pedidos|servi[cç]os|trabalhos|jobs)|quanto\s+(de\s+)?(servi[cç]o|trabalho|pedido)s?|qual\s+(a\s+)?quantidade|quantidade\s+(de\s+)?(servi[cç]os|trabalhos|pedidos)|(demanda|movimento)\s+(por|no|de)\s+m[eê]s)/i,
 }
 
+/** A gráfica diz que não tem preço fixo ("varia de pedido para pedido"): modo `orcamento_por_pedido`. */
+const SEM_PRECO = /(varia\s+(de\s+)?(pedido|servi[cç]o|trabalho|job)|depende\s+(do|de\s+cada)\s+(pedido|servi[cç]o|trabalho)|n[aã]o\s+(temos|tenho|t[eê]m|trabalhamos\s+com)\s+(uma\s+)?(tabela|pre[cç]o\s+fixo|valor\s+fixo)|sem\s+(tabela|pre[cç]o\s+fixo)|cada\s+(pedido|servi[cç]o|trabalho)\s+(\S+\s+)?(tem\s+)?(um\s+)?(pre[cç]o|valor))/i
+export const dizSemPrecoFixo = (textos: string[]) => SEM_PRECO.test(textos.join("\n"))
+
 /** Perguntas da gráfica sem resposta oficial. "Quanto vocês pagam?" não é custo: o pagamento tem resposta oficial. */
 export function perguntasSemResposta(textos: string[]): TemaPendente[] {
   const t = textos.join("\n")
@@ -100,7 +104,7 @@ export function ajustarLink(texto: string, a: { pode: boolean; quer: boolean; li
   return t
 }
 
-function prompt(a: { nome: string; conhecimento: string; jaMandouLink: boolean; jaCadastrou: boolean; faltando?: string[] }) {
+function prompt(a: { nome: string; conhecimento: string; jaMandouLink: boolean; jaCadastrou: boolean; faltando?: string[]; semPreco?: boolean }) {
   return `Você é o Atendente da ENYLA (gráfica de embalagens) conversando no WhatsApp com ${a.nome}, uma gráfica que respondeu ao nosso convite para ser PARCEIRA da ENYLA. Ela NÃO é cliente: é uma possível parceira que faria serviços de produção para nós.
 Seu objetivo em cada resposta: tirar a dúvida dela e levá-la ao cadastro em ${LINK_PARCEIROS}.
 Como funciona (fatos oficiais): o cadastro leva uns 5 minutos; depois o Felipe analisa e chama a gráfica no WhatsApp. Pagamento: ${PAGAMENTO}.
@@ -108,7 +112,7 @@ ${a.jaCadastrou ? `Esta gráfica JÁ fez o cadastro: agradeça, diga que o Felip
 Regras:
 - Você NÃO orça, não fala de preço de embalagem nem de valores em reais, e não trata a gráfica como cliente de compra.
 - Três assuntos NÃO têm resposta oficial: custo para entrar, exclusividade e volume esperado de serviço. Se ela perguntar, NÃO invente nem estime: responda normalmente o resto da mensagem, diga que o Felipe confirma esse ponto com ela, e liste o tema em perguntas_sem_resposta.
-- Só afirme o que está nos fatos oficiais e no conhecimento abaixo. Não prometa prazo, volume nem valor.
+${a.semPreco ? `- Ela disse que não tem preço fixo (varia de pedido para pedido). Explique com naturalidade, sem citar valor da ENYLA nem prometer volume: quem cadastra preço e prazo médio recebe prioridade na distribuição dos pedidos; sem isso, recebe um aviso a cada pedido compatível para orçar e concorre com as outras gráficas naquele pedido. Pergunte se ela prefere passar ao menos um preço de referência e o prazo médio.\n` : ""}- Só afirme o que está nos fatos oficiais e no conhecimento abaixo. Não prometa prazo, volume nem valor.
 - Empresa falando ("nós"), cordial, curta (2 a 4 frases), português do Brasil, no máximo um emoji. Não exponha nada interno (agentes, diretoria, sistema).
 ${a.conhecimento ? `\nConhecimento da ENYLA sobre o programa de parceiros (guardado pela CMO e pelo Felipe):\n${a.conhecimento}\n` : ""}`
 }
@@ -146,12 +150,13 @@ export async function responderParceiro(p: ProspectoDoJid, jid: string, deps: De
   const cadastrou = !!cadastro
   const jaMandouLink = ms.some(m => m.from_me && /app\.enyla\.com\.br\/parceiros/i.test(m.corpo ?? ""))
   const conhecimento = conhecimentoNoPrompt((cfg.conhecimentoAgente ?? []).filter(ehConhecimentoDeParceiro))
+  const semPreco = dizSemPrecoFixo(dela)
   let saida: { texto?: string; enviar_link?: boolean; perguntas_sem_resposta?: string[] }
   try {
     const resp = await clienteClaude(cfg.apiKey, "atendente_parceiro").beta.messages.create({
       model: MODELO, max_tokens: 800,
       output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
-      system: prompt({ nome, conhecimento, jaMandouLink, jaCadastrou: cadastrou, faltando: cadastro?.faltando }),
+      system: prompt({ nome, conhecimento, jaMandouLink, jaCadastrou: cadastrou, faltando: cadastro?.faltando, semPreco }),
       messages: [{ role: "user", content: `Conversa recente:\n${ms.map(m => `${m.from_me ? "ENYLA" : "Gráfica"}: ${String(m.corpo).slice(0, 400)}`).join("\n")}\n\nResponda a(s) última(s) mensagem(ns) da gráfica.` }],
     })
     saida = JSON.parse(resp.content.flatMap(c => c.type === "text" ? [c.text] : []).join(""))
@@ -177,6 +182,7 @@ export async function responderParceiro(p: ProspectoDoJid, jid: string, deps: De
   // Cadastro já feito vale mais que "respondeu"; senão, a primeira resposta
   const etapaFinal = cadastrou && !cadastro?.faltando.length && podeTransicionar(p.etapa as EtapaFunil, "cadastrou", false) ? "cadastrou" : avanca ? "respondeu" : null
   await registrar(p, { motivo: "resposta automática do Atendente (modo parceiro)", etapa: etapaFinal ?? p.etapa, mensagem: { direcao: "enviada", canal: "whatsapp", por: POR_ATENDENTE, texto, em } }, etapaFinal ? { etapa: etapaFinal } : camposResposta).catch(() => null)
+  if (semPreco) await registrar(p, { motivo: "gráfica sem preço fixo: modo orcamento_por_pedido (explicado pela IA)", modo_parceira: "orcamento_por_pedido" }).catch(() => null)
   for (const tema of pendentes) {
     const pergunta = dela.join(" / ").slice(0, 300)
     await registrar(p, { motivo: `pergunta pendente para o Felipe: ${ROTULO[tema]}`, pergunta_pendente: { tema, texto: pergunta, em } }).catch(() => null)
