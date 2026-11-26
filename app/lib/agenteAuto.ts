@@ -9,13 +9,14 @@ import { cotarItens, montarPedidosDoGrupo, mudouOGrupo, trouxeDadosNovos, pedido
 import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital, itensDoLembrete, lembreteDigitalAgora, ADIOU, prometeLinkSemLink, TEXTO_PEDE_MEDIDA } from "./digital"
 import { linkPedido } from "./digitalLink"
 import { faltaParaProposta, faltaParaOrcar } from "./propostaPronta"
+import { ehQuantidadeOffset, ehLeadOffset, faltaParaFichaOffset, jaOrcado, textoFichaOffset, travaOffset } from "./offsetRoteiro"
 import { emCampanha, type EstadoCampanha } from "./campanhaDigital"
 import type { RegraDigital } from "./precoDigital"
 import { supabase } from "./supabase"
 import { maisRecentesPrimeiro, ultimaMensagemReal } from "./ultimaMensagem"
 import { evo } from "./evolution"
 import { gravarLote, WaMessage, deveIgnorar } from "./whatsappDados"
-import { atender, lerConfigAtendente } from "./atendenteServidor"
+import { atender, lerConfigAtendente, conversaComEstrela } from "./atendenteServidor"
 import { etapaDoLead } from "./etapaLead"
 import { leadsDoFollowUp, jidsDoFollowUp } from "./leadsDoFollowUp"
 import { lerEstadosLead } from "./leadEstadoServidor"
@@ -366,13 +367,13 @@ export async function marcarNaoLida(c: Conversa, msgId: string) {
   }) }).catch(() => null)
 }
 
-export async function avisarMql(cfg: CfgAgente, c: Conversa, r: { lead: { perfil: PerfilLead; quantidade_total: number | null; motivo: string }; dados?: DadosPedido }, pronto = false) {
+export async function avisarMql(cfg: CfgAgente, c: Conversa, r: { lead: { perfil: PerfilLead; quantidade_total: number | null; motivo: string }; dados?: DadosPedido }, pronto = false, fichaOffset?: string) {
   // No celular pelo ntfy (chega mesmo com o WhatsApp caído): só perfil e quantidade, sem nome nem telefone
   const rotulo = r.lead.perfil === "icp" ? "ICP" : r.lead.perfil === "oportunidade" ? "Oportunidade" : "MQL"
   await notificar(pronto ? `${rotulo} pronto para orçar` : `Novo ${rotulo}`, `${r.lead.quantidade_total ? `${r.lead.quantidade_total.toLocaleString("pt-BR")} caixas` : "Bom negócio"}${r.dados?.resumo ? ` · ${r.dados.resumo.slice(0, 90)}` : ""}`, { prioridade: "alta", tags: ["star"] }).catch(() => null)
   const destino = (cfg.agenteAuto?.avisoNumero ?? "").replace(/\D/g, "") || await seuNumero()
   if (!destino) return
-  const texto = textoAvisoMql({ nome: c.nome, telefone: c.telefone, perfil: r.lead.perfil, quantidade: r.lead.quantidade_total, motivo: r.lead.motivo, resumo: r.dados?.resumo, dados: pronto ? r.dados : undefined })
+  const texto = textoAvisoMql({ nome: c.nome, telefone: c.telefone, perfil: r.lead.perfil, quantidade: r.lead.quantidade_total, motivo: r.lead.motivo, resumo: r.dados?.resumo, dados: pronto ? r.dados : undefined, fichaOffset: pronto ? fichaOffset : undefined })
   await evo("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: destino, text: texto }) }).catch(() => null)
 }
 
@@ -612,6 +613,9 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     || agenteAtendendo || emCampanha((cfg as { campanhaDigital?: EstadoCampanha }).campanhaDigital, jid)
   const c = await lerConversa(jid)
   if (!c) return
+  // Estrela do Felipe no "Perto de você": o Atendente não entra (nem etiqueta, nem IA, nem envio)
+  if (await conversaComEstrela(jid).catch(() => false))
+    return registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: "indefinido", enviou: false, texto: "", motivo: "conversa com estrela no Perto de você: fica com o Felipe" })
   // Respondeu: sai do follow-up (vale também para lead que você está atendendo)
   await aplicar(c, semFollowUp(c.etiquetas ?? []), null)
   await respondeuRetomada(cfg, c, msgId).catch(() => null)
@@ -629,7 +633,8 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     const antes = (() => { try { return (JSON.parse(pa?.proxima_acao ?? "") as { r?: { dados?: import("./atendente").DadosPedido } }).r?.dados ?? null } catch { return null } })()
     // Até o Felipe ter tudo para orçar com precisão (medida, quantidade, foto/referência, acabamento, modelos, arte).
     // Teto: depois de muitas perguntas sem fechar, a conversa volta para você (não vira interrogatório).
-    const falta = pediuMedida ? null : faltaParaOrcar(antes)
+    // Offset (1.000+): a ficha é a de 6 itens do roteiro da CCO; abaixo disso segue o que já existia
+    const falta = pediuMedida ? null : ehQuantidadeOffset(antes?.quantidade) ? faltaParaFichaOffset(antes) : faltaParaOrcar(antes)
     if (!falta || perguntasLevantando(cfg, jid) >= MAX_PERGUNTAS_MQL) {
       // Orçamento do Offset é do Felipe (proposta automática desligada até melhorar)
       if (!opts.atrasada) return   // esperando há 20+ min: o agente responde (sem preço) e a proposta segue com você
@@ -777,10 +782,26 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   // MQL que acabou de passar o que faltava: a proposta fica pronta para você e o aviso chega no seu WhatsApp
   // Proposta de rascunho assim que há quantidade e medida (vai se atualizando com acabamento e modelos);
   // quando chega o último dado, o aviso de "pronto para orçar" vai para o seu WhatsApp
-  if (coletandoMql && !conversa.clienteCadastrado && !faltaParaProposta(r.dados)) {
-    if (!faltaParaOrcar(r.dados)) await avisarMql(cfg, c, r, true).catch(() => null)
+  const offset = ehLeadOffset(r.lead) && ehQuantidadeOffset(r.dados?.quantidade ?? r.lead.quantidade_total)
+  const faltaFicha = (d: typeof r.dados) => offset ? faltaParaFichaOffset(d) : faltaParaOrcar(d)
+  if (coletandoMql && !conversa.clienteCadastrado && (offset || !faltaParaProposta(r.dados))) {
+    if (!faltaFicha(r.dados)) {
+      // Trava 5: lead que já recebeu orçamento (o Felipe mandou, ou proposta/ORC enviada) não sobe de novo
+      const ja = offset ? jaOrcado({
+        jid, mensagens: conversa.mensagens, propostas: (cfg as { propostasProntas?: { jid: string; status: string; numero?: string | null }[] }).propostasProntas,
+        idsDoAgente: new Set([...(cfg.agenteLog ?? []).flatMap(l => l.ids ?? []), ...(cfg.agenteIds ?? [])]),
+      }) : { orcado: false, motivo: null }
+      // Trava 2 (de novo, por garantia): com estrela só o fluxo existente de relato pode registrar; aqui não há aviso novo
+      if (!ja.orcado && !(offset && await conversaComEstrela(jid).catch(() => false)))
+        await avisarMql(cfg, c, r, true, offset && r.dados ? textoFichaOffset({ nome: c.nome, jid, perfil: r.lead.perfil, estrela: false, dados: r.dados }) : undefined).catch(() => null)
+    }
   }
-  const levantando = !conversa.clienteCadastrado && (!!coletandoMql || ehQualificado(r.lead.perfil)) && !!faltaParaOrcar(r.dados)
+  // Lead de Offset (perfil acertado pelo classificador): nunca preço, prazo, "1.000 por arte" nem pedir cidade/CEP/frete
+  if (offset && r.resposta) {
+    const t = travaOffset(r.resposta, { fichaCompleta: !faltaParaFichaOffset(r.dados) })
+    if (t.reescrita) { r.resposta = t.resposta; r.alerta = "decisao_sua"; r.pode_enviar_sozinho = false; r.motivo_alerta = `Offset: resposta corrigida (${t.motivos.join(", ")}); o Felipe revisa` }
+  }
+  const levantando = !conversa.clienteCadastrado && (!!coletandoMql || ehQualificado(r.lead.perfil)) && !!faltaFicha(r.dados)
     && perguntasLevantando(cfg, jid) < MAX_PERGUNTAS_MQL
   const trava = travaDoEnvio({
     ligado: true, resposta: r.resposta, alerta: r.alerta, podeSozinho: r.pode_enviar_sozinho, lead: r.lead,
