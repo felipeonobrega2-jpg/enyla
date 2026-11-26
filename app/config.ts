@@ -111,7 +111,7 @@ export type Configuracoes = {
 }
 
 export type StatusIdeia = "ideia" | "andamento" | "feita"
-export type Ideia = { id: string; texto: string; status: StatusIdeia; criadaEm: string }
+export type Ideia = { id: string; texto: string; status: StatusIdeia; criadaEm: string; autor?: string; atualizadaPor?: string; atualizadaEm?: string }
 
 // Cliente de confiança: recebe antes de quitar; o saldo é esperado alguns dias após a entrega
 export type ClienteRelacionamento = { nome: string; diasAposEntrega: number }

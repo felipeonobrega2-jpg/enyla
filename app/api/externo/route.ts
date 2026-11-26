@@ -21,6 +21,7 @@ import { ehComercial, podeAcionarComercial, comerciaisDoDiretor } from "@/app/li
 import { leadExterno } from "@/app/lib/leadExterno"
 import { acaoPendencia, lerPendenciasDaArea, renovarFotoDepois } from "@/app/lib/pendenciaExterna"
 import { acaoTarefaFelipe, tarefasDoDiretor } from "@/app/lib/tarefaFelipe"
+import { registrarIdeia, atualizarIdeia, AJUDA_IDEIAS } from "@/app/lib/ideiaExterna"
 import { pedidoExterno } from "@/app/lib/pedidoExterno"
 import { lerPertoExterno, AJUDA_PERTO } from "@/app/lib/pertoExterno"
 import { lerPropostasExterno, AJUDA_PROPOSTAS } from "@/app/lib/propostasExterno"
@@ -66,6 +67,8 @@ export async function GET(req: NextRequest) {
     escrita: { "POST {acao:'relatar', texto}": "manda algo ao Felipe",
       "POST {acao:'dispensar_pendencia', chave, motivo, ate?}": "QUALQUER DIRETOR. Dispensa uma pendência (a chave vem em ?o=empresa, campo pendencias) com motivo obrigatório (sem motivo: 400); ate (AAAA-MM-DD) opcional: depois dessa data ela volta. Não apaga nada",
       "POST {acao:'tarefa_felipe', titulo, detalhe?, prazo? (AAAA-MM-DD)}": "QUALQUER DIRETOR. Põe uma tarefa na lista 'Depende de você' do Felipe (pedido por você, com data e prazo). titulo obrigatório (até 140 caracteres); no máximo 10 abertas por diretor (a 11ª volta 429). Suas tarefas (abertas e feitas nos últimos 7 dias) estão em ?o=empresa, campo tarefasParaFelipe. {acao:'tarefa_felipe', operacao:'cancelar', id} cancela só as suas. Não manda mensagem a ninguém",
+      "POST {acao:'registrar_ideia', texto}": AJUDA_IDEIAS.registrar_ideia,
+      "POST {acao:'atualizar_ideia', id, status, texto?}": AJUDA_IDEIAS.atualizar_ideia,
       "POST {acao:'reabrir_pendencia', chave}": "QUALQUER DIRETOR. Tira a dispensa e a pendência volta na hora (?o=empresa lista as dispensadas à parte)",
       ...(diretor === "cmo" ? { "POST {acao:'meta_ads', operacao:'ligar'|'pausar'|'ajustar_verba', campanhaId | conjuntoId, verbaDiaria}": "SÓ A CHAVE DA CMO. Só em campanha ou conjunto que já existe (conjuntoId substitui campanhaId, nunca os dois; campanha ABO tem a verba no conjunto, campanha CBO se ajusta na campanha: conjunto CBO recebe 400): ligar (ACTIVE), pausar (PAUSED) ou ajustar a verba diária (verbaDiaria em reais, só em ajustar_verba). Mudança de verba de no máximo 20% sobre a atual e nunca acima de R$ 200 por campanha ou por conjunto: fora disso, 400 e nada é alterado (não corta). Criar campanha, conjunto ou anúncio e publicar são do Felipe. Resposta: { ok, registro } com antes e depois; cada ação e recusa fica registrada" } : {}),
       "POST {acao:'lead', operacao:'perdido'|'orcado'|'reabrir', jid | cliente, motivo}": "SÓ AS CHAVES DO CCO E DO COO (as outras recebem 403). perdido exige motivo (400 sem); orcado é manual, para quando a detecção do orçamento enviado pelo Felipe falhar; reabrir volta o lead ao normal. Nada é apagado (fica no histórico) e nada é enviado ao cliente. Resposta: { ok, resultado, jid }",
@@ -238,6 +241,9 @@ export async function POST(req: NextRequest) {
     msg = { id: novoId(), de: "diretor", texto: String(r.corpo.resultado), em: new Date().toISOString(), nuvem: true }
     await gravarConversa(diretor, [...await lerConversa(diretor), msg])
     return NextResponse.json(r.corpo)
+  } else if (b.acao === "registrar_ideia" || b.acao === "atualizar_ideia") {
+    const r = b.acao === "registrar_ideia" ? await registrarIdeia(diretor, b) : await atualizarIdeia(diretor, b)
+    return NextResponse.json(r.corpo, { status: r.status })
   } else if (b.acao === "cancelar_ordem") {
     const r = await cancelarOrdem(diretor, b)
     return NextResponse.json(r.corpo, { status: r.status })
@@ -274,7 +280,7 @@ export async function POST(req: NextRequest) {
       await gravarConversa(diretor, [...await lerConversa(diretor), msg])
       return NextResponse.json({ ok: true, resultado: saida, destino: r.destino, motivo: r.motivo, nivel: r.nivel, id: r.acao.id })
     }
-  } else return NextResponse.json({ erro: `acao: relatar, lancar_despesa, renomear_fornecedor, mover_card, gravar_digital, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
+  } else return NextResponse.json({ erro: `acao: relatar, lancar_despesa, renomear_fornecedor, mover_card, gravar_digital, cancelar_ordem, tarefa_felipe, registrar_ideia, atualizar_ideia, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
   await gravarConversa(diretor, [...await lerConversa(diretor), msg])
   return NextResponse.json({ ok: true, resultado: saida })
 }
