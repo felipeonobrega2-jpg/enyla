@@ -123,6 +123,12 @@ export function htmlDoPrimeiroContato(texto: string, token?: string): string {
 export function textoPlanoDoPrimeiroContato(texto: string, token?: string): string {
   return token ? `${texto}\n\n${LINHA_LINK_CADASTRO}\n${TEXTO_LINK_CADASTRO}: ${urlRastreada(token)}` : texto
 }
+/** HTML do e-mail cujo corpo já traz o link (variável {link}): parágrafos por linha em branco, quebra simples vira <br>, e cada URL vira link clicável. */
+export function htmlDoEmailComLink(texto: string): string {
+  const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
+  const linkar = (t: string) => esc(t).replace(/https?:\/\/[^\s<]+/g, u => `<a href="${u}">${u}</a>`)
+  return texto.trim().split(/\n\s*\n/).map(p => `<p>${p.split("\n").map(linkar).join("<br>")}</p>`).join("")
+}
 export const ASSUNTO_EMAIL = "ENYLA, gráfica de embalagens em Barueri"
 
 export const TEXTO_LEMBRETE = "Oi, tudo bem? Aqui é da ENYLA, de Barueri, de novo. Só para saber se vocês fazem serviços de terceirização para outras gráficas."

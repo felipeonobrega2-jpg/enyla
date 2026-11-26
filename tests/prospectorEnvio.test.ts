@@ -150,7 +150,7 @@ describe("primeiro contato", () => {
     expect(envios.email).toHaveBeenCalledTimes(1)
     const [para, msg, anexos, opcoes] = envios.email.mock.calls[0] as [string, { assunto: string; texto: string }, unknown[], { de: string; responderPara: string }]
     expect(para).toBe("contato@grafica.com.br")
-    expect(msg.assunto).toBe("ENYLA, gráfica de embalagens em Barueri")
+    expect(msg.assunto).toBe("Vocês pegam serviço terceirizado?")
     expect(msg.texto.startsWith("Oi, tudo bem?")).toBe(true)
     expect(anexos).toEqual([])
     expect(opcoes).toEqual({ de: "ENYLA Embalagens <parceiros@enyla.com.br>", responderPara: "felipeonobrega2@gmail.com" })
@@ -512,8 +512,10 @@ describe("pausa do primeiro contato e limite de 10 por dia", () => {
     expect(r.primeiros).toBe(10)
     expect(envios.email).toHaveBeenCalledTimes(10)
     const msg = envios.email.mock.calls[0][1] as { html: string; texto: string }
-    expect(msg.html).toContain("Para ser parceira da ENYLA, cadastre a sua gráfica aqui: <a href=")
-    expect(msg.texto).toContain("Cadastrar minha gráfica: https://app.enyla.com.br/api/prospector/r/")
+    // O e-mail padrão já leva o {link}: URL completa do link rastreado, clicável no HTML e em texto puro.
+    expect(msg.html).toMatch(/<a href="https:\/\/app\.enyla\.com\.br\/api\/prospector\/r\/[\w-]+">https:\/\/app\.enyla\.com\.br\/api\/prospector\/r\/[\w-]+<\/a>/)
+    expect(msg.texto).toMatch(/leva uns 5 minutos: https:\/\/app\.enyla\.com\.br\/api\/prospector\/r\//)
+    expect(msg.texto).not.toContain("Cadastrar minha gráfica")
     expect((await rodarReal(SEG_15H)).primeiros).toBe(0)
   })
   it("pausa ligada por parâmetro: nada sai, segue qualificado, sem erro", async () => {

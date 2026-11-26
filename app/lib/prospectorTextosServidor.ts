@@ -2,7 +2,7 @@
 // Nunca envia mensagem. Sem dado de prospecto em log.
 import { randomBytes } from "node:crypto"
 import { supabase } from "./supabase"
-import { COLECAO_TEXTOS, contarPorVersao, novaVersao, textoDe, type ContagemVersao, type PedidoTexto, type TextoProspector } from "./prospectorTextos"
+import { CANAIS_TEXTO, COLECAO_TEXTOS, ETAPAS_TEXTO, contarPorVersao, novaVersao, textoDe, type ContagemVersao, type PedidoTexto, type TextoProspector } from "./prospectorTextos"
 
 /** Lê a biblioteca. Falha de leitura devolve lista vazia: o envio cai no texto do código e nada muda. */
 export async function lerTextosProspector(): Promise<TextoProspector[]> {
@@ -56,7 +56,7 @@ export async function leituraTextosProspector(): Promise<{ corpo: Record<string,
     if (pagina.length < PAGINA) break
   }
   const versoes: ContagemVersao[] = contarPorVersao(textos, historicos)
-  return { corpo: { versoes, semVersaoAtiva: ["primeira", "resposta_sim", "resposta_nao"].filter(e => !textos.some(t => t.etapa === e && t.ativo)) }, status: 200 }
+  return { corpo: { versoes, semVersaoAtiva: ETAPAS_TEXTO.flatMap(e => CANAIS_TEXTO.filter(c => !textos.some(t => t.etapa === e && t.canal === c && t.ativo)).map(c => `${e}/${c}`)) }, status: 200 }
 }
 
-export const AJUDA_TEXTOS_PROSPECTOR = "SÓ CCO e CMO (as outras recebem 403). ?o=detalhe&area=prospector_textos: por versão do texto do Prospector (etapa primeira | resposta_sim | resposta_nao, rotulo, corpo, ativo): enviados, responderam, responderamSim e cadastros em /parceiros; semVersaoAtiva lista as etapas que usam o texto padrão do código. POST {acao:'guardar_texto_prospector', etapa, rotulo, corpo} cria uma versão NOVA, desligada (variáveis {nome}, {remetente}, {link}); editar = guardar de novo, nada é sobrescrito. POST {acao:'ativar_texto_prospector', id, ativo:true|false} liga ou desliga. Com mais de uma versão ativa na etapa, o envio sorteia com peso igual; com nenhuma, usa o texto padrão"
+export const AJUDA_TEXTOS_PROSPECTOR = "SÓ CCO e CMO (as outras recebem 403). ?o=detalhe&area=prospector_textos: por versão do texto do Prospector (canal whatsapp | email, etapa primeira | resposta_sim | resposta_nao, rotulo, assunto (só e-mail), corpo, ativo): enviados, responderam, responderamSim e cadastros em /parceiros; semVersaoAtiva lista etapa/canal que usam o texto padrão do código. POST {acao:'guardar_texto_prospector', canal ('whatsapp' por padrão | 'email'), etapa, rotulo, assunto (obrigatório no e-mail), corpo} cria uma versão NOVA, desligada (variáveis {nome}, {remetente}, {link}); editar = guardar de novo, nada é sobrescrito. POST {acao:'ativar_texto_prospector', id, ativo:true|false} liga ou desliga. Com mais de uma versão ativa na etapa, o envio sorteia com peso igual entre as do canal do envio entre as do canal do envio; com nenhuma, usa o texto padrão"

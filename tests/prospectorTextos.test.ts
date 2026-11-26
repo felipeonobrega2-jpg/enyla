@@ -1,7 +1,7 @@
 // Biblioteca de textos do Prospector (teste A/B): sorteio, fallback, nome só de gente, versão gravada no envio e contagem por versão.
 // Supabase, Evolution e Resend são simulados: nada é enviado de verdade.
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { ativosDaEtapa, classificarResposta, contarPorVersao, escolherTexto, montarTexto, novaVersao, sortearTexto, textoPrimeiroContato, TEXTOS_PADRAO, type TextoProspector } from "@/app/lib/prospectorTextos"
+import { ativosDaEtapa, classificarResposta, CORPO_EMAIL_PADRAO, textoDe, contarPorVersao, escolherTexto, montarTexto, novaVersao, sortearTexto, textoPrimeiroContato, TEXTOS_PADRAO, type TextoProspector } from "@/app/lib/prospectorTextos"
 
 type Linha = Record<string, unknown>
 const mundo = vi.hoisted(() => ({ cfg: {} as Record<string, unknown>, prospectos: [] as Record<string, unknown>[], textos: [] as Record<string, unknown>[] }))
@@ -46,7 +46,7 @@ vi.mock("@/app/lib/supabase", () => ({
 import { executarEnvio } from "@/app/lib/prospectorEnvioServidor"
 
 const SEG_10H = new Date("2026-11-23T13:00:00Z")
-const t = (id: string, etapa: TextoProspector["etapa"], rotulo: string, ativo: boolean, criadoEm = "2026-11-20T10:00:00Z", corpo = `corpo ${rotulo}`): TextoProspector => ({ id, etapa, rotulo, corpo, ativo, criadoEm })
+const t = (id: string, etapa: TextoProspector["etapa"], rotulo: string, ativo: boolean, criadoEm = "2026-11-20T10:00:00Z", corpo = `corpo ${rotulo}`, canal: TextoProspector["canal"] = "whatsapp"): TextoProspector => ({ id, canal, ...(canal === "email" ? { assunto: `assunto ${rotulo}` } : {}), etapa, rotulo, corpo, ativo, criadoEm })
 
 describe("sorteio com peso igual", () => {
   const lib = [t("a", "primeira", "A", true, "2026-11-20T10:00:00Z"), t("b", "primeira", "B", true, "2026-11-21T10:00:00Z"), t("c", "primeira", "C", false), t("s", "resposta_sim", "A", true)]
@@ -54,22 +54,66 @@ describe("sorteio com peso igual", () => {
     expect(ativosDaEtapa(lib, "primeira").map(x => x.id)).toEqual(["a", "b"])
   })
   it("divide o intervalo [0,1) igualmente entre as ativas", () => {
-    expect(sortearTexto(lib, "primeira", () => 0)?.id).toBe("a")
-    expect(sortearTexto(lib, "primeira", () => 0.49)?.id).toBe("a")
-    expect(sortearTexto(lib, "primeira", () => 0.5)?.id).toBe("b")
-    expect(sortearTexto(lib, "primeira", () => 0.999)?.id).toBe("b")
+    expect(sortearTexto(lib, "primeira", "whatsapp", () => 0)?.id).toBe("a")
+    expect(sortearTexto(lib, "primeira", "whatsapp", () => 0.49)?.id).toBe("a")
+    expect(sortearTexto(lib, "primeira", "whatsapp", () => 0.5)?.id).toBe("b")
+    expect(sortearTexto(lib, "primeira", "whatsapp", () => 0.999)?.id).toBe("b")
   })
   it("distribuição parelha com o sorteador real", () => {
     const tres = [t("a", "primeira", "A", true), t("b", "primeira", "B", true), t("c", "primeira", "C", true)]
     const cont: Record<string, number> = { a: 0, b: 0, c: 0 }
-    for (let i = 0; i < 3000; i++) cont[sortearTexto(tres, "primeira", () => (i + 0.5) / 3000)!.id]++
+    for (let i = 0; i < 3000; i++) cont[sortearTexto(tres, "primeira", "whatsapp", () => (i + 0.5) / 3000)!.id]++
     expect(cont).toEqual({ a: 1000, b: 1000, c: 1000 })
   })
   it("uma só ativa: sempre ela", () => {
-    expect(sortearTexto(lib, "resposta_sim", () => 0.9)?.id).toBe("s")
+    expect(sortearTexto(lib, "resposta_sim", "whatsapp", () => 0.9)?.id).toBe("s")
   })
-  it("mesmo contato mantém a versão que já recebeu", () => {
-    expect(escolherTexto(lib, "primeira", () => 0, "b").textoId).toBe("b")
+  it("escolherTexto devolve a versão sorteada", () => {
+    expect(escolherTexto(lib, "primeira", "whatsapp", () => 0.9).textoId).toBe("b")
+  })
+})
+
+describe("sorteio por canal", () => {
+  const lib = [
+    t("w1", "primeira", "A", true, "2026-11-20T10:00:00Z", "zap A", "whatsapp"),
+    t("e1", "primeira", "A", true, "2026-11-20T11:00:00Z", "mail A {link}", "email"),
+    t("e2", "primeira", "B", true, "2026-11-21T11:00:00Z", "mail B {link}", "email"),
+    t("e3", "primeira", "C", false, "2026-11-22T11:00:00Z", "mail C", "email"),
+  ]
+  it("só sorteia entre as ativas do canal do envio", () => {
+    expect(ativosDaEtapa(lib, "primeira", "email").map(x => x.id)).toEqual(["e1", "e2"])
+    expect(ativosDaEtapa(lib, "primeira", "whatsapp").map(x => x.id)).toEqual(["w1"])
+    for (const r of [0, 0.3, 0.6, 0.99]) expect(sortearTexto(lib, "primeira", "whatsapp", () => r)?.id).toBe("w1")
+    expect(sortearTexto(lib, "primeira", "email", () => 0.2)?.id).toBe("e1")
+    expect(sortearTexto(lib, "primeira", "email", () => 0.7)?.id).toBe("e2")
+  })
+  it("e-mail devolve o assunto da versão sorteada", () => {
+    expect(escolherTexto(lib, "primeira", "email", () => 0.7)).toEqual({ corpo: "mail B {link}", assunto: "assunto B", textoId: "e2" })
+  })
+  it("canal sem versão ativa cai no padrão do próprio canal, sem id", () => {
+    const soZap = [lib[0]]
+    expect(escolherTexto(soZap, "primeira", "email")).toEqual({ corpo: CORPO_EMAIL_PADRAO, assunto: "Vocês pegam serviço terceirizado?" })
+    const soMail = [lib[1]]
+    expect(escolherTexto(soMail, "primeira", "whatsapp")).toEqual({ corpo: TEXTOS_PADRAO.primeira })
+  })
+  it("padrão do e-mail já leva {link} e o remetente nas duas pontas", () => {
+    expect(CORPO_EMAIL_PADRAO).toContain("{link}")
+    const x = montarTexto(CORPO_EMAIL_PADRAO, { remetente: "Felipe", link: "https://app.enyla.com.br/api/prospector/r/abc" })
+    expect(x.startsWith("Oi, tudo bem?\n\nAqui é o Felipe, da ENYLA.")).toBe(true)
+    expect(x).toContain("leva uns 5 minutos: https://app.enyla.com.br/api/prospector/r/abc")
+    expect(x.endsWith("a gente chama vocês.\n\nFelipe")).toBe(true)
+  })
+  it("versão guardada: e-mail exige assunto; sem canal vale whatsapp", () => {
+    const agora = new Date("2026-11-26T12:00:00Z")
+    expect(novaVersao({ canal: "email", etapa: "primeira", rotulo: "A", corpo: "x {link}" }, "i", agora).ok).toBe(false)
+    const r = novaVersao({ canal: "email", assunto: " Oi ", etapa: "primeira", rotulo: "A", corpo: "x {link}" }, "i", agora)
+    expect(r.ok && r.texto.canal === "email" && r.texto.assunto === "Oi").toBe(true)
+    const w = novaVersao({ etapa: "primeira", rotulo: "A", corpo: "x" }, "i", agora)
+    expect(w.ok && w.texto.canal === "whatsapp" && !("assunto" in w.texto)).toBe(true)
+    expect(novaVersao({ canal: "sms", etapa: "primeira", rotulo: "A", corpo: "x" }, "i", agora).ok).toBe(false)
+  })
+  it("versão antiga sem canal é lida como whatsapp", () => {
+    expect(textoDe({ id: "z", etapa: "primeira", rotulo: "A", corpo: "x", ativo: true, criadoEm: "" })?.canal).toBe("whatsapp")
   })
 })
 
@@ -163,13 +207,29 @@ describe("nome no envio: nomeDePessoa decide", () => {
     expect([idDe(x), idDe(y)].sort()).toEqual(["txt_a", "txt_b"])
     expect(saidas().sort()).toEqual(["Versão A", "Versão B"])
   })
+  it("e-mail sorteia só versões de e-mail, usa o assunto e grava o textoId; WhatsApp ignora as de e-mail", async () => {
+    mundo.textos = [
+      { colecao: "prospectorTextos", id: "txt_w", v: 1, dados: t("txt_w", "primeira", "A", true, "2026-11-20T10:00:00Z", "Zap A", "whatsapp") },
+      { colecao: "prospectorTextos", id: "txt_e", v: 1, dados: t("txt_e", "primeira", "A", true, "2026-11-20T10:00:00Z", "Mail A\n\nCadastro: {link}", "email") },
+    ]
+    const a = novo({ email: "contato@grafica.com.br" })
+    await rodar()
+    expect(saidas()).toEqual(["Zap A"])
+    expect(envios.email).toHaveBeenCalledTimes(1)
+    const [, msg] = envios.email.mock.calls[0] as [string, { assunto: string; texto: string; html: string }]
+    expect(msg.assunto).toBe("assunto A")
+    expect(msg.texto).toMatch(/^Mail A\n\nCadastro: https:\/\/app\.enyla\.com\.br\/api\/prospector\/r\/[\w-]+$/)
+    expect(msg.html).toMatch(/<a href="https:\/\/app\.enyla\.com\.br\/api\/prospector\/r\/[\w-]+">/)
+    const ids = (mundo.prospectos.find(x => x.id === a.id)!.historico_etapas as { envio?: { canal: string; textoId?: string } }[]).filter(x => x.envio).map(x => `${x.envio!.canal}:${x.envio!.textoId}`)
+    expect([...new Set(ids)].sort()).toEqual(["email:txt_e", "whatsapp:txt_w"])
+  })
 })
 
 describe("nova versão (editar não sobrescreve)", () => {
   const agora = new Date("2026-11-26T12:00:00Z")
   it("cria versão nova, desligada, com o id recebido", () => {
     const r = novaVersao({ etapa: "primeira", rotulo: " B ", corpo: " Oi {nome} " }, "txt_1", agora)
-    expect(r).toEqual({ ok: true, texto: { id: "txt_1", etapa: "primeira", rotulo: "B", corpo: "Oi {nome}", ativo: false, criadoEm: agora.toISOString() } })
+    expect(r).toEqual({ ok: true, texto: { id: "txt_1", canal: "whatsapp", etapa: "primeira", rotulo: "B", corpo: "Oi {nome}", ativo: false, criadoEm: agora.toISOString() } })
   })
   it.each([
     [{ etapa: "outra", rotulo: "A", corpo: "x" }],

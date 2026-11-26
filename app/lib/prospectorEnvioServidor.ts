@@ -12,7 +12,7 @@ import { randomBytes } from "node:crypto"
 import { enviarEmail } from "./email"
 import { CNAES_PROSPECTO, aplicarOptOut, hojeSp, podeTransicionar, type EtapaFunil, type MudancaEtapa } from "./prospector"
 import {
-  ASSUNTO_EMAIL, htmlDoPrimeiroContato, textoPlanoDoPrimeiroContato, CHAVE_ENVIO_ATIVO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA, PRIMEIRO_CONTATO_PAUSADO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector,
+  ASSUNTO_EMAIL, htmlDoEmailComLink, htmlDoPrimeiroContato, urlRastreada, textoPlanoDoPrimeiroContato, CHAVE_ENVIO_ATIVO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA, PRIMEIRO_CONTATO_PAUSADO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector,
   canaisDisponiveis, canaisPendentes, celularWhatsapp, chaveTelefone, dentroDoHorario, ehRecusa, emailValido, enviosDoHistorico,
   motivoNaoQualifica, passoIniciado, passoSaiu, passouDias, saiu, TEXTO_LEMBRETE,
   type Canal, type EnvioHistorico, type MotivoParada, type Passo,
@@ -126,7 +126,7 @@ function bloqueado(est: Estado, passo: Passo, canal: Canal, l: Linha): boolean {
 
 type ResultadoCanal = { ok: true; id?: string } | { ok: false; erro: string; cota?: true }
 
-async function enviarPeloCanal(canal: Canal, l: Linha, texto: string, token?: string): Promise<ResultadoCanal> {
+async function enviarPeloCanal(canal: Canal, l: Linha, texto: string, token?: string, assunto?: string, linkNoCorpo?: boolean): Promise<ResultadoCanal> {
   if (canal === "whatsapp") {
     const numero = celularWhatsapp(l.telefone)
     if (!numero) return { ok: false, erro: "sem celular válido" }
@@ -135,32 +135,39 @@ async function enviarPeloCanal(canal: Canal, l: Linha, texto: string, token?: st
   }
   const para = emailValido(l.email)
   if (!para) return { ok: false, erro: "e-mail inválido" }
-  const r = await enviarEmail(para, { assunto: ASSUNTO_EMAIL, texto: textoPlanoDoPrimeiroContato(texto, token), html: htmlDoPrimeiroContato(texto, token) }, [], { de: REMETENTE, responderPara: replyToDoProspector() })
+  const r = await enviarEmail(para, linkNoCorpo
+    ? { assunto: assunto || ASSUNTO_EMAIL, texto, html: htmlDoEmailComLink(texto) }
+    : { assunto: assunto || ASSUNTO_EMAIL, texto: textoPlanoDoPrimeiroContato(texto, token), html: htmlDoPrimeiroContato(texto, token) }, [], { de: REMETENTE, responderPara: replyToDoProspector() })
   return r.ok ? { ok: true, id: r.id } : { ok: false, erro: r.erro, ...(r.cota ? { cota: true as const } : {}) }
 }
 
-/** Reserva, envia e fecha um canal de um passo. Devolve se saiu, se falhou, ou null se não reservou (alguém foi mais rápido). */
-/** Primeiro contato: versão da biblioteca (sorteio, ou a que este contato já recebeu em outro canal) ou o texto do código; `{nome}` só com nome de gente. Lembrete: texto fixo. */
-function textoDoContato(est: Estado, l: Linha, passo: Passo): { texto: string; textoId?: string } {
-  if (passo !== "primeiro_contato") return { texto: TEXTO_LEMBRETE }
-  const jaUsado = enviosDe(l).find(e => e.passo === "primeiro_contato" && e.textoId && saiu(e))?.textoId
-  const escolha: EscolhaTexto = escolherTexto(est.textos, "primeira", est.aleatorio, jaUsado)
-  const nome = nomeParaChamar(l.nome_fantasia) || nomeParaChamar(l.razao_social)
-  return { texto: montarTexto(escolha.corpo, { nome, remetente: est.remetente }), ...(escolha.textoId ? { textoId: escolha.textoId } : {}) }
+/** Primeiro contato: versão da biblioteca sorteada entre as ativas DO CANAL (ou o texto do código); `{nome}` só com nome de gente. Lembrete: texto fixo. */
+type Escolhido = { corpo: string; assunto?: string; textoId?: string; nome: string }
+function textoDoContato(est: Estado, l: Linha, passo: Passo, canal: Canal): Escolhido | null {
+  if (passo !== "primeiro_contato") return null
+  const escolha: EscolhaTexto = escolherTexto(est.textos, "primeira", canal, est.aleatorio)
+  return { ...escolha, nome: nomeParaChamar(l.nome_fantasia) || nomeParaChamar(l.razao_social) }
 }
 
-async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, agora: Date, escolhido: { texto: string; textoId?: string }): Promise<{ linha: Linha; ok: boolean } | null> {
-  const { texto, textoId } = escolhido
+/** Reserva, envia e fecha um canal de um passo. Devolve se saiu, se falhou, ou null se não reservou (alguém foi mais rápido). */
+async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, agora: Date, escolhido: Escolhido | null): Promise<{ linha: Linha; ok: boolean } | null> {
   const em = agora.toISOString()
   // Só o primeiro contato por e-mail leva o link rastreado; o token nasce na reserva e fica no histórico (sem dado do prospecto).
   const token = passo === "primeiro_contato" && canal === "email" ? randomBytes(12).toString("base64url") : undefined
+  // E-mail: o {link} do corpo sai como URL completa do link rastreado (clique e origem medem o cadastro por e-mail). WhatsApp: URL de cadastro.
+  const linkNoCorpo = !!escolhido && canal === "email" && !!token && escolhido.corpo.includes("{link}")
+  const texto = escolhido
+    ? montarTexto(escolhido.corpo, { nome: escolhido.nome, remetente: est.remetente, ...(canal === "email" && token ? { link: urlRastreada(token) } : {}) })
+    : TEXTO_LEMBRETE
+  const textoId = escolhido?.textoId
+  const assunto = escolhido?.assunto
   const envio: EnvioHistorico = { passo, canal, status: "reservado", em, texto, ...(token ? { token } : {}), ...(textoId ? { textoId } : {}) }
   const reservada = await gravar(l, { historico_etapas: [...historicoDe(l), { etapa: l.etapa as EtapaFunil, em, motivo: `${passo} (${canal}): reservado`, envio }] })
   if (!reservada) return null
   const k = chaveCanal(canal, l)
   if (k) est.usados[passo][canal].set(k, l.cnpj)
   let r: ResultadoCanal
-  try { r = await enviarPeloCanal(canal, l, texto, token) } catch (e) { r = { ok: false, erro: String(e) } }
+  try { r = await enviarPeloCanal(canal, l, texto, token, assunto, linkNoCorpo) } catch (e) { r = { ok: false, erro: String(e) } }
   // Cota da Resend esgotada: o e-mail para pelo resto do dia. A linha fica "falhou" com a mensagem de cota, que não conta como falha do lead.
   if (!r.ok && canal === "email" && (r.cota || ehErroDeCota(r.erro))) est.cotaEsgotada = true
   // Fecha a reserva. Se a trava perder (outra gravação no meio), relê e tenta de novo; a reserva já protege contra duplicata.
@@ -189,13 +196,12 @@ async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, ag
 async function mandarPasso(est: Estado, l: Linha, passo: Passo, canais: Canal[], agora: Date, res: ResultadoEnvio): Promise<{ linha: Linha; algumOk: boolean }> {
   let atual = l
   let algumOk = false
-  const escolhido = textoDoContato(est, l, passo)   // um sorteio por contato: e-mail e WhatsApp levam a mesma versão
   for (const canal of canais) {
     if (bloqueado(est, passo, canal, atual)) continue
     if (semFolga(est)) break
     if (canal === "email" && emailParado(est)) continue
     if (canal === "email") est.emailsNestaExecucao++
-    const r = await enviarCanal(est, atual, passo, canal, agora, escolhido)
+    const r = await enviarCanal(est, atual, passo, canal, agora, textoDoContato(est, atual, passo, canal))   // sorteio entre as versões ativas do canal
     if (!r) break
     atual = r.linha
     if (r.ok) algumOk = true; else res.falhas++
