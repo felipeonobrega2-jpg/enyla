@@ -14,6 +14,7 @@ import { compararPedidos } from "./calibragem"
 import { pendencias } from "./pendenciasDono"
 import { recebiveisDigitais, consultaAsaas, vinculosDoBanco, type PedidoReceber } from "./digitalReceber"
 import type { StatusPluggy } from "./bancoServidor"
+import type { Rodada } from "./rateioRodada"
 
 export const PARTES = ["receber", "pagar", "banco", "saldos", "gastos", "margem", "depende", "asaas"] as const
 export type Parte = typeof PARTES[number]
@@ -30,13 +31,13 @@ export const AJUDA_FINANCEIRO: Record<string, string> = {
   "?o=financeiro&parte=banco&estado=": "movimentos e conciliação do banco (pendente | vinculada | criada | ignorada | todas; padrão pendente), sem documento da contraparte",
   "?o=financeiro&parte=saldos": "saldo por conta (cadastro e Pluggy) e total",
   "?o=financeiro&parte=gastos": "gastos fixos cadastrados e gastos variáveis pagos no período, por categoria",
-  "?o=financeiro&parte=margem": "DRE do período, margem e custo por pedido (previsto x real quando há orçamento)",
+  "?o=financeiro&parte=margem": "DRE do período, margem e custo por pedido (previsto x real quando há orçamento). Pedido impresso numa rodada (várias encomendas na mesma tiragem) traz rodadaId, custoProprio (clichê, fotolito, arte, hot stamping, frete, imposto, faca exclusiva), custoRateado (fração da tiragem), custo e margem já com o rateio, e margemRodada/margemRodadaPct/rodadaVermelha (a rodada inteira; o alerta vermelho olha a rodada). Pedido sem rodada: custo = custo lançado, sem esses campos",
   "?o=financeiro&parte=depende": "'Dinheiro parado' e integrações de cobrança/banco do 'Depende de você' (só situação)",
 }
 
 type Cfg = Configuracoes & { pluggy?: { itens?: unknown[] }; pluggyStatus?: StatusPluggy } & Record<string, unknown>
 type Negocio = { comissaoValor: number; status: string }
-type Dados = { kanban: KanbanCard[]; lancamentos: LancamentoFinanceiro[]; negocios: Negocio[]; cfg: Cfg }
+export type Dados = { kanban: KanbanCard[]; lancamentos: LancamentoFinanceiro[]; negocios: Negocio[]; cfg: Cfg }
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 const soma = (ls: { valor: number }[]) => r2(ls.reduce((s, l) => s + l.valor, 0))
@@ -52,7 +53,7 @@ export function intervalo(nome: PeriodoNome, hojeIso = hoje()): Intervalo {
   return { from: new Date(a, 0, 1, 12), to: null }
 }
 
-async function carregar(): Promise<Dados> {
+export async function carregarFinanceiro(): Promise<Dados> {
   const [kanban, lancamentos, negocios, cfg] = await Promise.all([
     supabase.from("KanbanCard").select("*").order("createdAt", { ascending: false }),
     supabase.from("LancamentoFinanceiro").select("*").order("dataVencimento", { ascending: false }),
@@ -150,15 +151,19 @@ function gastos(d: Dados, per: Intervalo) {
 async function margem(d: Dados, per: Intervalo) {
   const nomeCategoria = (id: string) => ((d.cfg.categoriasDespesa ?? []) as { id: string; nome: string }[]).find(c => c.id === id)?.nome ?? id
   const dre = dreDoPeriodo({ lancamentos: d.lancamentos, noPeriodo: l => noPeriodo(l.dataPagamento ?? l.dataVencimento, per), nomeCategoria })
-  const pedidos = montarPedidos(d.kanban, d.lancamentos).filter(p => p.custoDireto > 0 && noPeriodo(p.dataFechamento, per))
+  const rodadas = ((d.cfg.producao as { rodadas?: Rodada[] } | undefined)?.rodadas ?? [])
+  const pedidos = montarPedidos(d.kanban, d.lancamentos, rodadas).filter(p => (p.rodada ? p.rodada.custoTotal : p.custoDireto) > 0 && noPeriodo(p.dataFechamento, per))
   const { data: hist } = await supabase.from("HistoricoItem").select("*")
   const comps = new Map(compararPedidos(pedidos, (hist ?? []) as never, d.cfg).map(c => [c.pedido.key, c]))
   return {
     dre,
     pedidos: pedidos.map(p => {
       const c = comps.get(p.key)
-      return { numero: p.numero, cliente: p.nomeCliente, venda: r2(p.venda), custo: r2(p.custoDireto), margem: r2(p.venda - p.custoDireto), margemPct: p.venda > 0 ? r2((p.venda - p.custoDireto) / p.venda * 100) : null,
-        previstoTotal: c?.previsto ? r2(c.previstoTotal) : null, realTotal: c ? r2(c.realTotal) : null }
+      const custo = p.rodada ? p.rodada.custoTotal : p.custoDireto
+      return { numero: p.numero, cliente: p.nomeCliente, venda: r2(p.venda), custo: r2(custo), margem: r2(p.venda - custo), margemPct: p.venda > 0 ? r2((p.venda - custo) / p.venda * 100) : null,
+        previstoTotal: c?.previsto ? r2(c.previstoTotal) : null, realTotal: c ? r2(c.realTotal) : null,
+        ...(p.rodada ? { rodadaId: p.rodada.rodadaId, custoProprio: r2(p.rodada.custoProprio), custoRateado: r2(p.rodada.custoRateado), puxador: p.rodada.puxador,
+          margemRodada: r2(p.rodada.margemRodada), margemRodadaPct: p.rodada.margemRodadaPct, rodadaVermelha: p.rodada.rodadaVermelha, pedidoVermelho: p.rodada.vermelho } : {}) }
     }),
   }
 }
@@ -192,7 +197,7 @@ export async function leituraFinanceira(params: URLSearchParams): Promise<Leitur
   const incluirEstornados = ie !== null
   const per = intervalo(pn as PeriodoNome), hj = hoje()
   const periodo = { nome: pn, de: per.from ? per.from.toLocaleDateString("sv-SE") : null, ate: per.to ? per.to.toLocaleDateString("sv-SE") : null, fuso: "America/Sao_Paulo" }
-  const d = await carregar()
+  const d = await carregarFinanceiro()
   if (!incluirEstornados) d.lancamentos = d.lancamentos.filter(l => !l.estornadoEm)
 
   if (!parte) {

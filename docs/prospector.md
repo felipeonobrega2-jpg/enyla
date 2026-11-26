@@ -127,7 +127,7 @@ Primeiro contato, até 12h (America/Sao_Paulo):
 Bom dia, tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?
 ```
 
-Depois das 12h: o mesmo texto com "Boa tarde". Assunto do e-mail: `ENYLA, gráfica de embalagens em Barueri`. Sem link, sem preço, sem volume, sem linha de saída.
+Depois das 12h: o mesmo texto com "Boa tarde". Assunto do e-mail: `ENYLA, gráfica de embalagens em Barueri`. Sem preço, sem volume, sem linha de saída. **Link (26/11/2026):** o HTML do primeiro contato por e-mail (só ele; lembrete e WhatsApp não) ganha, depois do texto, uma linha com o link rastreado `https://app.enyla.com.br/api/prospector/r/[token]`, que registra o clique e encaminha (302) a `https://app.enyla.com.br/parceiros`. A linha é `Para ser parceira da ENYLA, cadastre a sua gráfica aqui: <a>Cadastrar minha gráfica</a>` (o texto do link nunca mostra endereço, para não ser marcado como spam); no texto puro vai `Cadastrar minha gráfica: {link}`. O texto comercial não muda. O primeiro contato está liberado (`PRIMEIRO_CONTATO_PAUSADO = false`), com o limite de 10 por dia útil. O texto completo da CMO (etapas, A/B de assunto, lembrete) vem em PR posterior.
 
 Lembrete único, 3 dias depois, sem resposta:
 
@@ -144,3 +144,18 @@ Resposta ao "não" (não é enviada automaticamente; o Prospector só marca o op
 ```
 Obrigado pelo retorno. Não vamos voltar a escrever. Um abraço, ENYLA.
 ```
+
+## Funil de e-mail: abriu, entrega e bounce (issue #208)
+
+Antes, nada gravava a etapa `abriu`. Agora:
+
+- **Id da Resend.** Ao marcar o e-mail `enviado`, o `envio` no `historico_etapas` guarda `resendId` (o `id` devolvido pela Resend) e, no primeiro contato, um `token` aleatório do link. Nenhum dado do prospecto vai em log nem no token. Quem já está `enviado` não é reenviado; os 219 de 25/11 não têm `resendId` (os eventos deles não casam, e tudo bem).
+- **Eventos.** `POST /api/prospector/inbound` (mesmo endereço e mesma assinatura Svix do `email.received`) também trata `email.delivered`, `email.bounced`, `email.opened` e `email.clicked`, casando por `data.email_id` = `resendId` (`app/lib/prospectorEventosServidor.ts`). `delivered`/`bounced` gravam `entrega` (`entregue`/`bounce`) no envio e **não** mudam `status` nem etapa (bounce não reenvia nem descarta). `opened`/`clicked` gravam `abriuEm`/`cliqueEm` e levam `abordado` (ou `encerrado_sem_resposta`) a `abriu`; quem já respondeu ou cadastrou não anda para trás. Repetição do mesmo evento não grava de novo. E-mail que não é do Prospector (proposta, aprovação etc.) também dispara esses eventos e é ignorado com 200.
+- **Redirect.** `GET /api/prospector/r/[token]` (fora do login) marca clique + `abriu` e responde 302 para `/parceiros`. Token inválido ou desconhecido redireciona do mesmo jeito. Não usa `/api/d/`. Aviso: filtros de segurança de e-mail às vezes abrem links sozinhos, então `abriu` por clique pode ter falso positivo; o pixel de abertura também é impreciso (proxy de imagem). Leia `abriu` como sinal, não como certeza.
+
+**O que precisa estar ligado na Resend** (nada disto é feito pelo código; chaves e envs ficam com o Felipe):
+
+1. **Webhook** para `https://app.enyla.com.br/api/prospector/inbound` com os eventos `email.received`, `email.delivered`, `email.bounced`, `email.opened` e `email.clicked`, e o signing secret em `RESEND_WEBHOOK_SECRET` (Vercel, Production). Sem o secret a rota recusa com 503.
+2. **Rastreio no domínio.** No painel da Resend, em Domains → o domínio de envio, ligar **Open tracking** e **Click tracking** (sem isso `email.opened`/`email.clicked` não disparam; o link rastreado da ENYLA continua funcionando sozinho como sinal de clique).
+3. **Inbound/MX** de `respostas.enyla.com.br` na Cloudflare, com o valor do painel da Resend, e a migração `supabase/migrations/20261126_prospectos_emails_recebidos.sql` rodada.
+4. **`PROSPECTOR_REPLY_TO`** = `parceiros@respostas.enyla.com.br`, só depois de o inbound estar verificado. Enquanto estiver vazia o Reply-To é o Gmail e a resposta não entra no sistema (`respondeu` fica em 0).
