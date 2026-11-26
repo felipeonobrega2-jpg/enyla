@@ -66,15 +66,29 @@ export const NOTA_MINIMA_SO_SECUNDARIO = 2
 export const TERMOS_FORA_DO_RAMO: readonly string[] = ["inflavel", "inflaveis", "balao", "baloes", "figurinha", "brinquedo", "festa"]
 /** Único CNAE da lista que, sozinho, não qualifica: encadernação e plastificação (1822-9/01). */
 const CNAE_SO_ENCADERNACAO = "1822901"
-/** Cota de primeiros contatos por dia (dia de São Paulo), só do WhatsApp. E-mail não tem teto diário. */
-export const LIMITE_WHATSAPP_PRIMEIROS_POR_DIA = 10
-/** Teto diário de e-mails do Prospector (primeiro contato + lembrete), PROSPECTOR_TETO_EMAIL_DIA. Padrão 80: cota Free da Resend (100/dia) menos 20 de reserva
- *  para o que não é prospecção (transacional a cliente e resposta da diretoria, que não entram neste teto). 0 = sem teto (plano pago). Vazio ou inválido = padrão. */
-export const TETO_EMAIL_DIA_PADRAO = 80
-export function tetoEmailDia(valor: string | null | undefined = process.env.PROSPECTOR_TETO_EMAIL_DIA): number {
-  const v = (valor ?? "").trim()
-  return /^\d+$/.test(v) ? Number(v) : TETO_EMAIL_DIA_PADRAO
+/** Chaves do AppConfig com os limites diários por canal. Valor número (ou texto numérico). */
+export const CHAVE_LIMITE_WHATSAPP_DIA = "prospector_limite_whatsapp_dia"
+export const CHAVE_LIMITE_EMAIL_DIA = "prospector_limite_email_dia"
+/** Primeiros contatos por WhatsApp por dia útil (dia de São Paulo). Ausente, inválido ou 0 = padrão. */
+export const LIMITE_WHATSAPP_DIA_PADRAO = 30
+export function limiteWhatsappDia(valor: unknown): number {
+  const n = typeof valor === "string" && /^\d+$/.test(valor.trim()) ? Number(valor) : valor
+  return typeof n === "number" && Number.isInteger(n) && n > 0 ? n : LIMITE_WHATSAPP_DIA_PADRAO
 }
+/** Teto diário de e-mails do Prospector (primeiro contato + lembrete). Padrão 100. 0 = sem teto. Ausente ou inválido = padrão.
+ *  A Resend Free tem 100 por dia e o transacional usa a mesma cota: com a Free, baixe este valor no AppConfig. */
+export const LIMITE_EMAIL_DIA_PADRAO = 100
+export function tetoEmailDia(valor: unknown): number {
+  const n = typeof valor === "string" && /^\d+$/.test(valor.trim()) ? Number(valor) : valor
+  return typeof n === "number" && Number.isInteger(n) && n >= 0 ? n : LIMITE_EMAIL_DIA_PADRAO
+}
+/** Espaçamento mínimo entre envios do mesmo canal, para nunca sair em rajada. Vale entre execuções (lê o último envio do histórico) e dentro da mesma. */
+/** E-mail: no máximo 25 a cada 30 minutos, ou seja, um a cada 72 segundos. */
+export const ESPACAMENTO_EMAIL_MS = (30 * 60_000) / 25
+/** WhatsApp: distribui o limite do dia pela janela de envio (8h às 20h): com 30 por dia, um a cada 24 minutos. */
+export const espacamentoWhatsappMs = (limiteDia: number) => Math.floor(((HORA_FIM - HORA_INICIO) * 3_600_000) / Math.max(1, limiteDia))
+/** `ultimoEm`: instante (ms) do último envio do canal, ou null. Verdadeiro se já passou o espaçamento. */
+export const espacamentoLiberado = (ultimoEm: number | null, agoraMs: number, espacamentoMs: number) => ultimoEm === null || agoraMs - ultimoEm >= espacamentoMs
 export type MotivoParada = "teto_diario" | "cota_resend" | "limite_execucao"
 /** Erro de cota da Resend (já gravado no histórico): não é culpa do lead e não conta para MAX_FALHAS_POR_CANAL. */
 export const ehErroDeCota = (erro: string | null | undefined) => /(daily|monthly)\b.*\bquota|quota_exceeded/i.test(erro ?? "")
@@ -92,11 +106,9 @@ export const DIAS_ATE_ENCERRAR = 3
 export const LEMBRETE_EMAIL_ATIVO = false
 /**
  * Segura todo primeiro contato (e-mail e WhatsApp): ninguém novo é abordado, quem está `qualificado` continua `qualificado`, sem erro.
- * Desligada (`false`) com o link de cadastro rastreado no e-mail; o limite diário abaixo continua valendo. Lembrete e leitura de respostas não são afetados.
+ * Desligada (`false`) com o link de cadastro rastreado no e-mail; os limites diários por canal continuam valendo. Lembrete e leitura de respostas não são afetados.
  */
 export const PRIMEIRO_CONTATO_PAUSADO = false
-/** Máximo de primeiros contatos novos por dia útil (America/Sao_Paulo), somando todas as execuções e canais. Vale também depois da pausa. */
-export const LIMITE_PRIMEIROS_CONTATOS_POR_DIA = 10
 export const HORA_INICIO = 8
 export const HORA_FIM = 20
 export const MAX_FALHAS_POR_CANAL = 3
