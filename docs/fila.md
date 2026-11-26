@@ -61,6 +61,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 43 | Atendente: aceitar caixa de medicamento e de qualquer marca; quem nunca comprou é lead (nível) | Felipe (decisão 25/11/2026, 8h29) | — | — | Claude Code | não (ordem do Felipe) | (PR da issue #114) |
 | 44 | Porta externa: leitura de parceiros (`?o=parceiros` e `?o=detalhe&area=parceiros`): cadastros de /parceiros e respostas do Prospector, só leitura, CCO e CMO | CCO | hoje | — | Claude Code | não | (PR da issue #144) |
 | 45 | WhatsApp: busca acha "Alisson" em "Allison" (sem acento, sem letra dobrada, por telefone) e acha conversas antigas fora das 1.000 da lista | Felipe | — | — | Claude Code | não (correção de erro) | https://github.com/felipeonobrega2-jpg/enyla/pull/149 |
+| 46 | Porta externa: `acao=ordenar_fornecedor` (fila do Aprovo, número pelo cadastro de fornecedores ou conversa ligada, recusa cliente e lead) e `?o=fornecedor_conversa` | Felipe (issue #180) | alta | — | Claude Code | não (a mensagem só sai com o Aprovo do Felipe) | (PR da issue #180) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 

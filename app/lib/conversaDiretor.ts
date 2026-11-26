@@ -263,8 +263,10 @@ export async function responderAcao(diretor: IdDiretor, acaoId: string, resposta
   if (resposta === "descartar") acao.status = "descartado"
   else {
     if (textoEditado?.trim()) acao.texto = textoEditado.trim().slice(0, 4000)
-    const { enviarAoCliente } = await import("./enviarCliente")
-    const r = await enviarAoCliente(acao.cliente, acao.texto, acao.jid).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
+    // Mensagem a fornecedor (ordenar_fornecedor) sai pelo canal do fornecedor, nunca pela busca de cliente
+    const r = acao.fornecedorId
+      ? await import("./fornecedorCanal").then(m => m.enviarAoFornecedor(acao)).catch(e => ({ ok: false as const, erro: String(e) }))
+      : await import("./enviarCliente").then(m => m.enviarAoCliente(acao.cliente, acao.texto, acao.jid)).catch(e => ({ ok: false as const, erro: String(e), status: 500 }))
     if (r.ok) { acao.status = "enviado"; acao.em = new Date().toISOString(); delete acao.erro }
     else { acao.status = "erro"; acao.erro = r.erro }
   }
