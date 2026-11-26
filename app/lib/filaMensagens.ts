@@ -126,3 +126,24 @@ export function montarFila(args: {
 // Dispensados com mais de 60 dias saem da memória (o id já não volta: a conversa ou o saldo mudou)
 export const podarDispensados = (d: Record<string, string> | undefined, hoje = new Date()) =>
   Object.fromEntries(Object.entries(d ?? {}).filter(([, em]) => hoje.getTime() - new Date(em).getTime() < 60 * 86_400_000))
+
+// Desfazer a dispensa: devolve os itens à Fila. Devolve o mapa NOVO inteiro, sem as chaves pedidas (quem grava manda
+// o mapa todo: com MANTER_SE_AUSENTE o antigo não ressuscita). Id que não está no mapa é ignorado, sem erro.
+export function restaurarDispensados(mapa: Record<string, string> | undefined, ids: unknown): { mapa: Record<string, string>; devolvidos: string[] } {
+  const atual = mapa ?? {}
+  const pedidos = [...new Set(Array.isArray(ids) ? ids.filter((i): i is string => typeof i === "string") : [])]
+  const devolvidos = pedidos.filter(i => Object.prototype.hasOwnProperty.call(atual, i))
+  const fora = new Set(devolvidos)
+  return { mapa: Object.fromEntries(Object.entries(atual).filter(([k]) => !fora.has(k))), devolvidos }
+}
+
+export type ItemDispensado = { id: string; nome: string; em: string }
+
+// Lista os dispensados (mais recentes primeiro). O id é `fu-{jid}-{ultima_enviada_at}`: o nome vem da conversa do jid.
+export function listarDispensados(mapa: Record<string, string> | undefined, conversas: { jid: string; nome: string }[]): ItemDispensado[] {
+  return Object.entries(mapa ?? {}).map(([id, em]) => {
+    const jid = id.startsWith("fu-") ? conversas.map(c => c.jid).filter(j => id.startsWith(`fu-${j}-`)).sort((a, b) => b.length - a.length)[0] : undefined
+    const nome = conversas.find(c => c.jid === jid)?.nome || (jid ?? id.replace(/^fu-/, "")).replace(/@.*$/, "")
+    return { id, nome, em }
+  }).sort((a, b) => b.em.localeCompare(a.em))
+}
