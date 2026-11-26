@@ -339,6 +339,7 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 | 43 | Porta externa: ação `mover_card` para avançar etapa de produção (só avança, 1→2..8, motivo obrigatório) | Felipe | — | — | Claude Code | não | (PR da issue #137) |
 | 44 | Prospector: teto diário de e-mail (`PROSPECTOR_TETO_EMAIL_DIA`, padrão 80) e respeito à cota da Resend | Felipe (issue #136) | urgente | — | Claude Code | não | (PR da issue #136) |
 | 46 | Despesa em vários lotes: perguntar se o valor é o total (ratear por quantidade ou igual) ou o custo de cada lote, com prévia por lote. Não mexe em lançamentos antigos | Felipe | — | — | Claude Code | não | (PR da issue #161) |
+| 47 | Porta externa: `?o=propostas` preenche estrela, nível, jid e dataEnvio do ORC sem PP; `estrelaDesconhecida` quando não resolve (correção do #196) | Felipe | — | — | Claude Code | não (só leitura, CCO e CMO) | (PR da issue #204) |
 
 ## 44. Porta externa: leitura de parceiros
 

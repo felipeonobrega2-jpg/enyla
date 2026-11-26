@@ -40,7 +40,7 @@ beforeEach(() => {
 describe("?o=propostas", () => {
   it("campos certos e sem telefone/e-mail/documento", () => {
     const [i] = montar({ propostas: [pp({})] })
-    expect(Object.keys(i).sort()).toEqual(["codigoOrc", "codigoPp", "dataCriacao", "dataEnvio", "estrela", "jid", "nivel", "nome", "status", "valor"])
+    expect(Object.keys(i).sort()).toEqual(["codigoOrc", "codigoPp", "dataCriacao", "dataEnvio", "estrela", "estrelaDesconhecida", "jid", "nivel", "nome", "status", "valor"])
     expect(i).toMatchObject({ codigoPp: "PP-00001", codigoOrc: null, valor: 1000, status: "pronta", dataEnvio: null, estrela: false, jid: "a@s.whatsapp.net", nome: "Carla Dias" })
     const txt = JSON.stringify(i)
     expect(txt).not.toMatch(/5511999990000|carla@x\.com|12\.345\.678/)
@@ -80,6 +80,40 @@ describe("?o=propostas", () => {
     expect(r.find(i => i.codigoPp === "PP-2")!.estrela).toBe(false)
     expect(r[0].nivel).toBe("lead")
     expect(montar({ propostas: props })[0].nivel).toBeNull()
+  })
+
+  it("ORC sem PP: contato resolvido dá estrela, nivel e jid; sem contato dá estrelaDesconhecida", () => {
+    const fontes = { cards: [], pedidosDigitais: [], curvas: new Map(), cadastro: [], leituraOk: true } as FontesNivel
+    const contatos = new Map([["ORC-1", { jid: "a@s.whatsapp.net", nome: "Bruno" }], ["ORC-2", { jid: "b@s.whatsapp.net", nome: "Dora" }]])
+    const r = montar({
+      cards: [card({ numero: "ORC-1" }), card({ numero: "ORC-2" }), card({ numero: "ORC-3" })],
+      marcas: [{ jid: "a@s.whatsapp.net", nota: "", em: dia(1) }], fontes, contatos,
+    })
+    const por = (c: string) => r.find(i => i.codigoOrc === c)!
+    expect(por("ORC-1")).toMatchObject({ estrela: true, estrelaDesconhecida: false, nivel: "lead", jid: "a@s.whatsapp.net" })
+    expect(por("ORC-2")).toMatchObject({ estrela: false, estrelaDesconhecida: false, nivel: "lead", jid: "b@s.whatsapp.net" })
+    expect(por("ORC-3")).toMatchObject({ estrela: false, estrelaDesconhecida: true, nivel: null, jid: null })
+  })
+
+  it("ORC sem PP via leitura: conversa ligada ao card, estrela do ?o=perto e dataEnvio do histórico", async () => {
+    est.cfg = { propostasProntas: [], aprovacoesOnline: [] }
+    est.tabelas = {
+      agente_tratadas: [{ id: "perto|c@s.whatsapp.net|", em: dia(1) }],
+      KanbanCard: [card({ id: "k1", numero: "ORC-1" })],
+      whatsapp_conversas: [{ jid: "c@s.whatsapp.net", nome: "Bruno", kanban_card_id: "k1" }],
+      whatsapp_mensagens: [{ id: "m1", from_me: true, tipo: "documentMessage", ts: dia(1), corpo: "Orçamento R$ 500,00" }],
+    }
+    const [i] = (await lerPropostasExterno("cco")).corpo.itens as { estrela: boolean; estrelaDesconhecida: boolean; jid: string; dataEnvio: string | null }[]
+    expect(i).toMatchObject({ estrela: true, estrelaDesconhecida: false, jid: "c@s.whatsapp.net", dataEnvio: dia(1) })
+    expect(est.escritas).toEqual([])
+    // sem estrela marcada: contato resolvido e livre de verdade
+    est.tabelas.agente_tratadas = []
+    const [j] = (await lerPropostasExterno("cmo")).corpo.itens as { estrela: boolean; estrelaDesconhecida: boolean }[]
+    expect(j).toMatchObject({ estrela: false, estrelaDesconhecida: false })
+    // sem conversa nenhuma: desconhecida
+    est.tabelas.whatsapp_conversas = []
+    const [k] = (await lerPropostasExterno("cco")).corpo.itens as { estrelaDesconhecida: boolean; jid: string | null; dataEnvio: string | null }[]
+    expect(k).toMatchObject({ estrelaDesconhecida: true, jid: null, dataEnvio: null })
   })
 
   it("paginação: total certo, páginas sem repetir, passa de 7.000 caracteres sem perder item", () => {
