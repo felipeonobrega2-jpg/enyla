@@ -6,8 +6,9 @@ import type { Configuracoes, GastoFixo } from "@/app/config"
 import { supabase } from "./supabase"
 import { lerConfigLinha } from "./configAtomica"
 import { hoje, calcularResumoFinanceiro, dreDoPeriodo } from "./financeiro"
-import { receberDigital, juntarPedidos, ehPedidoDigital, type PedidoParaReceber } from "./receberDigital"
-import { montarPedidos, recebiveis, noPeriodo, type Periodo as Intervalo } from "./negocio"
+import { ehPedidoDigital, type PedidoParaReceber } from "./receberDigital"
+import { montarPedidos, noPeriodo, type Periodo as Intervalo } from "./negocio"
+import { totaisAReceber } from "./aReceber"
 import { financeiroDoAndar } from "./financeiroAndar"
 import { saldoInformado } from "./caixa"
 import { compararPedidos } from "./calibragem"
@@ -66,7 +67,6 @@ export async function carregarFinanceiro(): Promise<Dados> {
   }
 }
 
-const offsetDe = (ls: LancamentoFinanceiro[]) => ls.filter(l => (l.unidade ?? "offset") === "offset" && l.formaPagamento !== "conta")
 const aPagarDe = (ls: LancamentoFinanceiro[]) => ls.filter(l => l.tipo === "despesa" && l.status !== "pago" && l.formaPagamento !== "conta")
 
 function contasPagar(ls: LancamentoFinanceiro[], hj: string) {
@@ -98,19 +98,16 @@ async function receber(d: Dados, hj: string) {
   const dig = await digitalDe(d)
   const linhas = recebiveisDigitais(dig.pedidos, dig.vinculos, hj)
   const resumo = calcularResumoFinanceiro(d.kanban, d.lancamentos, d.negocios as never)
-  const offset = offsetDe(d.lancamentos)
-  // Digital na mesma lista: o saldo do restante vem dos lançamentos dig-{id}-* (a mesma base da página do cliente)
-  const digLancs = d.lancamentos.filter(l => l.unidade === "digital" && l.formaPagamento !== "conta")
-  const digital = receberDigital(d.cfg.pedidosDigitais as PedidoParaReceber[] | undefined, digLancs)
-  const rec = recebiveis(juntarPedidos(montarPedidos(d.kanban, offset), digital), [...offset, ...digLancs])
+  // Mesma função da tela inicial: a receber de pedidos (sem comissão), comissão pendente e total
+  const { rec, digital, pedidos: aReceberPedidos, comissaoPendente, total } = totaisAReceber(d.kanban, d.lancamentos, d.negocios, d.cfg.pedidosDigitais as PedidoParaReceber[] | undefined)
   return {
-    aReceberTotal: r2(resumo.aReceberTotal), emAtrasoTotal: r2(resumo.emAtrasoTotal), recebidoTotal: r2(resumo.recebidoTotal),
+    aReceberTotal: total, aReceberPedidos, comissaoPendente, emAtrasoTotal: r2(resumo.emAtrasoTotal), recebidoTotal: r2(resumo.recebidoTotal),
     aReceberDigital: r2(digital.reduce((s, p) => s + p.aReceber, 0)),
     pedidos: rec.comSaldo.map(p => ({ numero: p.numero, cliente: p.nomeCliente, etapa: p.etapa, venda: r2(p.venda), recebido: r2(p.recebido), aReceber: r2(p.aReceber), cobrado: r2(p.cobrado), vencido: r2(p.vencido), semCobranca: r2(p.semCobranca),
       ...(ehPedidoDigital(p) ? { unidade: "digital", sinal: r2(p.digital.sinal), pagoEm: p.digital.pagoEm, vencimento: p.digital.vencimento } : {}) })),
     vencidos: resumo.vencidos.map(v => ({ numero: v.loteNumero ?? v.cardNumero ?? null, cliente: v.nomeCliente, valor: r2(v.total), diasAtraso: v.diasAtraso, vencimento: v.lancamentos[0]?.dataVencimento ?? null, status: v.lancamentos[0]?.status ?? null })),
     aConferir: rec.aConferir.map(l => ({ id: l.id, numero: l.loteNumero ?? l.cardNumero ?? null, cliente: l.nomeCliente ?? null, valor: l.valor, vencimento: l.dataVencimento, status: l.status })),
-    comissoesPendentes: soma(d.negocios.filter(n => n.status === "pendente").map(n => ({ valor: n.comissaoValor }))),
+    comissoesPendentes: comissaoPendente,
     digital: { saldoTotal: soma(linhas.map(l => ({ valor: l.saldo }))), emConferenciaTotal: soma(linhas.map(l => ({ valor: l.emConferencia }))), pedidos: linhas.map(({ id, status, total, sinal, pago, emConferencia, saldo, vencimentoSaldo, atrasado, cliente }) => ({ id, cliente, status, total, sinal, pago, emConferencia, saldo, vencimentoSaldo, atrasado })) },
   }
 }
@@ -203,7 +200,7 @@ export async function leituraFinanceira(params: URLSearchParams): Promise<Leitur
   if (!parte) {
     const rec = await receber(d, hj), pagar = contasPagar(d.lancamentos, hj), sal = saldos(d.cfg)
     const mes = financeiroDoAndar(d.kanban, d.lancamentos, sal.total, dia(hj))
-    return { status: 200, corpo: { hoje: hj, periodo, incluirEstornados, aReceber: { total: rec.aReceberTotal, vencido: rec.emAtrasoTotal }, aPagar: { total: pagar.total, vencido: pagar.vencido, quantidade: pagar.quantidade },
+    return { status: 200, corpo: { hoje: hj, periodo, incluirEstornados, aReceber: { pedidos: rec.aReceberPedidos, comissaoPendente: rec.comissaoPendente, total: rec.aReceberTotal, vencido: rec.emAtrasoTotal }, aPagar: { total: pagar.total, vencido: pagar.vencido, quantidade: pagar.quantidade },
       saldos: { total: sal.total, contas: sal.contas.length }, mes, partes: PARTES } }
   }
   const corpo = parte === "receber" ? await receber(d, hj) : parte === "asaas" ? await asaasDoCfo(d) : parte === "pagar" ? contasPagar(d.lancamentos, hj) : parte === "banco" ? await banco(estado, per)

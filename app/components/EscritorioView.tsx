@@ -10,6 +10,7 @@ import { PredioView, type Andar } from "./predio/PredioView"
 import { GraficaVirtual, atrasado } from "./predio/GraficaVirtual"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { financeiroDoAndar } from "../lib/financeiroAndar"
+import type { PedidoParaReceber } from "../lib/receberDigital"
 import { montarDiretoria, DIRETORES, type IdDiretor } from "../lib/diretoria"
 import ConversaDiretor from "./predio/ConversaDiretor"
 import { AgendadorView } from "./AgendadorView"
@@ -113,7 +114,7 @@ function Status({ icone, rotulo, valor, tom }: { icone: React.ReactNode; rotulo:
   )
 }
 
-export function EscritorioView({ kanban = [], lancamentos = [], saldoContas = null }: { kanban?: KanbanCard[]; lancamentos?: LancamentoFinanceiro[]; saldoContas?: number | null }) {
+export function EscritorioView({ kanban = [], lancamentos = [], saldoContas = null, negocios = [], pedidosDigitais }: { kanban?: KanbanCard[]; lancamentos?: LancamentoFinanceiro[]; saldoContas?: number | null; negocios?: { comissaoValor: number; status: string }[]; pedidosDigitais?: PedidoParaReceber[] }) {
   const { segurados } = useSegurados()
   const [d, setD] = useState<Escritorio | null>(null)
   const [filtro, setFiltro] = useState<IdMesa | null>(null)
@@ -178,7 +179,7 @@ export function EscritorioView({ kanban = [], lancamentos = [], saldoContas = nu
     const hoje = new Date().toLocaleDateString("sv-SE")
     const naProducao = kanban.filter(c => c.coluna >= 2 && c.coluna <= 8)
     const atrasadosProd = naProducao.filter(c => atrasado(c, hoje) && !estaSegurado(segurados, c.numero)).length
-    const fin = financeiroDoAndar(kanban, lancamentos, saldoContas)
+    const fin = financeiroDoAndar(kanban, lancamentos, saldoContas, new Date(), { negocios, pedidosDigitais })
     const diretores = montarDiretoria({ hoje: hojeDir, fin, kanban, agentesTravados: d.mesas.filter(x => x.estado === "travado").map(x => x.nome),
       rotinas: rotinasDir, whatsapp: d.whatsapp, semCredito: d.semCredito, cota: d.cota, conhecimento: conhecimentoDir, segurados })
     const totalDecisoes = diretores.reduce((t, x) => t + x.decisoes.length, 0)
@@ -198,7 +199,7 @@ export function EscritorioView({ kanban = [], lancamentos = [], saldoContas = nu
         obras: "Anúncios da Meta ao vivo: quanto gastou hoje, leads que chegaram, custo por MQL e qual campanha está trazendo bom negócio." },
       { id: "2", rotulo: "2º andar", nome: "Financeiro", resumo: `${brlAndar(fin.recebidoMes)} recebido no mês${fin.vencido > 0.5 ? ` · ${brlAndar(fin.vencido)} vencido` : ""}`, ativo: true,
         conteudo: <div className="grid grid-cols-2 gap-2">
-          {[["Recebido no mês", fin.recebidoMes, "#009351"], ["Saiu no mês", fin.pagoMes, "#d33a3c"], ["A receber", fin.aReceber, "#c57800"], ["Cobrança vencida", fin.vencido, fin.vencido > 0.5 ? "#d33a3c" : "#009351"]].map(([r, v, c]) => (
+          {[["Recebido no mês", fin.recebidoMes, "#009351"], ["Saiu no mês", fin.pagoMes, "#d33a3c"], ["A receber (pedidos)", fin.aReceberPedidos, "#c57800"], ["Comissão pendente", fin.comissaoPendente, "#c57800"], ["A receber (total)", fin.aReceber, "#c57800"], ["Cobrança vencida", fin.vencido, fin.vencido > 0.5 ? "#d33a3c" : "#009351"]].map(([r, v, c]) => (
             <div key={r as string} className="bg-white rounded-xl border border-[rgba(60,60,67,0.08)] p-3"><p className="text-[11px] text-[#898892]">{r}</p><p className="text-[17px] font-semibold ds-num" style={{ color: c as string }}>{brlAndar(v as number)}</p></div>
           ))}
         </div> },
