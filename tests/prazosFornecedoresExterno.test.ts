@@ -7,7 +7,7 @@ vi.mock("@/app/lib/configAtomica", () => ({
 }))
 vi.mock("@/app/lib/supabase", () => ({ supabase: { from: () => { est.escritas.push("supabase"); return {} } } }))
 
-import { lerPrazosFornecedores, montarPrazosFornecedores, AJUDA_PRAZOS_FORNECEDORES } from "@/app/lib/prazosFornecedoresExterno"
+import { lerPrazosFornecedores, montarPrazosFornecedores, prazoDaEtapa, AJUDA_PRAZOS_FORNECEDORES } from "@/app/lib/prazosFornecedoresExterno"
 import { normalizarProducao } from "@/app/lib/producao"
 
 beforeEach(() => {
@@ -35,8 +35,8 @@ describe("?o=prazos_fornecedores", () => {
       expect(fs[1].prazosPorEtapa).toEqual({ colagem: 2 })
       expect(fs[0].prazosPorEtapa).toBeUndefined()
       const pe = corpo.porEtapa as { etapa: string; prazoCadastralDias: number; origem: string }[]
-      expect(pe.find(e => e.etapa === "colagem")).toMatchObject({ prazoCadastralDias: 2, origem: "etapa" })
-      expect(pe.find(e => e.etapa === "corteVinco")).toMatchObject({ prazoCadastralDias: 4, origem: "fornecedor" })
+      expect(pe.find(e => e.etapa === "colagem")).toMatchObject({ prazoCadastralDias: 2, origem: "cadastral", fonteCadastral: "etapa", aConfirmar: true })
+      expect(pe.find(e => e.etapa === "corteVinco")).toMatchObject({ prazoCadastralDias: 4, origem: "cadastral", fonteCadastral: "fornecedor" })
       expect(pe.find(e => e.etapa === "arte")).toMatchObject({ fornecedorId: "f1", prazoCadastralDias: 5 })
     }
   })
@@ -60,5 +60,49 @@ describe("?o=prazos_fornecedores", () => {
     const r = montarPrazosFornecedores(normalizarProducao(null))
     expect(r.fornecedores.length).toBeGreaterThan(0)
     expect(AJUDA_PRAZOS_FORNECEDORES).toMatch(/COO E DO CTO/)
+  })
+})
+
+describe("prazo medido x cadastral (issue #213)", () => {
+  const mov = (id: string, etapa: string, fornecedorId: string, enviadoEm: string, recebidoEm?: string) =>
+    ({ id, pedidoKey: id, pedidoLabel: id, fornecedorId, etapa, enviadoEm, recebidoEm }) as never
+  const f = (extra = {}) => ({ id: "f2", nome: "F", ativo: true, servicos: {}, frete: 0, prazoDias: 5, ...extra }) as never
+
+  it("medido com n>=3: mediana, origem medido", () => {
+    const ms = [mov("a", "corteVinco", "f2", "2026-11-02", "2026-11-04"), mov("b", "corteVinco", "f2", "2026-11-02", "2026-11-06"), mov("c", "corteVinco", "f2", "2026-11-02", "2026-11-05"), mov("d", "colagem", "f2", "2026-11-02", "2026-11-03")]
+    expect(prazoDaEtapa("corteVinco", f(), ms)).toEqual({ dias: 3, origem: "medido", n: 3, aConfirmar: false })
+  })
+
+  it("cadastral com n<3 (ou sem retorno): prazosPorEtapa, depois prazoDias, a confirmar", () => {
+    const ms = [mov("a", "corteVinco", "f2", "2026-11-02", "2026-11-04"), mov("b", "corteVinco", "f2", "2026-11-02", "2026-11-06"), mov("c", "corteVinco", "f2", "2026-11-02")]
+    expect(prazoDaEtapa("corteVinco", f(), ms)).toMatchObject({ dias: 5, origem: "cadastral", fonte: "fornecedor", aConfirmar: true })
+    expect(prazoDaEtapa("corteVinco", f({ prazosPorEtapa: { corteVinco: 3 } }), ms)).toMatchObject({ dias: 3, origem: "cadastral", fonte: "etapa", aConfirmar: true })
+  })
+
+  const prod = (fornExtra = {}, movimentos: unknown[] = []) => normalizarProducao({
+    fornecedores: [{ id: "f2", nome: "Fabiano", ativo: true, servicos: {}, frete: 0, prazoDias: 5, ...fornExtra }],
+    padroes: { corteVinco: "f2", colagem: "f2" }, movimentos,
+  } as never)
+
+  it("mesmo fornecedor em duas etapas com prazo único: não soma duas vezes", () => {
+    const r = montarPrazosFornecedores(prod({ prazosPorEtapa: { "corteVinco+colagem": 6 } }))
+    const pe = r.porEtapa
+    expect(pe.map(e => e.prazoDias)).toEqual([6, 0])
+    expect(pe.every(e => e.origem === "combinado" && e.aConfirmar)).toBe(true)
+    expect(r.previsaoTotal).toMatchObject({ medidoDias: 0, aConfirmarDias: 6, totalDias: 6 })
+  })
+
+  it("mesmo fornecedor sem prazo único: mostra as duas etapas, a confirmar, com aviso", () => {
+    const r = montarPrazosFornecedores(prod())
+    expect(r.porEtapa.map(e => [e.etapa, e.prazoDias, e.aConfirmar])).toEqual([["corteVinco", 5, true], ["colagem", 5, true]])
+    expect(r.previsaoTotal).toMatchObject({ aConfirmarDias: 10, medidoDias: 0 })
+    expect(r.previsaoTotal.avisoMesmoFornecedor).toBeTruthy()
+  })
+
+  it("total separado em medido e a confirmar", () => {
+    const ms = ["a", "b", "c"].map((id, i) => mov(id, "corteVinco", "f2", "2026-11-02", `2026-11-0${3 + i}`))
+    const r = montarPrazosFornecedores(prod({}, ms))
+    expect(r.porEtapa[0]).toMatchObject({ etapa: "corteVinco", origem: "medido", n: 3, aConfirmar: false })
+    expect(r.previsaoTotal).toMatchObject({ medidoDias: r.porEtapa[0].prazoDias, aConfirmarDias: 5 })
   })
 })
