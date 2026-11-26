@@ -121,13 +121,15 @@ export function replyToDoProspector(env: string | undefined = process.env.PROSPE
 export const URL_CADASTRO_PARCEIROS = "https://app.enyla.com.br/parceiros"
 export const URL_BASE_APP = "https://app.enyla.com.br"
 export const urlRastreada = (token: string) => `${URL_BASE_APP}/api/prospector/r/${token}`
+/** Pixel próprio de abertura (GIF 1x1). Marca `abriu` sem depender do webhook da Resend. Não tem dado do prospecto. */
+export const urlPixelAbertura = (token: string) => `${URL_BASE_APP}/api/prospector/o/${token}`
 /** Linha do link no primeiro contato. O texto do link não mostra endereço (mostrar um e apontar para outro é marcado como spam). */
 export const LINHA_LINK_CADASTRO = "Para ser parceira da ENYLA, cadastre a sua gráfica aqui:"
 export const TEXTO_LINK_CADASTRO = "Cadastrar minha gráfica"
 /** HTML do e-mail do primeiro contato: o texto comercial intacto, mais a linha com o link rastreado. Sem token, só o texto. */
 export function htmlDoPrimeiroContato(texto: string, token?: string): string {
   const esc = texto.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
-  return `<p>${esc}</p>` + (token ? `<p>${LINHA_LINK_CADASTRO} <a href="${urlRastreada(token)}">${TEXTO_LINK_CADASTRO}</a></p>` : "")
+  return `<p>${esc}</p>` + (token ? `<p>${LINHA_LINK_CADASTRO} <a href="${urlRastreada(token)}">${TEXTO_LINK_CADASTRO}</a></p><img src="${urlPixelAbertura(token)}" width="1" height="1" alt="" style="display:none" />` : "")
 }
 /** Versão em texto puro do primeiro contato: o texto e, com token, `Cadastrar minha gráfica: {link}`. */
 export function textoPlanoDoPrimeiroContato(texto: string, token?: string): string {

@@ -161,3 +161,7 @@ Antes, nada gravava a etapa `abriu`. Agora:
 2. **Rastreio no domínio.** No painel da Resend, em Domains → o domínio de envio, ligar **Open tracking** e **Click tracking** (sem isso `email.opened`/`email.clicked` não disparam; o link rastreado da ENYLA continua funcionando sozinho como sinal de clique).
 3. **Inbound/MX** de `respostas.enyla.com.br` na Cloudflare, com o valor do painel da Resend, e a migração `supabase/migrations/20261126_prospectos_emails_recebidos.sql` rodada.
 4. **`PROSPECTOR_REPLY_TO`** = `parceiros@respostas.enyla.com.br`, só depois de o inbound estar verificado. Enquanto estiver vazia o Reply-To é o Gmail e a resposta não entra no sistema (`respondeu` fica em 0).
+
+## Abertura do e-mail ("Abriram")
+
+O `abriu` vem de três fontes: o evento `email.opened` do webhook da Resend (`/api/prospector/inbound`, exige `RESEND_WEBHOOK_SECRET`), o clique no link rastreado (`/api/prospector/r/[token]`) e o pixel próprio de abertura (`/api/prospector/o/[token]`, GIF 1x1 no HTML do primeiro contato, sem depender do webhook). Quando falta o segredo, o painel mostra um aviso. O pixel só vale para e-mails enviados depois desta mudança. Clientes que bloqueiam imagens não contam; o Apple Mail com proteção de privacidade pode contar abertura sem o leitor abrir.
