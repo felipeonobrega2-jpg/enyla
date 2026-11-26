@@ -4,7 +4,7 @@ import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
 import { notificar, LINK_SISTEMA } from "./notificar"
-import { limparCadastro, errosDoCadastro, nomeServico, textoPrazo, textoEndereco, GERENTE_PADRAO, type CadastroParceiro } from "./parceiros"
+import { limparCadastro, errosDoCadastro, comFalta, type CadastroComFalta, nomeServico, textoPrazo, textoEndereco, GERENTE_PADRAO, type CadastroParceiro } from "./parceiros"
 import { textoEndereco as textoParaMotorista, type Endereco } from "./frete"
 
 import { CENARIOS_PADRAO, mesclarCenarios, limparCenario, cenariosPublicos, type CenarioParceiro, type CenarioPublico } from "./cenariosParceiros"
@@ -87,9 +87,9 @@ export async function receberCadastro(form: FormData): Promise<{ ok: true; id: s
   return { ok: true, id }
 }
 
-export async function listarCadastros(): Promise<CadastroParceiro[]> {
+export async function listarCadastros(): Promise<CadastroComFalta[]> {
   const { data: c } = await lerConfigLinha()
-  return ((c?.data ?? {}) as Cfg).cadastrosParceiros ?? []
+  return comFalta(((c?.data ?? {}) as Cfg).cadastrosParceiros ?? [])
 }
 
 export async function mudarStatus(id: string, status: CadastroParceiro["status"], fornecedorId?: string) {

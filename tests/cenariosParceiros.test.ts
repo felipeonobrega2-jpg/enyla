@@ -89,7 +89,7 @@ describe("preço do exemplo é obrigatório nos serviços com cenário", () => {
     expect(errosDaEtapa({ ...base, servicos: [serv()] }, "detalhes")["verniz.preco.verniz"]).toBeTruthy()
     expect(errosDaEtapa({ ...base, servicos: [serv({ precosExemplo: { verniz: 0 } })] }, "detalhes")["verniz.preco.verniz"]).toBeTruthy()
     expect(errosDaEtapa({ ...base, servicos: [serv({ precosExemplo: { verniz: 450 } })] }, "detalhes")).toEqual({})
-    expect(errosDaEtapa({ ...base, servicos: [{ id: "outro", qual: "X", cobranca: "varia", prazoDias: null, prazoVaria: true }] }, "detalhes")).toEqual({})
+    expect(errosDaEtapa({ ...base, servicos: [{ id: "outro", qual: "Serviço extra", cobranca: "varia", prazoDias: null, prazoVaria: true }] }, "detalhes")).toEqual({})
   })
   it("laminação grava os quatro preços e exige todos", async () => {
     const lam = (precosExemplo: Record<string, number>) => ({ id: "laminacao" as const, cobranca: "folha" as const, prazoDias: 3, prazoVaria: false, precosExemplo, tecnico: { tipos: ["Fosca", "Brilho", "Soft touch"], lados: "Os dois lados" } })

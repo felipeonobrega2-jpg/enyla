@@ -112,6 +112,13 @@ export const PERGUNTAS: Record<IdServicoParceiro, Pergunta[]> = {
   outro: [],
 }
 
+// Equipamentos: o parceiro marca em vez de escrever (o que não estiver na lista vai em "maquinas", texto livre e opcional)
+export const EQUIPAMENTOS_PARCEIRO = [
+  "Offset 2 cores", "Offset 4 cores", "Offset 5 ou mais cores", "Impressora digital", "Plotter de corte", "Laminadora",
+  "Máquina de verniz UV", "Hot stamping", "Corte e vinco plana (Minerva)", "Corte e vinco automática", "Coladeira automática",
+  "Guilhotina", "Dobradeira", "Refiladeira", "Máquina de relevo", "Veículo próprio para entrega",
+] as const
+
 export type FormaCobranca = "milheiro" | "folha" | "unidade" | "m2" | "acertoMilheiro" | "trabalho" | "hora" | "kg" | "tabela" | "varia"
 export const FORMAS_COBRANCA: { id: FormaCobranca; nome: string; unidade: string | null }[] = [
   { id: "milheiro", nome: "Por milheiro", unidade: "por mil" },
@@ -197,7 +204,8 @@ export type CadastroParceiro = {
   // operação
   capacidade?: string
   horario?: string
-  maquinas?: string
+  maquinas?: string                // outros equipamentos (texto livre)
+  equipamentos?: string[]          // marcados na lista EQUIPAMENTOS_PARCEIRO
   arquivos: { nome: string; url: string }[]
   comoConheceu?: string
   aceite: boolean
@@ -223,6 +231,18 @@ export function cpfValido(v: string): boolean {
   const dv = (n: number) => { const s = c.slice(0, n).split("").reduce((t, d, i) => t + Number(d) * (n + 1 - i), 0) * 10 % 11; return s === 10 ? 0 : s }
   return dv(9) === Number(c[9]) && dv(10) === Number(c[10])
 }
+// Texto de enchimento ("aaa", "xxxx", "123", "asdf", "..."): menos de 3 letras, um caractere só, só números/símbolos,
+// uma sílaba repetida ("ababab") ou palavra de teste. Serve para nomes e endereços, não para número da casa nem e-mail.
+const SEM_ACENTO = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+const PALAVRAS_DE_TESTE = new Set(["teste", "testes", "test", "asdf", "asdfg", "qwerty", "qwe", "abc", "abcd", "xxx", "nada", "nao tem", "n a", "na", "sem nome", "nome", "fulano", "ciclano", "aaa", "bbb"])
+export function textoEnchimento(v: unknown): boolean {
+  const t = SEM_ACENTO(String(v ?? "")).replace(/\s+/g, " ").trim()
+  const letras = t.replace(/[^a-z]/g, "")
+  if (letras.length < 3) return true                       // vazio, "ab", "123", "---"
+  if (new Set(letras).size === 1) return true              // "aaaa"
+  if (/^(.{1,3})\1{2,}$/.test(letras)) return true         // "ababab", "kkkkk"
+  return PALAVRAS_DE_TESTE.has(t.replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim())
+}
 export const emailValido = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((e ?? "").trim())
 export const whatsappValido = (w: string) => { const d = soDigitos(w).replace(/^55(?=\d{10,11}$)/, ""); return d.length === 10 || d.length === 11 }
 export const cepValido = (c: string) => soDigitos(c).length === 8
@@ -247,25 +267,25 @@ export type Etapa = typeof ETAPAS_IDS[number]
 export function errosDaEtapa(c: Partial<CadastroParceiro>, etapa: Etapa): Record<string, string> {
   const e: Record<string, string> = {}
   if (etapa === "empresa") {
-    if (!c.nomeFantasia?.trim()) e.nomeFantasia = "Como sua empresa é conhecida?"
+    if (textoEnchimento(c.nomeFantasia)) e.nomeFantasia = "Informe o nome real da empresa"
     if (c.tipoDocumento === "cpf" ? !cpfValido(c.documento ?? "") : !cnpjValido(c.documento ?? "")) e.documento = c.tipoDocumento === "cpf" ? "Confira o CPF" : "Confira o CNPJ"
   }
   if (etapa === "endereco") {
     if (!cepValido(c.cep ?? "")) e.cep = "CEP com 8 números"
-    if (!c.rua?.trim()) e.rua = "Qual a rua?"
+    if (textoEnchimento(c.rua)) e.rua = "Qual a rua?"
     if (!c.numero?.trim()) e.numero = "Número (ou s/n)"
-    if (!c.bairro?.trim()) e.bairro = "Qual o bairro?"
-    if (!c.cidade?.trim()) e.cidade = "Qual a cidade?"
+    if (textoEnchimento(c.bairro)) e.bairro = "Qual o bairro?"
+    if (textoEnchimento(c.cidade)) e.cidade = "Qual a cidade?"
     if (!/^[A-Za-z]{2}$/.test(c.uf ?? "")) e.uf = "UF"
   }
   if (etapa === "contato") {
-    if (!c.responsavel?.trim()) e.responsavel = "Com quem a gente fala?"
+    if (textoEnchimento(c.responsavel)) e.responsavel = "Informe o nome de quem fala com a gente"
     if (!whatsappValido(c.whatsapp ?? "")) e.whatsapp = "WhatsApp com DDD"
     if (!emailValido(c.email ?? "")) e.email = "Confira o e-mail"
   }
   if (etapa === "servicos" && !(c.servicos?.length)) e.servicos = "Escolha pelo menos um serviço"
   if (etapa === "detalhes") for (const s of c.servicos ?? []) {
-    if (s.id === "outro" && !s.qual?.trim()) e[`${s.id}.qual`] = "Qual serviço?"
+    if (s.id === "outro" && textoEnchimento(s.qual)) e[`${s.id}.qual`] = "Qual serviço?"
     if (cobraPorAcertoMilheiro(s.id)) {
       if (!formatoOk(s.tecnico?.formatoMax)) e[`${s.id}.formatoMax`] = "Informe o formato da máquina"
       if (!(Number(s.acerto) > 0)) e[`${s.id}.acerto`] = "Informe o acerto"
@@ -280,6 +300,22 @@ export function errosDaEtapa(c: Partial<CadastroParceiro>, etapa: Etapa): Record
   return e
 }
 export const errosDoCadastro = (c: Partial<CadastroParceiro>) => ETAPAS_IDS.reduce((t, et) => ({ ...t, ...errosDaEtapa(c, et) }), {} as Record<string, string>)
+
+// Mínimo para a análise (responsável, CNPJ/CPF, cidade, telefone, ao menos um serviço, e o resto do endereço, nome e e-mail):
+// as mesmas regras das etapas do formulário, sem os detalhes de preço/prazo e sem o aceite. Cadastro antigo que não passa
+// aqui é "incompleto" e o Atendente pede só esses itens pelo WhatsApp.
+const ROTULO_FALTA: Record<string, string> = {
+  nomeFantasia: "nome da empresa", documento: "CNPJ ou CPF válido", cep: "CEP", rua: "rua", numero: "número", bairro: "bairro", cidade: "cidade", uf: "UF",
+  responsavel: "nome do responsável", whatsapp: "WhatsApp com DDD", email: "e-mail", servicos: "pelo menos um serviço",
+}
+export function faltaDoCadastro(c: Partial<CadastroParceiro>): string[] {
+  const e = (["empresa", "endereco", "contato", "servicos"] as const).reduce((t, et) => ({ ...t, ...errosDaEtapa(c, et) }), {} as Record<string, string>)
+  return Object.keys(e).map(k => ROTULO_FALTA[k] ?? k)
+}
+
+export type CadastroComFalta = CadastroParceiro & { faltando: string[] }
+/** Cadastros com a lista do que falta, calculada na leitura (nada é gravado nem sobrescrito). Vazia = completo. */
+export const comFalta = (lista: CadastroParceiro[]): CadastroComFalta[] => lista.map(x => ({ ...x, faltando: faltaDoCadastro(x) }))
 
 // Respostas técnicas: só as perguntas que existem, dentro das opções e de tamanhos razoáveis
 export function limparTecnico(id: IdServicoParceiro, t: unknown): Record<string, Resposta> | undefined {
@@ -332,6 +368,7 @@ export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParce
       ...limparExemplos(s),
     })),
     capacidade: t(x.capacidade, 300) || undefined, horario: t(x.horario, 160) || undefined, maquinas: t(x.maquinas, 600) || undefined,
+    equipamentos: (Array.isArray(x.equipamentos) ? x.equipamentos : []).map(String).filter(e => (EQUIPAMENTOS_PARCEIRO as readonly string[]).includes(e)).slice(0, EQUIPAMENTOS_PARCEIRO.length),
     comoConheceu: t(x.comoConheceu, 200) || undefined, aceite: !!x.aceite,
   }
 }

@@ -12,6 +12,7 @@ import { aplicarOptOut, podeTransicionar, type EtapaFunil } from "./prospector"
 import { chaveTelefone, dentroDoHorario } from "./prospectorEnvio"
 import { prospectoExcluido, registrar, MOTIVO_FORA_DA_JANELA } from "./ordemProspecto"
 import type { ProspectoDoJid } from "./prospectorTrava"
+import { faltaDoCadastro, type CadastroParceiro } from "./parceiros"
 
 export const LINK_PARCEIROS = "https://app.enyla.com.br/parceiros"
 export const POR_ATENDENTE = "atendente_auto"
@@ -70,13 +71,15 @@ const novasDoLead = (ms: Msg[]): string[] => {
   return ms.slice(ult + 1).filter(m => !m.from_me).map(m => m.corpo ?? "")
 }
 
-/** Cadastro em /parceiros com o mesmo telefone (ou CNPJ, quando o prospecto tem): a gráfica já se cadastrou. */
-async function jaCadastrou(p: ProspectoDoJid): Promise<boolean> {
-  const cfg = await lerCampos<{ cadastrosParceiros?: { whatsapp?: string; documento?: string; status?: string }[] }>(["cadastrosParceiros"]).catch(() => ({ cadastrosParceiros: [] }))
+/** Cadastro em /parceiros com o mesmo telefone (ou CNPJ, quando o prospecto tem): a gráfica já se cadastrou.
+ *  `faltando` = o que ainda não passa nas regras mínimas (lista vazia = completo). Só leitura: nada é gravado. */
+async function cadastroDoProspecto(p: ProspectoDoJid): Promise<{ faltando: string[] } | null> {
+  const cfg = await lerCampos<{ cadastrosParceiros?: Partial<CadastroParceiro>[] }>(["cadastrosParceiros"]).catch(() => ({ cadastrosParceiros: [] }))
   const chave = chaveTelefone(p.telefone)
   const cnpj = String((p as { cnpj?: string | null }).cnpj ?? "").replace(/\D/g, "")
-  return (cfg.cadastrosParceiros ?? []).some(c => c.status !== "recusado"
+  const c = (cfg.cadastrosParceiros ?? []).find(c => c.status !== "recusado"
     && ((!!chave && chaveTelefone(c.whatsapp) === chave) || (cnpj.length === 14 && String(c.documento ?? "").replace(/\D/g, "") === cnpj)))
+  return c ? { faltando: faltaDoCadastro(c) } : null
 }
 
 /** Troca qualquer link da ENYLA que a IA escreveu pelo oficial (só se pode mandar) ou tira; nunca www, nunca repetido. */
@@ -94,11 +97,11 @@ export function ajustarLink(texto: string, a: { pode: boolean; quer: boolean }):
   return t
 }
 
-function prompt(a: { nome: string; conhecimento: string; jaMandouLink: boolean; jaCadastrou: boolean }) {
+function prompt(a: { nome: string; conhecimento: string; jaMandouLink: boolean; jaCadastrou: boolean; faltando?: string[] }) {
   return `Você é o Atendente da ENYLA (gráfica de embalagens) conversando no WhatsApp com ${a.nome}, uma gráfica que respondeu ao nosso convite para ser PARCEIRA da ENYLA. Ela NÃO é cliente: é uma possível parceira que faria serviços de produção para nós.
 Seu objetivo em cada resposta: tirar a dúvida dela e levá-la ao cadastro em ${LINK_PARCEIROS}.
 Como funciona (fatos oficiais): o cadastro leva uns 5 minutos; depois o Felipe analisa e chama a gráfica no WhatsApp. Pagamento: ${PAGAMENTO}.
-${a.jaCadastrou ? "Esta gráfica JÁ fez o cadastro: agradeça, diga que o Felipe analisa e chama no WhatsApp, e não mande o link." : a.jaMandouLink ? "O link do cadastro JÁ foi enviado nesta conversa: não repita o link; se ela perguntar, diga que está acima na conversa." : `Mande o link do cadastro (${LINK_PARCEIROS}) quando fizer sentido, uma vez só, e marque enviar_link=true.`}
+${a.jaCadastrou ? `Esta gráfica JÁ fez o cadastro: agradeça, diga que o Felipe analisa e chama no WhatsApp, e não mande o link.${a.faltando?.length ? ` Mas o cadastro está INCOMPLETO. Falta: ${a.faltando.join("; ")}. Peça só isso, no máximo dois itens por mensagem, de forma simples, e diga que com isso o Felipe consegue analisar. Não diga que o cadastro foi aprovado nem prometa aprovação, volume ou prazo.` : ""}` : a.jaMandouLink ? "O link do cadastro JÁ foi enviado nesta conversa: não repita o link; se ela perguntar, diga que está acima na conversa." : `Mande o link do cadastro (${LINK_PARCEIROS}) quando fizer sentido, uma vez só, e marque enviar_link=true.`}
 Regras:
 - Você NÃO orça, não fala de preço de embalagem nem de valores em reais, e não trata a gráfica como cliente de compra.
 - Três assuntos NÃO têm resposta oficial: custo para entrar, exclusividade e volume esperado de serviço. Se ela perguntar, NÃO invente nem estime: responda normalmente o resto da mensagem, diga que o Felipe confirma esse ponto com ela, e liste o tema em perguntas_sem_resposta.
@@ -136,7 +139,8 @@ export async function responderParceiro(p: ProspectoDoJid, jid: string, deps: De
 
   const cfg = await lerCampos<{ apiKey?: string; conhecimentoAgente?: Conhecimento[] }>(["apiKey", "conhecimentoAgente"]).catch(() => ({} as { apiKey?: string; conhecimentoAgente?: Conhecimento[] }))
   if (!cfg.apiKey) return { enviou: false, motivo: "sem chave da IA" }
-  const cadastrou = await jaCadastrou(p).catch(() => false)
+  const cadastro = await cadastroDoProspecto(p).catch(() => null)
+  const cadastrou = !!cadastro
   const jaMandouLink = ms.some(m => m.from_me && /app\.enyla\.com\.br\/parceiros/i.test(m.corpo ?? ""))
   const conhecimento = conhecimentoNoPrompt((cfg.conhecimentoAgente ?? []).filter(ehConhecimentoDeParceiro))
   let saida: { texto?: string; enviar_link?: boolean; perguntas_sem_resposta?: string[] }
@@ -144,7 +148,7 @@ export async function responderParceiro(p: ProspectoDoJid, jid: string, deps: De
     const resp = await clienteClaude(cfg.apiKey, "atendente_parceiro").beta.messages.create({
       model: MODELO, max_tokens: 800,
       output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA } },
-      system: prompt({ nome, conhecimento, jaMandouLink, jaCadastrou: cadastrou }),
+      system: prompt({ nome, conhecimento, jaMandouLink, jaCadastrou: cadastrou, faltando: cadastro?.faltando }),
       messages: [{ role: "user", content: `Conversa recente:\n${ms.map(m => `${m.from_me ? "ENYLA" : "Gráfica"}: ${String(m.corpo).slice(0, 400)}`).join("\n")}\n\nResponda a(s) última(s) mensagem(ns) da gráfica.` }],
     })
     saida = JSON.parse(resp.content.flatMap(c => c.type === "text" ? [c.text] : []).join(""))
@@ -168,7 +172,7 @@ export async function responderParceiro(p: ProspectoDoJid, jid: string, deps: De
     return { enviou: false, motivo: `envio falhou: ${e.erro}` }
   }
   // Cadastro já feito vale mais que "respondeu"; senão, a primeira resposta
-  const etapaFinal = cadastrou && podeTransicionar(p.etapa as EtapaFunil, "cadastrou", false) ? "cadastrou" : avanca ? "respondeu" : null
+  const etapaFinal = cadastrou && !cadastro?.faltando.length && podeTransicionar(p.etapa as EtapaFunil, "cadastrou", false) ? "cadastrou" : avanca ? "respondeu" : null
   await registrar(p, { motivo: "resposta automática do Atendente (modo parceiro)", etapa: etapaFinal ?? p.etapa, mensagem: { direcao: "enviada", canal: "whatsapp", por: POR_ATENDENTE, texto, em } }, etapaFinal ? { etapa: etapaFinal } : camposResposta).catch(() => null)
   for (const tema of pendentes) {
     const pergunta = dela.join(" / ").slice(0, 300)

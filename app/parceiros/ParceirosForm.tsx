@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Printer, Layers, Sparkles, Stamp, Mountain, Scissors, Package, Shapes, FileStack, Palette, FileCheck, Truck, Plus, Check, ChevronLeft, ArrowRight, Paperclip, X, Clock, BarChart3, ShieldCheck, Handshake, Loader2, MessageCircle, MapPin, Zap, Banknote, Wallet, Camera, Globe } from "lucide-react"
 import type { CenarioPublico } from "../lib/cenariosParceiros"
 import {
-  SERVICOS_PARCEIRO, FORMAS_COBRANCA, PERGUNTAS, ROTULO_PRECO_CENARIO, cobraPorAcertoMilheiro, cenarioAtivo, ETAPAS_IDS, errosDaEtapa, mascaraDocumento, mascaraTelefone, mascaraCep, GERENTE_PADRAO,
+  SERVICOS_PARCEIRO, FORMAS_COBRANCA, PERGUNTAS, ROTULO_PRECO_CENARIO, cobraPorAcertoMilheiro, cenarioAtivo, ETAPAS_IDS, errosDaEtapa, mascaraDocumento, mascaraTelefone, mascaraCep, cnpjValido, EQUIPAMENTOS_PARCEIRO, GERENTE_PADRAO,
   type CadastroParceiro, type ServicoCadastrado, type IdServicoParceiro, type Pergunta, type Resposta, type Formato,
 } from "../lib/parceiros"
 
@@ -117,6 +117,7 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
   const [erroEnvio, setErroEnvio] = useState<string | null>(null)
   const [buscandoCep, setBuscandoCep] = useState(false)
   const [cepAchado, setCepAchado] = useState<boolean | null>(null)
+  const [cnpjInfo, setCnpjInfo] = useState<{ situacao: string; ativa: boolean } | "nao_achou" | "buscando" | null>(null)
   const site = useRef<HTMLInputElement>(null)
   const conteudo = useRef<HTMLDivElement>(null)
   const numeroRef = useRef<HTMLInputElement>(null)
@@ -189,6 +190,20 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
       setTimeout(() => numeroRef.current?.focus(), 80)
     } catch { setCepAchado(null) }
     finally { setBuscandoCep(false) }
+  }
+
+  // CNPJ: confere na Receita (BrasilAPI) e preenche razão social, nome e endereço que ainda estão vazios
+  async function buscarCnpj(doc: string) {
+    setCnpjInfo("buscando")
+    try {
+      const r = await fetch(`/api/parceiros/cnpj?c=${doc}`).then(x => x.json()) as { ok: boolean; dados?: { razaoSocial: string; nomeFantasia: string; situacao: string; ativa: boolean; cep: string; rua: string; numero: string; complemento: string; bairro: string; cidade: string; uf: string } }
+      if (!r.ok || !r.dados) { setCnpjInfo("nao_achou"); return }
+      const x = r.dados
+      setD(a => ({ ...a, razaoSocial: a.razaoSocial || x.razaoSocial, nomeFantasia: a.nomeFantasia || x.nomeFantasia || x.razaoSocial,
+        cep: a.cep || x.cep, rua: a.rua || x.rua, numero: a.numero || x.numero, complemento: a.complemento || x.complemento, bairro: a.bairro || x.bairro, cidade: a.cidade || x.cidade, uf: a.uf || x.uf }))
+      setErros(e => { const n = { ...e }; for (const k of ["nomeFantasia", "documento"]) delete n[k]; return n })
+      setCnpjInfo({ situacao: x.situacao, ativa: x.ativa })
+    } catch { setCnpjInfo(null) }   // sem consulta: o cadastro segue, a validação do dígito é local
   }
 
   function avancar() {
@@ -362,7 +377,9 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
             <div className="flex p-1 rounded-xl bg-[#f1eff7] w-fit mb-2">
               {(["cnpj", "cpf"] as const).map(t => <button key={t} type="button" onClick={() => { set("tipoDocumento", t); set("documento", "") }} className={`h-9 px-4 rounded-lg text-[13.5px] font-semibold transition ${d.tipoDocumento === t ? "bg-white shadow-sm text-[#1d1a29]" : "text-[#6b6878]"}`}>{t === "cnpj" ? "Tenho CNPJ" : "Ainda não tenho CNPJ"}</button>)}
             </div>
-            <input enterKeyHint="next" className={inputCls(E("documento"))} inputMode="numeric" value={mascaraDocumento(d.documento ?? "", d.tipoDocumento ?? "cnpj")} onChange={e => set("documento", e.target.value.replace(/\D/g, ""))} placeholder={d.tipoDocumento === "cpf" ? "000.000.000-00" : "00.000.000/0000-00"} />
+            <input enterKeyHint="next" className={inputCls(E("documento"))} inputMode="numeric" value={mascaraDocumento(d.documento ?? "", d.tipoDocumento ?? "cnpj")} onChange={e => { const v = e.target.value.replace(/\D/g, ""); set("documento", v); setCnpjInfo(null); if (d.tipoDocumento === "cnpj" && v.length === 14 && cnpjValido(v)) void buscarCnpj(v) }} placeholder={d.tipoDocumento === "cpf" ? "000.000.000-00" : "00.000.000/0000-00"} />
+            {d.tipoDocumento === "cnpj" && cnpjInfo === "buscando" && <span className="mt-2 inline-flex items-center gap-1.5 text-[12.5px] text-[#6b6878]"><Loader2 className="w-3.5 h-3.5 animate-spin" />Conferindo o CNPJ…</span>}
+            {d.tipoDocumento === "cnpj" && cnpjInfo && typeof cnpjInfo === "object" && <span className={`mt-2 flex items-center gap-1.5 text-[12.5px] font-medium par-surge ${cnpjInfo.ativa ? "text-[#13a06f]" : "text-[#b26a00]"}`}>{cnpjInfo.ativa ? <Check className="w-3.5 h-3.5" /> : null}CNPJ encontrado · situação {cnpjInfo.situacao.toLowerCase() || "não informada"}{cnpjInfo.ativa ? "" : ". Confira se é o CNPJ certo."}</span>}
           </Campo></div>
           {d.tipoDocumento === "cnpj" && <Campo rotulo="Razão social" opcional>
             <input enterKeyHint="next" className={inputCls()} value={d.razaoSocial ?? ""} onChange={e => set("razaoSocial", e.target.value)} placeholder="Como está no CNPJ" />
@@ -524,7 +541,10 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
 
         {et === "final" && <>
           <h2 className="text-[24px] font-extrabold text-[#1d1a29] tracking-tight leading-tight">Sua operação</h2>
-          <Campo rotulo="Outras máquinas e equipamentos" dica="Marca e modelo ajudam (ex.: Heidelberg Speedmaster, Bobst SP 102)" opcional>
+          <Campo rotulo="Equipamentos" dica="Marque o que vocês têm. Pode marcar mais de um">
+            <div className="flex flex-wrap gap-2">{EQUIPAMENTOS_PARCEIRO.map(q => { const xs = d.equipamentos ?? []; return <Chip key={q} on={xs.includes(q)} onClick={() => set("equipamentos", xs.includes(q) ? xs.filter(x => x !== q) : [...xs, q])}>{q}</Chip> })}</div>
+          </Campo>
+          <Campo rotulo="Outros equipamentos" dica="Só se não estiver na lista. Marca e modelo ajudam (ex.: Heidelberg Speedmaster, Bobst SP 102)" opcional>
             <textarea className={`${inputCls()} h-24 py-3 resize-none`} value={d.maquinas ?? ""} onChange={e => set("maquinas", e.target.value)} />
           </Campo>
           <Campo rotulo="Capacidade" dica="Quanto vocês conseguem por dia ou semana" opcional>
