@@ -115,7 +115,7 @@ describe("as outras travas continuam", () => {
   it("gráfica do Prospector (nível lead): sai direto pelo caminho do Prospector, sem 409 e sem fila", async () => {
     e.prospecto = true; e.nivel = { nivel: "lead", jaCliente: false, motivo: "" }
     prospEnviar.mockResolvedValue({ saida: "enviado", destino: "enviado_direto", motivo: "prospector", nivel: "lead" })
-    const r = await ordenar()
+    const r = await ordenar({ jid: "5511999990001@s.whatsapp.net" })   // o caminho do Prospector precisa do jid/telefone na ordem
     expect(r.destino).toBe("enviado_direto"); expect(r.status).toBeUndefined(); expect(prospEnviar).toHaveBeenCalled()
   })
   it("promete orçamento sem link real: 409 com o motivo, em vez de fila", async () => {
