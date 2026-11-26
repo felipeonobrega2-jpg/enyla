@@ -93,3 +93,10 @@ Os demais limites de 23/11 seguem: até 10 abordagens por dia, de segunda a sext
 **Decisão.** Diretores gerem. A execução é de funcionários e de agentes.
 
 **Porquê.** Diretor que executa vira gargalo e mistura a decisão com a tarefa. Quem decide não é quem manda a mensagem nem quem mexe no pedido.
+
+## 26/11/2026 — perfil diretor: acesso total, auditoria e 7 interruptores desligados
+
+**Decisão.** O Felipe aprovou no grupo dos diretores, em 26/11/2026: às 6h26 "Diego pode criar e é está aprovado" e às 6h28 "Total". Cada diretor entra com usuário próprio, perfil **diretor**, com acesso total ao sistema. Toda alteração feita por diretor grava quem, quando, o antes e o depois. Sete bloqueios (apagar; financeiro; cobrança; preço e Offset; usuários, chaves e integrações; mensagem direta a cliente, lead ou parceiro; campanha, verba e anúncio da Meta) existem como interruptores por perfil, todos desligados por padrão, que o admin liga um a um pela tela, sem deploy. A senha única atual continua entrando como admin. Isso cobre construir e juntar (issue #214); guia em `docs/usuarios-diretor.md`.
+
+**Porquê.** Cada diretor precisa operar o sistema com identidade própria, e o Felipe quer poder fechar uma área depois, sem esperar código.
+

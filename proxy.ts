@@ -1,7 +1,11 @@
 import { auth } from "@/auth"
 import { NextResponse } from "next/server"
+import { avaliarGuarda, enxugar } from "@/app/lib/guardaAcesso"
+import { CAMPOS_CONFIG_VIGIADOS } from "@/app/lib/acesso"
+import { lerInterruptores, registrarAuditoria, usuarioAtivo, lerAntes } from "@/app/lib/acessoServidor"
+import { lerCampos } from "@/app/lib/configAtomica"
 
-export default auth((req) => {
+export default auth(async (req) => {
   const { pathname } = req.nextUrl
   const isPublic =
     pathname.startsWith("/login") ||
@@ -30,7 +34,8 @@ export default auth((req) => {
     pathname === "/api/externo" ||               // diretores na nuvem (exige a chave do diretor na própria rota)
     pathname === "/api/prospector/enviar" ||     // agendador da Vercel (mesma regra; chave prospector_envio_ativo desligada por padrão)
     pathname === "/api/prospector/importar" ||   // agendador da Vercel (exige CRON_SECRET, ou o agendador, na própria rota)
-    pathname === "/api/prospector/inbound" ||    // webhook da Resend (email.received; exige assinatura Svix na própria rota)
+    pathname === "/api/prospector/inbound" ||    // webhook da Resend (email.received e eventos do envio; exige assinatura Svix na própria rota)
+    pathname.startsWith("/api/prospector/r/") || // link rastreado do e-mail do Prospector (token aleatório; só redireciona ao /parceiros)
     pathname === "/api/whatsapp/verificar" ||    // agendador da Vercel (mesma regra)     // agendador da Vercel (exige CRON_SECRET na própria rota)
     pathname.startsWith("/api/track") ||
     pathname.startsWith("/brand/") ||
@@ -39,6 +44,32 @@ export default auth((req) => {
 
   if (!req.auth && !isPublic) {
     return NextResponse.redirect(new URL("/login", req.url))
+  }
+
+  // Perfil diretor: acesso total, menos o que o admin ligou nos interruptores (todos desligados por padrão).
+  // A guarda é do servidor (403 aqui, antes da rota), não depende de botão escondido na tela.
+  if (req.auth && pathname.startsWith("/api/") && !pathname.startsWith("/api/auth") && req.auth.papel === "diretor") {
+    const usuario = req.auth.usuario ?? "?"
+    try {
+      if (!(await usuarioAtivo(usuario))) return NextResponse.json({ erro: "Usuário desativado." }, { status: 401 })
+      const metodo = req.method
+      const escreve = !["GET", "HEAD", "OPTIONS"].includes(metodo)
+      let corpo: unknown
+      if (escreve && (req.headers.get("content-type") ?? "").includes("json")) corpo = await req.clone().json().catch(() => undefined)
+      const r = avaliarGuarda({
+        papel: "diretor", metodo, caminho: pathname, corpo,
+        configSalva: pathname === "/api/config" && metodo === "POST" ? await lerCampos(CAMPOS_CONFIG_VIGIADOS) : undefined,
+        interruptores: await lerInterruptores(),
+      })
+      if (!r.decisao.permitido) return NextResponse.json({ erro: r.decisao.mensagem, interruptor: r.decisao.interruptor }, { status: 403 })
+      if (r.auditar) {
+        const antes = r.antesDepois ? r.antesDepois.antes : await lerAntes(pathname)
+        await registrarAuditoria({ usuario, papel: "diretor", metodo, caminho: pathname + req.nextUrl.search, antes: enxugar(antes), depois: enxugar(r.antesDepois ? r.antesDepois.depois : corpo) })
+      }
+    } catch {
+      // Falha ao ler interruptor ou usuário: nega, nunca deixa passar sem a guarda
+      return NextResponse.json({ erro: "Não foi possível conferir a permissão agora. Tente de novo." }, { status: 503 })
+    }
   }
 })
 

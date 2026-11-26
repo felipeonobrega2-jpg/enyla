@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { ehAprovacao, sugestoesDeArte, confirmarArteAprovada, type MsgZap } from "../app/lib/arteAprovadaSugestao"
+import { aprovacoesSemAmbiguidade, ehAprovacao, sugestoesDeArte, confirmarArteAprovada, type MsgZap } from "../app/lib/arteAprovadaSugestao"
 import { digitaisEmProducao } from "../app/lib/digitalProducao"
 import { aprovarArte } from "../app/lib/digital"
 
@@ -68,5 +68,44 @@ describe("sugestão de arte aprovada", () => {
     void _a; void _b
     expect(resto).toEqual(p)
     expect(confirmarArteAprovada({ ...p, status: "producao" }, { em: "x", trecho: "y" }, "P", "z")).toBeNull()
+  })
+
+  describe("gravação automática da aprovação não ambígua", () => {
+    const grava = (pedidos: ReturnType<typeof ped>[], msgs: MsgZap[], decisoes: Parameters<typeof sugestoesDeArte>[2] = []) =>
+      aprovacoesSemAmbiguidade(sugestoesDeArte(pedidos, { j1: msgs }, decisoes)).map(s => ({ s, n: confirmarArteAprovada(pedidos.find(p => p.id === s.pedido)!, s, "sistema", "2026-11-25T20:00:00Z") }))
+    const msgs = [arte("2026-11-12T10:00:00Z"), cli("2026-11-13T14:00:00Z", "Pode sim", "m1")]
+    it("inequívoca: grava o ts da mensagem, por sistema, sem mudar a etapa", () => {
+      const [{ n }] = grava([ped("DIG-0001")], msgs)
+      expect(n!.arteAprovadaEm).toBe("2026-11-13T14:00:00Z")
+      expect(n!.arteAprovadaPor).toEqual({ por: "sistema", em: "2026-11-25T20:00:00Z", trecho: "Pode sim" })
+      expect(n!.status).toBe("arte")
+    })
+    it("segunda passagem não sobrescreve", () => {
+      const [{ n }] = grava([ped("DIG-0001")], msgs)
+      expect(sugestoesDeArte([n!], { j1: msgs })).toEqual([])
+      expect(confirmarArteAprovada(n!, { em: "2026-11-24T00:00:00Z", trecho: "x" }, "sistema", "2026-11-26T00:00:00Z")).toBeNull()
+    })
+    it("decisão confirmada registrada impede a sugestão de reaparecer", () => {
+      const d = [{ pedido: "DIG-0001", msgId: "m1", decisao: "confirmada" as const, por: "sistema", em: "2026-11-25T20:00:00Z" }]
+      expect(grava([ped("DIG-0001")], msgs, d)).toEqual([])
+    })
+    it("ajuste ou negação na mesma mensagem: não grava", () => {
+      for (const t of ["Aprovado, mas troca a cor", "Não aprovo", "Pode sim, ajusta o texto"])
+        expect(grava([ped("DIG-0001")], [arte("2026-11-12T10:00:00Z"), cli("2026-11-13T14:00:00Z", t)])).toEqual([])
+    })
+    it("dois pedidos no mesmo jid: ambígua, não grava sozinho", () => {
+      expect(grava([ped("DIG-0056"), ped("DIG-0057")], msgs)).toEqual([])
+    })
+    it("clique dias depois: arteAprovadaEm é a data da mensagem; a do clique fica só em arteAprovadaPor.em", () => {
+      const [s] = sugestoesDeArte([ped("DIG-0001")], { j1: msgs })
+      const n = confirmarArteAprovada(ped("DIG-0001"), s, "Painel", "2026-11-25T20:50:00Z")!
+      expect(n.arteAprovadaEm).toBe("2026-11-13T14:00:00Z")
+      expect(n.arteAprovadaPor.em).toBe("2026-11-25T20:50:00Z")
+      expect(n.status).toBe("arte")
+    })
+    it("nenhuma mensagem sai: a regra é pura e só devolve o pedido", () => {
+      const [{ n }] = grava([ped("DIG-0001")], msgs)
+      expect(Object.keys(n!).sort()).toEqual(["arteAprovadaEm", "arteAprovadaPor", "id", "jid", "sinalPagoEm", "status"])
+    })
   })
 })

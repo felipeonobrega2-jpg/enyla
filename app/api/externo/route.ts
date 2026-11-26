@@ -12,7 +12,8 @@ import { lancarDespesaExterno } from "@/app/lib/lancarDespesaExterno"
 import { renomearFornecedorExterno } from "@/app/lib/renomearFornecedorExterno"
 import { conciliacao } from "@/app/lib/conciliacaoExterna"
 import { categoria } from "@/app/lib/categoriaExterna"
-import { leituraFinanceira, AJUDA_FINANCEIRO } from "@/app/lib/financeiroExterno"
+import { leituraFinanceira, carregarFinanceiro, AJUDA_FINANCEIRO } from "@/app/lib/financeiroExterno"
+import { custoPorLote, AJUDA_CUSTO_LOTE } from "@/app/lib/custoLoteExterno"
 import { ErroMeta } from "@/app/lib/metaAdsLeitura"
 import { leituraMetaAdsComFunil } from "@/app/lib/funilMetaAds"
 import { paradasParaLeitura } from "@/app/lib/metaCampanhaParada"
@@ -21,13 +22,18 @@ import { ehComercial, podeAcionarComercial, comerciaisDoDiretor } from "@/app/li
 import { leadExterno } from "@/app/lib/leadExterno"
 import { acaoPendencia, lerPendenciasDaArea, renovarFotoDepois } from "@/app/lib/pendenciaExterna"
 import { acaoTarefaFelipe, tarefasDoDiretor } from "@/app/lib/tarefaFelipe"
+import { acaoRestaurarFila } from "@/app/lib/filaRestaurar"
 import { pedidoExterno } from "@/app/lib/pedidoExterno"
 import { lerPertoExterno, AJUDA_PERTO } from "@/app/lib/pertoExterno"
+import { lerPropostasExterno, AJUDA_PROPOSTAS } from "@/app/lib/propostasExterno"
 import { moverCardExterno } from "@/app/lib/moverCardExterno"
+import { gravarDigitalExterno } from "@/app/lib/gravarDigitalExterno"
 import { cancelarOrdem } from "@/app/lib/cancelarOrdem"
 import { ordenarFornecedor, leituraFornecedorConversa } from "@/app/lib/fornecedorExterno"
 import { niveisDosLeads } from "@/app/lib/nivelNoDetalhe"
+import { lerHistoricoOffset, AJUDA_HISTORICO_OFFSET } from "@/app/lib/historicoOffsetExterno"
 import { leituraParceiros, AJUDA_PARCEIROS } from "@/app/lib/parceirosExterno"
+import { lerPrazosFornecedores, AJUDA_PRAZOS_FORNECEDORES, PODEM_LER_PRAZOS } from "@/app/lib/prazosFornecedoresExterno"
 
 // Porta de acesso dos diretores na nuvem (ex.: Grok Bot). Pública no proxy, mas cada chamada exige a chave do diretor
 // (Authorization: Bearer enyla_<diretor>_...). Leitura da empresa e as mesmas ferramentas da conversa com o Felipe;
@@ -60,8 +66,9 @@ export async function GET(req: NextRequest) {
 
   if (!o) return NextResponse.json({
     voce: `${info.nome}, ${info.cargo} (${info.area})`,
-    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | ") + " | parceiros (só CCO e CMO)", ...(podeAcionarComercial(diretor) ? { "?o=parceiros": AJUDA_PARCEIROS } : { "?o=parceiros": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): cadastros de /parceiros e respostas do Prospector" }), "?o=conversa": "o que você e o Felipe conversaram", ...(podeAcionarComercial(diretor) ? { "?o=perto": AJUDA_PERTO } : { "?o=perto": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): a lista 'Perto de você'" }), ...(diretor === "cfo" ? AJUDA_FINANCEIRO : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa" }), ...(diretor === "cmo" ? { "?o=meta_ads": "Meta Ads ao vivo (só leitura): conta, campanhas, conjuntos e anúncios; hoje, 7 e 30 dias; cache de 3 min; bloco funil por campanha (7 e 30 dias: leads, mql, orçamentos, pedidos, vendido, gasto, custo por lead e por MQL) e previsaoSaldoDias" } : {}) },
+    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | ") + " | parceiros (só CCO e CMO)", ...(podeAcionarComercial(diretor) ? { "?o=parceiros": AJUDA_PARCEIROS } : { "?o=parceiros": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): cadastros de /parceiros e respostas do Prospector" }), "?o=historico_offset": AJUDA_HISTORICO_OFFSET, "?o=prazos_fornecedores": PODEM_LER_PRAZOS.includes(diretor) ? AJUDA_PRAZOS_FORNECEDORES : "SÓ PARA AS CHAVES DO COO E DO CTO (as outras recebem 403): prazos cadastrais dos fornecedores de produção", "?o=conversa": "o que você e o Felipe conversaram", ...(podeAcionarComercial(diretor) ? { "?o=propostas": AJUDA_PROPOSTAS } : { "?o=propostas": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): propostas Offset em JSON paginado" }), ...(podeAcionarComercial(diretor) ? { "?o=perto": AJUDA_PERTO } : { "?o=perto": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): a lista 'Perto de você'" }), ...(diretor === "cfo" ? { ...AJUDA_FINANCEIRO, ...AJUDA_CUSTO_LOTE } : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa", "?o=custo_lote": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): custo real por lote Offset" }), ...(diretor === "cmo" ? { "?o=meta_ads": "Meta Ads ao vivo (só leitura): conta, campanhas, conjuntos e anúncios; hoje, 7 e 30 dias; cache de 3 min; bloco funil por campanha (7 e 30 dias: leads, mql, orçamentos, pedidos, vendido, gasto, custo por lead e por MQL) e previsaoSaldoDias" } : {}) },
     escrita: { "POST {acao:'relatar', texto}": "manda algo ao Felipe",
+      "POST {acao:'restaurar_fila', ids}": "QUALQUER DIRETOR. Devolve à Fila de mensagens itens que foram dispensados (ids no formato fu-{jid}-{ultima_enviada_at}). Id que não está dispensado é ignorado. Não envia nada: o item só reaparece para envio manual. Responde { devolvidos }",
       "POST {acao:'dispensar_pendencia', chave, motivo, ate?}": "QUALQUER DIRETOR. Dispensa uma pendência (a chave vem em ?o=empresa, campo pendencias) com motivo obrigatório (sem motivo: 400); ate (AAAA-MM-DD) opcional: depois dessa data ela volta. Não apaga nada",
       "POST {acao:'tarefa_felipe', titulo, detalhe?, prazo? (AAAA-MM-DD)}": "QUALQUER DIRETOR. Põe uma tarefa na lista 'Depende de você' do Felipe (pedido por você, com data e prazo). titulo obrigatório (até 140 caracteres); no máximo 10 abertas por diretor (a 11ª volta 429). Suas tarefas (abertas e feitas nos últimos 7 dias) estão em ?o=empresa, campo tarefasParaFelipe. {acao:'tarefa_felipe', operacao:'cancelar', id} cancela só as suas. Não manda mensagem a ninguém",
       "POST {acao:'reabrir_pendencia', chave}": "QUALQUER DIRETOR. Tira a dispensa e a pendência volta na hora (?o=empresa lista as dispensadas à parte)",
@@ -81,10 +88,19 @@ export async function GET(req: NextRequest) {
       "POST {acao:'mover_card', numero | loteNumero, coluna, motivo}": "QUALQUER DIRETOR. Avança um pedido de etapa na produção. numero (ORC-...) ou loteNumero (move os cards do lote); coluna de 2 (Arte/Dieline) a 8 (Expedição); motivo obrigatório (até 300 caracteres). Só avança (destino maior que a coluna atual) e só de cards já Fechados (coluna 1 em diante); nunca volta, nunca vai a 0, 9 (Entregue) ou 10 (Perdido): 400 com o motivo e nada é alterado. Só muda a coluna (preço, quantidade, sinal e opcoes ficam como estão). Registra no Tracking quem moveu (seu nome) e o motivo. Não manda mensagem nem e-mail ao cliente. Resposta: { ok, resultado, movidos: [{numero, de, para}] }",
       "POST {acao:'ordenar_fornecedor', fornecedor, pedido, texto, anexos}": "QUALQUER DIRETOR. Mensagem ao fornecedor do cadastro de fornecedores (fornecedor = id do cadastro, pedido = DIG-0159, texto, anexos opcionais = até 10 referências a arquivos que já estão no sistema). Entra na fila do Aprovo do Felipe, marcada 'fornecedor', e só sai pelo WhatsApp do painel depois do Aprovo; fica gravada no histórico do fornecedor e do pedido, com o horário de envio. Recusa (422) número que seja de cliente ou de lead; fornecedor fora do cadastro: 404; máximo 20 esperando por diretor (429). Nada é enviado nesta chamada. Cancele com cancelar_ordem. Resposta: { ok, resultado, destino:'fila_aprovo', id }",
       "GET ?o=fornecedor_conversa&fornecedor=<id>": "QUALQUER DIRETOR. Últimas mensagens do WhatsApp com o fornecedor (de: 'fornecedor'|'enyla') e o que a diretoria mandou, com status e horário de envio, para conferir se ele respondeu.",
+      "POST {acao:'gravar_digital', id, situacaoArte?, prazoEntrega?, arteAprovadaEm?, motivo}": "QUALQUER DIRETOR (arteAprovadaEm: só CTO e COO). Grava no pedido Digital (id DIG-0000) só a situação da arte (sem arte | enviada | ajustes pedidos | aprovada | prova autorizada) e/ou o prazo de entrega (YYYY-MM-DD; vazio limpa e volta a 'a confirmar'). arteAprovadaEm (opcional): instante ISO com fuso, ex. 2026-11-13T14:00:00.000Z, no passado e não anterior à criação do pedido; é a data de que o acompanhamento parte para prever a entrega (use nos pedidos cuja arte foi aprovada no WhatsApp antes do gravador automático); outras chaves recebem 403 e nada é gravado. Informe ao menos um dos três; motivo obrigatório (até 300 caracteres). Registra no pedido quem gravou (seu nome), quando (Brasília), o motivo e o valor anterior de arteAprovadaEm (null se não havia). Não mexe em pagamento, status, custo nem mensagem, e não manda nada ao cliente. 400 com o motivo e nada alterado se algo estiver inválido; 403 se arteAprovadaEm vier de quem não é CTO/COO; 404 se o pedido não existe. Resposta: { ok, id, situacaoArte, prazoEntrega, arteAprovadaEm }",
       "POST {acao:'cancelar_ordem', id}": "QUALQUER DIRETOR. Cancela uma ordem SUA (id do cartão, devolvido por ordenar_funcionario) que ainda está esperando o Aprovo (status aguardando). Só marca como cancelada (canceladoPor, canceladoEm): nunca apaga nada e nada é enviado. Ordem de outro diretor ou que não existe: 404; já enviada, descartada, com erro ou cancelada: 409. A tela da diretoria mostra 'Cancelada' e não oferece o Aprovo. Resposta: { ok, resultado, id }",
       ...Object.fromEntries(FERRAMENTAS.map(f => [`POST {acao:'${f}', ...}`, "ferramenta (ver instruções)"])) },
     limitePorHora: LIMITE_POR_HORA,
   })
+
+  if (o === "custo_lote") {
+    if (diretor !== "cfo") return NextResponse.json({ erro: "?o=custo_lote é só para a chave do CFO." }, { status: 403 })
+    const ie = req.nextUrl.searchParams.get("incluirEstornados")
+    if (ie !== null && !["1", "true", "sim"].includes(ie)) return NextResponse.json({ erro: "incluirEstornados: 1 | true | sim" }, { status: 400 })
+    const d = await carregarFinanceiro()
+    return NextResponse.json({ lotes: custoPorLote(d.kanban, d.lancamentos, { lote: req.nextUrl.searchParams.get("lote") ?? undefined, incluirEstornados: ie !== null }) })
+  }
 
   if (o === "financeiro") {
     if (diretor !== "cfo") return NextResponse.json({ erro: "?o=financeiro é só para a chave do CFO." }, { status: 403 })
@@ -95,6 +111,22 @@ export async function GET(req: NextRequest) {
   if (o === "parceiros") {
     if (!podeAcionarComercial(diretor)) return NextResponse.json({ erro: "?o=parceiros é só para as chaves do CCO e da CMO." }, { status: 403 })
     const l = await leituraParceiros()
+    return NextResponse.json(l.corpo, { status: l.status })
+  }
+
+  if (o === "historico_offset") {
+    const l = await lerHistoricoOffset()
+    return NextResponse.json(l.corpo, { status: l.status })
+  }
+
+  if (o === "prazos_fornecedores") {
+    const l = await lerPrazosFornecedores(diretor)
+    return NextResponse.json(l.corpo, { status: l.status })
+  }
+
+  if (o === "propostas") {
+    const q = req.nextUrl.searchParams
+    const l = await lerPropostasExterno(diretor, { pagina: q.get("pagina"), limite: q.get("limite"), status: q.get("status"), estrela: q.get("estrela") })
     return NextResponse.json(l.corpo, { status: l.status })
   }
 
@@ -174,7 +206,7 @@ export async function GET(req: NextRequest) {
       outrasAreas: blocos.filter(b => b !== meu).map(b => b.split("\n").slice(0, 3).join("\n")),
     })
   }
-  return NextResponse.json({ erro: "o: empresa, detalhe, conversa, perto, parceiros (CCO e CMO) ou financeiro (só CFO)" }, { status: 400 })
+  return NextResponse.json({ erro: "o: empresa, detalhe, conversa, perto, historico_offset, prazos_fornecedores (só COO e CTO), propostas, parceiros (CCO e CMO) ou financeiro ou custo_lote (só CFO)" }, { status: 400 })
 }
 
 export async function POST(req: NextRequest) {
@@ -225,6 +257,9 @@ export async function POST(req: NextRequest) {
     const r = await acaoPendencia(diretor, b)
     if (r.status === 200) after(renovarFotoDepois)
     return NextResponse.json(r.corpo, { status: r.status })
+  } else if (b.acao === "restaurar_fila") {
+    const r = await acaoRestaurarFila(diretor, b)
+    return NextResponse.json(r.corpo, { status: r.status })
   } else if (b.acao === "tarefa_felipe") {
     const r = await acaoTarefaFelipe(diretor, b)
     if (r.status !== 200) return NextResponse.json(r.corpo, { status: r.status })
@@ -251,6 +286,10 @@ export async function POST(req: NextRequest) {
     await gravarConversa(diretor, [...await lerConversa(diretor), msg])
     after(() => { renovarFoto().catch(() => null) })
     return NextResponse.json({ ok: true, resultado: r.resultado, movidos: r.movidos })
+  } else if (b.acao === "gravar_digital") {
+    const r = await gravarDigitalExterno(diretor, b)
+    if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
+    return NextResponse.json({ ok: true, id: r.id, situacaoArte: r.situacaoArte, prazoEntrega: r.prazoEntrega, arteAprovadaEm: r.arteAprovadaEm })
   } else if (b.acao === "meta_ads") {
     const r = await acaoMetaAds(diretor, b)
     return NextResponse.json(r.corpo, { status: r.status })
@@ -266,7 +305,7 @@ export async function POST(req: NextRequest) {
       await gravarConversa(diretor, [...await lerConversa(diretor), msg])
       return NextResponse.json({ ok: true, resultado: saida, destino: r.destino, motivo: r.motivo, nivel: r.nivel, id: r.acao.id })
     }
-  } else return NextResponse.json({ erro: `acao: relatar, ordenar_fornecedor, lancar_despesa, renomear_fornecedor, mover_card, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
+  } else return NextResponse.json({ erro: `acao: relatar, ordenar_fornecedor, lancar_despesa, renomear_fornecedor, mover_card, gravar_digital, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, restaurar_fila, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
   await gravarConversa(diretor, [...await lerConversa(diretor), msg])
   return NextResponse.json({ ok: true, resultado: saida })
 }

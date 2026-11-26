@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 
 export default function LoginPage() {
+  const [usuario, setUsuario] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError]       = useState("")
   const [loading, setLoading]   = useState(false)
@@ -15,10 +16,10 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError("")
-    const result = await signIn("credentials", { password, redirect: false })
+    const result = await signIn("credentials", { usuario, password, redirect: false })
     setLoading(false)
     if (result?.error) {
-      setError("Senha incorreta.")
+      setError(usuario ? "Usuário ou senha incorretos." : "Senha incorreta.")
     } else {
       router.push("/")
       router.refresh()
@@ -57,6 +58,17 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
+              <label className="block text-zinc-400 text-[11px] font-semibold uppercase tracking-[0.1em] mb-2">Usuário <span className="normal-case tracking-normal text-zinc-600">(deixe em branco para a senha única)</span></label>
+              <input
+                type="text"
+                value={usuario}
+                onChange={e => setUsuario(e.target.value)}
+                autoCapitalize="none"
+                autoComplete="username"
+                style={{ width: "100%", height: 44, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: "0 16px", color: "#fff", fontSize: 14, outline: "none" }}
+              />
+            </div>
+            <div>
               <label className="block text-zinc-400 text-[11px] font-semibold uppercase tracking-[0.1em] mb-2">Senha de acesso</label>
               <input
                 type="password"
@@ -64,7 +76,6 @@ export default function LoginPage() {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                autoFocus
                 style={{
                   width: "100%", height: 44,
                   background: "rgba(255,255,255,0.05)",

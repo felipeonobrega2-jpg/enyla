@@ -2,9 +2,12 @@
 // (o mesmo histórico que /api/prazos-producao lê). Funções puras: nada é gravado aqui.
 // Dias úteis: o mesmo critério de diasUteis.ts (seg a sex, fora feriados).
 import { diasUteisEntre } from "./diasUteis"
+import type { MovimentoFornecedor } from "./producao"
+import type { Rodada } from "./rateioRodada"
 import { estatistica, type EtapaRastreio, type Rastreio } from "./prazoProducao"
 
-export type CardProducao = { numero: string; nomeCliente?: string; coluna: number; dataEntregaPrevista?: string | null; aguardandoPagamento?: unknown }
+export type CardProducao = { numero: string; chave?: string; nomeCliente?: string; coluna: number; dataEntregaPrevista?: string | null; aguardandoPagamento?: unknown }
+export type LoteFornecedor = { rodadaId?: string; fornecedor: string; enviadoEm: string; retornoEm: string | null }
 export type Passagem = { etapa: string; entrou: string; saiu: string | null; diasUteis: number }
 
 const LIMITE = 7000
@@ -51,8 +54,19 @@ export function prazoMedioPorEtapa(rastreios: Rastreio[], nomes: string[], hoje:
   return out
 }
 
+/** Envios do pedido a fornecedor: fornecedor, data de envio e data de retorno (a da rodada, se houver; senão a de recebimento). */
+function lotesDoPedido(c: CardProducao, l?: { movimentos?: MovimentoFornecedor[]; rodadas?: Rodada[]; nomeFornecedor?: (id: string) => string }): LoteFornecedor[] {
+  if (!l?.movimentos?.length) return []
+  if (!c.chave) return []
+  return l.movimentos.filter(m => m.pedidoKey === c.chave).map(m => {
+    const rod = m.rodadaId ? l.rodadas?.find(r => r.id === m.rodadaId) : undefined
+    return { ...(m.rodadaId ? { rodadaId: m.rodadaId } : {}), fornecedor: l.nomeFornecedor?.(m.fornecedorId) ?? m.fornecedorId,
+      enviadoEm: m.enviadoEm ?? rod?.enviadoEm ?? "", retornoEm: rod?.retornoEm ?? m.recebidoEm ?? null }
+  })
+}
+
 /** JSON do detalhe da produção (até 7000 caracteres: se passar, tira o histórico por etapa e depois pedidos). */
-export function detalheProducao(cards: CardProducao[], rastreios: Rastreio[], nomes: string[], hoje = hojeBrasilia()): string {
+export function detalheProducao(cards: CardProducao[], rastreios: Rastreio[], nomes: string[], hoje = hojeBrasilia(), lotes?: { movimentos?: MovimentoFornecedor[]; rodadas?: Rodada[]; nomeFornecedor?: (id: string) => string }): string {
   const medio = prazoMedioPorEtapa(rastreios, nomes, hoje)
   const porNumero = new Map(rastreios.map(r => [r.numero, r.etapas]))
   const pedidos = cards.map(c => {
@@ -61,10 +75,12 @@ export function detalheProducao(cards: CardProducao[], rastreios: Rastreio[], no
     const etapa = nomes[c.coluna] ?? String(c.coluna)
     const dias = atual ? diasDe(atual, hoje) : null
     const mediana = medio[etapa]
+    const envios = lotesDoPedido(c, lotes)
     return {
       numero: c.numero, cliente: c.nomeCliente, etapa, entregaPrevista: c.dataEntregaPrevista ?? null, aguardandoPagamento: c.aguardandoPagamento ?? null,
       naEtapaDesde: atual?.entrou ?? null, diasUteisNaEtapa: dias,
       acimaDoNormal: dias != null && mediana != null && dias > mediana * ACIMA,
+      ...(envios.length ? { lotes: envios } : {}),
       etapas: es.map<Passagem>(e => ({ etapa: nomes[e.coluna] ?? String(e.coluna), entrou: e.entrou, saiu: e.saiu, diasUteis: diasDe(e, hoje) })),
     }
   })
