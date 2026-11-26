@@ -6,12 +6,10 @@
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import QRCode from "qrcode"
-import { Check, Copy, Loader2, Upload, FileText, AlertCircle, Sparkles, Palette, Truck, Send, CreditCard, Wallet } from "lucide-react"
+import { Check, Copy, Loader2, Upload, FileText, AlertCircle, Sparkles, Palette, Send, CreditCard, Wallet } from "lucide-react"
 import { Caixa3D } from "@/app/components/Caixa3D"
 import { gerarPixPayload } from "@/app/lib/pix"
 import { formatarData } from "@/app/lib/formato"
-import type { Acompanhamento } from "@/app/lib/acompanhamentoDigital"
-import { AcompanhamentoDigital } from "./AcompanhamentoDigital"
 
 type Opcao = { quantidade: number; total: number; unit: number }
 type Pedido = {
@@ -28,7 +26,6 @@ type Pedido = {
   asaas: boolean; documento: string | null
   cobranca: { parte: "sinal" | "restante"; payload: string; imagem: string; fatura: string } | null
   cartao?: boolean
-  acompanhamento?: Acompanhamento | null
 }
 const ehPdf = (u: string) => /\.pdf($|\?)/i.test(u)
 
@@ -39,7 +36,7 @@ const ETAPAS = [["sinal_pago", "Sinal pago"], ["arte", "Arte"], ["producao", "Pr
 export default function DigitalClient({ id, t, dz = "" }: { id: string; t: string; dz?: string }) {
   const [p, setPedido] = useState<Pedido | null>(null)
   // As respostas das ações não trazem o acompanhamento (só o GET): mantém o último
-  const setP = (x: Pedido) => setPedido(ant => ({ ...x, acompanhamento: x.acompanhamento ?? ant?.acompanhamento }))
+  const setP = (x: Pedido) => setPedido(x)
   const [erro, setErro] = useState<string | null>(null)
   const [mudando, setMudando] = useState<number | null>(null)
   const [conferindo, setConferindo] = useState(false)
@@ -47,7 +44,6 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
   const [br, setBr] = useState<{ marca: string; cores: string; referencias: string; laminacao: "fosca" | "brilho" }>({ marca: "", cores: "", referencias: "", laminacao: "fosca" })
   const [ajuste, setAjuste] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
-  const [ent, setEnt] = useState({ cep: "", endereco: "" })
   const [salvo, setSalvo] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [rascunhoMedida, setRascunhoMedida] = useState<{ a: number; l: number; p: number } | null>(null)   // a caixa 3D acompanha o que o cliente digita
@@ -326,40 +322,25 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
         </div>
       )}
 
-      {!p.designer && p.acompanhamento && <AcompanhamentoDigital a={p.acompanhamento} />}
+      {!p.designer && pago && (
+        <a href={`/d/${encodeURIComponent(p.id)}/acompanhar?t=${encodeURIComponent(t)}`} data-testid="link-acompanhar"
+          className="block text-center text-[14px] font-semibold text-[#8456e8] bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04)] py-3.5">Acompanhar meu pedido</a>
+      )}
 
       {!p.designer && p.restante != null && !p.restantePagoEm && !p.prontoEm && (
         <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5">
           <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Wallet className="w-4 h-4 text-[#8456e8]" />Restante</p>
-          <p className="text-[13px] text-[#5e5c68] mt-1 leading-snug">Suas caixinhas estão em produção. Quando ficarem prontas, a gente te avisa e você paga o restante de <strong className="text-[#191625]">{brl(p.restante)}</strong>{p.frete ? " (com o frete)" : ""} para o envio.</p>
+          <p className="text-[13px] text-[#5e5c68] mt-1 leading-snug">Suas caixinhas estão em produção. Quando ficarem prontas, a gente te avisa e você paga o restante de <strong className="text-[#191625]">{brl(p.restante)}</strong>para o envio.</p>
         </div>
       )}
       {!p.designer && p.restante != null && (p.prontoEm || p.restantePagoEm) && (
         p.restantePagoEm
           ? <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5"><p className="text-[13px] text-[#009351] font-semibold flex items-center gap-1.5"><Check className="w-4 h-4" />Restante de {brl(p.restante)} recebido. Pedido quitado.</p></div>
           : <Pagamento p={p} titulo="Restante" valor={p.restante} txid={`${p.id}F`} descricao={`Restante ${p.id}`}
-              sub={p.frete ? `Suas caixinhas estão prontas · ${brl(p.restante - p.frete)} + frete ${brl(p.frete)}` : "Suas caixinhas estão prontas: o envio sai assim que o restante cair"}
+              sub="Suas caixinhas estão prontas: o envio sai assim que o restante cair"
               post={post} setP={setP} onConferir={() => acao("conferir", { acao: "conferir" })} conferindo={ocupado === "conferir"} />
       )}
 
-      {!p.designer && p.arteAprovadaEm && !p.restantePagoEm && (
-        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5">
-          <p className="text-[15px] font-bold text-[#191625] flex items-center gap-2"><Truck className="w-4 h-4 text-[#8456e8]" />Entrega</p>
-          {p.entrega ? (
-            <p className="text-[13px] text-[#5e5c68] mt-1">{p.entrega.endereco} · CEP {p.entrega.cep.replace(/(\d{5})(\d{3})/, "$1-$2")}</p>
-          ) : (<>
-            <p className="text-[12.5px] text-[#5e5c68] mt-1">Para onde a gente manda as suas caixinhas?</p>
-            <input value={ent.cep} onChange={e => setEnt({ ...ent, cep: e.target.value })} inputMode="numeric" maxLength={9} placeholder="CEP"
-              className="mt-3 w-full h-11 rounded-xl px-3.5 text-[14px] text-[#191625] bg-[rgba(116,116,128,0.06)] outline-none focus:ring-2 focus:ring-[#8456e8]/20" />
-            <textarea value={ent.endereco} onChange={e => setEnt({ ...ent, endereco: e.target.value })} rows={2} maxLength={300} placeholder="Rua, número, complemento, bairro e cidade"
-              className="mt-2 w-full rounded-xl px-3.5 py-2.5 text-[14px] text-[#191625] bg-[rgba(116,116,128,0.06)] outline-none focus:ring-2 focus:ring-[#8456e8]/20 resize-y" />
-            <button onClick={() => acao("entrega", { acao: "entrega", ...ent })} disabled={!!ocupado}
-              className="mt-2 w-full h-11 rounded-xl bg-[#191625] text-white text-[14px] font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
-              {ocupado === "entrega" && <Loader2 className="w-4 h-4 animate-spin" />}Salvar endereço
-            </button>
-          </>)}
-        </div>
-      )}
       {aviso && <p className="text-[12.5px] text-[#5e5c68] bg-white rounded-xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] px-4 py-3">{aviso}</p>}
 
       {!p.arteAprovadaEm && !p.arteEnviadaEm && <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.02)] p-5">

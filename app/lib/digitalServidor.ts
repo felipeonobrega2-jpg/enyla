@@ -5,7 +5,7 @@ import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { notificar } from "./notificar"
 import { linkPedido, linkDesigner } from "./digitalLink"
-export { BASE_PUBLICA, tokenDigital, tokenDigitalValido, linkPedido, tokenDesignerValido, linkDesigner } from "./digitalLink"
+export { BASE_PUBLICA, tokenDigital, tokenDigitalValido, linkPedido, linkAcompanhar, tokenDesignerValido, linkDesigner } from "./digitalLink"
 import { evo } from "./evolution"
 import { enviar, enviarArquivo, gravarCfg, seuNumero, Conversa, CfgAgente } from "./agenteAuto"
 import {

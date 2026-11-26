@@ -8,18 +8,7 @@ import { infinitePayConfigurado, numeroDoOrderNsu } from "@/app/lib/infinitePay"
 import { termosDigital, VERSAO_TERMOS } from "@/app/lib/termosDigital"
 import { prazoDoPedido, prazoDigital } from "@/app/lib/prazoDigital"
 import { mascararDocumento } from "@/app/lib/documento"
-import { supabase } from "@/app/lib/supabase"
-import { receberDigital } from "@/app/lib/receberDigital"
-import { acompanhamentoDigital } from "@/app/lib/acompanhamentoDigital"
-import type { LancamentoFinanceiro } from "@/app/types"
-
-// Acompanhamento (depois do sinal): o pagamento vem só do "a receber" (lançamentos do Digital); fora dele, "em conferência"
-async function acompanhamentoDe(p: PedidoComBriefing) {
-  if (!p.sinalPagoEm) return null
-  const { data } = await supabase.from("LancamentoFinanceiro").select("*").like("id", `dig-${p.id}-%`).eq("unidade", "digital").limit(20)
-  const receber = receberDigital([p], (data ?? []) as LancamentoFinanceiro[]).find(r => r.digital.id === p.id)
-  return acompanhamentoDigital(p, receber)
-}
+import { acompanhamentoDe } from "@/app/lib/acompanhamentoPedido"
 
 // Página pública do pedido digital (/d/DIG-0001?t=…): só com o link assinado. Nunca devolve custo nem margem.
 // Link da arte (Leandro): nenhum valor de venda (total, sinal, restante, opções, cobrança), ele não pode saber por quanto foi vendido

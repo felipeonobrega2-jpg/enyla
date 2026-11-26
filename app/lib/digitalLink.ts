@@ -9,3 +9,5 @@ export const linkPedido = (id: string) => `${BASE_PUBLICA}/d/${encodeURIComponen
 export const tokenDesigner = (id: string) => assinar("digital-designer", id)
 export const tokenDesignerValido = (id: string, t: string | null | undefined) => !!t && t === tokenDesigner(id)
 export const linkDesigner = (id: string) => `${linkPedido(id)}&dz=${tokenDesigner(id)}`
+// Link só de acompanhamento (etapas, arte, previsão, pago/saldo): mesmo token do fechamento, sem Pix nem briefing
+export const linkAcompanhar = (id: string) => `${BASE_PUBLICA}/d/${encodeURIComponent(id)}/acompanhar?t=${tokenDigital(id)}`
