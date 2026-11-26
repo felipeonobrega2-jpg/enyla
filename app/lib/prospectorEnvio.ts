@@ -66,14 +66,23 @@ export const NOTA_MINIMA_SO_SECUNDARIO = 2
 export const TERMOS_FORA_DO_RAMO: readonly string[] = ["inflavel", "inflaveis", "balao", "baloes", "figurinha", "brinquedo", "festa"]
 /** Único CNAE da lista que, sozinho, não qualifica: encadernação e plastificação (1822-9/01). */
 const CNAE_SO_ENCADERNACAO = "1822901"
-/** Cota de primeiros contatos por dia (dia de São Paulo), só do WhatsApp. E-mail não tem teto diário. */
-export const LIMITE_WHATSAPP_PRIMEIROS_POR_DIA = 10
-/** Teto diário de e-mails do Prospector (primeiro contato + lembrete), PROSPECTOR_TETO_EMAIL_DIA. Padrão 80: cota Free da Resend (100/dia) menos 20 de reserva
- *  para o que não é prospecção (transacional a cliente e resposta da diretoria, que não entram neste teto). 0 = sem teto (plano pago). Vazio ou inválido = padrão. */
-export const TETO_EMAIL_DIA_PADRAO = 80
-export function tetoEmailDia(valor: string | null | undefined = process.env.PROSPECTOR_TETO_EMAIL_DIA): number {
-  const v = (valor ?? "").trim()
-  return /^\d+$/.test(v) ? Number(v) : TETO_EMAIL_DIA_PADRAO
+/** Limites diários por canal (dia de São Paulo), configuráveis em AppConfig. Número inteiro >= 0; ausente ou inválido = padrão; 0 = o canal não envia.
+ *  WhatsApp: primeiros contatos por dia. E-mail: e-mails do Prospector por dia (primeiro contato + lembrete), somando todas as execuções. */
+export const CHAVE_LIMITE_WHATSAPP_DIA = "prospector_limite_whatsapp_dia"
+export const CHAVE_LIMITE_EMAIL_DIA = "prospector_limite_email_dia"
+export const LIMITE_WHATSAPP_DIA_PADRAO = 30
+export const LIMITE_EMAIL_DIA_PADRAO = 100
+export function limiteDoCanal(valor: unknown, padrao: number): number {
+  return typeof valor === "number" && Number.isInteger(valor) && valor >= 0 ? valor : padrao
+}
+/** Espaçamento mínimo entre duas mensagens de WhatsApp na mesma execução (primeiro contato e lembrete): nunca em rajada. */
+export const ESPACAMENTO_WHATSAPP_MS = 30_000
+/** Quantos primeiros contatos de WhatsApp já podem ter saído até o fim da hora atual: o limite do dia distribuído por igual nas horas da janela
+ *  (8h às 20h). Com 30 por dia, são 3 até as 8h59, 5 até as 9h59 e assim por diante, chegando a 30 na última hora. */
+export function metaWhatsappAteAgora(limiteDia: number, hora: number): number {
+  const horas = HORA_FIM - HORA_INICIO
+  const decorridas = Math.min(Math.max(hora - HORA_INICIO + 1, 0), horas)
+  return Math.min(limiteDia, Math.ceil((limiteDia * decorridas) / horas))
 }
 export type MotivoParada = "teto_diario" | "cota_resend" | "limite_execucao"
 /** Erro de cota da Resend (já gravado no histórico): não é culpa do lead e não conta para MAX_FALHAS_POR_CANAL. */
@@ -92,11 +101,9 @@ export const DIAS_ATE_ENCERRAR = 3
 export const LEMBRETE_EMAIL_ATIVO = false
 /**
  * Segura todo primeiro contato (e-mail e WhatsApp): ninguém novo é abordado, quem está `qualificado` continua `qualificado`, sem erro.
- * Desligada (`false`) com o link de cadastro rastreado no e-mail; o limite diário abaixo continua valendo. Lembrete e leitura de respostas não são afetados.
+ * Desligada (`false`) com o link de cadastro rastreado no e-mail; os limites diários por canal (AppConfig) continuam valendo. Lembrete e leitura de respostas não são afetados.
  */
 export const PRIMEIRO_CONTATO_PAUSADO = false
-/** Máximo de primeiros contatos novos por dia útil (America/Sao_Paulo), somando todas as execuções e canais. Vale também depois da pausa. */
-export const LIMITE_PRIMEIROS_CONTATOS_POR_DIA = 10
 export const HORA_INICIO = 8
 export const HORA_FIM = 20
 export const MAX_FALHAS_POR_CANAL = 3

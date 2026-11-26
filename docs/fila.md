@@ -351,6 +351,7 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 | 48 | Pós-venda acha o WhatsApp de pedido Digital (DIG-xxxx): pedido, cadastro, conversa; erro com motivo (`sem_jid`, `pedido_sem_jid`, `pedido_nao_encontrado`). Não muda o Aprovo | Felipe | — | — | Claude Code | não (correção de erro) | (PR da issue #206) |
 | 47 | Prospector: liberar primeiro contato (`PRIMEIRO_CONTATO_PAUSADO = false`, com a linha do link "Cadastrar minha gráfica") e limite de 10 primeiros contatos por dia útil. PR 0 da issue #208; o template novo com link de cadastro (A/B, lembrete, descadastro) vem em PR separado e troca a pausa para `false` | Felipe (issue #208) | urgente | antes do cron de 26/11 | Claude Code | não | (PR da issue #208) |
 | 49 | Página `/d/[id]`: datas em pt-BR (previsão de entrega) e fuso de Brasília; parte (a) da issue #205 (a parte (b), helper + doc + CI, vem em outro PR) | Felipe | urgente | — | Claude Code | não (só formatação) | (PR da issue #205) |
+| 55 | Prospector: limites diários por canal em AppConfig (`prospector_limite_whatsapp_dia` padrão 30, `prospector_limite_email_dia` padrão 100), WhatsApp distribuído pela janela 8h–20h com espaçamento mínimo de 30 s; substitui o limite fixo de 10 | Felipe (26/11/2026) | urgente | hoje | Claude Code | não | (PR a partir do #212) |
 
 ## 44. Porta externa: leitura de parceiros
 
