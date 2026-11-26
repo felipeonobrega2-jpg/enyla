@@ -8,7 +8,7 @@ import { contas as contasPluggy, item as itemPluggy, transacoes, pluggyConfigura
 import { daPluggy, sugerir, aprender, aprenderConta, completarSugestao as completar, regrasDoHistorico, paresDeDevolucao, FOI_E_VOLTOU, regraConfiavel, regraDaTx, aceitouSemMudar, zerarConfianca, vinculosPorSoma, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
 import { montarPedidos, pedidoEntregue, nomeChave, type Pedido } from "./negocio"
 import { previstosEmAberto, pedidoDoCusto, type PrevistoPedido } from "./calibragem"
-import { fonteDoExtrato, openiConfigurada, lerContasOpeni, contaValeNaData, transacoesOpeni, daOpeni, type TxOpeni } from "./openi"
+import { fonteDoExtrato, openiConfigurada, lerContasOpeni, lerTermosEmpresa, ehDaEmpresa, ACAO_PESSOAL, ACAO_EMPRESA_REGRA, contaValeNaData, transacoesOpeni, daOpeni, type TxOpeni } from "./openi"
 import { MARCA } from "./conciliacao"
 import { clienteClaude, FALLBACK, MODELO } from "./claude"
 import type { LancamentoFinanceiro, KanbanCard } from "../types"
@@ -53,6 +53,7 @@ export async function sincronizarOpeni(): Promise<{ ok: boolean; novas: number; 
   if (!contas.length) return { ok: false, novas: 0, sugeridas: 0, erro: "Nenhuma conta da Openi configurada (OPENI_CONTAS)." }
   const cfg = await lerConfig()
   const desde = cfg.pluggy?.dataCorte ?? hojeSP()
+  const termos = lerTermosEmpresa(cfg.termosEmpresaContaMista)
   let erro: string | null = null
   const linhas: Record<string, unknown>[] = []
   for (const c of contas) {
@@ -61,7 +62,11 @@ export async function sincronizarOpeni(): Promise<{ ok: boolean; novas: number; 
     for (const x of t.lista as TxOpeni[]) {
       const m = daOpeni(x, c.conta, `Openi · ${c.conta.slice(-4)}`)
       if (!m || m.data < desde || !contaValeNaData(c, m.data)) continue
-      linhas.push({ ...m, bruto: x })
+      // Conta mista: o que não é da empresa entra como "ignorada" (fora da fila, do caixa e da conciliação); dá para marcar como da empresa depois
+      const extra = !c.mista ? {} : ehDaEmpresa(m, termos)
+        ? { historico: [{ em: agora(), acao: ACAO_EMPRESA_REGRA }] }
+        : { estado: "ignorada", historico: [{ em: agora(), acao: ACAO_PESSOAL }] }
+      linhas.push({ ...m, bruto: x, ...extra })
     }
   }
   let novas = 0
@@ -432,6 +437,7 @@ export type Decisao =
   | { acao: "criar"; lancamentos: Partial<LancamentoFinanceiro>[]; ensinar?: boolean; automatico?: boolean }
   | { acao: "ignorar"; sempre?: boolean; automatico?: boolean }
   | { acao: "desfazer" }
+  | { acao: "marcarEmpresa" }   // conta mista: o movimento que entrou como pessoal passa a contar para a ENYLA
 
 export async function aplicar(txId: string, d: Decisao): Promise<{ ok: boolean; erro?: string; tx?: TxBanco; criados?: LancamentoFinanceiro[]; atualizados?: { id: string; campos: Partial<LancamentoFinanceiro> }[]; removidos?: string[] }> {
   const { data } = await supabase.from("banco_transacoes").select("*").eq("id", txId).maybeSingle()
@@ -452,6 +458,12 @@ export async function aplicar(txId: string, d: Decisao): Promise<{ ok: boolean; 
     if (ultimo?.detalhe?.includes("regra automática")) { const c = await lerConfig(); await salvarCampos({ regrasBanco: zerarConfianca(c.regrasBanco ?? [], tx) }) }
     const { data: nova } = await supabase.from("banco_transacoes").update({ estado: "pendente", lancamento_ids: [], historico: hist, atualizado_em: agora() }).eq("id", txId).select("*").maybeSingle()
     return { ok: true, tx: nova as TxBanco, removidos: antes.criados ?? [], atualizados: [...(antes.restaurar ? [antes.restaurar] : []), ...(antes.restaurarVarios ?? [])] }
+  }
+  if (d.acao === "marcarEmpresa") {
+    if (tx.estado !== "ignorada" || !hist.some(h => h.acao === ACAO_PESSOAL)) return { ok: false, erro: "Só vale para movimento de conta mista marcado como pessoal." }
+    hist.push({ em: agora(), acao: "conta mista: marcada como da empresa", detalhe: JSON.stringify({ por: quem }) })
+    const { data: nova } = await supabase.from("banco_transacoes").update({ estado: "pendente", sugestao: null, historico: hist, atualizado_em: agora() }).eq("id", txId).select("*").maybeSingle()
+    return { ok: true, tx: nova as TxBanco }
   }
   if (tx.estado !== "pendente") return { ok: false, erro: "Essa transação já foi resolvida. Desfaça antes para mudar." }
   // Um lançamento serve a uma transação só: não liga ao que já está ligado a outra
