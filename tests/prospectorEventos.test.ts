@@ -34,7 +34,7 @@ vi.mock("@/app/lib/configAtomica", () => ({ lerCampos: async () => ({}) }))
 vi.mock("@/app/lib/evolution", () => ({ evo: async () => ({ ok: false, status: 500 }) }))
 
 import { processarEventoEmail, registrarCliquePorToken } from "@/app/lib/prospectorEventosServidor"
-import { envioDe, htmlDoPrimeiroContato, URL_CADASTRO_PARCEIROS } from "@/app/lib/prospectorEnvio"
+import { envioDe, htmlDoPrimeiroContato, textoPlanoDoPrimeiroContato, URL_CADASTRO_PARCEIROS } from "@/app/lib/prospectorEnvio"
 import { GET } from "@/app/api/prospector/r/[token]/route"
 
 const AGORA = new Date("2026-11-26T14:00:00Z")
@@ -99,6 +99,17 @@ describe("link rastreado", () => {
     const h = htmlDoPrimeiroContato("Oi", "tokenabc12345")
     expect(h).toContain("https://app.enyla.com.br/api/prospector/r/tokenabc12345")
     expect(h).not.toContain("/api/d/")
+    expect(h).toContain('Para ser parceira da ENYLA, cadastre a sua gráfica aqui: <a href="https://app.enyla.com.br/api/prospector/r/tokenabc12345">Cadastrar minha gráfica</a>')
+  })
+  it("o texto do link não mostra endereço nenhum", () => {
+    const h = htmlDoPrimeiroContato("Oi", "tokenabc12345")
+    const textoDoLink = h.match(/<a [^>]*>([^<]*)<\/a>/)![1]
+    expect(textoDoLink).toBe("Cadastrar minha gráfica")
+    expect(textoDoLink).not.toMatch(/https?:|www\.|\.com|\.br|\//)
+  })
+  it("texto puro: `Cadastrar minha gráfica: {link}` só com token", () => {
+    expect(textoPlanoDoPrimeiroContato("Oi")).toBe("Oi")
+    expect(textoPlanoDoPrimeiroContato("Oi", "tokenabc12345")).toContain("Cadastrar minha gráfica: https://app.enyla.com.br/api/prospector/r/tokenabc12345")
   })
   it("token válido marca clique e redireciona 302 ao formulário", async () => {
     const res = await GET(new Request("https://x") as never, { params: Promise.resolve({ token: "tokenabc12345" }) })
