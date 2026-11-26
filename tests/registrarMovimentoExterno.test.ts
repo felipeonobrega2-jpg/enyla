@@ -1,4 +1,4 @@
-// Porta externa: registrar_movimento (CTO/COO) e mover_card para Perdido (CTO/COO). Só dados fictícios, tudo em memória.
+// Porta externa: registrar_movimento (CTO/COO) e mover_card para Entregue (CTO/COO) e Perdido (qualquer diretor). Só dados fictícios, tudo em memória.
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
 const estado = vi.hoisted(() => ({
@@ -148,9 +148,11 @@ describe("registrar_movimento permissão", () => {
   })
 })
 
-describe("mover_card para Perdido (coluna 10)", () => {
+describe("mover_card para Perdido (10, qualquer diretor) e Entregue (9, só CTO e COO)", () => {
   const perdido = { acao: "mover_card", numero: "ORC-1", coluna: 10, motivo: "Cliente desistiu" }
-  it.each(["cto", "coo"])("%s move para 10 com motivo: coluna, motivoPerdido e Tracking, sem mensagem", async d => {
+  const entregue = { acao: "mover_card", numero: "ORC-1", coluna: 9, motivo: "Retirado pelo cliente" }
+  type Trk = { colunaAtual: number; etapas: { coluna: number; por?: string; detalhe?: string }[] }
+  it.each(["cto", "coo", "cfo", "cmo", "cco"])("%s move para 10 com motivo: coluna, motivoPerdido e Tracking, sem mensagem", async d => {
     estado.diretor = d
     const r = await pedir(perdido)
     expect(r.status).toBe(200)
@@ -158,26 +160,43 @@ describe("mover_card para Perdido (coluna 10)", () => {
     expect(j.movidos).toEqual([{ numero: "ORC-1", de: 5, para: 10 }])
     expect(j.registro).toMatchObject({ autor: d, motivo: "Cliente desistiu", cards: [{ numero: "ORC-1", de: 5, para: 10 }] })
     expect(estado.updates.find(u => u.tabela === "KanbanCard")!.dados).toEqual({ coluna: 10, motivoPerdido: "Cliente desistiu" })
-    const trk = estado.updates.find(u => u.tabela === "Tracking")!.dados as { colunaAtual: number }
+    const trk = estado.updates.find(u => u.tabela === "Tracking")!.dados as Trk
     expect(trk.colunaAtual).toBe(10)
+    expect(trk.etapas.at(-1)).toMatchObject({ coluna: 10, detalhe: expect.stringContaining("Cliente desistiu") })
+    expect(trk.etapas.at(-1)!.por).toBeTruthy()
+    expect(estado.updates.every(u => u.tabela === "KanbanCard" || u.tabela === "Tracking")).toBe(true)
     expect(estado.fetchs).toBe(0)
   })
-  it("sem motivo: 400, nada gravado", async () => {
-    for (const motivo of [undefined, "", "  ", "a".repeat(301)]) expect((await pedir({ ...perdido, motivo })).status).toBe(400)
-    expect(estado.updates).toEqual([])
-  })
-  it.each(["cfo", "cmo", "cco"])("%s leva 403 em 10, sem escrita, mas segue podendo 2 a 8", async d => {
+  it.each(["cto", "coo"])("%s move para 9 com motivo: só coluna e Tracking, sem mensagem", async d => {
     estado.diretor = d
-    expect((await pedir(perdido)).status).toBe(403)
+    const r = await pedir(entregue)
+    expect(r.status).toBe(200)
+    expect((await r.json()).movidos).toEqual([{ numero: "ORC-1", de: 5, para: 9 }])
+    expect(estado.updates.find(u => u.tabela === "KanbanCard")!.dados).toEqual({ coluna: 9 })
+    const trk = estado.updates.find(u => u.tabela === "Tracking")!.dados as Trk
+    expect(trk.colunaAtual).toBe(9)
+    expect(trk.etapas.at(-1)).toMatchObject({ coluna: 9, detalhe: expect.stringContaining("Retirado pelo cliente") })
+    expect(trk.etapas.at(-1)!.por).toBeTruthy()
+    expect(estado.fetchs).toBe(0)
+  })
+  it.each(["cfo", "cmo", "cco"])("%s leva 403 em 9, sem escrita, mas segue podendo 2 a 8", async d => {
+    estado.diretor = d
+    expect((await pedir(entregue)).status).toBe(403)
     expect(estado.updates).toEqual([])
-    expect((await pedir({ ...perdido, coluna: 6 })).status).toBe(200)
+    expect((await pedir({ ...entregue, coluna: 6 })).status).toBe(200)
     expect(estado.updates.find(u => u.tabela === "KanbanCard")!.dados).toEqual({ coluna: 6 })
   })
-  it("0 e 9 continuam recusados; card já entregue ou perdido não vai a 10", async () => {
-    expect((await pedir({ ...perdido, coluna: 9 })).status).toBe(400)
+  it.each([9, 10])("coluna %s sem motivo: 400, nada gravado", async coluna => {
+    for (const motivo of [undefined, "", "  ", "a".repeat(301)]) expect((await pedir({ acao: "mover_card", numero: "ORC-1", coluna, motivo })).status).toBe(400)
+    expect(estado.updates).toEqual([])
+  })
+  it("0 continua recusado; card já entregue ou perdido não vai a 9 nem a 10", async () => {
     expect((await pedir({ ...perdido, coluna: 0 })).status).toBe(400)
-    estado.cards = [{ id: "1", numero: "ORC-1", coluna: 9 }]
-    expect((await pedir(perdido)).status).toBe(400)
+    for (const col of [9, 10]) {
+      estado.cards = [{ id: "1", numero: "ORC-1", coluna: col }]
+      expect((await pedir(perdido)).status).toBe(400)
+      expect((await pedir(entregue)).status).toBe(400)
+    }
     expect(estado.updates).toEqual([])
   })
 })
