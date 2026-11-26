@@ -1,5 +1,6 @@
 "use client"
 
+import type { PedidoParaReceber } from "./lib/receberDigital"
 import { unpackTerceirizado } from "./lib/kanbanUnpack"
 import { gravarPerda, podeExcluirDefinitivo } from "./lib/perdido"
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
@@ -2657,7 +2658,8 @@ export default function Home() {
           ) : view === "dados" ? (
             <AuditoriaView onAbrirCard={id => { const c = kanban.find(k => k.id === id); if (c) abrirDetalheCard(c) }} onNavegar={v => navigate(v)} />
           ) : view === "escritorio" ? (
-            <EscritorioView kanban={kanban} lancamentos={lancamentos}
+            <EscritorioView kanban={kanban} lancamentos={lancamentos} negocios={negocios}
+              pedidosDigitais={(config as { pedidosDigitais?: PedidoParaReceber[] }).pedidosDigitais}
               saldoContas={(() => { const cs = (config.contas ?? []).filter(c => c.ativa && c.tipo !== "credito" && c.saldo != null); return cs.length ? cs.reduce((t, c) => t + (c.saldo ?? 0), 0) : null })()} />
           ) : view === "ideias" ? (
             <IdeiasView config={config} onSalvar={salvarConfigTudo} />
