@@ -68,6 +68,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 54 | Chave `aprovoObrigatorio` (padrão false): sem o Aprovo, a mensagem sai direto pelo funcionário, com as travas, conferência do a receber ao centavo e histórico (`aprovoDesligadoLog`) | Felipe (ordem de 26/11/2026, 9h44) | urgente | — | Claude Code | não (ordem do Felipe) | (PR da issue #244) |
 | 52 | `/parceiros`: nova capa da rede de gráficas parceiras, sem "embalagem" nos textos (só texto) | Felipe | — | — | Claude Code | não (só texto) | (PR da issue #241) |
 | 53 | Atendente responde sozinho, pela IA, as gráficas do Prospector (modo parceiro: sem orçamento, link `app.enyla.com.br/parceiros`, 3 perguntas sem resposta oficial vão ao Felipe, opt-out); troca o item 38 | Felipe (ordem de 26/11/2026: "tem que ser tudo automático") | urgente | — | Claude Code | não (CI e preview verdes, o Felipe junta) | (PR da issue #242, parte do Atendente) |
+| 54 | `/parceiros`: aceite obrigatório dos Termos de Parceria (versão 0.3, RASCUNHO, tabela `termos_parceria`), página `/parceiros/termos`, aceite por token para quem já cadastrou. Só exibe e grava; sem cobrança, desconto ou multa | Felipe | depois das #242 e #245 | — | Claude Code | não (texto final entra como nova versão no registro) | (PR da issue #256) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
@@ -372,3 +373,13 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 ## 52. Parceira sem preço fixo: modo `tabela` / `orcamento_por_pedido` (issue #252)
 
 **Status:** Claude Code. **Aprovo:** decisão do Felipe na issue #252. Só registro e texto; a distribuição e o aviso de pedido às parceiras ficam para um PR seguinte. `modoDaParceira` (`app/lib/parceiros.ts`) grava `modo` no cadastro: `tabela` se todo serviço tem preço e prazo médio; senão `orcamento_por_pedido`. No modo parceiro do Atendente (`atendenteParceiro.ts`), se a gráfica diz que não tem preço fixo, a IA explica a prioridade de quem cadastra preço e prazo, pergunta se ela passa um preço de referência e o prazo médio, e o histórico do prospecto registra `modo_parceira`. Nunca cita valor da ENYLA nem promete volume. Testes em `tests/parceiros.test.ts` e `tests/atendenteParceiro.test.ts`.
+
+## 54. Termos de Parceria (issue #256)
+
+**Status:** Claude Code. **Aprovo:** não. **PR:** da issue #256.
+
+**Feito.** Caixa obrigatória no `/parceiros` (inclui `?o=prospector`); `/parceiros/termos` lê `termos_parceria` (migração aditiva `20261201_termos_parceria.sql`, versão 0.3 RASCUNHO; o item 1 usa a lista de serviços do formulário); aceite gravado no cadastro (`termosVersao`, `termosAceitosEm`, `termosIp`, `termosUserAgent`); cadastro sem aceite é `pendente_termos`; aceite pelo link `/parceiros/termos?aceite=1&t=<token>`. Nenhuma mensagem é enviada.
+
+**Regra para o PR de distribuição de pedidos (#252).** `podeReceberPedido` (`app/lib/termosParceria.ts`): só parceira cadastrada via `/parceiros` sem aceite fica sem pedido novo. Fornecedor em operação e pedido já em produção nunca são bloqueados (só pendência visível).
+
+**Regra para o mesmo PR: ordem de serviço.** A ordem de serviço enviada à parceira NUNCA inclui nome, telefone, e-mail, endereço ou CNPJ do cliente final: só o código do pedido ENYLA e o necessário para o serviço. O PR da distribuição deve ter teste que barra esses campos (lista em `CAMPOS_PROIBIDOS_NA_ORDEM`).
