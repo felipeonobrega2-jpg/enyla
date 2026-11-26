@@ -2,6 +2,7 @@
 // NUNCA envia nada: sem segundo contato, sem auto-resposta. Mesmo padrão de detectarRespostas (WhatsApp).
 import { supabase } from "./supabase"
 import { ehRecusa } from "./prospectorEnvio"
+import { classificarResposta } from "./prospectorTextos"
 import { enderecoDoRemetente } from "./prospectorInbound"
 import { COLUNAS, gravar, gravarOptOut, historicoDe, type Linha } from "./prospectorEnvioServidor"
 
@@ -60,7 +61,7 @@ export async function processarEmailRecebido(evento: EventoRecebido, agora: Date
     if (recusa) {
       if (await gravarOptOut(l, em, "recusa por e-mail (não quero receber)")) res.optOuts!++
     } else if (l.etapa === "abordado") {
-      if (await gravar(l, { etapa: "respondeu", historico_etapas: [...historicoDe(l), { etapa: "respondeu", em, motivo: "respondeu por e-mail" }] })) res.responderam!++
+      if (await gravar(l, { etapa: "respondeu", historico_etapas: [...historicoDe(l), { etapa: "respondeu", em, motivo: "respondeu por e-mail", resposta: classificarResposta(texto) }] })) res.responderam!++
     }
   }
   return res
