@@ -2,7 +2,7 @@ import { lerConfigLinha } from "../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { mudarConfig } from "@/app/lib/configAtomica"
-import { MidiaAgente, tipoDaMidia } from "@/app/lib/midiaAgente"
+import { MidiaAgente, tipoDaMidia, etapaValida } from "@/app/lib/midiaAgente"
 
 // Biblioteca de mídia do agente (rota protegida pelo login): listar, subir, descrever, pausar e tirar
 const MAX = 16 * 1024 * 1024   // limite do WhatsApp para vídeo
@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
     const file = form?.get("file") as File | null
     const descricao = String(form?.get("descricao") ?? "").trim().slice(0, 140)
     if (!file) return NextResponse.json({ erro: "Escolha o arquivo." }, { status: 400 })
+    const etapa = etapaValida(String(form?.get("etapa") ?? ""))
     const tipo = tipoDaMidia(file.type)
     if (!tipo) return NextResponse.json({ erro: "Mande vídeo (MP4) ou foto (JPG, PNG)." }, { status: 400 })
     if (file.size > MAX) return NextResponse.json({ erro: "Acima de 16 MB: o WhatsApp não aceita. Exporte em 720p." }, { status: 400 })
@@ -25,11 +26,11 @@ export async function POST(req: NextRequest) {
     const { error } = await supabase.storage.from("pedido-arquivos").upload(path, await file.arrayBuffer(), { contentType: file.type, upsert: false })
     if (error) return NextResponse.json({ erro: "Não consegui guardar. Tente de novo." }, { status: 500 })
     const { data: { publicUrl } } = supabase.storage.from("pedido-arquivos").getPublicUrl(path)
-    const m: MidiaAgente = { id, url: publicUrl, mime: file.type, nome: file.name.slice(0, 120), descricao: descricao || file.name.slice(0, 80), tipo, em: new Date().toISOString(), usos: 0, ativo: true }
+    const m: MidiaAgente = { id, url: publicUrl, mime: file.type, nome: file.name.slice(0, 120), descricao: descricao || file.name.slice(0, 80), tipo, em: new Date().toISOString(), usos: 0, ativo: true, ...(etapa ? { etapa } : {}) }
     await mudarConfig(d => ({ midiaAgente: [...((d as Dados).midiaAgente ?? []), m].slice(-40) }))
     return NextResponse.json({ midia: await ler() })
   }
-  const b = await req.json().catch(() => ({})) as { id?: string; descricao?: string; ativo?: boolean; tirar?: boolean }
+  const b = await req.json().catch(() => ({})) as { id?: string; descricao?: string; ativo?: boolean; tirar?: boolean; etapa?: string }
   if (!b.id) return NextResponse.json({ erro: "Faltou qual." }, { status: 400 })
   const atual = (await ler()).find(m => m.id === b.id)
   if (b.tirar && atual) {
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     if (caminho.startsWith("midia/")) await supabase.storage.from("pedido-arquivos").remove([caminho]).catch(() => null)
   }
   await mudarConfig(d => ({
-    midiaAgente: ((d as Dados).midiaAgente ?? []).flatMap(m => m.id !== b.id ? [m] : b.tirar ? [] : [{ ...m, ...(b.descricao != null ? { descricao: b.descricao.trim().slice(0, 140) } : {}), ...(b.ativo != null ? { ativo: b.ativo } : {}) }]),
+    midiaAgente: ((d as Dados).midiaAgente ?? []).flatMap(m => m.id !== b.id ? [m] : b.tirar ? [] : [{ ...m, ...(b.descricao != null ? { descricao: b.descricao.trim().slice(0, 140) } : {}), ...(b.ativo != null ? { ativo: b.ativo } : {}), ...(b.etapa != null ? { etapa: etapaValida(b.etapa) } : {}) }]),
   }))
   return NextResponse.json({ midia: await ler() })
 }

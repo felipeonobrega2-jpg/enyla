@@ -1,15 +1,16 @@
 "use client"
 
-// Biblioteca de mídia do agente: vídeos e fotos de produção. O F2 (1 dia sem resposta) leva o vídeo menos usado.
+// Biblioteca de mídia do agente: vídeos e fotos de produção. Cada etapa do Follow-up leva o vídeo menos usado daquela etapa.
 
 import { useEffect, useState } from "react"
 import { Film, Image as ImageIcon, Loader2, Upload, Trash2, Pause, Play } from "lucide-react"
 import { Cartao, TituloCartao, Selo } from "./ds"
-import type { MidiaAgente } from "../lib/midiaAgente"
+import { ETAPAS_MIDIA, type MidiaAgente } from "../lib/midiaAgente"
 
 export default function MidiaAgenteCard() {
   const [midia, setMidia] = useState<MidiaAgente[] | null>(null)
   const [descricao, setDescricao] = useState("")
+  const [etapa, setEtapa] = useState("")
   const [subindo, setSubindo] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -22,7 +23,7 @@ export default function MidiaAgenteCard() {
   async function subir(f: File | undefined) {
     if (!f) return
     setSubindo(true); setErro(null)
-    const fd = new FormData(); fd.append("file", f); fd.append("descricao", descricao)
+    const fd = new FormData(); fd.append("file", f); fd.append("descricao", descricao); fd.append("etapa", etapa)
     const r = await fetch("/api/midia", { method: "POST", body: fd }).catch(() => null)
     const d = await r?.json().catch(() => null)
     if (r?.ok) { setMidia(d.midia); setDescricao("") } else setErro(d?.erro ?? "Não consegui subir.")
@@ -37,10 +38,14 @@ export default function MidiaAgenteCard() {
   return (
     <Cartao className="ds-entrada">
       <TituloCartao titulo="Biblioteca de mídia" icone={<Film className="w-4 h-4" />}
-        sub={`Vídeos e fotos de produção. Quem fica 1 dia sem responder recebe, junto do F2, o vídeo menos usado. ${videos ? `${videos} vídeo(s) ativo(s).` : "Sem vídeo, o F2 vai só com texto."}`} />
+        sub={`Vídeos e fotos de produção. Cada Follow-up (F1, F2, F3) leva o vídeo ativo menos usado da sua etapa. ${videos ? `${videos} vídeo(s) ativo(s).` : "Sem vídeo da etapa, vai só com texto."}`} />
       <div className="flex gap-2 flex-wrap">
         <input value={descricao} onChange={e => setDescricao(e.target.value)} maxLength={140} placeholder="O que é (ex.: caixa rígida preta sendo montada)"
           className="flex-1 min-w-[200px] h-9 rounded-lg px-3 text-[12.5px] text-[#191625] bg-white ds-borda focus:outline-none focus:ring-2 focus:ring-[#8456e8]/20" />
+        <select value={etapa} onChange={e => setEtapa(e.target.value)} aria-label="Etapa" className="h-9 rounded-lg px-2 text-[12.5px] text-[#191625] bg-white ds-borda">
+          <option value="">Sem etapa</option>
+          {ETAPAS_MIDIA.map(x => <option key={x} value={x}>{x === "reativacao" ? "Reativação" : x}</option>)}
+        </select>
         <label className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[#8456e8] text-white text-[12.5px] font-semibold cursor-pointer ${subindo ? "opacity-60 pointer-events-none" : ""}`}>
           {subindo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}{subindo ? "Subindo…" : "Subir vídeo ou foto"}
           <input type="file" accept="video/mp4,video/quicktime,image/jpeg,image/png,image/webp" className="hidden" onChange={e => void subir(e.target.files?.[0])} />
@@ -54,8 +59,12 @@ export default function MidiaAgenteCard() {
             {m.tipo === "video" ? <Film className="w-4 h-4 text-[#8456e8] shrink-0" /> : <ImageIcon className="w-4 h-4 text-[#8456e8] shrink-0" />}
             <a href={m.url} target="_blank" rel="noreferrer" className="flex-1 min-w-0">
               <span className="block text-[12.5px] font-semibold text-[#191625] truncate">{m.descricao}</span>
-              <span className="block text-[11px] text-[#898892]">{m.usos ?? 0} envio(s)</span>
+              <span className="block text-[11px] text-[#898892]">{m.usos ?? 0} envio(s){m.etapa ? ` · ${m.etapa === "reativacao" ? "Reativação" : m.etapa}` : " · sem etapa"}</span>
             </a>
+            <select value={m.etapa ?? ""} onChange={e => void mudar({ id: m.id, etapa: e.target.value })} aria-label="Etapa" className="h-7 rounded px-1 text-[11px] bg-white ds-borda">
+              <option value="">Sem etapa</option>
+              {ETAPAS_MIDIA.map(x => <option key={x} value={x}>{x === "reativacao" ? "Reativação" : x}</option>)}
+            </select>
             {m.ativo === false && <Selo>pausado</Selo>}
             <button title={m.ativo === false ? "Voltar a usar" : "Pausar"} onClick={() => void mudar({ id: m.id, ativo: m.ativo === false })} className="text-[#898892] hover:text-[#191625]">
               {m.ativo === false ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}

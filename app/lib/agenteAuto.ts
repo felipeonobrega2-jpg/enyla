@@ -1116,10 +1116,10 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     if (trava) return registrar({ ...dados, enviou: false, motivo: `F${nivel} segurado: ${trava}` })
     const env = await enviar(c, r.resposta, undefined, { proativo: true })
     if (env.ids.length) await aplicar(c, passo!.etiquetas, null)
-    // F2 leva junto um vídeo de produção da biblioteca (o menos usado), quando houver
+    // Cada etapa (F1, F2, F3) leva junto o vídeo ativo menos usado cadastrado para ela; sem vídeo da etapa, só texto
     let video = ""
-    if (env.ids.length && nivel === 2) {
-      const v = escolherMidia((cfg as { midiaAgente?: MidiaAgente[] }).midiaAgente, "video")
+    if (env.ids.length && (nivel === 1 || nivel === 2 || nivel === 3)) {
+      const v = escolherMidia((cfg as { midiaAgente?: MidiaAgente[] }).midiaAgente, "video", `F${nivel}`)
       if (v) {
         await new Promise(res => setTimeout(res, 2500 + Math.random() * 2500))
         const ev = await enviarArquivo(c, v.url, v.mime, "", v.nome, { proativo: true }).catch(() => null)
