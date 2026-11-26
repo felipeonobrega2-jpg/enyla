@@ -96,7 +96,7 @@ export async function ordenarComercial(diretor: IdDiretor, x: Record<string, unk
     funcionario: func, cliente: lead.nome, jid: lead.jid, ordem, apiKey: op.apiKey, conhecimento: cfg.conhecimentoAgente, cultura: op.cultura,
     guia: cfg.guiaAtendimento?.trim() || undefined,
   })
-  if (!r.ok) return { saida: `Não deu: ${r.erro}`, acao: { id: op.novoId(), tipo: "falha", texto: r.erro }, status: 422 }
+  if (!r.ok) return semTexto(r, func.nome, op.novoId, nv.nivel)
   const fila = (texto: string, motivo: string): Pronto => ({
     acao: { id: op.novoId(), tipo: "mensagem", funcionario: func.nome, cliente: lead.nome, jid: lead.jid, texto, status: "aguardando" },
     saida: `${func.nome} escreveu e a mensagem está esperando o Aprovo do Felipe: "${texto}"`, destino: "fila_aprovo", motivo, nivel: nv.nivel,
@@ -114,6 +114,13 @@ export async function ordenarComercial(diretor: IdDiretor, x: Record<string, unk
     return fila(e.texto ?? r.texto, e.motivo)
   }
   return { acao: e.acao, saida: `${func.nome} enviou direto ao lead (sem compra, não precisa do Aprovo): "${(e.acao as { texto: string }).texto}"`, destino: "enviado_direto", motivo: `lead sem compra: enviado pelo ${func.nome}`, nivel: nv.nivel }
+}
+
+// O modelo decidiu não escrever (texto vazio): comportamento certo, não erro. 200, nada enviado, nada na fila, motivo claro.
+// Erro de verdade (exceção na IA, funcionário sem WhatsApp) segue como falha (422).
+function semTexto(r: { erro: string; nadaAEnviar?: boolean }, funcionario: string, novoId: () => string, nivel: string): Pronto {
+  if (r.nadaAEnviar) return { saida: `Nada a enviar: ${funcionario} avaliou a conversa e decidiu não escrever nada agora. Nada foi enviado nem entrou na fila.`, status: 200, motivo: r.erro, nivel }
+  return { saida: `Não deu: ${r.erro}`, acao: { id: novoId(), tipo: "falha", texto: r.erro }, status: 422 }
 }
 
 // jid candidato da ordem: o jid mandado ou, se o "cliente" é um telefone, o número no WhatsApp
@@ -141,6 +148,6 @@ async function ordenarProspecto(diretor: IdDiretor, func: Funcionario, x: Record
   const { redigirComoFuncionario } = await import("./funcionariosServidor")
   const nome = prospecto.nome_fantasia || prospecto.razao_social || String(x.cliente ?? jid)
   const r = await redigirComoFuncionario({ funcionario: func, cliente: nome, jid, ordem, apiKey: op.apiKey, conhecimento: cfg.conhecimentoAgente, cultura: op.cultura, guia: cfg.guiaAtendimento?.trim() || undefined })
-  if (!r.ok) return { saida: `Não deu: ${r.erro}`, acao: { id: op.novoId(), tipo: "falha", texto: r.erro }, status: 422 }
+  if (!r.ok) return semTexto(r, func.nome, op.novoId, "lead")
   return enviarAoProspecto({ diretor, func, prospecto, jid, texto: r.texto, novoId: op.novoId })
 }

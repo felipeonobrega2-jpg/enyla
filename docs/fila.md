@@ -66,6 +66,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 50 | Acompanhamento Digital usa prazo e arte gravados (`gravar_digital`) e guarda todas as edições (`edicoesAcomp`) | Felipe | urgente | — | Claude Code | não | (PR da issue #230) |
 | 51 | Porta externa: `acao=importar_prospectos` e ordem direta a gráfica do Prospector, sem Aprovo, só 8h–20h e fora da exclusão (regra do Felipe de 26/11/2026, 9h44; 1º PR da issue #242; verificar_whatsapp, responder_prospecto e decidir_cadastro_parceiro vêm depois) | CCO | urgente | — | Claude Code | não | (PR da issue #242) |
 | 52 | `/parceiros`: nova capa da rede de gráficas parceiras, sem "embalagem" nos textos (só texto) | Felipe | — | — | Claude Code | não (só texto) | (PR da issue #241) |
+| 53 | Atendente responde sozinho a gráfica do Prospector no WhatsApp (modo parceria: sim = link, dúvida = conhecimento, não = opt-out); funil registra abordado, respondeu e cadastrou; "nada a enviar" deixa de ser erro (issue #242, ordem do Felipe de 26/11/2026) | CCO | urgente | — | Claude Code | não | (PR da issue #242) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 

@@ -42,12 +42,15 @@ async function reservarVez(): Promise<number | null> {
 }
 
 /** Registra no histórico do prospecto, com quem fez. Não usa a chave `envio` (que é da cadência e mexeria nela). */
-async function registrar(p: ProspectoDoJid, entrada: Record<string, unknown>): Promise<void> {
+async function registrar(p: ProspectoDoJid, entrada: Record<string, unknown>, abordar = false): Promise<void> {
   let atual = p
   for (let i = 0; i < 3; i++) {
     const hist = Array.isArray(atual.historico_etapas) ? atual.historico_etapas : []
     const novoEm = new Date().toISOString()
-    const { data } = await supabase.from("prospectos_parceiros").update({ historico_etapas: [...hist, { etapa: atual.etapa, em: novoEm, ...entrada }], atualizado_em: novoEm })
+    // Quem recebeu a mensagem foi abordado: encontrado e qualificado andam para abordado (só para frente; as outras etapas ficam)
+    const abordou = abordar && (atual.etapa === "encontrado" || atual.etapa === "qualificado")
+    const etapa = abordou ? "abordado" : atual.etapa
+    const { data } = await supabase.from("prospectos_parceiros").update({ ...(abordou ? { etapa } : {}), historico_etapas: [...hist, { etapa, em: novoEm, ...entrada }], atualizado_em: novoEm })
       .eq("id", atual.id).eq("atualizado_em", atual.atualizado_em).select("id")
     if (Array.isArray(data) && data.length) return
     const { data: l } = await supabase.from("prospectos_parceiros").select("id, razao_social, nome_fantasia, telefone, etapa, opt_out, historico_etapas, atualizado_em").eq("id", p.id).maybeSingle()
@@ -68,7 +71,7 @@ export async function enviarAoProspecto(a: { diretor: string; func: Pick<Funcion
   const r = await evo<{ key?: { id?: string } }>("/message/sendText/{i}", { method: "POST", body: JSON.stringify({ number: numero, text: a.texto }) })
   if (!r.ok || !r.corpo?.key?.id) return { saida: `Não enviou (WhatsApp ${r.status}). Nada foi para a fila.`, status: 503, motivo: `WhatsApp não enviou (${r.status})`, nivel: "lead" }
   const em = new Date().toISOString()
-  await registrar(a.prospecto, { motivo: `mensagem enviada por ${a.diretor.toUpperCase()} (${a.func.nome}, ordem pela porta externa)`, mensagem: { direcao: "enviada", canal: "whatsapp", por: a.diretor, funcionario: a.func.nome, texto: a.texto, em } }).catch(() => null)
+  await registrar(a.prospecto, { motivo: `mensagem enviada por ${a.diretor.toUpperCase()} (${a.func.nome}, ordem pela porta externa)`, mensagem: { direcao: "enviada", canal: "whatsapp", por: a.diretor, funcionario: a.func.nome, texto: a.texto, em } }, true).catch(() => null)
   const nome = a.prospecto.nome_fantasia || a.prospecto.razao_social || a.jid
   return {
     acao: { id: a.novoId(), tipo: "mensagem", funcionario: a.func.nome, cliente: nome, jid: a.jid, texto: a.texto, status: "enviado", em, direto: true },

@@ -63,6 +63,11 @@ export async function receberCadastro(form: FormData): Promise<{ ok: true; id: s
     const { registrarCadastroRecebido } = await import("./prospectorServidor")
     await registrarCadastroRecebido(cadastro.documento, cadastro.tipoDocumento, cadastro.id)
   } catch { /* o cadastro já está salvo; o funil não pode desfazer isso */ }
+  // Mesmo CNPJ ou telefone de um prospecto: o funil vai a "cadastrou" já no recebimento (a conversão que o Atendente buscou)
+  try {
+    const { marcarProspectCadastrouNoRecebimento } = await import("./prospectorServidor")
+    await marcarProspectCadastrouNoRecebimento({ documento: cadastro.documento, tipoDocumento: cadastro.tipoDocumento, whatsapp: cadastro.whatsapp, id: cadastro.id })
+  } catch { /* idem */ }
 
   // E-mail "Cadastro recebido" para o parceiro (se a Resend estiver configurada)
   try {

@@ -4,14 +4,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 const e = vi.hoisted(() => ({
   base: [] as Record<string, unknown>[], inseridos: [] as Record<string, unknown>[], hist: [] as unknown[],
   nivel: { nivel: "lead", jaCliente: false, motivo: "" } as { nivel: string; jaCliente: boolean; motivo: string },
-  prospecto: null as Record<string, unknown> | null, evo: vi.fn(), redigir: vi.fn(), conversa: [] as unknown[],
+  prospecto: null as Record<string, unknown> | null, campos: {} as Record<string, unknown>, evo: vi.fn(), redigir: vi.fn(), conversa: [] as unknown[],
 }))
 const cadeia = (rows: () => unknown[]) => {
   const q: Record<string, unknown> = {
     then: (r: (v: unknown) => void) => r({ data: rows(), error: null }),
     maybeSingle: async () => ({ data: rows()[0] ?? null }),
     upsert: (linhas: Record<string, unknown>[]) => { e.inseridos.push(...linhas); const q2 = cadeia(() => linhas.map((l, i) => ({ id: 100 + i, cnpj: l.cnpj }))); return q2 },
-    update: (c: Record<string, unknown>) => { e.hist = c.historico_etapas as unknown[]; return cadeia(() => [{ id: 1 }]) },
+    update: (c: Record<string, unknown>) => { e.hist = c.historico_etapas as unknown[]; e.campos = c; return cadeia(() => [{ id: 1 }]) },
   }
   for (const m of ["select", "order", "limit", "eq", "range", "in"]) q[m] = () => q
   return q
@@ -42,7 +42,7 @@ const sabado = new Date("2026-11-28T15:00:00Z").getTime()
 describe("ordenar_funcionario a gráfica do Prospector", () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(util)
-    e.nivel = { nivel: "lead", jaCliente: false, motivo: "" }; e.conversa = []; e.hist = []
+    e.nivel = { nivel: "lead", jaCliente: false, motivo: "" }; e.conversa = []; e.hist = []; e.campos = {}
     e.prospecto = { id: 1, razao_social: "Gráfica Alfa", nome_fantasia: null, telefone: "11999990001", etapa: "encontrado", opt_out: false, historico_etapas: [], atualizado_em: "2026-11-26T00:00:00Z" }
     e.evo.mockReset(); e.evo.mockResolvedValue({ ok: true, status: 201, corpo: { key: { id: "w1" } } })
     e.redigir.mockReset(); e.redigir.mockResolvedValue({ ok: true, texto: "Oi! Vocês fazem terceirização?" })
@@ -52,6 +52,28 @@ describe("ordenar_funcionario a gráfica do Prospector", () => {
     expect(r.destino).toBe("enviado_direto"); expect(r.acao).toMatchObject({ status: "enviado", direto: true })
     expect(JSON.parse(e.evo.mock.calls[0][1].body)).toEqual({ number: "5511999990001", text: "Oi! Vocês fazem terceirização?" })
     expect(JSON.stringify(e.hist)).toContain("CCO"); expect(JSON.stringify(e.hist)).toContain("enviada")
+  })
+  it.each(["encontrado", "qualificado"])("quem recebeu a mensagem sai de %s e vai para abordado", async etapa => {
+    e.prospecto!.etapa = etapa
+    await ordenar()
+    expect(e.campos.etapa).toBe("abordado")
+    expect((e.hist as { etapa: string }[]).at(-1)?.etapa).toBe("abordado")
+  })
+  it.each(["abordado", "respondeu", "cadastrou"])("etapa %s não muda com a ordem direta", async etapa => {
+    e.prospecto!.etapa = etapa
+    await ordenar()
+    expect(e.campos).not.toHaveProperty("etapa")
+  })
+  it("o modelo decidiu não escrever (texto vazio): 200, nada a enviar, nada sai e nada vira cartão de falha", async () => {
+    e.redigir.mockResolvedValue({ ok: false, erro: "nada a enviar", nadaAEnviar: true })
+    const r = await ordenar()
+    expect(r.status).toBe(200); expect(r.motivo).toBe("nada a enviar"); expect(r.saida).toContain("Nada a enviar")
+    expect(r.acao).toBeUndefined(); expect(e.evo).not.toHaveBeenCalled()
+  })
+  it("erro real ao redigir (exceção na IA) segue como falha 422", async () => {
+    e.redigir.mockResolvedValue({ ok: false, erro: "Atendente não conseguiu escrever a mensagem (Error: x)" })
+    const r = await ordenar()
+    expect(r.status).toBe(422); expect(r.acao).toMatchObject({ tipo: "falha" }); expect(e.evo).not.toHaveBeenCalled()
   })
   it("prospecto excluído: 409 e nada sai", async () => {
     e.prospecto!.opt_out = true

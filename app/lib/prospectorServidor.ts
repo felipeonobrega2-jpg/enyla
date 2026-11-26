@@ -1,7 +1,8 @@
 // Leitura do funil e o gancho do cadastro. Não envia mensagem e não altera o cadastro do parceiro.
 import { supabase } from "./supabase"
+import { chaveTelefone } from "./prospectorEnvio"
 import {
-  aoCadastrarComCnpj, etapaConhecida, notaDoProspect, registrarCadastroRecebido as registrarNoHistorico, ETAPAS_FUNIL,
+  aoCadastrarComCnpj, etapaConhecida, transicionar, notaDoProspect, registrarCadastroRecebido as registrarNoHistorico, ETAPAS_FUNIL,
   type EstadoFunil, type EtapaFunil, type MudancaEtapa,
 } from "./prospector"
 
@@ -119,4 +120,37 @@ export async function marcarProspectCadastrou(documento: string, tipo: "cnpj" | 
   const cnpj = cnpjDe(documento, tipo)
   if (!cnpj) return false
   return mudarProspecto(cnpj, (estado, em) => aoCadastrarComCnpj(estado, em, cadastroId))
+}
+
+// Cadastro em /parceiros com o mesmo CNPJ ou o mesmo telefone (WhatsApp) de um prospecto: a conversão entra no funil
+// na hora ("cadastrou"), sem esperar a aprovação do Felipe. Só anda para frente; opt-out e descartado não mudam.
+// Falha quieta: o cadastro já está salvo e não depende desta tabela.
+export async function marcarProspectCadastrouNoRecebimento(c: { documento: string; tipoDocumento: "cnpj" | "cpf"; whatsapp?: string | null; id: string }): Promise<boolean> {
+  try {
+    const cnpj = cnpjDe(c.documento, c.tipoDocumento)
+    const chave = chaveTelefone(c.whatsapp)
+    let alvo: { id: number; etapa: string; opt_out: boolean; historico_etapas: unknown; atualizado_em?: string } | null = null
+    let por = "CNPJ"
+    if (cnpj) {
+      const { data } = await supabase.from(TABELA).select("id, etapa, opt_out, historico_etapas").eq("cnpj", cnpj).maybeSingle()
+      alvo = data as typeof alvo
+    }
+    if (!alvo && chave.length >= 10) {
+      por = "telefone"
+      for (let p = 0; p < 20 && !alvo; p++) {
+        const { data, error } = await supabase.from(TABELA).select("id, telefone, etapa, opt_out, historico_etapas").range(p * 1000, (p + 1) * 1000 - 1)
+        if (error || !data) break
+        alvo = (data as { telefone?: string | null; id: number; etapa: string; opt_out: boolean; historico_etapas: unknown }[]).find(r => chaveTelefone(r.telefone) === chave) ?? null
+        if (data.length < 1000) break
+      }
+    }
+    if (!alvo || !etapaConhecida(alvo.etapa)) return false
+    const em = new Date().toISOString()
+    const novo = transicionar({ etapa: alvo.etapa as EtapaFunil, optOut: alvo.opt_out === true, historico: historicoValido(alvo.historico_etapas) }, "cadastrou", em, `cadastro recebido em /parceiros (mesmo ${por})`)
+    if (!novo) return false
+    novo.historico[novo.historico.length - 1] = { ...novo.historico[novo.historico.length - 1], cadastroId: c.id }
+    const { data: gravado, error } = await supabase.from(TABELA).update({ etapa: novo.etapa, historico_etapas: novo.historico, atualizado_em: em })
+      .eq("id", alvo.id).eq("etapa", alvo.etapa).eq("opt_out", false).select("id")
+    return !error && Array.isArray(gravado) && gravado.length > 0
+  } catch { return false }
 }

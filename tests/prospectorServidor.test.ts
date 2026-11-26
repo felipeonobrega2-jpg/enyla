@@ -151,3 +151,43 @@ describe("lista das maiores notas", () => {
     expect(ops.indexOf("limit", ordem)).toBeGreaterThan(ordem)
   })
 })
+
+describe("marcarProspectCadastrouNoRecebimento (cadastro em /parceiros com o mesmo CNPJ ou telefone)", () => {
+  const cad = { documento: CNPJ, tipoDocumento: "cnpj" as const, whatsapp: "11988887777", id: "PAR-9" }
+  // lê por maybeSingle (CNPJ) ou por lista (telefone); grava e devolve as linhas atualizadas
+  function banco(linhas: Record<string, unknown>[], porCnpj: Record<string, unknown> | null) {
+    const chamadas: Chamada[] = []
+    const from = () => {
+      const q: Record<string, unknown> = {}
+      for (const op of ["select", "eq", "range", "update"]) q[op] = (...args: unknown[]) => { chamadas.push({ op, args }); return q }
+      q.maybeSingle = async () => ({ data: porCnpj, error: null })
+      q.then = (ok: (v: unknown) => unknown) => ok({ data: chamadas.some(c => c.op === "update") ? [{ id: 1 }] : linhas, error: null })
+      return q
+    }
+    return { from, chamadas }
+  }
+  const linha = (extra: Record<string, unknown> = {}) => ({ id: 1, telefone: "(11) 98888-7777", etapa: "respondeu", opt_out: false, historico_etapas: [], ...extra })
+
+  it("mesmo CNPJ: marca cadastrou já no recebimento, com o id do cadastro", async () => {
+    const b = banco([], linha())
+    vi.mocked(supabase.from).mockImplementation(b.from as never)
+    expect(await prospector.marcarProspectCadastrouNoRecebimento(cad)).toBe(true)
+    const update = b.chamadas.find(c => c.op === "update")!.args[0] as { etapa: string; historico_etapas: Record<string, unknown>[] }
+    expect(update.etapa).toBe("cadastrou")
+    expect(update.historico_etapas[0]).toMatchObject({ etapa: "cadastrou", cadastroId: "PAR-9", motivo: expect.stringContaining("CNPJ") })
+  })
+  it("sem CNPJ no prospecto, o mesmo telefone (com e sem o 9) também marca cadastrou", async () => {
+    const b = banco([linha({ telefone: "1188887777" })], null)
+    vi.mocked(supabase.from).mockImplementation(b.from as never)
+    expect(await prospector.marcarProspectCadastrouNoRecebimento({ ...cad, documento: "000", tipoDocumento: "cpf" })).toBe(true)
+    expect((b.chamadas.find(c => c.op === "update")!.args[0] as { historico_etapas: Record<string, unknown>[] }).historico_etapas[0].motivo).toContain("telefone")
+  })
+  it("descartado, opt-out ou outro telefone: nada muda", async () => {
+    for (const [l, c] of [[linha({ etapa: "descartado", opt_out: true }), cad], [linha({ telefone: "11911110000" }), { ...cad, documento: "1", tipoDocumento: "cpf" as const }]] as const) {
+      const b = banco([l], l)
+      vi.mocked(supabase.from).mockImplementation(b.from as never)
+      expect(await prospector.marcarProspectCadastrouNoRecebimento(c)).toBe(false)
+      expect(b.chamadas.some(x => x.op === "update")).toBe(false)
+    }
+  })
+})

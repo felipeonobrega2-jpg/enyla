@@ -95,6 +95,7 @@ export async function executarFerramenta(diretor: IdDiretor, nome: string, x: Re
       const { redigirComoFuncionario } = await import("./funcionariosServidor")
       const r = await redigirComoFuncionario({ funcionario: func, cliente: String(x.cliente), ordem: String(x.ordem), apiKey: op.apiKey, conhecimento: (await lerCampos<{ conhecimentoAgente?: import("./agenteLeads").Conhecimento[] }>(["conhecimentoAgente"])).conhecimentoAgente, cultura: ctx.cultura })
       if (r.ok) return { acao: { id: novoId(), tipo: "mensagem", funcionario: func.nome, cliente: String(x.cliente), texto: r.texto, status: "aguardando" }, saida: `${func.nome} escreveu e a mensagem está esperando o Aprovo do Felipe: "${r.texto}"` }
+      if (r.nadaAEnviar) return { saida: `Nada a enviar: ${func.nome} decidiu não escrever nada agora.`, status: 200, motivo: r.erro }
       return { acao: { id: novoId(), tipo: "falha", texto: r.erro }, saida: `Não deu: ${r.erro}` }
     }
     if (nome === "pedir_contratacao") {

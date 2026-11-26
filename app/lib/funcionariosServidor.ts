@@ -28,11 +28,15 @@ async function historico(destino: string, jid: string | null): Promise<string> {
   return (data ?? []).reverse().filter(m => m.corpo).map(m => `${m.from_me ? "ENYLA" : "Cliente"}: ${String(m.corpo).slice(0, 400)}`).join("\n")
 }
 
+export const ERRO_NADA_A_ENVIAR = "nada a enviar"
+/** `nadaAEnviar`: o modelo decidiu não escrever (texto vazio). Não é falha: quem chama devolve 200 com o motivo. */
+export type ResultadoRedacao = { ok: true; texto: string } | { ok: false; erro: string; nadaAEnviar?: boolean }
+
 export async function redigirComoFuncionario(a: {
   funcionario: Funcionario; cliente: string; ordem: string; apiKey: string
   conhecimento?: Conhecimento[]; cultura?: string[]
   jid?: string; guia?: string   // lead que ainda não é cliente cadastrado: a conversa do WhatsApp (jid) e o guia de atendimento do Felipe
-}): Promise<{ ok: true; texto: string } | { ok: false; erro: string }> {
+}): Promise<ResultadoRedacao> {
   const f = a.funcionario
   if (f.status !== "contratado" || f.capacidade !== "mensagem_cliente") return { ok: false, erro: `${f.nome} não está contratado para falar com cliente` }
   const { destino, jid, motivo } = a.jid ? { destino: a.jid, jid: a.jid, motivo: undefined } : await destinoDoCliente(a.cliente)
@@ -50,7 +54,7 @@ Como escrever: empresa falando ("nós"), cordial, curta (2 a 4 frases), sem pres
       messages: [{ role: "user", content: `Ordem da diretoria: ${a.ordem}\nCliente: ${a.cliente}\n\nConversa recente:\n${conversa || "(sem conversa registrada com este cliente)"}` }],
     })
     const texto = (JSON.parse(resp.content.flatMap(c => c.type === "text" ? [c.text] : []).join("")) as { texto: string }).texto?.trim()
-    return texto ? { ok: true, texto } : { ok: false, erro: `${f.nome} não conseguiu escrever a mensagem` }
+    return texto ? { ok: true, texto } : { ok: false, erro: ERRO_NADA_A_ENVIAR, nadaAEnviar: true }
   } catch (e) {
     return { ok: false, erro: `${f.nome} não conseguiu escrever a mensagem (${String(e).slice(0, 120)})` }
   }

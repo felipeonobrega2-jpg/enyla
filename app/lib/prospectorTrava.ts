@@ -54,6 +54,11 @@ export async function prospectoDoJid(jid: string | null | undefined): Promise<Pr
   const juntar = (j: string | null | undefined) => { if (j && j.endsWith("@s.whatsapp.net")) candidatos.add(chaveTelefone(j.split("@")[0])) }
   juntar(jid)
   if (jid.endsWith("@lid")) juntar(await lerApelidos().then(a => a[jid]).catch(() => undefined))
+  try {
+    const { data } = await supabase.from("whatsapp_conversas").select("telefone").eq("jid", jid).maybeSingle()
+    const t = chaveTelefone((data as { telefone?: string | null } | null)?.telefone)
+    if (t) candidatos.add(t)
+  } catch { /* sem a conversa: fica o que o jid já diz */ }
   candidatos.delete("")
   if (![...candidatos].some(k => k.length >= 10)) return null
   for (let p = 0; p < MAX_PAGINAS; p++) {

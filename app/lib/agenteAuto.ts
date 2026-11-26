@@ -31,7 +31,9 @@ import {
 } from "./agenteLeads"
 import { corrigirCumprimento, type DadosPedido } from "./atendente"
 import { mudarConfig } from "./configAtomica"
-import { ehProspecto } from "./prospectorTrava"
+import { prospectoDoJid, type ProspectoDoJid } from "./prospectorTrava"
+import { responderProspectoParceiro, registrarRecebida, excluido as prospectoExcluido, ESQUEMA as ESQUEMA_PARCERIA } from "./atendenteParceiro"
+import { clienteClaude, MODELO, FALLBACK } from "./claude"
 import { notificar, LINK_SISTEMA } from "./notificar"
 import { limparEmojis, leadEstaRindo } from "./estilo"
 import { escolherMidia, MidiaAgente } from "./midiaAgente"
@@ -466,9 +468,45 @@ async function jidDaMensagem(msgId: string) {
   return (data?.jid as string | undefined) ?? null
 }
 
+// ── Modo "prospecto parceiro" ───────────────────────────────────────────────
+// Gráfica de prospectos_parceiros que responde no WhatsApp: o mesmo Atendente responde, com o prompt de parceria
+// (lib/atendenteParceiro). Mesmas travas: reserva por mensagem, horário do agente, ritmo de gente, janela 8h-20h, exclusão.
+const prospectoDaMensagem = async (msgId: string): Promise<{ jid: string | null; corpo: string | null; prospecto: ProspectoDoJid | null }> => {
+  const { data } = await supabase.from("whatsapp_mensagens").select("jid, corpo, from_me").eq("id", msgId).maybeSingle()
+  const jid = (data?.jid as string | undefined) ?? null
+  if (!jid || data?.from_me) return { jid, corpo: null, prospecto: null }
+  return { jid, corpo: (data?.corpo as string | null) ?? null, prospecto: await prospectoDoJid(jid).catch(() => null) }
+}
+
+async function atenderProspectoParceiro(jid: string, msgId: string, prospecto: ProspectoDoJid, cfg: CfgAgente & { apiKey?: string; conhecimentoAgente?: import("./agenteLeads").Conhecimento[] }, opts: { atrasada?: boolean }) {
+  const c = await lerConversa(jid)
+  if (!c || !cfg.apiKey) return
+  const apiKey = cfg.apiKey
+  const { data: m } = await supabase.from("whatsapp_mensagens").select("corpo").eq("id", msgId).maybeSingle()
+  await responderProspectoParceiro(jid, prospecto, (m?.corpo as string | null) ?? null, {
+    mensagens: async j => ((await supabase.from("whatsapp_mensagens").select("from_me, corpo, ts").eq("jid", j).order("ts", { ascending: false }).limit(20)).data ?? []).reverse() as { from_me: boolean; corpo: string | null }[],
+    conhecimento: async () => cfg.conhecimentoAgente,
+    ia: async (sistema, conversa) => {
+      const r = await clienteClaude(apiKey, "atendente-parceiro").beta.messages.create({
+        model: MODELO, max_tokens: 800, output_config: { effort: "low", format: { type: "json_schema", schema: ESQUEMA_PARCERIA } },
+        system: sistema, messages: [{ role: "user", content: `Conversa recente:\n${conversa}\n\nResponda a última mensagem da gráfica.` }], ...FALLBACK,
+      } as never) as { content: { type: string; text?: string }[]; stop_reason?: string }
+      if (r.stop_reason === "refusal") throw new Error("a IA recusou")
+      return JSON.parse(r.content.flatMap(b => b.type === "text" ? [b.text ?? ""] : []).join(""))
+    },
+    reservar: () => opts.atrasada ? reservarAtrasada(msgId) : reservarMensagem(msgId),
+    enviar: texto => enviar(c, texto),
+    registrarLog: async x => { await registrar({ em: new Date().toISOString(), jid, nome: c.nome, perfil: "indefinido", ...x }).catch(() => null) },
+    avisar: (motivo, sugestao) => avisarSegurado(cfg, c, motivo, sugestao),
+  })
+}
+
 // 1ª etapa (no webhook): espera o lead terminar de escrever (costumam mandar 2–3 mensagens seguidas)
 export async function agendarResposta(msgId: string, origem: string) {
   const cfg = await lerCfg()
+  // Gráfica do Prospector que escreveu: a etapa vai para "respondeu" mesmo com o agente desligado ou fora do horário
+  const doProspecto = await prospectoDaMensagem(msgId).catch(() => ({ jid: null, corpo: null, prospecto: null as ProspectoDoJid | null }))
+  if (doProspecto.prospecto) doProspecto.prospecto = await registrarRecebida(doProspecto.prospecto, doProspecto.corpo).catch(() => doProspecto.prospecto)
   if (!cfg.agenteAuto?.ligado || !dentroDoHorario(cfg.agenteAuto.horario)) {
     // Desligado (ou fora do horário dele), o agente não responde; mas resposta a uma retomada ainda vira aviso para você.
     // Fora do horário, quem ficou esperando é respondido quando o horário abrir (retomar parados, aos poucos).
@@ -483,8 +521,8 @@ export async function agendarResposta(msgId: string, origem: string) {
     const pessoal = (cfg.agenteAuto as { avisoNumero?: string } | undefined)?.avisoNumero?.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "")
     if (pessoal && pessoal.length >= 10 && String(m?.jid ?? "").split("@")[0].replace(/^55(?=\d{10,11}$)/, "") === pessoal) return
   }
-  // Gráfica do Prospector que respondeu não é cliente: a Atendente não agenda (a mensagem já está gravada)
-  if (await ehProspecto(await jidDaMensagem(msgId))) return
+  // Gráfica do Prospector que respondeu: segue o fluxo no modo parceria; excluída (opt-out ou descartada) não recebe nada
+  if (doProspecto.prospecto && prospectoExcluido(doProspecto.prospecto)) return
   // Saudação automática do lead: segura e avisa o Felipe já, sem a espera nem a IA
   if (await segurarSaudacaoDoLead(cfg, msgId).catch(() => false)) return
   // Ritmo de gente (somado à 2ª etapa): de dia ~40 s a 1 min; de madrugada mais devagar (~1 a 1,5 min)
@@ -595,8 +633,10 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
     if (opts.atrasada) await mudarConfig((d: { vigiaTentouV3?: string[] }) => ({ vigiaTentouV3: (d.vigiaTentouV3 ?? []).filter(x => x !== msgId) })).catch(() => null)
     return
   }
-  // Gráfica do Prospector (também na resposta atrasada, em assumir e continuar e em retomar parados): sem IA, sem envio
-  if (await ehProspecto(jid)) return
+  // Gráfica do Prospector (também na resposta atrasada, em assumir e continuar e em retomar parados): modo parceria
+  // (prompt próprio, sem orçamento, sem nível A/B/C). Excluída: nada sai.
+  const prospecto = await prospectoDoJid(jid).catch(() => null)
+  if (prospecto) return atenderProspectoParceiro(jid, msgId, prospecto, cfg as never, opts)
   // Cada mensagem do lead é respondida uma vez só (dois disparos ao mesmo tempo: só um passa)
   if (!await reservarMensagem(msgId) && !opts.atrasada) return
   // Atrasada passa por cima da reserva (a tentativa que falhou já reservou): trava própria de 10 min por mensagem,
