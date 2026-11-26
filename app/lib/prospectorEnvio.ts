@@ -42,7 +42,18 @@ export type Canal = "whatsapp" | "email"
 export type StatusEnvio = "reservado" | "enviado" | "falhou"
 
 /** Linha do histórico do funil que registra um envio. A etapa é a que o prospecto tinha na hora. */
-export type EnvioHistorico = { passo: Passo; canal: Canal; status: StatusEnvio; em: string; texto?: string; erro?: string }
+export type EnvioHistorico = {
+  passo: Passo; canal: Canal; status: StatusEnvio; em: string; texto?: string; erro?: string
+  /** E-mail: id devolvido pela Resend ao aceitar o envio; é a chave que casa os eventos (delivered, bounced, opened, clicked). */
+  resendId?: string
+  /** E-mail do primeiro contato: token aleatório do link rastreado (/api/prospector/r/[token]). Não tem dado do prospecto. */
+  token?: string
+  /** Último desfecho de entrega informado pela Resend. Não muda `status`: quem já saiu nunca é reenviado. */
+  entrega?: "entregue" | "bounce"
+  /** Primeira abertura (pixel) e primeiro clique (link), ISO. */
+  abriuEm?: string
+  cliqueEm?: string
+}
 
 export const CHAVE_ENVIO_ATIVO = "prospector_envio_ativo"
 export const CHAVE_NOTA_MINIMA = "prospector_nota_minima"
@@ -93,6 +104,15 @@ export const REMETENTE_REPLY_TO = "felipeonobrega2@gmail.com"
 /** Reply-To do primeiro contato e do lembrete. Só troca quando PROSPECTOR_REPLY_TO está preenchida com um e-mail válido (entrada de respostas no ar); senão segue o Gmail. */
 export function replyToDoProspector(env: string | undefined = process.env.PROSPECTOR_REPLY_TO): string {
   return emailValido(env) ?? REMETENTE_REPLY_TO
+}
+/** Destino final do link rastreado do e-mail (formulário de cadastro de parceiros). */
+export const URL_CADASTRO_PARCEIROS = "https://app.enyla.com.br/parceiros"
+export const URL_BASE_APP = "https://app.enyla.com.br"
+export const urlRastreada = (token: string) => `${URL_BASE_APP}/api/prospector/r/${token}`
+/** HTML do e-mail do primeiro contato: o texto comercial intacto, mais uma linha com o link rastreado. Sem token, só o texto. */
+export function htmlDoPrimeiroContato(texto: string, token?: string): string {
+  const esc = texto.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
+  return `<p>${esc}</p>` + (token ? `<p>Se tiver interesse, o cadastro de parceiros é por aqui: <a href="${urlRastreada(token)}">app.enyla.com.br/parceiros</a></p>` : "")
 }
 export const ASSUNTO_EMAIL = "ENYLA, gráfica de embalagens em Barueri"
 
@@ -158,7 +178,12 @@ export function envioDe(x: unknown): EnvioHistorico | null {
   const e = (x as { envio?: unknown }).envio as Partial<EnvioHistorico> | undefined
   if (!e || (e.passo !== "primeiro_contato" && e.passo !== "lembrete") || (e.canal !== "whatsapp" && e.canal !== "email")) return null
   if (e.status !== "reservado" && e.status !== "enviado" && e.status !== "falhou") return null
-  return { passo: e.passo, canal: e.canal, status: e.status, em: String(e.em ?? ""), ...(e.texto ? { texto: e.texto } : {}), ...(e.erro ? { erro: e.erro } : {}) }
+  return {
+    passo: e.passo, canal: e.canal, status: e.status, em: String(e.em ?? ""), ...(e.texto ? { texto: e.texto } : {}), ...(e.erro ? { erro: e.erro } : {}),
+    ...(e.resendId ? { resendId: e.resendId } : {}), ...(e.token ? { token: e.token } : {}),
+    ...(e.entrega === "entregue" || e.entrega === "bounce" ? { entrega: e.entrega } : {}),
+    ...(e.abriuEm ? { abriuEm: e.abriuEm } : {}), ...(e.cliqueEm ? { cliqueEm: e.cliqueEm } : {}),
+  }
 }
 
 export function enviosDoHistorico(historico: readonly unknown[]): EnvioHistorico[] {
