@@ -57,6 +57,19 @@ beforeEach(() => {
   enviarAoCliente.mockReset(); enviarAoCliente.mockResolvedValue({ ok: true, jid: "5511999990001@s.whatsapp.net" })
 })
 
+describe("cartões de Aprovo já pendentes", () => {
+  it("com a chave desligada, nada pendente é enviado: só o novo sai e o cartão antigo segue aguardando", async () => {
+    const antigo = { id: "velho", tipo: "mensagem", funcionario: "Atendente", cliente: "Outro", texto: "mensagem antiga", status: "aguardando" }
+    e.conversa = [{ id: "c1", acoes: [antigo] }]
+    const r = await ordenar()
+    expect(r.destino).toBe("enviado_direto")
+    expect(e.enviar).toHaveBeenCalledTimes(1)
+    expect(e.enviar.mock.calls[0][1]).toBe("Oi! Pode mandar as medidas?")
+    expect(antigo.status).toBe("aguardando")
+    expect(e.log).toHaveLength(1)
+  })
+})
+
 describe("chave desligada (padrão): sai direto", () => {
   it.each(["A", "B", "C", "indefinido"])("cliente %s: enviado direto, com registro", async nivel => {
     e.nivel = { nivel, jaCliente: true, motivo: "" }
