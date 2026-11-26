@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { supabase } from "@/app/lib/supabase"
 import { lerCfg, gravarCfg, enviar, type Conversa } from "@/app/lib/agenteAuto"
-import { cotarDigital, montarPedido, textoLinkPedido, itensDoLembrete, textoReenvioDigital, pedidosDoGrupo, type PedidoDigital } from "@/app/lib/digital"
+import { cotarDigital, montarPedido, textoLinkPedido, itensDoLembrete, textoReenvioDigital, pedidosDoGrupo, FOLLOWUP_DIGITAL_LIGADO, type PedidoDigital } from "@/app/lib/digital"
 import { linkPedido } from "@/app/lib/digitalLink"
 import { dadosDaConversa } from "@/app/lib/hoje"
 
@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
   }
 
   // reenviar
+  if (!FOLLOWUP_DIGITAL_LIGADO) return NextResponse.json({ ok: false, enviou: false, motivo: "reenvio do orçamento Digital desligado (FOLLOWUP_DIGITAL_LIGADO)" }, { status: 409 })
   if (!abertos.length) return NextResponse.json({ erro: "nenhum orçamento esperando o sinal" }, { status: 404 })
   const base = abertos[0]
   const doGrupo = pedidosDoGrupo(cfg.pedidosDigitais, base).filter(p => p.status === "aguardando_sinal")

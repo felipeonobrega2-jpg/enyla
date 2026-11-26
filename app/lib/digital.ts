@@ -37,6 +37,11 @@ export function caberFrasco(pad: { a: number; l: number; p: number }, frasco: st
 
 export const SINAL_DIGITAL = 0.5
 
+// Follow-up automático da Digital (lembrete do pedido e reenvio do orçamento). DESLIGADO por ordem do Felipe em
+// 26/11/2026, 9h18: reenviou orçamento e link a lead que já tinha dito "vou analisar". Religar (true) só quando o
+// Felipe mandar os vídeos do follow-up novo. O código dos lembretes continua aqui, sem uso enquanto estiver false.
+export const FOLLOWUP_DIGITAL_LIGADO = false
+
 import type { SituacaoArte } from "./digitalPrazo"
 export type StatusDigital = "aguardando_sinal" | "sinal_pago" | "arte" | "producao" | "enviado" | "cancelado"
 export type LinkCartao = { v: number; orderNsu: string; url: string; valor: number; em: string }
@@ -265,6 +270,9 @@ export const DIAS_VALIDADE_DIGITAL = 15
 export function pedidoPendente(pedidos: PedidoDigital[] | undefined, jid: string, agora = Date.now()): PedidoDigital | null {
   return (pedidos ?? []).find(p => p.jid === jid && p.status === "aguardando_sinal" && agora - new Date(p.em).getTime() < DIAS_VALIDADE_DIGITAL * 86_400_000) ?? null
 }
+// Conversa com pedido Digital pendente: com o follow-up da Digital desligado, nada automático sai para ela
+export const followUpDigitalBarrado = (pedidos: PedidoDigital[] | undefined, jid: string, agora = Date.now()) =>
+  !FOLLOWUP_DIGITAL_LIGADO && pedidoPendente(pedidos, jid, agora) != null
 const primeiroNome = (n: string | null) => nomeParaChamar(n)
 // Calibrado em 07/11 (estava repetitivo e insistente): no máximo 2 lembretes por pedido, o 1º depois de ~1 dia,
 // o 2º 3 dias depois, textos que variam de lead para lead, nunca "segue o link de novo" para todo mundo.

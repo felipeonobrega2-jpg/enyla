@@ -6,7 +6,7 @@
 
 import { lerConfigLinha } from "./configAtomica"
 import { cotarItens, montarPedidosDoGrupo, mudouOGrupo, trouxeDadosNovos, pedidosDoGrupo, textoLinkGrupo, registrarNegociacao, totalPedido } from "./digital"
-import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, textoLembreteDigital, itensDoLembrete, lembreteDigitalAgora, ADIOU, prometeLinkSemLink, TEXTO_PEDE_MEDIDA } from "./digital"
+import { cotarDigital, montarPedido, pedidoDaConversa, mudouACotacao, textoLinkPedido, valoresDoPedido, PedidoDigital, pedidoPendente, followUpDigitalBarrado, FOLLOWUP_DIGITAL_LIGADO, textoLembreteDigital, itensDoLembrete, lembreteDigitalAgora, ADIOU, prometeLinkSemLink, TEXTO_PEDE_MEDIDA } from "./digital"
 import { linkPedido } from "./digitalLink"
 import { faltaParaProposta, faltaParaOrcar } from "./propostaPronta"
 import { ehQuantidadeOffset, ehLeadOffset, faltaParaFichaOffset, jaOrcado, textoFichaOffset, travaOffset } from "./offsetRoteiro"
@@ -1021,12 +1021,14 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
       if (!(em > x.enviada)) return true
       return falhas.has(`${x.c.jid}|${em}`)
     })
+    // Follow-up da Digital desligado (FOLLOWUP_DIGITAL_LIGADO): conversa com pedido Digital pendente sai da fila e não ocupa a vez dos outros
+    .filter(x => !followUpDigitalBarrado(cfg.pedidosDigitais, x.c.jid))
     // Orçamento digital esperando o sinal segue o ritmo dele (2 lembretes, espaçados) e não ocupa a vez dos outros
     .filter(x => { const pd = pedidoPendente(cfg.pedidosDigitais, x.c.jid); return !pd || lembreteDigitalAgora(pd, x.enviada) != null })
     // Rodízio: quem foi tentado há pouco (enviou, ou foi pulado em silêncio) não fica travando a frente da fila
     .filter(x => { const t = tentados[x.c.jid]; return !t || Date.now() - new Date(t).getTime() > HORAS_REPOUSO_TENTATIVA * 3_600_000 })
     // Prioridade: lembrete de pedido digital esperando o sinal (dinheiro na mesa); depois quem espera há mais tempo
-    .sort((a, b) => (pedidoPendente(cfg.pedidosDigitais, b.c.jid) ? 1 : 0) - (pedidoPendente(cfg.pedidosDigitais, a.c.jid) ? 1 : 0) || a.enviada.localeCompare(b.enviada))
+    .sort((a, b) => (FOLLOWUP_DIGITAL_LIGADO ? (pedidoPendente(cfg.pedidosDigitais, b.c.jid) ? 1 : 0) - (pedidoPendente(cfg.pedidosDigitais, a.c.jid) ? 1 : 0) : 0) || a.enviada.localeCompare(b.enviada))
     .slice(0, 2)   // cabe no minuto da Vercel; o resto vai na próxima rodada
   if (candidatos.length) {
     const agoraIso = new Date().toISOString()
@@ -1066,6 +1068,7 @@ export async function followUps(cfg: Awaited<ReturnType<typeof lerCfg>>) {
     if (!(c.etiquetas ?? []).includes(ETIQUETAS_AGENTE.digital) && await voceAtende(c.jid, cfg)) return
     // Orçamento digital esperando o sinal: o follow-up é o lembrete do pedido (texto fixo com o link, sem IA)
     const pd = pedidoPendente(cfg.pedidosDigitais, c.jid)
+    if (pd && !FOLLOWUP_DIGITAL_LIGADO) return   // cinto e suspensório: nem lembrete nem follow-up de IA com pedido Digital pendente
     if (pd) {
       const lemb = lembreteDigitalAgora(pd, enviada)
       if (!lemb) return
