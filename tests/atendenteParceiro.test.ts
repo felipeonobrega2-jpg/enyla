@@ -125,7 +125,7 @@ describe("parceira sem preço fixo (orcamento_por_pedido)", () => {
     mundo.ia.mockResolvedValue({ texto: "Entendi! Quem cadastra preço e prazo médio recebe prioridade; sem isso, avisamos a cada pedido para você orçar. Prefere passar um preço de referência e o prazo médio?", enviar_link: false, perguntas_sem_resposta: [] })
     const r = await responderParceiro(prosp(), JID, deps())
     expect(r.enviou).toBe(true)
-    const sistema = String((mundo.ia.mock.calls[0][0] as { system: string }).system)
+    const sistema = String((mundo.ia.mock.calls.at(-1)![0] as { system: string }).system)   // a 1ª chamada é a extração do rascunho
     expect(sistema).toContain("recebe prioridade"); expect(sistema).toContain("preço de referência e o prazo médio"); expect(sistema).toMatch(/sem citar valor da ENYLA nem prometer volume/)
     expect(hist().some(h => h.modo_parceira === "orcamento_por_pedido")).toBe(true)
   })

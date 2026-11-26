@@ -96,7 +96,16 @@ describe("rascunho de cadastro pela conversa", () => {
     expect(lista()[0].servicos[0]).toMatchObject({ id: "colagem", valor: 120, prazoDias: 3, cobranca: "milheiro" })
     expect(lista()[0].faltando).not.toContain("prazo médio em dias úteis (Colagem)")
   })
-  it("rascunho completo fica pendente de análise (nunca aprovado), avisa o Felipe uma vez e vai para cadastrou", async () => {
+  it("sem o aceite dos Termos de Parceria o rascunho não fica completo: não avisa o Felipe nem vai para cadastrou", async () => {
+    mundo.extrai.mockResolvedValue({ responsavel: "Maria Teste", email: "contato@exemplo.test", documento: "11222333000181", cep: "01001000", rua: "Rua Teste", numero: "10", bairro: "Centro", cidade: "São Paulo", uf: "SP",
+      servicos: [servico({ cobranca: "milheiro", valor: 120, prazoDias: 3 })] })
+    await rodar()
+    expect(lista()[0].faltando).toEqual(["aceite dos Termos de Parceria (só se dá no formulário do cadastro, no link)"])
+    expect(avisar).not.toHaveBeenCalled()
+    expect(mundo.prospectos[0].etapa).toBe("respondeu")
+  })
+  it("rascunho completo (com o aceite dos Termos) fica pendente de análise (nunca aprovado), avisa o Felipe uma vez e vai para cadastrou", async () => {
+    mundo.cfg.cadastrosParceiros = [{ id: "PAR-T", status: "novo", origem: "prospector", prospectoId: 3384, whatsapp: "11987654321", aceite: true, aceiteTermos: true, servicos: [], arquivos: [], em: "2026-11-25T14:00:00Z" }]
     mundo.extrai.mockResolvedValue({ responsavel: "Maria Teste", email: "contato@exemplo.test", documento: "11222333000181", cep: "01001000", rua: "Rua Teste", numero: "10", bairro: "Centro", cidade: "São Paulo", uf: "SP",
       servicos: [servico({ cobranca: "milheiro", valor: 120, prazoDias: 3 })] })
     mundo.ia.mockResolvedValue({ texto: "Recebemos tudo! O Felipe analisa e chama você aqui.", enviar_link: false, perguntas_sem_resposta: [] })

@@ -75,13 +75,13 @@ export function mesclarRascunho(atual: Partial<CadastroParceiro> | null, novo: E
 
 const ROTULO_CAMPO: Record<string, string> = {
   nomeFantasia: "nome da empresa", documento: "CNPJ", cep: "CEP", rua: "rua", numero: "número", bairro: "bairro", cidade: "cidade", uf: "UF",
-  responsavel: "nome de quem responde pela produção", whatsapp: "WhatsApp", email: "e-mail", servicos: "quais serviços a gráfica faz",
+  responsavel: "nome de quem responde pela produção", whatsapp: "WhatsApp", email: "e-mail", aceiteTermos: "aceite dos Termos de Parceria (só se dá no formulário do cadastro, no link)", servicos: "quais serviços a gráfica faz",
 }
 const ROTULO_SERVICO: Record<string, string> = { formatoMax: "formato máximo da máquina (cm)", acerto: "valor do acerto", valor: "valor do milheiro", prazo: "prazo médio em dias úteis", cobranca: "como cobra", qual: "qual é o serviço" }
 
 /**
  * O que ainda falta, na ordem em que vale perguntar: serviços, preço e prazo primeiro. Mesma validação do formulário, menos
- * o aceite (só quem preenche o formulário concorda ali) e os preços dos cenários-exemplo (o Felipe pede na análise).
+ * o aceite geral e os preços dos cenários-exemplo (o Felipe pede na análise).
  */
 export function faltaDoRascunho(c: Partial<CadastroParceiro>): string[] {
   const erros = Object.keys(errosDoCadastro(c)).filter(k => k !== "aceite" && !k.includes(".preco."))
