@@ -90,6 +90,7 @@ export function CadastrosParceirosCard({ onAprovar }: { onAprovar: (f: Fornecedo
                     <span className="flex items-center gap-2 flex-wrap">
                       <span className="text-[13.5px] font-semibold text-[#191625]">{c.nomeFantasia}</span>
                       <span className={`text-[10.5px] font-semibold rounded-full px-1.5 py-0.5 ${c.status === "novo" ? "bg-[#8456e8]/10 text-[#8456e8]" : c.status === "aprovado" ? "bg-[#009351]/10 text-[#009351]" : "bg-[rgba(116,116,128,0.1)] text-[#898892]"}`}>{c.status === "novo" ? "Novo" : c.status === "aprovado" ? "Aprovado" : "Recusado"}</span>
+                      {(c as CadastroParceiro & { termos?: string | null }).termos === "pendente_termos" && <span className="text-[10.5px] font-semibold rounded-full px-1.5 py-0.5 bg-[#f59e0b]/15 text-[#b45309]">Termos pendentes</span>}
                     </span>
                     <span className="block text-[12px] text-[#898892] truncate">{c.cidade}/{c.uf} · {c.servicos.map(nomeServico).join(", ")}</span>
                   </span>

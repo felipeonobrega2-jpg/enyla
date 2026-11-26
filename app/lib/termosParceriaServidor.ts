@@ -32,3 +32,11 @@ export async function aceitarPorToken(token: string, meta: MetaAceite): Promise<
   if (error) return { ok: false, erro: "Não consegui registrar agora. Tente de novo." }
   return { ok: true, versao: t.versao }
 }
+
+// Situação dos termos de cada cadastro (para o painel: pendência visível). Sem a tabela, lista vazia (nada marcado).
+export async function situacaoTermosPorCadastro(): Promise<Record<string, string>> {
+  try {
+    const { data } = await supabase.from("termos_parceria_aceites").select("cadastro_id, status")
+    return Object.fromEntries((data ?? []).map((r: { cadastro_id: string; status: string }) => [r.cadastro_id, r.status]))
+  } catch { return {} }
+}

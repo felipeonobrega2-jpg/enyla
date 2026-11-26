@@ -16,7 +16,7 @@ vi.mock("@/app/lib/evolution", () => ({ evo: async () => null }))
 vi.mock("@/app/lib/agenteAuto", () => ({ seuNumero: async () => null }))
 
 import { receberCadastro } from "@/app/lib/parceirosServidor"
-import { pendenteTermos, registroDoAceite } from "@/app/lib/termosParceria"
+import { pendenteTermos, podeReceberPedido, registroDoAceite } from "@/app/lib/termosParceria"
 
 const dados = { nomeFantasia: "Gráfica Teste", tipoDocumento: "cnpj", documento: "11222333000181", cep: "01310100", rua: "Rua A", numero: "1", bairro: "B", cidade: "São Paulo", uf: "SP", responsavel: "Fulano", whatsapp: "11988887777", email: "a@b.com.br",
   servicos: [{ id: "corteVinco", cobranca: "milheiro", valor: 38, prazoDias: 3, prazoVaria: false, precosExemplo: { corteVinco: 250 } }], aceite: true }
@@ -41,5 +41,14 @@ describe("Termos de Parceria", () => {
     expect(pendenteTermos(null)).toBe(true)
     expect(pendenteTermos({ status: "pendente_termos" })).toBe(true)
     expect(pendenteTermos({ status: registroDoAceite("v1", { ip: null, userAgent: null }).status })).toBe(false)
+  })
+  it("sem aceite, só cadastro via /parceiros fica sem pedido novo; fornecedor em operação não é bloqueado", () => {
+    expect(podeReceberPedido({ origem: "cadastro_parceiros", aceite: { status: "pendente_termos" } })).toBe(false)
+    expect(podeReceberPedido({ origem: "cadastro_parceiros", aceite: { status: "aceito" } })).toBe(true)
+    expect(podeReceberPedido({ origem: "fornecedor", aceite: null })).toBe(true)
+  })
+  it("pedido já em produção não é afetado, mesmo sem aceite", () => {
+    expect(podeReceberPedido({ origem: "cadastro_parceiros", aceite: null, pedidoEmProducao: true })).toBe(true)
+    expect(podeReceberPedido({ origem: "fornecedor", aceite: { status: "pendente_termos" }, pedidoEmProducao: true })).toBe(true)
   })
 })

@@ -28,3 +28,12 @@ export const registroDoAceite = (versao: string, meta: MetaAceite, agora = new D
 
 // Parceira sem aceite registrado (ou pendente) não recebe pedido (a distribuição, num PR futuro, usa esta função)
 export const pendenteTermos = (aceite?: { status?: string } | null) => aceite?.status !== "aceito"
+
+// Trava da distribuição de pedidos NOVOS (PR futuro da #252). Vale só para parceira cadastrada via /parceiros (origem "cadastro_parceiros").
+// Fornecedor/produtor já em operação (ex.: quem produz o Digital) e pedido já em produção NUNCA são bloqueados:
+// para eles o aceite é só pendência visível no painel, aceita pelo mesmo link.
+export function podeReceberPedido(o: { origem: "cadastro_parceiros" | "fornecedor"; aceite?: { status?: string } | null; pedidoEmProducao?: boolean }): boolean {
+  if (o.pedidoEmProducao) return true
+  if (o.origem !== "cadastro_parceiros") return true
+  return !pendenteTermos(o.aceite)
+}
