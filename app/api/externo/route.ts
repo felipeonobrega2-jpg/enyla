@@ -29,6 +29,7 @@ import { lerPropostasExterno, AJUDA_PROPOSTAS } from "@/app/lib/propostasExterno
 import { moverCardExterno } from "@/app/lib/moverCardExterno"
 import { gravarDigitalExterno } from "@/app/lib/gravarDigitalExterno"
 import { importarProspectosExterno, MAX_ITENS_IMPORTAR } from "@/app/lib/importarProspectosExterno"
+import { mensagemFornecedorExterno } from "@/app/lib/mensagemFornecedorExterno"
 import { cancelarOrdem } from "@/app/lib/cancelarOrdem"
 import { niveisDosLeads } from "@/app/lib/nivelNoDetalhe"
 import { lerHistoricoOffset, AJUDA_HISTORICO_OFFSET } from "@/app/lib/historicoOffsetExterno"
@@ -288,6 +289,12 @@ export async function POST(req: NextRequest) {
     const r = await gravarDigitalExterno(diretor, b)
     if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
     return NextResponse.json({ ok: true, id: r.id, situacaoArte: r.situacaoArte, prazoEntrega: r.prazoEntrega, arteAprovadaEm: r.arteAprovadaEm })
+  } else if (b.acao === "mensagem_fornecedor") {
+    const r = await mensagemFornecedorExterno(diretor, b)
+    if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
+    msg = { id: novoId(), de: "diretor", texto: r.resultado, em: new Date().toISOString(), nuvem: true }
+    await gravarConversa(diretor, [...await lerConversa(diretor), msg])
+    return NextResponse.json({ ok: true, resultado: r.resultado, registro: r.registro })
   } else if (b.acao === "meta_ads") {
     const r = await acaoMetaAds(diretor, b)
     return NextResponse.json(r.corpo, { status: r.status })
@@ -303,7 +310,7 @@ export async function POST(req: NextRequest) {
       await gravarConversa(diretor, [...await lerConversa(diretor), msg])
       return NextResponse.json({ ok: true, resultado: saida, destino: r.destino, motivo: r.motivo, nivel: r.nivel, id: r.acao.id })
     }
-  } else return NextResponse.json({ erro: `acao: relatar, importar_prospectos, lancar_despesa, renomear_fornecedor, mover_card, gravar_digital, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, restaurar_fila, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
+  } else return NextResponse.json({ erro: `acao: relatar, importar_prospectos, lancar_despesa, renomear_fornecedor, mover_card, gravar_digital, mensagem_fornecedor, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, restaurar_fila, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
   await gravarConversa(diretor, [...await lerConversa(diretor), msg])
   return NextResponse.json({ ok: true, resultado: saida })
 }
