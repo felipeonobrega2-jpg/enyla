@@ -345,3 +345,9 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 **Status:** Claude Code. **Aprovo:** não. **PR:** issue #144. Só leitura, sem migração.
 
 `GET /api/externo?o=parceiros` e `?o=detalhe&area=parceiros` (mesmo conteúdo; só chaves do CCO e da CMO, as outras recebem 403). `cadastros`: até 100, mais novos primeiro (`id`, `nome`, `empresa`, `data`, `origem` prospector/direto, `status`, `etapaProspector`, e-mail mascarado `ma***@dominio.com`, telefone `***1234`). Nunca documento nem endereço. `respostas`: prospectos na etapa `respondeu` e, se a tabela `prospectos_emails_recebidos` (#132) existir, as últimas 50 respostas com os 300 primeiros caracteres; sem a tabela, só pela etapa, sem erro. `funil`: contagem por etapa. Código em `app/lib/parceirosExterno.ts`; testes em `tests/parceirosExterno.test.ts`.
+
+## 45. Porta externa: métricas do Follow-up (`?o=followup_metricas`)
+
+**Status:** Claude Code. **Aprovo:** não (só leitura agregada, sem dado de cliente). **PR:** issue #202, item 5.
+
+`GET /api/externo?o=followup_metricas&de=AAAA-MM-DD&ate=AAAA-MM-DD` (CMO, CCO e CTO; as outras, 403). Padrão: últimos 30 dias. Por etapa F1, F2 e F3 e por dia: enviados, respondidos, sem resposta, taxa, com e sem vídeo. O registro do agente já guarda a etapa de cada envio, então o histórico vale (`historico_por_etapa: true`). Pedido de orçamento por passo não existe no registro: `orcamentoPedido: null`.
