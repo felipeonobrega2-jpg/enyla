@@ -58,7 +58,9 @@ export async function receberCadastro(form: FormData, meta: MetaAceite = {}): Pr
   } catch { /* sem coordenada: você ajusta na aprovação */ }
   // Aceite dos termos: versão vigente, data/hora, IP e user-agent (do servidor, nunca do navegador)
   const termos = await lerTermosVigentes()
-  const cadastro: CadastroParceiro = { ...dados, ...registroDeAceite(termos, meta), termosToken: randomBytes(18).toString("base64url"), id, em: new Date().toISOString(), status: "novo", gerente: GERENTE_PADRAO, arquivos, base }
+  const utm = (k: string) => { const v = String(form.get(k) ?? "").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 40); return v || undefined }
+  const utmSource = utm("utm_source"), utmMedium = utm("utm_medium")
+  const cadastro: CadastroParceiro = { ...dados, ...(utmSource ? { utmSource } : {}), ...(utmMedium ? { utmMedium } : {}), ...registroDeAceite(termos, meta), termosToken: randomBytes(18).toString("base64url"), id, em: new Date().toISOString(), status: "novo", gerente: GERENTE_PADRAO, arquivos, base }
   await mudarConfig((d: Cfg) => ({ cadastrosParceiros: [cadastro, ...(d.cadastrosParceiros ?? [])].slice(0, 500) }))
 
   // Mesmo CNPJ de um prospecto: só registra no histórico do prospecto (a etapa muda na aprovação do Felipe).

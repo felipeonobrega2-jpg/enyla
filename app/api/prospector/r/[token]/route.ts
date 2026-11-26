@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { urlCadastroComUtm } from "@/app/lib/prospectorEnvio"
+import { linkCadastro } from "@/app/lib/prospectorEnvio"
 import { registrarCliquePorToken } from "@/app/lib/prospectorEventosServidor"
 
 // Link rastreado do primeiro contato por e-mail. Rota fora do login (proxy.ts): o token aleatório do envio é a identificação.
@@ -7,5 +7,5 @@ import { registrarCliquePorToken } from "@/app/lib/prospectorEventosServidor"
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   await registrarCliquePorToken(token)
-  return NextResponse.redirect(urlCadastroComUtm("email"), 302)
+  return NextResponse.redirect(linkCadastro("email"), 302)
 }

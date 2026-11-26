@@ -5,10 +5,11 @@ import { supabase } from "./supabase"
 import { lerCampos } from "./configAtomica"
 import { ETAPAS_FUNIL } from "./prospector"
 import type { CadastroParceiro } from "./parceiros"
+import { CANAIS_UTM, envioDe } from "./prospectorEnvio"
 
 export const LIMITE_CADASTROS = 100
 export const LIMITE_RESPOSTAS = 50
-export const AJUDA_PARCEIROS = "SÓ CCO e CMO (as outras recebem 403). Mesmo conteúdo em ?o=parceiros e em ?o=detalhe&area=parceiros. Só leitura. cadastros: quem se cadastrou em /parceiros (mais novos primeiro, até 100: id, nome, empresa, data, origem 'prospector'|'direto', status, etapaProspector, email mascarado, telefone com 4 últimos dígitos; nunca documento nem endereço). respostas: prospectos na etapa 'respondeu' e, se a tabela prospectos_emails_recebidos existir, as últimas 50 respostas (prospecto_id, nome, data, assunto, 300 primeiros caracteres). funil: contagem por etapa"
+export const AJUDA_PARCEIROS = "SÓ CCO e CMO (as outras recebem 403). Mesmo conteúdo em ?o=parceiros e em ?o=detalhe&area=parceiros. Só leitura. cadastros: quem se cadastrou em /parceiros (mais novos primeiro, até 100: id, nome, empresa, data, origem 'prospector'|'direto', status, etapaProspector, email mascarado, telefone com 4 últimos dígitos; nunca documento nem endereço). respostas: prospectos na etapa 'respondeu' e, se a tabela prospectos_emails_recebidos existir, as últimas 50 respostas (prospecto_id, nome, data, assunto, 300 primeiros caracteres). funil: contagem por etapa. porCanal: por canal, cadastros e cliques (clique só é medido no link rastreado do e-mail; WhatsApp e boas-vindas ficam com 0 cliques)"
 
 export const mascararEmail = (e: unknown): string | null => {
   const s = String(e ?? "").trim()
@@ -35,9 +36,20 @@ export function montarCadastros(lista: CadastroParceiro[], prospectos: Pick<Pros
       id: c.id, nome: c.nomeFantasia, empresa: c.razaoSocial ?? null, data: c.em,
       origem: etapa ? "prospector" : "direto", status: c.status,
       ...(etapa ? { etapaProspector: etapa } : {}),
+      canal: c.utmSource || SEM_UTM, ...(c.utmMedium ? { utmMedium: c.utmMedium } : {}),
       email: mascararEmail(c.email), telefone: mascararTelefone(c.whatsapp),
     }
   })
+}
+
+export const SEM_UTM = "sem_utm"
+
+/** Pura: cadastros e cliques por canal. Canais conhecidos sempre aparecem (com 0); utm de outro valor e 'sem_utm' entram se houver. */
+export function contarPorCanal(lista: Pick<CadastroParceiro, "utmSource">[], cliquesEmail: number): Record<string, { cadastros: number; cliques: number }> {
+  const r: Record<string, { cadastros: number; cliques: number }> = Object.fromEntries(CANAIS_UTM.map(c => [c, { cadastros: 0, cliques: 0 }]))
+  for (const c of lista) { const k = c.utmSource || SEM_UTM; (r[k] ??= { cadastros: 0, cliques: 0 }).cadastros++ }
+  r.email.cliques = cliquesEmail
+  return r
 }
 
 export async function leituraParceiros(): Promise<{ corpo: Record<string, unknown>; status: number }> {
@@ -52,6 +64,12 @@ export async function leituraParceiros(): Promise<{ corpo: Record<string, unknow
     if (r.error) avisos.push("Tabela do prospector indisponível: origem e etapa não puderam ser conferidas.")
     else prospectos = (r.data ?? []) as Prospecto[]
   }
+
+  // Cliques: só o e-mail tem link rastreado; conta envios de e-mail com cliqueEm no histórico
+  let cliquesEmail = 0
+  const cl = await supabase.from("prospectos_parceiros").select("historico_etapas").contains("historico_etapas", [{ envio: { canal: "email" } }]).limit(5000)
+  if (cl.error) avisos.push("Cliques por canal indisponíveis.")
+  else for (const p of (cl.data ?? []) as { historico_etapas?: unknown[] | null }[]) for (const h of p.historico_etapas ?? []) { const e = envioDe(h as never); if (e?.canal === "email" && e.cliqueEm) cliquesEmail++ }
 
   const etapas = [...ETAPAS_FUNIL, "respondeu"] as const
   const funil: Record<string, number> = Object.fromEntries(etapas.map(e => [e, 0]))
@@ -87,7 +105,7 @@ export async function leituraParceiros(): Promise<{ corpo: Record<string, unknow
     corpo: {
       cadastros: montarCadastros(lista, prospectos), totalCadastros: lista.length,
       respostas: { porEtapa, ...(mensagens.length ? { mensagens } : {}) },
-      funil, ...(avisos.length ? { avisos } : {}),
+      funil, porCanal: contarPorCanal(lista, cliquesEmail), ...(avisos.length ? { avisos } : {}),
     },
   }
 }

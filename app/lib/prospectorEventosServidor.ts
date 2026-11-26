@@ -74,3 +74,15 @@ export async function registrarCliquePorToken(token: string, agora: Date = new D
     return ok
   } catch { return false }
 }
+
+/** Pixel de abertura: marca `abriu` pelo token do envio, sem o webhook da Resend. Token inválido, desconhecido ou erro: não faz nada. */
+export async function registrarAberturaPorToken(token: string, agora: Date = new Date()): Promise<boolean> {
+  if (!TOKEN_VALIDO.test(token)) return false
+  try {
+    const { data, error } = await supabase.from("prospectos_parceiros").select(COLUNAS).contains("historico_etapas", [{ envio: { token } }]).limit(5)
+    if (error) return false
+    let ok = false
+    for (const l of (data ?? []) as Linha[]) if (await aplicarSinal(l, e => e.token === token, "abriu", agora.toISOString())) ok = true
+    return ok
+  } catch { return false }
+}

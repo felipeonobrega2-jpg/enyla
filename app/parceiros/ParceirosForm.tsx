@@ -209,6 +209,7 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
     setEnviando(true); setErroEnvio(null)
     const f = new FormData()
     f.set("dados", JSON.stringify(d)); f.set("site", site.current?.value ?? "")
+    try { const q = new URLSearchParams(window.location.search); for (const k of ["utm_source", "utm_medium"]) { const v = q.get(k); if (v) f.set(k, v) } } catch { /* sem utm */ }
     for (const a of arquivos) f.append("arquivos", a)
     try {
       const r = await fetch("/api/parceiros/cadastro", { method: "POST", body: f }).then(x => x.json())

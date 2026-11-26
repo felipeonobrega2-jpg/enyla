@@ -119,10 +119,15 @@ export function replyToDoProspector(env: string | undefined = process.env.PROSPE
 }
 /** Destino final do link rastreado do e-mail (formulário de cadastro de parceiros). */
 export const URL_CADASTRO_PARCEIROS = "https://app.enyla.com.br/parceiros"
+/** Canal de origem do link de cadastro (utm_source). Medição: de onde vem cada cadastro. */
+export type CanalUtm = "email" | "whatsapp" | "boasvindas"
+export const CANAIS_UTM: readonly CanalUtm[] = ["email", "whatsapp", "boasvindas"]
+/** Link do cadastro com utm_source (canal) e utm_medium=prospector. */
+export const linkCadastro = (canal: CanalUtm) => `${URL_CADASTRO_PARCEIROS}?utm_source=${canal}&utm_medium=prospector`
 export const URL_BASE_APP = "https://app.enyla.com.br"
 export const urlRastreada = (token: string) => `${URL_BASE_APP}/api/prospector/r/${token}`
-/** Link do cadastro com o canal de origem, para medir de onde vem cada cadastro. */
-export const urlCadastroComUtm = (fonte: "email" | "whatsapp") => `${URL_CADASTRO_PARCEIROS}?utm_source=${fonte}&utm_medium=prospector`
+/** Pixel próprio de abertura (GIF 1x1). Marca `abriu` sem depender do webhook da Resend. Não tem dado do prospecto. */
+export const urlPixelAbertura = (token: string) => `${URL_BASE_APP}/api/prospector/o/${token}`
 export const ASSUNTO_EMAIL = "Parceria ENYLA: serviços para gráficas"
 
 /** Texto fixo do primeiro contato (sem IA). O link é o do cadastro; no e-mail, é trocado pelo link rastreado. */
@@ -132,15 +137,16 @@ export const TEXTO_LEMBRETE = "Oi, tudo bem? Sou da ENYLA, falei com vocês há 
 /** HTML do e-mail do primeiro contato: o link do texto vira o link rastreado (que redireciona ao destino com utm). Sem token, o link direto com utm. */
 export function htmlDoPrimeiroContato(texto: string, token?: string): string {
   const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
-  const link = urlCadastroComUtm("email")
+  const link = linkCadastro("email")
   const i = texto.indexOf(link)
-  if (i < 0) return `<p>${esc(texto)}</p>`
   const href = token ? urlRastreada(token) : link
-  return `<p>${esc(texto.slice(0, i))}<a href="${esc(href)}">${esc(href)}</a>${esc(texto.slice(i + link.length))}</p>`
+  const pixel = token ? `<img src="${urlPixelAbertura(token)}" width="1" height="1" alt="" style="display:none" />` : ""
+  if (i < 0) return `<p>${esc(texto)}</p>${pixel}`
+  return `<p>${esc(texto.slice(0, i))}<a href="${esc(href)}">${esc(href)}</a>${esc(texto.slice(i + link.length))}</p>${pixel}`
 }
 /** Versão em texto puro: com token, o link do texto vira o link rastreado. */
 export function textoPlanoDoPrimeiroContato(texto: string, token?: string): string {
-  return token ? texto.replace(urlCadastroComUtm("email"), urlRastreada(token)) : texto
+  return token ? texto.replace(linkCadastro("email"), urlRastreada(token)) : texto
 }
 
 const fmt = (agora: Date) => new Intl.DateTimeFormat("en-CA", {
@@ -160,7 +166,7 @@ export function dentroDoHorario(agora: Date): boolean {
 }
 
 export function textoPrimeiroContato(canal: Canal): string {
-  return `${CORPO_PRIMEIRO} ${urlCadastroComUtm(canal)}`
+  return `${CORPO_PRIMEIRO} ${linkCadastro(canal)}`
 }
 
 export function textoDoPasso(passo: Passo, canal: Canal): string {

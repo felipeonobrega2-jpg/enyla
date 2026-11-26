@@ -123,13 +123,11 @@ Nada é apagado: quem não serve fica na base em `encontrado`, não vira `qualif
 
 ### Textos finais
 Primeiro contato (texto fixo, sem IA, igual em qualquer horário):
-Primeiro contato, até 12h (America/Sao_Paulo):
 
-Oi, tudo bem? Sou da ENYLA. A gente recebe pedidos de embalagens e impressos do Brasil todo e passa para gráficas parceiras os serviços que elas fazem. Se vocês pegam serviço de terceiro, o cadastro é gratuito e leva uns 5 minutos: https://app.enyla.com.br/parceiros?utm_source={email|whatsapp}&utm_medium=prospector
-Bom dia, tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?
 ```
-Assunto do e-mail: `Parceria ENYLA: serviços para gráficas`. No e-mail, o link do texto é trocado pelo link rastreado `/api/prospector/r/[token]`, que registra o clique e encaminha (302) a `/parceiros?utm_source=email&utm_medium=prospector`. No WhatsApp o link leva `utm_source=whatsapp`. O primeiro contato está liberado (`PRIMEIRO_CONTATO_PAUSADO = false`), com o limite de 10 por dia útil.
-Depois das 12h: o mesmo texto com "Boa tarde". Assunto do e-mail: `ENYLA, gráfica de embalagens em Barueri`. Sem preço, sem volume, sem linha de saída. **Link (26/11/2026):** o HTML do primeiro contato por e-mail (só ele; lembrete e WhatsApp não) ganha, depois do texto, uma linha com o link rastreado `https://app.enyla.com.br/api/prospector/r/[token]`, que registra o clique e encaminha (302) a `https://app.enyla.com.br/parceiros`. A linha é `Para ser parceira da ENYLA, cadastre a sua gráfica aqui: <a>Cadastrar minha gráfica</a>` (o texto do link nunca mostra endereço, para não ser marcado como spam); no texto puro vai `Cadastrar minha gráfica: {link}`. O texto comercial não muda. O primeiro contato está liberado (`PRIMEIRO_CONTATO_PAUSADO = false`), com o limite de 10 por dia útil. O texto completo da CMO (etapas, A/B de assunto, lembrete) vem em PR posterior.
+Oi, tudo bem? Sou da ENYLA. A gente recebe pedidos de embalagens e impressos do Brasil todo e passa para gráficas parceiras os serviços que elas fazem. Se vocês pegam serviço de terceiro, o cadastro é gratuito e leva uns 5 minutos: https://app.enyla.com.br/parceiros?utm_source={email|whatsapp}&utm_medium=prospector
+```
+Assunto do e-mail: `Parceria ENYLA: serviços para gráficas`. No e-mail, o link do texto é trocado pelo link rastreado `/api/prospector/r/[token]` (o HTML leva também o pixel de abertura `/api/prospector/o/[token]`), que registra o clique e encaminha (302) a `/parceiros?utm_source=email&utm_medium=prospector`. No WhatsApp o link leva `utm_source=whatsapp`. O primeiro contato está liberado (`PRIMEIRO_CONTATO_PAUSADO = false`), com o limite de 10 por dia útil.
 
 Lembrete único, 3 dias depois, sem resposta:
 
@@ -161,3 +159,7 @@ Antes, nada gravava a etapa `abriu`. Agora:
 2. **Rastreio no domínio.** No painel da Resend, em Domains → o domínio de envio, ligar **Open tracking** e **Click tracking** (sem isso `email.opened`/`email.clicked` não disparam; o link rastreado da ENYLA continua funcionando sozinho como sinal de clique).
 3. **Inbound/MX** de `respostas.enyla.com.br` na Cloudflare, com o valor do painel da Resend, e a migração `supabase/migrations/20261126_prospectos_emails_recebidos.sql` rodada.
 4. **`PROSPECTOR_REPLY_TO`** = `parceiros@respostas.enyla.com.br`, só depois de o inbound estar verificado. Enquanto estiver vazia o Reply-To é o Gmail e a resposta não entra no sistema (`respondeu` fica em 0).
+
+## Abertura do e-mail ("Abriram")
+
+O `abriu` vem de três fontes: o evento `email.opened` do webhook da Resend (`/api/prospector/inbound`, exige `RESEND_WEBHOOK_SECRET`), o clique no link rastreado (`/api/prospector/r/[token]`) e o pixel próprio de abertura (`/api/prospector/o/[token]`, GIF 1x1 no HTML do primeiro contato, sem depender do webhook). Quando falta o segredo, o painel mostra um aviso. O pixel só vale para e-mails enviados depois desta mudança. Clientes que bloqueiam imagens não contam; o Apple Mail com proteção de privacidade pode contar abertura sem o leitor abrir.
