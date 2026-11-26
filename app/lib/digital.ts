@@ -40,6 +40,7 @@ export const SINAL_DIGITAL = 0.5
 import type { SituacaoArte } from "./digitalPrazo"
 export type StatusDigital = "aguardando_sinal" | "sinal_pago" | "arte" | "producao" | "enviado" | "cancelado"
 export type LinkCartao = { v: number; orderNsu: string; url: string; valor: number; em: string }
+export type MensagemParceira = { por: string; texto: string; em: string; enviado: boolean }
 export type EdicaoAcomp = { por: string; em: string; motivo: string; arteAprovadaAntes?: string | null; situacaoArteAntes?: string | null; prazoEntregaAntes?: string | null }
 export type PedidoDigital = {
   id: string                       // DIG-0001
@@ -75,6 +76,7 @@ export type PedidoDigital = {
   situacaoArte?: SituacaoArte; prazoEntregaEm?: string        // acompanhamento (#164): vazios nos pedidos antigos; data YYYY-MM-DD (a porta/tela chamam de prazoEntrega; o objeto prazoEntrega acima é o do #165)
   edicaoAcomp?: EdicaoAcomp   // a última gravação dos campos acima (compatibilidade); o histórico todo está em edicoesAcomp
   edicoesAcomp?: EdicaoAcomp[]   // todas as gravações, da mais antiga à mais recente (só acrescenta)
+  mensagensParceira?: MensagemParceira[]   // canal interno até a gráfica parceira de produção (só acrescenta; nunca vai a cliente)
   lembreteDepois?: string; lembreteParado?: boolean           // lead adiou (espera) · você assumiu a conversa (sem lembrete)
   reenviadoEm?: string                                         // orçamento reenviado com os valores (varredura)
   documento?: string                                         // CPF/CNPJ (cobrança no Asaas e nota)

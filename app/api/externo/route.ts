@@ -28,6 +28,7 @@ import { lerPertoExterno, AJUDA_PERTO } from "@/app/lib/pertoExterno"
 import { lerPropostasExterno, AJUDA_PROPOSTAS } from "@/app/lib/propostasExterno"
 import { moverCardExterno } from "@/app/lib/moverCardExterno"
 import { gravarDigitalExterno } from "@/app/lib/gravarDigitalExterno"
+import { mensagemParceiraExterno } from "@/app/lib/mensagemParceiraExterno"
 import { importarProspectosExterno, MAX_ITENS_IMPORTAR } from "@/app/lib/importarProspectosExterno"
 import { cancelarOrdem } from "@/app/lib/cancelarOrdem"
 import { niveisDosLeads } from "@/app/lib/nivelNoDetalhe"
@@ -288,6 +289,10 @@ export async function POST(req: NextRequest) {
     const r = await gravarDigitalExterno(diretor, b)
     if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
     return NextResponse.json({ ok: true, id: r.id, situacaoArte: r.situacaoArte, prazoEntrega: r.prazoEntrega, arteAprovadaEm: r.arteAprovadaEm })
+  } else if (b.acao === "mensagem_parceira") {
+    const r = await mensagemParceiraExterno(diretor, b)
+    if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
+    return NextResponse.json({ ok: true, id: r.id, enviado: r.enviado, em: r.em, aviso: r.aviso })
   } else if (b.acao === "meta_ads") {
     const r = await acaoMetaAds(diretor, b)
     return NextResponse.json(r.corpo, { status: r.status })

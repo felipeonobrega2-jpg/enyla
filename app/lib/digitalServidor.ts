@@ -426,3 +426,16 @@ export async function reservarIdsDigitais<T extends { id: string; grupo?: string
   }
   return novos.map(p => ({ ...p, id: mapa.get(p.id) ?? p.id, ...(p.grupo ? { grupo: mapa.get(p.grupo) ?? p.grupo } : {}) }))
 }
+
+
+// Canal interno até a gráfica parceira (Villa/Leandro): o número é SEMPRE o dos contatos do digital, nunca o jid do cliente.
+// Só acrescenta ao pedido (quem, texto, hora); teste não envia. Devolve se saiu e o registro gravado.
+export async function enviarParaParceira(id: string, por: string, texto: string): Promise<{ achou: boolean; enviado: boolean; semNumero?: boolean; em: string }> {
+  const { pedido, cfg } = await lerPedido(id)
+  const em = new Date().toISOString()
+  if (!pedido) return { achou: false, enviado: false, em }
+  const num = soDigitos(cfg.digitalContatos?.villa) || soDigitos(cfg.digitalContatos?.designer)
+  const enviado = !pedido.teste && !!num && await paraNumero(num, `Mensagem interna da ENYLA (${por}) sobre o pedido ${id}:\n\n${texto}`)
+  await gravarPedido(id, x => ({ ...x, mensagensParceira: [...(x.mensagensParceira ?? []), { por, texto, em, enviado }] }))
+  return { achou: true, enviado, semNumero: !num && !pedido.teste, em }
+}
