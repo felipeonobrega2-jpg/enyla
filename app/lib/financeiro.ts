@@ -28,7 +28,7 @@ export function isReceitaPendenteValida(l: LancamentoFinanceiro): boolean {
 }
 
 export function isAtrasada(l: LancamentoFinanceiro): boolean {
-  return isReceitaPendenteValida(l) && l.dataVencimento < hoje()
+  return isReceitaPendenteValida(l) && !!l.dataVencimento && l.dataVencimento < hoje()
 }
 
 export function pedidosElegiveis(kanban: KanbanCard[]): KanbanCard[] {

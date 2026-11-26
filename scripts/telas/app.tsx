@@ -737,7 +737,7 @@ function Telas() {
     }
     case "pedidos": case "pedidos-escuro": case "pedidos-aberto": case "pedidos-aberto-escuro": case "pedidos-quadro-escuro": case "pedidos-visao-escuro":
       return <div style={{ minHeight: "100vh", padding: 24 }} className={escuro ? "" : "bg-[#f5f5f7]"}><PedidosUnificadoView isDark={escuro} kanban={dados.kanban} historico={dados.historico as never}
-        lancamentos={lancs} lotes={[]} onChamarFrete={() => {}} onMove={() => {}} onDelete={() => {}} onSetMotivo={() => {}} onFechamento={() => {}} onNovoLancamento={() => {}} onDetalhes={() => {}} /></div>
+        lancamentos={lancs} lotes={[]} onChamarFrete={() => {}} onMove={() => {}} onMarcarPerdido={() => {}} onSetMotivo={() => {}} onFechamento={() => {}} onNovoLancamento={() => {}} onDetalhes={() => {}} /></div>
     case "entregas": case "entregas-escuro": case "entregas-corrida": return <div style={{ height: "100vh" }}><EntregasView isDark={escuro} kanban={dados.kanban} lancamentos={lancs} clientes={[]}
       onLancamentos={() => {}} onRemoverLancamentos={() => {}} onSalvarLocais={() => {}}
       config={{ ...cfg, locaisRetirada: [{ id: "g", nome: "Gráfica", contato: "Alanno", telefone: "11999990000", endereco: { texto: "Rua Correia de Andrade, 50 · Brás · São Paulo - SP", lat: -23.5427, lng: -46.6199 } }],

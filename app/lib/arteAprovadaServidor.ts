@@ -2,7 +2,8 @@
 // dados_sistema, coleção nova "sugestaoArteDecisao" (uma linha por pedido; nada é apagado). Nenhuma mensagem ao cliente.
 import { supabase } from "./supabase"
 import { gravarPedido } from "./digitalServidor"
-import { confirmarArteAprovada, sugestoesDeArte, type DecisaoSug, type MsgZap, type PedidoSug, type SugestaoArte } from "./arteAprovadaSugestao"
+import { lerConfigLinha } from "./configAtomica"
+import { aprovacoesSemAmbiguidade, confirmarArteAprovada, ehAprovacao, sugestoesDeArte, type DecisaoSug, type MsgZap, type PedidoSug, type SugestaoArte } from "./arteAprovadaSugestao"
 
 export const COLECAO_SUGESTAO = "sugestaoArteDecisao"
 
@@ -52,4 +53,27 @@ export async function decidirSugestao(pedidos: PedidoSug[], id: string, decisao:
   if (!novo) return { erro: "Esse pedido não está mais esperando aprovação da arte." }
   await gravarDecisao({ pedido: id, msgId: s.msgId, decisao: "confirmada", por, em })
   return { ok: true }
+}
+
+/**
+ * Aprovação não ambígua no WhatsApp: grava na hora arteAprovadaEm (o ts da mensagem do cliente) e arteAprovadaPor (por:
+ * sistema), registra a decisão "confirmada" e não mexe na etapa nem manda mensagem. Idempotente: arteAprovadaEm já
+ * preenchido não é sobrescrito. Ambígua (mais de um pedido esperando no mesmo jid) segue só como sugestão no painel.
+ * Chamada quando chega mensagem nova do cliente; falha nunca derruba o webhook.
+ */
+export async function gravarAprovacaoDoChat(jid: string, corpo: string | null | undefined): Promise<string[]> {
+  if (!ehAprovacao(corpo)) return []
+  try {
+    const { data } = await lerConfigLinha()
+    const pedidos = (((data?.data ?? {}) as { pedidosDigitais?: PedidoSug[] }).pedidosDigitais ?? []).filter(p => p.jid === jid)
+    const gravados: string[] = []
+    for (const s of aprovacoesSemAmbiguidade(await lerSugestoes(pedidos))) {
+      const em = new Date().toISOString()
+      const novo = await gravarPedido(s.pedido, p => confirmarArteAprovada(p, s, "sistema", em))
+      if (!novo) continue
+      await gravarDecisao({ pedido: s.pedido, msgId: s.msgId, decisao: "confirmada", por: "sistema", em })
+      gravados.push(s.pedido)
+    }
+    return gravados
+  } catch (e) { console.error("[arte aprovada no chat]", e); return [] }
 }

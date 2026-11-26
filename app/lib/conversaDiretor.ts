@@ -12,6 +12,7 @@ import { lerCampos, mudarConfig } from "./configAtomica"
 import { COLUNAS_KANBAN } from "../types"
 import { ehComercial, ordenarComercial, comerciaisDoDiretor } from "./ordemComercial"
 import { detalheProducao } from "./etapasProducao"
+import type { ConfigProducao } from "./producao"
 import { comDigital } from "./digitalProducao"
 import type { Rastreio } from "./prazoProducao"
 
@@ -57,11 +58,12 @@ function ferramentas(execIds: string[]): Anthropic.Beta.BetaTool[] {
 }
 
 type Ctx = Awaited<ReturnType<typeof coletarContexto>>
-function detalhe(ctx: Ctx, area: string, rastreios: Rastreio[] = [], digitais: Parameters<typeof comDigital>[1] = []): string {
+function detalhe(ctx: Ctx, area: string, rastreios: Rastreio[] = [], digitais: Parameters<typeof comDigital>[1] = [], prod?: ConfigProducao): string {
   const h = (ctx.hoje ?? {}) as Record<string, unknown>
   const corta = (x: unknown) => JSON.stringify(x).slice(0, 7000)
   if (area === "comercial") return corta({ responder: h.responder, orcar: h.orcar, resolver: h.resolver, meta: h.meta })
-  if (area === "producao") return comDigital(detalheProducao(ctx.kanban.filter(c => c.coluna >= 2 && c.coluna <= 8).map(c => ({ ...c, aguardandoPagamento: ctx.segurados[c.numero] ?? null })), rastreios, COLUNAS_KANBAN as unknown as string[]), digitais)
+  if (area === "producao") return comDigital(detalheProducao(ctx.kanban.filter(c => c.coluna >= 2 && c.coluna <= 8).map(c => ({ ...c, chave: c.loteId ? `lote-${c.loteId}` : `card-${c.id}`, aguardandoPagamento: ctx.segurados[c.numero] ?? null })), rastreios, COLUNAS_KANBAN as unknown as string[], undefined,
+    prod ? { movimentos: prod.movimentos, rodadas: prod.rodadas, nomeFornecedor: id => prod.fornecedores?.find(f => f.id === id)?.nome ?? id } : undefined), digitais)
   if (area === "financeiro") return corta(ctx.fin)
   if (area === "marketing") return corta({ anuncio: h.anuncio, marketing: h.marketing, gastos: h.gastos })
   return corta({ rotinas: ctx.rot?.rotinas, whatsapp: ctx.esc?.whatsapp, semCredito: ctx.esc?.semCredito, cota: ctx.esc?.cota, agentes: (ctx.esc?.mesas ?? []).map((m: { nome: string; estado: string }) => ({ nome: m.nome, estado: m.estado })) })
@@ -133,8 +135,9 @@ async function montarFoto(salvar: boolean): Promise<Foto> {
   const ctx = await coletarContexto()
   const rastreios = await lerRastreios()
   const digitais = await lerDigitais()
+  const prod = (await lerCampos<{ producao?: ConfigProducao }>(["producao"]).catch(() => ({}) as { producao?: ConfigProducao })).producao
   const foto: Foto = { em: new Date().toISOString(), norte: ctx.norte, resultados: ctx.resultados, equipe: ctx.equipe, bloco: ctx.bloco, ferramentasTxt: ctx.ferramentasTxt,
-    cultura: ctx.cultura, exec: ctx.exec, decisoes: ctx.decisoesTodas, detalhes: Object.fromEntries(AREAS.map(a => [a, detalhe(ctx, a, rastreios, digitais)])) }
+    cultura: ctx.cultura, exec: ctx.exec, decisoes: ctx.decisoesTodas, detalhes: Object.fromEntries(AREAS.map(a => [a, detalhe(ctx, a, rastreios, digitais, prod)])) }
   const { gravarFoto } = await import("./diretoriaServidor")
   if (salvar) await gravarFoto(foto).catch(() => null)
   return foto
