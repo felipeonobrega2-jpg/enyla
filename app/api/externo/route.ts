@@ -9,6 +9,7 @@ import { filtroDoAgente } from "@/app/lib/agenteLeads"
 import { gastoFixo } from "@/app/lib/gastoFixoExterno"
 import { lancamento } from "@/app/lib/lancamentoExterno"
 import { lancarDespesaExterno } from "@/app/lib/lancarDespesaExterno"
+import { mensagemFornecedorExterno } from "@/app/lib/mensagemFornecedorExterno"
 import { renomearFornecedorExterno } from "@/app/lib/renomearFornecedorExterno"
 import { conciliacao } from "@/app/lib/conciliacaoExterna"
 import { categoria } from "@/app/lib/categoriaExterna"
@@ -241,6 +242,12 @@ export async function POST(req: NextRequest) {
     const { ok: _ok, resultado, ...resto } = r
     void _ok
     return NextResponse.json({ ok: true, resultado, ...resto })
+  } else if (b.acao === "mensagem_fornecedor") {
+    const r = await mensagemFornecedorExterno(diretor, b)
+    if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
+    msg = { id: novoId(), de: "diretor", texto: r.resultado, em: new Date().toISOString(), nuvem: true }
+    await gravarConversa(diretor, [...await lerConversa(diretor), msg])
+    return NextResponse.json({ ok: true, resultado: r.resultado, registro: r.registro })
   } else if (b.acao === "lead") {
     const r = await leadExterno(b, diretor)
     if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
