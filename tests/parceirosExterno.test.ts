@@ -5,7 +5,7 @@ vi.mock("@/app/lib/supabase", () => ({
   supabase: {
     from: (t: string) => {
       const cadeia: Record<string, unknown> = {}
-      for (const m of ["select", "in", "order", "limit", "eq"]) cadeia[m] = () => cadeia
+      for (const m of ["select", "in", "order", "limit", "eq", "contains"]) cadeia[m] = () => cadeia
       for (const m of ["insert", "update", "upsert", "delete"]) cadeia[m] = () => { est.escritas.push(`${t}.${m}`); return cadeia }
       cadeia.then = (ok: (v: unknown) => unknown) => ok(est.tabelas[t] === undefined && t === "prospectos_emails_recebidos" ? { data: null, error: { message: "não existe" } } : { data: est.tabelas[t] ?? [], count: (est.tabelas[t] ?? []).length, error: null })
       return cadeia

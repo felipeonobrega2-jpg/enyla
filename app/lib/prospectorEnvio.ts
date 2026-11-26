@@ -119,6 +119,11 @@ export function replyToDoProspector(env: string | undefined = process.env.PROSPE
 }
 /** Destino final do link rastreado do e-mail (formulário de cadastro de parceiros). */
 export const URL_CADASTRO_PARCEIROS = "https://app.enyla.com.br/parceiros"
+/** Canal de origem do link de cadastro (utm_source). Medição: de onde vem cada cadastro. */
+export type CanalUtm = "email" | "whatsapp" | "boasvindas"
+export const CANAIS_UTM: readonly CanalUtm[] = ["email", "whatsapp", "boasvindas"]
+/** Link do cadastro com utm_source (canal) e utm_medium=prospector. */
+export const linkCadastro = (canal: CanalUtm) => `${URL_CADASTRO_PARCEIROS}?utm_source=${canal}&utm_medium=prospector`
 export const URL_BASE_APP = "https://app.enyla.com.br"
 export const urlRastreada = (token: string) => `${URL_BASE_APP}/api/prospector/r/${token}`
 /** Linha do link no primeiro contato. O texto do link não mostra endereço (mostrar um e apontar para outro é marcado como spam). */
