@@ -6,6 +6,7 @@ import { estaSegurado, textoSegurado, type MapaSegurados } from "../lib/pedidoSe
 import { KanbanCard, KanbanOpcao, Lote, LancamentoFinanceiro, NegocioParceiro, StatusLoteParceiro, COLUNAS_KANBAN, COL_FECHADO, COL_EXPEDICAO, COL_ENTREGUE, COL_PERDIDO, COL_HOT } from "../types"
 import { brl, num } from "../utils"
 import { COL_COLORS } from "./kanban-colors"
+import { motivoValido } from "../lib/perdido"
 import { MOTIVOS_PERDA, CategoriaPerda, textoMotivo } from "../lib/coleta"
 
 // HOT é renderizado entre col 0 e col 1, mas usa índice 11 para não deslocar os existentes no DB
@@ -173,7 +174,7 @@ function PixEmitModal({ card, loteTotal, onClose, onAddLancamento }: {
 export function KanbanView({
   cards,
   onMove,
-  onDelete,
+  onMarcarPerdido,
   onSetMotivo,
   onFechamento,
   onDetalhes,
@@ -196,7 +197,7 @@ export function KanbanView({
 }: {
   cards: KanbanCard[]
   onMove: (id: string, coluna: number) => void
-  onDelete: (id: string) => void
+  onMarcarPerdido: (id: string, motivo: string) => void
   onSetMotivo: (id: string, motivo: string) => void
   onFechamento: (id: string, opcao: KanbanOpcao) => void
   onHotOpcao?: (id: string, opcao: KanbanOpcao) => void
@@ -222,6 +223,16 @@ export function KanbanView({
   const [overCol, setOverCol]     = useState<number | null>(null)
   const [modal, setModal]         = useState<ModalFechamento | null>(null)
   const [colapsarVazias, setColapsarVazias] = useState(!!hideDashboard)
+  const [perdaCard, setPerdaCard]   = useState<KanbanCard | null>(null)
+  const [perdaMotivo, setPerdaMotivo] = useState("")
+  const [verPerdidos, setVerPerdidos] = useState(false)
+
+  function confirmarPerdaModal() {
+    if (!perdaCard || !motivoValido(perdaMotivo)) return
+    onMarcarPerdido(perdaCard.id, perdaMotivo.trim())
+    setPerdaCard(null)
+    setPerdaMotivo("")
+  }
 
   function tentarMover(id: string, destCol: number) {
     const card = cards.find(c => c.id === id)
@@ -466,7 +477,8 @@ export function KanbanView({
             const isOver   = overCol === colIdx
             const colors   = COL_COLORS[colIdx]
             const vazia    = colCards.length === 0
-            const colapsada = colapsarVazias && vazia
+            const ehPerdidoCol = colIdx === COL_PERDIDO
+            const colapsada = ehPerdidoCol ? !verPerdidos : colapsarVazias && vazia
             const prevCol  = renderPos > 0 ? BOARD_ORDER[renderPos - 1] : null
             const nextCol  = renderPos < BOARD_ORDER.length - 1 ? BOARD_ORDER[renderPos + 1] : null
 
@@ -474,11 +486,12 @@ export function KanbanView({
               return (
                 <div
                   key={colIdx}
-                  className={`flex flex-col shrink-0 self-start rounded-xl transition-all duration-200 cursor-default ${
+                  className={`flex flex-col shrink-0 self-start rounded-xl transition-all duration-200 ${ehPerdidoCol ? "cursor-pointer" : "cursor-default"} ${
                     isOver ? `ring-2 ${colors.border.replace("border-", "ring-")} ${colors.bg}` : "bg-[rgba(116,116,128,0.06)] hover:bg-[rgba(116,116,128,0.1)]"
                   }`}
                   style={{ width: 34, minHeight: isOver ? 260 : 190 }}
-                  title={`${colNome}: nenhum pedido. Arraste um cartão para cá.`}
+                  title={ehPerdidoCol ? `${colNome}: ${colCards.length} pedido${colCards.length === 1 ? "" : "s"}. Clique para ver.` : `${colNome}: nenhum pedido. Arraste um cartão para cá.`}
+                  onClick={ehPerdidoCol ? () => setVerPerdidos(true) : undefined}
                   onDragOver={e => handleDragOver(e, colIdx)}
                   onDrop={e => handleDrop(e, colIdx)}
                   onDragLeave={() => setOverCol(null)}
@@ -488,7 +501,7 @@ export function KanbanView({
                       className="text-[11px] font-medium text-[#898892] select-none whitespace-nowrap"
                       style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", letterSpacing: "0.04em" }}
                     >
-                      {colNome}
+                      {ehPerdidoCol ? `${colNome} (${colCards.length})` : colNome}
                     </span>
                   </div>
                   {isOver && (
@@ -513,6 +526,10 @@ export function KanbanView({
                   <span className={`w-2 h-2 rounded-full shrink-0 ${colors.dot}`} />
                   <p className="text-[12.5px] font-semibold flex-1 leading-tight text-[#191625]">{colNome}</p>
                   <span className="text-[11px] font-semibold text-[#898892] ds-num">{colCards.length}</span>
+                  {ehPerdidoCol && (
+                    <button onClick={() => setVerPerdidos(false)} title="Recolher Perdido"
+                      className="text-[11px] text-[#898892] hover:text-[#191625] px-1">⟩</button>
+                  )}
                 </div>
                 {colCards.length > 0 && (
                   <p className="px-3.5 -mt-1 pb-2 text-[11px] text-[#898892] ds-num">{brl(colCards.reduce((s, c) => s + c.preco, 0))}</p>
@@ -538,7 +555,7 @@ export function KanbanView({
                       colors={colors}
                       onDragStart={handleDragStart}
                       onDragEnd={handleDragEnd}
-                      onDelete={onDelete}
+                      onPedirPerda={c => { setPerdaMotivo(""); setPerdaCard(c) }}
                       onMove={tentarMover}
                       onSetMotivo={onSetMotivo}
                       onDetalhes={onDetalhes}
@@ -565,6 +582,31 @@ export function KanbanView({
           })}
         </div>
       </div>
+
+      {/* ── Modal: Marcar como Perdido (o X do card). Nada é apagado. ── */}
+      {perdaCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(25,22,37,0.38)] backdrop-blur-[6px] apple-backdrop-enter"
+          onClick={e => { if (e.target === e.currentTarget) setPerdaCard(null) }}>
+          <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] w-full max-w-sm mx-4 overflow-hidden apple-modal-enter px-6 py-5 space-y-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[#8E8E93] font-semibold mb-1">Marcar como Perdido</p>
+              <p className="font-bold text-[#1C1C1E] text-[15px] leading-snug truncate">{perdaCard.nomeCliente}</p>
+              <p className="text-[11px] text-[#8E8E93] mt-1">O pedido vai para a coluna Perdido. Nada é apagado.</p>
+            </div>
+            <textarea autoFocus value={perdaMotivo} onChange={e => setPerdaMotivo(e.target.value)} rows={3}
+              onKeyDown={e => { if (e.key === "Escape") setPerdaCard(null) }}
+              placeholder="Motivo (obrigatório)…"
+              className="w-full text-[12px] text-[#1C1C1E] bg-white border border-[rgba(0,0,0,0.12)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#FF3B30]/25 cursor-text select-text" />
+            <div className="flex gap-2">
+              <button onClick={() => setPerdaCard(null)}
+                className="flex-1 py-2 text-[12px] font-medium text-[#8E8E93] hover:bg-[rgba(0,0,0,0.04)] rounded-xl transition-colors">Cancelar</button>
+              <button onClick={confirmarPerdaModal} disabled={!motivoValido(perdaMotivo)}
+                className="flex-1 py-2 text-[12px] font-bold text-white rounded-xl transition-colors disabled:opacity-40"
+                style={{ background: "#FF3B30" }}>Marcar como Perdido</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal de fechamento ───────────────────────────────────────────── */}
       {modal && (
@@ -658,7 +700,7 @@ function fmt(iso?: string) {
 }
 
 function KanbanCardItem({
-  card, colIdx, prevCol, nextCol, isDragging, colors, onDragStart, onDragEnd, onDelete, onMove, onSetMotivo, onDetalhes,
+  card, colIdx, prevCol, nextCol, isDragging, colors, onDragStart, onDragEnd, onPedirPerda, onMove, onSetMotivo, onDetalhes,
   lotes, onLoteCreate, onLoteAssign, onLoteRemove, onLoteMerge, onLoteRename, negocios, onUpdateNegocio, allCards,
   onAddLancamento, isDark, isSelected, onSelectCard, segurado, onSegurar,
 }: {
@@ -670,7 +712,7 @@ function KanbanCardItem({
   colors: typeof COL_COLORS[0]
   onDragStart: (e: React.DragEvent, id: string) => void
   onDragEnd: () => void
-  onDelete: (id: string) => void
+  onPedirPerda: (card: KanbanCard) => void
   onMove: (id: string, col: number) => void
   onSetMotivo: (id: string, motivo: string) => void
   onDetalhes?: (card: KanbanCard) => void
@@ -858,8 +900,8 @@ function KanbanCardItem({
             )
           })()}
           <div className="flex-1" />
-          <button onClick={e => { e.stopPropagation(); if (confirm(`Remover "${card.nomeCliente}" do quadro?`)) onDelete(card.id) }}
-            title="Remover do quadro"
+          <button onClick={e => { e.stopPropagation(); onPedirPerda(card) }}
+            title="Marcar como Perdido"
             className="w-6 h-6 flex items-center justify-center rounded-md text-[#c7c7cc] hover:text-[#d33a3c] hover:bg-[#d33a3c]/[0.06] transition-all opacity-0 group-hover/card:opacity-100 shrink-0">
             <X className="w-3.5 h-3.5" />
           </button>

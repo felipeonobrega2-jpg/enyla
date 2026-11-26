@@ -1,6 +1,7 @@
 "use client"
 
 import { unpackTerceirizado } from "./lib/kanbanUnpack"
+import { gravarPerda, podeExcluirDefinitivo } from "./lib/perdido"
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { Layers, ShoppingBag, Ruler, Calculator, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb, Truck, Gauge, Printer , Scissors, Building2, ShieldCheck } from "lucide-react"
 import { IdeiasView } from "./components/IdeiasView"
@@ -232,6 +233,26 @@ export default function Home() {
   const [modalPropostaCustom, setModalPropostaCustom] = useState(false)
   const [editandoProposta, setEditandoProposta] = useState<PropostaCustom | null>(null)
   const [detalheModal, setDetalheModal] = useState<DetalheData | null>(null)
+  const [papelSessao, setPapelSessao] = useState<string | null>(null)
+  useEffect(() => {
+    fetch("/api/auth/session").then(r => r.ok ? r.json() : null).then(d => setPapelSessao(d?.papel ?? null)).catch(() => {})
+  }, [])
+
+  // Exclusão de verdade (só pelo detalhe do card, admin, com o nome do cliente digitado). O X do Kanban não chama isto.
+  function excluirDefinitivo(id: string) {
+    if (!podeExcluirDefinitivo(papelSessao)) return
+    const card = kanban.find(c => c.id === id)
+    const proposta = propostasCustom.find(p => p.cardId === id)
+    setKanban(prev => prev.filter(c => c.id !== id))
+    fetch(`/api/kanban/${id}`, { method: "DELETE" }).catch(() => {})
+    if (card?.numero) {
+      setHistorico(prev => prev.filter(h => h.numero !== card.numero))
+      fetch(`/api/historico/${encodeURIComponent(card.numero)}`, { method: "DELETE" }).catch(() => {})
+    }
+    setPropostasCustom(prev => prev.filter(p => p.cardId !== id))
+    if (proposta) fetch(`/api/propostas/${proposta.id}`, { method: "DELETE" }).catch(() => {})
+    setDetalheModal(null)
+  }
   const [parceiros, setParceiros] = useState<Parceiro[]>([])
   const [negocios, setNegocios]   = useState<NegocioParceiro[]>([])
   const [lancamentos, setLancamentos] = useState<LancamentoFinanceiro[]>([])
@@ -2776,17 +2797,12 @@ export default function Home() {
                   }
                 }
               }}
-              onDelete={id => {
+              onMarcarPerdido={(id, motivo) => {
                 const card = kanban.find(c => c.id === id)
-                const proposta = propostasCustom.find(p => p.cardId === id)
-                setKanban(prev => prev.filter(c => c.id !== id))
-                fetch(`/api/kanban/${id}`, { method: "DELETE" }).catch(() => {})
-                if (card?.numero) {
-                  setHistorico(prev => prev.filter(h => h.numero !== card.numero))
-                  fetch(`/api/historico/${encodeURIComponent(card.numero)}`, { method: "DELETE" }).catch(() => {})
-                }
-                setPropostasCustom(prev => prev.filter(p => p.cardId !== id))
-                if (proposta) fetch(`/api/propostas/${proposta.id}`, { method: "DELETE" }).catch(() => {})
+                if (!card || !motivo.trim()) return
+                setKanban(prev => prev.map(c => c.id === id ? { ...c, coluna: COL_PERDIDO, motivoPerdido: motivo.trim() } : c))
+                gravarPerda((url, init) => fetch(url, init), id, motivo).catch(() => {})
+                if (card.numero) atualizarTracking(card.numero, COL_PERDIDO)
               }}
               onSetMotivo={(id, motivo) => {
                 setKanban(prev => prev.map(c => c.id === id ? { ...c, motivoPerdido: motivo } : c))
@@ -3391,6 +3407,7 @@ export default function Home() {
           onEditar={(p) => { setDetalheModal(null); setEditandoProposta(p) }}
           onEditarHistorico={editarHistorico}
           onPersonalizarHistorico={personalizarHistorico}
+          onExcluirDefinitivo={"card" in detalheModal && detalheModal.card && podeExcluirDefinitivo(papelSessao) ? excluirDefinitivo : undefined}
           onSaveDelivery={"card" in detalheModal && detalheModal.card ? salvarDataEntrega : undefined}
           onSaveDeliveryReal={"card" in detalheModal && detalheModal.card ? salvarDataEntregaReal : undefined}
           onSaveCloseDate={"card" in detalheModal && detalheModal.card ? salvarDataFechamento : undefined}
