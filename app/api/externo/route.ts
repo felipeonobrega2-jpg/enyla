@@ -22,6 +22,7 @@ import { ehComercial, podeAcionarComercial, comerciaisDoDiretor } from "@/app/li
 import { leadExterno } from "@/app/lib/leadExterno"
 import { acaoPendencia, lerPendenciasDaArea, renovarFotoDepois } from "@/app/lib/pendenciaExterna"
 import { acaoTarefaFelipe, tarefasDoDiretor } from "@/app/lib/tarefaFelipe"
+import { acaoRestaurarFila } from "@/app/lib/filaRestaurar"
 import { pedidoExterno } from "@/app/lib/pedidoExterno"
 import { lerPertoExterno, AJUDA_PERTO } from "@/app/lib/pertoExterno"
 import { lerPropostasExterno, AJUDA_PROPOSTAS } from "@/app/lib/propostasExterno"
@@ -68,6 +69,7 @@ export async function GET(req: NextRequest) {
     voce: `${info.nome}, ${info.cargo} (${info.area})`,
     leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | ") + " | parceiros (só CCO e CMO) | prospector_textos (só CCO e CMO)", ...(podeAcionarComercial(diretor) ? { "?o=detalhe&area=prospector_textos": AJUDA_TEXTOS_PROSPECTOR } : {}), ...(podeAcionarComercial(diretor) ? { "?o=parceiros": AJUDA_PARCEIROS } : { "?o=parceiros": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): cadastros de /parceiros e respostas do Prospector" }), "?o=historico_offset": AJUDA_HISTORICO_OFFSET, "?o=prazos_fornecedores": PODEM_LER_PRAZOS.includes(diretor) ? AJUDA_PRAZOS_FORNECEDORES : "SÓ PARA AS CHAVES DO COO E DO CTO (as outras recebem 403): prazos cadastrais dos fornecedores de produção", "?o=conversa": "o que você e o Felipe conversaram", ...(podeAcionarComercial(diretor) ? { "?o=propostas": AJUDA_PROPOSTAS } : { "?o=propostas": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): propostas Offset em JSON paginado" }), ...(podeAcionarComercial(diretor) ? { "?o=perto": AJUDA_PERTO } : { "?o=perto": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): a lista 'Perto de você'" }), ...(diretor === "cfo" ? { ...AJUDA_FINANCEIRO, ...AJUDA_CUSTO_LOTE } : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa", "?o=custo_lote": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): custo real por lote Offset" }), ...(diretor === "cmo" ? { "?o=meta_ads": "Meta Ads ao vivo (só leitura): conta, campanhas, conjuntos e anúncios; hoje, 7 e 30 dias; cache de 3 min; bloco funil por campanha (7 e 30 dias: leads, mql, orçamentos, pedidos, vendido, gasto, custo por lead e por MQL) e previsaoSaldoDias" } : {}) },
     escrita: { "POST {acao:'relatar', texto}": "manda algo ao Felipe",
+      "POST {acao:'restaurar_fila', ids}": "QUALQUER DIRETOR. Devolve à Fila de mensagens itens que foram dispensados (ids no formato fu-{jid}-{ultima_enviada_at}). Id que não está dispensado é ignorado. Não envia nada: o item só reaparece para envio manual. Responde { devolvidos }",
       "POST {acao:'dispensar_pendencia', chave, motivo, ate?}": "QUALQUER DIRETOR. Dispensa uma pendência (a chave vem em ?o=empresa, campo pendencias) com motivo obrigatório (sem motivo: 400); ate (AAAA-MM-DD) opcional: depois dessa data ela volta. Não apaga nada",
       "POST {acao:'tarefa_felipe', titulo, detalhe?, prazo? (AAAA-MM-DD)}": "QUALQUER DIRETOR. Põe uma tarefa na lista 'Depende de você' do Felipe (pedido por você, com data e prazo). titulo obrigatório (até 140 caracteres); no máximo 10 abertas por diretor (a 11ª volta 429). Suas tarefas (abertas e feitas nos últimos 7 dias) estão em ?o=empresa, campo tarefasParaFelipe. {acao:'tarefa_felipe', operacao:'cancelar', id} cancela só as suas. Não manda mensagem a ninguém",
       "POST {acao:'reabrir_pendencia', chave}": "QUALQUER DIRETOR. Tira a dispensa e a pendência volta na hora (?o=empresa lista as dispensadas à parte)",
@@ -254,6 +256,9 @@ export async function POST(req: NextRequest) {
     const r = await acaoPendencia(diretor, b)
     if (r.status === 200) after(renovarFotoDepois)
     return NextResponse.json(r.corpo, { status: r.status })
+  } else if (b.acao === "restaurar_fila") {
+    const r = await acaoRestaurarFila(diretor, b)
+    return NextResponse.json(r.corpo, { status: r.status })
   } else if (b.acao === "tarefa_felipe") {
     const r = await acaoTarefaFelipe(diretor, b)
     if (r.status !== 200) return NextResponse.json(r.corpo, { status: r.status })
@@ -301,7 +306,7 @@ export async function POST(req: NextRequest) {
       await gravarConversa(diretor, [...await lerConversa(diretor), msg])
       return NextResponse.json({ ok: true, resultado: saida, destino: r.destino, motivo: r.motivo, nivel: r.nivel, id: r.acao.id })
     }
-  } else return NextResponse.json({ erro: `acao: relatar, lancar_despesa, renomear_fornecedor, mover_card, gravar_digital, guardar_texto_prospector, ativar_texto_prospector, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
+  } else return NextResponse.json({ erro: `acao: relatar, lancar_despesa, renomear_fornecedor, mover_card, gravar_digital, guardar_texto_prospector, ativar_texto_prospector, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, restaurar_fila, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
   await gravarConversa(diretor, [...await lerConversa(diretor), msg])
   return NextResponse.json({ ok: true, resultado: saida })
 }
