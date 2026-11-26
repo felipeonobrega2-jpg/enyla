@@ -203,6 +203,10 @@ export type CadastroParceiro = {
   aceite: boolean
   fornecedorId?: string
   emails?: { tipo: "recebido" | "aprovado"; em: string; ok: boolean; erro?: string }[]
+  // Rascunho montado pelo Atendente a partir da conversa no WhatsApp (ausente = veio do formulário /parceiros)
+  origem?: "formulario" | "prospector"
+  prospectoId?: number
+  faltando?: string[]              // o que ainda falta (vazio/ausente = completo); o status segue "novo": a IA nunca aprova
 }
 
 export const GERENTE_PADRAO = "Felipe"
