@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest"
-import { lerContasOpeni, contaValeNaData, daOpeni, fonteDoExtrato, segredoValido } from "@/app/lib/openi"
+import { lerContasOpeni, contaValeNaData, daOpeni, fonteDoExtrato, segredoValido, lerTermosEmpresa, ehDaEmpresa } from "@/app/lib/openi"
 
 // Só dados fictícios.
 describe("Openi", () => {
@@ -39,5 +39,20 @@ describe("Openi", () => {
     expect(segredoValido("segredo-ficticio")).toBe(true)
     expect(segredoValido("outro")).toBe(false)
     expect(segredoValido(null)).toBe(false)
+  })
+
+  it("conta mista: lê a flag e classifica por termos (sem acento, sem caixa)", () => {
+    expect(lerContasOpeni(JSON.stringify([{ item: "i", conta: "m1", mista: true }, { item: "i", conta: "m2" }])).map(c => c.mista)).toEqual([true, false])
+    const termos = lerTermosEmpresa(["Ferramenta Ficticia", "Hospedagem  Exemplo", "ab"], undefined)
+    expect(termos).toEqual(["ferramenta ficticia", "hospedagem exemplo"])
+    expect(ehDaEmpresa({ descricao: "COMPRA FERRAMENTA FICTÍCIA 12/11" }, termos)).toBe(true)
+    expect(ehDaEmpresa({ descricao: "Mercado", contraparte_nome: "Hospedagem Exemplo Ltda" }, termos)).toBe(true)
+    expect(ehDaEmpresa({ descricao: "Padaria do bairro" }, termos)).toBe(false)
+    expect(ehDaEmpresa({ descricao: "qualquer" }, [])).toBe(false)
+  })
+
+  it("termos vêm da env quando a config está vazia", () => {
+    expect(lerTermosEmpresa([], JSON.stringify(["Servico Ficticio"]))).toEqual(["servico ficticio"])
+    expect(lerTermosEmpresa(undefined, "lixo")).toEqual([])
   })
 })

@@ -14,7 +14,9 @@ export const fonteDoExtrato = (v: unknown): FonteExtrato => (v === "openi" ? "op
 
 export const openiConfigurada = () => !!process.env.OPENI_API_KEY
 
-export type ContaOpeni = { item: string; conta: string; antesDe?: string; aPartirDe?: string }
+// mista: conta/cartão de pessoa física usado também para a empresa. Tudo é importado, mas só entra na fila
+// (caixa e conciliação) o que for da empresa: pela regra de termos (descrição/favorecido) ou marcado à mão.
+export type ContaOpeni = { item: string; conta: string; antesDe?: string; aPartirDe?: string; mista?: boolean }
 
 export function lerContasOpeni(bruto = process.env.OPENI_CONTAS): ContaOpeni[] {
   if (!bruto) return []
@@ -23,7 +25,7 @@ export function lerContasOpeni(bruto = process.env.OPENI_CONTAS): ContaOpeni[] {
     if (!Array.isArray(j)) return []
     const dia = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined)
     return j.filter(c => c && typeof c.item === "string" && typeof c.conta === "string" && c.item && c.conta)
-      .map(c => ({ item: c.item, conta: c.conta, antesDe: dia(c.antesDe), aPartirDe: dia(c.aPartirDe) }))
+      .map(c => ({ item: c.item, conta: c.conta, antesDe: dia(c.antesDe), aPartirDe: dia(c.aPartirDe), mista: c.mista === true }))
   } catch { return [] }
 }
 
@@ -86,4 +88,23 @@ export function daOpeni(t: TxOpeni, conta: string, contaNome: string | null): Om
     contraparte_nome: t.counterpartyName ?? null, contraparte_doc: (t.counterpartyDocument ?? "").replace(/\D/g, "") || null,
     categoria_pluggy: t.category ?? null,
   }
+}
+
+// ── Conta mista ──────────────────────────────────────────────────────────────
+export const ACAO_PESSOAL = "conta mista: pessoal"
+export const ACAO_EMPRESA_REGRA = "conta mista: da empresa (regra)"
+
+const limpar = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim()
+
+// Termos (fornecedores, ferramentas) que marcam um movimento da conta mista como da empresa.
+// Vêm da config (termosEmpresaContaMista) ou, se vazia, da env OPENI_TERMOS_EMPRESA (JSON: ["termo", ...]).
+export function lerTermosEmpresa(daConfig?: unknown, bruto = process.env.OPENI_TERMOS_EMPRESA): string[] {
+  let l: unknown = daConfig
+  if (!Array.isArray(l) || !l.length) { try { l = bruto ? JSON.parse(bruto) : [] } catch { l = [] } }
+  return Array.isArray(l) ? l.filter((t): t is string => typeof t === "string").map(limpar).filter(t => t.length >= 3) : []
+}
+
+export const ehDaEmpresa = (tx: { descricao?: string | null; contraparte_nome?: string | null }, termos: string[]) => {
+  const texto = limpar(`${tx.descricao ?? ""} ${tx.contraparte_nome ?? ""}`)
+  return termos.some(t => texto.includes(t))
 }
