@@ -67,6 +67,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 51 | Porta externa: `acao=importar_prospectos` e ordem direta a gráfica do Prospector, sem Aprovo, só 8h–20h e fora da exclusão (regra do Felipe de 26/11/2026, 9h44; 1º PR da issue #242; verificar_whatsapp, responder_prospecto e decidir_cadastro_parceiro vêm depois) | CCO | urgente | — | Claude Code | não | (PR da issue #242) |
 | 53 | Chave `aprovoObrigatorio` (padrão false): sem o Aprovo, a mensagem sai direto pelo funcionário, com as travas, conferência do a receber ao centavo e histórico (`aprovoDesligadoLog`) | Felipe (ordem de 26/11/2026, 9h44) | urgente | — | Claude Code | não (ordem do Felipe) | (PR da issue #244) |
 | 52 | `/parceiros`: nova capa da rede de gráficas parceiras, sem "embalagem" nos textos (só texto) | Felipe | — | — | Claude Code | não (só texto) | (PR da issue #241) |
+| 53 | Atendente responde sozinho, pela IA, as gráficas do Prospector (modo parceiro: sem orçamento, link `app.enyla.com.br/parceiros`, 3 perguntas sem resposta oficial vão ao Felipe, opt-out); troca o item 38 | Felipe (ordem de 26/11/2026: "tem que ser tudo automático") | urgente | — | Claude Code | não (CI e preview verdes, o Felipe junta) | (PR da issue #242, parte do Atendente) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
