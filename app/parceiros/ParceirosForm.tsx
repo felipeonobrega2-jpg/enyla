@@ -86,7 +86,7 @@ function Rodape({ whatsappGerente }: { whatsappGerente: string | null }) {
       <div className="max-w-[1040px] mx-auto px-5 pt-10 pb-8 grid sm:grid-cols-[1.4fr_1fr_1fr] gap-8">
         <div>
           <img src="/brand/enyla-wordmark-light.png" alt="ENYLA" className="h-6" onError={e => { (e.target as HTMLImageElement).style.display = "none" }} />
-          <p className="mt-3 text-[13.5px] leading-relaxed max-w-[320px]">Embalagens personalizadas para marcas de todo o Brasil, produzidas com uma rede de parceiros de confiança.</p>
+          <p className="mt-3 text-[13.5px] leading-relaxed max-w-[320px]">Pedidos de impressão de todo o Brasil, produzidos com uma rede de parceiras de confiança.</p>
         </div>
         <div>
           <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-white/50">Fale com a gente</p>
@@ -239,10 +239,10 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
           <div className="par-in-fwd">
             <img src="/brand/enyla-wordmark-light.png" alt="ENYLA" className="h-7 mb-10" onError={e => { (e.target as HTMLImageElement).style.display = "none" }} />
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 backdrop-blur text-white text-[12.5px] font-semibold px-3 py-1"><Handshake className="w-3.5 h-3.5" />Parceiros ENYLA</span>
-            <h1 className="mt-4 text-white text-[38px] sm:text-[52px] leading-[1.03] font-extrabold tracking-tight">Nunca mais<br />fique ocioso.</h1>
-            <p className="mt-4 text-white/85 text-[16.5px] sm:text-[18px] leading-relaxed max-w-[520px]">A ENYLA produz embalagens para marcas de todo o Brasil e distribui a produção entre parceiros de confiança. <b className="text-white font-semibold">Máquina parada não paga conta:</b> cadastre o que você faz e receba pedidos com frequência.</p>
+            <h1 className="mt-4 text-white text-[38px] sm:text-[52px] leading-[1.03] font-extrabold tracking-tight">Sua gráfica na rede de parceiras da ENYLA</h1>
+            <p className="mt-4 text-white/85 text-[16.5px] sm:text-[18px] leading-relaxed max-w-[520px]">A ENYLA recebe pedidos de impressão do Brasil todo. Quando entra um pedido do que a sua gráfica faz, a gente passa pra você. Cadastre seus serviços e suas máquinas. Leva uns 5 minutos.</p>
             <button onClick={comecar} className="mt-7 w-full sm:w-auto inline-flex justify-center h-14 px-8 rounded-2xl bg-white text-[16.5px] font-bold items-center gap-2 active:scale-[0.99] transition shadow-[0_10px_30px_rgba(0,0,0,0.25)]" style={{ color: ROXO }}>
-              Quero ser parceiro<ArrowRight className="w-5 h-5" />
+              Cadastrar minha gráfica<ArrowRight className="w-5 h-5" />
             </button>
           </div>
           {/* Notificações de pedido (ilustração de como os pedidos e pagamentos chegam) */}

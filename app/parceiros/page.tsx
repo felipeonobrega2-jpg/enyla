@@ -2,8 +2,8 @@ import type { Metadata } from "next"
 import ParceirosForm from "./ParceirosForm"
 
 export const metadata: Metadata = {
-  title: "Parceiros ENYLA · Nunca mais fique ocioso",
-  description: "Cadastre os serviços da sua empresa e receba pedidos de embalagem da ENYLA com frequência.",
+  title: "Sua gráfica na rede de parceiras da ENYLA",
+  description: "A ENYLA recebe pedidos de impressão do Brasil todo. Cadastre seus serviços e suas máquinas e receba os pedidos do que a sua gráfica faz.",
   robots: { index: false, follow: false },
 }
 // Página do parceiro: sempre clara
