@@ -29,4 +29,25 @@ describe("etapasProducao", () => {
     const cards = Array.from({ length: 200 }, (_, i) => ({ numero: `P${i}`, nomeCliente: "Cliente", coluna: 2 }))
     expect(detalheProducao(cards, [], nomes, "2026-11-24").length).toBeLessThanOrEqual(7000)
   })
+  it("mostra por lote fornecedor, data de envio e data de retorno (rodada)", () => {
+    const lotes = {
+      movimentos: [
+        { id: "m1", pedidoKey: "lote-1", pedidoLabel: "L1", fornecedorId: "tio", etapa: "impressao" as const, enviadoEm: "2026-11-10", recebidoEm: "2026-11-15", rodadaId: "ROD-001" },
+        { id: "m2", pedidoKey: "lote-2", pedidoLabel: "L2", fornecedorId: "x", etapa: "acabamento" as const, enviadoEm: "2026-11-11" },
+      ],
+      rodadas: [{ id: "ROD-001", ficticio: true, folhas: 1, posicoesPorFolha: 1, custoTerceiro: {}, pedidos: [], retornoEm: "2026-11-16" }],
+      nomeFornecedor: (id: string) => (id === "tio" ? "Impressor" : id),
+    }
+    const p = JSON.parse(detalheProducao([{ numero: "A", chave: "lote-1", coluna: 5 }, { numero: "B", chave: "lote-2", coluna: 7 }, { numero: "C", coluna: 7 }], [], nomes, "2026-11-24", lotes))
+    expect(p.pedidos[0].lotes).toEqual([{ rodadaId: "ROD-001", fornecedor: "Impressor", enviadoEm: "2026-11-10", retornoEm: "2026-11-16" }])
+    expect(p.pedidos[1].lotes).toEqual([{ fornecedor: "x", enviadoEm: "2026-11-11", retornoEm: null }])
+    expect(p.pedidos[2].lotes).toBeUndefined()
+  })
+  it("com lotes, continua em 7000 caracteres e mantém os campos dos lotes visíveis", () => {
+    const cards = Array.from({ length: 200 }, (_, i) => ({ numero: `P${i}`, chave: `lote-${i}`, nomeCliente: "Cliente", coluna: 2 }))
+    const movimentos = cards.map((c, i) => ({ id: `m${i}`, pedidoKey: c.chave, pedidoLabel: c.numero, fornecedorId: "f", etapa: "impressao" as const, enviadoEm: "2026-11-10" }))
+    const s = detalheProducao(cards, [], nomes, "2026-11-24", { movimentos })
+    expect(s.length).toBeLessThanOrEqual(7000)
+    expect(JSON.parse(s).pedidos[0].lotes[0]).toMatchObject({ fornecedor: "f", enviadoEm: "2026-11-10", retornoEm: null })
+  })
 })
