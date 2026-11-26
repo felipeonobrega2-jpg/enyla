@@ -33,9 +33,10 @@ vi.mock("@/app/lib/supabase", () => ({
 vi.mock("@/app/lib/configAtomica", () => ({ lerCampos: async () => ({}) }))
 vi.mock("@/app/lib/evolution", () => ({ evo: async () => ({ ok: false, status: 500 }) }))
 
-import { processarEventoEmail, registrarCliquePorToken } from "@/app/lib/prospectorEventosServidor"
+import { processarEventoEmail, registrarCliquePorToken, descadastrarPorToken } from "@/app/lib/prospectorEventosServidor"
 import { envioDe, htmlDoPrimeiroContato, textoPlanoDoPrimeiroContato, URL_CADASTRO_PARCEIROS } from "@/app/lib/prospectorEnvio"
 import { GET } from "@/app/api/prospector/r/[token]/route"
+import { GET as GET_SAIR, POST as POST_SAIR } from "@/app/api/prospector/sair/[token]/route"
 
 const AGORA = new Date("2026-11-26T14:00:00Z")
 const prospecto = (extra: Linha = {}): Linha => ({
@@ -114,7 +115,7 @@ describe("link rastreado", () => {
   it("token válido marca clique e redireciona 302 ao formulário", async () => {
     const res = await GET(new Request("https://x") as never, { params: Promise.resolve({ token: "tokenabc12345" }) })
     expect(res.status).toBe(302)
-    expect(res.headers.get("location")).toBe(URL_CADASTRO_PARCEIROS)
+    expect(res.headers.get("location")).toBe(`${URL_CADASTRO_PARCEIROS}?origem=prospector_email`)
     expect(mundo.prospectos[0].etapa).toBe("abriu")
     expect(envioDo(mundo.prospectos[0]).cliqueEm).toBeTruthy()
   })
@@ -122,9 +123,35 @@ describe("link rastreado", () => {
     for (const token of ["naoexiste12345", "x", "a/b"]) {
       const res = await GET(new Request("https://x") as never, { params: Promise.resolve({ token }) })
       expect(res.status).toBe(302)
-      expect(res.headers.get("location")).toBe(URL_CADASTRO_PARCEIROS)
+      expect(res.headers.get("location")).toBe(`${URL_CADASTRO_PARCEIROS}?origem=prospector_email`)
     }
     expect(mundo.prospectos[0].etapa).toBe("abordado")
     expect(await registrarCliquePorToken("x")).toBe(false)
+  })
+})
+
+describe("reclamação de spam e descadastro", () => {
+  it("complained marca spam e põe o prospecto na lista de exclusão", async () => {
+    await processarEventoEmail({ type: "email.complained", data: { email_id: "re_1" } }, AGORA)
+    expect(envioDo(mundo.prospectos[0]).entrega).toBe("spam")
+    expect(mundo.prospectos[0].opt_out).toBe(true)
+    expect(mundo.prospectos[0].etapa).toBe("descartado")
+  })
+  it("descadastro por token grava a exclusão; token inválido não faz nada", async () => {
+    expect(await descadastrarPorToken("x")).toBe(false)
+    expect(await descadastrarPorToken("tokendesconhecido1")).toBe(false)
+    expect(mundo.prospectos[0].opt_out).toBe(false)
+    expect(await descadastrarPorToken("tokenabc12345", AGORA)).toBe(true)
+    expect(mundo.prospectos[0].opt_out).toBe(true)
+    expect(await descadastrarPorToken("tokenabc12345", AGORA)).toBe(true)   // repetido: segue ok
+  })
+  it("rota: GET só confirma, POST descadastra", async () => {
+    const g = await GET_SAIR(new Request("https://x") as never, { params: Promise.resolve({ token: "tokenabc12345" }) })
+    expect(g.status).toBe(200)
+    expect(mundo.prospectos[0].opt_out).toBe(false)
+    const p = await POST_SAIR(new Request("https://x", { method: "POST" }) as never, { params: Promise.resolve({ token: "tokenabc12345" }) })
+    expect(p.status).toBe(200)
+    expect(mundo.prospectos[0].opt_out).toBe(true)
+    expect((await POST_SAIR(new Request("https://x", { method: "POST" }) as never, { params: Promise.resolve({ token: "naoexiste1234" }) })).status).toBe(404)
   })
 })

@@ -1,6 +1,7 @@
 // Envio automático do Prospector: chave, horário, cota, cadência, resposta/opt-out e idempotência.
 // Supabase, Evolution e Resend são simulados: nenhum teste envia nada de verdade.
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import { reservasFalsas, tabelaDeReservas } from "./helpers/reservasFalsas"
 
 type Linha = Record<string, unknown>
 const mundo = vi.hoisted(() => ({ cfg: {} as Record<string, unknown>, prospectos: [] as Record<string, unknown>[], mensagens: [] as Record<string, unknown>[], consultas: 0 }))
@@ -17,6 +18,7 @@ vi.mock("@/app/lib/email", () => ({ enviarEmail: envios.email }))
 vi.mock("@/app/lib/supabase", () => ({
   supabase: {
     from: (tabela: string) => {
+      const reserva = tabelaDeReservas(tabela); if (reserva) return reserva
       mundo.consultas++
       const fonte = tabela === "prospectos_parceiros" ? mundo.prospectos : mundo.mensagens
       const filtros: ((r: Linha) => boolean)[] = []
@@ -55,7 +57,8 @@ vi.mock("@/app/lib/supabase", () => ({
 }))
 
 import { executarEnvio } from "@/app/lib/prospectorEnvioServidor"
-import { MAX_EMAILS_POR_EXECUCAO, MAX_FALHAS_POR_CANAL, tetoEmailDia, ehErroDeCota, celularWhatsapp, dentroDoHorario, ehRecusa, textoPrimeiroContato, TEXTO_LEMBRETE, PRIMEIRO_CONTATO_PAUSADO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA } from "@/app/lib/prospectorEnvio"
+import { textoPrimeiroContato } from "@/app/lib/prospectorTextos"
+import { MAX_EMAILS_POR_EXECUCAO, MAX_FALHAS_POR_CANAL, tetoEmailDia, ehErroDeCota, celularWhatsapp, dentroDoHorario, dentroDaJanelaEmail, janelaEmailDaConfig, JANELA_EMAIL_PADRAO, ehRecusa, TEXTO_LEMBRETE, PRIMEIRO_CONTATO_PAUSADO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA } from "@/app/lib/prospectorEnvio"
 
 // 2026-11-23 é segunda. São Paulo é UTC-3. Os deslocamentos em dias caem em dia útil (o horário é checado de verdade).
 const SEG_10H = new Date("2026-11-23T13:00:00Z")
@@ -85,6 +88,7 @@ beforeEach(() => {
   mundo.prospectos = []
   mundo.mensagens = []
   mundo.consultas = 0
+  reservasFalsas.limpar()
   envios.evo.mockClear()
   envios.email.mockClear()
   envios.email.mockImplementation(async () => ({ ok: true as const, id: "e1" }))
@@ -136,11 +140,11 @@ describe("primeiro contato", () => {
   it("texto exato, bom dia/boa tarde, sem link nem opt-out, e a etapa vai para abordado", async () => {
     const a = novo()
     await rodar(SEG_10H)
-    expect(saidasZap()[0]).toEqual({ number: `55${a.telefone}`, text: "Bom dia, tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?" })
+    expect(saidasZap()[0]).toEqual({ number: `55${a.telefone}`, text: "Oi, tudo bem? Aqui é o Felipe, da ENYLA. Vocês pegam serviço terceirizado de outra gráfica?" })
     expect(doBanco(a).etapa).toBe("abordado")
     expect(hist(a).some(h => h.envio?.status === "enviado" && h.envio.canal === "whatsapp" && h.envio.passo === "primeiro_contato" && h.envio.texto)).toBe(true)
-    expect(textoPrimeiroContato(SEG_15H)).toBe("Boa tarde, tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?")
-    expect(textoPrimeiroContato(SEG_10H)).not.toMatch(/https?:|www\.|\.com/)
+    expect(textoPrimeiroContato()).toBe("Oi, tudo bem? Aqui é o Felipe, da ENYLA. Vocês pegam serviço terceirizado de outra gráfica?")
+    expect(textoPrimeiroContato()).not.toMatch(/https?:|www\.|\.com|caixinha|papel cart|perfumaria/i)
   })
   it("usa os dois canais no mesmo dia, e-mail com assunto discreto, remetente e Reply-To do Prospector", async () => {
     novo({ email: "contato@grafica.com.br" })
@@ -149,10 +153,10 @@ describe("primeiro contato", () => {
     expect(envios.email).toHaveBeenCalledTimes(1)
     const [para, msg, anexos, opcoes] = envios.email.mock.calls[0] as [string, { assunto: string; texto: string }, unknown[], { de: string; responderPara: string }]
     expect(para).toBe("contato@grafica.com.br")
-    expect(msg.assunto).toBe("ENYLA, gráfica de embalagens em Barueri")
-    expect(msg.texto.startsWith("Boa tarde, tudo bem?")).toBe(true)
+    expect(msg.assunto).toBe("Vocês pegam serviço terceirizado?")
+    expect(msg.texto.startsWith("Oi, tudo bem?")).toBe(true)
     expect(anexos).toEqual([])
-    expect(opcoes).toEqual({ de: "ENYLA Embalagens <parceiros@enyla.com.br>", responderPara: "felipeonobrega2@gmail.com" })
+    expect(opcoes).toMatchObject({ de: "ENYLA Embalagens <parceiros@enyla.com.br>", responderPara: "felipeonobrega2@gmail.com" })
   })
   it("WhatsApp só para celular brasileiro com 9 dígitos depois do DDD", async () => {
     expect(celularWhatsapp("11987654321")).toBe("5511987654321")
@@ -430,14 +434,14 @@ const comEmail = (p: Partial<Linha> = {}) => novo({ telefone: null, email: `g${s
 const enviadoHoje = (em: string, status = "enviado") => ({ etapa: "abordado", em, motivo: "x", envio: { passo: "primeiro_contato", canal: "email", status, em } })
 
 describe("teto diário de e-mail e cota da Resend", () => {
-  it("PROSPECTOR_TETO_EMAIL_DIA: padrão 80, 0 sem teto, inválido volta ao padrão", () => {
-    expect(tetoEmailDia(undefined)).toBe(80)
-    expect(tetoEmailDia("")).toBe(80)
+  it("PROSPECTOR_TETO_EMAIL_DIA: padrão 200, 0 sem teto, inválido volta ao padrão", () => {
+    expect(tetoEmailDia(undefined)).toBe(200)
+    expect(tetoEmailDia("")).toBe(200)
     expect(tetoEmailDia("0")).toBe(0)
     expect(tetoEmailDia("50")).toBe(50)
-    expect(tetoEmailDia("abc")).toBe(80)
-    expect(tetoEmailDia("-5")).toBe(80)
-    expect(tetoEmailDia("1.5")).toBe(80)
+    expect(tetoEmailDia("abc")).toBe(200)
+    expect(tetoEmailDia("-5")).toBe(200)
+    expect(tetoEmailDia("1.5")).toBe(200)
   })
   it("respeita o teto somando os envios do dia de outros prospectos e de execuções anteriores", async () => {
     vi.stubEnv("PROSPECTOR_TETO_EMAIL_DIA", "5")
@@ -511,8 +515,10 @@ describe("pausa do primeiro contato e limite de 10 por dia", () => {
     expect(r.primeiros).toBe(10)
     expect(envios.email).toHaveBeenCalledTimes(10)
     const msg = envios.email.mock.calls[0][1] as { html: string; texto: string }
-    expect(msg.html).toContain("Para ser parceira da ENYLA, cadastre a sua gráfica aqui: <a href=")
-    expect(msg.texto).toContain("Cadastrar minha gráfica: https://app.enyla.com.br/api/prospector/r/")
+    // O e-mail padrão já leva o {link}: URL completa do link rastreado, clicável no HTML e em texto puro.
+    expect(msg.html).toMatch(/<a href="https:\/\/app\.enyla\.com\.br\/api\/prospector\/r\/[\w-]+">https:\/\/app\.enyla\.com\.br\/api\/prospector\/r\/[\w-]+<\/a>/)
+    expect(msg.texto).toMatch(/leva uns 5 minutos: https:\/\/app\.enyla\.com\.br\/api\/prospector\/r\//)
+    expect(msg.texto).not.toContain("Cadastrar minha gráfica")
     expect((await rodarReal(SEG_15H)).primeiros).toBe(0)
   })
   it("pausa ligada por parâmetro: nada sai, segue qualificado, sem erro", async () => {
@@ -531,5 +537,196 @@ describe("pausa do primeiro contato e limite de 10 por dia", () => {
     expect(envios.email).toHaveBeenCalledTimes(10)
     expect((await lim(dias(SEG_10H, 1))).primeiros).toBe(10)
     expect(envios.email).toHaveBeenCalledTimes(20)
+  })
+})
+
+describe("e-mail: saúde, teto 200, registro e descadastro", () => {
+  const AT = "2026-11-23T12:00:00.000Z"
+  const comId = (i: number, entrega?: string) => comEmail({ etapa: "abordado", atualizado_em: AT, historico_etapas: [{ etapa: "abordado", em: AT, motivo: "x", envio: { passo: "primeiro_contato", canal: "email", status: "enviado", em: "2026-11-22T12:00:00.000Z", resendId: `re_${i}`, ...(entrega ? { entrega } : {}) } }] })
+  const emailsEnviados = () => envios.email.mock.calls.length
+
+  it("devolução acima de 2% (com amostra mínima) para o e-mail", async () => {
+    for (let i = 0; i < 20; i++) comId(i, i === 0 ? "bounce" : "entregue")   // 5%
+    comEmail()
+    const r = await rodar(SEG_10H)
+    expect(emailsEnviados()).toBe(0)
+    expect(r.motivoParada).toBe("devolucao_alta")
+  })
+  it("devolução de exatamente 2% segue; amostra pequena não para", async () => {
+    for (let i = 0; i < 50; i++) comId(i, i < 1 ? "bounce" : "entregue")   // 2%
+    comEmail()
+    expect((await rodar(SEG_10H)).motivoParada).toBeUndefined()
+    expect(emailsEnviados()).toBe(1)
+    mundo.prospectos = []; envios.email.mockClear()
+    for (let i = 0; i < 5; i++) comId(i, "bounce")   // 100%, mas só 5 envios
+    comEmail()
+    await rodar(SEG_10H)
+    expect(emailsEnviados()).toBe(1)
+  })
+  it("uma reclamação de spam para o e-mail, mas o WhatsApp segue", async () => {
+    comId(1, "spam")
+    comEmail(); const zap = novo({ nota: 60 })
+    const r = await rodar(SEG_10H)
+    expect(emailsEnviados()).toBe(0)
+    expect(r.motivoParada).toBe("reclamacao_spam")
+    expect(saidasZap()).toHaveLength(1)
+    expect(hist(zap).some(h => h.envio?.canal === "whatsapp")).toBe(true)
+  })
+  it("teto padrão de 200 por dia", async () => {
+    for (let i = 0; i < 200; i++) comId(i)
+    for (const l of mundo.prospectos) (l.historico_etapas as { envio: { em: string } }[])[0].envio.em = "2026-11-23T12:00:00.000Z"
+    comEmail()
+    const r = await rodar(SEG_10H)
+    expect(r.tetoEmailDia).toBe(200)
+    expect(r.motivoParada).toBe("teto_diario")
+    expect(emailsEnviados()).toBe(0)
+  })
+  it("registra destino, assunto, hora e id da Resend; leva link de descadastro e cabeçalho", async () => {
+    envios.email.mockImplementation(async () => ({ ok: true as const, id: "re_abc" }))
+    const l = comEmail()
+    await rodar(SEG_10H)
+    const e = (hist(l).map(h => h.envio).find(x => x?.canal === "email") as unknown) as { para: string; assunto: string; em: string; resendId: string; token: string }
+    expect(e).toMatchObject({ para: l.email, resendId: "re_abc", em: SEG_10H.toISOString() })
+    expect(e.assunto).toBeTruthy()
+    const [para, msg, , opc] = envios.email.mock.calls[0] as [string, { texto: string; html: string }, unknown, { cabecalhos: Record<string, string> }]
+    expect(para).toBe(l.email)
+    const url = `https://app.enyla.com.br/api/prospector/sair/${e.token}`
+    expect(msg.html).toContain(`href="${url}"`)
+    expect(msg.texto).toContain(url)
+    expect(opc.cabecalhos["List-Unsubscribe"]).toBe(`<${url}>`)
+  })
+  it("quem está na lista de exclusão (opt-out) não recebe e-mail", async () => {
+    const fora = comEmail({ etapa: "descartado", opt_out: true, email: "fora@gr.com.br" })
+    comEmail({ email: "fora@gr.com.br" })
+    await rodar(SEG_10H)
+    expect(emailsEnviados()).toBe(0)
+    expect(hist(fora)).toHaveLength(0)
+  })
+})
+
+describe("trava de idempotência do e-mail (prospecto + canal + campanha)", () => {
+  it("reservarEnvio: duas chamadas ao mesmo tempo = uma reserva, a outra barrada e registrada", async () => {
+    const { reservarEnvio } = await import("@/app/lib/prospectorReserva")
+    const p = { prospectoId: 7, canal: "email", campanha: "primeiro_contato" } as const
+    const rs = await Promise.all([reservarEnvio(p), reservarEnvio(p)])
+    expect(rs.filter(r => r.reservado)).toHaveLength(1)
+    expect(rs.find(r => !r.reservado)).toMatchObject({ reservado: false, motivo: "duplicado" })
+    expect(reservasFalsas.reservas).toHaveLength(1)
+    expect(reservasFalsas.barrados).toEqual([{ prospecto_id: 7, canal: "email", campanha: "primeiro_contato", motivo: "duplicado" }])
+  })
+
+  it("campanhas e canais diferentes não se barram", async () => {
+    const { reservarEnvio } = await import("@/app/lib/prospectorReserva")
+    const a = await reservarEnvio({ prospectoId: 1, canal: "email", campanha: "primeiro_contato" })
+    const b = await reservarEnvio({ prospectoId: 1, canal: "email", campanha: "lembrete" })
+    const c = await reservarEnvio({ prospectoId: 1, canal: "whatsapp", campanha: "primeiro_contato" })
+    expect([a, b, c].every(r => r.reservado)).toBe(true)
+    expect(reservasFalsas.barrados).toHaveLength(0)
+  })
+
+  it("banco fora do ar ao reservar: barra (não envia) e registra o erro", async () => {
+    const { reservarEnvio } = await import("@/app/lib/prospectorReserva")
+    reservasFalsas.falhar = true
+    expect(await reservarEnvio({ prospectoId: 1, canal: "email", campanha: "primeiro_contato" })).toMatchObject({ reservado: false, motivo: "erro" })
+  })
+
+  it("duas execuções do cron ao mesmo tempo = um e-mail só", async () => {
+    const l = novo({ telefone: null, email: "contato@grafica.com.br" })
+    await Promise.all([rodar(SEG_10H), rodar(SEG_10H)])
+    expect(envios.email).toHaveBeenCalledTimes(1)
+    expect(reservasFalsas.reservas).toHaveLength(1)
+    expect(hist(l).filter(h => h.envio?.canal === "email" && h.envio.status === "enviado")).toHaveLength(1)
+  })
+
+  it("reserva já existente (outra execução na frente, mesmo com o histórico ainda vazio): não envia e registra a barrada", async () => {
+    const l = novo({ telefone: null, email: "contato@grafica.com.br" })
+    reservasFalsas.reservas.push({ prospecto_id: l.id, canal: "email", campanha: "primeiro_contato" })
+    await rodar(SEG_10H)
+    expect(envios.email).not.toHaveBeenCalled()
+    expect(reservasFalsas.barrados).toHaveLength(1)
+    expect(reservasFalsas.barrados[0]).toMatchObject({ prospecto_id: l.id, canal: "email", motivo: "duplicado" })
+  })
+
+  it("banco de reservas fora do ar: o e-mail não sai", async () => {
+    novo({ telefone: null, email: "contato@grafica.com.br" })
+    reservasFalsas.falhar = true
+    await rodar(SEG_10H)
+    expect(envios.email).not.toHaveBeenCalled()
+  })
+
+  it("e-mail que falhou libera a reserva e a próxima execução tenta de novo", async () => {
+    const l = novo({ telefone: null, email: "contato@grafica.com.br" })
+    envios.email.mockImplementationOnce(async () => ({ ok: false as const, erro: "erro temporário" }))
+    await rodar(SEG_10H)
+    expect(reservasFalsas.reservas).toHaveLength(0)
+    await rodar(SEG_10H)
+    expect(envios.email).toHaveBeenCalledTimes(2)
+    expect(reservasFalsas.reservas).toHaveLength(1)
+    expect(hist(l).some(h => h.envio?.status === "enviado")).toBe(true)
+  })
+
+  it("assunto A/B é a mesma campanha: a chave da reserva não leva o assunto", async () => {
+    const { campanhaDoPasso } = await import("@/app/lib/prospectorReserva")
+    expect(campanhaDoPasso("primeiro_contato")).toBe("primeiro_contato")
+  })
+})
+
+describe("janela de envio do e-mail (padrão 8h às 17h, segunda a sexta, Brasília)", () => {
+  const SEG_18H = new Date("2026-11-23T21:00:00Z")   // dentro do horário geral (8h–20h), fora da janela do e-mail
+  const SEG_17H = new Date("2026-11-23T20:00:00Z")
+  const SEG_8H = new Date("2026-11-23T11:00:00Z")
+  const SAB_10H = new Date("2026-11-28T13:00:00Z")
+  it("pura: padrão, bordas e dias", () => {
+    expect(JANELA_EMAIL_PADRAO).toEqual({ dias: [1, 2, 3, 4, 5], inicio: 8, fim: 17 })
+    expect(dentroDaJanelaEmail(SEG_8H)).toBe(true)
+    expect(dentroDaJanelaEmail(new Date("2026-11-23T19:59:00Z"))).toBe(true)
+    expect(dentroDaJanelaEmail(SEG_17H)).toBe(false)
+    expect(dentroDaJanelaEmail(new Date("2026-11-23T10:59:00Z"))).toBe(false)
+    expect(dentroDaJanelaEmail(SAB_10H)).toBe(false)
+  })
+  it("configurável: valor inválido volta ao padrão; início >= fim volta ao padrão", () => {
+    expect(janelaEmailDaConfig(undefined)).toEqual(JANELA_EMAIL_PADRAO)
+    expect(janelaEmailDaConfig({ inicio: 10, fim: 10 })).toEqual(JANELA_EMAIL_PADRAO)
+    expect(janelaEmailDaConfig({ inicio: 9, fim: 12, dias: [6] })).toEqual({ inicio: 9, fim: 12, dias: [6] })
+    expect(dentroDaJanelaEmail(SAB_10H, { inicio: 9, fim: 12, dias: [6] })).toBe(true)
+  })
+  it("fora da janela: nenhum e-mail sai, o prospecto segue qualificado e o motivo é fora_da_janela", async () => {
+    const l = novo({ telefone: null, email: "a@gr.com.br" })
+    const r = await rodar(SEG_18H)
+    expect(envios.email).not.toHaveBeenCalled()
+    expect(r.primeiros).toBe(0)
+    expect(r.motivoParada).toBe("fora_da_janela")
+    expect(doBanco(l).etapa).toBe("qualificado")
+    expect(hist(l).some(h => h.envio)).toBe(false)
+  })
+  it("fica na fila: quando a janela abre, o e-mail sai", async () => {
+    const l = novo({ telefone: null, email: "a@gr.com.br" })
+    await rodar(SEG_18H)
+    expect(envios.email).not.toHaveBeenCalled()
+    const r = await rodar(dias(SEG_8H, 1))
+    expect(r.primeiros).toBe(1)
+    expect(envios.email).toHaveBeenCalledTimes(1)
+    expect(doBanco(l).etapa).toBe("abordado")
+  })
+  it("fora da janela do e-mail o WhatsApp segue no horário dele", async () => {
+    novo({ email: "a@gr.com.br" })
+    await rodar(SEG_18H)
+    expect(envios.email).not.toHaveBeenCalled()
+    expect(envios.evo).toHaveBeenCalledTimes(1)
+  })
+  it("janela vinda da config vale: sábado liberado para e-mail só se o horário geral deixar (sábado não deixa)", async () => {
+    mundo.cfg = { prospector_envio_ativo: true, prospector_janela_email: { inicio: 9, fim: 12, dias: [1] } }
+    novo({ telefone: null, email: "a@gr.com.br" })
+    expect((await rodar(SEG_8H)).primeiros).toBe(0)     // 8h: antes do início configurado
+    expect((await rodar(SEG_10H)).primeiros).toBe(1)
+  })
+  it("dentro da janela respeita o teto diário e o espaçamento (limite por execução)", async () => {
+    vi.stubEnv("PROSPECTOR_TETO_EMAIL_DIA", "2")
+    for (let i = 0; i < 4; i++) novo({ nota: 100 - i, telefone: null, email: `t${i}@gr.com.br` })
+    expect((await rodar(SEG_10H)).primeiros).toBe(2)
+    const r = await rodar(SEG_15H)
+    expect(r.primeiros).toBe(0)
+    expect(r.motivoParada).toBe("teto_diario")
+    expect((await rodar(dias(SEG_10H, 1))).primeiros).toBe(2)
   })
 })

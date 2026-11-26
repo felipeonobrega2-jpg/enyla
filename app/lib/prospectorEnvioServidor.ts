@@ -12,11 +12,15 @@ import { randomBytes } from "node:crypto"
 import { enviarEmail } from "./email"
 import { CNAES_PROSPECTO, aplicarOptOut, hojeSp, podeTransicionar, type EtapaFunil, type MudancaEtapa } from "./prospector"
 import {
-  ASSUNTO_EMAIL, htmlDoPrimeiroContato, textoPlanoDoPrimeiroContato, CHAVE_ENVIO_ATIVO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA, PRIMEIRO_CONTATO_PAUSADO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector,
+  ASSUNTO_EMAIL, htmlDoEmailComLink, textoPlanoDoEmailComLink, urlDescadastro, motivoParadaPorSaude, JANELA_SAUDE_EMAIL_DIAS, htmlDoPrimeiroContato, urlRastreada, textoPlanoDoPrimeiroContato, CHAVE_ENVIO_ATIVO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA, PRIMEIRO_CONTATO_PAUSADO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, CHAVE_JANELA_EMAIL, janelaEmailDaConfig, dentroDaJanelaEmail, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector,
   canaisDisponiveis, canaisPendentes, celularWhatsapp, chaveTelefone, dentroDoHorario, ehRecusa, emailValido, enviosDoHistorico,
-  motivoNaoQualifica, passoIniciado, passoSaiu, passouDias, saiu, textoDoPasso,
+  motivoNaoQualifica, passoIniciado, passoSaiu, passouDias, saiu, TEXTO_LEMBRETE,
   type Canal, type EnvioHistorico, type MotivoParada, type Passo,
 } from "./prospectorEnvio"
+import { CHAVE_REMETENTE, REMETENTE_PADRAO, classificarResposta, escolherTexto, montarTexto, type EscolhaTexto, type TextoProspector } from "./prospectorTextos"
+import { lerTextosProspector } from "./prospectorTextosServidor"
+import { nomeParaChamar } from "./nomeDePessoa"
+import { campanhaDoPasso, liberarReserva, reservarEnvio } from "./prospectorReserva"
 
 const TABELA = "prospectos_parceiros"
 export const COLUNAS = "id, cnpj, razao_social, nome_fantasia, cnae_principal, cnaes_secundarios, telefone, email, nota, etapa, opt_out, historico_etapas, atualizado_em"
@@ -40,7 +44,7 @@ export const historicoDe = (l: Linha): MudancaEtapa[] => (Array.isArray(l.histor
 const enviosDe = (l: Linha) => enviosDoHistorico(historicoDe(l))
 
 /** `primeiroContatoPausado` e `limitePrimeirosPorDia` (0 = sem limite) existem só para teste; em produção valem as constantes. */
-type Deps = { agora?: () => Date; primeiroContatoPausado?: boolean; limitePrimeirosPorDia?: number }
+type Deps = { agora?: () => Date; primeiroContatoPausado?: boolean; limitePrimeirosPorDia?: number; aleatorio?: () => number }
 
 /** Grava com trava otimista (id + atualizado_em lido + sem opt-out). Devolve a linha nova ou null se alguém mudou antes. */
 export async function gravar(l: Linha, campos: Record<string, unknown>): Promise<Linha | null> {
@@ -81,11 +85,14 @@ type Estado = {
   emailsNestaExecucao: number; limiteAte: number                // limite técnico por execução (rota de 120s)
   emailsFeitosHoje: number; teto: number                        // e-mails do Prospector já enviados hoje (antes desta execução) e o teto diário (0 = sem)
   cotaEsgotada: boolean; motivoParada?: MotivoParada
+  foraDaJanela?: boolean                                        // fora da janela do e-mail: nada de e-mail sai, fica na fila
+  saude?: MotivoParada                                          // devolução > 2% ou reclamação de spam na janela: o e-mail para
+  textos: TextoProspector[]; remetente: string; aleatorio: () => number   // biblioteca de textos (A/B), nome que assina e sorteio
 }
 
 function novoEstado(): Estado {
   const m = () => ({ whatsapp: new Map<string, string>(), email: new Map<string, string>() })
-  return { usados: { primeiro_contato: m(), lembrete: m() }, bloqueadosTel: new Set(), bloqueadosEmail: new Set(), emailsNestaExecucao: 0, limiteAte: Date.now() + ORCAMENTO_MS_POR_EXECUCAO, emailsFeitosHoje: 0, teto: 0, cotaEsgotada: false }
+  return { usados: { primeiro_contato: m(), lembrete: m() }, bloqueadosTel: new Set(), bloqueadosEmail: new Set(), emailsNestaExecucao: 0, limiteAte: Date.now() + ORCAMENTO_MS_POR_EXECUCAO, emailsFeitosHoje: 0, teto: 0, cotaEsgotada: false, textos: [], remetente: REMETENTE_PADRAO, aleatorio: Math.random }
 }
 
 /** Esgotou o que cabe nesta execução: o que sobrar sai no próximo cron. */
@@ -97,6 +104,8 @@ const semFolga = (est: Estado) => {
 
 /** E-mail parado pelo resto do dia: a Resend recusou por cota, ou o teto diário do Prospector foi atingido. Só o e-mail para; o WhatsApp segue. */
 function emailParado(est: Estado): boolean {
+  if (est.foraDaJanela) { est.motivoParada ??= "fora_da_janela"; return true }
+  if (est.saude) { est.motivoParada = est.saude; return true }
   if (est.cotaEsgotada) { est.motivoParada = "cota_resend"; return true }
   if (est.teto > 0 && est.emailsFeitosHoje + est.emailsNestaExecucao >= est.teto) { est.motivoParada ??= "teto_diario"; return true }
   return false
@@ -122,7 +131,7 @@ function bloqueado(est: Estado, passo: Passo, canal: Canal, l: Linha): boolean {
 
 type ResultadoCanal = { ok: true; id?: string } | { ok: false; erro: string; cota?: true }
 
-async function enviarPeloCanal(canal: Canal, l: Linha, texto: string, token?: string): Promise<ResultadoCanal> {
+async function enviarPeloCanal(canal: Canal, l: Linha, texto: string, token?: string, assunto?: string, linkNoCorpo?: boolean): Promise<ResultadoCanal> {
   if (canal === "whatsapp") {
     const numero = celularWhatsapp(l.telefone)
     if (!numero) return { ok: false, erro: "sem celular válido" }
@@ -131,26 +140,48 @@ async function enviarPeloCanal(canal: Canal, l: Linha, texto: string, token?: st
   }
   const para = emailValido(l.email)
   if (!para) return { ok: false, erro: "e-mail inválido" }
-  const r = await enviarEmail(para, { assunto: ASSUNTO_EMAIL, texto: textoPlanoDoPrimeiroContato(texto, token), html: htmlDoPrimeiroContato(texto, token) }, [], { de: REMETENTE, responderPara: replyToDoProspector() })
+  const cabecalhos = token ? { "List-Unsubscribe": `<${urlDescadastro(token)}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } : undefined
+  const r = await enviarEmail(para, linkNoCorpo
+    ? { assunto: assunto || ASSUNTO_EMAIL, texto: textoPlanoDoEmailComLink(texto, token), html: htmlDoEmailComLink(texto, token) }
+    : { assunto: assunto || ASSUNTO_EMAIL, texto: textoPlanoDoPrimeiroContato(texto, token), html: htmlDoPrimeiroContato(texto, token) }, [], { de: REMETENTE, responderPara: replyToDoProspector(), ...(cabecalhos ? { cabecalhos } : {}) })
   return r.ok ? { ok: true, id: r.id } : { ok: false, erro: r.erro, ...(r.cota ? { cota: true as const } : {}) }
 }
 
+/** Primeiro contato: versão da biblioteca sorteada entre as ativas DO CANAL (ou o texto do código); `{nome}` só com nome de gente. Lembrete: texto fixo. */
+type Escolhido = { corpo: string; assunto?: string; textoId?: string; nome: string }
+function textoDoContato(est: Estado, l: Linha, passo: Passo, canal: Canal): Escolhido | null {
+  if (passo !== "primeiro_contato") return null
+  const escolha: EscolhaTexto = escolherTexto(est.textos, "primeira", canal, est.aleatorio)
+  return { ...escolha, nome: nomeParaChamar(l.nome_fantasia) || nomeParaChamar(l.razao_social) }
+}
+
 /** Reserva, envia e fecha um canal de um passo. Devolve se saiu, se falhou, ou null se não reservou (alguém foi mais rápido). */
-async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, agora: Date): Promise<{ linha: Linha; ok: boolean } | null> {
-  const texto = textoDoPasso(passo, agora)
+async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, agora: Date, escolhido: Escolhido | null): Promise<{ linha: Linha; ok: boolean } | null> {
   const em = agora.toISOString()
   // Só o primeiro contato por e-mail leva o link rastreado; o token nasce na reserva e fica no histórico (sem dado do prospecto).
   const token = passo === "primeiro_contato" && canal === "email" ? randomBytes(12).toString("base64url") : undefined
-  const envio: EnvioHistorico = { passo, canal, status: "reservado", em, texto, ...(token ? { token } : {}) }
+  // E-mail: o {link} do corpo sai como URL completa do link rastreado (clique e origem medem o cadastro por e-mail). WhatsApp: URL de cadastro.
+  const linkNoCorpo = !!escolhido && canal === "email" && !!token && escolhido.corpo.includes("{link}")
+  const texto = escolhido
+    ? montarTexto(escolhido.corpo, { nome: escolhido.nome, remetente: est.remetente, ...(canal === "email" && token ? { link: urlRastreada(token) } : {}) })
+    : TEXTO_LEMBRETE
+  const textoId = escolhido?.textoId
+  const assunto = escolhido?.assunto
+  const para = canal === "email" ? emailValido(l.email) : null
+  const envio: EnvioHistorico = { passo, canal, status: "reservado", em, texto, ...(para ? { para, assunto: assunto || ASSUNTO_EMAIL } : {}), ...(token ? { token } : {}), ...(textoId ? { textoId } : {}) }
+  // E-mail: trava atômica no banco (prospecto + canal + campanha) ANTES de qualquer coisa. Barrado = não envia.
+  const trava = canal === "email" ? { prospectoId: l.id, canal, campanha: campanhaDoPasso(passo) } as const : null
+  if (trava && !(await reservarEnvio(trava)).reservado) return null
   const reservada = await gravar(l, { historico_etapas: [...historicoDe(l), { etapa: l.etapa as EtapaFunil, em, motivo: `${passo} (${canal}): reservado`, envio }] })
-  if (!reservada) return null
+  if (!reservada) { if (trava) await liberarReserva(trava); return null }
   const k = chaveCanal(canal, l)
   if (k) est.usados[passo][canal].set(k, l.cnpj)
   let r: ResultadoCanal
-  try { r = await enviarPeloCanal(canal, l, texto, token) } catch (e) { r = { ok: false, erro: String(e) } }
+  try { r = await enviarPeloCanal(canal, l, texto, token, assunto, linkNoCorpo) } catch (e) { r = { ok: false, erro: String(e) } }
   // Cota da Resend esgotada: o e-mail para pelo resto do dia. A linha fica "falhou" com a mensagem de cota, que não conta como falha do lead.
   if (!r.ok && canal === "email" && (r.cota || ehErroDeCota(r.erro))) est.cotaEsgotada = true
   // Fecha a reserva. Se a trava perder (outra gravação no meio), relê e tenta de novo; a reserva já protege contra duplicata.
+  if (!r.ok && trava) await liberarReserva(trava)   // nada saiu: libera a trava; só "falhou" permite nova tentativa
   let atual: Linha | null = reservada
   for (let i = 0; i < 4 && atual; i++) {
     const h = historicoDe(atual).map(x => {
@@ -181,7 +212,7 @@ async function mandarPasso(est: Estado, l: Linha, passo: Passo, canais: Canal[],
     if (semFolga(est)) break
     if (canal === "email" && emailParado(est)) continue
     if (canal === "email") est.emailsNestaExecucao++
-    const r = await enviarCanal(est, atual, passo, canal, agora)
+    const r = await enviarCanal(est, atual, passo, canal, agora, textoDoContato(est, atual, passo, canal))   // sorteio entre as versões ativas do canal
     if (!r) break
     atual = r.linha
     if (r.ok) algumOk = true; else res.falhas++
@@ -206,7 +237,8 @@ async function detectarRespostas(linhas: Linha[], agora: Date, res: ResultadoEnv
       const g = await gravarOptOut(l, em, "recusa por WhatsApp (não quero receber)")
       if (g) { l.etapa = "descartado"; l.opt_out = true; l.historico_etapas = g.historico_etapas; l.atualizado_em = g.atualizado_em; res.optOuts++ }
     } else if (l.etapa === "abordado") {
-      const g = await gravar(l, { etapa: "respondeu", historico_etapas: [...historicoDe(l), { etapa: "respondeu", em, motivo: "respondeu no WhatsApp" }] })
+      const resposta = dele.map(m => classificarResposta(m.corpo)).find(r => r !== "outra") ?? "outra"   // só para a contagem do teste A/B
+      const g = await gravar(l, { etapa: "respondeu", historico_etapas: [...historicoDe(l), { etapa: "respondeu", em, motivo: "respondeu no WhatsApp", resposta }] })
       if (g) { l.etapa = "respondeu"; l.historico_etapas = g.historico_etapas; l.atualizado_em = g.atualizado_em; res.responderam++ }
     }
   }
@@ -215,12 +247,12 @@ async function detectarRespostas(linhas: Linha[], agora: Date, res: ResultadoEnv
 // ── Execução ─────────────────────────────────────────────────────────────────
 export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
   const res = vazio()
-  const cfg = await lerCampos<Record<string, unknown>>([CHAVE_ENVIO_ATIVO, CHAVE_NOTA_MINIMA])
+  const cfg = await lerCampos<Record<string, unknown>>([CHAVE_ENVIO_ATIVO, CHAVE_NOTA_MINIMA, CHAVE_REMETENTE, CHAVE_JANELA_EMAIL])
   if (cfg[CHAVE_ENVIO_ATIVO] !== true) return { ...res, ativo: false, motivo: "envio desligado (prospector_envio_ativo)" }
   const agora = (deps.agora ?? (() => new Date()))()
   const minimo = typeof cfg[CHAVE_NOTA_MINIMA] === "number" && Number.isFinite(cfg[CHAVE_NOTA_MINIMA]) ? (cfg[CHAVE_NOTA_MINIMA] as number) : NOTA_MINIMA_PADRAO
   // Fora do horário nada roda, nem a leitura de respostas: a rota recusa mesmo que o cron dispare.
-  if (!dentroDoHorario(agora)) return { ...res, motivo: "fora do horário (segunda a sexta, 9h às 17h, America/Sao_Paulo)" }
+  if (!dentroDoHorario(agora)) return { ...res, motivo: "fora do horário (segunda a sexta, 8h às 20h, America/Sao_Paulo)" }
 
   const [contatadas, elegiveis, saidas] = await Promise.all([
     supabase.from(TABELA).select(COLUNAS).in("etapa", ETAPAS_CONTATADAS).eq("opt_out", false).limit(5000),
@@ -230,6 +262,10 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
   ])
   if (contatadas.error || elegiveis.error) return { ...res, ok: false, erro: (contatadas.error ?? elegiveis.error)!.message }
   const est = novoEstado()
+  est.foraDaJanela = !dentroDaJanelaEmail(agora, janelaEmailDaConfig(cfg[CHAVE_JANELA_EMAIL]))
+  est.aleatorio = deps.aleatorio ?? Math.random
+  est.remetente = typeof cfg[CHAVE_REMETENTE] === "string" && (cfg[CHAVE_REMETENTE] as string).trim() ? (cfg[CHAVE_REMETENTE] as string).trim() : REMETENTE_PADRAO
+  est.textos = await lerTextosProspector()   // falha de leitura = lista vazia = texto do código
   for (const s of (saidas.data ?? []) as { telefone: string | null; email: string | null }[]) {
     const t = chaveTelefone(celularWhatsapp(s.telefone)); if (t) est.bloqueadosTel.add(t)
     const e = emailValido(s.email); if (e) est.bloqueadosEmail.add(e)
@@ -240,21 +276,26 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
   est.teto = tetoEmailDia()
   res.tetoEmailDia = est.teto
   const hoje = hojeSp(agora)
-  if (est.teto > 0) {
-    // Todo envio grava atualizado_em, então só as linhas tocadas hoje (SP, UTC-3) interessam. O PostgREST corta em 1000 linhas por
+  {
+    // Todo envio grava atualizado_em, então só as linhas tocadas na janela de saúde (7 dias; o teto olha só hoje, SP, UTC-3) interessam. O PostgREST corta em 1000 linhas por
     // chamada (max-rows): pagina com range até vir página incompleta. Falha em qualquer página: o e-mail não sai nesta execução.
-    const inicioDoDia = new Date(`${hoje}T00:00:00-03:00`).toISOString()
+    const inicioDaJanela = new Date(agora.getTime() - JANELA_SAUDE_EMAIL_DIAS * 86_400_000).toISOString()
     const PAGINA = 1000
     let feitos = 0
+    const daJanela: EnvioHistorico[] = []
     for (let de = 0; ; de += PAGINA) {
       const { data, error } = await supabase.from(TABELA).select("id, historico_etapas").contains("historico_etapas", [{ envio: { canal: "email" } }])
-        .gte("atualizado_em", inicioDoDia).order("id", { ascending: true }).range(de, de + PAGINA - 1)
+        .gte("atualizado_em", inicioDaJanela).order("id", { ascending: true }).range(de, de + PAGINA - 1)
       if (error) return { ...res, ok: false, erro: `não consegui contar os e-mails de hoje: ${error.message}` }
       const pagina = (data ?? []) as Linha[]
-      feitos += pagina.reduce((n, l) => n + enviosDe(l).filter(e => e.canal === "email" && saiu(e) && hojeSp(new Date(e.em)) === hoje).length, 0)
+      for (const l of pagina) for (const e of enviosDe(l)) if (e.canal === "email") {
+        if (saiu(e) && hojeSp(new Date(e.em)) === hoje) feitos++
+        if (Date.parse(e.em) >= Date.parse(inicioDaJanela)) daJanela.push(e)
+      }
       if (pagina.length < PAGINA) break
     }
     est.emailsFeitosHoje = feitos
+    est.saude = motivoParadaPorSaude(daJanela) ?? undefined
   }
   const jaContatadas = (contatadas.data ?? []) as Linha[]
   const lista = (elegiveis.data ?? []) as Linha[]

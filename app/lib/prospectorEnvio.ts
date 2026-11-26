@@ -48,8 +48,13 @@ export type EnvioHistorico = {
   resendId?: string
   /** E-mail do primeiro contato: token aleatório do link rastreado (/api/prospector/r/[token]). Não tem dado do prospecto. */
   token?: string
-  /** Último desfecho de entrega informado pela Resend. Não muda `status`: quem já saiu nunca é reenviado. */
-  entrega?: "entregue" | "bounce"
+  /** Id da versão do texto (biblioteca prospectorTextos) usada neste envio. Ausente quando valeu o texto padrão do código. */
+  textoId?: string
+  /** E-mail: destino e assunto de cada envio (registro de auditoria). */
+  para?: string
+  assunto?: string
+  /** Último desfecho de entrega informado pela Resend ("spam" = o destinatário marcou como spam). Não muda `status`: quem já saiu nunca é reenviado. */
+  entrega?: "entregue" | "bounce" | "spam"
   /** Primeira abertura (pixel) e primeiro clique (link), ISO. */
   abriuEm?: string
   cliqueEm?: string
@@ -68,14 +73,25 @@ export const TERMOS_FORA_DO_RAMO: readonly string[] = ["inflavel", "inflaveis", 
 const CNAE_SO_ENCADERNACAO = "1822901"
 /** Cota de primeiros contatos por dia (dia de São Paulo), só do WhatsApp. E-mail não tem teto diário. */
 export const LIMITE_WHATSAPP_PRIMEIROS_POR_DIA = 10
-/** Teto diário de e-mails do Prospector (primeiro contato + lembrete), PROSPECTOR_TETO_EMAIL_DIA. Padrão 80: cota Free da Resend (100/dia) menos 20 de reserva
- *  para o que não é prospecção (transacional a cliente e resposta da diretoria, que não entram neste teto). 0 = sem teto (plano pago). Vazio ou inválido = padrão. */
-export const TETO_EMAIL_DIA_PADRAO = 80
+/** Teto diário de e-mails do Prospector (primeiro contato + lembrete), PROSPECTOR_TETO_EMAIL_DIA. Padrão 200 (plano Pro da Resend, sem limite diário:
+ *  o teto é de reputação do domínio, não de cota). 0 = sem teto. Vazio ou inválido = padrão. */
+export const TETO_EMAIL_DIA_PADRAO = 200
 export function tetoEmailDia(valor: string | null | undefined = process.env.PROSPECTOR_TETO_EMAIL_DIA): number {
   const v = (valor ?? "").trim()
   return /^\d+$/.test(v) ? Number(v) : TETO_EMAIL_DIA_PADRAO
 }
-export type MotivoParada = "teto_diario" | "cota_resend" | "limite_execucao"
+export type MotivoParada = "fora_da_janela" | "teto_diario" | "cota_resend" | "limite_execucao" | "devolucao_alta" | "reclamacao_spam"
+/** Saúde do e-mail: janela dos envios olhados, devolução máxima (bounce / enviados) e amostra mínima para a taxa valer. Reclamação de spam para na hora. */
+export const JANELA_SAUDE_EMAIL_DIAS = 7
+export const LIMITE_DEVOLUCAO = 0.02
+export const AMOSTRA_MINIMA_DEVOLUCAO = 20
+/** Pura: com os envios de e-mail da janela, devolve o motivo para parar o e-mail, ou null. Só conta envio que saiu com id da Resend. */
+export function motivoParadaPorSaude(emails: readonly EnvioHistorico[]): MotivoParada | null {
+  const saidos = emails.filter(e => e.canal === "email" && e.status === "enviado" && !!e.resendId)
+  if (saidos.some(e => e.entrega === "spam")) return "reclamacao_spam"
+  const devolvidos = saidos.filter(e => e.entrega === "bounce").length
+  return saidos.length >= AMOSTRA_MINIMA_DEVOLUCAO && devolvidos / saidos.length > LIMITE_DEVOLUCAO ? "devolucao_alta" : null
+}
 /** Erro de cota da Resend (já gravado no histórico): não é culpa do lead e não conta para MAX_FALHAS_POR_CANAL. */
 export const ehErroDeCota = (erro: string | null | undefined) => /(daily|monthly)\b.*\bquota|quota_exceeded/i.test(erro ?? "")
 /** Limite técnico por execução (a rota tem maxDuration de 120s): e-mails enviados (primeiro contato e lembrete) e tempo total. O resto fica para o próximo cron. */
@@ -109,21 +125,33 @@ export function replyToDoProspector(env: string | undefined = process.env.PROSPE
 export const URL_CADASTRO_PARCEIROS = "https://app.enyla.com.br/parceiros"
 export const URL_BASE_APP = "https://app.enyla.com.br"
 export const urlRastreada = (token: string) => `${URL_BASE_APP}/api/prospector/r/${token}`
+/** Descadastro do e-mail do Prospector: a página pede a confirmação e grava a exclusão (opt-out) do prospecto dono do token. */
+export const urlDescadastro = (token: string) => `${URL_BASE_APP}/api/prospector/sair/${token}`
+export const TEXTO_DESCADASTRO = "Não quer mais receber nossos e-mails? Clique aqui para sair da lista"
+const htmlDescadastro = (token?: string) => (token ? `<p style="font-size:12px;color:#666"><a href="${urlDescadastro(token)}">${TEXTO_DESCADASTRO}</a>.</p>` : "")
+const textoDescadastro = (token?: string) => (token ? `\n\n${TEXTO_DESCADASTRO}: ${urlDescadastro(token)}` : "")
 /** Linha do link no primeiro contato. O texto do link não mostra endereço (mostrar um e apontar para outro é marcado como spam). */
 export const LINHA_LINK_CADASTRO = "Para ser parceira da ENYLA, cadastre a sua gráfica aqui:"
 export const TEXTO_LINK_CADASTRO = "Cadastrar minha gráfica"
 /** HTML do e-mail do primeiro contato: o texto comercial intacto, mais a linha com o link rastreado. Sem token, só o texto. */
 export function htmlDoPrimeiroContato(texto: string, token?: string): string {
   const esc = texto.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
-  return `<p>${esc}</p>` + (token ? `<p>${LINHA_LINK_CADASTRO} <a href="${urlRastreada(token)}">${TEXTO_LINK_CADASTRO}</a></p>` : "")
+  return `<p>${esc}</p>` + (token ? `<p>${LINHA_LINK_CADASTRO} <a href="${urlRastreada(token)}">${TEXTO_LINK_CADASTRO}</a></p>` : "") + htmlDescadastro(token)
 }
 /** Versão em texto puro do primeiro contato: o texto e, com token, `Cadastrar minha gráfica: {link}`. */
 export function textoPlanoDoPrimeiroContato(texto: string, token?: string): string {
-  return token ? `${texto}\n\n${LINHA_LINK_CADASTRO}\n${TEXTO_LINK_CADASTRO}: ${urlRastreada(token)}` : texto
+  return token ? `${texto}\n\n${LINHA_LINK_CADASTRO}\n${TEXTO_LINK_CADASTRO}: ${urlRastreada(token)}${textoDescadastro(token)}` : texto
 }
+/** HTML do e-mail cujo corpo já traz o link (variável {link}): parágrafos por linha em branco, quebra simples vira <br>, e cada URL vira link clicável. */
+export function htmlDoEmailComLink(texto: string, tokenDescadastro?: string): string {
+  const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
+  const linkar = (t: string) => esc(t).replace(/https?:\/\/[^\s<]+/g, u => `<a href="${u}">${u}</a>`)
+  return texto.trim().split(/\n\s*\n/).map(p => `<p>${p.split("\n").map(linkar).join("<br>")}</p>`).join("") + htmlDescadastro(tokenDescadastro)
+}
+/** Versão em texto puro do e-mail cujo corpo já traz o link: o corpo e a linha de descadastro. */
+export const textoPlanoDoEmailComLink = (texto: string, tokenDescadastro?: string) => texto + textoDescadastro(tokenDescadastro)
 export const ASSUNTO_EMAIL = "ENYLA, gráfica de embalagens em Barueri"
 
-const CORPO_PRIMEIRO = "tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?"
 export const TEXTO_LEMBRETE = "Oi, tudo bem? Aqui é da ENYLA, de Barueri, de novo. Só para saber se vocês fazem serviços de terceirização para outras gráficas."
 
 const fmt = (agora: Date) => new Intl.DateTimeFormat("en-CA", {
@@ -136,19 +164,29 @@ export function relogioSp(agora: Date): { dia: string; hora: number; diaSemana: 
   return { dia: `${p.year}-${p.month}-${p.day}`, hora: Number(p.hour), diaSemana: semana[p.weekday] ?? 0 }
 }
 
+/** Janela de envio do e-mail (America/Sao_Paulo): dias da semana (0 = domingo) e horas cheias, início inclusive, fim exclusive. */
+export type JanelaEmail = { dias: number[]; inicio: number; fim: number }
+export const CHAVE_JANELA_EMAIL = "prospector_janela_email"
+export const JANELA_EMAIL_PADRAO: JanelaEmail = { dias: [1, 2, 3, 4, 5], inicio: 8, fim: 17 }
+/** Lê a janela da config (`{ dias, inicio, fim }`). Valor ausente ou inválido = padrão (8h às 17h, segunda a sexta). */
+export function janelaEmailDaConfig(v: unknown): JanelaEmail {
+  const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>
+  const hora = (x: unknown, pad: number) => (typeof x === "number" && Number.isInteger(x) && x >= 0 && x <= 24 ? x : pad)
+  const inicio = hora(o.inicio, JANELA_EMAIL_PADRAO.inicio), fim = hora(o.fim, JANELA_EMAIL_PADRAO.fim)
+  if (inicio >= fim) return JANELA_EMAIL_PADRAO
+  const dias = Array.isArray(o.dias) ? [...new Set(o.dias.filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6))] : JANELA_EMAIL_PADRAO.dias
+  return { dias, inicio, fim }
+}
+/** O e-mail pode sair agora? Fora da janela ele fica na fila (o prospecto segue qualificado) e sai quando ela abrir. */
+export function dentroDaJanelaEmail(agora: Date, janela: JanelaEmail = JANELA_EMAIL_PADRAO): boolean {
+  const { hora, diaSemana } = relogioSp(agora)
+  return janela.dias.includes(diaSemana) && hora >= janela.inicio && hora < janela.fim
+}
+
 /** Segunda a sexta, das 8h (inclusive) às 20h (exclusive), America/Sao_Paulo. */
 export function dentroDoHorario(agora: Date): boolean {
   const { hora, diaSemana } = relogioSp(agora)
   return diaSemana >= 1 && diaSemana <= 5 && hora >= HORA_INICIO && hora < HORA_FIM
-}
-
-/** "Bom dia" antes das 12h, "Boa tarde" depois (America/Sao_Paulo). */
-export function textoPrimeiroContato(agora: Date): string {
-  return `${relogioSp(agora).hora < 12 ? "Bom dia" : "Boa tarde"}, ${CORPO_PRIMEIRO}`
-}
-
-export function textoDoPasso(passo: Passo, agora: Date): string {
-  return passo === "primeiro_contato" ? textoPrimeiroContato(agora) : TEXTO_LEMBRETE
 }
 
 /** Celular brasileiro: DDD (2 dígitos) + 9 + 8 dígitos. Devolve o número com 55, ou null. */
@@ -187,8 +225,9 @@ export function envioDe(x: unknown): EnvioHistorico | null {
   if (e.status !== "reservado" && e.status !== "enviado" && e.status !== "falhou") return null
   return {
     passo: e.passo, canal: e.canal, status: e.status, em: String(e.em ?? ""), ...(e.texto ? { texto: e.texto } : {}), ...(e.erro ? { erro: e.erro } : {}),
-    ...(e.resendId ? { resendId: e.resendId } : {}), ...(e.token ? { token: e.token } : {}),
-    ...(e.entrega === "entregue" || e.entrega === "bounce" ? { entrega: e.entrega } : {}),
+    ...(e.resendId ? { resendId: e.resendId } : {}), ...(e.para ? { para: e.para } : {}), ...(e.assunto ? { assunto: e.assunto } : {}), ...(e.token ? { token: e.token } : {}),
+    ...(typeof e.textoId === "string" && e.textoId ? { textoId: e.textoId } : {}),
+    ...(e.entrega === "entregue" || e.entrega === "bounce" || e.entrega === "spam" ? { entrega: e.entrega } : {}),
     ...(e.abriuEm ? { abriuEm: e.abriuEm } : {}), ...(e.cliqueEm ? { cliqueEm: e.cliqueEm } : {}),
   }
 }

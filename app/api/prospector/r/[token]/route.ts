@@ -7,5 +7,5 @@ import { registrarCliquePorToken } from "@/app/lib/prospectorEventosServidor"
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   await registrarCliquePorToken(token)
-  return NextResponse.redirect(URL_CADASTRO_PARCEIROS, 302)
+  return NextResponse.redirect(`${URL_CADASTRO_PARCEIROS}?origem=prospector_email`, 302)   // origem marcada para o ?o=parceiros medir o cadastro por e-mail
 }
