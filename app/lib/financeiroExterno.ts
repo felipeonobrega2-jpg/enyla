@@ -210,3 +210,12 @@ export async function leituraFinanceira(params: URLSearchParams): Promise<Leitur
     : parte === "saldos" ? saldos(d.cfg) : parte === "gastos" ? gastos(d, per) : parte === "margem" ? await margem(d, per) : await depende(d)
   return { status: 200, corpo: { parte, hoje: hj, periodo, incluirEstornados, ...corpo } }
 }
+
+// O "a receber" de cada pedido com saldo, calculado na hora (venda − total já pago): o mesmo número de ?o=detalhe&area=financeiro.
+// Pedido que não aparece aqui está quitado (saldo 0). Usado pela trava de valor das mensagens enviadas sem o Aprovo.
+export async function aReceberDosPedidos(): Promise<{ numero: string; cliente: string; aReceber: number }[]> {
+  const d = await carregarFinanceiro()
+  d.lancamentos = d.lancamentos.filter(l => !l.estornadoEm)
+  const r = await receber(d, hoje())
+  return r.pedidos.map(p => ({ numero: String(p.numero), cliente: p.cliente, aReceber: p.aReceber }))
+}

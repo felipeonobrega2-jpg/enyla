@@ -486,7 +486,7 @@ export async function agendarResposta(msgId: string, origem: string) {
   }
   // Gráfica do Prospector que respondeu não é cliente: atendida no modo parceiro (responderSozinho). Excluída (opt-out/descartada): nada.
   const prospectoDaMsg = await prospectoDoJid(await jidDaMensagem(msgId))
-  if (prospectoDaMsg && prospectoExcluido(prospectoDaMsg)) return
+  if (prospectoDaMsg && (!MODO_PARCEIRO_LIGADO || prospectoExcluido(prospectoDaMsg))) return
   // Saudação automática do lead: segura e avisa o Felipe já, sem a espera nem a IA
   if (await segurarSaudacaoDoLead(cfg, msgId).catch(() => false)) return
   // Ritmo de gente (somado à 2ª etapa): de dia ~40 s a 1 min; de madrugada mais devagar (~1 a 1,5 min)
@@ -580,8 +580,12 @@ export function comDesculpa(texto: string): string {
   return `${saudacao}Desculpa a demora pra te responder! ${resto}`.trim()
 }
 
+// DESLIGADO (#242): telefone de prospectos_parceiros não recebe resposta automática até a correção do modo parceiro
+// (sem "o Felipe analisa/chama", sem perguntar de busca e entrega) entrar com o teste das frases passando.
+export const MODO_PARCEIRO_LIGADO = false
+
 async function responderProspectoParceiro(cfg: CfgAgente, msgId: string, jid: string, prospecto: NonNullable<Awaited<ReturnType<typeof prospectoDoJid>>>, opts: { atrasada?: boolean }) {
-  if (prospectoExcluido(prospecto)) return
+  if (!MODO_PARCEIRO_LIGADO || prospectoExcluido(prospecto)) return
   // As mesmas travas de uma resposta por mensagem
   if (!await reservarMensagem(msgId) && !opts.atrasada) return
   if (opts.atrasada && !await reservarAtrasada(msgId)) return
@@ -619,6 +623,7 @@ export async function responderSozinho(msgId: string, opts: { atrasada?: boolean
   // Gráfica do Prospector (também na resposta atrasada, em assumir e continuar e em retomar parados): modo parceiro,
   // com prompt próprio (não orça, não é cliente A/B/C). Excluída (opt-out/descartada): nada sai.
   const prospecto = await prospectoDoJid(jid)
+  if (prospecto && !MODO_PARCEIRO_LIGADO) return
   if (prospecto) return responderProspectoParceiro(cfg, msgId, jid, prospecto, opts)
   // Cada mensagem do lead é respondida uma vez só (dois disparos ao mesmo tempo: só um passa)
   if (!await reservarMensagem(msgId) && !opts.atrasada) return

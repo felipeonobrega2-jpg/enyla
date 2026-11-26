@@ -10,7 +10,7 @@ const e = vi.hoisted(() => ({
 const cadeia = (rows: unknown[]) => { const q: Record<string, unknown> = { then: (r: (v: unknown) => void) => r({ data: rows }), maybeSingle: async () => ({ data: rows[0] ?? null }) }; for (const m of ["select", "order", "limit", "eq", "ilike"]) q[m] = () => q; return q }
 vi.mock("@/app/lib/supabase", () => ({ supabase: { from: (t: string) => cadeia(t === "whatsapp_conversas" ? e.conversas : []) } }))
 vi.mock("@/app/lib/configAtomica", () => ({
-  lerCampos: vi.fn(async () => ({ guiaAtendimento: "guia" })),
+  lerCampos: vi.fn(async () => ({ guiaAtendimento: "guia", aprovoObrigatorio: true })),   // chave ligada: o comportamento de antes (tests/aprovoDesligado.test.ts cobre a desligada)
   mudarConfig: vi.fn(async (f: (d: Record<string, unknown>) => Record<string, unknown> | null) => {
     const d = { ordemDiretaDia: e.contador ? { cco: { dia: new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }), n: e.contador } } : {} }
     return f(d)
