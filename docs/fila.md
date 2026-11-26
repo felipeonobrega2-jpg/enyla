@@ -344,6 +344,7 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 | 46 | Despesa em vários lotes: perguntar se o valor é o total (ratear por quantidade ou igual) ou o custo de cada lote, com prévia por lote. Não mexe em lançamentos antigos | Felipe | — | — | Claude Code | não | (PR da issue #161) |
 | 48 | Pós-venda acha o WhatsApp de pedido Digital (DIG-xxxx): pedido, cadastro, conversa; erro com motivo (`sem_jid`, `pedido_sem_jid`, `pedido_nao_encontrado`). Não muda o Aprovo | Felipe | — | — | Claude Code | não (correção de erro) | (PR da issue #206) |
 | 47 | Prospector: liberar primeiro contato (`PRIMEIRO_CONTATO_PAUSADO = false`, com a linha do link "Cadastrar minha gráfica") e limite de 10 primeiros contatos por dia útil. PR 0 da issue #208; o template novo com link de cadastro (A/B, lembrete, descadastro) vem em PR separado e troca a pausa para `false` | Felipe (issue #208) | urgente | antes do cron de 26/11 | Claude Code | não | (PR da issue #208) |
+| 49 | WhatsApp: botão "N para responder" e chip "Responder N" da aba Conversas usam a mesma função (`conversasAguardando`/`contarAguardando`). Só leitura | CCO (issue #224) | — | — | Claude Code | não | (PR da issue #224) |
 
 ## 44. Porta externa: leitura de parceiros
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { posicaoNoFunil, estaFechada } from "@/app/lib/funilWhatsapp"
+import { posicaoNoFunil, estaFechada, conversasAguardando, contarAguardando } from "@/app/lib/funilWhatsapp"
 import { card } from "./fixtures"
 
 const HOJE = new Date("2026-11-02T12:00:00Z")
@@ -42,5 +42,22 @@ describe("esperando resposta", () => {
     expect(aguardandoResposta({ jid: "1@lid", ultima_recebida_at: h(20) }, agora)).toBe(false)
     expect(aguardandoResposta({ jid: "1@g.us", ultima_recebida_at: h(0.1) }, agora)).toBe(false)
     expect(aguardandoResposta({ jid: "1@lid", ultima_recebida_at: h(1), fechada_em: h(0.5) }, agora)).toBe(false)
+  })
+})
+
+describe("contagem única de 'para responder'", () => {
+  const agora = HOJE.getTime()
+  const lista = [
+    { jid: "a@lid", ultima_recebida_at: h(0.1), ultima_enviada_at: h(1) },   // cliente por último: conta
+    { jid: "b@lid", ultima_recebida_at: h(0.1) },                             // nunca respondemos: conta
+    { jid: "c@lid", ultima_recebida_at: h(1), ultima_enviada_at: h(0.1) },   // já respondemos: não
+    { jid: "d@lid", ultima_recebida_at: h(20) },                              // velha demais: não
+    { jid: "e@g.us", ultima_recebida_at: h(0.1) },                            // grupo: não
+    { jid: "f@lid", ultima_recebida_at: h(0.2), ultima_enviada_at: h(1), ultima_msg: "ok 👍" }, // só confirmação: não
+  ]
+  it("filtra e conta com o mesmo critério", () => {
+    expect(conversasAguardando(lista, agora).map(c => c.jid)).toEqual(["a@lid", "b@lid"])
+    expect(contarAguardando(lista, agora)).toBe(2)
+    expect(contarAguardando([], agora)).toBe(0)
   })
 })

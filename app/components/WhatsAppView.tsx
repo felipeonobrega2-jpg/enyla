@@ -7,7 +7,7 @@ import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, nomeChave } from "../lib/negocio"
 import { clienteDaConversa, Vinculos } from "../lib/vinculoWhatsapp"
 import { lerOrigem } from "../lib/origemWhatsapp"
-import { ETAPAS, Etapa, posicaoNoFunil, estaFechada, aguardandoResposta } from "../lib/funilWhatsapp"
+import { ETAPAS, Etapa, posicaoNoFunil, estaFechada, aguardandoResposta, contarAguardando } from "../lib/funilWhatsapp"
 import { Segmentado } from "./ds"
 import { FilaMensagens } from "./FilaMensagens"
 import { montarFila, AvisoPedido } from "../lib/filaMensagens"
@@ -287,7 +287,7 @@ export default function WhatsAppView({
   }
 
   const totalNaoLidas = conversas.reduce((s, c) => s + c.nao_lidas, 0)
-  const totalAguardando = conversas.filter(aguardando).length
+  const totalAguardando = contarAguardando(conversas, agora)
 
   // Próxima conversa esperando você (depois de responder uma, vai direto para a seguinte)
   function abrirProxima() {

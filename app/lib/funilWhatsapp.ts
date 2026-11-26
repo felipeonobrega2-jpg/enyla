@@ -94,3 +94,9 @@ export const aguardandoResposta = (c: { jid?: string; fechada_em?: string | null
   !c.jid?.endsWith("@g.us") && !estaFechada(c) && !!c.ultima_recebida_at && (!c.ultima_enviada_at || c.ultima_recebida_at > c.ultima_enviada_at)
   && !(c.ultima_enviada_at && ehSoConfirmacao(c.ultima_msg))
   && agora - new Date(c.ultima_recebida_at).getTime() < DIAS_PERDIDO * 86_400_000
+
+// Única fonte da contagem "para responder": o botão do WhatsApp (/api/whatsapp/pendentes) e o chip "Responder N" da
+// aba Conversas passam por aqui. Só leitura: devolve as conversas que esperam resposta, sem alterar nada.
+export const conversasAguardando = <T extends Parameters<typeof aguardandoResposta>[0]>(lista: readonly T[], agora = Date.now()): T[] =>
+  lista.filter(c => aguardandoResposta(c, agora))
+export const contarAguardando = (lista: readonly Parameters<typeof aguardandoResposta>[0][], agora = Date.now()) => conversasAguardando(lista, agora).length
