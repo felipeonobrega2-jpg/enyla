@@ -1,8 +1,7 @@
 // Atendente no modo "prospecto parceiro" (ordem do Felipe, 26/11/2026: "tem que ser tudo automático").
 // Gráfica de prospectos_parceiros que responde no WhatsApp é atendida pela IA com um prompt próprio de PARCERIA:
 // não orça, não fala de preço de embalagem, não é cliente A/B/C. Objetivo: tirar a dúvida e levar ao cadastro em /parceiros.
-// Três perguntas não têm resposta oficial (custo, exclusividade, volume): a IA não inventa, diz que o Felipe confirma e a
-// pergunta vai para ele. Pedido para não receber mais: confirma uma vez, marca opt_out e nada mais sai.
+// Pergunta fora do conhecimento: a IA não inventa, diz que a equipe confirma e a pergunta é registrada. Pedido para não receber mais: confirma uma vez, marca opt_out e nada mais sai.
 // Só decide e redige; o envio, o aviso e as travas de cada mensagem (reservarMensagem, horário do agente, ritmo) são do chamador.
 import { supabase } from "./supabase"
 import { lerCampos } from "./configAtomica"
@@ -12,6 +11,7 @@ import { aplicarOptOut, podeTransicionar, type EtapaFunil } from "./prospector"
 import { chaveTelefone, dentroDoHorario } from "./prospectorEnvio"
 import { prospectoExcluido, registrar, MOTIVO_FORA_DA_JANELA } from "./ordemProspecto"
 import type { ProspectoDoJid } from "./prospectorTrava"
+import { REGRAS_VOZ, violaVoz, ehConhecimentoDeParceiro } from "./vozEnyla"
 
 export const LINK_PARCEIROS = "https://app.enyla.com.br/parceiros"
 export const POR_ATENDENTE = "atendente_auto"
@@ -97,17 +97,18 @@ export function ajustarLink(texto: string, a: { pode: boolean; quer: boolean }):
 function prompt(a: { nome: string; conhecimento: string; jaMandouLink: boolean; jaCadastrou: boolean }) {
   return `Você é o Atendente da ENYLA (gráfica de embalagens) conversando no WhatsApp com ${a.nome}, uma gráfica que respondeu ao nosso convite para ser PARCEIRA da ENYLA. Ela NÃO é cliente: é uma possível parceira que faria serviços de produção para nós.
 Seu objetivo em cada resposta: tirar a dúvida dela e levá-la ao cadastro em ${LINK_PARCEIROS}.
-Como funciona (fatos oficiais): o cadastro leva uns 5 minutos; depois o Felipe analisa e chama a gráfica no WhatsApp. Pagamento: ${PAGAMENTO}.
-${a.jaCadastrou ? "Esta gráfica JÁ fez o cadastro: agradeça, diga que o Felipe analisa e chama no WhatsApp, e não mande o link." : a.jaMandouLink ? "O link do cadastro JÁ foi enviado nesta conversa: não repita o link; se ela perguntar, diga que está acima na conversa." : `Mande o link do cadastro (${LINK_PARCEIROS}) quando fizer sentido, uma vez só, e marque enviar_link=true.`}
+Como funciona (fatos oficiais): o cadastro leva uns 5 minutos; depois a equipe ENYLA segue com ela por aqui. Pagamento: ${PAGAMENTO}.
+${a.jaCadastrou ? "Esta gráfica JÁ fez o cadastro: agradeça, diga que o cadastro foi recebido, conduza os próximos passos você mesma por aqui e não mande o link." : a.jaMandouLink ? "O link do cadastro JÁ foi enviado nesta conversa: não repita o link; se ela perguntar, diga que está acima na conversa." : `Mande o link do cadastro (${LINK_PARCEIROS}) quando fizer sentido, uma vez só, e marque enviar_link=true.`}
 Regras:
 - Você NÃO orça, não fala de preço de embalagem nem de valores em reais, e não trata a gráfica como cliente de compra.
-- Três assuntos NÃO têm resposta oficial: custo para entrar, exclusividade e volume esperado de serviço. Se ela perguntar, NÃO invente nem estime: responda normalmente o resto da mensagem, diga que o Felipe confirma esse ponto com ela, e liste o tema em perguntas_sem_resposta.
-- Só afirme o que está nos fatos oficiais e no conhecimento abaixo. Não prometa prazo, volume nem valor.
+- O conhecimento guardado abaixo VALE MAIS que os fatos fixos acima: use-o em toda resposta. Ex.: se ela disser que o preço varia de pedido para pedido, use a resposta padrão do conhecimento (quem cadastra prazo médio e preço de referência tem prioridade; quem não cadastra cota cada pedido junto com outras parceiras) e peça só o prazo médio e o CNPJ.
+- Se ela perguntar algo que NÃO está no conhecimento nem nos fatos (custo para entrar, exclusividade, volume esperado, ou outro ponto), NÃO invente nem estime: responda o resto normalmente, diga que confirmamos esse ponto e já retornamos aqui, e liste o tema (se for custo, exclusividade ou volume) em perguntas_sem_resposta.
+- Só afirme o que está nos fatos oficiais e no conhecimento. Não prometa prazo, volume nem valor.
 - Empresa falando ("nós"), cordial, curta (2 a 4 frases), português do Brasil, no máximo um emoji. Não exponha nada interno (agentes, diretoria, sistema).
+${REGRAS_VOZ}
 ${a.conhecimento ? `\nConhecimento da ENYLA sobre o programa de parceiros (guardado pela CMO e pelo Felipe):\n${a.conhecimento}\n` : ""}`
 }
 
-const ehConhecimentoDeParceiro = (c: Conhecimento) => /parceir|cadastro|gr[aá]fica\s+parceira|pagamento|pix/i.test(`${c.tema} ${c.texto}`)
 
 /** Atende a gráfica do Prospector que escreveu. Nada é enviado se ela está excluída ou fora da janela das 8h às 20h. */
 export async function responderParceiro(p: ProspectoDoJid, jid: string, deps: DepsParceiro): Promise<Saida> {
@@ -152,6 +153,12 @@ export async function responderParceiro(p: ProspectoDoJid, jid: string, deps: De
 
   const bruto = String(saida.texto ?? "").trim()
   if (!bruto) return { enviou: false, motivo: "a IA não escreveu a resposta" }
+  // Trava dura de voz: nunca fala como o Felipe nem empurra a parceira para ele
+  const quebra = violaVoz(bruto)
+  if (quebra) {
+    await deps.avisar(`⏸️ *Segurei a resposta à gráfica ${nome}* (Prospector)\nMotivo: ${quebra}.`).catch(() => null)
+    return { enviou: false, motivo: `segurou: ${quebra}` }
+  }
   // Trava dura: nunca valor em reais para a gráfica (não é orçamento). Fica com o Felipe, que recebe o aviso.
   if (/R\$\s*\d/.test(bruto)) {
     await deps.avisar(`⏸️ *Segurei a resposta à gráfica ${nome}* (Prospector)\nMotivo: a IA citou valor em reais.\nIa mandar:\n${bruto}`).catch(() => null)
@@ -173,7 +180,7 @@ export async function responderParceiro(p: ProspectoDoJid, jid: string, deps: De
   for (const tema of pendentes) {
     const pergunta = dela.join(" / ").slice(0, 300)
     await registrar(p, { motivo: `pergunta pendente para o Felipe: ${ROTULO[tema]}`, pergunta_pendente: { tema, texto: pergunta, em } }).catch(() => null)
-    await deps.avisar(`❓ *Pergunta para o Felipe confirmar* · gráfica ${nome} (Prospector)\nTema: ${ROTULO[tema]}\nEla escreveu: ${pergunta}\nA IA disse que o Felipe confirma. wa.me/${chaveTelefone(p.telefone) ? "55" + chaveTelefone(p.telefone) : jid.split("@")[0]}`).catch(() => null)
+    await deps.avisar(`❓ *Pergunta para o Felipe confirmar* · gráfica ${nome} (Prospector)\nTema: ${ROTULO[tema]}\nEla escreveu: ${pergunta}\nA IA disse que a equipe confirma e retorna. wa.me/${chaveTelefone(p.telefone) ? "55" + chaveTelefone(p.telefone) : jid.split("@")[0]}`).catch(() => null)
   }
   return { enviou: true, motivo: pendentes.length ? `respondeu; pergunta para o Felipe: ${pendentes.join(", ")}` : "respondeu", texto }
 }

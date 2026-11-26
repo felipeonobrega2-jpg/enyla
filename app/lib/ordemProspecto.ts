@@ -3,6 +3,7 @@
 // Continuam valendo: janela das 8h às 20h (seg-sex), lista de exclusão (opt_out ou descartado: 409, nada sai) e espaçamento entre envios.
 // Não conta no limite de 20 diretos de lead (ordemDiretaDia); o teto próprio do Prospector é da #238 e não é tocado aqui.
 // Cliente A, B, C ou indefinido não chega aqui: segue na fila do Aprovo (ordemComercial).
+import { violaVoz } from "./vozEnyla"
 import { mudarConfig } from "./configAtomica"
 import { supabase } from "./supabase"
 import { evo } from "./evolution"
@@ -61,6 +62,8 @@ export async function registrar(p: ProspectoDoJid, entrada: Record<string, unkno
 export async function enviarAoProspecto(a: { diretor: string; func: Pick<Funcionario, "nome">; prospecto: ProspectoDoJid; jid: string; texto: string; novoId: () => string; agora?: Date }): Promise<SaidaProspecto> {
   const trava = travasDoProspecto(a.prospecto, a.agora)
   if (trava) return trava
+  const quebra = violaVoz(a.texto)
+  if (quebra) return { saida: `Mensagem fora da voz da ENYLA (${quebra}): nada foi enviado.`, status: 422, motivo: `voz: ${quebra}`, nivel: "lead" }
   const numero = celularWhatsapp(a.prospecto.telefone) ?? (/^\d{10,13}$/.test(a.jid.split("@")[0]) && a.jid.endsWith("@s.whatsapp.net") ? a.jid.split("@")[0] : null)
   if (!numero || chaveTelefone(numero).length < 10) return { saida: "Prospecto sem número de WhatsApp válido: nada foi enviado.", status: 400, motivo: "sem número", nivel: "lead" }
   const espera = await reservarVez()

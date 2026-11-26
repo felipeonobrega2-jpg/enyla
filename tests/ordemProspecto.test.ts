@@ -53,6 +53,16 @@ describe("ordenar_funcionario a gráfica do Prospector", () => {
     expect(JSON.parse(e.evo.mock.calls[0][1].body)).toEqual({ number: "5511999990001", text: "Oi! Vocês fazem terceirização?" })
     expect(JSON.stringify(e.hist)).toContain("CCO"); expect(JSON.stringify(e.hist)).toContain("enviada")
   })
+  it.each(["Aqui é o Felipe, tudo bem?", "O Felipe analisa o cadastro.", "O Felipe confirma esse ponto.", "O Felipe entra em contato com você.", "Depois vocês alinham depois.", "Vocês buscam e entregam?", "Não precisa se preocupar com tabela."])("mensagem fora da voz da ENYLA não sai: %s", async (texto) => {
+    e.redigir.mockResolvedValue({ ok: true, texto })
+    const r = await ordenar()
+    expect(r.destino).toBeUndefined(); expect(e.evo).not.toHaveBeenCalled()
+  })
+  it("a ordem ao prospecto pede a redação em modo prospecto (voz da equipe, sem o guia do Felipe)", async () => {
+    await ordenar()
+    expect(e.redigir.mock.calls[0][0]).toMatchObject({ prospecto: true })
+    expect(e.redigir.mock.calls[0][0].guia).toBeUndefined()
+  })
   it("prospecto excluído: 409 e nada sai", async () => {
     e.prospecto!.opt_out = true
     const r = await ordenar()

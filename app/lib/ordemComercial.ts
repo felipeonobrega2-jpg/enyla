@@ -140,7 +140,7 @@ async function ordenarProspecto(diretor: IdDiretor, func: Funcionario, x: Record
   const cfg = await lerCampos<{ guiaAtendimento?: string; conhecimentoAgente?: Conhecimento[] }>(["guiaAtendimento", "conhecimentoAgente"])
   const { redigirComoFuncionario } = await import("./funcionariosServidor")
   const nome = prospecto.nome_fantasia || prospecto.razao_social || String(x.cliente ?? jid)
-  const r = await redigirComoFuncionario({ funcionario: func, cliente: nome, jid, ordem, apiKey: op.apiKey, conhecimento: cfg.conhecimentoAgente, cultura: op.cultura, guia: cfg.guiaAtendimento?.trim() || undefined })
+  const r = await redigirComoFuncionario({ funcionario: func, cliente: nome, jid, ordem, apiKey: op.apiKey, conhecimento: cfg.conhecimentoAgente, cultura: op.cultura, prospecto: true })
   if (!r.ok) return { saida: `Não deu: ${r.erro}`, acao: { id: op.novoId(), tipo: "falha", texto: r.erro }, status: 422 }
   return enviarAoProspecto({ diretor, func, prospecto, jid, texto: r.texto, novoId: op.novoId })
 }
