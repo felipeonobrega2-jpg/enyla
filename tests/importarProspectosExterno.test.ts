@@ -8,6 +8,7 @@ vi.mock("@/app/lib/supabase", () => ({
   supabase: { from: (t: string) => {
     if (t === "prospectos_parceiros") return {
       select: () => ({ range: async () => ({ data: e.base, error: null }) }),
+      insert: (l: Record<string, unknown>) => ({ select: async () => { e.gravados.push(l); return { data: [{ id: 100 + e.gravados.length }], error: null } } }),
       upsert: (l: Record<string, unknown>) => ({ select: async () => { e.gravados.push(l); return { data: [{ id: 100 + e.gravados.length }], error: null } } }),
     }
     const q: Record<string, unknown> = { then: (r: (v: unknown) => void) => r({ data: [] }) }
@@ -46,9 +47,25 @@ describe("importar_prospectos", () => {
     expect(JSON.stringify(e.gravados[0].historico_etapas)).toContain("CCO")
     expect(JSON.stringify(e.gravados[0].historico_etapas)).toContain("contato_felipe")
   })
+  it("item sem CNPJ entra (grava cnpj nulo) quando tem celular ou e-mail", async () => {
+    const r = await importarProspectosExterno({ itens: [item({ cnpj: "", celular: "11977776666" }), item({ cnpj: undefined, email: "s@c.com" })] }, "cco")
+    expect(r.ok && r.criados).toHaveLength(2)
+    expect(e.gravados[0]).toMatchObject({ cnpj: null, telefone: "11977776666" })
+  })
+  it("sem CNPJ, celular nem e-mail é recusado; CNPJ inválido continua recusado", async () => {
+    const r = await importarProspectosExterno({ itens: [item({ cnpj: "" }), item({ cnpj: "123" })] }, "cco")
+    expect(r.ok && r.recusados.map(x => x.motivo)).toEqual(["sem CNPJ, celular nem e-mail (não há como deduplicar)", "CNPJ inválido"])
+    expect(e.gravados).toHaveLength(0)
+  })
+  it("celular repetido sem CNPJ é duplicado (com e sem o 9, e dentro do lote); e-mail também", async () => {
+    e.base = [{ cnpj: null, telefone: "551199990002", email: "y@y.com", etapa: "encontrado", opt_out: false }]
+    const r = await importarProspectosExterno({ itens: [item({ cnpj: "", celular: "(11) 9999-0002" }), item({ cnpj: "", email: "Y@y.com" }), item({ cnpj: "", celular: "11955554444" }), item({ cnpj: "", celular: "11 95555-4444" })] }, "cco")
+    expect(r.ok && r.criados).toHaveLength(1)
+    expect(r.ok && r.duplicados.map(x => x.indice)).toEqual([0, 1, 3])
+  })
   it("recusa item sem nome, sem origem, sem CNPJ, CNPJ, telefone ou e-mail inválido", async () => {
-    const r = await importarProspectosExterno({ itens: [item({ nome: "" }), item({ origem: "" }), item({ cnpj: "" }), item({ cnpj: "11111111111111" }), item({ celular: "123" }), item({ email: "xx" })] }, "cmo")
-    expect(r.ok && r.recusados.map(x => x.motivo)).toEqual(["sem nome", "sem origem", "sem CNPJ (a base do Prospector exige CNPJ)", "CNPJ inválido", "telefone inválido", "e-mail inválido"])
+    const r = await importarProspectosExterno({ itens: [item({ nome: "" }), item({ origem: "" }), item({ cnpj: "11111111111111" }), item({ celular: "123" }), item({ email: "xx" })] }, "cmo")
+    expect(r.ok && r.recusados.map(x => x.motivo)).toEqual(["sem nome", "sem origem", "CNPJ inválido", "telefone inválido", "e-mail inválido"])
     expect(e.gravados).toHaveLength(0)
   })
   it("deduplica por CNPJ, telefone (com e sem o 9) e e-mail, também dentro do mesmo lote", async () => {

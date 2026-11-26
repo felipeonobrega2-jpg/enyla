@@ -60,35 +60,38 @@ export async function importarProspectosExterno(b: Pedido, diretor: IdDiretor, a
     const origem = txt(it.origem)
     if (!origem) { recusa("sem origem"); continue }
     const cnpj = txt(it.cnpj).replace(/\D/g, "")
-    // A tabela exige CNPJ (not null, 14 dígitos). Sem ele a linha não cabe na base.
-    if (!cnpj) { recusa("sem CNPJ (a base do Prospector exige CNPJ)"); continue }
-    if (!cnpjValido(cnpj)) { recusa("CNPJ inválido"); continue }
+    // CNPJ é opcional; quando vem preenchido tem que ter 14 dígitos válidos.
+    if (cnpj && !cnpjValido(cnpj)) { recusa("CNPJ inválido"); continue }
     const celular = txt(it.celular)
     const chaveTel = chaveTelefone(celular)
     if (celular && (chaveTel.length < 10 || chaveTel.length > 11)) { recusa("telefone inválido"); continue }
     const email = txt(it.email).toLowerCase()
     if (email && !EMAIL.test(email)) { recusa("e-mail inválido"); continue }
+    // Sem CNPJ, a deduplicação depende do celular e do e-mail: sem nenhum dos três não há como evitar repetição.
+    if (!cnpj && !chaveTel && !email) { recusa("sem CNPJ, celular nem e-mail (não há como deduplicar)"); continue }
     if (termoForaDoRamo(nome, null)) { recusa("fora do ramo"); continue }
 
-    const achados = [porCnpj.get(cnpj), chaveTel ? porTel.get(chaveTel) : undefined, email ? porEmail.get(email) : undefined].filter((x): x is Existente => !!x)
+    const achados = [cnpj ? porCnpj.get(cnpj) : undefined, chaveTel ? porTel.get(chaveTel) : undefined, email ? porEmail.get(email) : undefined].filter((x): x is Existente => !!x)
     const excluido = achados.find(x => x.opt_out || x.etapa === "descartado")
     if (excluido) { recusa(excluido.opt_out ? "lista de exclusão (pediu para não receber)" : "descartado antes (lista de exclusão)"); continue }
     if (achados.length) {
-      const por = achados[0] === porCnpj.get(cnpj) ? "CNPJ" : chaveTel && achados[0] === porTel.get(chaveTel) ? "telefone" : "e-mail"
+      const por = cnpj && achados[0] === porCnpj.get(cnpj) ? "CNPJ" : chaveTel && achados[0] === porTel.get(chaveTel) ? "telefone" : "e-mail"
       duplicados.push({ indice: i, nome, motivo: `já existe (mesmo ${por})` }); continue
     }
 
     const cidade = txt(it.cidade)
     const linha = {
-      cnpj, razao_social: nome, nome_fantasia: null, municipio: cidade || null, email: email || null, telefone: celular ? celular.replace(/\D/g, "") : null,
+      cnpj: cnpj || null, razao_social: nome, nome_fantasia: null, municipio: cidade || null, email: email || null, telefone: celular ? celular.replace(/\D/g, "") : null,
       fonte: `importação manual (${origem})`, coletado_em: em, etapa: "encontrado",
       historico_etapas: [{ etapa: "encontrado", em, motivo: `importado por ${diretor.toUpperCase()} pela porta externa (origem: ${origem})` }],
     }
-    const { data, error } = await supabase.from(TABELA).upsert(linha, { onConflict: "cnpj", ignoreDuplicates: true }).select("id")
+    const { data, error } = cnpj
+      ? await supabase.from(TABELA).upsert(linha, { onConflict: "cnpj", ignoreDuplicates: true }).select("id")
+      : await supabase.from(TABELA).insert(linha).select("id")
     if (error) { recusa(`erro ao gravar: ${error.message}`); continue }
     if (!data?.length) { duplicados.push({ indice: i, nome, motivo: "já existe (mesmo CNPJ)" }); continue }
     criados.push({ indice: i, id: (data[0] as { id: number }).id, nome })
-    indexar({ cnpj, telefone: linha.telefone, email: linha.email, etapa: "encontrado", opt_out: false })
+    indexar({ cnpj: cnpj || null, telefone: linha.telefone, email: linha.email, etapa: "encontrado", opt_out: false })
   }
   return { ok: true, criados, duplicados, recusados }
 }
