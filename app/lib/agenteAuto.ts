@@ -469,6 +469,11 @@ async function jidDaMensagem(msgId: string) {
 
 // 1ª etapa (no webhook): espera o lead terminar de escrever (costumam mandar 2–3 mensagens seguidas)
 export async function agendarResposta(msgId: string, origem: string) {
+  // Com o modo parceiro desligado, a 1ª resposta da gráfica do Prospector recebe uma mensagem fixa (sem IA, uma vez, 8h–20h)
+  if (!MODO_PARCEIRO_LIGADO) {
+    const { boasVindasParceiro } = await import("./boasVindasParceiro")
+    await boasVindasParceiro(await jidDaMensagem(msgId)).catch(() => null)
+  }
   const cfg = await lerCfg()
   if (!cfg.agenteAuto?.ligado || !dentroDoHorario(cfg.agenteAuto.horario)) {
     // Desligado (ou fora do horário dele), o agente não responde; mas resposta a uma retomada ainda vira aviso para você.
