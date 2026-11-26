@@ -40,6 +40,7 @@ export const SINAL_DIGITAL = 0.5
 import type { SituacaoArte } from "./digitalPrazo"
 export type StatusDigital = "aguardando_sinal" | "sinal_pago" | "arte" | "producao" | "enviado" | "cancelado"
 export type LinkCartao = { v: number; orderNsu: string; url: string; valor: number; em: string }
+export type EdicaoAcomp = { por: string; em: string; motivo: string; arteAprovadaAntes?: string | null; situacaoArteAntes?: string | null; prazoEntregaAntes?: string | null }
 export type PedidoDigital = {
   id: string                       // DIG-0001
   jid: string; nome: string | null
@@ -72,7 +73,8 @@ export type PedidoDigital = {
   restante?: number; restantePagoEm?: string; pagamentoFinal?: { txId: string; valor: number; data: string; nome: string | null }
   acertadoEm?: string
   situacaoArte?: SituacaoArte; prazoEntregaEm?: string        // acompanhamento (#164): vazios nos pedidos antigos; data YYYY-MM-DD (a porta/tela chamam de prazoEntrega; o objeto prazoEntrega acima é o do #165)
-  edicaoAcomp?: { por: string; em: string; motivo: string; arteAprovadaAntes?: string | null }   // quem gravou os dois campos acima, quando (Brasília) e por quê
+  edicaoAcomp?: EdicaoAcomp   // a última gravação dos campos acima (compatibilidade); o histórico todo está em edicoesAcomp
+  edicoesAcomp?: EdicaoAcomp[]   // todas as gravações, da mais antiga à mais recente (só acrescenta)
   lembreteDepois?: string; lembreteParado?: boolean           // lead adiou (espera) · você assumiu a conversa (sem lembrete)
   reenviadoEm?: string                                         // orçamento reenviado com os valores (varredura)
   documento?: string                                         // CPF/CNPJ (cobrança no Asaas e nota)
@@ -295,6 +297,22 @@ export function itensDoLembrete(pedidos: Pick<PedidoDigital, "id" | "quantidade"
 }
 
 const semente = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7)
+// Ordem do Felipe (26/11/2026, 9h18): follow-up automático da Digital DESLIGADO (lembrete, reenvio do orçamento e
+// follow-up F1/F2/F3 genérico). Para religar (quando houver follow-up novo com os vídeos), troque para true.
+export const FOLLOWUP_DIGITAL_LIGADO = false
+
+// Lead Digital = o mesmo critério que o agente já usa (agenteAuto, retomada e envio): etiqueta "Digital" ou último
+// perfil do agente "pequeno". Pedido Digital pendente (aguardando sinal) também conta. Offset não entra.
+export function followUpDigitalBarrado(
+  c: { etiquetas?: string[] | null },
+  perfilDoLog: string | null | undefined,
+  pedido: unknown,
+  ligado: boolean = FOLLOWUP_DIGITAL_LIGADO,
+): boolean {
+  if (ligado) return false
+  return !!pedido || (c.etiquetas ?? []).includes("Digital") || perfilDoLog === "pequeno"
+}
+
 // Reenvio do orçamento com os valores (quem recebeu só o link, ou a mensagem não apareceu): uma vez por pedido
 export function textoReenvioDigital(nome: string | null, itens: string): string {
   const n = primeiroNome(nome)
