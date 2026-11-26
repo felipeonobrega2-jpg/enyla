@@ -1,6 +1,6 @@
 import { lerConfigLinha } from "../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
-import { marcarProntoDigital, lerPedido, gravarPedido, linkPedido, linkDesigner, mandarArte, mandarParaVilla, avisarDesigner, avisarDesignerMedidas, conversaDoPedido, ContatosDigital } from "@/app/lib/digitalServidor"
+import { marcarProntoDigital, lerPedido, gravarPedido, linkPedido, linkAcompanhamento, linkDesigner, mandarArte, mandarParaVilla, avisarDesigner, avisarDesignerMedidas, conversaDoPedido, ContatosDigital } from "@/app/lib/digitalServidor"
 import { seuNumero, enviar } from "@/app/lib/agenteAuto"
 import { pedidoDeTeste, textoLinkPedido, opcoesDoPedido, trocarQuantidade, trocarMedidas, fmtMedidas, aprovarNegociacao, recusarNegociacao, textoNegociacaoAprovada, textoNegociacaoRecusada } from "@/app/lib/digital"
 import { supabase } from "@/app/lib/supabase"
@@ -27,7 +27,7 @@ export async function GET() {
     briefing: p.briefing ? { marca: p.briefing.marca ?? "", cores: p.briefing.cores ?? "", referencias: p.briefing.referencias ?? "", laminacao: p.briefing.laminacao ?? "fosca", arquivos: (p.briefing.arquivos ?? []).length } : null,
     teste: !!p.teste,
     vence: new Date(new Date(p.em).getTime() + DIAS_VALIDADE_DIGITAL * 86_400_000).toISOString(),
-    link: linkPedido(p.id), linkDesigner: linkDesigner(p.id),
+    link: linkPedido(p.id), linkAcompanhamento: linkAcompanhamento(p.id), linkDesigner: linkDesigner(p.id),
     opcoes: p.status === "aguardando_sinal" ? opcoesDoPedido(p, d.digital) : [],
     arteAtual: arteAtual(p), versoes: (p.artes ?? []).length, arteEnviadaEm: p.arteEnviadaEm ?? null, arteAprovadaEm: p.arteAprovadaEm ?? null,
     ajustes: p.ajustes ?? [], designerAvisadoEm: p.designerAvisadoEm ?? null, villaEnviadoEm: p.villaEnviadoEm ?? null,
