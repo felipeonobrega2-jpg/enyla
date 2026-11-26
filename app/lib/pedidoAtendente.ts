@@ -3,6 +3,7 @@
 
 import { conhecimentoRelevante, conhecimentoNoPrompt, filtroDoAgente, REGRA_PRODUTO, type Conhecimento } from "./agenteLeads"
 import { agoraParaIA } from "./atendente"
+import { ROTEIRO_OFFSET } from "./offsetRoteiro"
 import { instrucaoDoMotivo } from "./reativacao"
 import { textoEstilo, type EstiloFelipe } from "./estilo"
 import { nomeParaChamar } from "./nomeDePessoa"
@@ -29,7 +30,7 @@ export const ESQUEMA = {
     dados: {
       type: "object",
       additionalProperties: false,
-      required: ["itens", "produto", "volume_ml", "caixa_cm", "frasco_cm", "quantidade", "tem_arte", "referencia", "acabamento", "modelos", "resumo"],
+      required: ["itens", "produto", "volume_ml", "caixa_cm", "frasco_cm", "quantidade", "tem_arte", "referencia", "acabamento", "modelos", "offset", "resumo"],
       properties: {
         itens: {
           type: "array",
@@ -61,6 +62,22 @@ export const ESQUEMA = {
         referencia: { type: ["string", "null"], description: "O que o cliente já mostrou para a gente entender a caixa: foto do produto/frasco, foto de uma caixa que ele gosta, desenho ou ideia (ex.: \"foto do frasco e caixa de referência preta fosca\"). \"sem referência\" se ele disse que não tem. null se ainda não falou disso." },
         acabamento: { type: ["string", "null"], description: "Acabamento que ele quer (verniz, laminação fosca/brilho, hot stamping, relevo, papel especial). \"sem preferência\" se ele disse que tanto faz ou que quer o mais simples. null se ainda não falou disso." },
         modelos: { type: ["number", "null"], description: "Quantos modelos/artes diferentes (fragrâncias, cores, sabores) na mesma caixa. 1 se é um só. null se ainda não falou disso." },
+        offset: {
+          type: ["object", "null"], additionalProperties: false,
+          required: ["formato", "janela", "modelos_detalhe", "impressao_faca", "arte_formato", "concorrente", "formato_novo", "recado", "marca"],
+          description: "Ficha Offset: só em lead de Offset (1.000+ unidades no total). Cada campo só com o que o lead disse; null se não disse. Fora do Offset, null.",
+          properties: {
+            formato: { type: ["string", "null"], description: "fundo automático, cartucho, cubo, gaveta, cartela ou outro." },
+            janela: { type: ["string", "null"], description: "\"não\" ou \"sim, medida, acetato\"." },
+            modelos_detalhe: { type: ["string", "null"], description: "Quantas unidades de cada arte/modelo, como o lead disse." },
+            impressao_faca: { type: ["string", "null"], description: "Só por fora ou também por dentro; tem faca ou a gente desenvolve." },
+            arte_formato: { type: ["string", "null"], description: "Formato da arte pronta (PDF, faca, mockup), se houver." },
+            concorrente: { type: ["string", "null"], description: "Preço ou proposta de concorrente, só se o lead citou." },
+            formato_novo: { type: ["string", "null"], description: "Motivo, se o formato ainda não tem forma de orçar (gaveta, separador, lacre fora do padrão)." },
+            recado: { type: ["string", "null"], description: "Prazo desejado, pedido de amostra/visita/ligação ou outra observação do lead, sem virar promessa." },
+            marca: { type: ["string", "null"], description: "Marca do lead, se aparecer." },
+          },
+        },
         resumo: { type: "string", description: "Resumo do pedido em 1 linha para a observação interna do orçamento." },
       },
     },
@@ -168,6 +185,8 @@ Lead pequeno (menos de 1.000) no modo digital — vale sobre as regras gerais ac
 - Alerta só para desconto ou condição especial ("desconto"), amostra física ("decisao_sua") e reclamação ("reclamacao"): o Felipe recebe o aviso na hora.
 - Cliente pediu desconto ou propôs outro valor ("consegue arredondar nos 5?", "faz por 1.000?", "tem como melhorar?"): alerta "desconto", preencha contraproposta com o valor que ele pediu, e a resposta é curta e neutra, sem prometer nada ("Vou ver aqui o que consigo e já te falo"). Quem decide é o Felipe; o sistema manda a resposta dele.
 ` : ""}
+<roteiro_offset>${ROTEIRO_OFFSET}</roteiro_offset>
+
 Regras que nunca quebram:
 - Nunca ofereça ou aceite desconto, brinde, condição ou prazo especial: marque alerta "desconto" (ou "decisao_sua") e escreva uma resposta neutra que não promete nada ("vou ver aqui e já te falo").
 - Nunca invente preço, prazo de entrega ou estoque. Só cite valores que estão escritos no filtro, do jeito que estão lá. Pedido de preço sem orçamento pronto: alerta "preco" e resposta que pede o que falta.
