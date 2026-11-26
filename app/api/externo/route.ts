@@ -10,6 +10,7 @@ import { gastoFixo } from "@/app/lib/gastoFixoExterno"
 import { lancamento } from "@/app/lib/lancamentoExterno"
 import { lancarDespesaExterno } from "@/app/lib/lancarDespesaExterno"
 import { renomearFornecedorExterno } from "@/app/lib/renomearFornecedorExterno"
+import { leituraCronograma, gravarCronograma, AJUDA_CRONOGRAMA } from "@/app/lib/cronogramaExterno"
 import { conciliacao } from "@/app/lib/conciliacaoExterna"
 import { categoria } from "@/app/lib/categoriaExterna"
 import { leituraFinanceira, AJUDA_FINANCEIRO } from "@/app/lib/financeiroExterno"
@@ -59,8 +60,9 @@ export async function GET(req: NextRequest) {
 
   if (!o) return NextResponse.json({
     voce: `${info.nome}, ${info.cargo} (${info.area})`,
-    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | ") + " | parceiros (só CCO e CMO)", ...(podeAcionarComercial(diretor) ? { "?o=parceiros": AJUDA_PARCEIROS } : { "?o=parceiros": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): cadastros de /parceiros e respostas do Prospector" }), "?o=conversa": "o que você e o Felipe conversaram", ...(podeAcionarComercial(diretor) ? { "?o=perto": AJUDA_PERTO } : { "?o=perto": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): a lista 'Perto de você'" }), ...(diretor === "cfo" ? AJUDA_FINANCEIRO : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa" }), ...(diretor === "cmo" ? { "?o=meta_ads": "Meta Ads ao vivo (só leitura): conta, campanhas, conjuntos e anúncios; hoje, 7 e 30 dias; cache de 3 min; bloco funil por campanha (7 e 30 dias: leads, mql, orçamentos, pedidos, vendido, gasto, custo por lead e por MQL) e previsaoSaldoDias" } : {}) },
+    leitura: { "?o=dossie": "lista dos arquivos do dossiê (história, manual do sistema, linha do tempo, todas as conversas)", "?o=arquivo&nome=": "um arquivo do dossiê (markdown)", "?o=conhecimento": "conhecimento vivo do sistema (JSON)", "?o=empresa": "a empresa agora: números, sua área, seu plano, equipe", "?o=detalhe&area=": AREAS.join(" | ") + " | parceiros (só CCO e CMO)", ...(podeAcionarComercial(diretor) ? { "?o=parceiros": AJUDA_PARCEIROS } : { "?o=parceiros": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): cadastros de /parceiros e respostas do Prospector" }), "?o=cronograma": AJUDA_CRONOGRAMA, "?o=conversa": "o que você e o Felipe conversaram", ...(podeAcionarComercial(diretor) ? { "?o=perto": AJUDA_PERTO } : { "?o=perto": "SÓ PARA AS CHAVES DO CCO E DA CMO (as outras recebem 403): a lista 'Perto de você'" }), ...(diretor === "cfo" ? AJUDA_FINANCEIRO : { "?o=financeiro": "SÓ PARA A CHAVE DO CFO (as outras recebem 403): leitura financeira completa" }), ...(diretor === "cmo" ? { "?o=meta_ads": "Meta Ads ao vivo (só leitura): conta, campanhas, conjuntos e anúncios; hoje, 7 e 30 dias; cache de 3 min; bloco funil por campanha (7 e 30 dias: leads, mql, orçamentos, pedidos, vendido, gasto, custo por lead e por MQL) e previsaoSaldoDias" } : {}) },
     escrita: { "POST {acao:'relatar', texto}": "manda algo ao Felipe",
+      "POST {acao:'cronograma', loteNumero, etapa (2 a 8), previsto?, real? (AAAA-MM-DD), envioFornecedor?: {fornecedorId, enviadoEm?, ordemId?}}": "QUALQUER DIRETOR. Grava só as datas previstas/reais da etapa do lote (e, opcional, o envio ao fornecedor, gancho para ordenar_fornecedor/#180) com histórico de quem e quando. Data gravada só se corrige, nunca se apaga. Não move card, dinheiro nem manda mensagem. Lote inexistente: 404. Resposta: { ok, resultado, loteNumero, etapa, gravado }",
       "POST {acao:'dispensar_pendencia', chave, motivo, ate?}": "QUALQUER DIRETOR. Dispensa uma pendência (a chave vem em ?o=empresa, campo pendencias) com motivo obrigatório (sem motivo: 400); ate (AAAA-MM-DD) opcional: depois dessa data ela volta. Não apaga nada",
       "POST {acao:'tarefa_felipe', titulo, detalhe?, prazo? (AAAA-MM-DD)}": "QUALQUER DIRETOR. Põe uma tarefa na lista 'Depende de você' do Felipe (pedido por você, com data e prazo). titulo obrigatório (até 140 caracteres); no máximo 10 abertas por diretor (a 11ª volta 429). Suas tarefas (abertas e feitas nos últimos 7 dias) estão em ?o=empresa, campo tarefasParaFelipe. {acao:'tarefa_felipe', operacao:'cancelar', id} cancela só as suas. Não manda mensagem a ninguém",
       "POST {acao:'reabrir_pendencia', chave}": "QUALQUER DIRETOR. Tira a dispensa e a pendência volta na hora (?o=empresa lista as dispensadas à parte)",
@@ -107,6 +109,11 @@ export async function GET(req: NextRequest) {
       if (e instanceof ErroMeta) return NextResponse.json({ erro: e.message, codigo: e.codigo }, { status: e.status })
       return NextResponse.json({ erro: "Falha ao ler a Meta Ads." }, { status: 500 })
     }
+  }
+
+  if (o === "cronograma") {
+    const l = await leituraCronograma()
+    return NextResponse.json(l.corpo, { status: l.status })
   }
 
   if (o === "conversa") {
@@ -207,6 +214,14 @@ export async function POST(req: NextRequest) {
     const { ok: _ok, resultado, ...resto } = r
     void _ok
     return NextResponse.json({ ok: true, resultado, ...resto })
+  } else if (b.acao === "cronograma") {
+    const r = await gravarCronograma(diretor, b)
+    if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
+    msg = { id: novoId(), de: "diretor", texto: r.resultado, em: new Date().toISOString(), nuvem: true }
+    await gravarConversa(diretor, [...await lerConversa(diretor), msg])
+    const { ok: _ok, resultado, ...resto } = r
+    void _ok
+    return NextResponse.json({ ok: true, resultado, ...resto })
   } else if (b.acao === "lead") {
     const r = await leadExterno(b, diretor)
     if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
@@ -255,7 +270,7 @@ export async function POST(req: NextRequest) {
       await gravarConversa(diretor, [...await lerConversa(diretor), msg])
       return NextResponse.json({ ok: true, resultado: saida, destino: r.destino, motivo: r.motivo, nivel: r.nivel, id: r.acao.id })
     }
-  } else return NextResponse.json({ erro: `acao: relatar, lancar_despesa, renomear_fornecedor, mover_card, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
+  } else return NextResponse.json({ erro: `acao: relatar, cronograma, lancar_despesa, renomear_fornecedor, mover_card, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
   await gravarConversa(diretor, [...await lerConversa(diretor), msg])
   return NextResponse.json({ ok: true, resultado: saida })
 }
