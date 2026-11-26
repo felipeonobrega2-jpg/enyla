@@ -65,6 +65,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 49 | Perfil diretor: login por usuário (admin/diretor), 7 interruptores de bloqueio desligados por padrão, auditoria (quem, quando, antes e depois) e tela de administração | Felipe (Aprovo 26/11/2026, 6h26 e 6h28) | — | — | Claude Code | **aprovado pelo Felipe** (cobre construir e juntar); migration aditiva `20261129_usuarios_acesso.sql` roda no SQL Editor | (PR da issue #214) |
 | 50 | Acompanhamento Digital usa prazo e arte gravados (`gravar_digital`) e guarda todas as edições (`edicoesAcomp`) | Felipe | urgente | — | Claude Code | não | (PR da issue #230) |
 | 51 | Porta externa: `acao=importar_prospectos` e ordem direta a gráfica do Prospector, sem Aprovo, só 8h–20h e fora da exclusão (regra do Felipe de 26/11/2026, 9h44; 1º PR da issue #242; verificar_whatsapp, responder_prospecto e decidir_cadastro_parceiro vêm depois) | CCO | urgente | — | Claude Code | não | (PR da issue #242) |
+| 54 | Chave `aprovoObrigatorio` (padrão false): sem o Aprovo, a mensagem sai direto pelo funcionário, com as travas, conferência do a receber ao centavo e histórico (`aprovoDesligadoLog`) | Felipe (ordem de 26/11/2026, 9h44) | urgente | — | Claude Code | não (ordem do Felipe) | (PR da issue #244) |
 | 52 | `/parceiros`: nova capa da rede de gráficas parceiras, sem "embalagem" nos textos (só texto) | Felipe | — | — | Claude Code | não (só texto) | (PR da issue #241) |
 | 53 | Atendente responde sozinho, pela IA, as gráficas do Prospector (modo parceiro: sem orçamento, link `app.enyla.com.br/parceiros`, 3 perguntas sem resposta oficial vão ao Felipe, opt-out); troca o item 38 | Felipe (ordem de 26/11/2026: "tem que ser tudo automático") | urgente | — | Claude Code | não (CI e preview verdes, o Felipe junta) | (PR da issue #242, parte do Atendente) |
 
@@ -363,6 +364,10 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 ## 51. Fila: desfazer dispensa (issue #236)
 
 **Status:** Claude Code. **Aprovo:** pedido do Felipe na issue #236 (não envia nada). Aba "Dispensados" na Fila do WhatsApp com "Devolver à Fila" (um ou vários) e `POST /api/externo {acao:'restaurar_fila', ids}` (qualquer diretor, como o dispensar). Grava o mapa `filaDispensados` novo inteiro, sem as chaves devolvidas (por causa do `MANTER_SE_AUSENTE`), e registra autor e data em `filaRestaurados`. Id inexistente é ignorado. O dispensar da tela não guarda autor, então a lista mostra nome e data.
+
+## 54. Aprovo desligado: chave `aprovoObrigatorio` (issue #244)
+
+**Status:** Claude Code. **Aprovo:** ordem do Felipe, 26/11/2026 9h44 ("tirem esse negócio de aprovo para tudo"). `AppConfig.aprovoObrigatorio` (padrão `false`): desligada, o que ia para a fila do Aprovo sai direto pelo funcionário indicado (`ordenar_funcionario` para A, B, C e indefinido, funcionários do quadro como a Cobrança). Mantém horário do agente, contato descartado, limite diário por diretor, espaçamento do envio e a trava do orçamento sem link (409 com o motivo, em vez de fila). Trava de valor: todo R$ que fale de saldo ou falta pagar (todos, na Cobrança) tem de bater ao centavo com o "a receber" do pedido lido na hora (o mesmo de `?o=detalhe&area=financeiro`); divergiu: 409 e nada sai. Cada envio direto e cada recusa vão para `aprovoDesligadoLog` (quem mandou, agente, texto completo, data e hora; `destino: 'enviado_direto'`, `motivo: 'aprovo_desligado'`). Ligada (`true`), tudo como antes. Fila e cartões antigos ficam. Testes: `tests/aprovoDesligado.test.ts`, `tests/ordemDiretaLead.test.ts` (chave ligada).
 
 ## 52. Parceira sem preço fixo: modo `tabela` / `orcamento_por_pedido` (issue #252)
 
