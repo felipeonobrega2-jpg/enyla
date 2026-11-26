@@ -2,9 +2,10 @@
 
 import { unpackTerceirizado } from "./lib/kanbanUnpack"
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
-import { Layers, ShoppingBag, Ruler, Calculator, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb, Truck, Gauge, Printer , Scissors, Building2, ShieldCheck } from "lucide-react"
+import { Layers, ShoppingBag, Ruler, Calculator, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb, Truck, Gauge, Printer , Scissors, Building2, ShieldCheck, Pin } from "lucide-react"
 import { IdeiasView } from "./components/IdeiasView"
 import { EscritorioView } from "./components/EscritorioView"
+import { PendenciasFelipeView } from "./components/PendenciasFelipeView"
 import { AuditoriaView } from "./components/AuditoriaView"
 import { signOut } from "next-auth/react"
 import WhatsAppView, { ConversaLateral } from "./components/WhatsAppView"
@@ -178,7 +179,7 @@ function NavGroup({ label }: { label: string }) {
 // ─── App ─────────────────────────────────────────────────────────────────────
 const urlDaAba = (v: string) => { const q = new URLSearchParams(window.location.search); q.set("aba", v); return `${window.location.pathname}?${q.toString()}${window.location.hash}` }
 // Telas do sistema (a aba fica na URL, ?aba=..., para o voltar/avançar do navegador andar entre elas)
-const VIEWS: string[] = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias","entregas","gastos","digital","cx-pedidos","cx-chapas","cx-facas","cx-custos","biblioteca","escritorio","dados"]
+const VIEWS: string[] = ["orcamento","orcamentos","historico","clientes","forma","config","dashboard","parceiros","financeiro","conquistas","terceirizados","pedidos","meta","whatsapp","fornecedores","painel","ideias","entregas","gastos","digital","cx-pedidos","cx-chapas","cx-facas","cx-custos","biblioteca","escritorio","dados","pendencias-felipe"]
 
 export default function Home() {
   const [form, setForm]       = useState<FormData>(FORM_INICIAL)
@@ -202,7 +203,7 @@ export default function Home() {
   const [editandoHistorico, setEditandoHistorico] = useState<string | null>(null)
   const [kanban, setKanban]   = useState<KanbanCard[]>([])
   const [contador, setContador] = useState<number>(0)
-  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias" | "entregas" | "gastos" | "digital" | "cx-pedidos" | "cx-chapas" | "cx-facas" | "cx-custos" | "biblioteca" | "escritorio" | "dados">("painel")
+  const [view, setView]       = useState<"orcamento" | "orcamentos" | "historico" | "clientes" | "forma" | "config" | "dashboard" | "parceiros" | "financeiro" | "conquistas" | "terceirizados" | "pedidos" | "meta" | "whatsapp" | "fornecedores" | "painel" | "ideias" | "entregas" | "gastos" | "digital" | "cx-pedidos" | "cx-chapas" | "cx-facas" | "cx-custos" | "biblioteca" | "escritorio" | "dados" | "pendencias-felipe">("painel")
   const viewRef = useRef(view)
   const [perfilClienteExterno, setPerfilClienteExterno] = useState<string | null>(null)
   const [config, setConfig]   = useState<Configuracoes>(CONFIG_PADRAO)
@@ -1903,6 +1904,8 @@ export default function Home() {
           <NavGroup label="Ferramentas" />
           <NavItem active={view === "meta"} onClick={() => navigate("meta")} label="Campanhas"
             icon={<Megaphone className="w-4 h-4" strokeWidth={1.8} />} />
+          <NavItem active={view === "pendencias-felipe"} onClick={() => navigate("pendencias-felipe")} label="Pendências do Felipe"
+            icon={<Pin className="w-4 h-4" strokeWidth={1.8} />} />
           <NavItem active={view === "escritorio"} onClick={() => navigate("escritorio")} label="Escritório"
             aviso={avisosMenu?.agenteTravado ? { ponto: true, cor: "#d33a3c", titulo: "Algum agente está travado" } : null}
             icon={<Building2 className="w-4 h-4" strokeWidth={1.8} />} />
@@ -2635,6 +2638,8 @@ export default function Home() {
             />
           ) : view === "dados" ? (
             <AuditoriaView onAbrirCard={id => { const c = kanban.find(k => k.id === id); if (c) abrirDetalheCard(c) }} onNavegar={v => navigate(v)} />
+          ) : view === "pendencias-felipe" ? (
+            <PendenciasFelipeView />
           ) : view === "escritorio" ? (
             <EscritorioView kanban={kanban} lancamentos={lancamentos}
               saldoContas={(() => { const cs = (config.contas ?? []).filter(c => c.ativa && c.tipo !== "credito" && c.saldo != null); return cs.length ? cs.reduce((t, c) => t + (c.saldo ?? 0), 0) : null })()} />

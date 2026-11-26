@@ -41,6 +41,9 @@ export async function vigiar(agora = new Date()): Promise<Record<string, unknown
   // 1c. Orçamento prometido e não enviado: cobra você (2 h, depois a cada 4 h) até sair
   out.promessas = await cobrarPromessas(cfg, agora).catch(e => String(e))
 
+  // 1d. Pendências do Felipe: item novo no top 5 avisa o próprio Felipe (ntfy, sem dado de cliente)
+  out.pendenciasFelipe = await import("./pendenciasFelipeServidor").then(m => m.avisarNovos()).catch(e => String(e).slice(0, 140))
+
   // 2. Rotina (dias de trabalho do agente): 13h checagem, 18h fechamento
   const sp = new Date(agora.getTime() - 3 * 3600_000)
   const hora = sp.getUTCHours(), dia = sp.toISOString().slice(0, 10), semana = sp.getUTCDay()
@@ -307,7 +310,11 @@ export async function textoDaRotina(slot: "8" | "13" | "18"): Promise<string> {
   const { montarCaixaServidor } = await import("./caixaServidor")
   const { textoResumo } = await import("./caixaEntrada")
   const itens = await montarCaixaServidor()
-  const texto = textoResumo(itens, slot, `${LINK_SISTEMA}/?aba=painel`)
+  let texto = textoResumo(itens, slot, `${LINK_SISTEMA}/?aba=painel`)
+  if (slot === "8") {   // só os 3 itens de maior valor das pendências do Felipe (decisão de 25/11)
+    const l = await import("./pendenciasFelipeServidor").then(m => m.linhasDoResumo()).catch(() => [])
+    if (l.length) texto += `\n\n📌 *Pendências do Felipe (3 de maior valor):*\n${l.map(x => `• ${x}`).join("\n")}\n${LINK_SISTEMA}/?aba=pendencias-felipe`
+  }
   return slot === "18" ? `${texto}${await linhaDosDados()}` : texto
 }
 
