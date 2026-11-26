@@ -8,7 +8,7 @@ import { formatarData } from "@/app/lib/formato"
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 const dataBR = (iso: string | null) => iso ? formatarData(iso, "completo") : null
 const cm = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })
-const ARTE = { aprovada: "Arte aprovada", esperando_cliente: "Arte esperando a sua aprovação", nao_enviada: "Arte ainda não enviada" } as const
+const ARTE = { aprovada: "Arte aprovada", ajustes_pedidos: "Ajustes na arte em andamento", esperando_cliente: "Arte esperando a sua aprovação", nao_enviada: "Arte ainda não enviada" } as const
 
 export function AcompanhamentoDigital({ a }: { a: Acompanhamento }) {
   const fim = a.etapaAtual.chave === "enviado"
