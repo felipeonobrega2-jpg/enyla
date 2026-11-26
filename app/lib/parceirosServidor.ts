@@ -4,14 +4,15 @@ import { lerConfigLinha } from "./configAtomica"
 import { supabase } from "./supabase"
 import { mudarConfig } from "./configAtomica"
 import { notificar, LINK_SISTEMA } from "./notificar"
-import { limparCadastro, errosDoCadastro, nomeServico, textoPrazo, textoEndereco, GERENTE_PADRAO, type CadastroParceiro } from "./parceiros"
+import { limparCadastro, errosDoCadastro, completarFornecedor, nomeServico, textoPrazo, textoEndereco, GERENTE_PADRAO, type CadastroParceiro } from "./parceiros"
 import { lerTermosVigentes, registroDeAceite, type MetaAceite } from "./termosParceriaServidor"
+import type { FornecedorProducao } from "./producao"
 import { randomBytes } from "node:crypto"
 import { textoEndereco as textoParaMotorista, type Endereco } from "./frete"
 
 import { CENARIOS_PADRAO, mesclarCenarios, limparCenario, cenariosPublicos, type CenarioParceiro, type CenarioPublico } from "./cenariosParceiros"
 
-type Cfg = Record<string, unknown> & { cadastrosParceiros?: CadastroParceiro[]; cenariosParceiros?: CenarioParceiro[]; agenteAuto?: { avisoNumero?: string } }
+type Cfg = Record<string, unknown> & { producao?: { fornecedores?: FornecedorProducao[] }; cadastrosParceiros?: CadastroParceiro[]; cenariosParceiros?: CenarioParceiro[]; agenteAuto?: { avisoNumero?: string } }
 const TIPOS = /^(application\/pdf|image\/(png|jpe?g|webp|heic|heif)|application\/vnd\.(ms-excel|openxmlformats-officedocument\.(spreadsheetml\.sheet|wordprocessingml\.document))|text\/csv)$/
 const MAX_BYTES = 10 * 1024 * 1024
 
@@ -145,4 +146,27 @@ export async function salvarCenarios(entrada: unknown): Promise<CenarioParceiro[
     return { cenariosParceiros: final }
   })
   return final
+}
+
+/** Reprocessa os cadastros aprovados (com `fornecedorId`): completa `servicos` do fornecedor já gerado com o mapeamento atual.
+ *  Idempotente; não apaga, não cria fornecedor (cadastro cujo fornecedor não existe é só contado) e não envia mensagem. */
+export async function reprocessarCadastrosAprovados(): Promise<{ aprovados: number; atualizados: string[]; semFornecedor: string[] }> {
+  const atualizados: string[] = [], semFornecedor: string[] = []
+  let aprovados = 0
+  await mudarConfig((d: Cfg) => {
+    atualizados.length = 0; semFornecedor.length = 0; aprovados = 0
+    const fornecedores = d.producao?.fornecedores ?? []
+    const novos = [...fornecedores]
+    for (const c of d.cadastrosParceiros ?? []) {
+      if (c.status !== "aprovado" || !c.fornecedorId) continue
+      aprovados++
+      const i = novos.findIndex(f => f.id === c.fornecedorId)
+      if (i < 0) { semFornecedor.push(c.id); continue }
+      const depois = completarFornecedor(novos[i], c)
+      if (JSON.stringify(depois) === JSON.stringify(novos[i])) continue
+      novos[i] = depois; atualizados.push(c.id)
+    }
+    return atualizados.length ? { producao: { ...(d.producao ?? {}), fornecedores: novos } } : null
+  })
+  return { aprovados, atualizados, semFornecedor }
 }
