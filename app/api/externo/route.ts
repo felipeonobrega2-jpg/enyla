@@ -9,6 +9,7 @@ import { filtroDoAgente } from "@/app/lib/agenteLeads"
 import { gastoFixo } from "@/app/lib/gastoFixoExterno"
 import { lancamento } from "@/app/lib/lancamentoExterno"
 import { lancarDespesaExterno } from "@/app/lib/lancarDespesaExterno"
+import { corrigirCategoriaExterno } from "@/app/lib/corrigirCategoriaExterno"
 import { renomearFornecedorExterno } from "@/app/lib/renomearFornecedorExterno"
 import { conciliacao } from "@/app/lib/conciliacaoExterna"
 import { categoria } from "@/app/lib/categoriaExterna"
@@ -74,7 +75,8 @@ export async function GET(req: NextRequest) {
         "POST {acao:'categoria', operacao:'criar'|'editar'|'desativar', tipo:'receita'|'despesa', id, nome, subcategorias, ativa}": "SÓ A CHAVE DO CFO. Categorias financeiras. criar exige nome; editar e desativar exigem id. Desativar só põe ativa:false, a categoria continua na lista. Resposta: { ok, resultado, categoria }",
       } : {}),
       ...(diretor === "cto" ? {
-        "POST {acao:'lancar_despesa', chaveIdempotencia, fornecedorId, descricao, valor, dataVencimento, dataPagamento, status:'pago'|'pendente', rateio:[{loteNumero | loteId, valor}]}": "SÓ A CHAVE DO CTO (CFO e as outras recebem 403; o CFO só confere por leitura em ?o=financeiro). Lança UMA despesa (total em valor, reais) rateada por lote: cada item do rateio leva a fatia do lote (> 0, no máximo 2 casas); a soma tem de ser igual ao total, comparada em centavos (senão 400 e nada é gravado; o residual não é acertado). Lote repetido: 400; lote ou fornecedor inexistente: 404. Grava uma linha por lote com a fatia e um id de grupo (nunca o total em cada lote): custo direto, a pagar, caixa e DRE contam o total uma vez. chaveIdempotencia obrigatória (400 sem): a mesma chave com o mesmo payload devolve o resultado original sem duplicar; com payload diferente: 409. status 'pago' é só baixa no livro (dataPagamento opcional, padrão = dataVencimento): não dispara pagamento, não chama Asaas, Pluggy nem banco. Registra quem, quando (Brasília) e o payload. Resposta: { ok, resultado, despesa, rateio, registro }",
+        "POST {acao:'lancar_despesa', chaveIdempotencia, fornecedorId, descricao, valor, dataVencimento, dataPagamento, status:'pago'|'pendente', categoria, rateio:[{loteNumero | loteId, valor}]}": "SÓ A CHAVE DO CTO (CFO e as outras recebem 403; o CFO só confere por leitura em ?o=financeiro). Lança UMA despesa (total em valor, reais) rateada por lote: cada item do rateio leva a fatia do lote (> 0, no máximo 2 casas); a soma tem de ser igual ao total, comparada em centavos (senão 400 e nada é gravado; o residual não é acertado). Lote repetido: 400; lote ou fornecedor inexistente: 404. Grava uma linha por lote com a fatia e um id de grupo (nunca o total em cada lote): custo direto, a pagar, caixa e DRE contam o total uma vez. chaveIdempotencia obrigatória (400 sem): a mesma chave com o mesmo payload devolve o resultado original sem duplicar; com payload diferente: 409. status 'pago' é só baixa no livro (dataPagamento opcional, padrão = dataVencimento): não dispara pagamento, não chama Asaas, Pluggy nem banco. Registra quem, quando (Brasília) e o payload. categoria (opcional, mas mande): ID de uma categoria de despesa cadastrada e ativa (ex.: materiais, fornecedor, impressao, frete), nunca nome livre; id desconhecido: 400. Sem categoria o livro mostra Outros. Resposta: { ok, resultado, despesa, rateio, registro }",
+        "POST {acao:'corrigir_categoria_lancamento', lancamentoId, categoria}": "SÓ A CHAVE DO CTO (as outras, inclusive a do CFO, recebem 403). Corrige SÓ o campo categoria de um lançamento de despesa já existente (id de categoria cadastrada e ativa; senão 400; lançamento inexistente: 404). Valor, data, status e lote não mudam; não apaga nem relança. Registra quem, quando (Brasília), categoria anterior e nova em AppConfig.correcoesCategoria. Resposta: { ok, resultado, lancamento, registro }",
         "POST {acao:'renomear_fornecedor', id, nome}": "SÓ A CHAVE DO CTO (as outras, inclusive a do CFO, recebem 403). Troca só o nome exibido do fornecedor (AppConfig.fornecedores); o id e os vínculos continuam. id inexistente: 404; nome vazio: 400. Registra quem, quando (Brasília), id, nome anterior e novo. Resposta: { ok, resultado, fornecedor, registro }",
       } : {}),
       ...(comerciaisDoDiretor(diretor).length ? { "POST {acao:'ordenar_funcionario', funcionario:'atendente'|'followup'|'reativacao', cliente | jid, ordem}": "SÓ CCO e CMO (as outras recebem 403). O agente do Comercial escreve a mensagem para UM lead com o histórico do WhatsApp; REGRA (25/11): só 'cliente' (quem já comprou, nível A, B ou C) precisa do Aprovo do Felipe. Para LEAD (nunca comprou; cadastro sem compra e orçamento aberto não contam) a mensagem SAI DIRETO pelo agente indicado, só com o agente ligado e dentro do horário dele (senão 409 'fora do horário do agente', nada é criado), no máximo 20 envios diretos por dia por diretor (a 21ª volta 429). Cliente A, B, C ou nível 'indefinido' (já comprou sem curva, compra antiga, só digital, ligação fraca com quem comprou, erro de leitura) vai para a fila do Aprovo, no máximo 20 esperando por diretor (a 21ª volta 429). Texto que promete orçamento sem link real, Felipe escrevendo na conversa e gráfica do Prospector também vão para a fila. Lead sem WhatsApp: 404. Resposta: { ok, resultado, destino: 'enviado_direto'|'fila_aprovo', motivo, nivel, id }; leia o nível antes em ?o=perto ou ?o=detalhe&area=comercial" } : {}),
@@ -89,7 +91,7 @@ export async function GET(req: NextRequest) {
     const ie = req.nextUrl.searchParams.get("incluirEstornados")
     if (ie !== null && !["1", "true", "sim"].includes(ie)) return NextResponse.json({ erro: "incluirEstornados: 1 | true | sim" }, { status: 400 })
     const d = await carregarFinanceiro()
-    return NextResponse.json({ lotes: custoPorLote(d.kanban, d.lancamentos, { lote: req.nextUrl.searchParams.get("lote") ?? undefined, incluirEstornados: ie !== null }) })
+    return NextResponse.json({ lotes: custoPorLote(d.kanban, d.lancamentos, { lote: req.nextUrl.searchParams.get("lote") ?? undefined, incluirEstornados: ie !== null, categorias: d.cfg.categoriasDespesa }) })
   }
 
   if (o === "financeiro") {
@@ -207,9 +209,9 @@ export async function POST(req: NextRequest) {
     const { ok: _ok, resultado, ...resto } = r
     void _ok
     return NextResponse.json({ ok: true, resultado, ...resto })
-  } else if (b.acao === "lancar_despesa" || b.acao === "renomear_fornecedor") {
+  } else if (b.acao === "lancar_despesa" || b.acao === "renomear_fornecedor" || b.acao === "corrigir_categoria_lancamento") {
     if (diretor !== "cto") return NextResponse.json({ erro: `${b.acao} é só para a chave do CTO.` }, { status: 403 })
-    const r = b.acao === "lancar_despesa" ? await lancarDespesaExterno(diretor, b) : await renomearFornecedorExterno(diretor, b)
+    const r = b.acao === "lancar_despesa" ? await lancarDespesaExterno(diretor, b) : b.acao === "corrigir_categoria_lancamento" ? await corrigirCategoriaExterno(diretor, b) : await renomearFornecedorExterno(diretor, b)
     if (!r.ok) return NextResponse.json({ erro: r.erro }, { status: r.status })
     msg = { id: novoId(), de: "diretor", texto: r.resultado, em: new Date().toISOString(), nuvem: true }
     await gravarConversa(diretor, [...await lerConversa(diretor), msg])
@@ -264,7 +266,7 @@ export async function POST(req: NextRequest) {
       await gravarConversa(diretor, [...await lerConversa(diretor), msg])
       return NextResponse.json({ ok: true, resultado: saida, destino: r.destino, motivo: r.motivo, nivel: r.nivel, id: r.acao.id })
     }
-  } else return NextResponse.json({ erro: `acao: relatar, lancar_despesa, renomear_fornecedor, mover_card, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
+  } else return NextResponse.json({ erro: `acao: relatar, lancar_despesa, renomear_fornecedor, corrigir_categoria_lancamento, mover_card, cancelar_ordem, tarefa_felipe, dispensar_pendencia, reabrir_pendencia, ${FERRAMENTAS.join(", ")}` }, { status: 400 })
   await gravarConversa(diretor, [...await lerConversa(diretor), msg])
   return NextResponse.json({ ok: true, resultado: saida })
 }

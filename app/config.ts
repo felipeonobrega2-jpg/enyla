@@ -124,7 +124,7 @@ const CATS_RECEITA_PADRAO: CategoriaFinanceira[] = [
   { id: "outros",      nome: "Outros" },
 ]
 
-const CATS_DESPESA_PADRAO: CategoriaFinanceira[] = [
+export const CATS_DESPESA_PADRAO: CategoriaFinanceira[] = [
   { id: "aluguel",    nome: "Aluguel" },
   { id: "fornecedor", nome: "Fornecedor" },
   { id: "materiais",  nome: "Materiais" },

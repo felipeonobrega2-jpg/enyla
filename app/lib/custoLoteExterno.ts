@@ -5,9 +5,10 @@
 import type { KanbanCard, LancamentoFinanceiro, ProjecaoCustos } from "@/app/types"
 import { montarPedidos } from "./negocio"
 import { unpackTerceirizado } from "./kanbanUnpack"
+import { CATS_DESPESA_PADRAO, type CategoriaFinanceira } from "@/app/config"
 
 export const AJUDA_CUSTO_LOTE: Record<string, string> = {
-  "?o=custo_lote": "SÓ A CHAVE DO CFO (as outras recebem 403). Só leitura. Custo real por lote Offset pelo livro: soma das despesas lançadas do lote (pagas ou na conta do fornecedor, como o custoDireto), já com o rateio de lancar_despesa (cada lote entra só com o valor da FATIA; o total da despesa não se repete). Por lote: venda, custoReal, papel, porCategoria, porFornecedor (fornecedorId), rateios (rateioGrupoId + fatia), margem real x orçada (projecaoCustos). Opcional: &lote=NUMERO filtra um lote; &incluirEstornados=1 inclui lançamentos estornados. Estornados ficam fora por padrão. Não duplica a margem da rodada (#155)",
+  "?o=custo_lote": "SÓ A CHAVE DO CFO (as outras recebem 403). Só leitura. Custo real por lote Offset pelo livro: soma das despesas lançadas do lote (pagas ou na conta do fornecedor, como o custoDireto), já com o rateio de lancar_despesa (cada lote entra só com o valor da FATIA; o total da despesa não se repete). Por lote: venda, custoReal, papel, porCategoria e categorias (id, nome, valor: impressão, frete etc. separados, nunca numa faixa só; sem categoria vira sem_categoria até o CTO corrigir com corrigir_categoria_lancamento), porFornecedor (fornecedorId), rateios (rateioGrupoId + fatia), margem real x orçada (projecaoCustos). Opcional: &lote=NUMERO filtra um lote; &incluirEstornados=1 inclui lançamentos estornados. Estornados ficam fora por padrão. Não duplica a margem da rodada (#155)",
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100
@@ -21,7 +22,8 @@ export function grupoDoRateio(l: LancamentoFinanceiro): string | null {
   return /\[rateio ([0-9a-f-]{36});/i.exec(l.obs ?? "")?.[1] ?? null
 }
 
-export function custoPorLote(kanban: KanbanCard[], lancamentos: LancamentoFinanceiro[], opts: { lote?: string; incluirEstornados?: boolean } = {}) {
+export function custoPorLote(kanban: KanbanCard[], lancamentos: LancamentoFinanceiro[], opts: { lote?: string; incluirEstornados?: boolean; categorias?: CategoriaFinanceira[] } = {}) {
+  const nomes = new Map((opts.categorias?.length ? opts.categorias : CATS_DESPESA_PADRAO).map(c => [c.id, c.nome]))
   const lancs = lancamentos.filter(l => (l.unidade ?? "offset") === "offset" && (opts.incluirEstornados || !l.estornadoEm))
   const pedidos = montarPedidos(kanban.map(unpackTerceirizado), lancs).filter(p => p.tipo === "lote" && (!opts.lote || p.numero === opts.lote))
   return pedidos.map(p => {
@@ -47,6 +49,7 @@ export function custoPorLote(kanban: KanbanCard[], lancamentos: LancamentoFinanc
       lote: p.numero, cliente: p.nomeCliente, venda, custoReal,
       papel: r2(custeadas.filter(ehPapel).reduce((s, l) => s + l.valor, 0)),
       porCategoria, porFornecedor,
+      categorias: Object.entries(porCategoria).sort((a, b) => b[1] - a[1]).map(([id, valor]) => ({ id, nome: id === "sem_categoria" ? "(sem categoria)" : nomes.get(id) ?? id, valor })),
       rateios: [...grupos].map(([rateioGrupoId, fatia]) => ({ rateioGrupoId, fatia })),
       lancamentos: custeadas.length,
       margem: { real: margemReal, realPct: pct(margemReal), orcada: margemOrcada, orcadaPct: margemOrcada === null ? null : pct(margemOrcada), custoOrcado: temOrcado ? orcado : null,

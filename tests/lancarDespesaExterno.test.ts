@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 const estado = vi.hoisted(() => ({
   cfg: {} as Record<string, unknown>, diretor: "cto" as string | null, conversa: [] as unknown[],
   ops: [] as { t: string; op: string; v?: unknown }[],
-  cards: [] as Record<string, unknown>[],
+  cards: [] as Record<string, unknown>[], lancs: [] as Record<string, unknown>[],
 }))
 vi.mock("@/app/lib/configAtomica", () => ({
   lerCampos: vi.fn(async (campos: string[]) => Object.fromEntries(campos.filter(c => estado.cfg[c] !== undefined).map(c => [c, structuredClone(estado.cfg[c])]))),
@@ -32,7 +32,7 @@ vi.mock("@/app/lib/supabase", () => ({
       q.delete = () => { op = "delete"; return q }
       q.then = (ok: (r: unknown) => unknown) => {
         if (op !== "select") { estado.ops.push({ t, op, v }); return ok({ data: null, error: null }) }
-        return ok({ data: t === "KanbanCard" ? estado.cards.filter(c => !filtro || c[filtro[0]] === filtro[1]) : [], error: null })
+        return ok({ data: t === "KanbanCard" ? estado.cards.filter(c => !filtro || c[filtro[0]] === filtro[1]) : t === "LancamentoFinanceiro" ? estado.lancs.filter(c => !filtro || c[filtro[0]] === filtro[1]) : [], error: null })
       }
       return q
     },
@@ -53,12 +53,44 @@ const base = {
 }
 
 beforeEach(() => {
-  estado.diretor = "cto"; estado.conversa = []; estado.ops = []
+  estado.diretor = "cto"; estado.conversa = []; estado.ops = []; estado.lancs = []
   estado.cfg = { fornecedores: [{ id: "F1", nome: "Gráfica Fictícia", categoria: "x" }] }
   estado.cards = [
     { id: "c1", numero: "ORC-1", loteId: "lote-a", loteNumero: "L-1", coluna: 3, preco: 1000 },
     { id: "c2", numero: "ORC-2", loteId: "lote-b", loteNumero: "L-2", coluna: 3, preco: 1000 },
   ]
+})
+
+describe("categoria na porta (CTO)", () => {
+  it("lancar_despesa grava o id da categoria cadastrada em todas as fatias", async () => {
+    const r = await pedir({ ...base, chaveIdempotencia: "kc", categoria: "materiais" })
+    expect(r.status).toBe(200)
+    expect(inseridas().map(l => l.categoria)).toEqual(["materiais", "materiais"])
+  })
+  it("categoria inexistente, nome livre ou desativada: 400 e nada gravado", async () => {
+    estado.cfg.categoriasDespesa = [{ id: "frete", nome: "Frete" }, { id: "impressao", nome: "Impressão", ativa: false }]
+    for (const c of ["Materiais", "papel", "impressao"]) {
+      expect((await pedir({ ...base, chaveIdempotencia: "kx" + c, categoria: c })).status, c).toBe(400)
+    }
+    expect(inseridas()).toEqual([])
+    expect((await pedir({ ...base, chaveIdempotencia: "kf", categoria: "frete" })).status).toBe(200)
+  })
+  it("corrigir_categoria_lancamento: só categoria muda, com registro; CFO e outras chaves 403", async () => {
+    estado.cfg.categoriasDespesa = [{ id: "frete", nome: "Frete" }]
+    for (const d of ["cfo", "coo"]) { estado.diretor = d; expect((await pedir({ acao: "corrigir_categoria_lancamento", lancamentoId: "x", categoria: "frete" })).status, d).toBe(403) }
+    estado.diretor = "cto"
+    expect((await pedir({ acao: "corrigir_categoria_lancamento", lancamentoId: "x", categoria: "livre" })).status).toBe(400)
+    expect(estado.ops.filter(o => o.t === "LancamentoFinanceiro")).toEqual([])
+    expect((await pedir({ acao: "corrigir_categoria_lancamento", lancamentoId: "nao", categoria: "frete" })).status).toBe(404)
+    estado.lancs = [{ id: "L9", tipo: "despesa", valor: 50, status: "pago", loteId: "lote-a" }]
+    const r = await pedir({ acao: "corrigir_categoria_lancamento", lancamentoId: "L9", categoria: "frete" })
+    expect(r.status).toBe(200)
+    const up = estado.ops.filter(o => o.t === "LancamentoFinanceiro")
+    expect(up).toEqual([{ t: "LancamentoFinanceiro", op: "update", v: { categoria: "frete" } }])
+    const reg = (estado.cfg.correcoesCategoria as Record<string, unknown>[])[0]
+    expect(reg).toMatchObject({ autor: "cto", lancamentoId: "L9", categoriaAnterior: null, categoriaNova: "frete" })
+    semDelete()
+  })
 })
 
 describe("lancar_despesa", () => {
