@@ -25,7 +25,7 @@ const ROTULO: Record<string, string> = {
 }
 
 type Item = { cnpj: string; nome: string; municipio: string | null; uf: string | null; nota: number; servicos: string[] }
-type Funil = { contagem: Record<(typeof ETAPAS)[number][0], number>; qualificados: Item[]; aviso?: string }
+type Funil = { contagem: Record<(typeof ETAPAS)[number][0], number>; qualificados: Item[]; aviso?: string; avisoAbriu?: string }
 
 const cnpjFmt = (v: string) => v.replace(/\D/g, "").replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")
 
@@ -59,6 +59,7 @@ export function ProspectorParceirosCard() {
       {dados ? (
         <>
           {dados.aviso ? <p className="mt-4 text-[12px] text-[#b26b00]">{dados.aviso}</p> : null}
+          {dados.avisoAbriu ? <p className="mt-4 text-[12px] text-[#b26b00]">{dados.avisoAbriu}</p> : null}
           <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-2">
             {ETAPAS.map(([id, nome]) => (
               <div key={id} className="rounded-xl bg-[rgba(116,116,128,0.05)] px-3 py-2">

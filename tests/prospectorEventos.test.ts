@@ -36,6 +36,7 @@ vi.mock("@/app/lib/evolution", () => ({ evo: async () => ({ ok: false, status: 5
 import { processarEventoEmail, registrarCliquePorToken } from "@/app/lib/prospectorEventosServidor"
 import { envioDe, htmlDoPrimeiroContato, textoPlanoDoPrimeiroContato, URL_CADASTRO_PARCEIROS } from "@/app/lib/prospectorEnvio"
 import { GET } from "@/app/api/prospector/r/[token]/route"
+import { GET as GET_PIXEL } from "@/app/api/prospector/o/[token]/route"
 
 const AGORA = new Date("2026-11-26T14:00:00Z")
 const prospecto = (extra: Linha = {}): Linha => ({
@@ -117,6 +118,20 @@ describe("link rastreado", () => {
     expect(res.headers.get("location")).toBe(URL_CADASTRO_PARCEIROS)
     expect(mundo.prospectos[0].etapa).toBe("abriu")
     expect(envioDo(mundo.prospectos[0]).cliqueEm).toBeTruthy()
+  })
+  it("o HTML leva o pixel de abertura só com token", () => {
+    expect(htmlDoPrimeiroContato("Oi")).not.toContain("<img")
+    expect(htmlDoPrimeiroContato("Oi", "tokenabc12345")).toContain('<img src="https://app.enyla.com.br/api/prospector/o/tokenabc12345"')
+  })
+  it("pixel com token válido marca abriu sem clique e devolve GIF; token ruim devolve GIF e não muda nada", async () => {
+    const res = await GET_PIXEL(new Request("https://x") as never, { params: Promise.resolve({ token: "tokenabc12345" }) })
+    expect(res.status).toBe(200)
+    expect(res.headers.get("content-type")).toBe("image/gif")
+    expect(mundo.prospectos[0].etapa).toBe("abriu")
+    expect(envioDo(mundo.prospectos[0]).abriuEm).toBeTruthy()
+    expect(envioDo(mundo.prospectos[0]).cliqueEm).toBeUndefined()
+    const ruim = await GET_PIXEL(new Request("https://x") as never, { params: Promise.resolve({ token: "a/b" }) })
+    expect(ruim.status).toBe(200)
   })
   it("token desconhecido ou malformado redireciona do mesmo jeito e não muda nada", async () => {
     for (const token of ["naoexiste12345", "x", "a/b"]) {

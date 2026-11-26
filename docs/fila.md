@@ -69,6 +69,7 @@ Fila única, compartilhada entre o Diego (CTO, código construído pelo Claude C
 | 52 | `/parceiros`: nova capa da rede de gráficas parceiras, sem "embalagem" nos textos (só texto) | Felipe | — | — | Claude Code | não (só texto) | (PR da issue #241) |
 | 53 | Atendente responde sozinho, pela IA, as gráficas do Prospector (modo parceiro: sem orçamento, link `app.enyla.com.br/parceiros`, 3 perguntas sem resposta oficial vão ao Felipe, opt-out); troca o item 38 | Felipe (ordem de 26/11/2026: "tem que ser tudo automático") | urgente | — | Claude Code | não (CI e preview verdes, o Felipe junta) | (PR da issue #242, parte do Atendente) |
 | 54 | `/parceiros`: aceite obrigatório dos Termos de Parceria (versão 0.3, RASCUNHO, tabela `termos_parceria`), página `/parceiros/termos`, aceite por token para quem já cadastrou. Só exibe e grava; sem cobrança, desconto ou multa | Felipe | depois das #242 e #245 | — | Claude Code | não (texto final entra como nova versão no registro) | (PR da issue #256) |
+| 55 | Prospector: "Abriram" deixa de ficar zerado sem o webhook da Resend: pixel próprio de abertura no e-mail (`/api/prospector/o/[token]`) e aviso no painel quando falta `RESEND_WEBHOOK_SECRET`. Sem mexer na Resend nem na Vercel | Felipe | — | — | Claude Code | não | (PR da issue #212, comentário de 26/11/2026) |
 
 Os prazos dos itens 3, 4 e 5 vêm da decisão de 23/11/2026: as cinco ferramentas da diretoria até 11/12/2026. Os itens 1 e 2 vencem antes, em 30/11/2026.
 
