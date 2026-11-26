@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
   FileText, CheckCircle2, XCircle, Target, Clock, BarChart3, Plus, Users, Search, X, Hourglass, MessageSquareX,
 } from "lucide-react"
 import { KanbanCard, PropostaCustom } from "../types"
 import { conversao, orcamentosDoPeriodo, nomeChave, isAberto, isGanho, isPerdido, isExpirado, parseData, SEM_PERIODO } from "../lib/negocio"
 import { brl, num } from "../utils"
+import type { MapaConversas } from "../lib/diasParado"
 import { HistoricoView, HistItem, OrdemHistorico, SituacaoOrc, situacaoDoCard } from "./HistoricoView"
 import { CabecalhoPagina, Kpi, GradeKpis, Segmentado, Botao, Cartao, TituloCartao, Colunas, ListaBarras, Gaveta, LinhaLista, Vazio, Selo } from "./ds"
 
@@ -40,6 +41,12 @@ export function OrcamentosView(props: Props) {
   const [situacao, setSituacao] = useState<SituacaoOrc>("todos")
   const [busca, setBusca] = useState("")
   const [ordem, setOrdem] = useState<OrdemHistorico>("recente")
+  const [conversas, setConversas] = useState<MapaConversas>({})
+  useEffect(() => {
+    let vivo = true
+    fetch("/api/orcamentos-conversa").then(r => r.ok ? r.json() : null).then(d => { if (vivo && d) setConversas(d) }).catch(() => {})
+    return () => { vivo = false }
+  }, [])
   const [gaveta, setGaveta] = useState<{ titulo: string; sub: string; cards: KanbanCard[] } | null>(null)
 
   // Definições canônicas (lib/negocio): unidade = orçamento (card), exclui terceirizados
@@ -120,9 +127,10 @@ export function OrcamentosView(props: Props) {
                 <option value="maior">Maior valor</option>
                 <option value="menor">Menor valor</option>
                 <option value="nome">Cliente A–Z</option>
+                <option value="parado">Mais dias parado</option>
               </select>
             </div>
-            <HistoricoView {...props} busca={busca} ordem={ordem} situacao={situacao} />
+            <HistoricoView {...props} busca={busca} ordem={ordem} situacao={situacao} conversas={conversas} />
           </> : (
             <VisaoGeral base={base} abrir={abrir} />
           )}

@@ -7,8 +7,9 @@ import { brl, num } from "../utils"
 import { isGanho, isPerdido, isExpirado, parseData } from "../lib/negocio"
 import { Copy, Sparkles, MessageCircle, FileDown, FileText, Trash2, PencilLine, Search } from "lucide-react"
 import { Selo, Tom, Vazio } from "./ds"
+import { diasParado, type MapaConversas } from "../lib/diasParado"
 
-export type OrdemHistorico = "recente" | "antigo" | "maior" | "menor" | "nome"
+export type OrdemHistorico = "recente" | "antigo" | "maior" | "menor" | "nome" | "parado"
 export type SituacaoOrc = "todos" | "aberto" | "fechado" | "recusado" | "semResposta"
 
 export type HistItem = { form: FormData; calculo: Calculo; data: string; numero?: string }
@@ -28,7 +29,7 @@ type ListItem =
   | { tipo: "proposta"; item: PropostaCustom; data: string; numero: string; preco: number; qtd: number; nome: string; card?: KanbanCard }
 
 export function HistoricoView({
-  historico, propostasCustom, kanban, busca, ordem, situacao,
+  historico, propostasCustom, kanban, busca, ordem, situacao, conversas,
   onReplicar, onDownloadPdf, onDownloadPdfCliente, onExcluir, onWhatsApp,
   onPdfCustom, onWhatsAppCustom, onExcluirCustom, onEditarCustom, onPersonalizar, onDetalhes,
 }: {
@@ -38,6 +39,7 @@ export function HistoricoView({
   busca: string
   ordem: OrdemHistorico
   situacao: SituacaoOrc
+  conversas?: MapaConversas
   onReplicar: (item: HistItem) => void
   onDownloadPdf: (item: HistItem) => void
   onDownloadPdfCliente: (item: HistItem) => void
@@ -77,6 +79,7 @@ export function HistoricoView({
     })),
   ]
 
+  const parado = (e: ListItem) => e.card ? diasParado(e.card, conversas?.[e.card.id]) : null
   const lista = todos
     .filter(e => !q || e.nome.toLowerCase().includes(q) || e.numero.toLowerCase().includes(q) || e.data.includes(q))
     .filter(e => situacao === "todos" || situacaoDoCard(e.card).id === situacao)
@@ -85,6 +88,7 @@ export function HistoricoView({
       if (ordem === "antigo")  return (tempo(a.data) - tempo(b.data)) || (numeroInt(a.numero) - numeroInt(b.numero))
       if (ordem === "maior")   return b.preco - a.preco
       if (ordem === "menor")   return a.preco - b.preco
+      if (ordem === "parado")  return (parado(b) ?? -1) - (parado(a) ?? -1)
       return a.nome.localeCompare(b.nome, "pt-BR")
     })
 
@@ -109,6 +113,9 @@ export function HistoricoView({
             ? [entry.item.form.frente > 0 ? `${entry.item.form.frente}×${entry.item.form.alturaBox}×${entry.item.form.lateral} cm` : "Dieline importado", entry.item.form.materialNome]
             : [entry.item.descricao, entry.item.dimensoes, entry.item.material]
           const data = parseData(entry.data)?.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).replace(".", "")
+          const dias = parado(entry)
+          const rec = entry.card ? conversas?.[entry.card.id]?.recebida : null
+          const resposta = rec ? new Date(rec).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }) : null
           return (
             <div key={entry.tipo === "hist" ? `h-${entry.originalIndex}` : `p-${entry.item.id}`}
               className="group bg-white rounded-xl ds-cartao hover:shadow-[0_4px_14px_rgba(25,22,37,0.06)]">
@@ -130,6 +137,16 @@ export function HistoricoView({
                     {[...sub.filter(Boolean), data].join(" · ")}
                   </p>
                 </button>
+                <div className="shrink-0 hidden md:flex items-center gap-5 text-right">
+                  <div style={{ minWidth: 64 }}>
+                    <p className="text-[10px] uppercase tracking-wide text-[#898892]">Dias parado</p>
+                    <p className="text-[12.5px] font-semibold text-[#191625] ds-num mt-0.5">{dias == null ? "—" : dias}</p>
+                  </div>
+                  <div style={{ minWidth: 96 }}>
+                    <p className="text-[10px] uppercase tracking-wide text-[#898892]">Últ. resposta do cliente</p>
+                    <p className="text-[12.5px] text-[#191625] ds-num mt-0.5">{resposta ?? "—"}</p>
+                  </div>
+                </div>
                 <div className="relative shrink-0 flex items-center justify-end" style={{ minWidth: 210 }}>
                   <div className="text-right transition-opacity duration-150 group-hover:opacity-0 group-hover:pointer-events-none">
                     <p className="font-semibold text-[13.5px] text-[#191625] ds-num">{entry.preco > 0 ? brl(entry.preco) : entry.card?.preco ? brl(entry.card.preco) : "—"}</p>
