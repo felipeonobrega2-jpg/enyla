@@ -167,6 +167,15 @@ export const ROTULO_PRECO_CENARIO: Record<string, string> = { "arte-unitaria": "
 export const cobraPorAcertoMilheiro = (id: IdServicoParceiro) => id === "impressaoOffset" || id === "impressaoDigital"
 const formatoOk = (f: unknown) => !!f && typeof f === "object" && Number((f as Formato).l) > 0 && Number((f as Formato).a) > 0
 
+export type ModoParceira = "tabela" | "orcamento_por_pedido"
+/** `tabela`: todo serviço com preço (valor ou exemplo) e prazo médio. Qualquer falta (ou "varia") vira `orcamento_por_pedido`. */
+export function modoDaParceira(servicos: Pick<ServicoCadastrado, "valor" | "precosExemplo" | "prazoDias" | "prazoVaria" | "cobranca">[]): ModoParceira {
+  if (!servicos.length) return "orcamento_por_pedido"
+  const temPreco = (s: typeof servicos[number]) => s.cobranca !== "varia" && (Number(s.valor) > 0 || Object.values(s.precosExemplo ?? {}).some(v => Number(v) > 0))
+  const temPrazo = (s: typeof servicos[number]) => !s.prazoVaria && Number(s.prazoDias) > 0
+  return servicos.every(s => temPreco(s) && temPrazo(s)) ? "tabela" : "orcamento_por_pedido"
+}
+
 export type CadastroParceiro = {
   id: string
   em: string
@@ -201,6 +210,8 @@ export type CadastroParceiro = {
   arquivos: { nome: string; url: string }[]
   comoConheceu?: string
   aceite: boolean
+  /** Como a parceira entra na distribuição de pedidos (só registro; a distribuição vem em outro PR). */
+  modo?: ModoParceira
   fornecedorId?: string
   emails?: { tipo: "recebido" | "aprovado"; em: string; ok: boolean; erro?: string }[]
   // Rascunho montado pelo Atendente a partir da conversa no WhatsApp (ausente = veio do formulário /parceiros)
@@ -316,10 +327,18 @@ function limparExemplos(s: Partial<ServicoCadastrado> & { id: IdServicoParceiro 
   return { ...(Object.keys(precos).length ? { precosExemplo: precos } : {}), ...(Object.keys(versoes).length ? { cenarioVersoes: versoes } : {}) }
 }
 
-export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParceiro, "id" | "em" | "status" | "gerente" | "arquivos" | "base"> {
+export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParceiro, "id" | "em" | "status" | "gerente" | "arquivos" | "base"> & { modo: ModoParceira } {
   const t = (s: unknown, max = 200) => String(s ?? "").replace(/\s+/g, " ").trim().slice(0, max)
   const n = (v: unknown, max: number) => { const k = Number(v); return Number.isFinite(k) && k > 0 && k <= max ? Math.round(k * 100) / 100 : null }
   const ids = new Set(SERVICOS_PARCEIRO.map(s => s.id)), formas = new Set(FORMAS_COBRANCA.map(f => f.id))
+  const servicos = (x.servicos ?? []).filter(s => ids.has(s.id)).slice(0, 20).map(s => ({
+      id: s.id, qual: s.id === "outro" ? t(s.qual, 80) : undefined, tecnico: limparTecnico(s.id, s.tecnico),
+      cobranca: cobraPorAcertoMilheiro(s.id) ? "acertoMilheiro" as const : s.cobranca && formas.has(s.cobranca) ? s.cobranca : null,
+      valor: n(s.valor, 1_000_000), acerto: n(s.acerto, 1_000_000),
+      prazoDias: s.prazoVaria ? null : n(s.prazoDias, 120), prazoVaria: !!s.prazoVaria,
+      minimo: t(s.minimo, 120) || undefined, obs: t(s.obs, 600) || undefined,
+      ...limparExemplos(s),
+    }))
   return {
     nomeFantasia: t(x.nomeFantasia, 120), razaoSocial: t(x.razaoSocial, 160) || undefined,
     tipoDocumento: x.tipoDocumento === "cpf" ? "cpf" : "cnpj", documento: soDigitos(x.documento ?? "").slice(0, 14),
@@ -327,14 +346,7 @@ export function limparCadastro(x: Partial<CadastroParceiro>): Omit<CadastroParce
     bairro: t(x.bairro, 80), cidade: t(x.cidade, 80), uf: t(x.uf, 2).toUpperCase(), referencia: t(x.referencia, 200) || undefined,
     responsavel: t(x.responsavel, 100), whatsapp: soDigitos(x.whatsapp ?? "").slice(-13), email: t(x.email, 160).toLowerCase(),
     contatoProducao: t(x.contatoProducao, 160) || undefined,
-    servicos: (x.servicos ?? []).filter(s => ids.has(s.id)).slice(0, 20).map(s => ({
-      id: s.id, qual: s.id === "outro" ? t(s.qual, 80) : undefined, tecnico: limparTecnico(s.id, s.tecnico),
-      cobranca: cobraPorAcertoMilheiro(s.id) ? "acertoMilheiro" as const : s.cobranca && formas.has(s.cobranca) ? s.cobranca : null,
-      valor: n(s.valor, 1_000_000), acerto: n(s.acerto, 1_000_000),
-      prazoDias: s.prazoVaria ? null : n(s.prazoDias, 120), prazoVaria: !!s.prazoVaria,
-      minimo: t(s.minimo, 120) || undefined, obs: t(s.obs, 600) || undefined,
-      ...limparExemplos(s),
-    })),
+    servicos, modo: modoDaParceira(servicos),
     capacidade: t(x.capacidade, 300) || undefined, horario: t(x.horario, 160) || undefined, maquinas: t(x.maquinas, 600) || undefined,
     comoConheceu: t(x.comoConheceu, 200) || undefined, aceite: !!x.aceite,
   }
