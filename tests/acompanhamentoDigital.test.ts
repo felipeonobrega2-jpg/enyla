@@ -69,4 +69,33 @@ describe("link do cliente", () => {
     expect(tokenDigitalValido("DIG-0007", tokenDigital("DIG-0008"))).toBe(false)
     expect(tokenDigitalValido("DIG-0007", null)).toBe(false)
   })
+
+  it("prazo gravado vence o calculado (uma data, dd/mm/aaaa)", () => {
+    const a = acompanhamentoDigital({ ...base, arteAprovadaEm: "2026-11-13", prazoEntregaEm: "2026-12-05" } as never)!.prazoEntrega
+    expect(a).toEqual({ previstoDe: "2026-12-05", previstoAte: "2026-12-05", texto: "Entrega prevista até 05/12/2026." })
+    expect(acompanhamentoDigital({ ...base, prazoEntregaEm: "2026-12-05" } as never)!.prazoEntrega.texto).toBe("Entrega prevista até 05/12/2026.")
+    expect(acompanhamentoDigital({ ...base, arteAprovadaEm: "2026-11-13", prazoEntregaEm: "lixo" } as never)!.prazoEntrega.previstoDe).toBe("2026-11-25")
+  })
+  it("situacaoArte manda na etapa da arte", () => {
+    const arte = (situacaoArte: string, extra = {}) => acompanhamentoDigital({ ...base, situacaoArte, ...extra } as never)!.arte
+    expect(arte("aprovada")).toBe("aprovada"); expect(arte("prova autorizada")).toBe("aprovada")
+    expect(arte("ajustes pedidos")).toBe("ajustes_pedidos"); expect(arte("enviada")).toBe("esperando_cliente"); expect(arte("sem arte")).toBe("nao_enviada")
+    expect(arte("sem arte", { arteAprovadaEm: "2026-11-13" })).toBe("nao_enviada")
+  })
+  it("arte aprovada sem arteAprovadaEm: etapa aprovada sem data", () => {
+    const h = acompanhamentoDigital({ ...base, situacaoArte: "aprovada" } as never)!.historico
+    expect(h.find(e => e.chave === "arte_aprovada")).toEqual({ chave: "arte_aprovada", rotulo: "Arte aprovada (fila de produção)", em: null })
+  })
+  it("em produção acende com o status do painel, mesmo sem villaEnviadoEm", () => {
+    const a = acompanhamentoDigital({ ...base, status: "producao" } as never)!
+    expect(a.etapaAtual.chave).toBe("producao")
+    expect(acompanhamentoDigital(base as never)!.historico.some(e => e.chave === "producao")).toBe(false)
+  })
+})
+
+describe("previsão de entrega em pt-BR", () => {
+  it("texto usa dd/mm, nunca a data ISO", () => {
+    const t = acompanhamentoDigital({ ...base, arteAprovadaEm: "2026-11-13" } as never)!.prazoEntrega.texto
+    expect(t).toMatch(/\d{2}\/\d{2}/); expect(t).not.toMatch(/\d{4}-\d{2}-\d{2}/)
+  })
 })

@@ -35,8 +35,8 @@ export async function redigirComoFuncionario(a: {
 }): Promise<{ ok: true; texto: string } | { ok: false; erro: string }> {
   const f = a.funcionario
   if (f.status !== "contratado" || f.capacidade !== "mensagem_cliente") return { ok: false, erro: `${f.nome} não está contratado para falar com cliente` }
-  const { destino, jid } = a.jid ? { destino: a.jid, jid: a.jid } : await destinoDoCliente(a.cliente)
-  if (!destino) return { ok: false, erro: `${f.nome} não achou o WhatsApp de ${a.cliente} (sem telefone no cadastro e sem conversa ligada)` }
+  const { destino, jid, motivo } = a.jid ? { destino: a.jid, jid: a.jid, motivo: undefined } : await destinoDoCliente(a.cliente)
+  if (!destino) return { ok: false, erro: `${f.nome} não achou o WhatsApp de ${a.cliente} (sem telefone no cadastro e sem conversa ligada${motivo ? `; motivo: ${motivo}` : ""})` }
   const conversa = await historico(destino, jid).catch(() => "")
   const jeito = conhecimentoNoPrompt((a.conhecimento ?? []).filter(i => i.id.startsWith("felipe-")))
   try {

@@ -55,8 +55,11 @@ export function sugestoesDeArte(pedidos: PedidoSug[], msgsPorJid: Record<string,
   })
 }
 
+/** Só as sugestões sem ambiguidade (um único pedido esperando naquela conversa): essas podem ser gravadas na hora. */
+export const aprovacoesSemAmbiguidade = (sugs: SugestaoArte[]): SugestaoArte[] => sugs.filter(s => s.ambigua === false)
+
 /** O que o clique em "Confirmar arte aprovada" faz no pedido: só marca a aprovação (quando e por quem). Etapa e resto intactos. */
-export function confirmarArteAprovada<T extends { status: string; arteAprovadaEm?: string }>(p: T, s: Pick<SugestaoArte, "em" | "trecho">, por: string, em: string): (T & { arteAprovadaPor: { por: string; em: string; trecho: string } }) | null {
+export function confirmarArteAprovada<T extends { status: string; arteAprovadaEm?: string }>(p: T, s: Pick<SugestaoArte, "em" | "trecho">, por: string, em: string): (T & { arteAprovadaEm: string; arteAprovadaPor: { por: string; em: string; trecho: string } }) | null {
   if (!STATUS_OK.includes(p.status) || p.arteAprovadaEm) return null
   return { ...p, arteAprovadaEm: s.em, arteAprovadaPor: { por, em, trecho: s.trecho } }
 }

@@ -42,7 +42,18 @@ export type Canal = "whatsapp" | "email"
 export type StatusEnvio = "reservado" | "enviado" | "falhou"
 
 /** Linha do histórico do funil que registra um envio. A etapa é a que o prospecto tinha na hora. */
-export type EnvioHistorico = { passo: Passo; canal: Canal; status: StatusEnvio; em: string; texto?: string; erro?: string }
+export type EnvioHistorico = {
+  passo: Passo; canal: Canal; status: StatusEnvio; em: string; texto?: string; erro?: string
+  /** E-mail: id devolvido pela Resend ao aceitar o envio; é a chave que casa os eventos (delivered, bounced, opened, clicked). */
+  resendId?: string
+  /** E-mail do primeiro contato: token aleatório do link rastreado (/api/prospector/r/[token]). Não tem dado do prospecto. */
+  token?: string
+  /** Último desfecho de entrega informado pela Resend. Não muda `status`: quem já saiu nunca é reenviado. */
+  entrega?: "entregue" | "bounce"
+  /** Primeira abertura (pixel) e primeiro clique (link), ISO. */
+  abriuEm?: string
+  cliqueEm?: string
+}
 
 export const CHAVE_ENVIO_ATIVO = "prospector_envio_ativo"
 export const CHAVE_NOTA_MINIMA = "prospector_nota_minima"
@@ -79,6 +90,13 @@ export const DIAS_ATE_ENCERRAR = 3
  * Quem foi abordado só por WhatsApp não é afetado: a detecção de resposta do WhatsApp já para a cadência.
  */
 export const LEMBRETE_EMAIL_ATIVO = false
+/**
+ * Segura todo primeiro contato (e-mail e WhatsApp): ninguém novo é abordado, quem está `qualificado` continua `qualificado`, sem erro.
+ * Desligada (`false`) com o link de cadastro rastreado no e-mail; o limite diário abaixo continua valendo. Lembrete e leitura de respostas não são afetados.
+ */
+export const PRIMEIRO_CONTATO_PAUSADO = false
+/** Máximo de primeiros contatos novos por dia útil (America/Sao_Paulo), somando todas as execuções e canais. Vale também depois da pausa. */
+export const LIMITE_PRIMEIROS_CONTATOS_POR_DIA = 10
 export const HORA_INICIO = 8
 export const HORA_FIM = 20
 export const MAX_FALHAS_POR_CANAL = 3
@@ -86,6 +104,22 @@ export const REMETENTE_REPLY_TO = "felipeonobrega2@gmail.com"
 /** Reply-To do primeiro contato e do lembrete. Só troca quando PROSPECTOR_REPLY_TO está preenchida com um e-mail válido (entrada de respostas no ar); senão segue o Gmail. */
 export function replyToDoProspector(env: string | undefined = process.env.PROSPECTOR_REPLY_TO): string {
   return emailValido(env) ?? REMETENTE_REPLY_TO
+}
+/** Destino final do link rastreado do e-mail (formulário de cadastro de parceiros). */
+export const URL_CADASTRO_PARCEIROS = "https://app.enyla.com.br/parceiros"
+export const URL_BASE_APP = "https://app.enyla.com.br"
+export const urlRastreada = (token: string) => `${URL_BASE_APP}/api/prospector/r/${token}`
+/** Linha do link no primeiro contato. O texto do link não mostra endereço (mostrar um e apontar para outro é marcado como spam). */
+export const LINHA_LINK_CADASTRO = "Para ser parceira da ENYLA, cadastre a sua gráfica aqui:"
+export const TEXTO_LINK_CADASTRO = "Cadastrar minha gráfica"
+/** HTML do e-mail do primeiro contato: o texto comercial intacto, mais a linha com o link rastreado. Sem token, só o texto. */
+export function htmlDoPrimeiroContato(texto: string, token?: string): string {
+  const esc = texto.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
+  return `<p>${esc}</p>` + (token ? `<p>${LINHA_LINK_CADASTRO} <a href="${urlRastreada(token)}">${TEXTO_LINK_CADASTRO}</a></p>` : "")
+}
+/** Versão em texto puro do primeiro contato: o texto e, com token, `Cadastrar minha gráfica: {link}`. */
+export function textoPlanoDoPrimeiroContato(texto: string, token?: string): string {
+  return token ? `${texto}\n\n${LINHA_LINK_CADASTRO}\n${TEXTO_LINK_CADASTRO}: ${urlRastreada(token)}` : texto
 }
 export const ASSUNTO_EMAIL = "ENYLA, gráfica de embalagens em Barueri"
 
@@ -151,7 +185,12 @@ export function envioDe(x: unknown): EnvioHistorico | null {
   const e = (x as { envio?: unknown }).envio as Partial<EnvioHistorico> | undefined
   if (!e || (e.passo !== "primeiro_contato" && e.passo !== "lembrete") || (e.canal !== "whatsapp" && e.canal !== "email")) return null
   if (e.status !== "reservado" && e.status !== "enviado" && e.status !== "falhou") return null
-  return { passo: e.passo, canal: e.canal, status: e.status, em: String(e.em ?? ""), ...(e.texto ? { texto: e.texto } : {}), ...(e.erro ? { erro: e.erro } : {}) }
+  return {
+    passo: e.passo, canal: e.canal, status: e.status, em: String(e.em ?? ""), ...(e.texto ? { texto: e.texto } : {}), ...(e.erro ? { erro: e.erro } : {}),
+    ...(e.resendId ? { resendId: e.resendId } : {}), ...(e.token ? { token: e.token } : {}),
+    ...(e.entrega === "entregue" || e.entrega === "bounce" ? { entrega: e.entrega } : {}),
+    ...(e.abriuEm ? { abriuEm: e.abriuEm } : {}), ...(e.cliqueEm ? { cliqueEm: e.cliqueEm } : {}),
+  }
 }
 
 export function enviosDoHistorico(historico: readonly unknown[]): EnvioHistorico[] {

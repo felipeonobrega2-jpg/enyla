@@ -104,9 +104,10 @@ export type Configuracoes = {
   filtroLeads?: string                                     // quem é ICP e como filtrar os leads: o agente lê antes de responder
   agenteAuto?: import("./lib/agenteLeads").AgenteAuto      // modo automático do agente de leads
   avisosPedido?: Record<string, import("./lib/filaMensagens").AvisoPedido>  // último aviso de produção mandado por pedido
+  filaRestaurados?: { ids: string[]; por: string; em: string }[]      // quem devolveu itens dispensados à fila e quando (só o servidor grava)
   filaDispensados?: Record<string, string>                 // itens da fila já enviados/dispensados (id → quando)
   ideias?: Ideia[]                                         // anotações para implementar depois
-  digital?: { arte: number; margem: number }               // impressão digital (Villa): preço = custo + arte + margem, por pedido
+  digital?: { arte: number; margem: number; prazoPadraoDiasUteis?: number | null }               // impressão digital (Villa): preço = custo + arte + margem, por pedido
   conciliacao?: import("./lib/conciliacao").MemoriaConciliacao  // quem paga por quem e entradas ignoradas
 }
 

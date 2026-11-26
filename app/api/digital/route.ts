@@ -1,6 +1,6 @@
 import { lerConfigLinha } from "../../lib/configAtomica"
 import { NextRequest, NextResponse } from "next/server"
-import { marcarProntoDigital, lerPedido, gravarPedido, linkPedido, linkDesigner, mandarArte, mandarParaVilla, avisarDesigner, avisarDesignerMedidas, conversaDoPedido, ContatosDigital } from "@/app/lib/digitalServidor"
+import { marcarProntoDigital, lerPedido, gravarPedido, linkPedido, linkAcompanhamento, linkDesigner, mandarArte, mandarParaVilla, avisarDesigner, avisarDesignerMedidas, conversaDoPedido, ContatosDigital } from "@/app/lib/digitalServidor"
 import { seuNumero, enviar } from "@/app/lib/agenteAuto"
 import { pedidoDeTeste, textoLinkPedido, opcoesDoPedido, trocarQuantidade, trocarMedidas, fmtMedidas, aprovarNegociacao, recusarNegociacao, textoNegociacaoAprovada, textoNegociacaoRecusada } from "@/app/lib/digital"
 import { supabase } from "@/app/lib/supabase"
@@ -8,8 +8,10 @@ import { mudarStatus, trocarFrete, restanteUnico, arteAtual, acertoDaSemana, Ped
 import { mudarConfig } from "@/app/lib/configAtomica"
 import { lerSugestoes, decidirSugestao } from "@/app/lib/arteAprovadaServidor"
 import { auth } from "@/auth"
+import { prazoDoPedido } from "@/app/lib/digitalPrazo"
+import { gravarDigitalExterno } from "@/app/lib/gravarDigitalExterno"
 
-type Dados = { pedidosDigitais?: PedidoComBriefing[]; digitalContatos?: ContatosDigital; digital?: import("@/app/lib/precoDigital").RegraDigital }
+type Dados = { pedidosDigitais?: PedidoComBriefing[]; digitalContatos?: ContatosDigital; digital?: import("@/app/lib/precoDigital").RegraDigital & { prazoPadraoDiasUteis?: number | null } }
 
 // Painel do braço digital (rota protegida pelo login): os pedidos dos últimos 45 dias com o link e o que o cliente fez
 export async function GET() {
@@ -25,11 +27,12 @@ export async function GET() {
     briefing: p.briefing ? { marca: p.briefing.marca ?? "", cores: p.briefing.cores ?? "", referencias: p.briefing.referencias ?? "", laminacao: p.briefing.laminacao ?? "fosca", arquivos: (p.briefing.arquivos ?? []).length } : null,
     teste: !!p.teste,
     vence: new Date(new Date(p.em).getTime() + DIAS_VALIDADE_DIGITAL * 86_400_000).toISOString(),
-    link: linkPedido(p.id), linkDesigner: linkDesigner(p.id),
+    link: linkPedido(p.id), linkAcompanhamento: linkAcompanhamento(p.id), linkDesigner: linkDesigner(p.id),
     opcoes: p.status === "aguardando_sinal" ? opcoesDoPedido(p, d.digital) : [],
     arteAtual: arteAtual(p), versoes: (p.artes ?? []).length, arteEnviadaEm: p.arteEnviadaEm ?? null, arteAprovadaEm: p.arteAprovadaEm ?? null,
     ajustes: p.ajustes ?? [], designerAvisadoEm: p.designerAvisadoEm ?? null, villaEnviadoEm: p.villaEnviadoEm ?? null,
     frete: p.frete ?? null, restante: p.restante ?? null, restantePagoEm: p.restantePagoEm ?? null, prontoEm: p.prontoEm ?? null, entrega: p.entrega ?? null, acertadoEm: p.acertadoEm ?? null,
+    situacaoArte: p.situacaoArte ?? null, prazoEntrega: p.prazoEntregaEm ?? null, edicaoAcomp: p.edicaoAcomp ?? null, edicoesAcomp: p.edicoesAcomp ?? [], prazoCalculado: prazoDoPedido(p, d.digital?.prazoPadraoDiasUteis).texto,
     negociacao: p.negociacao ?? null, termosAceitosEm: p.termos?.em ?? null,
   }))
   const acerto = acertoDaSemana(todos)
@@ -66,6 +69,12 @@ export async function POST(req: NextRequest) {
     const { data } = await lerConfigLinha()
     const r = await decidirSugestao(((data?.data ?? {}) as Dados).pedidosDigitais ?? [], b.id, b.decisao, "Painel (login do sistema)")
     return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ erro: r.erro }, { status: 400 })
+  }
+  // Painel: situação da arte e prazo de entrega (só esses dois campos, com quem/quando/motivo). Nada é enviado ao cliente.
+  if (b.acao === "acomp") {
+    if (!(await auth().catch(() => null))) return NextResponse.json({ erro: "Entre no sistema para gravar." }, { status: 401 })
+    const r = await gravarDigitalExterno("Painel (login do sistema)", b as unknown as Record<string, unknown>)
+    return r.ok ? NextResponse.json({ ok: true, id: r.id, situacaoArte: r.situacaoArte, prazoEntrega: r.prazoEntrega }) : NextResponse.json({ erro: r.erro }, { status: r.status })
   }
   if (b.acertar?.length) {
     const ids = new Set(b.acertar)

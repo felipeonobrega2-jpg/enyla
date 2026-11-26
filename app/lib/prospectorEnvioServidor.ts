@@ -8,10 +8,11 @@
 import { lerCampos } from "./configAtomica"
 import { supabase } from "./supabase"
 import { evo } from "./evolution"
+import { randomBytes } from "node:crypto"
 import { enviarEmail } from "./email"
 import { CNAES_PROSPECTO, aplicarOptOut, hojeSp, podeTransicionar, type EtapaFunil, type MudancaEtapa } from "./prospector"
 import {
-  ASSUNTO_EMAIL, CHAVE_ENVIO_ATIVO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector,
+  ASSUNTO_EMAIL, htmlDoPrimeiroContato, textoPlanoDoPrimeiroContato, CHAVE_ENVIO_ATIVO, LIMITE_PRIMEIROS_CONTATOS_POR_DIA, PRIMEIRO_CONTATO_PAUSADO, CHAVE_NOTA_MINIMA, DIAS_ATE_ENCERRAR, DIAS_ATE_LEMBRETE, cadenciaSuspensaPorEmail, LIMITE_WHATSAPP_PRIMEIROS_POR_DIA, MAX_EMAILS_POR_EXECUCAO, tetoEmailDia, ehErroDeCota, NOTA_MINIMA_PADRAO, ORCAMENTO_MS_POR_EXECUCAO, replyToDoProspector,
   canaisDisponiveis, canaisPendentes, celularWhatsapp, chaveTelefone, dentroDoHorario, ehRecusa, emailValido, enviosDoHistorico,
   motivoNaoQualifica, passoIniciado, passoSaiu, passouDias, saiu, textoDoPasso,
   type Canal, type EnvioHistorico, type MotivoParada, type Passo,
@@ -38,7 +39,8 @@ const vazio = (): ResultadoEnvio => ({ ok: true, ativo: true, enviado: false, em
 export const historicoDe = (l: Linha): MudancaEtapa[] => (Array.isArray(l.historico_etapas) ? l.historico_etapas : []).filter((x): x is MudancaEtapa => !!x && typeof x === "object")
 const enviosDe = (l: Linha) => enviosDoHistorico(historicoDe(l))
 
-type Deps = { agora?: () => Date }
+/** `primeiroContatoPausado` e `limitePrimeirosPorDia` (0 = sem limite) existem só para teste; em produção valem as constantes. */
+type Deps = { agora?: () => Date; primeiroContatoPausado?: boolean; limitePrimeirosPorDia?: number }
 
 /** Grava com trava otimista (id + atualizado_em lido + sem opt-out). Devolve a linha nova ou null se alguém mudou antes. */
 export async function gravar(l: Linha, campos: Record<string, unknown>): Promise<Linha | null> {
@@ -118,7 +120,9 @@ function bloqueado(est: Estado, passo: Passo, canal: Canal, l: Linha): boolean {
   return !!dono && dono !== l.cnpj
 }
 
-async function enviarPeloCanal(canal: Canal, l: Linha, texto: string): Promise<{ ok: true } | { ok: false; erro: string; cota?: true }> {
+type ResultadoCanal = { ok: true; id?: string } | { ok: false; erro: string; cota?: true }
+
+async function enviarPeloCanal(canal: Canal, l: Linha, texto: string, token?: string): Promise<ResultadoCanal> {
   if (canal === "whatsapp") {
     const numero = celularWhatsapp(l.telefone)
     if (!numero) return { ok: false, erro: "sem celular válido" }
@@ -127,22 +131,23 @@ async function enviarPeloCanal(canal: Canal, l: Linha, texto: string): Promise<{
   }
   const para = emailValido(l.email)
   if (!para) return { ok: false, erro: "e-mail inválido" }
-  const esc = texto.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
-  const r = await enviarEmail(para, { assunto: ASSUNTO_EMAIL, texto, html: `<p>${esc}</p>` }, [], { de: REMETENTE, responderPara: replyToDoProspector() })
-  return r.ok ? { ok: true } : { ok: false, erro: r.erro, ...(r.cota ? { cota: true as const } : {}) }
+  const r = await enviarEmail(para, { assunto: ASSUNTO_EMAIL, texto: textoPlanoDoPrimeiroContato(texto, token), html: htmlDoPrimeiroContato(texto, token) }, [], { de: REMETENTE, responderPara: replyToDoProspector() })
+  return r.ok ? { ok: true, id: r.id } : { ok: false, erro: r.erro, ...(r.cota ? { cota: true as const } : {}) }
 }
 
 /** Reserva, envia e fecha um canal de um passo. Devolve se saiu, se falhou, ou null se não reservou (alguém foi mais rápido). */
 async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, agora: Date): Promise<{ linha: Linha; ok: boolean } | null> {
   const texto = textoDoPasso(passo, agora)
   const em = agora.toISOString()
-  const envio: EnvioHistorico = { passo, canal, status: "reservado", em, texto }
+  // Só o primeiro contato por e-mail leva o link rastreado; o token nasce na reserva e fica no histórico (sem dado do prospecto).
+  const token = passo === "primeiro_contato" && canal === "email" ? randomBytes(12).toString("base64url") : undefined
+  const envio: EnvioHistorico = { passo, canal, status: "reservado", em, texto, ...(token ? { token } : {}) }
   const reservada = await gravar(l, { historico_etapas: [...historicoDe(l), { etapa: l.etapa as EtapaFunil, em, motivo: `${passo} (${canal}): reservado`, envio }] })
   if (!reservada) return null
   const k = chaveCanal(canal, l)
   if (k) est.usados[passo][canal].set(k, l.cnpj)
-  let r: { ok: true } | { ok: false; erro: string; cota?: true }
-  try { r = await enviarPeloCanal(canal, l, texto) } catch (e) { r = { ok: false, erro: String(e) } }
+  let r: ResultadoCanal
+  try { r = await enviarPeloCanal(canal, l, texto, token) } catch (e) { r = { ok: false, erro: String(e) } }
   // Cota da Resend esgotada: o e-mail para pelo resto do dia. A linha fica "falhou" com a mensagem de cota, que não conta como falha do lead.
   if (!r.ok && canal === "email" && (r.cota || ehErroDeCota(r.erro))) est.cotaEsgotada = true
   // Fecha a reserva. Se a trava perder (outra gravação no meio), relê e tenta de novo; a reserva já protege contra duplicata.
@@ -151,7 +156,7 @@ async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, ag
     const h = historicoDe(atual).map(x => {
       const e = x.envio as EnvioHistorico | undefined
       return e && e.passo === passo && e.canal === canal && e.em === em && e.status === "reservado"
-        ? { ...x, motivo: `${passo} (${canal}): ${r.ok ? "enviado" : "falhou"}`, envio: { ...e, status: r.ok ? "enviado" : "falhou", ...(r.ok ? {} : { erro: r.erro }) } }
+        ? { ...x, motivo: `${passo} (${canal}): ${r.ok ? "enviado" : "falhou"}`, envio: { ...e, status: r.ok ? "enviado" : "falhou", ...(r.ok ? (r.id ? { resendId: r.id } : {}) : { erro: r.erro }) } }
         : x
     })
     const campos: Record<string, unknown> = { historico_etapas: h }
@@ -305,10 +310,18 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
 
   // Primeiro contato, nota decrescente. E-mail sai sem teto diário (só o limite técnico da execução); WhatsApp só com vaga na cota.
   // Quem tem os dois canais: o e-mail sai mesmo com a cota do WhatsApp cheia; o WhatsApp fica pendente para o próximo dia com vaga.
+  const pausado = deps.primeiroContatoPausado ?? PRIMEIRO_CONTATO_PAUSADO
+  const limiteDia = deps.limitePrimeirosPorDia ?? LIMITE_PRIMEIROS_CONTATOS_POR_DIA
+  // Primeiros contatos que já saíram hoje (SP), contados por prospecto, antes desta execução.
+  const novoHoje = (l: Linha) => { const p = passoSaiu(enviosDe(l), "primeiro_contato"); return !!p && hojeSp(new Date(p.em)) === hoje }
+  const primeirosHoje = [...jaContatadas, ...lista].filter((l, i, a) => a.findIndex(x => x.id === l.id) === i).filter(novoHoje).length
+  let novosNestaExecucao = 0
   const abordadosComFalha = jaContatadas.filter(l => l.etapa === "abordado" && !l.opt_out && !passoIniciado(enviosDe(l), "lembrete"))
-  for (const l0 of [...fila, ...abordadosComFalha].sort((a, b) => (b.nota ?? 0) - (a.nota ?? 0))) {
+  for (const l0 of pausado ? [] : [...fila, ...abordadosComFalha].sort((a, b) => (b.nota ?? 0) - (a.nota ?? 0))) {
     if (semFolga(est)) break
     const envios = enviosDe(l0)
+    const ehNovo = !passoSaiu(envios, "primeiro_contato")
+    if (ehNovo && limiteDia > 0 && primeirosHoje + novosNestaExecucao >= limiteDia) break
     const iniciado = passoIniciado(envios, "primeiro_contato")
     const pendentes = canaisPendentes(envios, "primeiro_contato", canaisDisponiveis(l0))
       .filter(c => !bloqueado(est, "primeiro_contato", c, l0))
@@ -317,6 +330,7 @@ export async function executarEnvio(deps: Deps = {}): Promise<ResultadoEnvio> {
     const r = await mandarPasso(est, l0, "primeiro_contato", pendentes, agora, res)
     const zapSaiu = enviosDe(r.linha).some(e => e.passo === "primeiro_contato" && e.canal === "whatsapp" && saiu(e)) && !envios.some(e => e.passo === "primeiro_contato" && e.canal === "whatsapp" && saiu(e))
     if (zapSaiu) zapFeitosHoje++
+    if (ehNovo && enviosDe(r.linha).some(e => e.passo === "primeiro_contato" && saiu(e))) novosNestaExecucao++
     if (r.algumOk && !iniciado) res.primeiros++
   }
 
