@@ -14,6 +14,8 @@ export default auth(async (req) => {
     pathname.startsWith("/aprovar") ||
     pathname === "/parceiros" ||                // cadastro público Parceiros ENYLA
     pathname === "/api/parceiros/cadastro" ||
+    pathname === "/parceiros/termos" ||         // Termos de Parceria (texto e aceite por token do cadastro)
+    pathname === "/api/parceiros/termos" ||
 
     pathname.startsWith("/d/") ||               // pedido digital (link assinado)
     pathname.startsWith("/api/d/") ||
@@ -29,12 +31,14 @@ export default auth(async (req) => {
     pathname === "/api/sistema/vigia" ||          // vigia do VPS (exige o segredo do webhook na rota)     // a rota exige login ou o segredo do webhook
     pathname === "/api/frete/webhook" ||
     pathname === "/api/infinitepay/webhook" ||  // InfinitePay (sem assinatura: só dispara o payment_check)
+    pathname === "/api/openi/webhook" ||        // Openi (segredo OPENI_WEBHOOK_SECRET na própria rota)
     pathname === "/api/asaas/webhook" ||        // Asaas (token no cabeçalho; status vem da API)        // Lalamove (só lê o nº da corrida; status vem da API)
     pathname === "/api/meta/cron-refresh" ||
     pathname === "/api/externo" ||               // diretores na nuvem (exige a chave do diretor na própria rota)
     pathname === "/api/prospector/enviar" ||     // agendador da Vercel (mesma regra; chave prospector_envio_ativo desligada por padrão)
     pathname === "/api/prospector/importar" ||   // agendador da Vercel (exige CRON_SECRET, ou o agendador, na própria rota)
     pathname === "/api/prospector/inbound" ||    // webhook da Resend (email.received e eventos do envio; exige assinatura Svix na própria rota)
+    pathname.startsWith("/api/prospector/o/") || // pixel de abertura do e-mail do Prospector (token aleatório; só devolve um GIF 1x1)
     pathname.startsWith("/api/prospector/r/") || // link rastreado do e-mail do Prospector (token aleatório; só redireciona ao /parceiros)
     pathname === "/api/whatsapp/verificar" ||    // agendador da Vercel (mesma regra)     // agendador da Vercel (exige CRON_SECRET na própria rota)
     pathname.startsWith("/api/track") ||

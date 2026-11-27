@@ -26,6 +26,8 @@ export const ROTINAS: Rotina[] = [
   { id: "aprendizado", nome: "Aprendizado do agente", faz: "Lê as suas conversas e ensina o atendente", onde: "carona", quando: "a cada 6 h", esperadoMin: 6 * 60 + 30 },
   { id: "relatorioSemanal", nome: "Relatório semanal", faz: "PDF gerencial no seu e-mail", onde: "servidor", quando: "segunda, 8h", esperadoMin: 7 * 24 * 60 + 60 },
   { id: "metaToken", nome: "Token da Meta", faz: "Renova o acesso aos anúncios", onde: "vercel", quando: "todo dia, 8h", esperadoMin: 25 * 60 },
+  // esperadoMin null: fora da janela (noite, fim de semana) a rotina não roda, então "parada há X" seria alarme falso.
+  { id: "prospectorEnvio", nome: "Prospector: envio", faz: "Primeiro contato e lembrete às gráficas (e-mail e WhatsApp), com teto por execução", onde: "vercel", quando: "a cada 30 min, 8h–20h (seg a sex)", esperadoMin: null },
   { id: "whatsappVigia", nome: "Vigia do WhatsApp", faz: "Religa o WhatsApp se cair e avisa no celular", onde: "servidor", quando: "a cada 2 min", esperadoMin: null },
   { id: "siteVigia", nome: "Vigia do site", faz: "Avisa se o sistema sair do ar", onde: "servidor", quando: "a cada 2 min", esperadoMin: null },
 ]

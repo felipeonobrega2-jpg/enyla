@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Printer, Layers, Sparkles, Stamp, Mountain, Scissors, Package, Shapes, FileStack, Palette, FileCheck, Truck, Plus, Check, ChevronLeft, ArrowRight, Paperclip, X, Clock, BarChart3, ShieldCheck, Handshake, Loader2, MessageCircle, MapPin, Zap, Banknote, Wallet, Camera, Globe } from "lucide-react"
+import { TEXTO_CAIXA_ACEITE } from "../lib/termosParceria"
 import type { CenarioPublico } from "../lib/cenariosParceiros"
 import {
   SERVICOS_PARCEIRO, FORMAS_COBRANCA, PERGUNTAS, ROTULO_PRECO_CENARIO, cobraPorAcertoMilheiro, cenarioAtivo, ETAPAS_IDS, errosDaEtapa, mascaraDocumento, mascaraTelefone, mascaraCep, GERENTE_PADRAO,
@@ -127,7 +128,7 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
   // Convite do Captador (?c=…): marca que abriu e acompanha até o envio
 
   // Rascunho no aparelho (volta de onde parou)
-  useEffect(() => { try { const r = JSON.parse(localStorage.getItem(RASCUNHO) ?? "null"); if (r?.d) { setD({ ...VAZIO, ...r.d }); if (typeof r.passo === "number" && r.passo >= 0 && r.passo < N) { setPasso(r.passo); if (typeof r.sub === "number") setSub(r.sub) } } } catch { /* sem rascunho */ } }, [])
+  useEffect(() => { try { const r = JSON.parse(localStorage.getItem(RASCUNHO) ?? "null"); if (r?.d) { setD({ ...VAZIO, ...r.d, aceiteTermos: false }); if (typeof r.passo === "number" && r.passo >= 0 && r.passo < N) { setPasso(r.passo); if (typeof r.sub === "number") setSub(r.sub) } } } catch { /* sem rascunho */ } }, [])
   useEffect(() => { if (passo >= 0 && passo < N) try { localStorage.setItem(RASCUNHO, JSON.stringify({ d, passo, sub })) } catch { /* sem storage */ } }, [d, passo, sub])
 
   // Troca de etapa: a atual sai (160 ms), a página volta ao topo e a próxima entra pelo lado certo
@@ -208,6 +209,7 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
     setEnviando(true); setErroEnvio(null)
     const f = new FormData()
     f.set("dados", JSON.stringify(d)); f.set("site", site.current?.value ?? "")
+    try { const q = new URLSearchParams(window.location.search); for (const k of ["utm_source", "utm_medium"]) { const v = q.get(k); if (v) f.set(k, v) } } catch { /* sem utm */ }
     for (const a of arquivos) f.append("arquivos", a)
     try {
       const r = await fetch("/api/parceiros/cadastro", { method: "POST", body: f }).then(x => x.json())
@@ -561,6 +563,11 @@ export default function ParceirosForm({ whatsappGerente, cenarios = [] }: { what
             <span className="text-[14px] text-[#4a4658] leading-snug">Concordo que a ENYLA registre o tempo e a qualidade das entregas, e que as informações deste cadastro estão corretas.</span>
           </button>
           {E("aceite") && <p className="text-[13px] text-[#d33a3c] font-medium -mt-3 par-surge">{E("aceite")}</p>}
+          <div data-erro={marca("aceiteTermos")} className="flex gap-3 items-start">
+            <button type="button" role="checkbox" aria-checked={!!d.aceiteTermos} aria-label="Aceitar os Termos de Parceria" onClick={() => set("aceiteTermos", !d.aceiteTermos)} className={`mt-0.5 w-6 h-6 rounded-lg border-2 grid place-items-center shrink-0 transition ${d.aceiteTermos ? "text-white" : E("aceiteTermos") ? "border-[#d33a3c]" : "border-[#cfcbdb]"}`} style={d.aceiteTermos ? { background: ROXO, borderColor: ROXO } : undefined}>{d.aceiteTermos && <Check className="w-4 h-4 ds-pop" strokeWidth={3} />}</button>
+            <span className="text-[14px] text-[#4a4658] leading-snug">{TEXTO_CAIXA_ACEITE} <a href="/parceiros/termos" target="_blank" rel="noopener noreferrer" className="font-semibold underline" style={{ color: ROXO }}>Ler os Termos de Parceria</a></span>
+          </div>
+          {E("aceiteTermos") && <p className="text-[13px] text-[#d33a3c] font-medium -mt-3 par-surge">{E("aceiteTermos")}</p>}
           <input ref={site} name="site" tabIndex={-1} autoComplete="off" className="absolute -left-[9999px] w-px h-px opacity-0" aria-hidden />
           {erroEnvio && <p className="rounded-xl bg-[#fff1f1] text-[#c92f31] text-[13.5px] font-medium px-4 py-3 par-surge">{erroEnvio}</p>}
         </>}

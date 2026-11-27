@@ -66,20 +66,39 @@ export const NOTA_MINIMA_SO_SECUNDARIO = 2
 export const TERMOS_FORA_DO_RAMO: readonly string[] = ["inflavel", "inflaveis", "balao", "baloes", "figurinha", "brinquedo", "festa"]
 /** Único CNAE da lista que, sozinho, não qualifica: encadernação e plastificação (1822-9/01). */
 const CNAE_SO_ENCADERNACAO = "1822901"
-/** Cota de primeiros contatos por dia (dia de São Paulo), só do WhatsApp. E-mail não tem teto diário. */
-export const LIMITE_WHATSAPP_PRIMEIROS_POR_DIA = 10
-/** Teto diário de e-mails do Prospector (primeiro contato + lembrete), PROSPECTOR_TETO_EMAIL_DIA. Padrão 80: cota Free da Resend (100/dia) menos 20 de reserva
- *  para o que não é prospecção (transacional a cliente e resposta da diretoria, que não entram neste teto). 0 = sem teto (plano pago). Vazio ou inválido = padrão. */
-export const TETO_EMAIL_DIA_PADRAO = 80
-export function tetoEmailDia(valor: string | null | undefined = process.env.PROSPECTOR_TETO_EMAIL_DIA): number {
-  const v = (valor ?? "").trim()
-  return /^\d+$/.test(v) ? Number(v) : TETO_EMAIL_DIA_PADRAO
+/** Chaves do AppConfig com os limites diários por canal. Valor número (ou texto numérico). */
+export const CHAVE_LIMITE_WHATSAPP_DIA = "prospector_limite_whatsapp_dia"
+export const CHAVE_LIMITE_EMAIL_DIA = "prospector_limite_email_dia"
+/** Primeiros contatos por WhatsApp por dia útil (dia de São Paulo). Ausente, inválido ou 0 = padrão. */
+export const LIMITE_WHATSAPP_DIA_PADRAO = 30
+export function limiteWhatsappDia(valor: unknown): number {
+  const n = typeof valor === "string" && /^\d+$/.test(valor.trim()) ? Number(valor) : valor
+  return typeof n === "number" && Number.isInteger(n) && n > 0 ? n : LIMITE_WHATSAPP_DIA_PADRAO
 }
+/** Teto diário de e-mails do Prospector (primeiro contato + lembrete). Padrão 100. 0 = sem teto. Ausente ou inválido = padrão.
+ *  A Resend Free tem 100 por dia e o transacional usa a mesma cota: com a Free, baixe este valor no AppConfig. */
+export const LIMITE_EMAIL_DIA_PADRAO = 100
+export function tetoEmailDia(valor: unknown): number {
+  const n = typeof valor === "string" && /^\d+$/.test(valor.trim()) ? Number(valor) : valor
+  return typeof n === "number" && Number.isInteger(n) && n >= 0 ? n : LIMITE_EMAIL_DIA_PADRAO
+}
+/** Espaçamento mínimo entre envios do mesmo canal, para nunca sair em rajada. Vale entre execuções (lê o último envio do histórico) e dentro da mesma. */
+/** E-mail: no máximo 25 a cada 30 minutos, ou seja, um a cada 72 segundos. */
+export const ESPACAMENTO_EMAIL_MS = (30 * 60_000) / 25
+/** WhatsApp: distribui o limite do dia pela janela de envio (8h às 20h): com 30 por dia, um a cada 24 minutos. */
+export const espacamentoWhatsappMs = (limiteDia: number) => Math.floor(((HORA_FIM - HORA_INICIO) * 3_600_000) / Math.max(1, limiteDia))
+/** `ultimoEm`: instante (ms) do último envio do canal, ou null. Verdadeiro se já passou o espaçamento. */
+export const espacamentoLiberado = (ultimoEm: number | null, agoraMs: number, espacamentoMs: number) => ultimoEm === null || agoraMs - ultimoEm >= espacamentoMs
 export type MotivoParada = "teto_diario" | "cota_resend" | "limite_execucao"
 /** Erro de cota da Resend (já gravado no histórico): não é culpa do lead e não conta para MAX_FALHAS_POR_CANAL. */
 export const ehErroDeCota = (erro: string | null | undefined) => /(daily|monthly)\b.*\bquota|quota_exceeded/i.test(erro ?? "")
-/** Limite técnico por execução (a rota tem maxDuration de 120s): e-mails enviados (primeiro contato e lembrete) e tempo total. O resto fica para o próximo cron. */
-export const MAX_EMAILS_POR_EXECUCAO = 60
+/** Limite por execução (a rota tem maxDuration de 120s): e-mails enviados (primeiro contato e lembrete) e tempo total. O resto fica para o próximo cron.
+ *  Configurável pelo env MAX_EMAILS_POR_EXECUCAO (inteiro maior que 0). Vazio, inválido ou 0 = padrão 4 (0 não é "ilimitado"). */
+export const MAX_EMAILS_POR_EXECUCAO = 4
+export function maxEmailsPorExecucao(valor: unknown): number {
+  const n = typeof valor === "string" && /^\d+$/.test(valor.trim()) ? Number(valor) : valor
+  return typeof n === "number" && Number.isInteger(n) && n > 0 ? n : MAX_EMAILS_POR_EXECUCAO
+}
 export const ORCAMENTO_MS_POR_EXECUCAO = 90_000
 export const DIAS_ATE_LEMBRETE = 3
 export const DIAS_ATE_ENCERRAR = 3
@@ -92,11 +111,9 @@ export const DIAS_ATE_ENCERRAR = 3
 export const LEMBRETE_EMAIL_ATIVO = false
 /**
  * Segura todo primeiro contato (e-mail e WhatsApp): ninguém novo é abordado, quem está `qualificado` continua `qualificado`, sem erro.
- * Desligada (`false`) com o link de cadastro rastreado no e-mail; o limite diário abaixo continua valendo. Lembrete e leitura de respostas não são afetados.
+ * Desligada (`false`) com o link de cadastro rastreado no e-mail; os limites diários por canal continuam valendo. Lembrete e leitura de respostas não são afetados.
  */
 export const PRIMEIRO_CONTATO_PAUSADO = false
-/** Máximo de primeiros contatos novos por dia útil (America/Sao_Paulo), somando todas as execuções e canais. Vale também depois da pausa. */
-export const LIMITE_PRIMEIROS_CONTATOS_POR_DIA = 10
 export const HORA_INICIO = 8
 export const HORA_FIM = 20
 export const MAX_FALHAS_POR_CANAL = 3
@@ -107,48 +124,59 @@ export function replyToDoProspector(env: string | undefined = process.env.PROSPE
 }
 /** Destino final do link rastreado do e-mail (formulário de cadastro de parceiros). */
 export const URL_CADASTRO_PARCEIROS = "https://app.enyla.com.br/parceiros"
+/** Canal de origem do link de cadastro (utm_source). Medição: de onde vem cada cadastro. */
+export type CanalUtm = "email" | "whatsapp" | "boasvindas"
+export const CANAIS_UTM: readonly CanalUtm[] = ["email", "whatsapp", "boasvindas"]
+/** Link do cadastro com utm_source (canal) e utm_medium=prospector. */
+export const linkCadastro = (canal: CanalUtm) => `${URL_CADASTRO_PARCEIROS}?utm_source=${canal}&utm_medium=prospector`
 export const URL_BASE_APP = "https://app.enyla.com.br"
 export const urlRastreada = (token: string) => `${URL_BASE_APP}/api/prospector/r/${token}`
-/** Linha do link no primeiro contato. O texto do link não mostra endereço (mostrar um e apontar para outro é marcado como spam). */
-export const LINHA_LINK_CADASTRO = "Para ser parceira da ENYLA, cadastre a sua gráfica aqui:"
-export const TEXTO_LINK_CADASTRO = "Cadastrar minha gráfica"
-/** HTML do e-mail do primeiro contato: o texto comercial intacto, mais a linha com o link rastreado. Sem token, só o texto. */
-export function htmlDoPrimeiroContato(texto: string, token?: string): string {
-  const esc = texto.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
-  return `<p>${esc}</p>` + (token ? `<p>${LINHA_LINK_CADASTRO} <a href="${urlRastreada(token)}">${TEXTO_LINK_CADASTRO}</a></p>` : "")
-}
-/** Versão em texto puro do primeiro contato: o texto e, com token, `Cadastrar minha gráfica: {link}`. */
-export function textoPlanoDoPrimeiroContato(texto: string, token?: string): string {
-  return token ? `${texto}\n\n${LINHA_LINK_CADASTRO}\n${TEXTO_LINK_CADASTRO}: ${urlRastreada(token)}` : texto
-}
-export const ASSUNTO_EMAIL = "ENYLA, gráfica de embalagens em Barueri"
+/** Pixel próprio de abertura (GIF 1x1). Marca `abriu` sem depender do webhook da Resend. Não tem dado do prospecto. */
+export const urlPixelAbertura = (token: string) => `${URL_BASE_APP}/api/prospector/o/${token}`
+export const ASSUNTO_EMAIL = "Parceria ENYLA: serviços para gráficas"
 
-const CORPO_PRIMEIRO = "tudo bem? Aqui é da ENYLA, somos uma gráfica de embalagens em Barueri. Vocês fazem serviços de terceirização para outras gráficas?"
-export const TEXTO_LEMBRETE = "Oi, tudo bem? Aqui é da ENYLA, de Barueri, de novo. Só para saber se vocês fazem serviços de terceirização para outras gráficas."
+/** Texto fixo do primeiro contato (sem IA). O link é o do cadastro; no e-mail, é trocado pelo link rastreado. */
+const CORPO_PRIMEIRO = "Oi, tudo bem? Sou da ENYLA. A gente recebe pedidos de embalagens e impressos do Brasil todo e passa para gráficas parceiras os serviços que elas fazem. Se vocês pegam serviço de terceiro, o cadastro é gratuito e leva uns 5 minutos:"
+export const TEXTO_LEMBRETE = "Oi, tudo bem? Sou da ENYLA, falei com vocês há pouco. Só para saber se vocês pegam serviço de terceiro de outras gráficas."
+
+/** HTML do e-mail do primeiro contato: o link do texto vira o link rastreado (que redireciona ao destino com utm). Sem token, o link direto com utm. */
+export function htmlDoPrimeiroContato(texto: string, token?: string): string {
+  const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]!))
+  const link = linkCadastro("email")
+  const i = texto.indexOf(link)
+  const href = token ? urlRastreada(token) : link
+  const pixel = token ? `<img src="${urlPixelAbertura(token)}" width="1" height="1" alt="" style="display:none" />` : ""
+  if (i < 0) return `<p>${esc(texto)}</p>${pixel}`
+  return `<p>${esc(texto.slice(0, i))}<a href="${esc(href)}">${esc(href)}</a>${esc(texto.slice(i + link.length))}</p>${pixel}`
+}
+/** Versão em texto puro: com token, o link do texto vira o link rastreado. */
+export function textoPlanoDoPrimeiroContato(texto: string, token?: string): string {
+  return token ? texto.replace(linkCadastro("email"), urlRastreada(token)) : texto
+}
 
 const fmt = (agora: Date) => new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Sao_Paulo", hourCycle: "h23", weekday: "short", hour: "2-digit", minute: "2-digit", year: "numeric", month: "2-digit", day: "2-digit",
 }).formatToParts(agora)
 
-export function relogioSp(agora: Date): { dia: string; hora: number; diaSemana: number } {
+export function relogioSp(agora: Date): { dia: string; hora: number; minuto: number; diaSemana: number } {
   const p = Object.fromEntries(fmt(agora).map(x => [x.type, x.value]))
   const semana: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
-  return { dia: `${p.year}-${p.month}-${p.day}`, hora: Number(p.hour), diaSemana: semana[p.weekday] ?? 0 }
+  return { dia: `${p.year}-${p.month}-${p.day}`, hora: Number(p.hour), minuto: Number(p.minute), diaSemana: semana[p.weekday] ?? 0 }
 }
 
-/** Segunda a sexta, das 8h (inclusive) às 20h (exclusive), America/Sao_Paulo. */
+/** Segunda a sexta, das 8h00 às 20h00 em ponto (minuto 0 inclusive; 20h01 já é fora), America/Sao_Paulo. */
 export function dentroDoHorario(agora: Date): boolean {
-  const { hora, diaSemana } = relogioSp(agora)
-  return diaSemana >= 1 && diaSemana <= 5 && hora >= HORA_INICIO && hora < HORA_FIM
+  const { hora, minuto, diaSemana } = relogioSp(agora)
+  const min = hora * 60 + minuto
+  return diaSemana >= 1 && diaSemana <= 5 && min >= HORA_INICIO * 60 && min <= HORA_FIM * 60
 }
 
-/** "Bom dia" antes das 12h, "Boa tarde" depois (America/Sao_Paulo). */
-export function textoPrimeiroContato(agora: Date): string {
-  return `${relogioSp(agora).hora < 12 ? "Bom dia" : "Boa tarde"}, ${CORPO_PRIMEIRO}`
+export function textoPrimeiroContato(canal: Canal): string {
+  return `${CORPO_PRIMEIRO} ${linkCadastro(canal)}`
 }
 
-export function textoDoPasso(passo: Passo, agora: Date): string {
-  return passo === "primeiro_contato" ? textoPrimeiroContato(agora) : TEXTO_LEMBRETE
+export function textoDoPasso(passo: Passo, canal: Canal): string {
+  return passo === "primeiro_contato" ? textoPrimeiroContato(canal) : TEXTO_LEMBRETE
 }
 
 /** Celular brasileiro: DDD (2 dígitos) + 9 + 8 dígitos. Devolve o número com 55, ou null. */

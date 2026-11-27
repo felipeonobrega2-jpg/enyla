@@ -43,18 +43,19 @@ async function reservarVez(): Promise<number | null> {
 }
 
 /** Registra no histórico do prospecto, com quem fez. Não usa a chave `envio` (que é da cadência e mexeria nela). */
-async function registrar(p: ProspectoDoJid, entrada: Record<string, unknown>): Promise<void> {
+export async function registrar(p: ProspectoDoJid, entrada: Record<string, unknown>, campos: Record<string, unknown> = {}): Promise<boolean> {
   let atual = p
   for (let i = 0; i < 3; i++) {
     const hist = Array.isArray(atual.historico_etapas) ? atual.historico_etapas : []
     const novoEm = new Date().toISOString()
-    const { data } = await supabase.from("prospectos_parceiros").update({ historico_etapas: [...hist, { etapa: atual.etapa, em: novoEm, ...entrada }], atualizado_em: novoEm })
+    const { data } = await supabase.from("prospectos_parceiros").update({ historico_etapas: [...hist, { etapa: atual.etapa, em: novoEm, ...entrada }], atualizado_em: novoEm, ...campos })
       .eq("id", atual.id).eq("atualizado_em", atual.atualizado_em).select("id")
-    if (Array.isArray(data) && data.length) return
+    if (Array.isArray(data) && data.length) return true
     const { data: l } = await supabase.from("prospectos_parceiros").select("id, razao_social, nome_fantasia, telefone, etapa, opt_out, historico_etapas, atualizado_em").eq("id", p.id).maybeSingle()
-    if (!l) return
+    if (!l) return false
     atual = l as ProspectoDoJid
   }
+  return false
 }
 
 /** Com o texto já redigido: reserva a vez, confere de novo a exclusão, envia pela Evolution e registra no histórico. */
