@@ -9,7 +9,8 @@ vi.mock("@/app/lib/configAtomica", () => ({
     const m = f(structuredClone(est.cfg)); if (m) est.cfg = { ...est.cfg, ...m }; return est.cfg
   }),
 }))
-vi.mock("@/app/lib/pluggy", () => ({
+vi.mock("@/app/lib/pluggy", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/app/lib/pluggy")>()),
   pluggyConfigurada: () => true,
   atualizarItem: vi.fn(async () => ({ ok: true })),
   item: vi.fn(async () => ({ ok: true, dados: { connector: { name: "Santander" }, lastUpdatedAt: new Date().toISOString(), status: "UPDATED" } })),

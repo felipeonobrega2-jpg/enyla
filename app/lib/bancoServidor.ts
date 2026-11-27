@@ -4,7 +4,7 @@
 import { lerConfigLinha } from "./configAtomica"
 import { randomUUID } from "crypto"
 import { supabase } from "./supabase"
-import { contas as contasPluggy, item as itemPluggy, transacoes, pluggyConfigurada, atualizarItem, ContaPluggy } from "./pluggy"
+import { contas as contasPluggy, item as itemPluggy, transacoes, pluggyConfigurada, atualizarItem, bancoParado, recusaDoMeuPluggy, ContaPluggy } from "./pluggy"
 import { daPluggy, sugerir, aprender, aprenderConta, contasNovasDoBanco, type ContaVista, completarSugestao as completar, regrasDoHistorico, paresDeDevolucao, FOI_E_VOLTOU, regraConfiavel, regraDaTx, aceitouSemMudar, zerarConfianca, vinculosPorSoma, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
 import { montarPedidos, pedidoEntregue, nomeChave, type Pedido } from "./negocio"
 import { previstosEmAberto, pedidoDoCusto, type PrevistoPedido } from "./calibragem"
@@ -123,9 +123,9 @@ async function sincronizarPluggy(sugerirAgora = true): Promise<{ ok: boolean; no
     const info = await itemPluggy(it.id)
     const banco = it.nome || info.dados?.connector?.name || "Banco"
     const atualizadoEm = info.dados?.lastUpdatedAt ?? null
-    const velho = !atualizadoEm || Date.now() - new Date(atualizadoEm).getTime() > 36 * 3600_000
-    const motivo = !pedidos[i].ok ? pedidos[i].erro ?? null : info.dados?.error?.message ?? (info.dados?.status && !["UPDATED", "UPDATING"].includes(info.dados.status) ? `conexão com status ${info.dados.status}` : null)
-    status.bancos!.push({ banco, atualizadoEm, parado: velho || !pedidos[i].ok, motivo })
+    const recusaOk = !pedidos[i].ok && recusaDoMeuPluggy(pedidos[i].erro)
+    const motivo = !pedidos[i].ok && !recusaOk ? pedidos[i].erro ?? null : info.dados?.error?.message ?? (info.dados?.status && !["UPDATED", "UPDATING"].includes(info.dados.status) ? `conexão com status ${info.dados.status}` : null)
+    status.bancos!.push({ banco, atualizadoEm, parado: bancoParado(pedidos[i], atualizadoEm), motivo })
     const r = await contasPluggy(it.id)
     if (!r.ok) { status.erro = `${banco}: ${r.erro}`; continue }
     for (const c of (r.dados?.results ?? []).filter((c: ContaPluggy) => c.type === "BANK")) {

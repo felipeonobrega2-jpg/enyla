@@ -60,3 +60,12 @@ export async function atualizarItem(id: string): Promise<{ ok: boolean; erro?: s
   const j = await r.json().catch(() => null) as { message?: string; codeDescription?: string } | null
   return { ok: false, erro: j?.message ?? j?.codeDescription ?? `Pluggy respondeu ${r.status}.` }
 }
+
+// MeuPluggy se atualiza sozinho e recusa o PATCH ("MeuPluggy item cant be updated"). Isso não é falha do banco.
+export const recusaDoMeuPluggy = (erro?: string | null) => !!erro && /meupluggy.*(cant|can'?t|cannot|can not) be updated/i.test(erro)
+
+// Banco parado: lastUpdatedAt velho (36 h) ou o PATCH falhou por outro motivo. A recusa do MeuPluggy só conta pela idade.
+export function bancoParado(pedido: { ok: boolean; erro?: string }, atualizadoEm: string | null | undefined, agora = Date.now()): boolean {
+  const velho = !atualizadoEm || agora - new Date(atualizadoEm).getTime() > 36 * 3600_000
+  return velho || (!pedido.ok && !recusaDoMeuPluggy(pedido.erro))
+}
