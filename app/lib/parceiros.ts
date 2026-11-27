@@ -226,6 +226,10 @@ export type CadastroParceiro = {
   modo?: ModoParceira
   fornecedorId?: string
   emails?: { tipo: "recebido" | "aprovado"; em: string; ok: boolean; erro?: string }[]
+  // Rascunho montado pelo Atendente a partir da conversa no WhatsApp (ausente = veio do formulário /parceiros)
+  origem?: "formulario" | "prospector"
+  prospectoId?: number
+  faltando?: string[]              // o que ainda falta (vazio/ausente = completo); o status segue "novo": a IA nunca aprova
 }
 
 export const ERRO_ACEITE_TERMOS = "Marque a caixa para aceitar os Termos de Parceria e enviar"
