@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server"
-import { segredoValido, fonteDoExtrato } from "@/app/lib/openi"
+import { segredoValido, fonteDoExtrato, openiJunto } from "@/app/lib/openi"
 import { sincronizarOpeni } from "@/app/lib/bancoServidor"
 import { lerConfigLinha } from "@/app/lib/configAtomica"
 
@@ -13,7 +13,8 @@ export async function POST(req: NextRequest) {
   if (!segredoValido(recebido)) return NextResponse.json({ erro: "não autorizado" }, { status: 401 })
   after(async () => {
     const { data } = await lerConfigLinha()
-    if (fonteDoExtrato((data?.data as { bankFeedSource?: unknown } | null)?.bankFeedSource) !== "openi") return   // chave desligada: ignora
+    // Roda com a chave em openi ou, no modo junto com a Pluggy, quando OPENI_API_KEY e OPENI_CONTAS existem; senão ignora
+    if (fonteDoExtrato((data?.data as { bankFeedSource?: unknown } | null)?.bankFeedSource) !== "openi" && !openiJunto()) return
     await sincronizarOpeni().catch(() => console.error("[openi] falha ao sincronizar"))
   })
   return NextResponse.json({ ok: true })

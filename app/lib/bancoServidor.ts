@@ -5,10 +5,10 @@ import { lerConfigLinha } from "./configAtomica"
 import { randomUUID } from "crypto"
 import { supabase } from "./supabase"
 import { contas as contasPluggy, item as itemPluggy, transacoes, pluggyConfigurada, atualizarItem, ContaPluggy } from "./pluggy"
-import { daPluggy, sugerir, aprender, aprenderConta, completarSugestao as completar, regrasDoHistorico, paresDeDevolucao, FOI_E_VOLTOU, regraConfiavel, regraDaTx, aceitouSemMudar, zerarConfianca, vinculosPorSoma, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
+import { daPluggy, sugerir, aprender, aprenderConta, contasNovasDoBanco, type ContaVista, completarSugestao as completar, regrasDoHistorico, paresDeDevolucao, FOI_E_VOLTOU, regraConfiavel, regraDaTx, aceitouSemMudar, zerarConfianca, vinculosPorSoma, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
 import { montarPedidos, pedidoEntregue, nomeChave, type Pedido } from "./negocio"
 import { previstosEmAberto, pedidoDoCusto, type PrevistoPedido } from "./calibragem"
-import { fonteDoExtrato, openiConfigurada, lerContasOpeni, contaValeNaData, transacoesOpeni, daOpeni, type TxOpeni } from "./openi"
+import { fonteDoExtrato, openiConfigurada, openiJunto, lerContasOpeni, contaValeNaData, transacoesOpeni, daOpeni, type TxOpeni } from "./openi"
 import { MARCA } from "./conciliacao"
 import { clienteClaude, FALLBACK, MODELO } from "./claude"
 import type { LancamentoFinanceiro, KanbanCard } from "../types"
@@ -47,19 +47,31 @@ const linhaLanc = (l: Partial<LancamentoFinanceiro>) => Object.fromEntries(COLUN
 // ── Sincronizar ──────────────────────────────────────────────────────────────
 // Extrato da Openi (bankFeedSource = 'openi'). Só insere o que ainda não existe (id = "openi:<id externo>"):
 // nada que já está no banco é alterado, então estado, vínculo e histórico ficam como estão.
-export async function sincronizarOpeni(): Promise<{ ok: boolean; novas: number; sugeridas: number; restantes?: number; erro?: string }> {
-  if (!openiConfigurada()) return { ok: false, novas: 0, sugeridas: 0, erro: "Openi não configurada (OPENI_API_KEY na Vercel)." }
+// Cria a conta de cadastro de um banco novo (uma vez só) e grava contasDoBanco pelo conta_id.
+async function garantirContas(vistas: ContaVista[]) {
+  if (!vistas.length) return
+  await mudarConfig((d: Record<string, unknown> & { contas?: { id: string; banco: string }[]; contasDoBanco?: ContasDoBanco }) => {
+    const r = contasNovasDoBanco(d.contas ?? [], d.contasDoBanco, vistas, () => `conta-${randomUUID().slice(0, 8)}`)
+    return r.contas.length ? { contas: [...(d.contas ?? []), ...r.contas], contasDoBanco: r.mapa } : null
+  })
+}
+
+type Ingestao = { ok: boolean; novas: number; erro?: string }
+async function ingerirOpeni(): Promise<Ingestao> {
+  if (!openiConfigurada()) return { ok: false, novas: 0, erro: "Openi não configurada (OPENI_API_KEY na Vercel)." }
   const contas = lerContasOpeni()
-  if (!contas.length) return { ok: false, novas: 0, sugeridas: 0, erro: "Nenhuma conta da Openi configurada (OPENI_CONTAS)." }
+  if (!contas.length) return { ok: false, novas: 0, erro: "Nenhuma conta da Openi configurada (OPENI_CONTAS)." }
   const cfg = await lerConfig()
   const desde = cfg.pluggy?.dataCorte ?? hojeSP()
   let erro: string | null = null
   const linhas: Record<string, unknown>[] = []
+  const vistas: ContaVista[] = []
   for (const c of contas) {
     const t = await transacoesOpeni(c.item, c.conta)
     if (!t.ok) { erro = t.erro ?? "Falha na Openi."; continue }
+    if (c.banco) vistas.push({ conta_id: c.conta, banco: c.banco })
     for (const x of t.lista as TxOpeni[]) {
-      const m = daOpeni(x, c.conta, `Openi · ${c.conta.slice(-4)}`)
+      const m = daOpeni(x, c.conta, c.banco ? `${c.banco} · ${c.conta.slice(-4)}` : `Openi · ${c.conta.slice(-4)}`)
       if (!m || m.data < desde || !contaValeNaData(c, m.data)) continue
       linhas.push({ ...m, bruto: x })
     }
@@ -69,18 +81,39 @@ export async function sincronizarOpeni(): Promise<{ ok: boolean; novas: number; 
     const { data } = await supabase.from("banco_transacoes").upsert(linhas.slice(i, i + 500), { onConflict: "id", ignoreDuplicates: true }).select("id")
     novas += (data ?? []).length
   }
-  const s = await sugerirPendentes(40_000)
-  return { ok: !erro, novas, sugeridas: s.feitas, restantes: s.restantes, erro: erro ?? undefined }
+  await garantirContas(vistas).catch(() => console.error("[openi] falha ao criar a conta de cadastro"))
+  return { ok: !erro, novas, erro: erro ?? undefined }
 }
 
+export async function sincronizarOpeni(): Promise<{ ok: boolean; novas: number; sugeridas: number; restantes?: number; erro?: string }> {
+  if (!openiConfigurada() || !lerContasOpeni().length) return { ...(await ingerirOpeni()), sugeridas: 0 }   // só devolve o erro de configuração
+  const r = await ingerirOpeni()
+  const s = await sugerirPendentes(40_000)
+  return { ...r, sugeridas: s.feitas, restantes: s.restantes }
+}
+
+// Pluggy e Openi juntas: a Pluggy segue no que está configurado; a Openi entra quando OPENI_API_KEY e OPENI_CONTAS existem
+// (mesmo com bankFeedSource em pluggy). bankFeedSource = 'openi' continua desligando a Pluggy.
 export async function sincronizar(): Promise<{ ok: boolean; novas: number; sugeridas: number; restantes?: number; erro?: string }> {
   if (fonteDoExtrato((await lerConfig()).bankFeedSource) === "openi") return sincronizarOpeni()
-  if (!pluggyConfigurada()) return { ok: false, novas: 0, sugeridas: 0, erro: "Pluggy não configurada (chaves na Vercel)." }
+  if (!openiJunto()) return sincronizarPluggy()
+  const p = await sincronizarPluggy(false)
+  const o = await ingerirOpeni()
+  const s = await sugerirPendentes(40_000)
+  // Pluggy sem configuração não é erro quando a Openi está ligada
+  const erroP = p.semConfig ? undefined : p.erro
+  const erro = [erroP, o.erro].filter(Boolean).join(" | ") || undefined
+  return { ok: !erro, novas: p.novas + o.novas, sugeridas: s.feitas, restantes: s.restantes, erro }
+}
+
+async function sincronizarPluggy(sugerirAgora = true): Promise<{ ok: boolean; novas: number; sugeridas: number; restantes?: number; erro?: string; semConfig?: boolean }> {
+  if (!pluggyConfigurada()) return { ok: false, novas: 0, sugeridas: 0, erro: "Pluggy não configurada (chaves na Vercel).", semConfig: true }
   const cfg = await lerConfig()
   const conf = cfg.pluggy ?? {}
   const desde = conf.dataCorte ?? hojeSP()
   const itens = conf.itens ?? []
-  if (!itens.length) return { ok: false, novas: 0, sugeridas: 0, erro: "Nenhum banco conectado: cole o Item ID de cada banco em Financeiro → Banco." }
+  if (!itens.length) return { ok: false, novas: 0, sugeridas: 0, erro: "Nenhum banco conectado: cole o Item ID de cada banco em Financeiro → Banco.", semConfig: true }
+  const vistas: ContaVista[] = []
 
   // Pede à Pluggy para buscar no banco de novo (o que chegar depois entra na próxima sincronização, em poucos minutos)
   const pedidos = await Promise.all(itens.map(it => atualizarItem(it.id).catch(() => ({ ok: false, erro: "Sem conexão com a Pluggy." }))))
@@ -97,6 +130,7 @@ export async function sincronizar(): Promise<{ ok: boolean; novas: number; suger
     if (!r.ok) { status.erro = `${banco}: ${r.erro}`; continue }
     for (const c of (r.dados?.results ?? []).filter((c: ContaPluggy) => c.type === "BANK")) {
       status.contas.push({ id: c.id, nome: `${banco}${c.number ? ` · ${c.number}` : ""}`, banco, saldo: c.balance ?? null })
+      vistas.push({ conta_id: c.id, banco })
       const t = await transacoes<TxPluggy>(c.id, desde)
       if (!t.ok) { status.erro = `${banco}: ${t.erro}`; continue }
       for (const x of t.lista) {
@@ -114,6 +148,8 @@ export async function sincronizar(): Promise<{ ok: boolean; novas: number; suger
   }
   status.novas = novas
   await salvarCampos({ pluggyStatus: status })
+  await garantirContas(vistas).catch(() => console.error("[pluggy] falha ao criar a conta de cadastro"))
+  if (!sugerirAgora) return { ok: !status.erro, novas, sugeridas: 0, erro: status.erro ?? undefined }
   const s = await sugerirPendentes(40_000)
   return { ok: !status.erro, novas, sugeridas: s.feitas, restantes: s.restantes, erro: status.erro ?? undefined }
 }

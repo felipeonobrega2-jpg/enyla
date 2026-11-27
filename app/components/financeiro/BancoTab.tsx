@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { RefreshCw, Link2, Plus, EyeOff, Undo2, Settings2, Sparkles, Landmark, Check, X, Loader2, AlertCircle, ArrowDownLeft, ArrowUpRight, Layers, Keyboard, Zap, Wallet } from "lucide-react"
 import type { KanbanCard, LancamentoFinanceiro } from "../../types"
 import type { Configuracoes } from "../../config"
-import { chaveContraparte, REGRA_CONFIAVEL, pagamentoDaConta, possiveisDuplicados, duplicadosNoLote, type TxBanco, type SugestaoBanco } from "../../lib/banco"
+import { chaveContraparte, contaDoBanco, REGRA_CONFIAVEL, pagamentoDaConta, possiveisDuplicados, duplicadosNoLote, type TxBanco, type SugestaoBanco } from "../../lib/banco"
 import { ModalLancamento } from "../FinanceiroView"
 import { Botao, Selo, Segmentado, Vazio } from "../ds"
 
@@ -111,7 +111,10 @@ export function BancoTab({ config, lancamentos, kanban, onUpdateConfig, onAdd, o
   const abrirCorrecao = (tx: TxBanco, s: SugestaoBanco | null) => {
     salvos.current = []
     const base = s?.acao === "criar" ? s.lancamentos[0] : {}
-    setCorrigindo({ tx, inicial: { tipo: tx.tipo === "entrada" ? "receita" : "despesa", descricao: tx.contraparte_nome ?? tx.descricao, valor: tx.valor, dataVencimento: tx.data, dataPagamento: tx.data, status: "pago", ...base } })
+    // Conta do cadastro pelo mapa do banco (antes da conta padrão); só vale se ainda existir e estiver ativa
+    const mapeada = contaDoBanco(config.contasDoBanco, tx.conta_id)
+    const contaMapeada = (config.contas ?? []).some(c => c.id === mapeada && c.ativa) ? mapeada : undefined
+    setCorrigindo({ tx, inicial: { tipo: tx.tipo === "entrada" ? "receita" : "despesa", descricao: tx.contraparte_nome ?? tx.descricao, valor: tx.valor, dataVencimento: tx.data, dataPagamento: tx.data, status: "pago", ...(contaMapeada ? { contaId: contaMapeada } : {}), ...base } })
   }
 
   const exatos = (dados?.transacoes ?? []).filter(t => t.sugestao?.acao === "vincular" || t.sugestao?.acao === "atualizar" || t.sugestao?.acao === "vincularVarios")

@@ -327,6 +327,28 @@ export function contaDoBanco(m: ContasDoBanco | undefined, contaBanco: string): 
   return Object.entries(x).sort((a, b) => b[1] - a[1])[0]?.[0]
 }
 
+// Conta bancária nova (Openi ou Pluggy): cria a conta de cadastro uma vez só e grava o mapa pelo conta_id, para a
+// conciliação não cair na conta padrão. Conta do banco já mapeada, ou de um banco que já tem cadastro, não muda.
+export type ContaVista = { conta_id: string; banco: string }
+const semAcento = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
+export function contasNovasDoBanco(
+  cadastro: { id: string; banco: string }[], mapa: ContasDoBanco | undefined, vistas: ContaVista[], novoId: () => string,
+): { contas: { id: string; nome: string; banco: string; tipo: "corrente"; cor: string; ativa: true }[]; mapa: ContasDoBanco } {
+  const novas: { id: string; nome: string; banco: string; tipo: "corrente"; cor: string; ativa: true }[] = []
+  let m: ContasDoBanco = mapa ?? {}
+  const vistos = new Set<string>()
+  for (const v of vistas) {
+    if (!v.conta_id || vistos.has(v.conta_id) || m[v.conta_id]) continue
+    vistos.add(v.conta_id)
+    const nb = semAcento(v.banco)
+    if (!nb || [...cadastro, ...novas].some(c => { const cb = semAcento(c.banco); return cb && (cb.includes(nb) || nb.includes(cb)) })) continue
+    const id = novoId()
+    novas.push({ id, nome: v.banco, banco: v.banco, tipo: "corrente", cor: "#8456e8", ativa: true })
+    m = aprenderConta(m, v.conta_id, id)
+  }
+  return { contas: novas, mapa: m }
+}
+
 // Subcategoria só vale se for uma das da categoria (nome exato, sem diferença de maiúscula/acento)
 export function subcategoriaValida(subs: string[] | undefined, sub: string | null | undefined): string | undefined {
   if (!sub || !subs?.length) return undefined

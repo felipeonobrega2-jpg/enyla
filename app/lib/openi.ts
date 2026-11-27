@@ -1,7 +1,9 @@
 // Cliente da Openi (Open Finance, https://of.openi.com.br/v1). Só roda no servidor.
 // Chave na Vercel: OPENI_API_KEY (nunca no código). Webhook protegido por OPENI_WEBHOOK_SECRET.
 // Quais itens/contas valem, e de que data a que data, vêm de OPENI_CONTAS (JSON), preenchida fora do código:
-//   [{"item":"<id>","conta":"<id>","antesDe":"2026-12-01"},{"item":"<id>","conta":"<id>","aPartirDe":"2026-12-01"}]
+//   [{"item":"<id>","conta":"<id>","banco":"Itaú","antesDe":"2026-12-01"},{"item":"<id>","conta":"<id>","aPartirDe":"2026-12-01"}]
+// "banco" (opcional) = nome da conta no cadastro, criada sozinha na primeira vez. Só conta corrente (cartão fica de fora).
+// Com OPENI_API_KEY e OPENI_CONTAS presentes a Openi roda junto com a Pluggy, mesmo com bankFeedSource em pluggy.
 // "antesDe" = vale para movimentos com data anterior à data; "aPartirDe" = vale da data em diante (inclusive).
 
 import { timingSafeEqual } from "crypto"
@@ -14,7 +16,7 @@ export const fonteDoExtrato = (v: unknown): FonteExtrato => (v === "openi" ? "op
 
 export const openiConfigurada = () => !!process.env.OPENI_API_KEY
 
-export type ContaOpeni = { item: string; conta: string; antesDe?: string; aPartirDe?: string }
+export type ContaOpeni = { item: string; conta: string; banco?: string; antesDe?: string; aPartirDe?: string }
 
 export function lerContasOpeni(bruto = process.env.OPENI_CONTAS): ContaOpeni[] {
   if (!bruto) return []
@@ -23,9 +25,12 @@ export function lerContasOpeni(bruto = process.env.OPENI_CONTAS): ContaOpeni[] {
     if (!Array.isArray(j)) return []
     const dia = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined)
     return j.filter(c => c && typeof c.item === "string" && typeof c.conta === "string" && c.item && c.conta)
-      .map(c => ({ item: c.item, conta: c.conta, antesDe: dia(c.antesDe), aPartirDe: dia(c.aPartirDe) }))
+      .map(c => ({ item: c.item, conta: c.conta, banco: typeof c.banco === "string" && c.banco.trim() ? c.banco.trim() : undefined, antesDe: dia(c.antesDe), aPartirDe: dia(c.aPartirDe) }))
   } catch { return [] }
 }
+
+// Openi roda junto com a Pluggy quando a chave e as contas existem
+export const openiJunto = () => openiConfigurada() && lerContasOpeni().length > 0
 
 // A conta vale para esta data? (por conta e por período)
 export const contaValeNaData = (c: Pick<ContaOpeni, "antesDe" | "aPartirDe">, data: string) =>

@@ -100,6 +100,7 @@ export type Configuracoes = {
   enderecosClientes?: Record<string, import("./lib/frete").Endereco & { recebedor?: string; telefone?: string }>  // entrega salva por cliente (gravado pelo servidor)
   pluggy?: import("./lib/bancoServidor").ConfigPluggy        // bancos conectados (Item ID), data de corte, modo automático
   bankFeedSource?: "pluggy" | "openi"                        // de onde vem o extrato bancário (padrão: pluggy)
+  contasDoBanco?: import("./lib/banco").ContasDoBanco        // conta do banco → conta do cadastro (gravado pelo servidor)
   pluggyStatus?: import("./lib/bancoServidor").StatusPluggy  // última sincronização (gravado pelo servidor)
   regrasBanco?: import("./lib/banco").RegraBanco[]           // aprendidas com as suas correções (gravado pelo servidor)
   guiaAtendimento?: string                                 // como você conversa: a IA lê antes de sugerir mensagens
