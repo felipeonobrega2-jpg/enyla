@@ -5,7 +5,7 @@ import { lerConfigLinha } from "./configAtomica"
 import { randomUUID } from "crypto"
 import { supabase } from "./supabase"
 import { contas as contasPluggy, item as itemPluggy, transacoes, pluggyConfigurada, atualizarItem, bancoParado, recusaDoMeuPluggy, ContaPluggy } from "./pluggy"
-import { daPluggy, sugerir, aprender, aprenderConta, contasNovasDoBanco, type ContaVista, completarSugestao as completar, regrasDoHistorico, paresDeDevolucao, FOI_E_VOLTOU, regraConfiavel, regraDaTx, aceitouSemMudar, zerarConfianca, vinculosPorSoma, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
+import { daPluggy, sugerir, aprender, aprenderConta, contasNovasDoBanco, type ContaVista, completarSugestao as completar, regrasDoHistorico, paresDeDevolucao, FOI_E_VOLTOU, regraConfiavel, regraDaTx, aceitouSemMudar, zerarConfianca, vinculosPorSoma, bloqueiaLigacaoAutomatica, TxBanco, TxPluggy, RegraBanco, SugestaoBanco, ContasDoBanco } from "./banco"
 import { montarPedidos, pedidoEntregue, nomeChave, type Pedido } from "./negocio"
 import { previstosEmAberto, pedidoDoCusto, type PrevistoPedido } from "./calibragem"
 import { fonteDoExtrato, openiConfigurada, openiJunto, lerContasOpeni, contaValeNaData, transacoesOpeni, daOpeni, type TxOpeni } from "./openi"
@@ -490,6 +490,13 @@ export async function aplicar(txId: string, d: Decisao): Promise<{ ok: boolean; 
     return { ok: true, tx: nova as TxBanco, removidos: antes.criados ?? [], atualizados: [...(antes.restaurar ? [antes.restaurar] : []), ...(antes.restaurarVarios ?? [])] }
   }
   if (tx.estado !== "pendente") return { ok: false, erro: "Essa transação já foi resolvida. Desfaça antes para mudar." }
+  // Ligação automática: só 1 para 1 com valor exato, fora de fatura/cartão e de movimento desfeito (a sugestão segue pendente)
+  if ("automatico" in d && d.automatico && (d.acao === "vincular" || d.acao === "atualizar" || d.acao === "vincularVarios")) {
+    let valorL: number | undefined
+    if (d.acao !== "vincularVarios") valorL = ((await supabase.from("LancamentoFinanceiro").select("valor").eq("id", d.lancamentoId).maybeSingle()).data as { valor: number } | null)?.valor
+    const bloqueio = bloqueiaLigacaoAutomatica(tx, d as { acao: string; junto?: string[] }, valorL)
+    if (bloqueio) return { ok: false, erro: bloqueio }
+  }
   // Um lançamento serve a uma transação só: não liga ao que já está ligado a outra
   const paraLigar = d.acao === "vincularVarios" ? d.lancamentoIds : d.acao === "vincular" || d.acao === "atualizar" ? [d.lancamentoId] : []
   if (paraLigar.length) {

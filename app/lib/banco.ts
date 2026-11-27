@@ -493,3 +493,26 @@ export function vinculosPorSoma(pendentes: TxBanco[], livres: LancamentoFinancei
   }
   return { porTx, rateioAutomatico }
 }
+
+// ── Ligação automática: o que a sincronização pode ligar sozinha ─────────────
+// Só vínculo 1 para 1 com o mesmo valor exato. Soma de várias transações (`junto`), vincularVarios,
+// descrição de pagamento de fatura/cartão e movimento que a pessoa desfez ficam pendentes para decisão.
+export function pagamentoDeFatura(descricao: string): boolean {
+  const d = (descricao ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+  return /\bpag(amento|to|\.)?\s*(de\s+|da\s+|do\s+)?(fatura|cartao)/.test(d) || /\bfatura\b.*\bcartao\b|\bfatura\s+(do\s+)?(cartao|itau|nubank|visa|master)/.test(d) || /\bpgto\s*fat/.test(d)
+}
+export function foiDesfeita(tx: Pick<TxBanco, "historico">): boolean {
+  return (tx.historico ?? []).some(h => h.acao === "desfeito")
+}
+export function bloqueiaLigacaoAutomatica(
+  tx: Pick<TxBanco, "descricao" | "valor" | "historico">,
+  d: { acao: string; junto?: string[] },
+  valorLancamento?: number,
+): string | null {
+  if (foiDesfeita(tx)) return "movimento desfeito por você: não é religado sozinho"
+  if (d.acao === "vincularVarios") return "vários lançamentos: fica para você decidir"
+  if (d.junto?.length) return "soma de várias transações: fica para você decidir"
+  if (pagamentoDeFatura(tx.descricao)) return "pagamento de fatura/cartão: fica para você decidir"
+  if ((d.acao === "vincular" || d.acao === "atualizar") && (valorLancamento === undefined || Math.abs(Math.abs(valorLancamento) - Math.abs(tx.valor)) > 0.005)) return "valor diferente: fica para você decidir"
+  return null
+}
