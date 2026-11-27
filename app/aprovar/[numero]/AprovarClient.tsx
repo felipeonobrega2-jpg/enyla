@@ -17,6 +17,7 @@ type Proposta = {
   vencida: boolean
   jaAprovado: boolean
   sinalPct: number
+  condicaoTexto?: string   // condição de pagamento personalizada (sem: sinal + restante na entrega)
   caixa?: { largura: number; altura: number; profundidade: number; material?: string; verniz?: boolean; laminacao?: string | null; arteUrl?: string | null; artePrevia?: import("@/app/lib/artePrevia").FacesArte | null; efeitos?: import("@/app/lib/artePrevia").EfeitosCaixa } | null
   entregaSeAprovarHoje?: string | null
   termos?: { titulo: string; itens: string[] }[]
@@ -88,12 +89,12 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
           <Aviso icone={<AlertCircle className="w-6 h-6" />} titulo="Link inválido" texto="Este link de aprovação não é válido. Peça um novo link para a Enyla." />
         ) : feito ? (
           <PosAprovacao numero={numero} token={token} primeiroNome={nome.trim().split(" ")[0] || proposta.nomeCliente.split(" ")[0]} quantidade={escolhida!.quantidade}
-            total={escolhida!.preco} sinal={feito.sinal} sinalPct={proposta.sinalPct} pix={feito.pix} rastreio={feito.rastreio}
+            total={escolhida!.preco} sinal={feito.sinal} sinalPct={proposta.sinalPct} condicaoTexto={proposta.condicaoTexto} pix={feito.pix} rastreio={feito.rastreio}
             entregaAte={proposta.entregaSeAprovarHoje} cartao={!!proposta.pagamento?.cartao} pago={false} nomeAprovou={nome.trim()} agoraAprovou />
         ) : proposta.jaAprovado ? (
           proposta.pagamento ? (
             <PosAprovacao numero={numero} token={token} primeiroNome={proposta.nomeCliente.split(" ")[0]} quantidade={proposta.pagamento.quantidade}
-              total={proposta.pagamento.total} sinal={proposta.pagamento.sinal} sinalPct={proposta.sinalPct} pix={proposta.pagamento.pix}
+              total={proposta.pagamento.total} sinal={proposta.pagamento.sinal} sinalPct={proposta.sinalPct} condicaoTexto={proposta.condicaoTexto} pix={proposta.pagamento.pix}
               rastreio={`/track/${encodeURIComponent(numero)}`} entregaAte={proposta.pagamento.entregaAte} cartao={proposta.pagamento.cartao}
               pago={proposta.pagamento.pago} retorno={proposta.pagamento.retorno} />
           ) : (
@@ -171,7 +172,9 @@ export default function AprovarClient({ numero, token, proposta }: { numero: str
               <label className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" checked={aceite} onChange={e => setAceite(e.target.checked)} className="mt-0.5 w-5 h-5 accent-[#8456e8] shrink-0" />
                 <span className="text-[13px] text-[#5e5c68] leading-relaxed">
-                  Aprovo a proposta {numero}{escolhida ? <> de <strong className="text-[#191625]">{num(escolhida.quantidade)} unidades</strong> por <strong className="text-[#191625]">{brl(escolhida.preco)}</strong></> : ""}. A produção começa após o sinal de {proposta.sinalPct}%{proposta.pagamento?.cartao ? " (ou o pagamento no cartão)" : ""}.
+                  Aprovo a proposta {numero}{escolhida ? <> de <strong className="text-[#191625]">{num(escolhida.quantidade)} unidades</strong> por <strong className="text-[#191625]">{brl(escolhida.preco)}</strong></> : ""}{proposta.condicaoTexto
+                    ? <>. Pagamento: {proposta.condicaoTexto}{proposta.pagamento?.cartao ? " (ou o pedido inteiro no cartão)" : ""}.</>
+                    : <>. A produção começa após o sinal de {proposta.sinalPct}%{proposta.pagamento?.cartao ? " (ou o pagamento no cartão)" : ""}.</>}
                   {proposta.termos?.length ? <> Li e aceito os <button type="button" onClick={e => { e.preventDefault(); setVerTermos(v => !v) }} className="text-[#8456e8] font-semibold underline underline-offset-2">termos do pedido</button>.</> : null}
                 </span>
               </label>

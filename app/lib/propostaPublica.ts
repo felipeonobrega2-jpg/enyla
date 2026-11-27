@@ -1,6 +1,7 @@
 // Dados da proposta mostrados ao cliente na página pública de aprovação (só leitura no servidor).
 
 import { supabase } from "./supabase"
+import { condicaoValida } from "./condicaoPagamento"
 import { efeitosDoFormulario } from "./artePrevia"
 import { validaAte } from "./aprovacao"
 import { KanbanCard, KanbanOpcao, FormData } from "../types"
@@ -16,6 +17,7 @@ export type PropostaPublica = {
   observacao?: string
   validaAte: string | null
   vencida: boolean
+  condicao?: import("./condicaoPagamento").CondicaoPagamento   // condição de pagamento do orçamento (sem: padrão)
 }
 
 const TIPO_CAIXA: Record<string, string> = {
@@ -78,5 +80,7 @@ export async function carregarProposta(numero: string): Promise<PropostaPublica 
     card: card as KanbanCard, caixa, opcoes, especificacoes: especificar(card as KanbanCard, form),
     observacao: form?.obsCliente || undefined,
     validaAte: limite, vencida: !!limite && hoje > limite,
+    // Condição que não fecha 100% não vale (fica o padrão) para não cobrar errado
+    condicao: condicaoValida(form?.condicaoPagamento) ? form?.condicaoPagamento : undefined,
   }
 }

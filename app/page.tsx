@@ -104,6 +104,8 @@ import BuscaGlobal from "./components/BuscaGlobal"
 import { parseDXF, DXFResult, caixaDoDxf } from "./lib/dxf"
 import { nomeDoDesenho, facasParaPedido, type FacaSugerida, type Desenho } from "./lib/biblioteca"
 import type { DXFGeo } from "./LayoutChapaVisual"
+import { CondicaoPagamentoCampo } from "./components/CondicaoPagamentoCampo"
+import { textoCondicao } from "./lib/condicaoPagamento"
 
 const FORM_INICIAL: FormData = {
   nomeCliente: "", tipoCaixa: "simples", frente: 0, lateral: 0, alturaBox: 0, abaColagem: 1,
@@ -1596,6 +1598,7 @@ export default function Home() {
       min.quantidade !== ideal.quantidade ? `📌 Pedido mínimo: ${num(min.quantidade)} un — ${brl(precoMin)}` : null,
       form.obsCliente ? `\n📝 ${form.obsCliente}` : null,
       ``,
+      `💳 Pagamento: ${textoCondicao(form.condicaoPagamento, config.sinalPct ?? 50)}.`,
       `⏳ Proposta válida por ${form.validadeDias} dias.`,
       aprovar ? `\n👉 *Veja sua proposta em 3D e aprove:* ${aprovar}` : null,
       ``,
@@ -2503,6 +2506,11 @@ export default function Home() {
                 <span className="block text-[11px] text-[#898892] leading-snug">Aparece na proposta, no PDF, na mensagem e na página de aprovação. Fora de SP segue a combinar.</span>
               </span>
             </label>
+          </FormSection>
+
+          {/* Seção: Condição de pagamento */}
+          <FormSection label="Condição de pagamento">
+            <CondicaoPagamentoCampo valor={form.condicaoPagamento} sinalPct={config.sinalPct ?? 50} onChange={c => set("condicaoPagamento", c)} />
           </FormSection>
 
           {/* Seção: Observações */}

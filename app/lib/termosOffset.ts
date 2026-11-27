@@ -8,7 +8,7 @@ import type { SecaoTermos } from "./termosDigital"
 export const VERSAO_TERMOS_OFFSET = "2026-11-18.1"
 export const VARIACAO_OFFSET_PCT = 10
 
-export function termosOffset(p: { quantidade: number | null; sinalPct: number; prazoDiasUteis: number | null; validaAte: string | null }): SecaoTermos[] {
+export function termosOffset(p: { quantidade: number | null; sinalPct: number; prazoDiasUteis: number | null; validaAte: string | null; condicaoTexto?: string }): SecaoTermos[] {
   const q = p.quantidade ? `${p.quantidade.toLocaleString("pt-BR")} unidades` : "a quantidade escolhida"
   const data = (iso: string) => iso.split("-").reverse().join("/")
   return [
@@ -36,7 +36,9 @@ export function termosOffset(p: { quantidade: number | null; sinalPct: number; p
       "O frete, quando não estiver na proposta, é combinado à parte.",
     ] },
     { titulo: "Pagamento", itens: [
-      `${p.sinalPct}% de sinal para começar e o restante na entrega, ou o pedido inteiro no cartão em até 12x.`,
+      p.condicaoTexto
+        ? `Condição combinada para este pedido: ${p.condicaoTexto}. Ou o pedido inteiro no cartão em até 12x.`
+        : `${p.sinalPct}% de sinal para começar e o restante na entrega, ou o pedido inteiro no cartão em até 12x.`,
     ] },
     { titulo: "Desistência", itens: [
       "Até você aprovar a arte, se desistir, devolvemos o sinal, descontando o que já tiver sido feito sob medida para o seu pedido (faca de corte, clichê, fotolito).",

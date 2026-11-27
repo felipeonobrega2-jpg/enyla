@@ -1,4 +1,5 @@
 import { lerConfigLinha } from "../../../lib/configAtomica"
+import { entradaPct, textoCondicao, valoresDasParcelas, vencimentoDa, type CondicaoPagamento } from "@/app/lib/condicaoPagamento"
 import { NextRequest, NextResponse } from "next/server"
 import { supabase } from "@/app/lib/supabase"
 import { tokenValido, AprovacaoOnline, SINAL_PCT_PADRAO } from "@/app/lib/aprovacao"
@@ -31,6 +32,18 @@ async function fecharSozinho(card: KanbanCard, numero: string, sinal: number, ho
     categoria: "sinal", formaPagamento: "pix", obs: "Criado ao aprovar online", criadoEm: new Date().toISOString(),
   })
   return error ? { loteId, loteNumero } : { loteId, loteNumero, lancamentoSinal: id }
+}
+
+// Parcelas da condição personalizada, menos a entrada (que já é o sinal acima)
+async function lancarParcelas(card: KanbanCard, numero: string, total: number, condicao: CondicaoPagamento, sinalPct: number, hoje: string, entrega: string | null, loteId?: string, loteNumero?: string) {
+  const parcelas = valoresDasParcelas(condicao, sinalPct, total).filter(x => !(x.base === "aprovacao" && x.dias === 0) && x.valor > 0)
+  if (!parcelas.length) return
+  const n = parcelas.length
+  await supabase.from("LancamentoFinanceiro").insert(parcelas.map((x, i) => ({
+    id: crypto.randomUUID(), tipo: "receita", descricao: `Parcela ${i + 1}/${n} · ${numero}`, valor: x.valor, dataVencimento: vencimentoDa(x, hoje, entrega), dataPagamento: null,
+    status: "pendente", cardId: null, cardNumero: numero, nomeCliente: card.nomeCliente, loteId: loteId ?? null, loteNumero: loteNumero ?? null,
+    categoria: "pedido", formaPagamento: "pix", obs: `Condição do orçamento: ${x.pct}% ${x.dias ? `em ${x.dias} dias ` : ""}${x.base === "entrega" ? "após a entrega" : "após a aprovação"} · criado ao aprovar online`, criadoEm: new Date().toISOString(),
+  })))
 }
 
 // Cliente aprova o orçamento pela página pública. Fecha o card, registra no rastreio
@@ -82,13 +95,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ num
   if (emailCliente) await supabase.from("Cliente").update({ email: emailCliente }).eq("nome", p.card.nomeCliente).then(() => null, () => null)
 
   // Aviso para o painel (campo do servidor: salvar a configuração na tela não apaga)
-  const sinal = Math.round(opcao.preco * ((cfg.sinalPct as number | undefined) ?? SINAL_PCT_PADRAO)) / 100
+  const sinalPctCfg = (cfg.sinalPct as number | undefined) ?? SINAL_PCT_PADRAO
+  const sinal = Math.round(opcao.preco * entradaPct(p.condicao, sinalPctCfg)) / 100
   const aprovacao: AprovacaoOnline = {
     numero, cardId: p.card.id, nomeCliente: p.card.nomeCliente, aprovadoPor: nome,
     quantidade: opcao.quantidade, preco: opcao.preco, sinal, em: new Date().toISOString(), termos,
     ...(emailCliente ? { email: emailCliente } : {}),
     ...(await fecharSozinho(p.card, numero, sinal, hoje).catch(() => ({}))),
+    ...(p.condicao?.tipo === "personalizada" ? { condicao: textoCondicao(p.condicao, sinalPctCfg) } : {}),
   }
+  // Condição personalizada: as outras parcelas já entram no A receber, cada uma com o seu vencimento
+  if (p.condicao?.tipo === "personalizada") await lancarParcelas(p.card, numero, opcao.preco, p.condicao, sinalPctCfg, hoje, (patch.dataEntregaPrevista as string | undefined) ?? p.card.dataEntregaPrevista ?? null, aprovacao.loteId, aprovacao.loteNumero).catch(e => console.error("[aprovar parcelas]", e))
   const lista = [aprovacao, ...((cfg.aprovacoesOnline as AprovacaoOnline[] | undefined) ?? [])].slice(0, 100)
   await gravarCampos({ aprovacoesOnline: lista })
 

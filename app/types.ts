@@ -42,6 +42,7 @@ export type FormData = {
   obsCliente: string
   freteGratis?: boolean        // frete grátis para entregas em São Paulo (aparece no PDF, na mensagem e na aprovação)
   validadeDias: number
+  condicaoPagamento?: import("./lib/condicaoPagamento").CondicaoPagamento   // sem campo: padrão (sinal + restante na entrega)
   materialId: string
   materialNome: string
   rota?: import("./lib/producao").OpcoesRota
@@ -302,6 +303,7 @@ export type AprovacaoOnline = {
   loteNumero?: string
   lancamentoSinal?: string
   termos?: { versao: string; em: string }   // termos da proposta aceitos na aprovação
+  condicao?: string     // condição de pagamento personalizada do orçamento (texto), se houver
 }
 
 export type Lote = {

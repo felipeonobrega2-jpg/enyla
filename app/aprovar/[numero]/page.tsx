@@ -11,6 +11,7 @@ import { CONFIG_PADRAO } from "@/app/config"
 import type { VisitaProposta } from "@/app/types"
 import { gravarCampos } from "@/app/lib/configAtomica"
 import { termosOffset, VERSAO_TERMOS_OFFSET } from "@/app/lib/termosOffset"
+import { entradaPct, textoCondicao } from "@/app/lib/condicaoPagamento"
 import { infinitePayConfigurado } from "@/app/lib/infinitePay"
 import { voltaMercadoPago } from "@/app/lib/mercadoPago"
 import { confirmarPagamentoInfinitePay, type PagamentoCartao } from "@/app/lib/cartaoAprovacao"
@@ -60,11 +61,15 @@ export default async function AprovarPage({ params, searchParams }: {
   const prazoDias = normalizarProducao(config.producao as never).prazoEntregaPadraoDias
   const entregaSeAprovarHoje = p ? somarDiasUteis(new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }), normalizarProducao(config.producao as never).prazoEntregaPadraoDias) : null
   if (p && isAberto(p.card) && !(await auth())) await registrarVisita(numero).catch(() => {})
+  // Condição de pagamento do orçamento: a entrada (o que vence na aprovação) é o que o Pix cobra
+  const personalizada = p?.condicao?.tipo === "personalizada"
+  const entrada = entradaPct(p?.condicao, sinalPct)
+  const condicaoTexto = personalizada ? textoCondicao(p!.condicao, sinalPct) : undefined
   // Pedido já aprovado: pode pagar aqui (cartão 100% ou Pix do sinal), a não ser que já esteja pago
   let pagamento = null
   if (p) {
     const total = Number(p.card.preco) || 0
-    const sinal = Math.round(total * sinalPct) / 100
+    const sinal = Math.round(total * entrada) / 100
     const cartao = config.pagamentosCartao?.[numero]
     const { data: rec } = isAberto(p.card) ? { data: [] } : await supabase.from("LancamentoFinanceiro").select("id").eq("cardNumero", numero).eq("tipo", "receita").eq("status", "pago").limit(1)
     pagamento = { total, sinal, pix: `/pix/${encodeURIComponent(numero)}?v=${sinal.toFixed(2)}&c=${encodeURIComponent(p.card.nomeCliente)}`,
@@ -75,9 +80,9 @@ export default async function AprovarPage({ params, searchParams }: {
     <AprovarClient numero={numero} token={t ?? ""}
       proposta={p && {
         nomeCliente: p.card.nomeCliente, opcoes: p.opcoes, especificacoes: p.especificacoes, observacao: p.observacao,
-        validaAte: p.validaAte, vencida: p.vencida, jaAprovado: !isAberto(p.card), sinalPct,
+        validaAte: p.validaAte, vencida: p.vencida, jaAprovado: !isAberto(p.card), sinalPct: entrada, condicaoTexto,
         caixa: p.caixa, entregaSeAprovarHoje,
-        termos: termosOffset({ quantidade: p.opcoes.length === 1 ? p.opcoes[0].quantidade : null, sinalPct, prazoDiasUteis: prazoDias || null, validaAte: p.validaAte }),
+        termos: termosOffset({ quantidade: p.opcoes.length === 1 ? p.opcoes[0].quantidade : null, sinalPct, prazoDiasUteis: prazoDias || null, validaAte: p.validaAte, condicaoTexto }),
         versaoTermos: VERSAO_TERMOS_OFFSET, pagamento,
       }} />
   )
