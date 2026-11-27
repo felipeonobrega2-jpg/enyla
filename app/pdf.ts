@@ -1,4 +1,5 @@
 import { FormData, Calculo, PropostaCustom, KanbanCard, COLUNAS_KANBAN } from "./types"
+import { textoCondicao, condicaoValida, type CondicaoPagamento } from "./lib/condicaoPagamento"
 
 type HistoricoItem = { form: FormData; calculo: Calculo; data: string; numero?: string }
 
@@ -455,7 +456,10 @@ function paginaVisualizacao3D(
 }
 
 export const FRETE_GRATIS = "Frete grátis para entregas em São Paulo"
-function paginaCondicoesGerais(item: { dataRodape: string; freteGratis?: boolean }): string {
+// Condição personalizada do orçamento: troca só o texto (o padrão continua com a frase de sempre)
+const condicaoPdf = (c?: CondicaoPagamento) => c?.tipo === "personalizada" && condicaoValida(c) ? textoCondicao(c, 50).replace(/^./, l => l.toUpperCase()) : null
+
+function paginaCondicoesGerais(item: { dataRodape: string; freteGratis?: boolean; condicao?: CondicaoPagamento }): string {
   const { dataRodape } = item
   return `
 <!-- ═══════════════════════════════════════════════════════ PÁGINA 3: CONDIÇÕES -->
@@ -469,12 +473,12 @@ function paginaCondicoesGerais(item: { dataRodape: string; freteGratis?: boolean
 
   <div class="cond-item">
     <div class="cond-num-titulo">1. Formalização do Pedido</div>
-    <div class="cond-texto">O pedido é considerado fechado com o pagamento do sinal de 50% ou com o envio de ordem de compra pelo cliente. A partir desse momento, iniciamos o desenvolvimento da arte.</div>
+    <div class="cond-texto">O pedido é considerado fechado com o pagamento ${item.condicao?.tipo === "personalizada" ? "da primeira parcela" : "do sinal de 50%"} ou com o envio de ordem de compra pelo cliente. A partir desse momento, iniciamos o desenvolvimento da arte.</div>
   </div>
 
   <div class="cond-item">
     <div class="cond-num-titulo">2. Pagamento</div>
-    <div class="cond-texto">50% de sinal no fechamento do pedido + 50% na entrega. Pagamento via PIX ou transferência. Havendo pendência no saldo final, a entrega fica retida até a regularização.</div>
+    <div class="cond-texto">${condicaoPdf(item.condicao) ?? "50% de sinal no fechamento do pedido + 50% na entrega"}. Pagamento via PIX ou transferência. Havendo pendência no saldo final, a entrega fica retida até a regularização.</div>
   </div>
 
   <div class="cond-item">
@@ -630,7 +634,7 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
 
   <div class="section-bar">Pagamento</div>
   <div class="kv-grid">
-    <div class="kv" style="grid-column:1/-1"><span class="lbl">Condições:</span><span class="val">50% de sinal no fechamento do pedido + 50% na entrega</span></div>
+    <div class="kv" style="grid-column:1/-1"><span class="lbl">Condições:</span><span class="val">${condicaoPdf(form.condicaoPagamento) ?? "50% de sinal no fechamento do pedido + 50% na entrega"}</span></div>
   </div>
 
   ${linhasHtml ? `
@@ -661,7 +665,7 @@ export function gerarHtmlOrcamentoCliente(item: HistoricoItem, telefoneCliente?:
 </div>
 ${temDims3D ? paginaVisualizacao3D(form.frente, form.alturaBox, form.lateral, !!form.incluirVerniz, previewQrDataUrl, previewUrl, data)
   : form.caixaDxf ? paginaVisualizacao3D(form.caixaDxf.largura / 10, form.caixaDxf.altura / 10, form.caixaDxf.profundidade / 10, !!form.incluirVerniz, previewQrDataUrl, previewUrl, data) : ""}
-${semCondicoesGerais ? "" : paginaCondicoesGerais({ dataRodape: data, freteGratis: !!form.freteGratis })}
+${semCondicoesGerais ? "" : paginaCondicoesGerais({ dataRodape: data, freteGratis: !!form.freteGratis, condicao: form.condicaoPagamento })}
 
 </body>
 </html>`

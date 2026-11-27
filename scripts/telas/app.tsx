@@ -1,4 +1,5 @@
 import { PainelView } from "../../app/components/PainelView"
+import { CondicaoPagamentoCampo } from "../../app/components/CondicaoPagamentoCampo"
 import { Esqueleto } from "../../app/components/ds"
 import { FornecedoresView } from "../../app/components/FornecedoresView"
 import { GrandesNegociosCard } from "../../app/components/GrandesNegociosCard"
@@ -781,6 +782,12 @@ function Telas() {
       especificacoes: [], opcoes: [{ quantidade: 3000, preco: 6540, unitario: 2.18 }],
       pagamento: { total: 6540, sinal: 3270, pix: "#", pago: false, cartao: true, quantidade: 3000, entregaAte: "2026-12-04" },
     }} />
+    case "aprovar-condicao": return <AprovarClient numero="ORC-2026-002" token="x" proposta={{
+      nomeCliente: "Cliente Teste", sinalPct: 30, condicaoTexto: "30% na aprovação e 70% em 30 dias após a entrega", validaAte: "2099-12-31", vencida: false, jaAprovado: true,
+      especificacoes: [], opcoes: [{ quantidade: 3000, preco: 6540, unitario: 2.18 }],
+      pagamento: { total: 6540, sinal: 1962, pix: "#", pago: false, cartao: true, quantidade: 3000, entregaAte: "2026-12-04" },
+    }} />
+    case "condicao": return <CondicaoDemo />
     case "grandes": case "grandes-m": case "grandes-editar": return <div className="p-4 max-w-3xl"><GrandesNegociosCard onAbrirConversa={() => {}} /></div>
     case "fornecedores-receber": case "fornecedores-receber-m": return pagina(<FornecedoresView config={cfg} kanban={dados.kanban} lancamentos={lancs} historico={dados.historico} onSave={setCfg} />)
     case "esqueleto": return <div className="p-4 max-w-md space-y-3"><Esqueleto linhas={4} /><Esqueleto linhas={2} titulo={false} /></div>
@@ -876,4 +883,9 @@ function FolhasPdf({ lote = false, frete = false }: { lote?: boolean; frete?: bo
       {(folhas ?? []).map((f, i) => <img key={i} src={f.imagem} style={{ width: 718, background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,.2)" }} alt="" />)}
     </div>
   </div>
+}
+
+function CondicaoDemo() {
+  const [c, setC] = React.useState<import("../../app/lib/condicaoPagamento").CondicaoPagamento>({ tipo: "personalizada", parcelas: [{ pct: 30, dias: 0, base: "aprovacao" }, { pct: 40, dias: 30, base: "entrega" }, { pct: 20, dias: 60, base: "entrega" }] })
+  return <div className="p-6 max-w-xl bg-white"><p className="text-[11px] font-semibold uppercase tracking-wide text-[#898892] mb-2">Condição de pagamento</p><CondicaoPagamentoCampo valor={c} sinalPct={50} onChange={setC} /></div>
 }

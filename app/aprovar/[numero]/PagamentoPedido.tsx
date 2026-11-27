@@ -10,12 +10,14 @@ const sombra = "shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
 
 // Depois de aprovar (ou ao abrir o link de um pedido já aprovado): resumo, como pagar e o que acontece depois.
 // Cartão: página segura do Mercado Pago (antes, InfinitePay), o cliente volta para cá já com a confirmação.
-export function PosAprovacao({ numero, token, primeiroNome, quantidade, total, sinal, sinalPct, pix, rastreio, entregaAte, cartao, pago, retorno, nomeAprovou, agoraAprovou }: {
-  numero: string; token: string; primeiroNome: string; quantidade: number; total: number; sinal: number; sinalPct: number
+export function PosAprovacao({ numero, token, primeiroNome, quantidade, total, sinal, sinalPct, condicaoTexto, pix, rastreio, entregaAte, cartao, pago, retorno, nomeAprovou, agoraAprovou }: {
+  numero: string; token: string; primeiroNome: string; quantidade: number; total: number; sinal: number; sinalPct: number; condicaoTexto?: string
   pix: string; rastreio: string; entregaAte?: string | null; cartao: boolean; pago: boolean; retorno?: "pago" | "pendente" | null
   nomeAprovou?: string; agoraAprovou?: boolean
 }) {
-  const [modo, setModo] = useState<"pix" | "cartao">("pix")
+  // Sem entrada na aprovação (ex.: 30/60/90 dias): não há Pix agora; o cartão continua como opção do pedido inteiro
+  const temEntrada = sinal > 0
+  const [modo, setModo] = useState<"pix" | "cartao">(temEntrada ? "pix" : "cartao")
   const [abrindo, setAbrindo] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const confirmado = pago || retorno === "pago"
@@ -45,7 +47,7 @@ export function PosAprovacao({ numero, token, primeiroNome, quantidade, total, s
           <div className="w-12 h-12 rounded-full bg-[#009351]/10 flex items-center justify-center shrink-0 ds-pop"><CircleCheck className="w-7 h-7 text-[#009351]" /></div>
           <div className="min-w-0">
             <p className="font-bold text-[#191625] text-[19px] leading-tight">{confirmado ? "Pedido confirmado!" : agoraAprovou ? "Pedido aprovado!" : "Seu pedido está aprovado"}</p>
-            <p className="text-[13px] text-[#5e5c68] mt-0.5">{confirmado ? `Pagamento recebido. Obrigado, ${primeiroNome}!` : `Obrigado, ${primeiroNome}. Falta só o pagamento.`}</p>
+            <p className="text-[13px] text-[#5e5c68] mt-0.5">{confirmado ? `Pagamento recebido. Obrigado, ${primeiroNome}!` : temEntrada ? `Obrigado, ${primeiroNome}. Falta só o pagamento.` : `Obrigado, ${primeiroNome}. Pagamento: ${condicaoTexto ?? "como combinado"}.`}</p>
           </div>
         </div>
         <div className="mt-5 grid grid-cols-3 rounded-xl bg-[rgba(116,116,128,0.06)]">
@@ -58,14 +60,16 @@ export function PosAprovacao({ numero, token, primeiroNome, quantidade, total, s
         </div>
       </div>
 
-      {!confirmado && (
+      {!confirmado && (temEntrada || cartao) && (
         <div className={`bg-white rounded-2xl p-5 space-y-3 ${sombra}`}>
           {retorno === "pendente" && (
             <p className="text-[13px] text-[#b26b00] bg-[#b26b00]/[0.08] rounded-xl px-3.5 py-2.5 flex items-start gap-2"><Clock className="w-4 h-4 mt-0.5 shrink-0" />Ainda não recebemos a confirmação do cartão. Se você já pagou, ela chega em instantes: atualize a página.</p>
           )}
-          <p className="text-[15px] font-semibold text-[#191625]">Como você prefere pagar?</p>
+          <p className="text-[15px] font-semibold text-[#191625]">{temEntrada ? "Como você prefere pagar?" : "Quer pagar tudo agora no cartão?"}</p>
           {([
-            { k: "pix" as const, ic: <QrCode className="w-5 h-5" />, t: "Pix", s: <>Sinal de <strong className="text-[#191625] ds-num">{brl(sinal)}</strong> agora e o restante na entrega</>, selo: "Confirma na hora" },
+            ...(temEntrada ? [{ k: "pix" as const, ic: <QrCode className="w-5 h-5" />, t: "Pix", s: condicaoTexto
+              ? <>Entrada de <strong className="text-[#191625] ds-num">{brl(sinal)}</strong> agora · {condicaoTexto}</>
+              : <>Sinal de <strong className="text-[#191625] ds-num">{brl(sinal)}</strong> agora e o restante na entrega</>, selo: "Confirma na hora" }] : []),
             ...(cartao ? [{ k: "cartao" as const, ic: <CreditCard className="w-5 h-5" />, t: "Cartão de crédito", s: <>Em até <strong className="text-[#191625]">12x</strong> no cartão</>, selo: null }] : []),
           ]).map(({ k, ic, t, s, selo }) => {
             const sel = modo === k
@@ -84,7 +88,7 @@ export function PosAprovacao({ numero, token, primeiroNome, quantidade, total, s
           })}
           {erro && <p className="text-[13px] text-[#d33a3c] flex items-start gap-2"><AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />{erro}</p>}
           {modo === "pix" ? (
-            <a href={pix} className="ds-toque h-12 w-full rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-colors"><QrCode className="w-5 h-5" /> Pagar sinal com Pix</a>
+            <a href={pix} className="ds-toque h-12 w-full rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-colors"><QrCode className="w-5 h-5" /> {condicaoTexto ? "Pagar entrada com Pix" : "Pagar sinal com Pix"}</a>
           ) : (
             <button onClick={irParaCartao} disabled={abrindo}
               className="ds-toque h-12 w-full rounded-xl bg-[#8456e8] hover:bg-[#7445d4] text-white font-semibold text-[15px] flex items-center justify-center gap-2 transition-all disabled:opacity-60">
@@ -92,7 +96,7 @@ export function PosAprovacao({ numero, token, primeiroNome, quantidade, total, s
             </button>
           )}
           <p className="text-[11.5px] text-[#8E8E93] text-center leading-snug px-2">
-            <Lock className="w-3 h-3 inline -mt-0.5 mr-1" />{modo === "cartao" ? "Ambiente seguro de pagamento. Você volta para cá depois de pagar." : `Sinal de ${sinalPct}% · a produção começa assim que o pagamento é confirmado.`}
+            <Lock className="w-3 h-3 inline -mt-0.5 mr-1" />{modo === "cartao" ? "Ambiente seguro de pagamento. Você volta para cá depois de pagar." : condicaoTexto ? `Entrada de ${String(sinalPct).replace(".", ",")}% · a produção começa assim que o pagamento é confirmado.` : `Sinal de ${sinalPct}% · a produção começa assim que o pagamento é confirmado.`}
           </p>
         </div>
       )}
