@@ -19,6 +19,10 @@
     {
       "path": "/api/prospector/enviar",
       "schedule": "0 23 * * 1-5"
+    },
+    {
+      "path": "/api/banco/cron",
+      "schedule": "0 * * * *"
     }
   ]
 }
