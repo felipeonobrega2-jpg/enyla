@@ -94,7 +94,8 @@ function periodoDoPdf(o: OpcaoPdf, hoje: Date, de: string, ate: string): { de: D
   return { de: a1, ate: a2, nome: `${a1.toLocaleDateString("pt-BR")} a ${a2.toLocaleDateString("pt-BR")}` }
 }
 
-export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, origensClientes, historico = [], fixosMes = 0, nomeCategoria = id => id, impostoPct }: {
+export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, origensClientes, historico = [], fixosMes = 0, nomeCategoria = id => id, neutras, impostoPct }: {
+  neutras?: ReadonlySet<string>
   nomeCategoria?: (id: string) => string
   impostoPct?: number
   fixosMes?: number
@@ -226,7 +227,7 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, 
       const iso = (d: Date) => d.toLocaleDateString("sv-SE")
       const q = new URLSearchParams({ de: iso(per.de), ate: iso(per.ate), deAnt: iso(ant.de), ateAnt: iso(ant.ate) })
       const extras = await fetch(`/api/relatorio?${q}`).then(r => r.ok ? r.json() as Promise<ExtrasRelatorio> : null).catch(() => null)
-      const dados = montarRelatorio({ kanban, lancamentos, periodo: per, periodoNome: per.nome, nomeCategoria, impostoPct, extras, hoje })
+      const dados = montarRelatorio({ kanban, lancamentos, periodo: per, periodoNome: per.nome, nomeCategoria, neutras, impostoPct, extras, hoje })
       w.document.open(); w.document.write(htmlRelatorio(dados, LOGO_DARK_B64)); w.document.close()
       setTimeout(() => w.print(), 600)
       setPdfAberto(false)

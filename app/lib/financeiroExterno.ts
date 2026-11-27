@@ -5,7 +5,7 @@ import type { KanbanCard, LancamentoFinanceiro } from "@/app/types"
 import type { Configuracoes, GastoFixo } from "@/app/config"
 import { supabase } from "./supabase"
 import { lerConfigLinha } from "./configAtomica"
-import { hoje, calcularResumoFinanceiro, dreDoPeriodo } from "./financeiro"
+import { hoje, calcularResumoFinanceiro, dreDoPeriodo, idsNeutros, lancamentoNeutro } from "./financeiro"
 import { receberDigital, juntarPedidos, ehPedidoDigital, type PedidoParaReceber } from "./receberDigital"
 import { montarPedidos, recebiveis, noPeriodo, type Periodo as Intervalo } from "./negocio"
 import { financeiroDoAndar } from "./financeiroAndar"
@@ -139,7 +139,7 @@ function gastos(d: Dados, per: Intervalo) {
   const nomes = ativos.map(g => g.nome.trim().toLowerCase()).filter(Boolean)
   // Variável = despesa paga no período (sem a conta corrente de fornecedor) que não é o pagamento de um gasto fixo cadastrado (pelo nome)
   const variaveis = d.lancamentos.filter(l => l.tipo === "despesa" && l.status === "pago" && l.formaPagamento !== "conta" && noPeriodo(l.dataPagamento ?? l.dataVencimento, per)
-    && !nomes.some(n => l.descricao.toLowerCase().includes(n)))
+    && !nomes.some(n => l.descricao.toLowerCase().includes(n)) && !lancamentoNeutro(l, idsNeutros(d.cfg.categoriasDespesa as never, d.cfg.categoriasReceita as never)))
   const porCat = new Map<string, { total: number; quantidade: number }>()
   for (const l of variaveis) { const k = l.categoria || "outros"; const c = porCat.get(k) ?? { total: 0, quantidade: 0 }; porCat.set(k, { total: c.total + l.valor, quantidade: c.quantidade + 1 }) }
   return {
@@ -150,7 +150,7 @@ function gastos(d: Dados, per: Intervalo) {
 
 async function margem(d: Dados, per: Intervalo) {
   const nomeCategoria = (id: string) => ((d.cfg.categoriasDespesa ?? []) as { id: string; nome: string }[]).find(c => c.id === id)?.nome ?? id
-  const dre = dreDoPeriodo({ lancamentos: d.lancamentos, noPeriodo: l => noPeriodo(l.dataPagamento ?? l.dataVencimento, per), nomeCategoria })
+  const dre = dreDoPeriodo({ lancamentos: d.lancamentos, neutras: idsNeutros(d.cfg.categoriasDespesa as never, d.cfg.categoriasReceita as never), noPeriodo: l => noPeriodo(l.dataPagamento ?? l.dataVencimento, per), nomeCategoria })
   const rodadas = ((d.cfg.producao as { rodadas?: Rodada[] } | undefined)?.rodadas ?? [])
   const pedidos = montarPedidos(d.kanban, d.lancamentos, rodadas).filter(p => (p.rodada ? p.rodada.custoTotal : p.custoDireto) > 0 && noPeriodo(p.dataFechamento, per))
   const { data: hist } = await supabase.from("HistoricoItem").select("*")

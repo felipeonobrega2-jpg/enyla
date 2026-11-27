@@ -1,6 +1,7 @@
 "use client"
 
 import { unpackTerceirizado } from "./lib/kanbanUnpack"
+import { idsNeutros } from "./lib/financeiro"
 import { gravarPerda, podeExcluirDefinitivo } from "./lib/perdido"
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { Layers, ShoppingBag, Ruler, Calculator, Check, Factory, LayoutDashboard, FileText, Package, Users, Wallet, BarChart3, Handshake, Megaphone, MessageCircle, Box, Lightbulb, Truck, Gauge, Printer , Scissors, Building2, ShieldCheck } from "lucide-react"
@@ -2644,7 +2645,7 @@ export default function Home() {
               vendasDigitais={vendasDigitais}
             />
           ) : view === "dashboard" ? (
-            <RelatoriosView kanban={kanban} lancamentos={lancamentosOffset} clientes={clientes} origensClientes={config.origensClientes} historico={historico}
+            <RelatoriosView neutras={idsNeutros(config.categoriasReceita, config.categoriasDespesa)} kanban={kanban} lancamentos={lancamentosOffset} clientes={clientes} origensClientes={config.origensClientes} historico={historico}
               nomeCategoria={id => { const c = (config.categoriasDespesa ?? DEFAULT_CATS_DESP).find(x => x.id === id); if (c) return c.nome; const t = id.replace(/[-_]+/g, " ").trim(); return t.charAt(0).toUpperCase() + t.slice(1) }}
               impostoPct={normalizarProducao(config.producao).impostoPct}
               fixosMes={(config.gastosFixos ?? []).filter(g => g.ativa !== false).reduce((t, g) => t + g.valor, 0)}

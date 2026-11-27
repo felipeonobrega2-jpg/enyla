@@ -17,6 +17,27 @@ export function pixVencido(l: LancamentoFinanceiro): boolean {
   return l.categoria === "pix_link" && l.status !== "pago" && l.dataVencimento < hoje()
 }
 
+// Categoria neutra (Ajuste neutro, Transferência entre contas próprias): existe nos dois lados, mas não é receita,
+// despesa nem faturamento. Vale a marcação `neutra` da categoria; na falta dela, o nome (ou o id) da categoria.
+const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+const NOMES_NEUTROS = ["ajuste neutro", "transferencia entre contas proprias"]
+export const nomeNeutro = (s?: string | null) => !!s && NOMES_NEUTROS.includes(semAcento(s))
+
+/** Ids das categorias marcadas `neutra` (ou de nome neutro) nas listas de receita e despesa. */
+export function idsNeutros(...listas: (readonly { id: string; nome: string; neutra?: boolean }[] | undefined)[]): Set<string> {
+  const ids = new Set<string>()
+  for (const l of listas) for (const c of l ?? []) if (c.neutra === true || nomeNeutro(c.nome) || nomeNeutro(c.id)) ids.add(c.id)
+  return ids
+}
+
+export function lancamentoNeutro(l: Pick<LancamentoFinanceiro, "categoria">, neutras?: ReadonlySet<string>): boolean {
+  return !!l.categoria && (!!neutras?.has(l.categoria) || nomeNeutro(l.categoria))
+}
+
+/** Tira os lançamentos neutros: use antes de somar receita, despesa ou faturamento. */
+export const semNeutras = <T extends Pick<LancamentoFinanceiro, "categoria">>(ls: T[], neutras?: ReadonlySet<string>): T[] =>
+  ls.filter(l => !lancamentoNeutro(l, neutras))
+
 export function isSobra(l: LancamentoFinanceiro): boolean {
   return l.categoria === "sobra"
 }
@@ -231,9 +252,10 @@ export function dreDoPeriodo(args: {
   parcerias?: number
   nomeCategoria: (id: string) => string
   impostoPct?: number
+  neutras?: ReadonlySet<string>
 }): Dre {
   const { lancamentos, noPeriodo, nomeCategoria } = args
-  const base = lancamentos.filter(l => l.status === "pago" && l.formaPagamento !== "conta" && noPeriodo(l))
+  const base = semNeutras(lancamentos, args.neutras).filter(l => l.status === "pago" && l.formaPagamento !== "conta" && noPeriodo(l))
   const receitas = base.filter(l => l.tipo === "receita")
   const despesas = base.filter(l => l.tipo === "despesa")
   const soma = (ls: LancamentoFinanceiro[]) => ls.reduce((s, l) => s + l.valor, 0)

@@ -24,7 +24,7 @@ import { FixasTab } from "./financeiro/FixasTab"
 import { FornecedoresTab } from "./financeiro/FornecedoresTab"
 import {
   hoje, isReceitaPendenteValida, pedidosElegiveis as calcPedidosElegiveis,
-  calcularPedidosFechados, pedidosAbertos, contarNaoRegistrados, calcularVencidos, dreDoPeriodo, parceriasSemLancamento,
+  calcularPedidosFechados, pedidosAbertos, contarNaoRegistrados, calcularVencidos, dreDoPeriodo, parceriasSemLancamento, idsNeutros, lancamentoNeutro,
 } from "../lib/financeiro"
 
 
@@ -1149,6 +1149,7 @@ export function FinanceiroView({
 }) {
   const catsRec  = config?.categoriasReceita ?? DEFAULT_CATS_REC
   const catsDesp = config?.categoriasDespesa ?? DEFAULT_CATS_DESP
+  const neutras = useMemo(() => idsNeutros(catsRec, catsDesp), [catsRec, catsDesp])
 
   // Linha de negócio: o digital tem caixa próprio para a margem do Offset não se misturar
   const [linha, setLinha] = useState<Linha>("offset")
@@ -1277,7 +1278,7 @@ export function FinanceiroView({
 
   const kpis = useMemo(() => {
     const semConta = (l: LancamentoFinanceiro) => l.formaPagamento !== "conta"
-    const all = lancamentos.filter(inPeriodo).filter(semConta)
+    const all = lancamentos.filter(inPeriodo).filter(semConta).filter(l => !lancamentoNeutro(l, neutras))
     const recebidas = all.filter(l => l.tipo === "receita" && l.status === "pago")
     const despesas  = all.filter(l => l.tipo === "despesa" && l.status === "pago")
 
@@ -1406,18 +1407,18 @@ export function FinanceiroView({
       const key = d.toISOString().slice(0, 7)
       const label = MES_BR[d.getMonth()]
       const receita = lancamentos
-        .filter(l => l.tipo === "receita" && l.status === "pago" && l.formaPagamento !== "conta" && (l.dataPagamento || l.dataVencimento)?.slice(0, 7) === key)
+        .filter(l => l.tipo === "receita" && l.status === "pago" && l.formaPagamento !== "conta" && !lancamentoNeutro(l, neutras) && (l.dataPagamento || l.dataVencimento)?.slice(0, 7) === key)
         .reduce((s, l) => s + l.valor, 0)
       const parceiros = negocios
         .filter(n => n.status === "pago" && (n.dataOrcamento || n.criadoEm)?.slice(0, 7) === key)
         .reduce((s, n) => s + n.comissaoValor, 0)
       const despesas = lancamentos
-        .filter(l => l.tipo === "despesa" && l.status === "pago" && l.formaPagamento !== "conta" && (l.dataPagamento || l.dataVencimento)?.slice(0, 7) === key)
+        .filter(l => l.tipo === "despesa" && l.status === "pago" && l.formaPagamento !== "conta" && !lancamentoNeutro(l, neutras) && (l.dataPagamento || l.dataVencimento)?.slice(0, 7) === key)
         .reduce((s, l) => s + l.valor, 0)
       result.push({ key, label, receita: receita + parceiros, despesas })
     }
     return result
-  }, [lancamentos, negocios])
+  }, [lancamentos, negocios, neutras])
 
   // Mesma previsão da aba "Previsão de caixa" (lib/caixa): saldo no fim de cada semana
   const previsao = useMemo(() => config ? previsaoDeCaixa({ pedidos: montarPedidos(kanban, lancamentos), lancamentos, historico: historico ?? [], config }) : null,
@@ -1712,7 +1713,7 @@ export function FinanceiroView({
         {/* ── DRE ── */}
         {tab === "dre" && (() => {
           const dre = dreDoPeriodo({
-            lancamentos, noPeriodo: inPeriodo, parcerias: negociosPagos.reduce((s, n) => s + n.comissaoValor, 0),
+            lancamentos, neutras, noPeriodo: inPeriodo, parcerias: negociosPagos.reduce((s, n) => s + n.comissaoValor, 0),
             nomeCategoria: id => nomeCategoria(id, catsDesp), impostoPct: normalizarProducao(config?.producao).impostoPct,
           })
           const pctDe = (v: number) => dre.receita > 0 ? `${num(v / dre.receita * 100, 1)}%` : ""
