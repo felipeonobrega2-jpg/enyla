@@ -27,6 +27,7 @@ export type CategoriaFinanceira = {
   nome: string
   subcategorias?: string[]
   ativa?: boolean   // omitido = ativa; desativar põe false e a categoria continua na lista
+  neutra?: boolean  // true = não é receita, despesa nem faturamento (ex.: Ajuste neutro, Transferência entre contas próprias); fica fora dos totais e do DRE
 }
 
 export type ContaBancaria = {

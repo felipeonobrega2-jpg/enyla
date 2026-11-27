@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { dreDoPeriodo } from "@/app/lib/financeiro"
+import { dreDoPeriodo, idsNeutros } from "@/app/lib/financeiro"
 import { receita, despesa } from "./fixtures"
 
 const lancs = [
@@ -29,5 +29,25 @@ describe("DRE", () => {
     expect(dre.margemBruta).toBe(7150)
     expect(dre.resultado).toBeCloseTo(6350.1)
     expect(dre.impostoEstimado).toBeCloseTo(687)
+  })
+})
+
+describe("DRE: categorias neutras", () => {
+  const ls = [
+    receita({ valor: 1000 }), despesa({ valor: 400, categoria: "aluguel" }),
+    receita({ valor: 777, categoria: "ajuste-neutro" }), despesa({ valor: 555, categoria: "transferencia-entre-contas-proprias" }),
+    receita({ valor: 333, categoria: "marcada" }), despesa({ valor: 222, categoria: "marcada" }),
+  ]
+  const calc = (neutras?: Set<string>) => dreDoPeriodo({ lancamentos: ls, noPeriodo: () => true, nomeCategoria: id => id, neutras })
+  it("pelo nome da categoria (sem marcação)", () => {
+    const d = calc()
+    expect(d.receita).toBe(1333)
+    expect(d.despesaOperacional).toBe(622)
+  })
+  it("pela marcação neutra, nos dois lados", () => {
+    const d = calc(idsNeutros([{ id: "marcada", nome: "Qualquer", neutra: true }]))
+    expect(d.receita).toBe(1000)
+    expect(d.despesaOperacional).toBe(400)
+    expect(d.resultado).toBe(600)
   })
 })

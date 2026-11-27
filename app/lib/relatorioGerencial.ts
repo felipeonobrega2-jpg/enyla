@@ -3,7 +3,7 @@
 // produção e confiança dos dados. Puro: monta os números e o HTML A4; quem chama abre a impressão.
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, vendasDoPeriodo, caixaDoPeriodo, conversao, orcamentosDoPeriodo, margemContribuicao, recebiveis, noPeriodo, nomeChave, isTerceirizado, type Periodo, type Pedido } from "./negocio"
-import { dreDoPeriodo, type Dre } from "./financeiro"
+import { dreDoPeriodo, semNeutras, type Dre } from "./financeiro"
 import { categoriaPerda, rotuloPerda, type CategoriaPerda } from "./coleta"
 
 export type ExtrasRelatorio = {
@@ -62,9 +62,10 @@ export type DadosRelatorio = {
 
 export function montarRelatorio(a: {
   kanban: KanbanCard[]; lancamentos: LancamentoFinanceiro[]; periodo: { de: Date; ate: Date }; periodoNome: string
-  nomeCategoria: (id: string) => string; impostoPct?: number; extras: ExtrasRelatorio | null; hoje?: Date
+  nomeCategoria: (id: string) => string; neutras?: ReadonlySet<string>; impostoPct?: number; extras: ExtrasRelatorio | null; hoje?: Date
 }): DadosRelatorio {
   const hoje = a.hoje ?? new Date()
+  const lancP = semNeutras(a.lancamentos, a.neutras)   // totais de caixa, despesa e DRE sem as categorias neutras (cobrança e pagamento seguem com todos)
   const pedidos = montarPedidos(a.kanban, a.lancamentos)
   const ant = periodoAnterior(a.periodo)
   const P = comoPeriodo(a.periodo), PA = comoPeriodo(ant)
@@ -74,10 +75,10 @@ export function montarRelatorio(a: {
 
   const medir = (per: Periodo, dig: Digital | undefined): Medida => {
     const v = vendasDoPeriodo(pedidos, a.lancamentos, per)
-    const cx = caixaDoPeriodo(a.lancamentos, per, hoje)
-    const pago = a.lancamentos.filter(l => l.tipo === "despesa" && l.status === "pago" && l.formaPagamento !== "conta" && noPeriodo(l.dataPagamento ?? l.dataVencimento, per)).reduce((s, l) => s + l.valor, 0)
+    const cx = caixaDoPeriodo(lancP, per, hoje)
+    const pago = lancP.filter(l => l.tipo === "despesa" && l.status === "pago" && l.formaPagamento !== "conta" && noPeriodo(l.dataPagamento ?? l.dataVencimento, per)).reduce((s, l) => s + l.valor, 0)
     const conv = conversao(orcamentosDoPeriodo(a.kanban, per))
-    const dre = dreDoPeriodo({ lancamentos: a.lancamentos, noPeriodo: l => noPeriodo(l.dataPagamento ?? l.dataVencimento, per), nomeCategoria: a.nomeCategoria, impostoPct: a.impostoPct })
+    const dre = dreDoPeriodo({ lancamentos: a.lancamentos, neutras: a.neutras, noPeriodo: l => noPeriodo(l.dataPagamento ?? l.dataVencimento, per), nomeCategoria: a.nomeCategoria, impostoPct: a.impostoPct })
     const vd = dig?.faturamento ?? 0
     return {
       vendidoOffset: v.receita, vendidoDigital: vd, vendido: v.receita + vd, pedidos: v.pedidos.length + (dig?.pagos ?? 0),
@@ -95,8 +96,8 @@ export function montarRelatorio(a: {
     return {
       rotulo: d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""),
       vendido: vendasDoPeriodo(pedidos, a.lancamentos, per).receita,
-      recebido: caixaDoPeriodo(a.lancamentos, per, hoje).recebido,
-      despesas: a.lancamentos.filter(l => l.tipo === "despesa" && l.status === "pago" && l.formaPagamento !== "conta" && noPeriodo(l.dataPagamento ?? l.dataVencimento, per)).reduce((s, l) => s + l.valor, 0),
+      recebido: caixaDoPeriodo(lancP, per, hoje).recebido,
+      despesas: lancP.filter(l => l.tipo === "despesa" && l.status === "pago" && l.formaPagamento !== "conta" && noPeriodo(l.dataPagamento ?? l.dataVencimento, per)).reduce((s, l) => s + l.valor, 0),
     }
   })
 
@@ -117,7 +118,7 @@ export function montarRelatorio(a: {
   // Despesas por categoria (período × anterior)
   const porCat = (per: Periodo) => {
     const m = new Map<string, number>()
-    for (const l of a.lancamentos) if (l.tipo === "despesa" && l.status === "pago" && l.formaPagamento !== "conta" && noPeriodo(l.dataPagamento ?? l.dataVencimento, per)) {
+    for (const l of lancP) if (l.tipo === "despesa" && l.status === "pago" && l.formaPagamento !== "conta" && noPeriodo(l.dataPagamento ?? l.dataVencimento, per)) {
       const n = a.nomeCategoria(l.categoria || "outros"); m.set(n, (m.get(n) ?? 0) + l.valor)
     }
     return m

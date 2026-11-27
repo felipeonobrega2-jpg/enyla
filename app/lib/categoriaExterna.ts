@@ -28,8 +28,10 @@ export async function categoria(b: Pedido): Promise<Resultado> {
   }
   let ativa: boolean | undefined
   if (b.ativa !== undefined) { if (typeof b.ativa !== "boolean") return { ok: false, status: 400, erro: "ativa: verdadeiro ou falso." }; ativa = b.ativa }
+  let neutra: boolean | undefined
+  if (b.neutra !== undefined) { if (typeof b.neutra !== "boolean") return { ok: false, status: 400, erro: "neutra: verdadeiro ou falso." }; neutra = b.neutra }
   if (op === "criar" && !nome) return { ok: false, status: 400, erro: "criar exige nome." }
-  if (op === "editar" && nome === undefined && subs === undefined && ativa === undefined) return { ok: false, status: 400, erro: "editar: mande nome, subcategorias ou ativa." }
+  if (op === "editar" && nome === undefined && subs === undefined && ativa === undefined && neutra === undefined) return { ok: false, status: 400, erro: "editar: mande nome, subcategorias, ativa ou neutra." }
 
   const marca = { alteradoPor: "cfo", alteradoEm: new Date().toISOString() }
   let achada: Gravada | null = null
@@ -40,7 +42,7 @@ export async function categoria(b: Pedido): Promise<Resultado> {
     if (op === "criar") {
       let novo = slug(nome!)
       for (let i = 2; lista.some(c => c.id === novo); i++) novo = `${slug(nome!)}-${i}`
-      achada = { id: novo, nome: nome!, ...(subs ? { subcategorias: subs } : {}), ativa: true, ...marca }
+      achada = { id: novo, nome: nome!, ...(subs ? { subcategorias: subs } : {}), ...(neutra ? { neutra: true } : {}), ativa: true, ...marca }
       return { [campo]: [...lista, achada] }
     }
     const i = lista.findIndex(c => c.id === id)
@@ -48,7 +50,7 @@ export async function categoria(b: Pedido): Promise<Resultado> {
     if (op === "desativar") {
       if (lista[i].ativa === false) { achada = lista[i]; jaInativa = true; return null }
       achada = { ...lista[i], ativa: false, ...marca }
-    } else achada = { ...lista[i], ...(nome !== undefined ? { nome } : {}), ...(subs !== undefined ? { subcategorias: subs } : {}), ...(ativa !== undefined ? { ativa } : {}), id: lista[i].id, ...marca }
+    } else achada = { ...lista[i], ...(nome !== undefined ? { nome } : {}), ...(subs !== undefined ? { subcategorias: subs } : {}), ...(ativa !== undefined ? { ativa } : {}), ...(neutra !== undefined ? { neutra } : {}), id: lista[i].id, ...marca }
     return { [campo]: lista.map((c, k) => k === i ? achada! : c), categoriasMudadasEm: marca.alteradoEm }
   })
   if (!achada) return { ok: false, status: 404, erro: `Categoria ${id} não encontrada em ${b.tipo}.` }

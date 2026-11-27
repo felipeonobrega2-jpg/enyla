@@ -1,4 +1,5 @@
 "use client"
+import { idsNeutros, semNeutras } from "../lib/financeiro"
 import { PertoDeVoceCard } from "./PertoDeVoceCard"
 import { CaixaEntrada, type ItemExterno } from "./CaixaEntrada"
 import { FunilAgoraCard } from "./FunilAgoraCard"
@@ -97,7 +98,8 @@ export function PainelView({
 
   const pedidos = React.useMemo(() => montarPedidos(kanban, lancamentos), [kanban, lancamentos])
   const vendas = vendasDoPeriodo(pedidos, lancamentos, periodo)
-  const caixa = caixaDoPeriodo(lancamentos, periodo, hoje)
+  const neutras = React.useMemo(() => idsNeutros(config?.categoriasReceita, config?.categoriasDespesa), [config?.categoriasReceita, config?.categoriasDespesa])
+  const caixa = caixaDoPeriodo(semNeutras(lancamentos, neutras), periodo, hoje)
   const orcs = orcamentosDoPeriodo(kanban, periodo)
   const conv = conversao(orcs)
   const pipe = pipelineComercial(kanban)
@@ -205,7 +207,7 @@ export function PainelView({
     destino: { nome: "Abrir Pedidos", ir: () => onNavegar("pedidos") },
   })
   function abrirCaixa() {
-    const recebidos = lancamentos.filter(l => l.tipo === "receita" && l.status === "pago" && l.formaPagamento !== "conta" && noPeriodo(l.dataPagamento ?? l.dataVencimento, periodo))
+    const recebidos = semNeutras(lancamentos, neutras).filter(l => l.tipo === "receita" && l.status === "pago" && l.formaPagamento !== "conta" && noPeriodo(l.dataPagamento ?? l.dataVencimento, periodo))
     const titulo = (t: string) => <p className="px-3 pt-3 pb-1 text-[11px] font-semibold text-[#898892]">{t}</p>
     setDetalhe({
       titulo: "Dinheiro",
