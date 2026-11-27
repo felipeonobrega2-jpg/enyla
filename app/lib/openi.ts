@@ -58,10 +58,20 @@ export const itemOpeni = (id: string) => openi<{ data?: Record<string, unknown> 
 export const contasOpeni = (id: string) => openi<{ data?: unknown }>(`/items/${seg(id)}/accounts`)
 export const cartoesOpeni = (id: string) => openi<{ data?: unknown }>(`/items/${seg(id)}/credit-cards`)
 
+export type PartesOpeni = { name?: string | null; document?: string | null; documentType?: string | null }
 export type TxOpeni = {
-  id?: string; date?: string; postedAt?: string; transactionDate?: string; amount?: number | string
-  type?: string; description?: string; descriptionRaw?: string | null; category?: string | null
+  id?: string; transactionAt?: string; date?: string; postedAt?: string; transactionDate?: string; amount?: number | string
+  type?: string; description?: string; descriptionRaw?: string | null; category?: { id?: string; name?: string | null } | string | null
+  payer?: PartesOpeni | null; receiver?: PartesOpeni | null
   counterpartyName?: string | null; counterpartyDocument?: string | null
+}
+
+// transactionAt vem em UTC; o dia que vale é o de São Paulo. Já em AAAA-MM-DD ou meia-noite UTC: 10 primeiros caracteres.
+function diaDaOpeni(t: TxOpeni): string {
+  const iso = String(t.transactionAt ?? t.date ?? t.postedAt ?? t.transactionDate ?? "").trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso) || /^\d{4}-\d{2}-\d{2}T00:00:00(\.0+)?Z$/.test(iso)) return iso.slice(0, 10)
+  const d = new Date(iso)
+  return iso && !Number.isNaN(d.getTime()) ? d.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) : ""
 }
 
 // Todas as páginas de movimentos de uma conta (data.pagination.totalPages)
@@ -81,14 +91,16 @@ export async function transacoesOpeni(item: string, conta: string, maxPaginas = 
 // Mesmo formato dos movimentos da Pluggy. O id leva o prefixo da fonte: a chave (fonte, id externo) não colide com a Pluggy.
 export function daOpeni(t: TxOpeni, conta: string, contaNome: string | null): Omit<TxBanco, "estado" | "lancamento_ids" | "sugestao" | "historico"> | null {
   const bruto = Number(t.amount)
-  const data = (t.date ?? t.postedAt ?? t.transactionDate ?? "").slice(0, 10)
+  const data = diaDaOpeni(t)
   if (!t.id || !Number.isFinite(bruto) || !/^\d{4}-\d{2}-\d{2}$/.test(data)) return null
   const tipo = String(t.type ?? "").toUpperCase()
   const saida = tipo ? /DEBIT|DEBITO|SAIDA/.test(tipo) : bruto < 0
+  const parte = saida ? t.receiver : t.payer
+  const categoria = typeof t.category === "string" ? t.category : t.category?.name
   return {
     id: `openi:${t.id}`, conta_id: conta, conta_nome: contaNome, data, valor: Math.abs(bruto),
     tipo: saida ? "saida" : "entrada", descricao: (t.description || t.descriptionRaw || "").trim(),
-    contraparte_nome: t.counterpartyName ?? null, contraparte_doc: (t.counterpartyDocument ?? "").replace(/\D/g, "") || null,
-    categoria_pluggy: t.category ?? null,
+    contraparte_nome: parte?.name || t.counterpartyName || null, contraparte_doc: (parte?.document ?? t.counterpartyDocument ?? "").replace(/\D/g, "") || null,
+    categoria_pluggy: categoria || null,
   }
 }
