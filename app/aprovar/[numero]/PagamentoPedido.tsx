@@ -9,7 +9,7 @@ const dataBR = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/")
 const sombra = "shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
 
 // Depois de aprovar (ou ao abrir o link de um pedido já aprovado): resumo, como pagar e o que acontece depois.
-// Cartão: página segura da InfinitePay, o cliente volta para cá já com a confirmação.
+// Cartão: página segura do Mercado Pago (antes, InfinitePay), o cliente volta para cá já com a confirmação.
 export function PosAprovacao({ numero, token, primeiroNome, quantidade, total, sinal, sinalPct, pix, rastreio, entregaAte, cartao, pago, retorno, nomeAprovou, agoraAprovou }: {
   numero: string; token: string; primeiroNome: string; quantidade: number; total: number; sinal: number; sinalPct: number
   pix: string; rastreio: string; entregaAte?: string | null; cartao: boolean; pago: boolean; retorno?: "pago" | "pendente" | null
@@ -92,7 +92,7 @@ export function PosAprovacao({ numero, token, primeiroNome, quantidade, total, s
             </button>
           )}
           <p className="text-[11.5px] text-[#8E8E93] text-center leading-snug px-2">
-            <Lock className="w-3 h-3 inline -mt-0.5 mr-1" />{modo === "cartao" ? "Ambiente seguro da InfinitePay. Você volta para cá depois de pagar." : `Sinal de ${sinalPct}% · a produção começa assim que o pagamento é confirmado.`}
+            <Lock className="w-3 h-3 inline -mt-0.5 mr-1" />{modo === "cartao" ? "Ambiente seguro de pagamento. Você volta para cá depois de pagar." : `Sinal de ${sinalPct}% · a produção começa assim que o pagamento é confirmado.`}
           </p>
         </div>
       )}

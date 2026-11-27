@@ -58,8 +58,12 @@ export default function DigitalClient({ id, t, dz = "" }: { id: string; t: strin
       setP(d); setBr({ marca: d.briefing.marca, cores: d.briefing.cores, referencias: d.briefing.referencias, laminacao: d.briefing.laminacao ?? "fosca" })
       // Voltou do cartão (InfinitePay): o servidor confere antes de marcar como pago; a URL fica limpa
       const q = new URLSearchParams(window.location.search)
-      if (q.get("transaction_nsu") && q.get("order_nsu")) {
-        const corpo = { t, acao: "cartaoVolta", order_nsu: q.get("order_nsu"), transaction_nsu: q.get("transaction_nsu"), slug: q.get("slug") }
+      // Mercado Pago volta com payment_id e external_reference; a InfinitePay, com transaction_nsu e order_nsu
+      const pid = q.get("payment_id") ?? q.get("collection_id"), ref = q.get("external_reference")
+      const volta = pid && pid !== "null" && ref ? { order_nsu: ref, transaction_nsu: pid, slug: "mp" }
+        : q.get("transaction_nsu") && q.get("order_nsu") ? { order_nsu: q.get("order_nsu"), transaction_nsu: q.get("transaction_nsu"), slug: q.get("slug") } : null
+      if (volta) {
+        const corpo = { t, acao: "cartaoVolta", ...volta }
         window.history.replaceState(null, "", `${window.location.pathname}?t=${encodeURIComponent(t)}`)
         const v = await fetch(`/api/d/${encodeURIComponent(id)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }).catch(() => null)
         if (v?.ok) setP(await v.json())
@@ -535,7 +539,7 @@ function Pagamento({ p, titulo, valor, txid, descricao, sub, post, setP, onConfe
           {gerando ? <Loader2 className="w-5 h-5 animate-spin" /> : null}Gerar o Pix
         </button>
         {cartao}
-        <p className="text-[11.5px] text-[#8E8E93] mt-2">O CPF/CNPJ é para o Pix sair no seu nome. No cartão, os dados são pedidos na página segura da InfinitePay.</p>
+        <p className="text-[11.5px] text-[#8E8E93] mt-2">O CPF/CNPJ é para o Pix sair no seu nome. No cartão, os dados são pedidos na página segura de pagamento.</p>
         {erro && <p className="text-[12px] text-[#d33a3c] mt-2">{erro}</p>}
       </div>
     )

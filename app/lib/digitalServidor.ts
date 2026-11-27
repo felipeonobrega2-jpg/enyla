@@ -370,7 +370,7 @@ export async function confirmarCartaoDigital(id: string, parte: "sinal" | "resta
   const c = await conferirInfinitePay(a)
   if (!c.pago) return "pendente"
   if (c.valorCentavos != null && c.valorCentavos !== Math.round(reg.valor * 100)) { console.error("[infinitepay digital] valor não bate", id, c.valorCentavos, reg.valor); return "invalido" }
-  await pagoPeloAsaas(id, parte, { txId: `infinitepay:${a.transacao}`, valor: reg.valor, data: new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) }, "cartão")
+  await pagoPeloAsaas(id, parte, { txId: `${a.slug === "mp" ? "mercadopago" : "infinitepay"}:${a.transacao}`, valor: reg.valor, data: new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) }, "cartão")
   return "pago"
 }
 

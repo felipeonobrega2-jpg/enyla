@@ -12,6 +12,7 @@ import type { VisitaProposta } from "@/app/types"
 import { gravarCampos } from "@/app/lib/configAtomica"
 import { termosOffset, VERSAO_TERMOS_OFFSET } from "@/app/lib/termosOffset"
 import { infinitePayConfigurado } from "@/app/lib/infinitePay"
+import { voltaMercadoPago } from "@/app/lib/mercadoPago"
 import { confirmarPagamentoInfinitePay, type PagamentoCartao } from "@/app/lib/cartaoAprovacao"
 
 // Link do cliente: sempre claro (inclusive no modo escuro automático do Chrome/Samsung, que inverte as cores)
@@ -41,10 +42,13 @@ export const dynamic = "force-dynamic"
 
 export default async function AprovarPage({ params, searchParams }: {
   params: Promise<{ numero: string }>
-  searchParams: Promise<{ t?: string; order_nsu?: string; transaction_nsu?: string; slug?: string }>
+  searchParams: Promise<{ t?: string; order_nsu?: string; transaction_nsu?: string; slug?: string; payment_id?: string; collection_id?: string; external_reference?: string }>
 }) {
   const numero = decodeURIComponent((await params).numero)
-  const { t, order_nsu, transaction_nsu, slug } = await searchParams
+  const q = await searchParams
+  const { t } = q
+  // Volta da InfinitePay (order_nsu, transaction_nsu, slug) ou do Mercado Pago (payment_id, external_reference)
+  const { order_nsu, transaction_nsu, slug } = voltaMercadoPago(q) ?? q
   const p = tokenValido(numero, t) ? await carregarProposta(numero) : null
   // Volta do checkout da InfinitePay: confere o pagamento antes de mostrar (os parâmetros da volta podem ser forjados)
   const retorno = p && order_nsu && transaction_nsu && slug ? await confirmarPagamentoInfinitePay({ nsu: order_nsu, transacao: transaction_nsu, slug }).catch(() => "pendente" as const) : null

@@ -3,9 +3,10 @@
 import { lerConfigLinha } from "./configAtomica"
 import type { KanbanCard } from "@/app/types"
 import { conferirInfinitePay, numeroDoOrderNsu } from "./infinitePay"
+import { SLUG_MP } from "./mercadoPago"
 
 // pagamentosCartao[numero]: o link criado e o resultado. status: "aguardando" | "pago"
-export type PagamentoCartao = { v?: number; orderNsu?: string; url?: string; status: string; valor: number; parcelas?: number; metodo?: string; transacao?: string; em?: string; baixado?: boolean }
+export type PagamentoCartao = { v?: number; orderNsu?: string; url?: string; status: string; valor: number; parcelas?: number; metodo?: string; transacao?: string; em?: string; baixado?: boolean; provedor?: string }
 
 const metodoDe = (m?: string) => m === "pix" ? "pix" as const : "cartao_credito" as const
 
@@ -14,7 +15,7 @@ export async function registrarPagoNoCartao(numero: string, card: Pick<KanbanCar
   const { supabase } = await import("@/app/lib/supabase")
   const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" })
   const forma = metodoDe(pg.metodo)
-  const marca = `InfinitePay ${pg.transacao ?? pg.orderNsu ?? ""}`
+  const marca = `${pg.provedor ?? "InfinitePay"} ${pg.transacao ?? pg.orderNsu ?? ""}`
   const campos = {
     valor: pg.valor, status: "pago", dataPagamento: hoje, formaPagamento: forma, categoria: "pedido",
     descricao: `Pago ${forma === "pix" ? "no Pix" : "no cartão"} (100%)${(pg.parcelas ?? 1) > 1 ? ` em ${pg.parcelas}x` : ""} · ${numero}`,
@@ -48,13 +49,14 @@ export async function confirmarPagamentoInfinitePay(a: { nsu: string; transacao:
   const c = await conferirInfinitePay(a)
   if (!c.pago) return "pendente"
   if (c.valorCentavos != null && c.valorCentavos !== Math.round(reg.valor * 100)) { console.error("[infinitepay] valor não bate", numero, c.valorCentavos, reg.valor); return "invalido" }
-  const novo: PagamentoCartao = { ...reg, status: "pago", baixado: true, parcelas: c.parcelas ?? 1, metodo: c.metodo, transacao: a.transacao }
+  const provedor = a.slug === SLUG_MP ? "Mercado Pago" : "InfinitePay"
+  const novo: PagamentoCartao = { ...reg, status: "pago", baixado: true, parcelas: c.parcelas ?? 1, metodo: c.metodo, transacao: a.transacao, provedor }
   await gravarCampos({ pagamentosCartao: { ...todos, [numero]: novo } })
   const { data: card } = await supabase.from("KanbanCard").select("nomeCliente, loteId, loteNumero").eq("numero", numero).maybeSingle()
   if (card) await registrarPagoNoCartao(numero, card, novo)
   const { notificar, LINK_SISTEMA } = await import("./notificar")
   const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-  await notificar(c.metodo === "pix" ? "Pago no Pix (InfinitePay)" : "Pago no cartão", `${numero} · ${card?.nomeCliente ?? ""} · ${brl(reg.valor)}${(c.parcelas ?? 1) > 1 ? ` em ${c.parcelas}x` : ""}`,
+  await notificar(c.metodo === "pix" ? `Pago no Pix (${provedor})` : "Pago no cartão", `${numero} · ${card?.nomeCliente ?? ""} · ${brl(reg.valor)}${(c.parcelas ?? 1) > 1 ? ` em ${c.parcelas}x` : ""}`,
     { prioridade: "alta", tags: ["credit_card"], link: `${LINK_SISTEMA}/?aba=painel` }).catch(() => null)
   return "pago"
 }
