@@ -37,6 +37,7 @@ export default auth(async (req) => {
     pathname === "/api/meta/cron-refresh" ||
     pathname === "/api/externo" ||               // diretores na nuvem (exige a chave do diretor na própria rota)
     pathname === "/api/prospector/enviar" ||     // agendador da Vercel (mesma regra; chave prospector_envio_ativo desligada por padrão)
+    pathname === "/api/banco/cron" ||            // agendador da Vercel, a cada 1h (exige CRON_SECRET na própria rota)
     pathname === "/api/prospector/importar" ||   // agendador da Vercel (exige CRON_SECRET, ou o agendador, na própria rota)
     pathname === "/api/prospector/inbound" ||    // webhook da Resend (email.received e eventos do envio; exige assinatura Svix na própria rota)
     pathname.startsWith("/api/prospector/o/") || // pixel de abertura do e-mail do Prospector (token aleatório; só devolve um GIF 1x1)
