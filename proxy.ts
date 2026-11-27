@@ -31,6 +31,7 @@ export default auth(async (req) => {
     pathname === "/api/sistema/vigia" ||          // vigia do VPS (exige o segredo do webhook na rota)     // a rota exige login ou o segredo do webhook
     pathname === "/api/frete/webhook" ||
     pathname === "/api/infinitepay/webhook" ||  // InfinitePay (sem assinatura: só dispara o payment_check)
+    pathname === "/api/mercadopago/webhook" ||  // Mercado Pago (o pagamento é sempre buscado na API com o nosso token)
     pathname === "/api/openi/webhook" ||        // Openi (segredo OPENI_WEBHOOK_SECRET na própria rota)
     pathname === "/api/asaas/webhook" ||        // Asaas (token no cabeçalho; status vem da API)        // Lalamove (só lê o nº da corrida; status vem da API)
     pathname === "/api/meta/cron-refresh" ||

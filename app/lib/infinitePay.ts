@@ -3,12 +3,19 @@
 // link de pagamento único (não deixa pagar duas vezes), validade de 24 h, só cartão e sem pedir endereço.
 // O checkout é a página da InfinitePay (não pode ser embutida): o cliente vai, paga e volta para a aprovação.
 // Nem o webhook nem a volta são assinados: o pagamento só vale depois de confirmado no payment_check.
+// Desde 27/11/2026, com MP_ACCESS_TOKEN na Vercel, o cartão vai para o Mercado Pago (lib/mercadoPago.ts) pelas mesmas
+// funções abaixo: quem chama não muda. Sem a chave do Mercado Pago, continua na InfinitePay.
 import { LINK_SISTEMA } from "./notificar"
+import { mercadoPagoConfigurado, criarLinkMercadoPago, conferirMercadoPago, SLUG_MP } from "./mercadoPago"
 
 const API = "https://api.checkout.infinitepay.io"
 // Versão das opções do link: mudou (ex.: tirou o endereço), link antigo não é reaproveitado
-export const VERSAO_LINK = 2
-export const infinitePayConfigurado = () => !!process.env.INFINITEPAY_HANDLE
+// (3 = Mercado Pago: link antigo da InfinitePay não é reaproveitado depois da troca)
+export const VERSAO_LINK = process.env.MP_ACCESS_TOKEN ? 3 : 2
+/** Cartão disponível (Mercado Pago ou InfinitePay). */
+export const infinitePayConfigurado = () => mercadoPagoConfigurado() || !!process.env.INFINITEPAY_HANDLE
+/** Nome de quem recebe o cartão agora, para os textos ao cliente e ao Felipe. */
+export const provedorCartao = () => mercadoPagoConfigurado() ? "Mercado Pago" : "InfinitePay"
 const handle = () => (process.env.INFINITEPAY_HANDLE ?? "").replace(/^\$/, "").trim()
 
 // order_nsu = "<número do orçamento>_<tentativa>": o webhook sabe de que pedido é
@@ -17,6 +24,7 @@ export const numeroDoOrderNsu = (nsu: string | null | undefined) => /^(.+)_[a-z0
 
 export async function criarLinkInfinitePay(a: { numero: string; nsu: string; valor: number; descricao: string; voltarPara: string; cliente?: { name?: string; email?: string; phone_number?: string } }):
   Promise<{ url: string } | { erro: string }> {
+  if (mercadoPagoConfigurado()) return criarLinkMercadoPago({ nsu: a.nsu, valor: a.valor, descricao: a.descricao, voltarPara: a.voltarPara, notificar: `${LINK_SISTEMA}/api/mercadopago/webhook`, cliente: a.cliente })
   const chave = process.env.INFINITEPAY_API_KEY
   const r = await fetch(`${API}/links`, {
     method: "POST", headers: { "Content-Type": "application/json", ...(chave ? { "X-Api-Key": chave } : {}) },
@@ -40,6 +48,7 @@ export async function criarLinkInfinitePay(a: { numero: string; nsu: string; val
 
 export type ConferenciaInfinitePay = { pago: boolean; valorCentavos?: number; pagoCentavos?: number; parcelas?: number; metodo?: string }
 export async function conferirInfinitePay(a: { nsu: string; transacao: string; slug: string }): Promise<ConferenciaInfinitePay> {
+  if (a.slug === SLUG_MP) return conferirMercadoPago({ nsu: a.nsu, pagamentoId: a.transacao })
   const r = await fetch(`${API}/payment_check`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ handle: handle(), order_nsu: a.nsu, transaction_nsu: a.transacao, slug: a.slug }),
