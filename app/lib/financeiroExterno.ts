@@ -4,7 +4,7 @@
 import type { KanbanCard, LancamentoFinanceiro } from "@/app/types"
 import type { Configuracoes, GastoFixo } from "@/app/config"
 import { supabase } from "./supabase"
-import { lerConfigLinha } from "./configAtomica"
+import { lerConfigLinha, lerCampos } from "./configAtomica"
 import { hoje, calcularResumoFinanceiro, dreDoPeriodo } from "./financeiro"
 import { receberDigital, juntarPedidos, ehPedidoDigital, type PedidoParaReceber } from "./receberDigital"
 import { montarPedidos, recebiveis, noPeriodo, type Periodo as Intervalo } from "./negocio"
@@ -31,6 +31,7 @@ export const AJUDA_FINANCEIRO: Record<string, string> = {
   "?o=financeiro&parte=banco&estado=": "movimentos e conciliação do banco (pendente | vinculada | criada | ignorada | todas; padrão pendente), sem documento da contraparte",
   "?o=financeiro&parte=saldos": "saldo por conta (cadastro e Pluggy) e total",
   "?o=financeiro&parte=gastos": "gastos fixos cadastrados e gastos variáveis pagos no período, por categoria",
+  "?o=financeiro&parte=edicoes": "registro das edições de lançamento (só a chave do CTO edita; o CFO confere aqui): autor, em (Brasília), emIso, lancamentoId, campo, antes, depois; mais recentes primeiro (até 500). Opcional &lancamentoId=",
   "?o=financeiro&parte=margem": "DRE do período, margem e custo por pedido (previsto x real quando há orçamento). Pedido impresso numa rodada (várias encomendas na mesma tiragem) traz rodadaId, custoProprio (clichê, fotolito, arte, hot stamping, frete, imposto, faca exclusiva), custoRateado (fração da tiragem), custo e margem já com o rateio, e margemRodada/margemRodadaPct/rodadaVermelha (a rodada inteira; o alerta vermelho olha a rodada). Pedido sem rodada: custo = custo lançado, sem esses campos",
   "?o=financeiro&parte=depende": "'Dinheiro parado' e integrações de cobrança/banco do 'Depende de você' (só situação)",
 }
@@ -187,6 +188,14 @@ export type Leitura = { status: 200 | 400; corpo: unknown }
 
 export async function leituraFinanceira(params: URLSearchParams): Promise<Leitura> {
   const parte = params.get("parte")
+  // Registro das edições de lançamento (feitas só pela chave do CTO): quem, quando (Brasília), campo, antes e depois. Mais recentes primeiro.
+  if (parte === "edicoes") {
+    const { edicoesLancamento } = await lerCampos<{ edicoesLancamento?: unknown[] }>(["edicoesLancamento"])
+    const lista = [...(edicoesLancamento ?? [])].reverse()
+    const id = params.get("lancamentoId")
+    const itens = id ? lista.filter(r => (r as { lancamentoId?: string }).lancamentoId === id) : lista
+    return { status: 200, corpo: { parte, fuso: "America/Sao_Paulo", total: itens.length, edicoes: itens.slice(0, 500) } }
+  }
   if (parte && !(PARTES as readonly string[]).includes(parte)) return { status: 400, corpo: { erro: `parte: ${PARTES.join(" | ")}` } }
   const pn = params.get("periodo") ?? "mes"
   if (!(PERIODOS as readonly string[]).includes(pn)) return { status: 400, corpo: { erro: `periodo: ${PERIODOS.join(" | ")}` } }
