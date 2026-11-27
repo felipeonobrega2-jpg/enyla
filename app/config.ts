@@ -28,6 +28,7 @@ export type CategoriaFinanceira = {
   subcategorias?: string[]
   ativa?: boolean   // omitido = ativa; desativar põe false e a categoria continua na lista
   neutra?: boolean  // true = não é receita, despesa nem faturamento (ex.: Ajuste neutro, Transferência entre contas próprias); fica fora dos totais e do DRE
+  natureza?: "entrada-nao-receita"  // dinheiro que entra mas não é receita (ex.: Aporte do Felipe): conta no caixa e no saldo, fica fora da DRE e do recebido do mês
 }
 
 export type ContaBancaria = {

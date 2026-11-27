@@ -5,7 +5,7 @@ import type { KanbanCard, LancamentoFinanceiro } from "@/app/types"
 import type { Configuracoes, GastoFixo } from "@/app/config"
 import { supabase } from "./supabase"
 import { lerConfigLinha } from "./configAtomica"
-import { hoje, calcularResumoFinanceiro, dreDoPeriodo, idsNeutros, lancamentoNeutro } from "./financeiro"
+import { hoje, calcularResumoFinanceiro, dreDoPeriodo, idsNeutros, idsEntradaNaoReceita, lancamentoNeutro } from "./financeiro"
 import { receberDigital, juntarPedidos, ehPedidoDigital, type PedidoParaReceber } from "./receberDigital"
 import { montarPedidos, recebiveis, noPeriodo, type Periodo as Intervalo } from "./negocio"
 import { financeiroDoAndar } from "./financeiroAndar"
@@ -97,7 +97,7 @@ async function digitalDe(d: Dados) {
 async function receber(d: Dados, hj: string) {
   const dig = await digitalDe(d)
   const linhas = recebiveisDigitais(dig.pedidos, dig.vinculos, hj)
-  const resumo = calcularResumoFinanceiro(d.kanban, d.lancamentos, d.negocios as never)
+  const resumo = calcularResumoFinanceiro(d.kanban, d.lancamentos, d.negocios as never, idsEntradaNaoReceita(d.cfg.categoriasReceita as never))
   const offset = offsetDe(d.lancamentos)
   // Digital na mesma lista: o saldo do restante vem dos lançamentos dig-{id}-* (a mesma base da página do cliente)
   const digLancs = d.lancamentos.filter(l => l.unidade === "digital" && l.formaPagamento !== "conta")
@@ -150,7 +150,7 @@ function gastos(d: Dados, per: Intervalo) {
 
 async function margem(d: Dados, per: Intervalo) {
   const nomeCategoria = (id: string) => ((d.cfg.categoriasDespesa ?? []) as { id: string; nome: string }[]).find(c => c.id === id)?.nome ?? id
-  const dre = dreDoPeriodo({ lancamentos: d.lancamentos, neutras: idsNeutros(d.cfg.categoriasDespesa as never, d.cfg.categoriasReceita as never), noPeriodo: l => noPeriodo(l.dataPagamento ?? l.dataVencimento, per), nomeCategoria })
+  const dre = dreDoPeriodo({ lancamentos: d.lancamentos, neutras: idsNeutros(d.cfg.categoriasDespesa as never, d.cfg.categoriasReceita as never), entradasNaoReceita: idsEntradaNaoReceita(d.cfg.categoriasReceita as never), noPeriodo: l => noPeriodo(l.dataPagamento ?? l.dataVencimento, per), nomeCategoria })
   const rodadas = ((d.cfg.producao as { rodadas?: Rodada[] } | undefined)?.rodadas ?? [])
   const pedidos = montarPedidos(d.kanban, d.lancamentos, rodadas).filter(p => (p.rodada ? p.rodada.custoTotal : p.custoDireto) > 0 && noPeriodo(p.dataFechamento, per))
   const { data: hist } = await supabase.from("HistoricoItem").select("*")

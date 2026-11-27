@@ -24,7 +24,7 @@ import { FixasTab } from "./financeiro/FixasTab"
 import { FornecedoresTab } from "./financeiro/FornecedoresTab"
 import {
   hoje, isReceitaPendenteValida, pedidosElegiveis as calcPedidosElegiveis,
-  calcularPedidosFechados, pedidosAbertos, contarNaoRegistrados, calcularVencidos, dreDoPeriodo, parceriasSemLancamento, idsNeutros, lancamentoNeutro,
+  calcularPedidosFechados, pedidosAbertos, contarNaoRegistrados, calcularVencidos, dreDoPeriodo, parceriasSemLancamento, idsNeutros, lancamentoNeutro, idsEntradaNaoReceita, lancamentoEntradaNaoReceita,
 } from "../lib/financeiro"
 
 
@@ -1150,6 +1150,7 @@ export function FinanceiroView({
   const catsRec  = config?.categoriasReceita ?? DEFAULT_CATS_REC
   const catsDesp = config?.categoriasDespesa ?? DEFAULT_CATS_DESP
   const neutras = useMemo(() => idsNeutros(catsRec, catsDesp), [catsRec, catsDesp])
+  const entradasNaoReceita = useMemo(() => idsEntradaNaoReceita(catsRec), [catsRec])
 
   // Linha de negócio: o digital tem caixa próprio para a margem do Offset não se misturar
   const [linha, setLinha] = useState<Linha>("offset")
@@ -1279,7 +1280,7 @@ export function FinanceiroView({
   const kpis = useMemo(() => {
     const semConta = (l: LancamentoFinanceiro) => l.formaPagamento !== "conta"
     const all = lancamentos.filter(inPeriodo).filter(semConta).filter(l => !lancamentoNeutro(l, neutras))
-    const recebidas = all.filter(l => l.tipo === "receita" && l.status === "pago")
+    const recebidas = all.filter(l => l.tipo === "receita" && l.status === "pago" && !lancamentoEntradaNaoReceita(l, entradasNaoReceita))
     const despesas  = all.filter(l => l.tipo === "despesa" && l.status === "pago")
 
     const totalParceiros = negociosPagos.reduce((s, n) => s + n.comissaoValor, 0)
@@ -1407,7 +1408,7 @@ export function FinanceiroView({
       const key = d.toISOString().slice(0, 7)
       const label = MES_BR[d.getMonth()]
       const receita = lancamentos
-        .filter(l => l.tipo === "receita" && l.status === "pago" && l.formaPagamento !== "conta" && !lancamentoNeutro(l, neutras) && (l.dataPagamento || l.dataVencimento)?.slice(0, 7) === key)
+        .filter(l => l.tipo === "receita" && l.status === "pago" && l.formaPagamento !== "conta" && !lancamentoNeutro(l, neutras) && !lancamentoEntradaNaoReceita(l, entradasNaoReceita) && (l.dataPagamento || l.dataVencimento)?.slice(0, 7) === key)
         .reduce((s, l) => s + l.valor, 0)
       const parceiros = negocios
         .filter(n => n.status === "pago" && (n.dataOrcamento || n.criadoEm)?.slice(0, 7) === key)
@@ -1713,7 +1714,7 @@ export function FinanceiroView({
         {/* ── DRE ── */}
         {tab === "dre" && (() => {
           const dre = dreDoPeriodo({
-            lancamentos, neutras, noPeriodo: inPeriodo, parcerias: negociosPagos.reduce((s, n) => s + n.comissaoValor, 0),
+            lancamentos, neutras, entradasNaoReceita, noPeriodo: inPeriodo, parcerias: negociosPagos.reduce((s, n) => s + n.comissaoValor, 0),
             nomeCategoria: id => nomeCategoria(id, catsDesp), impostoPct: normalizarProducao(config?.producao).impostoPct,
           })
           const pctDe = (v: number) => dre.receita > 0 ? `${num(v / dre.receita * 100, 1)}%` : ""
@@ -1749,6 +1750,7 @@ export function FinanceiroView({
                 {dre.receitaSobras > 0 && <Linha nome="Sobras" valor={dre.receitaSobras} nivel={1} />}
                 {dre.receitaParcerias > 0 && <Linha nome="Parcerias" valor={dre.receitaParcerias} nivel={1} />}
                 {dre.receitaOutras > 0 && <Linha nome="Outras receitas" valor={dre.receitaOutras} nivel={1} />}
+                {dre.entradaNaoReceita > 0 && <Linha nome="Aportes / entradas que não são receita (entraram no caixa, fora da receita)" valor={dre.entradaNaoReceita} nivel={1} />}
                 <Linha nome="Custos de produção" valor={-dre.custoProducao} forte tom="perigo" />
                 {dre.custosProducao.map(x => <Linha key={x.nome} nome={x.nome} valor={-x.valor} nivel={1} />)}
                 <Linha nome="Margem bruta" valor={dre.margemBruta} forte tom={dre.margemBruta >= 0 ? "sucesso" : "perigo"} />
