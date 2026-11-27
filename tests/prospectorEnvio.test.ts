@@ -6,12 +6,14 @@ type Linha = Record<string, unknown>
 const mundo = vi.hoisted(() => ({ cfg: {} as Record<string, unknown>, prospectos: [] as Record<string, unknown>[], mensagens: [] as Record<string, unknown>[], consultas: 0 }))
 const envios = vi.hoisted(() => ({
   evo: vi.fn(async (..._a: unknown[]) => ({ ok: true, status: 200, corpo: { key: { id: "ABC" } } })),
+  marcar: vi.fn(async (..._a: unknown[]) => undefined),
   email: vi.fn(async (..._a: unknown[]): Promise<{ ok: true; id: string } | { ok: false; erro: string; cota?: true }> => ({ ok: true, id: "e1" })),
 }))
 
 vi.mock("@/app/lib/configAtomica", () => ({
   lerCampos: vi.fn(async (campos: string[]) => Object.fromEntries(campos.filter(c => c in mundo.cfg).map(c => [c, mundo.cfg[c]]))),
 }))
+vi.mock("@/app/lib/agendador", () => ({ marcarRotina: envios.marcar }))
 vi.mock("@/app/lib/evolution", () => ({ evo: envios.evo }))
 vi.mock("@/app/lib/email", () => ({ enviarEmail: envios.email }))
 vi.mock("@/app/lib/supabase", () => ({
@@ -54,8 +56,8 @@ vi.mock("@/app/lib/supabase", () => ({
   },
 }))
 
-import { executarEnvio } from "@/app/lib/prospectorEnvioServidor"
-import { MAX_EMAILS_POR_EXECUCAO, MAX_FALHAS_POR_CANAL, tetoEmailDia, ehErroDeCota, celularWhatsapp, dentroDoHorario, ehRecusa, textoPrimeiroContato, TEXTO_LEMBRETE, PRIMEIRO_CONTATO_PAUSADO, limiteWhatsappDia, ESPACAMENTO_EMAIL_MS, espacamentoWhatsappMs } from "@/app/lib/prospectorEnvio"
+import { executarEnvio, resumoParaAgendador } from "@/app/lib/prospectorEnvioServidor"
+import { MAX_EMAILS_POR_EXECUCAO, maxEmailsPorExecucao, MAX_FALHAS_POR_CANAL, tetoEmailDia, ehErroDeCota, celularWhatsapp, dentroDoHorario, ehRecusa, textoPrimeiroContato, TEXTO_LEMBRETE, PRIMEIRO_CONTATO_PAUSADO, limiteWhatsappDia, ESPACAMENTO_EMAIL_MS, espacamentoWhatsappMs } from "@/app/lib/prospectorEnvio"
 
 // 2026-11-23 é segunda. São Paulo é UTC-3. Os deslocamentos em dias caem em dia útil (o horário é checado de verdade).
 const SEG_10H = new Date("2026-11-23T13:00:00Z")
@@ -88,7 +90,9 @@ beforeEach(() => {
   envios.evo.mockClear()
   envios.email.mockClear()
   envios.email.mockImplementation(async () => ({ ok: true as const, id: "e1" }))
+  envios.marcar.mockClear()
   vi.unstubAllEnvs()
+  vi.stubEnv("MAX_EMAILS_POR_EXECUCAO", "100")   // padrão de produção (4) é testado à parte
 })
 
 describe("chave liga/desliga", () => {
@@ -101,6 +105,23 @@ describe("chave liga/desliga", () => {
     expect(mundo.consultas).toBe(0)
     expect(envios.evo).not.toHaveBeenCalled()
     expect(envios.email).not.toHaveBeenCalled()
+    expect(envios.marcar).toHaveBeenCalledWith("prospectorEnvio", "envio desligado")
+  })
+  it("marca o agendador em toda execução, só com contagens", async () => {
+    novo({ telefone: null, email: "segredo@gr.com.br", razao_social: "Gráfica Sigilosa" })
+    await rodar(SEG_10H)
+    await rodar(new Date("2026-11-29T13:00:00Z"))
+    const textos = envios.marcar.mock.calls.map(c => c[1] as string)
+    expect(textos).toEqual(["ok: 1 e-mail(s) nesta execução", "fora do horário"])
+    expect(textos.join("|")).not.toMatch(/segredo|Sigilosa|@/)
+  })
+  it("sem env, o teto por execução é 4", async () => {
+    vi.stubEnv("MAX_EMAILS_POR_EXECUCAO", "")
+    for (let i = 0; i < 6; i++) novo({ nota: 100 - i, telefone: null, email: `d${i}@gr.com.br` })
+    const r = await rodar(SEG_10H)
+    expect(r.primeiros).toBe(4)
+    expect(r.motivoParada).toBe("limite_execucao")
+    expect(envios.marcar).toHaveBeenLastCalledWith("prospectorEnvio", "ok: 4 e-mail(s) nesta execução; parou por limite_execucao")
   })
   it("só o valor true liga (texto 'true' não liga)", async () => {
     mundo.cfg = { prospector_envio_ativo: "true" }
@@ -115,7 +136,7 @@ describe("horário e dia útil", () => {
     ["sábado 10h", "2026-11-28T13:00:00Z"],
     ["domingo 10h", "2026-11-29T13:00:00Z"],
     ["quarta 7h59", "2026-11-25T10:59:00Z"],
-    ["quarta 20h", "2026-11-25T23:00:00Z"],
+    ["quarta 20h01", "2026-11-25T23:01:00Z"],
     ["quarta 22h", "2026-11-26T01:00:00Z"],
     ["quarta 20h30", "2026-11-25T23:30:00Z"],
   ])("recusa %s", async (_n, iso) => {
@@ -129,6 +150,31 @@ describe("horário e dia útil", () => {
   it("aceita 8h00 e 19h59 de segunda a sexta", () => {
     expect(dentroDoHorario(new Date("2026-11-23T11:00:00Z"))).toBe(true)
     expect(dentroDoHorario(new Date("2026-11-27T22:59:00Z"))).toBe(true)
+  })
+  it("20h00 em ponto passa; 20h01 e 20h59 não; sábado e domingo nunca", () => {
+    expect(dentroDoHorario(new Date("2026-11-23T23:00:00Z"))).toBe(true)   // seg 20h00
+    expect(dentroDoHorario(new Date("2026-11-23T23:01:00Z"))).toBe(false)  // 20h01
+    expect(dentroDoHorario(new Date("2026-11-23T23:59:00Z"))).toBe(false)  // 20h59
+    expect(dentroDoHorario(new Date("2026-11-23T23:30:00Z"))).toBe(false)  // 20h30
+    expect(dentroDoHorario(new Date("2026-11-28T14:00:00Z"))).toBe(false)  // sábado 11h
+    expect(dentroDoHorario(new Date("2026-11-29T14:00:00Z"))).toBe(false)  // domingo 11h
+  })
+})
+
+describe("teto por execução configurável", () => {
+  it("vazio, inválido ou 0 = 4; inteiro positivo vale", () => {
+    for (const v of [undefined, "", "abc", "0", 0, -1, 1.5, "2.5"]) expect(maxEmailsPorExecucao(v)).toBe(4)
+    expect(maxEmailsPorExecucao("7")).toBe(7)
+    expect(maxEmailsPorExecucao(3)).toBe(3)
+    expect(MAX_EMAILS_POR_EXECUCAO).toBe(4)
+  })
+  it("resumo do agendador só leva contagens e motivo", () => {
+    const base = { ok: true, ativo: true, enviado: true, emailHoje: 4, tetoEmailDia: 80, qualificados: 0, primeiros: 3, lembretes: 1, encerrados: 0, responderam: 0, optOuts: 0, falhas: 0 }
+    expect(resumoParaAgendador({ ...base, motivoParada: "limite_execucao" })).toBe("ok: 4 e-mail(s) nesta execução; parou por limite_execucao")
+    expect(resumoParaAgendador({ ...base, ativo: false })).toBe("envio desligado")
+    expect(resumoParaAgendador({ ...base, motivo: "fora do horário (x)" })).toBe("fora do horário")
+    expect(resumoParaAgendador({ ...base, ok: false, erro: "falha com a@b.com" })).toMatch(/^erro/)
+    expect(resumoParaAgendador({ ...base, ok: false, erro: "falha com a@b.com" })).not.toContain("a@b.com")
   })
 })
 
@@ -247,9 +293,11 @@ describe("cota por canal: WhatsApp (AppConfig, aqui 10); e-mail pelo teto própr
     expect(envios.email).toHaveBeenCalledTimes(12)
   })
   it("limite técnico por execução: o que passa de MAX_EMAILS_POR_EXECUCAO fica para o próximo cron", async () => {
+    vi.stubEnv("MAX_EMAILS_POR_EXECUCAO", String(MAX_EMAILS_POR_EXECUCAO))
     for (let i = 0; i < MAX_EMAILS_POR_EXECUCAO + 5; i++) novo({ nota: 200 - i, telefone: null, email: `c${i}@gr.com.br` })
     expect((await rodar(SEG_10H)).primeiros).toBe(MAX_EMAILS_POR_EXECUCAO)
-    expect((await rodar(SEG_10H)).primeiros).toBe(5)
+    expect((await rodar(SEG_10H)).primeiros).toBe(MAX_EMAILS_POR_EXECUCAO)
+    expect((await rodar(SEG_10H)).primeiros).toBe(1)
     expect(envios.email).toHaveBeenCalledTimes(MAX_EMAILS_POR_EXECUCAO + 5)
   })
   it("lembretes não entram na cota", async () => {
@@ -470,6 +518,7 @@ describe("teto diário de e-mail e cota da Resend", () => {
   })
   it("teto 0 = sem teto; limite por execução vira o motivo", async () => {
     mundo.cfg.prospector_limite_email_dia = 0
+    vi.stubEnv("MAX_EMAILS_POR_EXECUCAO", String(MAX_EMAILS_POR_EXECUCAO))
     for (let i = 0; i < MAX_EMAILS_POR_EXECUCAO + 5; i++) comEmail()
     const r = await rodar(SEG_10H)
     expect(envios.email).toHaveBeenCalledTimes(MAX_EMAILS_POR_EXECUCAO)
@@ -543,13 +592,14 @@ describe("limites por canal (AppConfig) e espaçamento", () => {
     expect(r.tetoEmailDia).toBe(100)
     expect(r.motivoParada).toBe("teto_diario")
   })
-  it("janela: antes das 8h e a partir das 20h nada sai; às 8h e às 19h59 sai", async () => {
+  it("janela: antes das 8h e depois das 20h00 nada sai; de 8h a 20h00 sai", async () => {
     expect(dentroDoHorario(DIA_NOVO(7, 59))).toBe(false)
     expect(dentroDoHorario(DIA_NOVO(8))).toBe(true)
     expect(dentroDoHorario(DIA_NOVO(19, 59))).toBe(true)
-    expect(dentroDoHorario(DIA_NOVO(20))).toBe(false)
+    expect(dentroDoHorario(DIA_NOVO(20))).toBe(true)
+    expect(dentroDoHorario(DIA_NOVO(20, 1))).toBe(false)
     novo({ telefone: null, email: "a@gr.com.br" })
-    const r = await rodarReal(DIA_NOVO(20))
+    const r = await rodarReal(DIA_NOVO(20, 1))
     expect(r.motivo).toContain("8h às 20h")
     expect(envios.email).not.toHaveBeenCalled()
   })

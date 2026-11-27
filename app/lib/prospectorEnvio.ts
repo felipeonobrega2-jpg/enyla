@@ -92,8 +92,13 @@ export const espacamentoLiberado = (ultimoEm: number | null, agoraMs: number, es
 export type MotivoParada = "teto_diario" | "cota_resend" | "limite_execucao"
 /** Erro de cota da Resend (já gravado no histórico): não é culpa do lead e não conta para MAX_FALHAS_POR_CANAL. */
 export const ehErroDeCota = (erro: string | null | undefined) => /(daily|monthly)\b.*\bquota|quota_exceeded/i.test(erro ?? "")
-/** Limite técnico por execução (a rota tem maxDuration de 120s): e-mails enviados (primeiro contato e lembrete) e tempo total. O resto fica para o próximo cron. */
-export const MAX_EMAILS_POR_EXECUCAO = 60
+/** Limite por execução (a rota tem maxDuration de 120s): e-mails enviados (primeiro contato e lembrete) e tempo total. O resto fica para o próximo cron.
+ *  Configurável pelo env MAX_EMAILS_POR_EXECUCAO (inteiro maior que 0). Vazio, inválido ou 0 = padrão 4 (0 não é "ilimitado"). */
+export const MAX_EMAILS_POR_EXECUCAO = 4
+export function maxEmailsPorExecucao(valor: unknown): number {
+  const n = typeof valor === "string" && /^\d+$/.test(valor.trim()) ? Number(valor) : valor
+  return typeof n === "number" && Number.isInteger(n) && n > 0 ? n : MAX_EMAILS_POR_EXECUCAO
+}
 export const ORCAMENTO_MS_POR_EXECUCAO = 90_000
 export const DIAS_ATE_LEMBRETE = 3
 export const DIAS_ATE_ENCERRAR = 3
@@ -153,16 +158,17 @@ const fmt = (agora: Date) => new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Sao_Paulo", hourCycle: "h23", weekday: "short", hour: "2-digit", minute: "2-digit", year: "numeric", month: "2-digit", day: "2-digit",
 }).formatToParts(agora)
 
-export function relogioSp(agora: Date): { dia: string; hora: number; diaSemana: number } {
+export function relogioSp(agora: Date): { dia: string; hora: number; minuto: number; diaSemana: number } {
   const p = Object.fromEntries(fmt(agora).map(x => [x.type, x.value]))
   const semana: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
-  return { dia: `${p.year}-${p.month}-${p.day}`, hora: Number(p.hour), diaSemana: semana[p.weekday] ?? 0 }
+  return { dia: `${p.year}-${p.month}-${p.day}`, hora: Number(p.hour), minuto: Number(p.minute), diaSemana: semana[p.weekday] ?? 0 }
 }
 
-/** Segunda a sexta, das 8h (inclusive) às 20h (exclusive), America/Sao_Paulo. */
+/** Segunda a sexta, das 8h00 às 20h00 em ponto (minuto 0 inclusive; 20h01 já é fora), America/Sao_Paulo. */
 export function dentroDoHorario(agora: Date): boolean {
-  const { hora, diaSemana } = relogioSp(agora)
-  return diaSemana >= 1 && diaSemana <= 5 && hora >= HORA_INICIO && hora < HORA_FIM
+  const { hora, minuto, diaSemana } = relogioSp(agora)
+  const min = hora * 60 + minuto
+  return diaSemana >= 1 && diaSemana <= 5 && min >= HORA_INICIO * 60 && min <= HORA_FIM * 60
 }
 
 export function textoPrimeiroContato(canal: Canal): string {
