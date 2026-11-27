@@ -18,7 +18,7 @@ vi.mock("@/app/lib/pluggy", () => ({
 }))
 vi.mock("@/app/lib/openi", async orig => {
   const m = await orig<typeof import("@/app/lib/openi")>()
-  return { ...m, transacoesOpeni: vi.fn(async () => { est.openiChamada++; return { ok: true, lista: [{ id: "t1", date: "2099-01-01", amount: 10, type: "CREDIT", description: "Pix fictício" }] } }) }
+  return { ...m, transacoesOpeni: vi.fn(async () => { est.openiChamada++; return { ok: true, lista: [{ id: "t1", transactionAt: "2099-01-01T12:00:00.000Z", amount: "10.00", type: "CREDIT", description: "Pix fictício", category: { id: "c1", name: "Transfer - PIX" }, payer: { name: "Pagador Exemplo", document: "000.000.000-00", documentType: "CPF" }, receiver: null }] } }) }
 })
 vi.mock("@/app/lib/supabase", () => {
   const q = (t: string) => {
