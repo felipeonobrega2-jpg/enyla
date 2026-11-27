@@ -13,6 +13,12 @@ const envios = vi.hoisted(() => ({
 vi.mock("@/app/lib/configAtomica", () => ({
   lerCampos: vi.fn(async (campos: string[]) => Object.fromEntries(campos.filter(c => c in mundo.cfg).map(c => [c, mundo.cfg[c]]))),
 }))
+// Trava de idempotência (#249): banco em memória, com a mesma regra (um destino + passo + canal = um envio).
+const reservas = vi.hoisted(() => new Set<string>())
+vi.mock("@/app/lib/envioIdem", () => ({
+  reservarEnvio: async (id: number, canal: string, c: string) => { const k = `${id}|${canal}|${c}`; if (reservas.has(k)) return false; reservas.add(k); return true },
+  liberarEnvio: async (id: number, canal: string, c: string) => { reservas.delete(`${id}|${canal}|${c}`) },
+}))
 vi.mock("@/app/lib/agendador", () => ({ marcarRotina: envios.marcar }))
 vi.mock("@/app/lib/evolution", () => ({ evo: envios.evo }))
 vi.mock("@/app/lib/email", () => ({ enviarEmail: envios.email }))
@@ -82,6 +88,7 @@ const hist = (l: Linha) => doBanco(l).historico_etapas as { etapa: string; envio
 const saidasZap = () => envios.evo.mock.calls.map(c => JSON.parse((c[1] as { body: string }).body) as { number: string; text: string })
 
 beforeEach(() => {
+  reservas.clear()
   seq = 0
   mundo.cfg = { prospector_envio_ativo: true }
   mundo.prospectos = []

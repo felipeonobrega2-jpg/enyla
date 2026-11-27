@@ -5,6 +5,7 @@
 // otimista em atualizado_em. Só envia quem conseguiu gravar. Um segundo disparo (retry do cron, duas instâncias)
 // enxerga a reserva e não manda de novo. Depois do envio a linha vira "enviado" ou "falhou". Reservado sem desfecho
 // (processo morreu no meio) conta como enviado: nunca reenvia. Só "falhou" libera nova tentativa do mesmo canal.
+import { liberarEnvio, reservarEnvio } from "./envioIdem"
 import { lerCampos } from "./configAtomica"
 import { supabase } from "./supabase"
 import { evo } from "./evolution"
@@ -143,12 +144,15 @@ async function enviarCanal(est: Estado, l: Linha, passo: Passo, canal: Canal, ag
   // Só o primeiro contato por e-mail leva o link rastreado; o token nasce na reserva e fica no histórico (sem dado do prospecto).
   const token = passo === "primeiro_contato" && canal === "email" ? randomBytes(12).toString("base64url") : undefined
   const envio: EnvioHistorico = { passo, canal, status: "reservado", em, texto, ...(token ? { token } : {}) }
+  // Idempotência (#249): um destino + um passo + um canal = um envio só, mesmo com dois crons ou execuções em paralelo.
+  if (!(await reservarEnvio(l.id, canal, passo))) return null
   const reservada = await gravar(l, { historico_etapas: [...historicoDe(l), { etapa: l.etapa as EtapaFunil, em, motivo: `${passo} (${canal}): reservado`, envio }] })
-  if (!reservada) return null
+  if (!reservada) { await liberarEnvio(l.id, canal, passo).catch(() => null); return null }
   const k = chaveCanal(canal, l)
   if (k) est.usados[passo][canal].set(k, l.cnpj)
   let r: ResultadoCanal
   try { r = await enviarPeloCanal(canal, l, texto, token) } catch (e) { r = { ok: false, erro: String(e) } }
+  if (!r.ok) await liberarEnvio(l.id, canal, passo).catch(() => null)   // nada saiu: a próxima execução pode tentar
   // Cota da Resend esgotada: o e-mail para pelo resto do dia. A linha fica "falhou" com a mensagem de cota, que não conta como falha do lead.
   if (!r.ok && canal === "email" && (r.cota || ehErroDeCota(r.erro))) est.cotaEsgotada = true
   // Fecha a reserva. Se a trava perder (outra gravação no meio), relê e tenta de novo; a reserva já protege contra duplicata.

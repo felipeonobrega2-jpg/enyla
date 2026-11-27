@@ -206,11 +206,32 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ erro: "o: empresa, detalhe, conversa, perto, historico_offset, prazos_fornecedores (só COO e CTO), propostas, parceiros (CCO e CMO) ou financeiro ou custo_lote (só CFO)" }, { status: 400 })
 }
 
+// Idempotency-Key (#249): só em ordenar_funcionario. Mesma chave do mesmo diretor em 24 h devolve a resposta da primeira chamada, sem reenviar.
 export async function POST(req: NextRequest) {
+  const b = await req.json().catch(() => null) as (Record<string, unknown> & { acao?: string; texto?: string }) | null
+  if (b?.acao !== "ordenar_funcionario") return postarSemChave(req, b)
+  const chave = String(req.headers.get("idempotency-key") ?? (typeof b.idempotency_key === "string" ? b.idempotency_key : "")).trim().slice(0, 120)
+  if (!chave) return postarSemChave(req, b)
+  const c = await entrar(req)
+  if (c instanceof NextResponse) return c
+  const { reservarChavePorta, guardarRespostaPorta, soltarChavePorta } = await import("@/app/lib/envioIdem")
+  const k = await reservarChavePorta(c.diretor, chave)
+  if (!k.primeira) {
+    if (!k.guardada) return NextResponse.json({ ok: false, resultado: "Chamada com a mesma Idempotency-Key ainda em andamento. Nada foi reenviado.", motivo: "idempotency-key em andamento" }, { status: 409 })
+    return NextResponse.json(k.guardada.corpo, { status: k.guardada.status, headers: { "Idempotent-Replay": "true" } })
+  }
+  let res: NextResponse
+  try { res = await postarSemChave(req, b) } catch (e) { await soltarChavePorta(c.diretor, chave).catch(() => null); throw e }
+  const corpo = await res.clone().json().catch(() => null)
+  if (res.status >= 500 || corpo == null) await soltarChavePorta(c.diretor, chave).catch(() => null)   // falha de infraestrutura: pode repetir
+  else await guardarRespostaPorta(c.diretor, chave, { status: res.status, corpo }).catch(() => null)
+  return res
+}
+
+async function postarSemChave(req: NextRequest, b: (Record<string, unknown> & { acao?: string; texto?: string }) | null) {
   const c = await entrar(req)
   if (c instanceof NextResponse) return c
   const diretor = c.diretor
-  const b = await req.json().catch(() => null) as (Record<string, unknown> & { acao?: string; texto?: string }) | null
   if (!b?.acao) return NextResponse.json({ erro: "Mande { acao, ... } em JSON." }, { status: 400 })
   const texto = typeof b.texto === "string" ? b.texto.trim().slice(0, 4000) : ""
   let msg: MsgConversa

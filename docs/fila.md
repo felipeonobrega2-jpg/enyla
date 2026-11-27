@@ -353,6 +353,7 @@ O Felipe autorizou rodar os dois scripts em 24/11/2026, 8h33 (cerca de R$ 120).
 | 47 | Prospector: liberar primeiro contato (`PRIMEIRO_CONTATO_PAUSADO = false`, com a linha do link "Cadastrar minha gráfica") e limite de 10 primeiros contatos por dia útil. PR 0 da issue #208; o template novo com link de cadastro (A/B, lembrete, descadastro) vem em PR separado e troca a pausa para `false` | Felipe (issue #208) | urgente | antes do cron de 26/11 | Claude Code | não | (PR da issue #208) |
 | 48 | Prospector: limites por canal no AppConfig (WhatsApp 30/dia, e-mail 100/dia), janela 8h–20h e espaçamento sem rajada (WhatsApp 1 a cada 24 min; e-mail no máximo 25 a cada 30 min, cron a cada 2 min). Troca o limite fixo de 10 | Felipe (PR #212, comentário de 26/11/2026) | urgente | — | Claude Code | em andamento (PR aberto) | (PR deste ajuste) |
 | 49 | Página `/d/[id]`: datas em pt-BR (previsão de entrega) e fuso de Brasília; parte (a) da issue #205 (a parte (b), helper + doc + CI, vem em outro PR) | Felipe | urgente | — | Claude Code | não (só formatação) | (PR da issue #205) |
+| 52 | Prospector: trava de idempotência no envio (um destino + uma campanha + um canal = um envio só; `Idempotency-Key` em `ordenar_funcionario`; migração aditiva `20261201_prospector_envios_idem.sql`, a aplicar antes do deploy) | Felipe (issue #249) | — | — | Claude Code | não | (PR da issue #249) |
 
 ## 44. Porta externa: leitura de parceiros
 
