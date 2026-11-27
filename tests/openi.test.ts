@@ -1,9 +1,17 @@
-import { describe, it, expect, afterEach } from "vitest"
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest"
 import { lerContasOpeni, contaValeNaData, daOpeni, fonteDoExtrato, segredoValido } from "@/app/lib/openi"
 
 // Só dados fictícios.
 describe("Openi", () => {
-  afterEach(() => { delete process.env.OPENI_WEBHOOK_SECRET })
+  // Isola a env real (ex.: OPENI_CONTAS na Vercel) para o teste ser determinístico.
+  beforeEach(() => {
+    vi.stubEnv("OPENI_CONTAS", "")
+    vi.stubEnv("OPENI_API_KEY", "")
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    delete process.env.OPENI_WEBHOOK_SECRET
+  })
 
   it("lê as contas da configuração e ignora lixo", () => {
     expect(lerContasOpeni(undefined)).toEqual([])
