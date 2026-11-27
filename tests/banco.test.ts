@@ -266,3 +266,15 @@ it("revenda de parceria: venda e custo no banco são só dinheiro passando", () 
   expect(sugerir({ ...base, tx: tx({ valor: 2927.42, data: "2026-11-04", contraparte_nome: "PAGAR.ME" }) })).toMatchObject({ acao: "ignorar" })
   expect(sugerir({ ...base, tx: tx({ valor: 2927.42, data: "2026-12-20" }) })).toBeNull()
 })
+
+describe("contasNovasDoBanco", () => {
+  it("cria uma vez, mapeia pelo conta_id e não duplica banco já cadastrado", async () => {
+    const { contasNovasDoBanco } = await import("@/app/lib/banco")
+    let n = 0
+    const r1 = contasNovasDoBanco([{ id: "s", banco: "Santander" }], undefined, [{ conta_id: "x1", banco: "Itaú" }, { conta_id: "x1", banco: "Itaú" }, { conta_id: "p1", banco: "Santander" }], () => `n${++n}`)
+    expect(r1.contas).toHaveLength(1)
+    expect(r1.mapa).toEqual({ x1: { n1: 1 } })
+    const r2 = contasNovasDoBanco([{ id: "s", banco: "Santander" }, ...r1.contas], r1.mapa, [{ conta_id: "x1", banco: "Itaú" }], () => `n${++n}`)
+    expect(r2.contas).toHaveLength(0)
+  })
+})
