@@ -279,7 +279,7 @@ async function executarEnvioInterno(deps: Deps = {}): Promise<ResultadoEnvio> {
     const PAGINA = 1000
     let feitos = 0
     for (const canal of ["email", "whatsapp"] as const) for (let de = 0; ; de += PAGINA) {
-      const { data, error } = await supabase.from(TABELA).select("id, historico_etapas").contains("historico_etapas", [{ envio: { canal } }])
+      const { data, error } = await supabase.from(TABELA).select("id, historico_etapas").contains("historico_etapas", JSON.stringify([{ envio: { canal } }]))
         .gte("atualizado_em", inicioDoDia).order("id", { ascending: true }).range(de, de + PAGINA - 1)
       if (error) return { ...res, ok: false, erro: `não consegui contar os envios de hoje: ${error.message}` }
       const pagina = (data ?? []) as Linha[]

@@ -51,7 +51,7 @@ export async function processarEventoEmail(evento: EventoEmail, agora: Date = ne
   if (!sinal) return { ok: true, status: 200, motivo: "evento ignorado" }
   const emailId = evento.data?.email_id
   if (!emailId || typeof emailId !== "string") return { ok: false, status: 400, motivo: "sem email_id" }
-  const { data, error } = await supabase.from("prospectos_parceiros").select(COLUNAS).contains("historico_etapas", [{ envio: { resendId: emailId } }]).limit(5)
+  const { data, error } = await supabase.from("prospectos_parceiros").select(COLUNAS).contains("historico_etapas", JSON.stringify([{ envio: { resendId: emailId } }])).limit(5)
   if (error) return { ok: false, status: 500, motivo: "erro ao consultar" }   // a Resend tenta de novo
   const linhas = (data ?? []) as Linha[]
   // E-mail que não é do Prospector (proposta, aprovação...) também dispara estes eventos: 200 e segue.
@@ -67,7 +67,7 @@ const TOKEN_VALIDO = /^[A-Za-z0-9_-]{8,64}$/
 export async function registrarCliquePorToken(token: string, agora: Date = new Date()): Promise<boolean> {
   if (!TOKEN_VALIDO.test(token)) return false
   try {
-    const { data, error } = await supabase.from("prospectos_parceiros").select(COLUNAS).contains("historico_etapas", [{ envio: { token } }]).limit(5)
+    const { data, error } = await supabase.from("prospectos_parceiros").select(COLUNAS).contains("historico_etapas", JSON.stringify([{ envio: { token } }])).limit(5)
     if (error) return false
     let ok = false
     for (const l of (data ?? []) as Linha[]) if (await aplicarSinal(l, e => e.token === token, "clique", agora.toISOString())) ok = true
@@ -79,7 +79,7 @@ export async function registrarCliquePorToken(token: string, agora: Date = new D
 export async function registrarAberturaPorToken(token: string, agora: Date = new Date()): Promise<boolean> {
   if (!TOKEN_VALIDO.test(token)) return false
   try {
-    const { data, error } = await supabase.from("prospectos_parceiros").select(COLUNAS).contains("historico_etapas", [{ envio: { token } }]).limit(5)
+    const { data, error } = await supabase.from("prospectos_parceiros").select(COLUNAS).contains("historico_etapas", JSON.stringify([{ envio: { token } }])).limit(5)
     if (error) return false
     let ok = false
     for (const l of (data ?? []) as Linha[]) if (await aplicarSinal(l, e => e.token === token, "abriu", agora.toISOString())) ok = true

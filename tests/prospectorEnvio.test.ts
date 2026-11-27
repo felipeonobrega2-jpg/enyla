@@ -32,7 +32,7 @@ vi.mock("@/app/lib/supabase", () => ({
       q.in = (c: string, vs: unknown[]) => { filtros.push(r => vs.includes(r[c])); return q }
       q.gte = (c: string, v: number | string) => { filtros.push(r => r[c] != null && (r[c] as number | string) >= v); return q }
       q.or = () => q
-      q.contains = (c: string, v: { envio: { canal: string } }[]) => { filtros.push(r => ((r[c] as { envio?: { canal?: string } }[]) ?? []).some(h => h?.envio?.canal === v[0].envio.canal)); return q }
+      q.contains = (c: string, s: string) => { const v = JSON.parse(s) as { envio: { canal: string } }[]; filtros.push(r => ((r[c] as { envio?: { canal?: string } }[]) ?? []).some(h => h?.envio?.canal === v[0].envio.canal)); return q }
       q.order = (col: string, o: { ascending?: boolean }) => { ordem = { col, asc: o?.ascending !== false }; return q }
       q.limit = (n: number) => { limite = n; return q }
       let faixa: [number, number] | null = null

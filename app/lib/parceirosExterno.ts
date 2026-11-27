@@ -67,7 +67,7 @@ export async function leituraParceiros(): Promise<{ corpo: Record<string, unknow
 
   // Cliques: só o e-mail tem link rastreado; conta envios de e-mail com cliqueEm no histórico
   let cliquesEmail = 0
-  const cl = await supabase.from("prospectos_parceiros").select("historico_etapas").contains("historico_etapas", [{ envio: { canal: "email" } }]).limit(5000)
+  const cl = await supabase.from("prospectos_parceiros").select("historico_etapas").contains("historico_etapas", JSON.stringify([{ envio: { canal: "email" } }])).limit(5000)
   if (cl.error) avisos.push("Cliques por canal indisponíveis.")
   else for (const p of (cl.data ?? []) as { historico_etapas?: unknown[] | null }[]) for (const h of p.historico_etapas ?? []) { const e = envioDe(h as never); if (e?.canal === "email" && e.cliqueEm) cliquesEmail++ }
 

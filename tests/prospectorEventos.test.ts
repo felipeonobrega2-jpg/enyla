@@ -18,7 +18,8 @@ vi.mock("@/app/lib/supabase", () => ({
         select: () => q,
         update: (p: Linha) => { patch = p; return q },
         eq: (c: string, v: unknown) => { filtros.push(r => r[c] === v); return q },
-        contains: (_c: string, v: [{ envio: Record<string, string> }]) => {
+        contains: (_c: string, s: string) => {
+          const v = JSON.parse(s) as [{ envio: Record<string, string> }]
           const [k, val] = Object.entries(v[0].envio)[0]
           filtros.push(r => (r.historico_etapas as Linha[]).some(h => h.envio?.[k] === val)); return q
         },
