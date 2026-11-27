@@ -62,7 +62,7 @@ export type DadosRelatorio = {
 
 export function montarRelatorio(a: {
   kanban: KanbanCard[]; lancamentos: LancamentoFinanceiro[]; periodo: { de: Date; ate: Date }; periodoNome: string
-  nomeCategoria: (id: string) => string; neutras?: ReadonlySet<string>; impostoPct?: number; extras: ExtrasRelatorio | null; hoje?: Date
+  nomeCategoria: (id: string) => string; neutras?: ReadonlySet<string>; entradasNaoReceita?: ReadonlySet<string>; impostoPct?: number; extras: ExtrasRelatorio | null; hoje?: Date
 }): DadosRelatorio {
   const hoje = a.hoje ?? new Date()
   const lancP = semNeutras(a.lancamentos, a.neutras)   // totais de caixa, despesa e DRE sem as categorias neutras (cobrança e pagamento seguem com todos)
@@ -75,10 +75,10 @@ export function montarRelatorio(a: {
 
   const medir = (per: Periodo, dig: Digital | undefined): Medida => {
     const v = vendasDoPeriodo(pedidos, a.lancamentos, per)
-    const cx = caixaDoPeriodo(lancP, per, hoje)
+    const cx = caixaDoPeriodo(lancP, per, hoje, a.entradasNaoReceita)
     const pago = lancP.filter(l => l.tipo === "despesa" && l.status === "pago" && l.formaPagamento !== "conta" && noPeriodo(l.dataPagamento ?? l.dataVencimento, per)).reduce((s, l) => s + l.valor, 0)
     const conv = conversao(orcamentosDoPeriodo(a.kanban, per))
-    const dre = dreDoPeriodo({ lancamentos: a.lancamentos, neutras: a.neutras, noPeriodo: l => noPeriodo(l.dataPagamento ?? l.dataVencimento, per), nomeCategoria: a.nomeCategoria, impostoPct: a.impostoPct })
+    const dre = dreDoPeriodo({ lancamentos: a.lancamentos, neutras: a.neutras, entradasNaoReceita: a.entradasNaoReceita, noPeriodo: l => noPeriodo(l.dataPagamento ?? l.dataVencimento, per), nomeCategoria: a.nomeCategoria, impostoPct: a.impostoPct })
     const vd = dig?.faturamento ?? 0
     return {
       vendidoOffset: v.receita, vendidoDigital: vd, vendido: v.receita + vd, pedidos: v.pedidos.length + (dig?.pagos ?? 0),
@@ -96,7 +96,7 @@ export function montarRelatorio(a: {
     return {
       rotulo: d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""),
       vendido: vendasDoPeriodo(pedidos, a.lancamentos, per).receita,
-      recebido: caixaDoPeriodo(lancP, per, hoje).recebido,
+      recebido: caixaDoPeriodo(lancP, per, hoje, a.entradasNaoReceita).recebido,
       despesas: lancP.filter(l => l.tipo === "despesa" && l.status === "pago" && l.formaPagamento !== "conta" && noPeriodo(l.dataPagamento ?? l.dataVencimento, per)).reduce((s, l) => s + l.valor, 0),
     }
   })

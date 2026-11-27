@@ -38,6 +38,21 @@ export function lancamentoNeutro(l: Pick<LancamentoFinanceiro, "categoria">, neu
 export const semNeutras = <T extends Pick<LancamentoFinanceiro, "categoria">>(ls: T[], neutras?: ReadonlySet<string>): T[] =>
   ls.filter(l => !lancamentoNeutro(l, neutras))
 
+// Entrada que não é receita (ex.: Aporte do Felipe): o dinheiro entrou, então o caixa e o saldo da conta contam;
+// mas fica fora da DRE e do "recebido do mês". Vale a natureza da categoria ou o id `entrada-nao-receita`.
+export const ENTRADA_NAO_RECEITA = "entrada-nao-receita"
+export const NOME_ENTRADA_NAO_RECEITA = "Aportes / entradas que não são receita"
+
+export function idsEntradaNaoReceita(...listas: (readonly { id: string; natureza?: string }[] | undefined)[]): Set<string> {
+  const ids = new Set<string>([ENTRADA_NAO_RECEITA])
+  for (const l of listas) for (const c of l ?? []) if (c.natureza === ENTRADA_NAO_RECEITA) ids.add(c.id)
+  return ids
+}
+
+export function lancamentoEntradaNaoReceita(l: Pick<LancamentoFinanceiro, "tipo" | "categoria">, ids?: ReadonlySet<string>): boolean {
+  return l.tipo === "receita" && !!l.categoria && (l.categoria === ENTRADA_NAO_RECEITA || !!ids?.has(l.categoria))
+}
+
 export function isSobra(l: LancamentoFinanceiro): boolean {
   return l.categoria === "sobra"
 }
@@ -170,8 +185,8 @@ export function calcularVencidos(kanban: KanbanCard[], lancamentos: LancamentoFi
 // Soma de receita paga (inclui sobras pagas — uma sobra só sai da régua de "a
 // receber"/"em atraso", mas dinheiro que já entrou conta normalmente aqui),
 // mais comissões de parceria pagas.
-export function calcularRecebidoTotal(lancamentos: LancamentoFinanceiro[], negocios: NegocioParceiro[] = []): number {
-  const recebidoLancamentos = somaPago(lancamentos.filter(l => l.tipo === "receita" && l.formaPagamento !== "conta"))
+export function calcularRecebidoTotal(lancamentos: LancamentoFinanceiro[], negocios: NegocioParceiro[] = [], entradasNaoReceita?: ReadonlySet<string>): number {
+  const recebidoLancamentos = somaPago(lancamentos.filter(l => l.tipo === "receita" && l.formaPagamento !== "conta" && !lancamentoEntradaNaoReceita(l, entradasNaoReceita)))
   const recebidoParceiros = somaPago(negocios.map(n => ({ status: n.status, valor: n.comissaoValor, tipo: "receita" } as LancamentoFinanceiro)))
   return recebidoLancamentos + recebidoParceiros
 }
@@ -187,14 +202,14 @@ export type ResumoFinanceiro = {
 
 // Snapshot completo, sem filtro de período — usado pela assistente Forma e
 // por qualquer outra tela que precise do quadro geral em vez de KPIs do mês.
-export function calcularResumoFinanceiro(kanban: KanbanCard[], lancamentos: LancamentoFinanceiro[], negocios: NegocioParceiro[]): ResumoFinanceiro {
+export function calcularResumoFinanceiro(kanban: KanbanCard[], lancamentos: LancamentoFinanceiro[], negocios: NegocioParceiro[], entradasNaoReceita?: ReadonlySet<string>): ResumoFinanceiro {
   const itens = calcularPedidosFechados(kanban, lancamentos)
   const abertos = pedidosAbertos(itens)
   const negPendentes = negociosPendentes(negocios)
   const vencidos = calcularVencidos(kanban, lancamentos)
 
   return {
-    recebidoTotal: calcularRecebidoTotal(lancamentos, negocios),
+    recebidoTotal: calcularRecebidoTotal(lancamentos, negocios, entradasNaoReceita),
     aReceberTotal: abertos.reduce((s, i) => s + i.restante, 0) + negPendentes.reduce((s, n) => s + n.comissaoValor, 0),
     emAtrasoTotal: vencidos.reduce((s, v) => s + v.total, 0),
     pedidosAbertos: abertos,
@@ -227,6 +242,7 @@ export type Dre = {
   receitaSobras: number
   receitaOutras: number
   receitaParcerias: number
+  entradaNaoReceita: number        // aportes e afins: entraram no caixa, mas fora da receita
   receita: number
   custosProducao: LinhaDre[]      // despesas ligadas a pedidos, por tipo
   custoProducao: number
@@ -253,10 +269,12 @@ export function dreDoPeriodo(args: {
   nomeCategoria: (id: string) => string
   impostoPct?: number
   neutras?: ReadonlySet<string>
+  entradasNaoReceita?: ReadonlySet<string>
 }): Dre {
   const { lancamentos, noPeriodo, nomeCategoria } = args
   const base = semNeutras(lancamentos, args.neutras).filter(l => l.status === "pago" && l.formaPagamento !== "conta" && noPeriodo(l))
-  const receitas = base.filter(l => l.tipo === "receita")
+  const todasReceitas = base.filter(l => l.tipo === "receita")
+  const receitas = todasReceitas.filter(l => !lancamentoEntradaNaoReceita(l, args.entradasNaoReceita))
   const despesas = base.filter(l => l.tipo === "despesa")
   const soma = (ls: LancamentoFinanceiro[]) => ls.reduce((s, l) => s + l.valor, 0)
   const ligado = (l: LancamentoFinanceiro) => !!(l.cardId || l.loteId)
@@ -265,6 +283,7 @@ export function dreDoPeriodo(args: {
   const receitaPedidos = soma(receitas.filter(l => !isSobra(l) && ligado(l)))
   const receitaOutras = soma(receitas.filter(l => !isSobra(l) && !ligado(l)))
   const receitaParcerias = args.parcerias ?? 0
+  const entradaNaoReceita = soma(todasReceitas.filter(l => lancamentoEntradaNaoReceita(l, args.entradasNaoReceita)))
   const receita = receitaSobras + receitaPedidos + receitaOutras + receitaParcerias
 
   // Custo de produção: ligado a um pedido, ou de categoria de fornecedor/material/terceirização
@@ -278,7 +297,7 @@ export function dreDoPeriodo(args: {
   const resultado = margemBruta - despesaOperacional
   const impostoEstimado = Math.max(0, receita * (args.impostoPct ?? 0) / 100)
   return {
-    receitaPedidos, receitaSobras, receitaOutras, receitaParcerias, receita,
+    receitaPedidos, receitaSobras, receitaOutras, receitaParcerias, entradaNaoReceita, receita,
     custosProducao, custoProducao, margemBruta, margemBrutaPct: receita > 0 ? margemBruta / receita * 100 : null,
     despesasOperacionais, despesaOperacional, resultado, resultadoPct: receita > 0 ? resultado / receita * 100 : null,
     impostoEstimado, resultadoAposImposto: resultado - impostoEstimado,

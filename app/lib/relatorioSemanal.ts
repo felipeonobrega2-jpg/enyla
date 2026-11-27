@@ -5,7 +5,7 @@ import { montarRelatorio, htmlRelatorio, periodoAnterior } from "./relatorioGere
 import { extrasDoRelatorio } from "./relatorioExtras"
 import { unpackTerceirizado } from "./kanbanUnpack"
 import { normalizarProducao } from "./producao"
-import { idsNeutros } from "./financeiro"
+import { idsNeutros, idsEntradaNaoReceita } from "./financeiro"
 import { LOGO_DARK_B64 } from "../pdf"
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 
@@ -41,8 +41,9 @@ export async function htmlRelatorioSemanal(per = semanaPassada()): Promise<{ htm
   ])
   const cats = ((c as { categoriasDespesa?: { id: string; nome: string }[] } | null)?.categoriasDespesa ?? [])
   const neutras = idsNeutros(cats, (c as { categoriasReceita?: { id: string; nome: string; neutra?: boolean }[] } | null)?.categoriasReceita)
+  const entradasNaoReceita = idsEntradaNaoReceita((c as { categoriasReceita?: { id: string; natureza?: string }[] } | null)?.categoriasReceita)
   const nomeCategoria = (id: string) => cats.find(x => x.id === id)?.nome ?? (id.replace(/[-_]+/g, " ").trim().replace(/^./, m => m.toUpperCase()))
   const impostoPct = normalizarProducao((c as { producao?: never } | null)?.producao).impostoPct
-  const dados = montarRelatorio({ kanban: kanban.map(unpackTerceirizado), lancamentos, periodo: per, periodoNome: per.nome, nomeCategoria, neutras, impostoPct, extras: extras as never })
+  const dados = montarRelatorio({ kanban: kanban.map(unpackTerceirizado), lancamentos, periodo: per, periodoNome: per.nome, nomeCategoria, neutras, entradasNaoReceita, impostoPct, extras: extras as never })
   return { html: htmlRelatorio(dados, LOGO_DARK_B64), nome: per.nome }
 }

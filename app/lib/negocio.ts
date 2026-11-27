@@ -20,6 +20,7 @@
  *   Pipeline / produção → foto do momento (sem período)
  */
 
+import { lancamentoEntradaNaoReceita } from "./financeiro"
 import { estaSegurado, type MapaSegurados } from "./pedidoSegurado"
 import { resultadoDaRodada, type Rodada } from "./rateioRodada"
 import {
@@ -323,8 +324,9 @@ export type Caixa = { recebido: number; aReceber: number; vencido: number }
  *  não é dinheiro entrando nem saindo do caixa, e o ajuste a favor nunca é venda. */
 export const naContaDoFornecedor = (l: Pick<LancamentoFinanceiro, "formaPagamento">) => l.formaPagamento === "conta"
 
-export function caixaDoPeriodo(lancamentos: LancamentoFinanceiro[], p: Periodo, hoje = new Date()): Caixa {
-  const rec = lancamentos.filter(l => l.tipo === "receita" && !naContaDoFornecedor(l))
+export function caixaDoPeriodo(lancamentos: LancamentoFinanceiro[], p: Periodo, hoje = new Date(), entradasNaoReceita?: ReadonlySet<string>): Caixa {
+  // "Recebido" é receita: aporte (entrada-nao-receita) entrou no caixa, mas não entra aqui
+  const rec = lancamentos.filter(l => l.tipo === "receita" && !naContaDoFornecedor(l) && !lancamentoEntradaNaoReceita(l, entradasNaoReceita))
   const pendentes = rec.filter(l => l.status !== "pago")
   return {
     recebido: rec.filter(l => l.status === "pago" && noPeriodo(l.dataPagamento ?? l.dataVencimento, p)).reduce((s, l) => s + l.valor, 0),

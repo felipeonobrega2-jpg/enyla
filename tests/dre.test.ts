@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
-import { dreDoPeriodo, idsNeutros } from "@/app/lib/financeiro"
+import { dreDoPeriodo, idsNeutros, idsEntradaNaoReceita, calcularRecebidoTotal } from "@/app/lib/financeiro"
+import { caixaDoPeriodo } from "@/app/lib/negocio"
 import { receita, despesa } from "./fixtures"
 
 const lancs = [
@@ -49,5 +50,33 @@ describe("DRE: categorias neutras", () => {
     expect(d.receita).toBe(1000)
     expect(d.despesaOperacional).toBe(400)
     expect(d.resultado).toBe(600)
+  })
+})
+
+describe("DRE: aporte (entrada-nao-receita)", () => {
+  const ls = [
+    receita({ valor: 1000, cardId: "c1" }), receita({ valor: 300 }),
+    receita({ valor: 1486.63, categoria: "entrada-nao-receita" }),
+    receita({ valor: 200, categoria: "aporte-felipe" }),
+  ]
+  const calc = (entradasNaoReceita?: Set<string>) => dreDoPeriodo({ lancamentos: ls, noPeriodo: () => true, nomeCategoria: id => id, entradasNaoReceita })
+  it("fica fora de receitaOutras, receita e resultado, e aparece em entradaNaoReceita", () => {
+    const d = calc()
+    expect(d.receitaOutras).toBe(500)
+    expect(d.receita).toBe(1500)
+    expect(d.resultado).toBe(1500)
+    expect(d.entradaNaoReceita).toBeCloseTo(1486.63)
+  })
+  it("categoria marcada por natureza também sai", () => {
+    const d = calc(idsEntradaNaoReceita([{ id: "aporte-felipe", natureza: "entrada-nao-receita" }]))
+    expect(d.receitaOutras).toBe(300)
+    expect(d.entradaNaoReceita).toBeCloseTo(1686.63)
+  })
+  it("recebido do mês fora do aporte; o dinheiro segue nos lançamentos (caixa/saldo)", () => {
+    const p = { from: new Date("2026-01-01T00:00:00"), to: new Date("2026-12-31T23:59:59") }
+    const com = [receita({ valor: 1000 }), receita({ valor: 1486.63, categoria: "entrada-nao-receita" })]
+    expect(caixaDoPeriodo(com, p).recebido).toBe(1000)
+    expect(calcularRecebidoTotal(com)).toBe(1000)
+    expect(com.reduce((s, l) => s + l.valor, 0)).toBeCloseTo(2486.63)  // saldo de conta ainda conta a entrada
   })
 })
