@@ -13,6 +13,8 @@ import { brl, num } from "../utils"
 import { CabecalhoPagina, Segmentado, Botao, Cartao, TituloCartao, ColunasDuplas, Colunas, ListaBarras, Vazio } from "./ds"
 import { montarRelatorio, htmlRelatorio, periodoAnterior, type ExtrasRelatorio } from "../lib/relatorioGerencial"
 import { LOGO_DARK_B64 } from "../pdf"
+import { montarFinanceiro } from "../lib/relatorioFinanceiro"
+import type { Configuracoes } from "../config"
 import { Gaveta } from "./ds"
 import { TempoAteFecharCard } from "./TempoAteFecharCard"
 import { SaudeEmpresaCard } from "./SaudeEmpresaCard"
@@ -94,7 +96,8 @@ function periodoDoPdf(o: OpcaoPdf, hoje: Date, de: string, ate: string): { de: D
   return { de: a1, ate: a2, nome: `${a1.toLocaleDateString("pt-BR")} a ${a2.toLocaleDateString("pt-BR")}` }
 }
 
-export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, origensClientes, historico = [], fixosMes = 0, nomeCategoria = id => id, neutras, impostoPct }: {
+export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, origensClientes, historico = [], fixosMes = 0, nomeCategoria = id => id, neutras, impostoPct, config }: {
+  config?: Configuracoes
   neutras?: ReadonlySet<string>
   nomeCategoria?: (id: string) => string
   impostoPct?: number
@@ -212,6 +215,7 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, 
   const [pdfAberto, setPdfAberto] = React.useState(false)
   const [opcaoPdf, setOpcaoPdf] = React.useState<OpcaoPdf>("mesPassado")
   const [pdfDe, setPdfDe] = React.useState(""), [pdfAte, setPdfAte] = React.useState("")
+  const [financeiroCompleto, setFinanceiroCompleto] = React.useState(false)
   const [gerando, setGerando] = React.useState(false)
   const [erroPdf, setErroPdf] = React.useState<string | null>(null)
   async function gerarPdf() {
@@ -228,7 +232,10 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, 
       const q = new URLSearchParams({ de: iso(per.de), ate: iso(per.ate), deAnt: iso(ant.de), ateAnt: iso(ant.ate) })
       const extras = await fetch(`/api/relatorio?${q}`).then(r => r.ok ? r.json() as Promise<ExtrasRelatorio> : null).catch(() => null)
       const dados = montarRelatorio({ kanban, lancamentos, periodo: per, periodoNome: per.nome, nomeCategoria, neutras, impostoPct, extras, hoje })
-      w.document.open(); w.document.write(htmlRelatorio(dados, LOGO_DARK_B64)); w.document.close()
+      const financeiro = financeiroCompleto && config
+        ? montarFinanceiro({ kanban, lancamentos, historico: historico as { numero?: string; form?: unknown }[], config, periodo: per, nomeCategoria, neutras, anuncios: extras?.meta ?? null, hoje })
+        : null
+      w.document.open(); w.document.write(htmlRelatorio(dados, LOGO_DARK_B64, financeiro)); w.document.close()
       setTimeout(() => w.print(), 600)
       setPdfAberto(false)
     } catch (e) { w.close(); setErroPdf(`Não consegui montar o relatório: ${String(e)}`) }
@@ -374,6 +381,12 @@ export function RelatoriosView({ kanban, lancamentos, clientes, onAbrirCliente, 
                 <label className="text-[12px] text-[#5e5c68]">De<input type="date" value={pdfDe} onChange={e => setPdfDe(e.target.value)} className="mt-1 w-full h-10 rounded-lg px-2 bg-white ds-borda text-[13px]" /></label>
                 <label className="text-[12px] text-[#5e5c68]">Até<input type="date" value={pdfAte} onChange={e => setPdfAte(e.target.value)} className="mt-1 w-full h-10 rounded-lg px-2 bg-white ds-borda text-[13px]" /></label>
               </div>
+            )}
+            {config && (
+              <label className="flex items-start gap-2 pt-2 text-[13px] text-[#191625]">
+                <input type="checkbox" checked={financeiroCompleto} onChange={e => setFinanceiroCompleto(e.target.checked)} className="mt-1" />
+                <span><b>Financeiro completo</b><span className="block text-[12px] text-[#898892]">Acrescenta caixa e previsão até fev/2027, recebíveis em aberto, retiradas, IA, anúncios e meta do mês</span></span>
+              </label>
             )}
             {erroPdf && <p className="text-[12.5px] text-[#d33a3c]">{erroPdf}</p>}
             <p className="text-[11.5px] text-[#898892] pt-1">Na janela de impressão, escolha "Salvar como PDF".</p>

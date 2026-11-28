@@ -4,6 +4,7 @@
 import type { KanbanCard, LancamentoFinanceiro } from "../types"
 import { montarPedidos, vendasDoPeriodo, caixaDoPeriodo, conversao, orcamentosDoPeriodo, margemContribuicao, recebiveis, noPeriodo, nomeChave, isTerceirizado, type Periodo, type Pedido } from "./negocio"
 import { dreDoPeriodo, semNeutras, type Dre } from "./financeiro"
+import { paginasFinanceiro, type DadosFinanceiro } from "./relatorioFinanceiro"
 import { categoriaPerda, rotuloPerda, type CategoriaPerda } from "./coleta"
 
 export type ExtrasRelatorio = {
@@ -229,7 +230,7 @@ function barraH(itens: { rotulo: string; valor: number; extra?: string }[], cor 
   return itens.map(i => `<div class="bh"><div class="bh-r">${esc(i.rotulo)}</div><div class="bh-t"><div style="width:${Math.max(1, i.valor / max * 100)}%;background:${cor}"></div></div><div class="bh-v">${brl(i.valor)}${i.extra ? `<small>${i.extra}</small>` : ""}</div></div>`).join("")
 }
 
-export function htmlRelatorio(d: DadosRelatorio, logo: string): string {
+export function htmlRelatorio(d: DadosRelatorio, logo: string, financeiro?: DadosFinanceiro | null): string {
   const { a, b } = d, ex = d.extras
   const kpi = (rotulo: string, valor: string, x: number | null, y: number | null, sub?: string, menorMelhor = false) =>
     `<div class="kpi"><div class="kl">${rotulo}</div><div class="kv">${valor}</div><div class="ks">${delta(x, y, menorMelhor)} <span>${sub ?? ""}</span></div></div>`
@@ -366,5 +367,5 @@ export function htmlRelatorio(d: DadosRelatorio, logo: string): string {
   .bh-t{height:8px;background:#f0eef5;border-radius:4px;overflow:hidden}.bh-t div{height:100%;border-radius:4px}.bh-v{text-align:right;white-space:nowrap;font-weight:600}.bh-v small{display:block;font-weight:400;color:#8a8796;font-size:8.5px}
   .eixo{font-size:10px;fill:#6b6878}.legenda{display:flex;gap:14px;font-size:9.5px;color:#6b6878;margin-top:2px}.legenda i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
   .rod{margin-top:auto;padding-top:10px;display:flex;justify-content:space-between;color:#9a97a5;font-size:8.5px;border-top:1px solid #f0eef5}
-  </style></head><body>${p1}${p2}${p3}${p4}${p5}</body></html>`
+  </style></head><body>${p1}${p2}${p3}${p4}${p5}${financeiro ? paginasFinanceiro(financeiro, cab, rod, 6) : ""}</body></html>`
 }

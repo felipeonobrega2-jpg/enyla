@@ -2645,7 +2645,7 @@ export default function Home() {
               vendasDigitais={vendasDigitais}
             />
           ) : view === "dashboard" ? (
-            <RelatoriosView neutras={idsNeutros(config.categoriasReceita, config.categoriasDespesa)} kanban={kanban} lancamentos={lancamentosOffset} clientes={clientes} origensClientes={config.origensClientes} historico={historico}
+            <RelatoriosView config={config} neutras={idsNeutros(config.categoriasReceita, config.categoriasDespesa)} kanban={kanban} lancamentos={lancamentosOffset} clientes={clientes} origensClientes={config.origensClientes} historico={historico}
               nomeCategoria={id => { const c = (config.categoriasDespesa ?? DEFAULT_CATS_DESP).find(x => x.id === id); if (c) return c.nome; const t = id.replace(/[-_]+/g, " ").trim(); return t.charAt(0).toUpperCase() + t.slice(1) }}
               impostoPct={normalizarProducao(config.producao).impostoPct}
               fixosMes={(config.gastosFixos ?? []).filter(g => g.ativa !== false).reduce((t, g) => t + g.valor, 0)}
